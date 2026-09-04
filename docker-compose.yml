@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: auroraplus_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-1234}
+    volumes:
+      - aurora_db_data:/var/lib/postgresql/data
+    ports:
+      # Expuesto en el host solo para poder entrar con psql a inspeccionar/migrar
+      # a mano (como hicimos en desarrollo) — quitar este mapeo si no hace falta
+      # acceso directo desde fuera del servidor.
+      - "5432:5432"
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/auroraplus_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-1234}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "8080:8080"
+
+  # Respaldo automático de la base — corre pg_dump periódicamente y guarda los
+  # archivos en ./backups del HOST (no en un volumen interno de Docker), para
+  # que sobrevivan a un `docker compose down -v` accidental y se puedan copiar
+  # fuera del servidor (scp/rsync) para tener una copia offsite real.
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-1234}
+      DB_NAME: auroraplus_db
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - ./backups:/backups
+      - ./docker/backup/backup.sh:/backup.sh:ro
+    entrypoint: ["sh", "/backup.sh"]
+
+volumes:
+  aurora_db_data:

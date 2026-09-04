@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comprobante Oficial de Báscula — Carbones Tamanaco</title>
+  <link rel="icon" href="/icon-app.png">
+  <style>
+    :root {
+      --primary: #002b5b;
+      --accent: #16a34a;
+      --bg: #0f172a;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .card {
+      background: var(--card-bg);
+      width: 100%;
+      max-width: 440px;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+    }
+    .card-header {
+      background: linear-gradient(135deg, #002b5b 0%, #0b132b 100%);
+      color: #ffffff;
+      padding: 24px 20px;
+      text-align: center;
+      border-bottom: 3px solid #22c55e;
+    }
+    .card-header h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .card-header p {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+    .card-body {
+      padding: 20px;
+    }
+    .ticket-badge {
+      display: inline-block;
+      background: #eff6ff;
+      color: #0284c7;
+      border: 1px solid #bae6fd;
+      font-size: 0.85rem;
+      font-weight: 800;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      margin-bottom: 16px;
+    }
+    .data-grid {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.88rem;
+    }
+    .data-row:last-child {
+      border-bottom: none;
+    }
+    .data-label {
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+    }
+    .data-val {
+      font-weight: 700;
+      color: var(--text-main);
+      text-align: right;
+    }
+    .peso-destacado {
+      background: #f0fdf4;
+    }
+    .peso-val {
+      font-size: 1.3rem;
+      color: var(--accent);
+      font-weight: 900;
+    }
+    .foto-section {
+      margin-top: 16px;
+      text-align: center;
+    }
+    .foto-section h3 {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .foto-wrapper {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      max-height: 350px;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .foto-wrapper img {
+      width: 100%;
+      height: auto;
+      display: block;
+      object-fit: contain;
+      cursor: pointer;
+    }
+    .ver-full-btn {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 0.75rem;
+      color: #0284c7;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .card-footer {
+      padding: 14px 20px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .verified-tag {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: #16a34a;
+      font-weight: 700;
+      font-size: 0.8rem;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card" id="card-comprobante">
+    <div class="card-header">
+      <h1>Carbones Tamanaco C.A.</h1>
+      <p>Comprobante Oficial de Báscula</p>
+    </div>
+
+    <div class="card-body">
+      <div style="text-align: center;">
+        <span class="ticket-badge" id="badge-ticket">TICKET #—</span>
+      </div>
+
+      <div class="data-grid">
+        <div class="data-row">
+          <span class="data-label">Fecha / Hora:</span>
+          <span class="data-val" id="val-fecha">—</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Chofer:</span>
+          <span class="data-val" id="val-chofer">—</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Placa:</span>
+          <span class="data-val" id="val-placa">—</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Mina / Origen:</span>
+          <span class="data-val" id="val-mina">—</span>
+        </div>
+        <div class="data-row peso-destacado">
+          <span class="data-label" style="color: #15803d; font-weight:800;">Peso Neto:</span>
+          <span class="data-val peso-val" id="val-peso">— Ton</span>
+        </div>
+      </div>
+
+      <div class="foto-section" id="seccion-foto" style="display: none;">
+        <h3>Foto del Ticket de Romana</h3>
+        <div class="foto-wrapper">
+          <img id="img-ticket" src="" alt="Ticket de Romana" onclick="window.open(this.src, '_blank')" />
+        </div>
+        <a id="link-full" href="#" target="_blank" class="ver-full-btn">Ver foto en tamaño completo</a>
+      </div>
+    </div>
+
+    <div class="card-footer">
+      <div>Operador: <strong>Báscula Tamanaco</strong></div>
+      <div class="verified-tag">
+        <span>Validación Digital de Romana OK</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const id = urlParams.get('id') || window.location.pathname.split('/').pop();
+
+      if (!id || isNaN(parseInt(id))) {
+        document.getElementById('badge-ticket').textContent = 'Comprobante no especificado';
+        return;
+      }
+
+      try {
+        const resp = await fetch(`/api/v1/despachos/ticket/${id}`);
+        if (!resp.ok) throw new Error('Ticket no encontrado');
+        const data = await resp.json();
+
+        document.getElementById('badge-ticket').textContent = `TICKET #${data.id}`;
+        document.getElementById('val-fecha').textContent = data.fechaHora || data.fecha || '—';
+        document.getElementById('val-chofer').textContent = (data.chofer || '—').toUpperCase();
+        document.getElementById('val-placa').textContent = (data.placa || '—').toUpperCase();
+        document.getElementById('val-mina').textContent = (data.mina || '—').toUpperCase();
+        document.getElementById('val-peso').textContent = (parseFloat(data.pesoNeto || 0)).toFixed(2) + ' Ton';
+
+        const fotoUrl = data.ticketUrl || data.comprobanteUrl;
+        if (fotoUrl) {
+          document.getElementById('seccion-foto').style.display = 'block';
+          document.getElementById('img-ticket').src = fotoUrl;
+          document.getElementById('link-full').href = fotoUrl;
+        }
+      } catch (err) {
+        document.getElementById('badge-ticket').textContent = `Ticket #${id} no disponible`;
+      }
+    });
+  </script>
+</body>
+</html>

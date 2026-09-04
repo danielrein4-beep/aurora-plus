@@ -1,0 +1,3309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carbones Tamanaco — Sistema ERP</title>
+  <meta name="description" content="Sistema de gestión administrativo e inventario para Carbones Tamanaco">
+  <link rel="manifest" href="/manifest.json?v=2">
+  <link rel="icon" href="/icon-app.png">
+  <link rel="stylesheet" href="/css/style.css?v=13">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+</head>
+<body>
+
+<!-- Modal de Inicio de Sesión (Login) -->
+<div id="login-modal" class="login-overlay" style="display:none;">
+  <div class="login-box">
+    <img src="/img/logo.svg" alt="Carbones Tamanaco" class="login-logo-clean" />
+    <div class="login-title">Carbones Tamanaco</div>
+    <div class="login-sub">Sistema de Gestión ERP — Iniciar Sesión</div>
+    
+    <form onsubmit="event.preventDefault(); Auth.login(document.getElementById('login-email').value, document.getElementById('login-password').value);">
+      <div class="form-group" style="text-align:left; margin-bottom:12px;">
+        <label class="form-label" for="login-email">Correo Electrónico</label>
+        <input type="email" id="login-email" class="form-input" placeholder="admin@tamanaco.com" required autocomplete="username">
+      </div>
+      
+      <div class="form-group" style="text-align:left; margin-bottom:20px;">
+        <label class="form-label" for="login-password">Contraseña</label>
+        <input type="password" id="login-password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+      
+      <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:10px;">
+        Ingresar al Sistema
+      </button>
+    </form>
+    
+    <div style="text-align: center; margin-top: 15px;">
+      <a href="#" onclick="Auth.showForgotPassword()" style="color: var(--t-mid); font-size: 12px; text-decoration: underline;">¿Olvidaste tu contraseña?</a>
+    </div>
+
+    <div class="login-footer">
+      Usuario inicial por defecto:<br>
+      <strong>admin@tamanaco.com</strong> / <strong>admin123</strong>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Recuperación de Contraseña -->
+<div id="forgot-modal" class="login-overlay" style="display:none; align-items:center; justify-content:center; padding:20px; z-index:99999;">
+  <div class="card" style="width:100%; max-width:400px; padding:30px; text-align: left;">
+    <div style="text-align:center; margin-bottom:20px;">
+      <h2 style="margin-bottom:10px;">Recuperar Contraseña</h2>
+      <p style="color:var(--t-low); font-size:14px;">Ingresa tu correo para recibir un enlace temporal.</p>
+    </div>
+    <form id="forgotForm" onsubmit="event.preventDefault(); Auth.handleForgotPassword();">
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label class="form-label">Correo Electrónico</label>
+        <input type="email" id="forgot-email" class="form-input" required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; margin-bottom:10px; justify-content:center;">Enviar Enlace</button>
+      <button type="button" class="btn btn-ghost" style="width:100%; justify-content:center;" onclick="Auth.closeForgotPassword()">Volver al Login</button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal de Nueva Contraseña (Reseteo) -->
+<div id="reset-modal" class="login-overlay" style="display:none; align-items:center; justify-content:center; padding:20px; z-index:99999;">
+  <div class="card" style="width:100%; max-width:400px; padding:30px; text-align: left;">
+    <div style="text-align:center; margin-bottom:20px;">
+      <h2 style="margin-bottom:10px;">Nueva Contraseña</h2>
+      <p style="color:var(--t-low); font-size:14px;">Ingresa tu nueva clave de acceso.</p>
+    </div>
+    <form id="resetForm" onsubmit="event.preventDefault(); Auth.handleResetPassword();">
+      <input type="hidden" id="reset-token">
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label class="form-label">Nueva Contraseña</label>
+        <input type="password" id="reset-password" class="form-input" required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Guardar Contraseña</button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Expediente e Historial del Proveedor -->
+<div id="p-modal-historial" class="login-overlay" style="display:none; align-items:flex-start; overflow-y:auto; padding:40px 20px;">
+  <div class="card" style="width:100%; max-width:850px; margin:auto; background:var(--bg-surface); border:1px solid var(--b-default);">
+    <div class="card-header flex-between">
+      <div>
+        <h2 id="p-hist-nombre" style="font-size:18px; margin:0; color:var(--t-high);">Proveedor</h2>
+        <div style="font-size:12px; color:var(--t-low); margin-top:2px;">
+          <span id="p-hist-tipo" class="badge badge-blue"></span>
+        </div>
+      </div>
+      <div class="flex gap-8 no-print">
+        <button class="btn btn-subtle btn-sm" onclick="window.print()">Imprimir / PDF</button>
+        <button class="btn btn-ghost btn-sm" onclick="ProveedoresModule.cerrarModalHistorial()">✕ Cerrar</button>
+      </div>
+    </div>
+    
+    <div class="card-body">
+      <!-- Datos de contacto -->
+      <div style="display:flex; flex-wrap:wrap; gap:20px; font-size:12.5px; color:var(--t-mid); margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--b-subtle);">
+        <div id="p-hist-contacto"></div>
+        <div id="p-hist-telefono"></div>
+        <div id="p-hist-direccion"></div>
+      </div>
+
+      <!-- KPIs de Balance y Saldo Pendiente -->
+      <div class="stats-grid" style="margin-bottom:24px;">
+        <div class="stat-card s-red" id="p-hist-card-saldo">
+          <div class="stat-label">Saldo Pendiente por Pagar</div>
+          <div class="stat-value" id="p-hist-saldo-pendiente" style="font-size:20px; color:var(--c-red);">$ 0</div>
+          <div class="stat-sub no-print" style="margin-top:6px;">
+            <button class="btn btn-warn btn-sm" onclick="ProveedoresModule.pagarSaldoPendiente()">Registrar pago en Gastos</button>
+          </div>
+        </div>
+        <div class="stat-card s-blue">
+          <div class="stat-label">Total Devengado (Cargas)</div>
+          <div class="stat-value" id="p-hist-devengado" style="font-size:18px;">$ 0</div>
+          <div class="stat-sub">Según tarifa por tonelada</div>
+        </div>
+        <div class="stat-card s-green">
+          <div class="stat-label">Total Pagado (Gastos)</div>
+          <div class="stat-value" id="p-hist-pagado-cop" style="font-size:18px;">$ 0</div>
+          <div class="stat-sub">Abonos y pagos liquidados</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Suministro de Carbón</div>
+          <div class="stat-value" id="p-hist-ton" style="font-size:16px;">0.00 Ton</div>
+          <div class="stat-sub">Acumulado histórico</div>
+        </div>
+      </div>
+
+      <!-- Cargas y Despachos Suministrados -->
+      <div class="flex-between mb-8">
+        <h3 style="font-size:14px; margin:0; color:var(--t-high); font-weight:600;">Cargas y Despachos Suministrados</h3>
+      </div>
+      <div class="table-wrap mb-16" style="max-height:220px; overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Chofer</th>
+              <th>Placa</th>
+              <th class="text-right">Peso</th>
+              <th class="text-right">Tarifa/Ton</th>
+              <th class="text-right">Total Devengado</th>
+              <th class="text-center">Ticket</th>
+            </tr>
+          </thead>
+          <tbody id="p-hist-tabla-despachos"></tbody>
+        </table>
+      </div>
+
+      <!-- Historial de Pagos, Compras y Préstamos -->
+      <h3 style="font-size:14px; margin-bottom:8px; color:var(--t-high); font-weight:600;">Pagos, Gastos y Préstamos Asociados</h3>
+      <div class="table-wrap mb-16" style="max-height:200px; overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Categoría</th>
+              <th>Descripción</th>
+              <th>Método</th>
+              <th class="text-right">Monto</th>
+              <th class="text-center">Soporte</th>
+            </tr>
+          </thead>
+          <tbody id="p-hist-tabla-gastos"></tbody>
+        </table>
+      </div>
+
+      <!-- Bitácora y Notas del Proveedor -->
+      <div class="flex-between mb-8">
+        <h3 style="font-size:14px; margin:0; color:var(--t-high); font-weight:600;">Bitácora de Eventos y Acuerdos</h3>
+      </div>
+      <div class="table-wrap mb-12" style="max-height:160px; overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha y Hora</th>
+              <th>Tipo</th>
+              <th>Detalle del Evento</th>
+            </tr>
+          </thead>
+          <tbody id="p-hist-tabla-eventos"></tbody>
+        </table>
+      </div>
+
+      <!-- Agregar Nota Rápida -->
+      <div class="no-print" style="display:flex; gap:8px; margin-top:14px;">
+        <input type="text" id="p-nueva-nota" class="form-input" placeholder="Escribir un acuerdo, nota de pago o comentario sobre este aliado...">
+        <button class="btn btn-primary" onclick="ProveedoresModule.agregarNotaRapida()">Guardar Nota</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Pago de Nómina de Mina -->
+<div id="modal-pago-nomina" class="login-overlay" style="display:none; align-items:center; justify-content:center; overflow-y:auto; padding:20px;">
+  <div class="card" style="width:100%; max-width:520px; margin:auto; background:var(--bg-surface); border:1px solid var(--b-default); box-shadow:var(--sh-lg);">
+    <div class="card-header flex-between">
+      <div>
+        <h2 style="font-size:16px; margin:0; color:var(--t-high); font-weight:700;">Registrar Pago de Nómina</h2>
+        <div style="font-size:11px; color:var(--t-low); margin-top:2px;">Se creará automáticamente el Gasto y se afectará la Caja de Tesorería</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="NominaModule.cerrarModalPago()">✕</button>
+    </div>
+    <div class="card-body">
+      <div class="form-group mb-12">
+        <label class="form-label">Mina / Proveedor</label>
+        <input type="text" id="mp-mina" class="form-input" readonly style="background:var(--bg-elevated); font-weight:700; color:var(--t-high); cursor:default;">
+      </div>
+      
+      <div class="form-grid mb-12">
+        <div class="form-group">
+          <label class="form-label">Fecha del Pago</label>
+          <input type="date" id="mp-fecha" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Moneda del Pago</label>
+          <select id="mp-moneda" class="form-input">
+            <option value="COP" selected>COP (Pesos Colombianos)</option>
+            <option value="USD">USD (Dólares)</option>
+            <option value="VES">VES (Bolívares)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid mb-12">
+        <div class="form-group">
+          <label class="form-label">Monto a Pagar</label>
+          <input type="text" inputmode="decimal" id="mp-monto" class="form-input" placeholder="0.00" style="font-weight:700;">
+          <span id="mp-monto-hint" style="font-size:11px; color:var(--t-low); margin-top:3px; display:block;"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Método de Pago</label>
+          <select id="mp-metodo" class="form-input">
+            <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+            <option value="Efectivo">Efectivo</option>
+            <option value="Pago Móvil">Pago Móvil</option>
+            <option value="Binance (USDT / Cripto)">Binance (USDT)</option>
+            <option value="Zelle / Dólares Efectivo">Zelle / Dólares</option>
+            <option value="Cheque">Cheque</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Préstamos pendientes asociados -->
+      <div class="form-group mb-12" id="mp-prestamos-container" style="display:none;">
+        <label class="form-label" style="color:var(--c-red); font-weight:600;">Préstamos descontados en este pago</label>
+        <div id="mp-prestamos-list" style="background:rgba(239, 68, 68, 0.05); border:1px solid rgba(239, 68, 68, 0.15); border-radius:6px; padding:8px 12px; font-size:12px;"></div>
+        <span style="font-size:11px; color:var(--t-low); margin-top:3px; display:block;">Al confirmar, estos préstamos se marcarán automáticamente como descontados/pagados.</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notas / N° de Comprobante</label>
+        <input type="text" id="mp-notas" class="form-input" placeholder="Ej: Comprobante transferencia 987654 / Pago total de semana">
+      </div>
+
+      <div class="flex gap-8 mt-16" style="justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="NominaModule.cerrarModalPago()">Cancelar</button>
+        <button class="btn btn-primary" id="mp-btn-confirmar" onclick="NominaModule.confirmarPago()">
+          Confirmar Pago y Registrar Gasto
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Movimiento de Stock -->
+<div id="modal-movimiento-stock" class="login-overlay" style="display:none; align-items:center; justify-content:center; overflow-y:auto; padding:20px;">
+  <div class="card" style="width:100%; max-width:520px; margin:auto; background:var(--bg-surface); border:1px solid var(--b-default); box-shadow:var(--sh-lg);">
+    <div class="card-header flex-between">
+      <div>
+        <h2 style="font-size:16px; margin:0; color:var(--t-high); font-weight:700;">Registrar Movimiento de Inventario</h2>
+        <div style="font-size:11px; color:var(--t-low); margin-top:2px;" id="im-producto-nombre">Producto Seleccionado</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="InventarioModule.cerrarModalMovimiento()">✕</button>
+    </div>
+    <div class="card-body">
+      <input type="hidden" id="im-producto-id">
+      
+      <div class="form-grid mb-12">
+        <div class="form-group">
+          <label class="form-label">Tipo de Movimiento</label>
+          <select id="im-tipo" class="form-input" onchange="InventarioModule.alCambiarTipoMovimiento()">
+            <option value="ENTRADA">ENTRADA (Compra, Devolución, Ingreso)</option>
+            <option value="SALIDA">SALIDA (Uso, Despacho, Daño)</option>
+            <option value="AJUSTE">AJUSTE (Conteo físico exacto)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha</label>
+          <input type="date" id="im-fecha" class="form-input">
+        </div>
+      </div>
+
+      <div class="form-grid mb-12">
+        <div class="form-group">
+          <label class="form-label" id="im-label-cantidad">Cantidad a mover</label>
+          <input type="number" id="im-cantidad" class="form-input" placeholder="Ej: 10" min="0" step="0.01">
+          <span style="font-size:11px; color:var(--t-low); margin-top:3px; display:block;">Stock actual: <strong id="im-stock-actual">0</strong></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Motivo</label>
+          <input type="text" id="im-motivo" class="form-input" placeholder="Ej: Compra de material, Uso en mina, etc.">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Referencia / Comprobante (Opcional)</label>
+        <input type="text" id="im-referencia" class="form-input" placeholder="Factura, ID Despacho o Gasto asociado">
+      </div>
+
+      <div class="flex gap-8 mt-16" style="justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="InventarioModule.cerrarModalMovimiento()">Cancelar</button>
+        <button class="btn btn-primary" onclick="InventarioModule.guardarMovimiento()">Registrar Movimiento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Vista Previa de Recibo -->
+<div id="modalRecibo" class="login-overlay" style="display:none; align-items:center; justify-content:center; overflow-y:auto; padding:20px; z-index:10000;">
+  <div class="card" style="width:100%; max-width:800px; margin:auto; background:var(--bg-surface); border:1px solid var(--b-default); box-shadow:var(--sh-lg); display: flex; flex-direction: column; max-height: 90vh;">
+    <div class="card-header flex-between no-print">
+      <div>
+        <h2 style="font-size:16px; margin:0; color:var(--t-high); font-weight:700;">Vista Previa de Recibo</h2>
+      </div>
+      <div class="flex gap-8">
+        <button class="btn btn-primary btn-sm" onclick="NominaModule.imprimirDesdeModal()">Imprimir</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modalRecibo').style.display='none'">✕ Cerrar</button>
+      </div>
+    </div>
+    <div class="card-body" style="overflow-y:auto; background: white; color: black; padding: 40px;" id="modalReciboBody">
+      <!-- Contenido inyectado por JS -->
+    </div>
+  </div>
+</div>
+
+<!-- Marca de agua sólo en print -->
+<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.05; pointer-events: none; z-index: 0;">
+    <img src="/img/logo.svg" style="width: 280px; height: auto;" />
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LAYOUT
+     ═══════════════════════════════════════════════════════════ -->
+<div class="app-layout" id="appLayout">
+
+  <!-- ─── SIDEBAR ─────────────────────────────────────────── -->
+  <aside class="sidebar">
+
+    <div class="sidebar-brand-wrapper">
+        <img src="/img/logo.svg" alt="Carbones Tamanaco" class="sidebar-logo-svg" />
+        <div class="sidebar-brand-text">
+            <span class="brand-title">Carbones Tamanaco</span>
+            <span class="brand-subtitle">ERP</span>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav">
+
+      <div class="nav-section">Principal</div>
+
+      <div class="nav-item active"
+           data-module="despachos"
+           data-tip="Despachos"
+           onclick="Router.navigate('despachos')">
+        <span class="nav-icon">↑↓</span>
+        <span class="nav-label">Despachos</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="metas"
+           data-tip="Metas de Entrega"
+           onclick="Router.navigate('metas')">
+        <span class="nav-icon">◩</span>
+        <span class="nav-label">Metas</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="nomina"
+           data-tip="Nómina"
+           onclick="Router.navigate('nomina')">
+        <span class="nav-icon">₡</span>
+        <span class="nav-label">Nómina</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="laboratorio"
+           data-tip="Laboratorio y Calidad"
+           onclick="Router.navigate('laboratorio')">
+        <span class="nav-icon">⎔</span>
+        <span class="nav-label">Laboratorio</span>
+      </div>
+
+      <div class="nav-section" style="margin-top:10px;">Administración</div>
+
+      <div class="nav-item"
+           data-module="auditoria"
+           data-tip="Seguridad y Auditoría"
+           onclick="Router.navigate('auditoria')">
+        <span class="nav-icon">❖</span>
+        <span class="nav-label">Auditoría</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="choferes"
+           data-tip="Auditoría / Choferes"
+           onclick="Router.navigate('choferes')">
+        <span class="nav-icon">☺</span>
+        <span class="nav-label">Choferes</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="gastos"
+           data-tip="Gastos"
+           onclick="Router.navigate('gastos')">
+        <span class="nav-icon">$</span>
+        <span class="nav-label">Gastos</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="proveedores"
+           data-tip="Proveedores"
+           onclick="Router.navigate('proveedores')">
+        <span class="nav-icon">◈</span>
+        <span class="nav-label">Proveedores</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="inventario"
+           data-tip="Inventario"
+           onclick="Router.navigate('inventario')">
+        <span class="nav-icon">⊟</span>
+        <span class="nav-label">Inventario</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="pagos"
+           data-tip="Tesorería y Caja"
+           onclick="Router.navigate('pagos')">
+        <span class="nav-icon">$</span>
+        <span class="nav-label">Tesorería y Caja</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="produccion"
+           data-tip="Producción"
+           onclick="Router.navigate('produccion')">
+        <span class="nav-icon">+</span>
+        <span class="nav-label">Producción</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="rentabilidad"
+           data-tip="BI y Rentabilidad"
+           onclick="Router.navigate('rentabilidad')">
+        <span class="nav-icon">#</span>
+        <span class="nav-label">Rentabilidad</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="facturacion"
+           data-tip="Facturación"
+           onclick="Router.navigate('facturacion')">
+        <span class="nav-icon">▤</span>
+        <span class="nav-label">Facturación</span>
+      </div>
+
+      <div class="nav-section" style="margin-top:10px;">Sistema</div>
+
+      <div class="nav-item"
+           data-module="usuarios"
+           data-tip="Usuarios"
+           onclick="Router.navigate('usuarios')">
+        <span class="nav-icon">●</span>
+        <span class="nav-label">Usuarios</span>
+      </div>
+
+      <div class="nav-item"
+           data-module="documentos"
+           data-tip="Documentos Legales"
+           onclick="Router.navigate('documentos')">
+        <span class="nav-icon">≡</span>
+        <span class="nav-label">Documentos Legales</span>
+      </div>
+
+      <div class="nav-item admin-only"
+           data-module="ajustes"
+           data-tip="Ajustes"
+           onclick="Router.navigate('ajustes')">
+        <span class="nav-icon">☼</span>
+        <span class="nav-label">Ajustes</span>
+      </div>
+
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-avatar" id="sidebarAvatar">A</div>
+      <div style="flex:1; min-width:0;">
+        <div class="user-name" id="sidebarUserName">Administrador</div>
+        <div class="user-role" id="sidebarUserRole">Admin</div>
+      </div>
+      <button class="sidebar-logout-btn" onclick="Auth.logout()" title="Cerrar sesión">
+        Salir
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- ─── HEADER ───────────────────────────────────────────── -->
+  <header class="app-header no-print">
+
+    <div class="header-left">
+      <button class="toggle-btn" onclick="toggleSidebar()" title="Colapsar menú">
+        &#9776;
+      </button>
+      <div class="breadcrumb">
+        <span>Carbones Tamanaco</span>
+        <span class="breadcrumb-sep">/</span>
+        <span id="breadcrumb-module">Despachos</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div style="font-weight:600; color:var(--t-medium); margin-right: 12px; font-size: 14px;" id="header-greeting"></div>
+      <div class="header-date" id="headerDate"></div>
+      <button id="btnInstalar" class="btn btn-ghost btn-sm"
+              onclick="instalarApp()" style="display:none">
+        Instalar App
+      </button>
+    </div>
+
+  </header>
+
+  <!-- ─── MAIN ─────────────────────────────────────────────── -->
+  <main class="app-main">
+
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULO: DESPACHOS
+         ═══════════════════════════════════════════════════════ -->
+    <section class="module-page active" id="page-despachos">
+
+      <!-- Encabezado visible solo en impresión -->
+      <div class="print-header">
+        <div class="print-header-brand">
+          <img src="/img/logo.svg" alt="Carbones Tamanaco" class="brand-logo" >
+          <div class="print-header-text">
+            <div class="print-header-title">Carbones Tamanaco S.A.S.</div>
+            <div class="print-header-subtitle">Reporte de Despachos de Mineral</div>
+          </div>
+        </div>
+        <div class="print-header-meta">
+          <div><strong>Fecha:</strong> <span class="print-fecha-hoy"></span></div>
+          <div><strong>Control:</strong> Romana & Báscula</div>
+          <div><strong>Estado:</strong> Oficial</div>
+        </div>
+      </div>
+
+      <!-- Page header — se oculta en print vía .no-print -->
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Despachos</h1>
+          <p>Control diario de salidas de camiones y toneladas</p>
+        </div>
+        <div class="flex gap-8">
+          <button type="button" class="btn btn-subtle btn-export" onclick="abrirModalExcel()">Excel</button>
+          <button type="button" class="btn btn-subtle" onclick="DespachoModule.generarPDF()">Imprimir / PDF</button>
+        </div>
+      </div>
+
+      <!-- KPIs — ocultas en print -->
+      <div class="stats-grid no-print">
+        <div class="stat-card">
+          <div class="stat-label">Camiones — Hoy</div>
+          <div class="stat-value" id="d-stat-camiones-dia">0</div>
+          <div class="stat-sub">despachos registrados</div>
+        </div>
+        <div class="stat-card s-green">
+          <div class="stat-label">Peso Total — Hoy</div>
+          <div class="stat-value" id="d-stat-peso-dia">0.00</div>
+          <div class="stat-sub">toneladas</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Camiones — Semana</div>
+          <div class="stat-value" id="d-stat-camiones-sem">0</div>
+          <div class="stat-sub">esta semana</div>
+        </div>
+        <div class="stat-card s-blue">
+          <div class="stat-label">Peso — Semana</div>
+          <div class="stat-value" id="d-stat-peso-sem">0.00</div>
+          <div class="stat-sub">toneladas acumuladas</div>
+        </div>
+      </div>
+
+      <!-- Formulario — se oculta en print mediante clase .form-section y .no-print -->
+      <div class="card form-section mb-12 no-print">
+        <div class="card-header">
+          <span class="card-title" id="d-form-title">Nuevo despacho</span>
+        </div>
+        <div class="card-body">
+
+          <!-- Navegador de fechas -->
+          <div class="flex-between mb-12" style="flex-wrap:wrap; gap:10px;">
+            <div class="flex gap-8 align-center">
+              <button id="d-btn-modo-semanal" class="btn btn-ghost btn-sm" onclick="DespachoModule.toggleModoSemanal()">Ver Semana</button>
+              <div class="date-nav">
+                <button class="date-nav-btn" onclick="DespachoModule.cambiarDia(-1)">&#8249;</button>
+                <input type="date" id="d-filtroFecha" class="date-nav-input"
+                       onchange="DespachoModule.alCambiarFecha()">
+                <button class="date-nav-btn" onclick="DespachoModule.cambiarDia(1)">&#8250;</button>
+                <button class="date-nav-today" onclick="DespachoModule.irAHoy()">Hoy</button>
+              </div>
+            </div>
+          </div>
+
+          <input type="hidden" id="d-id">
+
+          <!-- Catálogos para Autocompletado Predictivo -->
+          <datalist id="lista-choferes"></datalist>
+          <datalist id="lista-placas"></datalist>
+          <datalist id="lista-minas"></datalist>
+
+          <!-- OCR: Escaneo de comprobante con IA (Bloqueado temporalmente) -->
+          <div style="margin-bottom: 14px;">
+            <button type="button" 
+                    id="btn-escanear-ocr" 
+                    class="btn-scanner-locked" 
+                    disabled 
+                    title="Función no disponible temporalmente">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-lock">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <span>Escanear Comprobante (Próximamente)</span>
+            </button>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="d-cedula-chofer">Cédula del Chofer</label>
+              <input type="text" id="d-cedula-chofer" class="form-input" placeholder="V-12345678" autocomplete="off"
+                     onblur="DespachoModule.buscarChoferPorCedula()">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="d-chofer">Chofer</label>
+              <input type="text" id="d-chofer" class="form-input" placeholder="Nombre completo" autocomplete="off" list="lista-choferes">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="d-placa">Placa</label>
+              <input type="text" id="d-placa" class="form-input" placeholder="ABC-123" autocomplete="off" list="lista-placas" style="text-transform: uppercase;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="d-mina">Mina</label>
+              <input type="text" id="d-mina" class="form-input" placeholder="Nombre de la mina" autocomplete="off" list="lista-minas">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="d-peso">Peso neto (Ton)</label>
+              <input type="number" id="d-peso" class="form-input" step="0.01" min="0" placeholder="0.00" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="flex gap-8 mt-12">
+            <button class="btn btn-primary" id="d-btn-guardar" onclick="DespachoModule.guardar()">
+              Guardar despacho
+            </button>
+            <button class="btn btn-ghost" id="d-btn-cancelar"
+                    onclick="DespachoModule.limpiarFormulario()"
+                    style="display:none;">
+              Cancelar edición
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Tabla — esta SÍ aparece en print -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Registro del día</span>
+          <span class="text-muted" id="d-label-fecha" style="font-size:11px;"></span>
+        </div>
+        <div class="table-wrap">
+          <table id="d-tabla">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Chofer</th>
+                <th>Placa</th>
+                <th>Mina</th>
+                <th>Peso (Ton)</th>
+                <th class="no-print no-export">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Generado dinámicamente por despachos.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULO: NÓMINA
+         ═══════════════════════════════════════════════════════ -->
+    <section class="module-page" id="page-nomina">
+
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Nómina Semanal</h1>
+          <p>Pago por toneladas despachadas según tarifa COP por mina</p>
+        </div>
+        <div class="flex gap-8">
+          <button type="button" class="btn btn-subtle btn-export" onclick="abrirModalExcelNomina()">Excel</button>
+          <button class="btn btn-subtle" onclick="NominaModule.imprimirReporteNomina()">Imprimir / PDF</button>
+        </div>
+      </div>
+
+      <!-- Tabs internas -->
+      <div class="no-print" style="display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--b-subtle); padding-bottom:12px; overflow-x:auto;">
+        <button id="n-tab-calculo" class="btn btn-primary btn-sm"
+                onclick="NominaModule.activarTab('calculo')">
+          Pago a Minas
+        </button>
+        <button id="n-tab-minas" class="btn btn-ghost btn-sm"
+                onclick="NominaModule.activarTab('minas')">
+          Tarifas por mina
+        </button>
+        <button id="n-tab-empleados-dir" class="btn btn-ghost btn-sm"
+                onclick="NominaModule.activarTab('empleados-dir')">
+          Directorio Personal
+        </button>
+        <button id="n-tab-empleados-calc" class="btn btn-ghost btn-sm"
+                onclick="NominaModule.activarTab('empleados-calc')">
+          Nómina Interna
+        </button>
+      </div>
+
+      <!-- ── Panel: Cálculo semanal ── -->
+      <div id="n-panel-calculo">
+
+        <!-- Selector de semana con navegación -->
+        <div class="card form-section mb-12 no-print">
+          <div class="card-header">
+            <span class="card-title">Semana de nómina</span>
+            <span class="n-semana-label text-mid" style="font-size:11px;"></span>
+          </div>
+          <div class="card-body">
+            <div class="flex-between" style="flex-wrap:wrap; gap:10px;">
+              <div class="date-nav">
+                <button class="date-nav-btn" onclick="NominaModule.cambiarSemana(-1)" title="Semana anterior">&#8249;</button>
+                <input type="date" id="n-semana" class="date-nav-input" onchange="NominaModule.calcular()">
+                <button class="date-nav-btn" onclick="NominaModule.cambiarSemana(1)" title="Semana siguiente">&#8250;</button>
+                <button class="date-nav-today" onclick="NominaModule.irAEstaSemana()">Esta semana</button>
+              </div>
+              <button class="btn btn-primary" id="n-btn-calcular" onclick="NominaModule.calcular()">
+                Calcular nómina
+              </button>
+            </div>
+            
+            <div id="n-cierre-container" class="flex gap-8 mt-12" style="align-items: center; flex-wrap: wrap;">
+              <button type="button" id="n-btn-marcar-pagada" class="btn btn-primary btn-sm" onclick="NominaModule.abrirModalPagoSemana()" style="background:#059669; border-color:#059669;">
+                Marcar como Pagada y Subir Comprobante
+              </button>
+
+              <div id="n-badge-pagada" style="display:none; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span class="badge" style="background:#059669; color:#fff; padding:6px 12px; font-weight:700; font-size:12px; border-radius:6px;">
+                  SEMANA PAGADA Y CERRADA
+                </span>
+                <a id="n-btn-ver-comprobante" href="#" target="_blank" class="btn btn-subtle btn-sm" style="display:none;">
+                  Ver Comprobante
+                </a>
+                <button type="button" id="n-btn-reabrir-semana" class="btn btn-warn btn-sm" onclick="NominaModule.reabrirSemana()" style="display:none;">
+                  Reabrir Período
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resultado del cálculo -->
+        <div id="n-resultado" style="display:none;">
+
+          <!-- Encabezado de impresión -->
+          <div class="print-header">
+            <div class="print-header-brand">
+              <img src="/img/logo.svg" alt="Carbones Tamanaco" class="brand-logo" >
+              <div class="print-header-text">
+                <div class="print-header-title">Carbones Tamanaco S.A.S.</div>
+                <div class="print-header-subtitle">Liquidación de Nómina y Despachos</div>
+              </div>
+            </div>
+            <div class="print-header-meta">
+              <div><strong>Período:</strong> <span class="n-semana-label">Semana Actual</span></div>
+              <div><strong>Fecha de emisión:</strong> <span class="print-fecha-hoy"></span></div>
+              <div><strong>Control:</strong> Nómina Oficial</div>
+            </div>
+          </div>
+
+          <!-- Stats -->
+          <div class="stats-grid no-print" style="margin-bottom:16px;">
+            <div class="stat-card">
+              <div class="stat-label">Semana</div>
+              <div class="stat-value" style="font-size:14px;" id="n-label-semana-card">—</div>
+            </div>
+            <div class="stat-card s-green" style="position: relative;">
+              <div class="stat-label">Total a pagar</div>
+              <div class="stat-value" id="n-total-general" style="font-size:20px;">$ 0</div>
+              <div class="stat-sub">en Pesos Colombianos</div>
+              <button class="btn btn-primary btn-sm no-print" onclick="NominaModule.pagarTodaLaNomina()" style="margin-top:12px; width:100%; background:var(--c-green); border-color:var(--c-green);">Pagar Todo</button>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Despachos en semana</div>
+              <div class="stat-value" id="n-total-despachos">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Total Toneladas</div>
+              <div class="stat-value" id="n-total-peso" style="color: var(--c-gold);">0 Ton</div>
+            </div>
+          </div>
+
+          <!-- Tabla de resultados -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Detalle por mina</span>
+              <span class="text-mid n-semana-label" style="font-size:11px;"></span>
+            </div>
+            <div class="table-wrap">
+              <table id="n-tabla-nomina" class="tabla-nomina-compacta">
+                <thead>
+                  <tr>
+                    <th>Mina</th>
+                    <th class="text-right">Viajes</th>
+                    <th class="text-right">Toneladas</th>
+                    <th class="text-right">Tarifa COP/Ton</th>
+                    <th class="text-right">Total Carbón</th>
+                    <th class="text-right">Ajuste (+ / -)</th>
+                    <th class="text-right">Total a Entregar</th>
+                    <th class="text-center">Recordatorio</th>
+                    <th class="no-print text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="n-tabla-items">
+                  <tr><td colspan="9"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Firmas y aprobaciones en impresión -->
+            <div class="print-signatures">
+              <div class="print-sig-box">
+                <div class="print-sig-line"></div>
+                <div class="print-sig-name">Elaborado Por</div>
+                <div class="print-sig-role">Auxiliar de Nómina / Despachos</div>
+              </div>
+              <div class="print-sig-box">
+                <div class="print-sig-line"></div>
+                <div class="print-sig-name">Revisado Por</div>
+                <div class="print-sig-role">Administración & Finanzas</div>
+              </div>
+              <div class="print-sig-box">
+                <div class="print-sig-line"></div>
+                <div class="print-sig-name">Aprobado Por</div>
+                <div class="print-sig-role">Gerencia General</div>
+              </div>
+            </div>
+
+            <div class="print-doc-footer">
+              <div>Carbones Tamanaco S.A.S. — Sistema ERP v4.0</div>
+              <div>Reporte Oficial de Liquidación de Nómina</div>
+            </div>
+          </div>
+
+        </div><!-- /n-resultado -->
+
+      </div><!-- /n-panel-calculo -->
+
+      <!-- MODAL MINIMALISTA DE AJUSTE Y RECORDATORIO -->
+      <div id="modal-ajuste-simple" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+          <div style="background: #0f172a; color: #f8fafc; width: 100%; max-width: 380px; border-radius: 12px; border: 1px solid #334155; padding: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); box-sizing: border-box;">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 12px;">
+                  <h4 style="margin: 0; color: #38bdf8; font-size: 1.05rem; font-weight: 800;">Ajuste de Pago & Saldo</h4>
+                  <button type="button" onclick="cerrarModalAjusteSimple()" style="background: transparent; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">&times;</button>
+              </div>
+
+              <form id="form-ajuste-simple" onsubmit="guardarAjusteSimple(event)">
+                  <input type="hidden" id="ajuste-nomina-id" />
+
+                  <div style="background: #1e293b; padding: 10px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #334155; font-size: 0.85rem;">
+                      <div style="color: #94a3b8; font-size: 0.72rem;">MINA / PROVEEDOR:</div>
+                      <div id="ajuste-mina-nombre" style="font-weight: 800; color: #fff; font-size: 0.95rem;">—</div>
+                      <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                          <span style="color: #94a3b8;">Liquidación Carbón:</span>
+                          <strong id="ajuste-monto-base" style="color: #38bdf8;">$ 0</strong>
+                      </div>
+                  </div>
+
+                  <!-- Campo de Ajuste -->
+                  <div style="margin-bottom: 10px;">
+                      <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">VALOR DEL AJUSTE (COP):</label>
+                      <div style="font-size: 0.7rem; color: #64748b; margin-bottom: 3px;">Use signo negativo (-) si nos debe para descontarlo.</div>
+                      <input type="number" id="input-ajuste-monto" step="1000" placeholder="Ej: 50000 o -30000" oninput="recalcularTotalModalAjuste()" style="width: 100%; box-sizing: border-box; background: #0b132b; border: 1.5px solid #334155; color: #fff; font-size: 1.1rem; font-weight: 800; padding: 8px; border-radius: 6px;" />
+                  </div>
+
+                  <!-- Total Calculado en Vivo -->
+                  <div style="background: #0b132b; border: 1px solid #0284c7; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-size: 0.75rem; font-weight: 700; color: #94a3b8;">TOTAL A PAGAR:</span>
+                      <strong id="ajuste-total-calculado" style="font-size: 1.2rem; font-weight: 900; color: #22c55e;">$ 0</strong>
+                  </div>
+
+                  <!-- Nota de Recordatorio -->
+                  <div style="margin-bottom: 14px;">
+                      <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">MOTIVO / RECORDATORIO:</label>
+                      <input type="text" id="input-ajuste-nota" placeholder="Ej: Se le debían $50k de la semana pasada" style="width: 100%; box-sizing: border-box; background: #0b132b; border: 1px solid #334155; color: #fff; font-size: 0.82rem; padding: 8px; border-radius: 6px;" />
+                  </div>
+
+                  <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                      <button type="button" onclick="cerrarModalAjusteSimple()" style="padding: 7px 12px; background: #334155; border: none; border-radius: 6px; color: #fff; cursor: pointer; font-size: 0.82rem;">Cancelar</button>
+                      <button type="submit" style="padding: 7px 16px; background: #0284c7; border: none; border-radius: 6px; color: #fff; font-weight: 700; cursor: pointer; font-size: 0.85rem;">Guardar Ajuste</button>
+                  </div>
+              </form>
+          </div>
+      </div>
+
+      <!-- ── Panel: Configuración de minas ── -->
+      <div id="n-panel-minas" style="display:none;">
+
+        <!-- Formulario nueva mina -->
+        <div class="card form-section mb-12">
+          <div class="card-header">
+            <span class="card-title" id="n-form-mina-title">Nueva mina</span>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Nombre de la mina</label>
+                <input type="text" id="n-mina-nombre" class="form-input"
+                       placeholder="Debe coincidir exactamente con el campo Mina en despachos">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Tarifa (COP por tonelada)</label>
+                <input type="number" id="n-mina-tarifa" class="form-input"
+                       placeholder="Ej: 100000" min="0" step="1000">
+              </div>
+            </div>
+            <div class="flex gap-8 mt-12">
+              <button class="btn btn-primary" id="n-btn-guardar-mina"
+                      onclick="NominaModule.guardarMina()">
+                Guardar mina
+              </button>
+              <button class="btn btn-ghost" id="n-btn-cancelar-mina"
+                      onclick="NominaModule.limpiarFormMina()"
+                      style="display:none;">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla de minas configuradas -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Minas registradas</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mina</th>
+                  <th class="text-right">Tarifa COP/Ton</th>
+                  <th>Estado</th>
+                  <th class="no-print">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="n-tabla-minas">
+                <tr><td colspan="4"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- /n-panel-minas -->
+
+      <!-- ── Panel: Directorio Personal ── -->
+      <div id="n-panel-empleados-dir" style="display:none;">
+        <div class="card form-section mb-12 no-print">
+          <div class="card-header">
+            <span class="card-title" id="n-emp-form-title">Registrar Nuevo Empleado</span>
+          </div>
+          <div class="card-body">
+            <input type="hidden" id="n-emp-id">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="n-emp-nombre">Nombre Completo</label>
+                <input type="text" id="n-emp-nombre" class="form-input" placeholder="Ej: Juan Pérez" autocomplete="off">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="n-emp-cedula">Cédula / Documento</label>
+                <input type="text" id="n-emp-cedula" class="form-input" placeholder="Ej: V-12345678" autocomplete="off">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="n-emp-cargo">Cargo / Puesto</label>
+                <input type="text" id="n-emp-cargo" class="form-input" placeholder="Ej: Operador de Maquinaria" autocomplete="off">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="n-emp-salario">Salario Base</label>
+                <input type="number" id="n-emp-salario" class="form-input" placeholder="0.00" step="0.01" autocomplete="off">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="n-emp-moneda">Moneda</label>
+                <select id="n-emp-moneda" class="form-input">
+                  <option value="USD" selected>USD (Dólares)</option>
+                  <option value="COP">COP (Pesos Colombianos)</option>
+                  <option value="VES">VES (Bolívares)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="n-emp-frecuencia">Frecuencia de Pago</label>
+                <select id="n-emp-frecuencia" class="form-input">
+                  <option value="SEMANAL" selected>Semanal</option>
+                  <option value="QUINCENAL">Quincenal</option>
+                  <option value="MENSUAL">Mensual</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="n-emp-activo">Estado</label>
+                <select id="n-emp-activo" class="form-input">
+                  <option value="true" selected>Activo</option>
+                  <option value="false">Inactivo (Baja)</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex gap-8 mt-12">
+              <button class="btn btn-primary" id="n-btn-guardar-emp" onclick="NominaModule.guardarEmpleado()">Registrar Empleado</button>
+              <button class="btn btn-ghost" id="n-btn-cancelar-emp" onclick="NominaModule.limpiarFormEmpleado()" style="display:none;">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Directorio de Personal</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Cédula</th>
+                  <th>Cargo</th>
+                  <th class="text-right">Salario Base</th>
+                  <th>Frecuencia</th>
+                  <th>Estado</th>
+                  <th class="no-print">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="n-tabla-empleados">
+                <tr><td colspan="7"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /n-panel-empleados-dir -->
+
+      <!-- ── Panel: Nómina Empleados (Cálculo) ── -->
+      <div id="n-panel-empleados-calc" style="display:none;">
+        <div class="card mb-12 no-print" style="padding: 16px;">
+          <h3 style="margin-top:0; font-size:14px; margin-bottom:8px;">Procesar Nómina de Personal</h3>
+          <p style="margin:0; font-size:12px; color:var(--t-medium);">
+            A continuación se listan los empleados activos. Ajusta los bonos o deducciones y registra el pago. El pago se descontará automáticamente de la caja.
+          </p>
+          <button class="btn btn-primary btn-sm no-print" onclick="NominaModule.pagarTodosEmpleados()" style="margin-top:12px; background:var(--c-green); border-color:var(--c-green);">Pagar a Todos</button>
+        </div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Empleado / Cargo</th>
+                  <th class="text-right" style="width:120px;">Salario Base</th>
+                  <th class="text-right" style="width:120px;">Bono (+)</th>
+                  <th class="text-right" style="width:120px;">Deducción (-)</th>
+                  <th class="text-right" style="width:130px;">Total a Pagar</th>
+                  <th class="no-print" style="width:140px;">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="n-tabla-empleados-pago">
+                <tr><td colspan="6"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /n-panel-empleados-calc -->
+
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULO: GASTOS OPERATIVOS Y PRÉSTAMOS
+         ═══════════════════════════════════════════════════════ -->
+    <section class="module-page" id="page-gastos">
+      <!-- Encabezado visible solo en impresión -->
+      <div class="print-header" style="display:none;">
+        <img src="/img/logo.svg" alt="Carbones Tamanaco" class="brand-logo">
+        <div>
+          <div style="font-size:16px; font-weight:700; color:#000;">Carbones Tamanaco</div>
+          <div style="font-size:12px; color:#555;">Reporte de Gastos Operativos y Préstamos</div>
+        </div>
+      </div>
+
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Gastos y Préstamos</h1>
+          <p>Control de egresos en Pesos (COP), Dólares (USD), Bolívares (VES) y anticipos a minas</p>
+        </div>
+        <div class="flex gap-8">
+          <button class="btn btn-subtle" onclick="Utils.exportarExcel('g-tabla-gastos', 'Gastos_Prestamos')">Excel</button>
+          <button class="btn btn-subtle" onclick="window.print()">Imprimir / PDF</button>
+        </div>
+      </div>
+
+      <!-- KPIs Gastos Multi-Moneda -->
+      <div class="stats-grid no-print">
+        <div class="stat-card s-red">
+          <div class="stat-label">Gastos Mes (COP)</div>
+          <div class="stat-value" id="g-total-mes-cop">$ 0</div>
+          <div class="stat-sub">Pesos Colombianos</div>
+        </div>
+        <div class="stat-card s-green">
+          <div class="stat-label">Gastos Mes (USD)</div>
+          <div class="stat-value" id="g-total-mes-usd">$ 0.00 USD</div>
+          <div class="stat-sub">Dólares Americanos</div>
+        </div>
+        <div class="stat-card s-blue">
+          <div class="stat-label">Gastos Mes (VES)</div>
+          <div class="stat-value" id="g-total-mes-ves">Bs. 0.00</div>
+          <div class="stat-sub">Bolívares</div>
+        </div>
+      </div>
+
+      <!-- Formulario Gastos -->
+      <div class="card form-section mb-12 no-print">
+        <div class="card-header">
+          <span class="card-title" id="g-form-title">Nuevo gasto / préstamo</span>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="g-fecha">Fecha</label>
+              <input type="date" id="g-fecha" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="g-categoria">Categoría</label>
+              <select id="g-categoria" class="form-input"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="g-tipo-gasto">Tipo de Gasto</label>
+              <select id="g-tipo-gasto" class="form-input">
+                <option value="FLETES_TRANSPORTE">🚚 Fletes y Transporte</option>
+                <option value="OPERATIVO_PATIO">🚜 Operativo y Patio (Diésel, Repuestos)</option>
+                <option value="ADMINISTRATIVO_PERSONAL">👔 Administrativo / Nómina de Personal</option>
+              </select>
+            </div>
+            <div class="form-group" id="g-mina-group" style="display:none;">
+              <label class="form-label" for="g-mina" style="color:var(--c-accent);">Mina / Proveedor beneficiario</label>
+              <select id="g-mina" class="form-input"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="g-moneda">Moneda</label>
+              <select id="g-moneda" class="form-input"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="g-monto">Monto</label>
+              <input type="number" id="g-monto" class="form-input" step="0.01" min="0" placeholder="0.00">
+            </div>
+            <div class="form-group" id="g-tasa-group" style="display:none;">
+              <label class="form-label" for="g-tasa-cambio" id="g-tasa-label">Tasa de Cambio (COP/USD)</label>
+              <input type="number" id="g-tasa-cambio" class="form-input" step="0.01" min="0" placeholder="Ej: 4000">
+              <span style="font-size:11px; color:var(--c-green); margin-top:3px; display:block;" id="g-preview-usd"></span>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="g-metodo-pago">Método de pago</label>
+              <select id="g-metodo-pago" class="form-input"></select>
+            </div>
+          </div>
+          <div class="form-group mt-12">
+            <label class="form-label" for="g-descripcion">Descripción / Concepto / Motivo</label>
+            <input type="text" id="g-descripcion" class="form-input" placeholder="Detalle del gasto o préstamo">
+          </div>
+
+          <div class="flex gap-8 mt-12">
+            <button class="btn btn-primary" onclick="GastosModule.guardarGasto()">Guardar gasto / préstamo</button>
+            <button class="btn btn-ghost" id="g-btn-cancelar" onclick="GastosModule.limpiarForm()" style="display:none;">Cancelar edición</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla Gastos -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Historial de Gastos y Préstamos</span>
+        </div>
+        <div class="table-wrap">
+          <table id="g-tabla-gastos">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Categoría</th>
+                <th>Concepto / Estado</th>
+                <th>Método de pago</th>
+                <th>Moneda</th>
+                <th class="text-right">Monto</th>
+                <th class="no-print no-export">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="g-tabla-gastos-body">
+              <tr><td colspan="7"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULOS EN CONSTRUCCIÓN (Fases siguientes)
+         ═══════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULO: PROVEEDORES E HISTORIAL AUTOMÁTICO
+         ═══════════════════════════════════════════════════════ -->
+    <section class="module-page" id="page-proveedores">
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Proveedores, Alianzas y Brigadas</h1>
+          <p>Directorio comercial y expedientes con historial y pesajes automáticos</p>
+        </div>
+      </div>
+
+      <!-- Formulario Proveedor -->
+      <div class="card form-section mb-12 no-print">
+        <div class="card-header">
+          <span class="card-title" id="p-form-title">Nuevo aliado / proveedor</span>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="p-nombre">Nombre / Razón Social / Mina</label>
+              <input type="text" id="p-nombre" class="form-input" placeholder="Ej: Mina Tamanaco / Brigada 1">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="p-tipo">Tipo / Categoría</label>
+              <select id="p-tipo" class="form-input"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="p-contacto">Persona de Contacto / Encargado</label>
+              <input type="text" id="p-contacto" class="form-input" placeholder="Nombre del representante">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="p-telefono">Teléfono</label>
+              <input type="text" id="p-telefono" class="form-input" placeholder="0414-1234567">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="p-activo">Estado</label>
+              <select id="p-activo" class="form-input">
+                <option value="true" selected>Activo</option>
+                <option value="false">Inactivo</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group mt-12">
+            <label class="form-label" for="p-direccion">Ubicación / Sector</label>
+            <input type="text" id="p-direccion" class="form-input" placeholder="Sector minero, ciudad o dirección">
+          </div>
+
+          <div class="flex gap-8 mt-12">
+            <button class="btn btn-primary" onclick="ProveedoresModule.guardarProveedor()">Guardar</button>
+            <button class="btn btn-ghost" id="p-btn-cancelar" onclick="ProveedoresModule.limpiarForm()" style="display:none;">Cancelar edición</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla Proveedores -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Listado de Proveedores, Alianzas y Brigadas</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre / Contacto</th>
+                <th>Tipo</th>
+                <th>Teléfono</th>
+                <th>Ubicación</th>
+                <th>Estado</th>
+                <th class="no-print">Expediente</th>
+                <th class="no-print">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="p-tabla-proveedores">
+              <tr><td colspan="7"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="module-page" id="page-inventario">
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Inventario</h1>
+          <p>Control de stock de mineral en patio y catálogo de insumos y materiales</p>
+        </div>
+      </div>
+
+      <!-- Sub-navegación por Secciones de Inventario -->
+      <div class="tabs-nav no-print mb-24" style="display:flex; gap:10px; border-bottom:1px solid var(--b-default); padding-bottom:12px;">
+        <button class="btn btn-primary inv-tab-sec" data-sec="patio" onclick="PatioModule.cambiarSeccion('patio')">
+          Stock de Mineral en Patio
+        </button>
+        <button class="btn btn-subtle inv-tab-sec" data-sec="productos" onclick="PatioModule.cambiarSeccion('productos')">
+          Catálogo de Insumos y Materiales
+        </button>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════
+           SECCIÓN: STOCK DE MINERAL EN PATIO (FASE 4)
+           ═══════════════════════════════════════════════════════ -->
+      <div id="inv-sec-patio" class="inv-sec-container">
+
+        <!-- Encabezado visible solo en impresión -->
+        <div class="print-header" style="display:none;">
+          <img src="/img/logo.svg" alt="Carbones Tamanaco" class="brand-logo">
+          <div>
+            <div style="font-size:16px; font-weight:700; color:#000;">Carbones Tamanaco</div>
+            <div style="font-size:12px; color:#555;">Balance Físico de Acopio en Patio</div>
+          </div>
+        </div>
+
+        <div class="flex-between no-print mb-12">
+          <span class="card-title" style="font-size:14px;">Stock consolidado de mineral por mina y pila de acopio</span>
+          <div class="flex gap-8">
+            <button class="btn btn-subtle" onclick="PatioModule.abrirModalPila()">+ Nueva Pila de Acopio</button>
+            <button class="btn btn-subtle" onclick="window.print()">Imprimir Balance Físico de Acopio</button>
+          </div>
+        </div>
+
+        <!-- KPIs Patio -->
+        <div class="stats-grid no-print">
+          <div class="stat-card s-blue">
+            <div class="stat-label">Stock Total Disponible en Patio</div>
+            <div class="stat-value" id="p-stat-stock-total">0 Ton</div>
+            <div class="stat-sub">suma de todas las pilas activas</div>
+          </div>
+          <div class="stat-card s-green">
+            <div class="stat-label">Total Recibido (Entradas)</div>
+            <div class="stat-value" id="p-stat-entrada">0 Ton</div>
+            <div class="stat-sub">acumulado histórico</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Despachado (Salidas)</div>
+            <div class="stat-value" id="p-stat-salida">0 Ton</div>
+            <div class="stat-sub">acumulado histórico</div>
+          </div>
+          <div class="stat-card s-red">
+            <div class="stat-label">Pilas con Stock Bajo</div>
+            <div class="stat-value" id="p-stat-bajo">0</div>
+            <div class="stat-sub">requieren reabastecimiento</div>
+          </div>
+        </div>
+
+        <!-- Tabla de Pilas / Lotes de Acopio -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Pilas / Lotes de Acopio por Mina</span>
+          </div>
+          <div class="table-wrap">
+            <table id="p-tabla-pilas">
+              <thead>
+                <tr>
+                  <th>Mina</th>
+                  <th>Pila / Lote de Acopio</th>
+                  <th class="text-right">Entrada (Ton)</th>
+                  <th class="text-right">Salida (Ton)</th>
+                  <th class="text-right">Stock Actual (Ton)</th>
+                  <th style="width:180px;">Ocupación</th>
+                  <th class="text-center">Estado</th>
+                  <th>Último Movimiento</th>
+                  <th class="no-print">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="p-tabla-pilas-body">
+                <tr><td colspan="9"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /inv-sec-patio -->
+
+      <!-- ═══════════════════════════════════════════════════════
+           SECCIÓN: CATÁLOGO DE PRODUCTOS / INSUMOS (existente)
+           ═══════════════════════════════════════════════════════ -->
+      <div id="inv-sec-productos" class="inv-sec-container" style="display:none;">
+
+        <!-- KPIs Inventario -->
+        <div class="stats-grid no-print">
+          <div class="stat-card">
+            <div class="stat-label">Total Productos</div>
+            <div class="stat-value" id="i-stat-total">0</div>
+            <div class="stat-sub">registrados en catálogo</div>
+          </div>
+          <div class="stat-card s-red">
+            <div class="stat-label">Bajo Stock o Agotados</div>
+            <div class="stat-value" id="i-stat-alertas">0</div>
+            <div class="stat-sub">requieren atención</div>
+          </div>
+        </div>
+
+        <!-- Formulario Nuevo Producto -->
+        <div class="card form-section mb-12 no-print">
+          <div class="card-header">
+            <span class="card-title" id="i-form-title">Nuevo Producto / Insumo</span>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="i-codigo">Código / SKU</label>
+                <input type="text" id="i-codigo" class="form-input" placeholder="Ej: HR-001 (Opcional)">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="i-nombre">Nombre del Producto</label>
+                <input type="text" id="i-nombre" class="form-input" placeholder="Ej: Aceite de motor 15W40">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="i-categoria">Categoría</label>
+                <input type="text" id="i-categoria" class="form-input" placeholder="Ej: Lubricantes, Herramientas, Carbón" list="list-categorias">
+                <datalist id="list-categorias">
+                  <option value="Lubricantes">
+                  <option value="Herramientas">
+                  <option value="Carbón">
+                  <option value="Repuestos">
+                </datalist>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="i-unidad">Unidad de Medida</label>
+                <select id="i-unidad" class="form-input">
+                  <option value="UNIDAD">UNIDAD</option>
+                  <option value="KG">KILOGRAMOS (KG)</option>
+                  <option value="TON">TONELADAS (TON)</option>
+                  <option value="LITROS">LITROS (L)</option>
+                  <option value="GALONES">GALONES</option>
+                  <option value="METROS">METROS</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="i-stock-minimo">Stock Mínimo (Alerta)</label>
+                <input type="number" id="i-stock-minimo" class="form-input" placeholder="Ej: 5" min="0" step="0.01">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="i-descripcion">Descripción</label>
+                <input type="text" id="i-descripcion" class="form-input" placeholder="Opcional">
+              </div>
+            </div>
+            <div class="flex gap-8 mt-12">
+              <button class="btn btn-primary" onclick="InventarioModule.guardarProducto()">Guardar Producto</button>
+              <button class="btn btn-ghost" id="i-btn-cancelar" onclick="InventarioModule.limpiarForm()" style="display:none;">Cancelar edición</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla Catálogo e Inventario -->
+        <div class="card">
+          <div class="card-header flex-between">
+            <span class="card-title">Catálogo y Existencias</span>
+            <input type="text" class="form-input no-print" style="width:200px; height:32px;" placeholder="Buscar producto..." oninput="InventarioModule.setBusqueda(this.value)">
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Producto</th>
+                  <th>Categoría</th>
+                  <th>Unidad</th>
+                  <th class="text-right">Stock Actual</th>
+                  <th class="text-center">Estado</th>
+                  <th class="no-print">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="i-tabla-productos">
+                <tr><td colspan="7"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /inv-sec-productos -->
+    </section>
+
+    <!-- Modal: Nueva Pila de Acopio -->
+    <div id="modal-nueva-pila" class="login-overlay no-print" style="display:none; align-items:center; justify-content:center; overflow-y:auto; padding:20px;">
+      <div class="card" style="width:100%; max-width:420px; margin:auto; background:var(--bg-surface); border:1px solid var(--b-default); box-shadow:var(--sh-lg);">
+        <div class="card-header flex-between">
+          <h2 style="font-size:16px; margin:0; color:var(--t-high); font-weight:700;">Nueva Pila de Acopio</h2>
+          <button class="btn btn-ghost btn-sm" onclick="PatioModule.cerrarModalPila()">✕</button>
+        </div>
+        <div class="card-body">
+          <div class="form-group mb-12">
+            <label class="form-label" for="p-nueva-mina">Mina</label>
+            <input type="text" id="p-nueva-mina" class="form-input" placeholder="Ej: MINA LA ESPERANZA" list="list-minas-patio">
+            <datalist id="list-minas-patio"></datalist>
+          </div>
+          <div class="form-group mb-12">
+            <label class="form-label" for="p-nueva-pila">Nombre de la Pila / Lote</label>
+            <input type="text" id="p-nueva-pila" class="form-input" placeholder="Ej: Pila A1">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="p-nueva-capacidad">Capacidad Máxima (Ton)</label>
+            <input type="number" id="p-nueva-capacidad" class="form-input" placeholder="Ej: 500" min="1" step="0.01" value="500">
+          </div>
+          <div class="flex gap-8 mt-16" style="justify-content:flex-end;">
+            <button class="btn btn-ghost" onclick="PatioModule.cerrarModalPila()">Cancelar</button>
+            <button class="btn btn-primary" onclick="PatioModule.guardarPila()">Crear Pila</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Registrar Movimiento de Patio -->
+    <div id="modal-movimiento-patio" class="login-overlay no-print" style="display:none; align-items:center; justify-content:center; overflow-y:auto; padding:20px;">
+      <div class="card" style="width:100%; max-width:420px; margin:auto; background:var(--bg-surface); border:1px solid var(--b-default); box-shadow:var(--sh-lg);">
+        <div class="card-header flex-between">
+          <div>
+            <h2 style="font-size:16px; margin:0; color:var(--t-high); font-weight:700;">Registrar Movimiento de Patio</h2>
+            <div style="font-size:11px; color:var(--t-low); margin-top:2px;" id="pm-pila-nombre">Pila Seleccionada</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="PatioModule.cerrarModalMovimiento()">✕</button>
+        </div>
+        <div class="card-body">
+          <input type="hidden" id="pm-pila-id">
+          <div class="form-group mb-12">
+            <label class="form-label" for="pm-tipo">Tipo de Movimiento</label>
+            <select id="pm-tipo" class="form-input">
+              <option value="ENTRADA">Entrada (Recepción de Mina)</option>
+              <option value="SALIDA">Salida (Despacho desde Patio)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pm-toneladas">Toneladas</label>
+            <input type="number" id="pm-toneladas" class="form-input" placeholder="Ej: 25.5" min="0.01" step="0.01">
+            <span style="font-size:11px; color:var(--t-low); margin-top:3px; display:block;">Stock actual: <strong id="pm-pila-stock">0</strong> Ton</span>
+          </div>
+          <div class="flex gap-8 mt-16" style="justify-content:flex-end;">
+            <button class="btn btn-ghost" onclick="PatioModule.cerrarModalMovimiento()">Cancelar</button>
+            <button class="btn btn-primary" onclick="PatioModule.guardarMovimiento()">Registrar Movimiento</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULO: TESORERÍA, INGRESOS Y CAJA REAL (SOLO ADMIN)
+         ═══════════════════════════════════════════════════════ -->
+    <section class="module-page" id="page-pagos">
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Tesorería, Ingresos y Saldo Disponible</h1>
+          <p>Control de depósitos recibidos, caja real y flujo financiero consolidado</p>
+        </div>
+        <!-- Panel de Exportación PDF -->
+        <div class="flex gap-8" style="align-items:flex-end; flex-wrap:wrap;">
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:10px; font-weight:600; color:var(--t-low); letter-spacing:.05em; text-transform:uppercase;">Desde (PDF)</label>
+            <input type="date" id="t-fecha-inicio" class="form-input" style="height:34px; font-size:12px; width:145px;">
+          </div>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:10px; font-weight:600; color:var(--t-low); letter-spacing:.05em; text-transform:uppercase;">Hasta (PDF)</label>
+            <input type="date" id="t-fecha-fin" class="form-input" style="height:34px; font-size:12px; width:145px;">
+          </div>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:10px; font-weight:600; color:var(--t-low); letter-spacing:.05em; text-transform:uppercase;">Tipo</label>
+            <select id="t-rep-tipo" class="form-input" style="height:34px; font-size:12px; width:130px;">
+              <option value="TODAS">Todos</option>
+              <option value="INGRESO">Solo Ingresos</option>
+              <option value="EGRESO">Solo Egresos</option>
+            </select>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:10px; font-weight:600; color:var(--t-low); letter-spacing:.05em; text-transform:uppercase;">Moneda (PDF)</label>
+            <select id="t-rep-moneda" class="form-input" style="height:34px; font-size:12px; width:130px;" onchange="TesoreriaModule.setFiltroMoneda(this.value)">
+              <option value="TODAS">Todas</option>
+              <option value="COP">COP</option>
+              <option value="USD">USD</option>
+              <option value="VES">VES</option>
+            </select>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <button id="btn-exportar-pdf-tesoreria" class="btn btn-primary" style="height:34px; padding:0 18px; font-size:12px; white-space:nowrap;" onclick="TesoreriaModule.exportarPDF()">
+              Exportar Estado de Caja PDF
+            </button>
+            <button class="btn btn-subtle" style="height:34px; font-size:12px;" onclick="Utils.exportarExcel('t-tabla-tesoreria', 'Libro_Diario_Tesoreria')">
+              Exportar a Excel
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cabecera para impresión / PDF -->
+      <div class="print-header" style="display:none;">
+        <img src="/img/logo.svg" alt="Carbones Tamanaco" class="brand-logo">
+        <div>
+          <h2 style="font-size:18px; margin:0;">Carbones Tamanaco — Estado de Tesorería y Flujo de Caja</h2>
+          <div style="font-size:12px; color:#555; margin-top:2px;">
+            Reporte financiero consolidado de ingresos, egresos y saldos disponibles
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub-navegación por Secciones de Tesorería -->
+      <div class="tabs-nav no-print mb-24" style="display:flex; gap:10px; border-bottom:1px solid var(--b-default); padding-bottom:12px;">
+        <button class="btn btn-primary t-tab-sec" data-sec="libro-diario" onclick="TesoreriaModule.cambiarSeccion('libro-diario')">
+          Libro Diario y Flujo de Caja (Principal)
+        </button>
+        <button class="btn btn-subtle t-tab-sec" data-sec="ingresos" onclick="TesoreriaModule.cambiarSeccion('ingresos')">
+          Registrar Depósitos / Ingresos
+        </button>
+        <button class="btn btn-subtle t-tab-sec" data-sec="cambios" onclick="TesoreriaModule.cambiarSeccion('cambios')">
+          Registrar Cambios de Moneda
+        </button>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           SECCIÓN 1: LIBRO DIARIO Y FLUJO DE CAJA (PRINCIPAL)
+           ═══════════════════════════════════════════════════════════ -->
+      <div id="t-sec-libro-diario" class="t-sec-container">
+        <!-- KPIs de Saldo Disponible en Tiempo Real -->
+        <div class="stats-grid">
+          <div class="stat-card s-green" id="t-card-cop">
+            <div class="stat-label">Saldo Disponible (COP)</div>
+            <div class="stat-value" id="t-saldo-cop" style="font-size:22px;">$ 0</div>
+            <div class="stat-sub" style="margin-top:6px; display:flex; justify-content:space-between;">
+              <span>Ingresos: <strong id="t-ingresos-cop" style="color:var(--c-green);">$ 0</strong></span>
+              <span>Gastos: <strong id="t-gastos-cop" style="color:var(--c-red);">$ 0</strong></span>
+            </div>
+          </div>
+          <div class="stat-card s-green" id="t-card-usd">
+            <div class="stat-label">Saldo Disponible (USD)</div>
+            <div class="stat-value" id="t-saldo-usd" style="font-size:22px;">$ 0.00 USD</div>
+            <div class="stat-sub" style="margin-top:6px; display:flex; justify-content:space-between;">
+              <span>Ingresos: <strong id="t-ingresos-usd" style="color:var(--c-green);">$ 0.00</strong></span>
+              <span>Gastos: <strong id="t-gastos-usd" style="color:var(--c-red);">$ 0.00</strong></span>
+            </div>
+          </div>
+          <div class="stat-card s-green" id="t-card-ves">
+            <div class="stat-label">Saldo Disponible (VES)</div>
+            <div class="stat-value" id="t-saldo-ves" style="font-size:22px;">Bs. 0.00</div>
+            <div class="stat-sub" style="margin-top:6px; display:flex; justify-content:space-between;">
+              <span>Ingresos: <strong id="t-ingresos-ves" style="color:var(--c-green);">Bs. 0</strong></span>
+              <span>Gastos: <strong id="t-gastos-ves" style="color:var(--c-red);">Bs. 0</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Libro Diario / Cuenta Detallada -->
+        <div class="card">
+          <div class="card-header flex-between">
+            <span class="card-title">Libro Diario y Flujo de Caja Consolidado</span>
+            <div class="flex gap-8 no-print" style="align-items:center; flex-wrap:wrap;">
+              
+              <!-- Navegador de fechas estilo Cargas de Camiones -->
+              <div class="date-nav" style="align-items:center;">
+                <button class="date-nav-btn" onclick="TesoreriaModule.cambiarDia(-1)">&#8249;</button>
+                <input type="date" id="t-filtroFecha" class="date-nav-input" style="height:28px; font-size:12px; padding:0 8px;" onchange="TesoreriaModule.alCambiarFecha()">
+                <button class="date-nav-btn" onclick="TesoreriaModule.cambiarDia(1)">&#8250;</button>
+                <button class="date-nav-today" onclick="TesoreriaModule.irAHoy()" style="height:28px; font-size:11px;">Hoy</button>
+              </div>
+
+              <!-- Filtro por Tipo -->
+              <div class="date-nav">
+                <button class="date-nav-btn t-tab-tipo active" data-tipo="TODAS" onclick="TesoreriaModule.setFiltroTipo('TODAS')" style="font-size:11px; width:auto; padding:0 8px;">Todos</button>
+                <button class="date-nav-btn t-tab-tipo" data-tipo="INGRESO" onclick="TesoreriaModule.setFiltroTipo('INGRESO')" style="font-size:11px; width:auto; padding:0 8px;">+ Ingresos</button>
+                <button class="date-nav-btn t-tab-tipo" data-tipo="EGRESO" onclick="TesoreriaModule.setFiltroTipo('EGRESO')" style="font-size:11px; width:auto; padding:0 8px;">- Egresos</button>
+                <button class="date-nav-btn t-tab-tipo" data-tipo="CAMBIO" onclick="TesoreriaModule.setFiltroTipo('CAMBIO')" style="font-size:11px; width:auto; padding:0 8px;">Cambios</button>
+              </div>
+              <!-- Filtro por Moneda -->
+              <div class="date-nav">
+                <button class="date-nav-btn t-tab-moneda active" data-moneda="TODAS" onclick="TesoreriaModule.setFiltroMoneda('TODAS')" style="font-size:11px; width:auto; padding:0 8px;">Todas</button>
+                <button class="date-nav-btn t-tab-moneda" data-moneda="COP" onclick="TesoreriaModule.setFiltroMoneda('COP')" style="font-size:11px; width:auto; padding:0 8px;">COP</button>
+                <button class="date-nav-btn t-tab-moneda" data-moneda="USD" onclick="TesoreriaModule.setFiltroMoneda('USD')" style="font-size:11px; width:auto; padding:0 8px;">USD</button>
+                <button class="date-nav-btn t-tab-moneda" data-moneda="VES" onclick="TesoreriaModule.setFiltroMoneda('VES')" style="font-size:11px; width:auto; padding:0 8px;">VES</button>
+              </div>
+              <input type="text" class="form-input" style="width:140px; height:28px; font-size:11px;" placeholder="Buscar..." oninput="TesoreriaModule.setBusqueda(this.value)">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="t-tabla-tesoreria">
+              <thead>
+                <tr>
+                  <th>Fecha / Hora</th>
+                  <th>Tipo</th>
+                  <th>Concepto / Detalle</th>
+                  <th>Categoría</th>
+                  <th>Método de pago</th>
+                  <th>Moneda</th>
+                  <th class="text-right">Monto</th>
+                </tr>
+              </thead>
+              <tbody id="t-tabla-movimientos">
+                <tr><td colspan="7"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           SECCIÓN 2: REGISTRAR DEPÓSITOS / INGRESOS
+           ═══════════════════════════════════════════════════════════ -->
+      <div id="t-sec-ingresos" class="t-sec-container" style="display:none;">
+        <div class="card form-section mb-24 no-print">
+          <div class="card-header">
+            <span class="card-title" id="t-form-title">Nuevo depósito / ingreso recibido</span>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="t-fecha">Fecha del Depósito</label>
+                <input type="date" id="t-fecha" class="form-input">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="t-cliente">Cliente / Origen de los Fondos</label>
+                <input type="text" id="t-cliente" class="form-input" placeholder="Ej: Termoeléctrica del Zulia / Aporte propio">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="t-monto">Monto Depositado</label>
+                <input type="text" inputmode="decimal" id="t-monto" class="form-input" placeholder="Ej: 10000000 o 10.000.000">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="t-moneda">Moneda</label>
+                <select id="t-moneda" class="form-input">
+                  <option value="COP" selected>COP (Pesos Colombianos)</option>
+                  <option value="USD">USD (Dólares)</option>
+                  <option value="VES">VES (Bolívares)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="t-metodo">Método de Pago / Cuenta</label>
+                <select id="t-metodo" class="form-input"></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="t-referencia">N° de Referencia / Comprobante</label>
+                <input type="text" id="t-referencia" class="form-input" placeholder="Ej: REF-987654 / Hash Binance">
+              </div>
+            </div>
+            <div class="form-group mt-12">
+              <label class="form-label" for="t-notas">Concepto / Notas</label>
+              <input type="text" id="t-notas" class="form-input" placeholder="Anticipo por despacho, abono de factura, etc.">
+            </div>
+
+            <div class="flex gap-8 mt-12">
+              <button class="btn btn-primary" onclick="TesoreriaModule.guardarIngreso()">Registrar depósito en caja</button>
+              <button class="btn btn-ghost" onclick="TesoreriaModule.limpiarForm()">Limpiar</button>
+            </div>
+          </div>
+          <!-- Historial de Depósitos Registrados -->
+          <div class="table-wrap" style="border-top: 1px solid var(--border-color);">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha / Hora</th>
+                  <th>Cliente / Origen</th>
+                  <th>Método</th>
+                  <th>Referencia</th>
+                  <th>Moneda</th>
+                  <th class="text-right">Monto</th>
+                  <th>Notas</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="t-tabla-ingresos">
+                <tr><td colspan="8"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           SECCIÓN 3: REGISTRAR CAMBIOS DE MONEDA
+           ═══════════════════════════════════════════════════════════ -->
+      <div id="t-sec-cambios" class="t-sec-container" style="display:none;">
+        <div class="card form-section mb-24 no-print">
+          <div class="card-header">
+            <span class="card-title" id="c-form-title">Nuevo cambio / conversion de moneda</span>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="c-fecha">Fecha del Cambio</label>
+                <input type="date" id="c-fecha" class="form-input">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="c-moneda-origen">Moneda a Entregar</label>
+                <select id="c-moneda-origen" class="form-input" onchange="TesoreriaModule.calcularTasaCambio()">
+                  <option value="VES">VES (Bolivares)</option>
+                  <option value="USD">USD (Dolares)</option>
+                  <option value="COP">COP (Pesos)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="c-monto-origen">Monto a Entregar</label>
+                <input type="text" inputmode="decimal" id="c-monto-origen" class="form-input" placeholder="Ej: 10000000 o 10.000.000"
+                       oninput="TesoreriaModule.calcularTasaCambio()">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="c-moneda-destino">Moneda a Recibir</label>
+                <select id="c-moneda-destino" class="form-input" onchange="TesoreriaModule.calcularTasaCambio()">
+                  <option value="USD">USD (Dolares)</option>
+                  <option value="COP">COP (Pesos)</option>
+                  <option value="VES">VES (Bolivares)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="c-tasa">Tasa de Cambio</label>
+                <input type="text" inputmode="decimal" id="c-tasa" class="form-input" placeholder="Ej: 70 o 70.50"
+                       oninput="TesoreriaModule.calcularTasaCambio()">
+                <span id="c-formula-hint" style="font-size:11px; color:var(--t-low); margin-top:4px; display:block;"></span>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="c-monto-destino">Monto a Recibir (calculado)</label>
+                <input type="text" id="c-monto-destino" class="form-input" placeholder="Se calcula automaticamente" readonly
+                       style="background:var(--bg-elevated); color:var(--t-high); font-weight:600; cursor:default;">
+              </div>
+            </div>
+            <div class="form-grid mt-12">
+              <div class="form-group">
+                <label class="form-label" for="c-concepto">Concepto</label>
+                <input type="text" id="c-concepto" class="form-input" placeholder="Ej: Compra de dolares en Binance">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="c-referencia">N. de Referencia / Hash</label>
+                <input type="text" id="c-referencia" class="form-input" placeholder="Ej: Hash Binance, codigo transferencia">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="c-notas">Notas</label>
+                <input type="text" id="c-notas" class="form-input" placeholder="Observaciones adicionales">
+              </div>
+            </div>
+            <div class="flex gap-8 mt-12">
+              <button class="btn btn-primary" onclick="TesoreriaModule.guardarCambio()">Registrar cambio</button>
+              <button class="btn btn-ghost" onclick="TesoreriaModule.limpiarFormCambio()">Limpiar</button>
+            </div>
+          </div>
+          <!-- Historial de cambios registrados -->
+          <div class="table-wrap" style="border-top: 1px solid var(--border-color);">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha / Hora</th>
+                  <th>Conversion</th>
+                  <th>Entrega</th>
+                  <th>Recibe</th>
+                  <th>Tasa Ref.</th>
+                  <th>Concepto</th>
+                  <th>Referencia</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="c-tabla-cambios">
+                <tr><td colspan="8"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="module-page" id="page-produccion">
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Producción</h1>
+          <p>Costos de producción, BOM y órdenes</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <div class="empty-state">
+            <div class="empty-icon">—</div>
+            <h3>Próxima fase</h3>
+            <p>Fichas de costo, listas de materiales y lotes de producción.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULO: GESTIÓN DE USUARIOS Y ROLES (ADMIN)
+         ═══════════════════════════════════════════════════════ -->
+    <section class="module-page" id="page-usuarios">
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Gestión de Usuarios</h1>
+          <p>Administración de accesos y roles del personal</p>
+        </div>
+      </div>
+
+      <!-- Formulario Usuario -->
+      <div class="card form-section mb-12 no-print">
+        <div class="card-header">
+          <span class="card-title" id="u-form-title">Nuevo usuario</span>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="u-nombre">Nombre Completo</label>
+              <input type="text" id="u-nombre" class="form-input" placeholder="Ej: Juan Pérez">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="u-email">Correo Electrónico</label>
+              <input type="email" id="u-email" class="form-input" placeholder="usuario@tamanaco.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="u-password">Contraseña</label>
+              <input type="password" id="u-password" class="form-input" placeholder="Contraseña segura">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="u-rol">Rol / Permisos</label>
+              <select id="u-rol" class="form-input">
+                <option value="ADMIN">ADMIN — Administrador (Acceso Total)</option>
+                <option value="OPERADOR" selected>OPERADOR — Editor General (Despachos y Gastos)</option>
+                <option value="DESPACHADOR">DESPACHADOR — Operador de Patio (Solo Cargas/Despachos)</option>
+                <option value="CONSULTA">CONSULTA — Solo Lectura (Ver y Reportes PDF)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="u-activo">Estado</label>
+              <select id="u-activo" class="form-input">
+                <option value="true" selected>Activo (Permitir acceso)</option>
+                <option value="false">Inactivo (Bloquear acceso)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex gap-8 mt-12">
+            <button class="btn btn-primary" onclick="UsuariosModule.guardarUsuario()">Guardar usuario</button>
+            <button class="btn btn-ghost" id="u-btn-cancelar" onclick="UsuariosModule.limpiarForm()" style="display:none;">Cancelar edición</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla Usuarios -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Usuarios del Sistema</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Correo</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th class="no-print">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="u-tabla-usuarios">
+              <tr><td colspan="5"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULO: METAS DE ENTREGA
+         ═══════════════════════════════════════════════════════ -->
+    <section class="module-page" id="page-metas">
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Metas de Entrega</h1>
+          <p>Progreso de despachos a clientes y contratos</p>
+        </div>
+        <div class="flex gap-8">
+          <button id="btn-edit-cuota" class="btn btn-ghost" onclick="MetasModule.editarCuotaActiva()" style="display:none; color:var(--c-blue);">Editar Meta Activa</button>
+          <button id="btn-config-cuota" class="btn btn-primary" onclick="MetasModule.abrirModalCuota()" style="display:none;">Configurar Nueva Meta</button>
+        </div>
+      </div>
+
+      <div id="m-cuota-empty" style="text-align:center; padding: 40px 20px; color: var(--t-low); display:none;">
+        <h3>No hay ninguna meta activa</h3>
+        <p style="font-size:12px;">Contacte a un Administrador para establecer una nueva cuota de entrega.</p>
+      </div>
+
+      <!-- Dashboard de Cuota -->
+      <div id="m-cuota-container" class="card mb-16 no-print" style="display:none; background: linear-gradient(135deg, rgba(30,58,138,0.1), rgba(17,24,39,0)); border: 1px solid var(--b-hover);">
+        <div class="card-body">
+          <div class="flex-between mb-8">
+            <div>
+              <h3 style="font-size:14px; font-weight:700; color:var(--t-high); margin:0;">Meta de Despacho (Cuota Activa)</h3>
+              <p style="font-size:12px; color:var(--t-low); margin:2px 0 0 0;" id="m-cuota-cliente">Cargando...</p>
+            </div>
+            <div style="text-align:right;">
+              <span id="m-cuota-porcentaje" style="font-size:18px; font-weight:800; color:var(--c-blue);">0%</span>
+            </div>
+          </div>
+          
+          <!-- Barra de Progreso -->
+          <div style="width: 100%; height: 8px; background: var(--bg-elevated); border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
+            <div id="m-cuota-barra" style="width: 0%; height: 100%; background: var(--c-blue); border-radius: 4px; transition: width 0.5s ease-out;"></div>
+          </div>
+          
+          <div class="flex-between" style="font-size:11px; color:var(--t-low);">
+            <span id="m-cuota-entregado">Entregado: 0 TON</span>
+            <span id="m-cuota-meta" style="font-weight:600; color:var(--t-high);">Meta: 0 TON</span>
+            <span id="m-cuota-restante">Faltan: 0 TON</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historial de Metas -->
+      <div class="card mb-16 no-print">
+        <div class="card-header">
+          <span class="card-title">Historial de Metas</span>
+        </div>
+        <div class="table-wrap">
+          <table id="m-tabla-historial">
+            <thead>
+              <tr>
+                <th>Cliente / Contrato</th>
+                <th>Período</th>
+                <th>Meta (Ton)</th>
+                <th>Entregado (Ton)</th>
+                <th>Cumplimiento</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="5"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Modal: Configurar Cuota -->
+      <div id="modal-cuota" class="login-overlay" style="display:none; align-items:center; justify-content:center; padding:20px; z-index:9999;">
+        <div class="card" style="width:100%; max-width:400px; margin:auto; background:var(--bg-surface); border:1px solid var(--b-default); box-shadow:var(--sh-lg);">
+          <div class="card-header flex-between">
+            <h2 style="font-size:16px; margin:0; color:var(--t-high);">Establecer Nueva Cuota</h2>
+            <button class="btn btn-ghost btn-sm" onclick="MetasModule.cerrarModalCuota()">✕</button>
+          </div>
+          <div class="card-body">
+            <p style="font-size:12px; color:var(--t-low); margin-bottom:12px;">Al establecer una nueva cuota, la anterior se marcará como completada automáticamente.</p>
+            <div class="form-group mb-12">
+              <label class="form-label">Cliente / Contrato</label>
+              <input type="text" id="mc-cliente" class="form-input" placeholder="Ej: Planta Termoeléctrica">
+            </div>
+            <div class="form-group mb-12">
+              <label class="form-label">Meta a Entregar (Toneladas)</label>
+              <input type="number" id="mc-meta" class="form-input" placeholder="Ej: 1500" min="1">
+            </div>
+            <div class="form-group mb-12">
+              <label class="form-label">Mes / Período</label>
+              <input type="month" id="mc-periodo" class="form-input">
+            </div>
+            <div class="form-group mb-12">
+              <label class="form-label">Toneladas ya adelantadas (Opcional)</label>
+              <input type="number" id="mc-adelanto" class="form-input" placeholder="Ej: 250" min="0" step="0.01">
+            </div>
+            <div class="form-group mb-12">
+              <label class="form-label" style="color:var(--c-green);">Precio de Venta Pactado (USD / Ton)</label>
+              <input type="number" id="mc-precio" class="form-input" placeholder="Ej: 84" step="0.01" min="0">
+              <span style="font-size:10px; color:var(--t-medium);">Este precio se usará automáticamente en el Reporte de Rentabilidad.</span>
+            </div>
+            <div class="flex gap-8 mt-16" style="justify-content:flex-end;">
+              <button class="btn btn-ghost" onclick="MetasModule.cerrarModalCuota()">Cancelar</button>
+              <button class="btn btn-primary" onclick="MetasModule.guardarCuota()">Establecer Meta</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULO: LABORATORIO Y CALIDAD
+         ═══════════════════════════════════════════════════════ -->
+    <section class="module-page" id="page-laboratorio">
+      <!-- Encabezado visible solo en impresión -->
+      <div id="print-area-laboratorio" class="print-only">
+        <div class="print-header">
+          <div class="print-brand">
+            <h2>CARBONES TAMANACO C.A.</h2>
+            <p>SISTEMA INTEGRAL DE CONTROL OPERATIVO</p>
+          </div>
+          <div class="print-doc-title">
+            <h3>INFORME DE ENSAYOS DE LABORATORIO Y CONTROL DE CALIDAD</h3>
+            <p>Semana evaluada: <span id="print-lab-periodo">Semana en Curso</span></p>
+          </div>
+        </div>
+
+        <table class="print-table">
+          <thead>
+            <tr>
+              <th style="width: 5%;">#</th>
+              <th style="width: 12%;">FECHA</th>
+              <th style="width: 25%;">MINA / PROVEEDOR</th>
+              <th style="width: 12%;">LOTE</th>
+              <th style="text-align: right; width: 11%;">CENIZA (%)</th>
+              <th style="text-align: right; width: 11%;">AZUFRE (%)</th>
+              <th style="text-align: right; width: 14%;">PODER CAL. (BTU/LB)</th>
+              <th style="text-align: center; width: 10%;">ESTADO</th>
+            </tr>
+          </thead>
+          <tbody id="print-lab-tbody"></tbody>
+        </table>
+
+        <div class="print-signatures">
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <p>ANALISTA DE LABORATORIO</p>
+          </div>
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <p>CONTROL DE CALIDAD</p>
+          </div>
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <p>GERENCIA DE OPERACIONES</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Laboratorio y Calidad</h1>
+          <p>Control químico y penalizaciones automáticas</p>
+        </div>
+        <div class="flex gap-8">
+          <button type="button" class="btn btn-subtle btn-export" onclick="abrirModalExcelLaboratorio()">Excel</button>
+          <button type="button" class="btn btn-subtle" onclick="imprimirReporteLaboratorio()">Imprimir / PDF</button>
+        </div>
+      </div>
+
+      <!-- Navegador de Semanas -->
+      <div class="card mb-12 no-print" style="padding: 12px 16px;">
+        <div class="flex-between" style="align-items: center;">
+          <div class="flex gap-8" style="align-items: center;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--t-medium);">Semana:</span>
+            <span id="lab-label-semana" style="font-size: 14px; font-weight: 700; color: var(--t-high);">Cargando...</span>
+          </div>
+          <div class="flex gap-8" style="align-items: center;">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="LaboratorioModule.cambiarSemana(-1)">◀ Semana Anterior</button>
+            <button type="button" class="btn btn-subtle btn-sm" onclick="LaboratorioModule.hoySemana()">Hoy</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="LaboratorioModule.cambiarSemana(1)">Semana Siguiente ▶</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Calidad Ponderada del Acopio Semanal (Mezcla Real) -->
+      <div class="card-laboratorio-semanal no-print" style="background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 25px;">
+          
+          <!-- Header de Calidad Ponderada -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 12px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                  <h3 style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; margin: 0;">
+                      CALIDAD PONDERADA DEL ACOPIO SEMANAL (MEZCLA REAL)
+                  </h3>
+                  <p style="font-size: 0.8rem; color: #94a3b8; margin: 3px 0 0 0;">
+                      Consolidación fisicoquímica en tiempo real según despachos reales en báscula
+                  </p>
+              </div>
+              
+              <div style="display: flex; gap: 8px; align-items: center;">
+                  <button type="button" onclick="toggleTablaMezcla()" id="btn-toggle-mezcla" style="background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 7px 12px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;">
+                      Ocultar Tabla
+                  </button>
+                  <button type="button" onclick="imprimirReporteMezclasSemanal()" style="background: #0284c7; color: #fff; border: none; padding: 7px 15px; border-radius: 6px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
+                      Reporte de Mezclas
+                  </button>
+              </div>
+          </div>
+
+          <!-- 5 Tarjetas KPI Consolidadas -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; text-align: center;">
+              <div style="background: #1e293b; padding: 12px; border-radius: 8px; border: 1px solid #334155;">
+                  <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 600;">TOTAL ACOPIO SEMANAL</div>
+                  <div id="lab-total-ton-semana" style="font-size: 1.4rem; font-weight: 800; color: #38bdf8; margin-top: 4px;">0.00 Ton</div>
+              </div>
+              <div id="card-sem-ash" style="background: #1e293b; padding: 12px; border-radius: 8px; border: 1px solid #334155;">
+                  <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 600;">CENIZA GLOBAL MEZCLA</div>
+                  <div id="lab-ash-ponderada" style="font-size: 1.4rem; font-weight: 800; color: #ffffff; margin-top: 4px;">0.00 %</div>
+                  <div id="lab-ash-tag" style="font-size: 0.68rem; font-weight: 700; color: #22c55e; margin-top: 2px;">—</div>
+              </div>
+              <div id="card-sem-sulf" style="background: #1e293b; padding: 12px; border-radius: 8px; border: 1px solid #334155;">
+                  <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 600;">AZUFRE GLOBAL MEZCLA</div>
+                  <div id="lab-sulf-ponderada" style="font-size: 1.4rem; font-weight: 800; color: #ffffff; margin-top: 4px;">0.00 %</div>
+                  <div id="lab-sulf-tag" style="font-size: 0.68rem; font-weight: 700; color: #22c55e; margin-top: 2px;">—</div>
+              </div>
+              <div id="card-sem-moist" style="background: #1e293b; padding: 12px; border-radius: 8px; border: 1px solid #334155;">
+                  <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 600;">HUMEDAD GLOBAL MEZCLA</div>
+                  <div id="lab-moist-ponderada" style="font-size: 1.4rem; font-weight: 800; color: #ffffff; margin-top: 4px;">0.00 %</div>
+                  <div id="lab-moist-tag" style="font-size: 0.68rem; font-weight: 700; color: #22c55e; margin-top: 2px;">—</div>
+              </div>
+              <div id="card-sem-btu" style="background: #1e293b; padding: 12px; border-radius: 8px; border: 1px solid #334155;">
+                  <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 600;">PODER CALORÍFICO PROMEDIO</div>
+                  <div id="lab-btu-ponderado" style="font-size: 1.4rem; font-weight: 800; color: #ffffff; margin-top: 4px;">0 BTU/lb</div>
+                  <div id="lab-btu-tag" style="font-size: 0.68rem; font-weight: 700; color: #22c55e; margin-top: 2px;">—</div>
+              </div>
+          </div>
+
+          <!-- Contenedor Desplegable con Filtro y Scroll Inteligente -->
+          <div id="contenedor-tabla-mezcla">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                  <span style="font-size: 0.78rem; color: #94a3b8; font-weight: 600;">LISTADO DE MINAS APORTANTES:</span>
+                  <input type="text" id="filtro-mina-lab" placeholder="Buscar mina..." oninput="filtrarMinasLab()" style="background: #1e293b; border: 1px solid #334155; color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; width: 200px;" />
+              </div>
+
+              <div style="max-height: 280px; overflow-y: auto; border: 1px solid #334155; border-radius: 8px;">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 0.84rem; text-align: left;">
+                      <thead style="position: sticky; top: 0; background: #1e293b; z-index: 10; border-bottom: 2px solid #334155;">
+                          <tr style="color: #94a3b8;">
+                              <th style="padding: 8px 10px;">MINA / ORIGEN</th>
+                              <th style="padding: 8px 10px; text-align: right;">DESPACHADO (TON)</th>
+                              <th style="padding: 8px 10px; text-align: center;">% PART.</th>
+                              <th style="padding: 8px 10px; text-align: right;">CENIZA (%)</th>
+                              <th style="padding: 8px 10px; text-align: right;">AZUFRE (%)</th>
+                              <th style="padding: 8px 10px; text-align: right;">HUMEDAD (%)</th>
+                              <th style="padding: 8px 10px; text-align: right;">BTU/LB</th>
+                              <th style="padding: 8px 10px; text-align: center;">ESTADO</th>
+                              <th style="padding: 8px 10px; text-align: center;">ACCIÓN</th>
+                          </tr>
+                      </thead>
+                      <tbody id="tabla-calidad-semanal-tbody">
+                          <!-- Filas renderizadas por JS -->
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+      </div>
+
+      <!-- MODAL DE CARGA / EDICIÓN RÁPIDA DE ANÁLISIS -->
+      <div id="modal-analisis-rapido" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+          <div style="background: #0f172a; color: #f8fafc; width: 100%; max-width: 460px; border-radius: 12px; border: 1px solid #334155; padding: 22px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); box-sizing: border-box;">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 14px;">
+                  <h4 style="margin: 0; color: #38bdf8; font-size: 1.1rem; font-weight: 800;">
+                      Cargar Análisis de Calidad
+                  </h4>
+                  <button type="button" onclick="cerrarModalAnalisisRapido()" style="background: transparent; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">&times;</button>
+              </div>
+
+              <form id="form-analisis-rapido" onsubmit="guardarAnalisisRapido(event)">
+                  <input type="hidden" id="rapido-analisis-id" value="" />
+                  <input type="hidden" id="rapido-mina-nombre" />
+                  
+                  <div style="background: #1e293b; padding: 10px; border-radius: 6px; margin-bottom: 14px; border: 1px solid #334155;">
+                      <div style="font-size: 0.72rem; color: #94a3b8;">MINA SELECCIONADA:</div>
+                      <div id="rapido-mina-label" style="font-size: 1.1rem; font-weight: 800; color: #ffffff;">—</div>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                      <div>
+                          <label style="font-size: 0.75rem; color: #94a3b8;">Cenizas (%):</label>
+                          <input type="text" id="rapido-ceniza" inputmode="decimal" placeholder="Ej: 1.1" oninput="normalizarDecimalInput(this)" style="width: 100%; box-sizing: border-box; background: #0b132b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 6px; font-weight: 700;" />
+                      </div>
+                      <div>
+                          <label style="font-size: 0.75rem; color: #94a3b8;">Azufre (%):</label>
+                          <input type="text" id="rapido-azufre" inputmode="decimal" placeholder="Ej: 1.1" oninput="normalizarDecimalInput(this)" style="width: 100%; box-sizing: border-box; background: #0b132b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 6px;" />
+                      </div>
+                      <div>
+                          <label style="font-size: 0.75rem; color: #94a3b8;">Humedad (%):</label>
+                          <input type="text" id="rapido-humedad" inputmode="decimal" placeholder="Ej: 6.0" oninput="normalizarDecimalInput(this)" style="width: 100%; box-sizing: border-box; background: #0b132b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 6px;" />
+                      </div>
+                      <div>
+                          <label style="font-size: 0.75rem; color: #94a3b8;">Poder Calorífico (BTU):</label>
+                          <input type="text" id="rapido-btu" inputmode="numeric" placeholder="Ej: 13000" oninput="normalizarDecimalInput(this)" style="width: 100%; box-sizing: border-box; background: #0b132b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 6px;" />
+                      </div>
+                  </div>
+
+                  <div style="margin-bottom: 16px;">
+                      <label style="font-size: 0.75rem; color: #94a3b8;">Fecha de Muestra:</label>
+                      <input type="date" id="rapido-fecha" style="width: 100%; box-sizing: border-box; background: #0b132b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 6px;" />
+                  </div>
+
+                  <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                      <button type="button" onclick="cerrarModalAnalisisRapido()" style="padding: 8px 14px; background: #334155; border: none; border-radius: 6px; color: #fff; cursor: pointer; font-weight: 600;">Cancelar</button>
+                      <button type="submit" style="padding: 8px 18px; background: #0284c7; border: none; border-radius: 6px; color: #fff; font-weight: 700; cursor: pointer;">Guardar y Recalcular</button>
+                  </div>
+              </form>
+          </div>
+      </div>
+
+      <div class="stats-grid no-print">
+        <!-- Formulario de ingreso -->
+        <div class="card form-section" style="grid-column: span 12;">
+          <div class="card-header"><span class="card-title">Ingresar Resultado de Análisis</span></div>
+          <div class="card-body">
+            <form id="form-laboratorio" class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Mina / Proveedor</label>
+                <input type="text" id="lab-mina" class="form-input" placeholder="Ej: Mina La Rinconada" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Fecha de Muestra</label>
+                <input type="date" id="lab-fecha" class="form-input" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Lote / Referencia (Opcional)</label>
+                <input type="text" id="lab-lote" class="form-input" placeholder="Ticket o guía">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Ceniza (%)</label>
+                <input type="text" inputmode="decimal" id="lab-ceniza" class="form-input" placeholder="Ej: 9.5" oninput="normalizarDecimalInput(this)" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Azufre (%)</label>
+                <input type="text" inputmode="decimal" id="lab-azufre" class="form-input" placeholder="Ej: 0.8" oninput="normalizarDecimalInput(this)">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Poder Calorífico (BTU/lb o Kcal)</label>
+                <input type="text" inputmode="numeric" id="lab-btu" class="form-input" placeholder="Ej: 12500" oninput="normalizarDecimalInput(this)">
+              </div>
+              <div class="form-group" style="align-self: flex-end;">
+                <button type="submit" class="btn btn-primary" style="width:100%;">Guardar Análisis</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla de Historial -->
+      <div class="card">
+        <div class="card-header flex-between" style="align-items: center;">
+          <span class="card-title">Historial de Calidad</span>
+          <div class="flex gap-8" style="align-items: center;">
+            <label for="lab-filtro-mina" style="font-size: 12px; color: var(--t-medium); font-weight:600;">Filtrar por Mina:</label>
+            <select id="lab-filtro-mina" class="form-input" style="padding: 4px 8px; font-size: 12px; min-width: 180px;" onchange="LaboratorioModule.filtrarPorMina(this.value)">
+              <option value="SEMANA">-- Semana Activa --</option>
+              <option value="TODAS">Todas las Minas (Histórico Completo)</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="lab-tabla">
+            <thead>
+              <tr>
+                <th>Mina / Proveedor</th>
+                <th>Fecha Análisis</th>
+                <th>Lote</th>
+                <th class="text-right">Ceniza (%)</th>
+                <th class="text-right">Azufre (%)</th>
+                <th class="text-right">Poder Cal.</th>
+                <th class="text-center">Estado</th>
+                <th class="text-center no-print">Acciones</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULO: AUDITORÍA (CAJA NEGRA)
+         ═══════════════════════════════════════════════════════ -->
+    <section class="module-page" id="page-auditoria">
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Seguridad y Auditoría</h1>
+          <p>Bitácora inmutable de acciones del sistema (Últimos 500 registros)</p>
+        </div>
+        <div class="flex gap-8">
+          <button class="btn btn-subtle" onclick="Utils.exportarExcel('a-tabla-auditoria', 'Auditoria')">Excel</button>
+        </div>
+      </div>
+
+      <!-- Tabla de Auditoría -->
+      <div class="card">
+        <div class="table-wrap">
+          <table id="a-tabla-auditoria">
+            <thead>
+              <tr>
+                <th style="width: 140px;">Fecha y Hora</th>
+                <th style="width: 120px;">Usuario</th>
+                <th style="width: 100px;">Acción</th>
+                <th style="width: 120px;">Módulo</th>
+                <th>Detalle del evento</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULO: AUDITORÍA / CHOFERES (Historial por Cédula)
+         ═══════════════════════════════════════════════════════ -->
+    <section class="module-page" id="page-choferes">
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Auditoría / Choferes</h1>
+          <p>Historial de choferes identificados por cédula y sus viajes registrados en Despachos</p>
+        </div>
+        <button class="btn btn-subtle" onclick="Utils.exportarExcel('ch-tabla-choferes', 'Historial_Choferes')">Excel</button>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table id="ch-tabla-choferes">
+            <thead>
+              <tr>
+                <th>Cédula</th>
+                <th>Nombre Completo</th>
+                <th class="text-right">Viajes Realizados</th>
+              </tr>
+            </thead>
+            <tbody id="ch-tabla-choferes-body">
+              <tr><td colspan="3"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MÓDULO: RENTABILIDAD (BI)
+         ═══════════════════════════════════════════════════════ -->
+    <section class="module-page" id="page-rentabilidad">
+
+      <!-- Encabezado visible solo en impresión -->
+      <div class="print-header" style="display:none;">
+        <img src="/img/logo.svg" alt="Carbones Tamanaco" class="brand-logo">
+        <div>
+          <div style="font-size:16px; font-weight:700; color:#000;">Carbones Tamanaco</div>
+          <div style="font-size:12px; color:#555;">Estado de Resultados Operativo y Estructura de Costos (USD)</div>
+        </div>
+      </div>
+
+      <div class="page-header no-print">
+        <div class="page-title">
+          <h1>Rentabilidad</h1>
+          <p>Estructura de costos y margen neto en dólares (USD) por tonelada</p>
+        </div>
+        <button class="btn btn-subtle" onclick="RentabilidadModule.imprimirReporteRentabilidad()">📊 Imprimir Estructura de Costos</button>
+      </div>
+
+      <div class="card form-section mb-16 no-print">
+        <div class="card-header">
+          <span class="card-title">Semana del Reporte</span>
+          <span class="r-semana-label text-mid" style="font-size:11px;"></span>
+        </div>
+        <div class="card-body">
+          <div class="flex-between" style="flex-wrap:wrap; gap:10px; margin-bottom:16px;">
+            <div class="date-nav">
+              <button class="date-nav-btn" onclick="RentabilidadModule.cambiarSemana(-1)" title="Semana anterior">&#8249;</button>
+              <input type="date" id="r-semana" class="date-nav-input" onchange="RentabilidadModule.irASemanaDe(this.value)">
+              <button class="date-nav-btn" onclick="RentabilidadModule.cambiarSemana(1)" title="Semana siguiente">&#8250;</button>
+              <button class="date-nav-today" onclick="RentabilidadModule.irAEstaSemana()">Esta semana</button>
+            </div>
+          </div>
+          <div class="form-grid" style="align-items:end;">
+            <div class="form-group">
+              <label class="form-label" style="color:var(--c-gold)">Precio Venta (USD/Ton)</label>
+              <input type="number" id="r-precio-venta-usd" class="form-input" step="0.50" value="45.00" oninput="RentabilidadModule.cargarRentabilidad()" onchange="RentabilidadModule.guardarParametrosSemana()">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="color:var(--c-blue)">Tasa de Cambio (COP/USD)</label>
+              <input type="number" id="r-tasa-cambio" class="form-input" step="25" value="4000" oninput="RentabilidadModule.cargarRentabilidad()" onchange="RentabilidadModule.guardarParametrosSemana()">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="color:var(--c-amber)">Tasa de Cambio (VES/USD)</label>
+              <input type="number" id="input-tasa-ves-usd" class="form-input" step="1" value="50.00" placeholder="Ej: Bs. 50"
+                     oninput="RentabilidadModule.cargarRentabilidad()" onchange="RentabilidadModule.guardarParametrosSemana()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 KPIs Ejecutivos -->
+      <div class="stats-grid no-print">
+        <div class="stat-card">
+          <div class="stat-label">Volumen Total</div>
+          <div class="stat-value" id="r-kpi-toneladas">0 Ton</div>
+          <div class="stat-sub">en el período seleccionado</div>
+        </div>
+        <div class="stat-card s-blue">
+          <div class="stat-label">Ingreso Bruto</div>
+          <div class="stat-value" id="r-kpi-ingreso">$ 0.00 USD</div>
+          <div class="stat-sub">toneladas × precio venta</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Costo Total General</div>
+          <div class="stat-value" id="r-kpi-costo">$ 0.00 USD</div>
+          <div class="stat-sub" id="r-kpi-costo-ton">$ 0.00 USD / Ton</div>
+        </div>
+        <div class="stat-card s-green">
+          <div class="stat-label">Utilidad Neta Real</div>
+          <div class="stat-value" id="r-kpi-margen">$ 0.00 USD</div>
+          <div class="stat-sub" id="r-kpi-margen-pct">0% de margen</div>
+        </div>
+        <div class="stat-card s-green">
+          <div class="stat-label">Margen Neto Final por Tonelada</div>
+          <div class="stat-value" id="r-kpi-margen-ton">$ 0.00 / Ton</div>
+          <div class="stat-sub">promedio consolidado</div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 1: Estructura de Costos Unitaria ($/Ton) -->
+      <div class="card mb-16">
+        <div class="card-header">
+          <span class="card-title">Estructura de Costos Unitaria ($/Ton)</span>
+        </div>
+        <div class="table-wrap">
+          <table id="r-tabla-estructura">
+            <thead>
+              <tr>
+                <th>Rubro / Concepto</th>
+                <th class="text-right">Monto Original (COP)</th>
+                <th class="text-right">Monto Convertido (USD)</th>
+                <th class="text-right">Costo Unitario (USD/Ton)</th>
+                <th class="text-right">% Participación</th>
+              </tr>
+            </thead>
+            <tbody id="r-tabla-estructura-body">
+              <tr><td colspan="5"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-body no-print" id="r-gastos-detalle-wrap" style="display:none; border-top:1px solid var(--b-default); padding-top:12px;">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th>Categoría</th>
+                  <th>Descripción</th>
+                  <th>Moneda</th>
+                  <th class="text-right">Monto Original</th>
+                  <th class="text-right">Monto (USD)</th>
+                </tr>
+              </thead>
+              <tbody id="r-gastos-detalle-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 2: Matriz de Rentabilidad por Mina -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Matriz de Rentabilidad por Mina</span>
+        </div>
+        <div class="table-wrap">
+          <table id="r-tabla-minas">
+            <thead>
+              <tr>
+                <th>Mina</th>
+                <th class="text-right">Viajes</th>
+                <th class="text-right">Toneladas</th>
+                <th class="text-right">Ingreso (USD)</th>
+                <th class="text-right">Costo Carbón (USD)</th>
+                <th class="text-right">Margen Neto (USD)</th>
+                <th class="text-right">Utilidad / Ton (USD)</th>
+              </tr>
+            </thead>
+            <tbody id="r-tabla-minas-body">
+              <tr><td colspan="7"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- MÓDULO FACTURACIÓN E IMPUESTOS -->
+    <section class="module-page" id="page-facturacion">
+      <div class="flex-between mb-24">
+        <div>
+          <h1 style="font-size:24px; font-weight:700; color:var(--t-high); margin-bottom:4px;">Facturación Legal</h1>
+          <p style="color:var(--t-medium); font-size:14px;">Emisión de facturas con IVA, IGTF y Retenciones (Formato SENIAT)</p>
+        </div>
+        <button class="btn btn-primary" onclick="FacturacionModule.abrirModalNueva()">+ Nueva Factura</button>
+      </div>
+
+      <div class="card mb-24">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nro Control</th>
+                <th>Fecha</th>
+                <th>Cliente (RIF)</th>
+                <th>Concepto</th>
+                <th class="text-right">Total</th>
+                <th class="text-center">Estado</th>
+                <th class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="f-tabla-facturas">
+              <!-- Renderizado dinámico JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Módulo de Ajustes -->
+    <section id="page-ajustes" class="module-page page">
+      <div class="card" style="max-width: 600px; margin: 0 auto; margin-top: 40px;">
+        <div class="card-header">
+          <h2>Configuración General del ERP</h2>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Nombre de la Empresa</label>
+              <input type="text" id="a-empresa" class="form-input" disabled value="Carbones Tamanaco, C.A.">
+              <small style="color:var(--t-low); font-size:11px;">(Vinculado al RIF, no modificable)</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">RIF</label>
+              <input type="text" id="a-rif" class="form-input" value="J-12345678-9">
+            </div>
+            <div class="form-group">
+              <label class="form-label">IVA por Defecto (%)</label>
+              <input type="number" id="a-iva" class="form-input" step="0.1" value="16.0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Precio Referencial Tonelada (USD)</label>
+              <input type="number" id="a-tonelada" class="form-input" step="0.1" value="45.0">
+            </div>
+            
+            <div class="form-group" style="grid-column: span 2; margin-top: 20px;">
+              <h3 style="font-size:16px; margin-bottom:12px; color:var(--t-high); border-bottom:1px solid var(--border); padding-bottom:8px;">Preferencias del Sistema</h3>
+              
+              <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; background:var(--bg-card); padding:12px; border-radius:6px; border:1px solid var(--border); margin-bottom:8px;">
+                <input type="checkbox" id="a-lightmode" style="width:18px; height:18px;" onchange="document.body.classList.toggle('light-theme')">
+                <span style="flex:1;">Activar Modo Claro (Light Mode)</span>
+              </label>
+              
+              <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; background:var(--bg-card); padding:12px; border-radius:6px; border:1px solid var(--border); margin-bottom:8px;">
+                <input type="checkbox" id="a-notif" style="width:18px; height:18px;" checked>
+                <span style="flex:1;">Activar notificaciones de sonido (Alertas)</span>
+              </label>
+
+              <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; background:var(--bg-card); padding:12px; border-radius:6px; border:1px solid var(--border);">
+                <input type="checkbox" id="a-animations" style="width:18px; height:18px;" checked>
+                <span style="flex:1;">Reducir animaciones de la interfaz</span>
+              </label>
+            </div>
+          </div>
+          <div class="form-actions" style="margin-top: 20px;">
+            <button class="btn btn-primary" onclick="AjustesModule.guardarAjustes()">Guardar Ajustes</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Módulo de Documentos Corporativos -->
+    <section id="page-documentos" class="module-page page">
+      <div class="card" style="max-width: 800px; margin: 0 auto; margin-top: 40px;">
+        <div class="card-header">
+          <h2>Generador de Documentos Corporativos (Word)</h2>
+        </div>
+        <div class="card-body">
+          <p style="margin-bottom: 20px; color: var(--t-low);">Selecciona el tipo de documento. El sistema insertará el membrete de tu empresa, tu logo como marca de agua y el formato corporativo automáticamente en un archivo de Word listo para editar.</p>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Tipo de Documento</label>
+              <select id="doc-tipo" class="form-select">
+                <option value="LIBRE">Carta Libre / Hoja en Blanco con Membrete</option>
+                <option value="CONSTANCIA">Constancia de Trabajo</option>
+                <option value="COTIZACION">Cotización / Presupuesto</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fecha del Documento</label>
+              <input type="date" id="doc-fecha" class="form-input">
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label class="form-label">Título del Documento (Opcional)</label>
+              <input type="text" id="doc-titulo" class="form-input" placeholder="Ej: CONSTANCIA DE TRABAJO">
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label class="form-label">Destinatario (Opcional)</label>
+              <input type="text" id="doc-destinatario" class="form-input" placeholder="Ej: A quien pueda interesar">
+            </div>
+          </div>
+          <div class="form-actions" style="margin-top: 20px;">
+            <button class="btn btn-primary" onclick="DocumentosModule.generarDocumento()">Generar y Descargar Word</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+</div><!-- /app-layout -->
+
+<!-- Modal de Vista Previa (PDF, Imagen y Excel) -->
+<div id="preview-modal" class="login-overlay" style="display:none; align-items:center; justify-content:center; padding:20px; z-index:9999;" onclick="if(event.target===this) Utils.cerrarPreview()">
+  <div class="card" style="width:100%; max-width:900px; height:85vh; display:flex; flex-direction:column; background:var(--bg-surface); border:1px solid var(--b-default); box-shadow:var(--sh-lg);">
+    <div class="card-header flex-between" style="flex-shrink:0;">
+      <h2 style="font-size:16px; margin:0; color:var(--t-high);" id="pm-title">Vista Previa</h2>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-primary btn-sm" id="pm-btn-descargar" style="display:none;">Descargar</button>
+        <button class="btn btn-ghost btn-sm" onclick="Utils.cerrarPreview()">✕</button>
+      </div>
+    </div>
+    <div class="card-body" style="flex-grow:1; overflow:hidden; display:flex; flex-direction:column; padding:0;">
+      <div id="pm-content-excel" style="display:none; flex-grow:1; overflow:auto; padding:16px; font-size:12px;"></div>
+      <iframe id="pm-content-pdf" style="display:none; width:100%; height:100%; border:none;"></iframe>
+      <div id="pm-content-img-wrap" style="display:none; flex-grow:1; overflow:auto; justify-content:center; align-items:center; padding:16px; background:var(--bg-input);">
+        <img id="pm-content-img" src="" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="recibo-impresion">
+  <div style="padding: 40px; font-family: 'Inter', sans-serif; color: #000; border: 1px solid #ccc; max-width: 700px; margin: 0 auto; position: relative; overflow: hidden;">
+    
+    <!-- WATERMARK -->
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.05; pointer-events: none; z-index: 0;">
+        <img src="/img/logo.svg" style="width: 280px; height: auto;" />
+    </div>
+
+    <div style="text-align: center; margin-bottom: 12px; background: transparent; position: relative; z-index: 1;">
+        <img src="/img/logo.svg" alt="Carbones Tamanaco" style="height: 60px; width: auto; display: block; margin: 0 auto; background: transparent !important; border: none;" />
+        <p style="margin: 10px 0 0 0; font-size: 14px; color: #444; font-weight: 600; letter-spacing: 0.04em;">RECIBO DE PAGO DE N&Oacute;MINA &mdash; PROVEEDORES / MINAS</p>
+    </div>
+
+    <!-- Bloque informativo de Proveedor y Período -->
+    <div style="background: transparent; border-top: 1.5px solid #0f172a; border-bottom: 1.5px solid #0f172a; padding: 10px 0; margin: 16px 0 20px 0; position: relative; z-index: 1;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 11px; color: #0f172a;">
+            <span><strong>Proveedor / Mina:</strong> <strong contenteditable="true" class="editable-field" id="r-mina" style="font-weight: 700; text-transform: uppercase; color: #0f172a;"></strong></span>
+            <span><strong>Fecha de Pago:</strong> <span contenteditable="true" class="editable-field" id="r-fecha" style="color: #0f172a;"></span></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; color: #475569;">
+            <span><strong>Semana:</strong> <span contenteditable="true" class="editable-field" id="r-semana"></span></span>
+            <span><strong>Total Despachado:</strong> <span contenteditable="true" class="editable-field" id="r-toneladas" style="font-weight: 600; color: #0f172a;"></span> TM</span>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 30px; position: relative; z-index: 1;">
+      <p style="font-size: 15px; line-height: 1.6; text-align: justify;" id="r-mensaje" contenteditable="true" class="editable-field">
+        <!-- El mensaje amistoso se inyecta por JS -->
+      </p>
+    </div>
+
+    <div style="background: #f9f9f9; border: 1px solid #ddd; padding: 20px; text-align: center; margin-bottom: 50px; position: relative; z-index: 1;">
+      <div style="font-size: 14px; color: #555; text-transform: uppercase; margin-bottom: 10px;">Monto Total Pagado</div>
+      <div style="font-size: 22px; font-weight: bold; letter-spacing: 1px;" id="r-monto-total" contenteditable="true" class="editable-field"></div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; margin-top: 80px; text-align: center; position: relative; z-index: 1;">
+      <div style="width: 45%;">
+        <div style="border-bottom: 1px solid #000; height: 1px; margin-bottom: 5px;"></div>
+        <div style="font-size: 12px; font-weight: bold;" contenteditable="true" class="editable-field">Por Carbones Tamanaco</div>
+        <div style="font-size: 11px; color: #666; margin-top: 3px;" contenteditable="true" class="editable-field">Firma y Sello Autorizado</div>
+      </div>
+      <div style="width: 45%;">
+        <div style="border-bottom: 1px solid #000; height: 1px; margin-bottom: 5px;"></div>
+        <div style="font-size: 12px; font-weight: bold;" contenteditable="true" class="editable-field">Recibo Conforme</div>
+        <div style="font-size: 11px; color: #666; margin-top: 3px;" contenteditable="true" class="editable-field">Nombre, C.I. y Firma del Proveedor</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="recibo-empleado-impresion">
+  <div style="padding: 40px; font-family: 'Inter', sans-serif; color: #000; border: 1px solid #ccc; max-width: 700px; margin: 0 auto;">
+    
+    <!-- WATERMARK -->
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.05; pointer-events: none; z-index: 0;">
+        <img src="/img/logo.svg" style="width: 280px; height: auto;" />
+    </div>
+
+    <div style="text-align: center; margin-bottom: 12px; background: transparent; position: relative; z-index: 1;">
+        <img src="/img/logo.svg" alt="Carbones Tamanaco" style="height: 60px; width: auto; display: block; margin: 0 auto; background: transparent !important; border: none;" />
+        <p style="margin: 10px 0 0 0; font-size: 14px; color: #444; font-weight: 600; letter-spacing: 0.04em;">RECIBO DE PAGO DE N&Oacute;MINA &mdash; PERSONAL</p>
+    </div>
+
+    <!-- Bloque informativo del Trabajador y Período -->
+    <div style="background: transparent; border-top: 1.5px solid #0f172a; border-bottom: 1.5px solid #0f172a; padding: 10px 0; margin: 16px 0 20px 0; position: relative; z-index: 1;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 11px; color: #0f172a;">
+            <span><strong>Trabajador:</strong> <strong contenteditable="true" class="editable-field" id="re-empleado" style="font-weight: 700; text-transform: uppercase; color: #0f172a;"></strong></span>
+            <span><strong>Fecha de Pago:</strong> <span contenteditable="true" class="editable-field" id="re-fecha" style="color: #0f172a;"></span></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; color: #475569;">
+            <span><strong>Cargo:</strong> <span contenteditable="true" class="editable-field" id="re-cargo"></span></span>
+            <span><strong>Período:</strong> <span contenteditable="true" class="editable-field" id="re-semana"></span></span>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 30px; position: relative; z-index: 1;">
+      <p style="font-size: 15px; line-height: 1.6; text-align: justify;" id="re-mensaje" contenteditable="true" class="editable-field">
+        <!-- El mensaje inyectado por JS -->
+      </p>
+    </div>
+
+    <div style="background: #f9f9f9; border: 1px solid #ddd; padding: 20px; text-align: center; margin-bottom: 50px; position: relative; z-index: 1;">
+      <div style="font-size: 14px; color: #555; text-transform: uppercase; margin-bottom: 10px;">Monto Total a Recibir</div>
+      <div style="font-size: 22px; font-weight: bold; letter-spacing: 1px;" id="re-monto-total" contenteditable="true" class="editable-field"></div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; margin-top: 80px; text-align: center; position: relative; z-index: 1;">
+      <div style="width: 45%;">
+        <div style="border-bottom: 1px solid #000; height: 1px; margin-bottom: 5px;"></div>
+        <div style="font-size: 12px; font-weight: bold;" contenteditable="true" class="editable-field">Por Carbones Tamanaco</div>
+        <div style="font-size: 11px; color: #666; margin-top: 3px;" contenteditable="true" class="editable-field">Firma y Sello Autorizado</div>
+      </div>
+      <div style="width: 45%;">
+        <div style="border-bottom: 1px solid #000; height: 1px; margin-bottom: 5px;"></div>
+        <div style="font-size: 12px; font-weight: bold;" contenteditable="true" class="editable-field">Recibo Conforme</div>
+        <div style="font-size: 11px; color: #666; margin-top: 3px;" contenteditable="true" class="editable-field">Nombre, C.I. y Firma del Trabajador</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<!-- Modal: Emitir Factura -->
+<div id="f-modal-nueva" class="login-overlay" style="display:none; align-items:center; justify-content:center; padding:20px; z-index:9999;">
+  <div class="card" style="width:100%; max-width:600px;">
+    <div class="card-header flex-between">
+      <h2 style="font-size:16px; margin:0;">Emitir Nueva Factura</h2>
+      <button class="btn btn-ghost btn-sm" onclick="FacturacionModule.cerrarModalNueva()">✕</button>
+    </div>
+    <div class="card-body">
+      <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="form-group">
+          <label class="form-label">Cliente / Razón Social</label>
+          <input type="text" id="f-cliente" class="form-input" placeholder="Nombre de la empresa">
+        </div>
+        <div class="form-group">
+          <label class="form-label">RIF / C.I.</label>
+          <input type="text" id="f-rif" class="form-input" placeholder="J-12345678-9">
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label class="form-label">Dirección Fiscal</label>
+        <input type="text" id="f-direccion" class="form-input" placeholder="Dirección completa">
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label class="form-label">Concepto / Descripción</label>
+        <input type="text" id="f-concepto" class="form-input" placeholder="Ej: Venta de Carbón Mineral">
+      </div>
+      <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-top:12px;">
+        <div class="form-group">
+          <label class="form-label">Moneda</label>
+          <select id="f-moneda" class="form-select">
+            <option value="VES">Bolívares (VES)</option>
+            <option value="USD">Dólares (USD)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Base Imponible (Subtotal)</label>
+          <input type="number" id="f-subtotal" class="form-input" step="0.01">
+        </div>
+      </div>
+
+      <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-top:12px; background:var(--bg-input); padding:12px; border-radius:6px;">
+        <div class="form-group">
+          <label class="form-label">Tasa de IVA</label>
+          <select id="f-iva" class="form-select">
+            <option value="16.0">General (16%)</option>
+            <option value="8.0">Reducida (8%)</option>
+            <option value="0.0">Exento (0%)</option>
+          </select>
+        </div>
+        <div class="form-group" style="display:flex; flex-direction:column; justify-content:center;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; cursor:pointer;">
+            <input type="checkbox" id="f-igtf" style="width:16px; height:16px;">
+            Aplica IGTF (3%) por pago en Divisas
+          </label>
+        </div>
+      </div>
+      
+      <div class="form-actions" style="margin-top:20px;">
+        <button class="btn btn-subtle" onclick="FacturacionModule.cerrarModalNueva()">Cancelar</button>
+        <button class="btn btn-primary" onclick="FacturacionModule.guardarFactura()">Emitir Factura</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="f-modal-retencion" class="login-overlay" style="display:none; align-items:center; justify-content:center; padding:20px; z-index:9999;">
+  <div class="card" style="width:100%; max-width:400px;">
+    <div class="card-header flex-between">
+      <h2 style="font-size:16px; margin:0;">Aplicar Retención</h2>
+      <button class="btn btn-ghost btn-sm" onclick="FacturacionModule.cerrarModalRetencion()">✕</button>
+    </div>
+    <div class="card-body">
+      <div class="form-group">
+        <label class="form-label">Tipo de Retención</label>
+        <select id="r-tipo" class="form-select">
+          <option value="IVA">Retención de IVA</option>
+          <option value="ISLR">Retención de ISLR</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label class="form-label">Porcentaje (%)</label>
+        <select id="r-porcentaje" class="form-select">
+          <option value="75.0">75% (IVA)</option>
+          <option value="100.0">100% (IVA)</option>
+          <option value="1.0">1% (ISLR)</option>
+          <option value="2.0">2% (ISLR)</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label class="form-label">Nro de Comprobante</label>
+        <input type="text" id="r-comprobante" class="form-input" placeholder="Ej: 2026120001234">
+      </div>
+      <div class="form-actions" style="margin-top:20px;">
+        <button class="btn btn-subtle" onclick="FacturacionModule.cerrarModalRetencion()">Cancelar</button>
+        <button class="btn btn-primary" onclick="FacturacionModule.guardarRetencion()">Aplicar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sección de Impresión Oficial de Despachos -->
+<div id="print-section-despachos" class="print-only">
+    <div class="print-header">
+        <img src="/img/logo.svg" alt="Logo" class="print-logo">
+        <h2 class="print-title">REPORTE OFICIAL DE DESPACHOS DE MINERAL</h2>
+        <p class="print-subtitle">Periodo: <span id="print-fecha-rango"></span></p>
+    </div>
+
+    <table class="print-table" id="print-table-despachos">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>FECHA</th>
+                <th>CHOFER</th>
+                <th>PLACA</th>
+                <th>MINA</th>
+                <th style="text-align: right;">PESO (TON)</th>
+            </tr>
+        </thead>
+        <tbody id="print-tbody-despachos">
+            <!-- Filas inyectadas por JS -->
+        </tbody>
+        <tfoot>
+            <tr class="print-total-row">
+                <td colspan="5" style="text-align: left;"><strong>TOTAL GENERAL: <span id="print-total-viajes">0</span> vjs</strong></td>
+                <td style="text-align: right;"><strong><span id="print-total-toneladas">0.00</span> Ton</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="print-signatures">
+        <div class="signature-box">
+            <hr>
+            <p>ELABORADO POR</p>
+        </div>
+        <div class="signature-box">
+            <hr>
+            <p>REVISADO POR</p>
+        </div>
+        <div class="signature-box">
+            <hr>
+            <p>APROBADO POR</p>
+        </div>
+    </div>
+
+    <div class="print-footer">
+        <span>Carbones Tamanaco ERP</span>
+        <span id="print-fecha-emision"></span>
+    </div>
+</div>
+
+<!-- Modal de Vista Previa de Excel -->
+<div id="modal-excel-preview" class="excel-modal-overlay" style="display: none;">
+    <div class="excel-modal-card">
+        <div class="excel-modal-header">
+            <h4>Vista Previa — Reporte Excel</h4>
+            <button type="button" class="excel-modal-close" onclick="cerrarModalExcel()">&times;</button>
+        </div>
+        <div class="excel-modal-body">
+            <div class="excel-modal-sheet-frame">
+                <div class="excel-sheet-header-box">
+                    <div class="excel-sheet-title">CARBONES TAMANACO C.A.</div>
+                    <div class="excel-sheet-subtitle">REPORTE DE DESPACHOS DE MINERAL</div>
+                    <div class="excel-sheet-dates">Periodo: <span id="excel-modal-rango">Registro del Día</span></div>
+                </div>
+                <div class="excel-sheet-table-scroll">
+                    <table class="excel-sheet-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>FECHA</th>
+                                <th>CHOFER</th>
+                                <th>PLACA</th>
+                                <th>MINA</th>
+                                <th style="text-align: right;">PESO NETO (TON)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="excel-modal-tbody"></tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="5"><strong>TOTAL GENERAL: <span id="excel-modal-total-vjs">0</span> viajes</strong></td>
+                                <td style="text-align: right;"><strong><span id="excel-modal-total-ton">0.00</span> Ton</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="excel-modal-footer">
+            <button type="button" class="excel-btn-cancel" onclick="cerrarModalExcel()">Cancelar</button>
+            <button type="button" class="excel-btn-download" onclick="descargarExcelConfirmado()">Descargar .xlsx</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Vista Previa de Excel para Nómina -->
+<div id="modal-excel-preview-nomina" class="excel-modal-overlay" style="display: none;">
+    <div class="excel-modal-card">
+        <div class="excel-modal-header">
+            <h4>Vista Previa — Liquidación de Nómina (.xlsx)</h4>
+            <button type="button" class="excel-modal-close" onclick="cerrarModalExcelNomina()">&times;</button>
+        </div>
+        <div class="excel-modal-body">
+            <div class="excel-modal-sheet-frame">
+                <div class="excel-sheet-header-box">
+                    <div class="excel-sheet-title">CARBONES TAMANACO C.A.</div>
+                    <div class="excel-sheet-subtitle">REPORTE OFICIAL DE LIQUIDACIÓN DE NÓMINA</div>
+                    <div class="excel-sheet-dates">Semana: <span id="excel-modal-nomina-rango"></span></div>
+                </div>
+                <div class="excel-sheet-table-scroll">
+                    <table class="excel-sheet-table">
+                        <thead>
+                            <tr>
+                                <th>MINA</th>
+                                <th style="text-align: center;">VIAJES</th>
+                                <th style="text-align: right;">TONELADAS</th>
+                                <th style="text-align: right;">TARIFA COP/TON</th>
+                                <th style="text-align: right;">TOTAL A PAGAR</th>
+                            </tr>
+                        </thead>
+                        <tbody id="excel-modal-nomina-tbody"></tbody>
+                        <tfoot>
+                            <tr>
+                                <td><strong>TOTAL GENERAL:</strong></td>
+                                <td style="text-align: center;"><strong><span id="excel-modal-nomina-total-vjs">0</span> vjs</strong></td>
+                                <td style="text-align: right;"><strong><span id="excel-modal-nomina-total-ton">0.00</span> Ton</strong></td>
+                                <td style="text-align: center;">—</td>
+                                <td style="text-align: right; color: #10b981;"><strong><span id="excel-modal-nomina-total-pagar">$ 0 COP</span></strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="excel-modal-footer">
+            <button type="button" class="excel-btn-cancel" onclick="cerrarModalExcelNomina()">Cancelar</button>
+            <button type="button" class="excel-btn-download" onclick="descargarExcelNominaConfirmado()">Descargar .xlsx</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Vista Previa Excel Laboratorio -->
+<div id="modal-excel-preview-lab" class="excel-modal-overlay" style="display: none;">
+    <div class="excel-modal-card">
+        <div class="excel-modal-header">
+            <h4>Vista Previa — Control de Calidad (.xlsx)</h4>
+            <button type="button" class="excel-modal-close" onclick="cerrarModalExcelLaboratorio()">&times;</button>
+        </div>
+        <div class="excel-modal-body">
+            <div class="excel-modal-sheet-frame">
+                <div class="excel-sheet-header-box">
+                    <div class="excel-sheet-title">CARBONES TAMANACO C.A.</div>
+                    <div class="excel-sheet-subtitle">INFORME OFICIAL DE LABORATORIO Y CALIDAD</div>
+                </div>
+                <div class="excel-sheet-table-scroll">
+                    <table class="excel-sheet-table">
+                        <thead>
+                            <tr>
+                                <th>FECHA</th>
+                                <th>MINA / PROVEEDOR</th>
+                                <th style="text-align: center;">LOTE</th>
+                                <th style="text-align: right;">CENIZA (%)</th>
+                                <th style="text-align: right;">AZUFRE (%)</th>
+                                <th style="text-align: right;">PODER CAL.</th>
+                                <th style="text-align: center;">ESTADO</th>
+                            </tr>
+                        </thead>
+                        <tbody id="excel-modal-lab-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="excel-modal-footer">
+            <button type="button" class="excel-btn-cancel" onclick="cerrarModalExcelLaboratorio()">Cancelar</button>
+            <button type="button" class="excel-btn-download" onclick="descargarExcelLabConfirmado()">Descargar .xlsx</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Pago y Cierre de Semana de Nómina -->
+<div id="modal-pago-semana-nomina" class="excel-modal-overlay" style="display: none;">
+    <div class="excel-modal-card" style="max-width: 480px;">
+        <div class="excel-modal-header">
+            <h4>Confirmar Pago y Cierre de Nómina</h4>
+            <button type="button" class="excel-modal-close" onclick="NominaModule.cerrarModalPagoSemana()">&times;</button>
+        </div>
+        <div class="excel-modal-body" style="padding: 20px;">
+            <p style="font-size: 13px; color: var(--t-medium); margin-bottom: 16px;">
+              Al marcar esta semana como <strong>PAGADA</strong>, el período quedará congelado en <em>Solo Lectura</em> para proteger los registros de pesaje y liquidación.
+            </p>
+            <div class="form-group mb-12">
+              <label class="form-label" style="font-weight:600; font-size:12px;">Adjuntar Comprobante de Transferencia / Recibo (PDF, PNG, JPG)</label>
+              <input type="file" id="n-input-comprobante" class="form-input" accept=".pdf,image/png,image/jpeg,image/jpg">
+            </div>
+            <div class="form-group mb-12">
+              <label class="form-label" style="font-weight:600; font-size:12px;">Notas u Observaciones de Pago (Opcional)</label>
+              <textarea id="n-input-notas-pago" class="form-input" rows="2" placeholder="Ej: Transferencia Bancolombia #98212..."></textarea>
+            </div>
+        </div>
+        <div class="excel-modal-footer">
+            <button type="button" class="excel-btn-cancel" onclick="NominaModule.cerrarModalPagoSemana()">Cancelar</button>
+            <button type="button" class="excel-btn-download" onclick="NominaModule.confirmarPagoSemana()" style="background:#059669;">Confirmar Pago de Nómina</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ticket Digital de Pesaje con QR y WhatsApp -->
+<div id="modal-ticket-despacho" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 99999; padding: 15px;">
+    <div style="background: #ffffff; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; border-radius: 14px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-sizing: border-box;">
+        
+        <!-- ÁREA QUE SE RENDERIZA EN IMAGEN Y SE IMPRIME -->
+        <div id="ticket-imprimible-area" style="background: #ffffff; color: #000000; width: 340px; padding: 20px; font-family: 'Segoe UI', Arial, sans-serif; box-sizing: border-box; border: 1px solid #e2e8f0; margin: 0 auto;">
+            
+            <!-- Encabezado Oficial -->
+            <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 8px; margin-bottom: 12px;">
+                <div style="font-size: 1.1rem; font-weight: 800; letter-spacing: 0.5px; color: #000000;">CARBONES TAMANACO C.A.</div>
+                <div style="font-size: 0.72rem; font-weight: 700; color: #475569; letter-spacing: 0.5px; text-transform: uppercase;">Comprobante Oficial de Báscula</div>
+            </div>
+
+            <!-- Tabla de Datos -->
+            <div style="font-size: 0.85rem; line-height: 1.8; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="font-weight: 700;">TICKET N°:</span>
+                    <strong id="ticket-id" style="font-size: 0.95rem;">#—</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>FECHA / HORA:</span>
+                    <span id="ticket-fecha" style="font-weight: 600;">—</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>CHOFER:</span>
+                    <strong id="ticket-chofer">—</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>PLACA:</span>
+                    <strong id="ticket-placa" style="border: 1px solid #000000; padding: 0 4px; border-radius: 2px;">—</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>MINA / ORIGEN:</span>
+                    <strong id="ticket-mina">—</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; border-top: 1px solid #000000; margin-top: 6px; padding-top: 4px;">
+                    <span style="font-weight: 800; font-size: 0.95rem;">PESO NETO:</span>
+                    <strong id="ticket-peso" style="font-size: 1.25rem; font-weight: 900; color: #16a34a;">0.00 Ton</strong>
+                </div>
+            </div>
+
+            <!-- QR de Validación -->
+            <div style="text-align: center; margin: 10px 0;">
+                <div id="ticket-qrcode" style="display: inline-block;"></div>
+                <div style="font-size: 0.65rem; color: #64748b; margin-top: 3px;">Validación digital de báscula</div>
+            </div>
+
+            <!-- Foto del Ticket de Romana -->
+            <div id="ticket-foto-romana-seccion" style="border-top: 1px dashed #000000; padding-top: 8px; margin-top: 8px; text-align: center; display: none;">
+                <div style="font-size: 0.68rem; font-weight: 700; color: #334155; margin-bottom: 4px; text-transform: uppercase;">
+                    Comprobante Físico de Romana
+                </div>
+                <div style="border: 1px solid #cbd5e1; padding: 2px; background: #ffffff;">
+                    <img id="ticket-foto-romana-img" crossOrigin="anonymous" src="" alt="Ticket Físico" style="width: 100%; max-height: 240px; object-fit: contain; display: block;" />
+                </div>
+            </div>
+
+            <!-- Pie del Ticket -->
+            <div style="font-size: 0.65rem; color: #64748b; text-align: center; border-top: 1px solid #000000; padding-top: 6px; margin-top: 8px;">
+                Operador: <strong>Báscula Tamanaco</strong> • Sistema ERP
+            </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="ticket-modal-actions no-print" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;">
+            <button type="button" onclick="cerrarModalTicket()" style="padding: 8px 14px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: 600; color: #475569;">Cerrar</button>
+            <button type="button" onclick="compartirTicketWhatsApp()" style="padding: 8px 16px; background: #25D366; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 6px;">
+                WhatsApp
+            </button>
+            <button type="button" onclick="imprimirTicketDirecto()" style="padding: 8px 16px; background: #0284c7; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 6px;">
+                Imprimir
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="/js/api.js?v=12"></script>
+<script src="/js/auth.js?v=12"></script>
+<script src="/js/despachos.js?v=12"></script>
+<script src="/js/metas.js?v=12"></script>
+<script src="/js/laboratorio.js?v=12"></script>
+<script src="/js/auditoria.js?v=12"></script>
+<script src="/js/choferes.js?v=1"></script>
+<script src="/js/nomina.js?v=12"></script>
+<script src="/js/gastos.js?v=12"></script>
+<script src="/js/proveedores.js?v=12"></script>
+<script src="/js/tesoreria.js?v=12"></script>
+<script src="/js/inventario.js?v=12"></script>
+<script src="/js/patio.js?v=1"></script>
+<script src="/js/usuarios.js?v=12"></script>
+<script src="/js/rentabilidad.js?v=13"></script>
+<script src="/js/facturacion.js?v=12"></script>
+<script src="/js/ajustes.js?v=12"></script>
+<script src="/js/documentos.js?v=12"></script>
+
+
+<script>
+  /* ── Inicialización global ── */
+
+  function actualizarFechaHeader() {
+    const el = document.getElementById('headerDate');
+    if (!el) return;
+    const now = new Date();
+    el.textContent = now.toLocaleDateString('es-VE', {
+      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+    });
+  }
+
+  function toggleSidebar() {
+    document.getElementById('appLayout').classList.toggle('collapsed');
+  }
+
+  /* ── PWA ── */
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const btn = document.getElementById('btnInstalar');
+    if (btn) btn.style.display = 'inline-flex';
+  });
+  async function instalarApp() {
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      Toast.show('La aplicación ya está instalada.', 'info');
+      return;
+    }
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      document.getElementById('btnInstalar').style.display = 'none';
+    }
+  }
+
+  // Desactivar Service Worker en desarrollo para evitar problemas de caché
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      for (let registration of registrations) {
+        registration.unregister();
+      }
+    });
+  }
+
+
+
+  /* Arranque */
+  document.addEventListener('DOMContentLoaded', () => {
+    actualizarFechaHeader();
+
+    Router.register('despachos',   () => DespachoModule.init());
+    Router.register('metas',       () => MetasModule.init());
+    Router.register('laboratorio', () => LaboratorioModule.init());
+    Router.register('auditoria',   () => AuditoriaModule.init());
+    Router.register('choferes',    () => ChoferesModule.init());
+    Router.register('nomina',      () => NominaModule.init());
+    Router.register('gastos',      () => GastosModule.init());
+    Router.register('proveedores', () => ProveedoresModule.init());
+    Router.register('inventario',  () => { PatioModule.init(); InventarioModule.init(); });
+    Router.register('pagos',       () => TesoreriaModule.init());
+    Router.register('produccion',  () => {});
+    Router.register('usuarios',    () => UsuariosModule.init());
+    Router.register('rentabilidad',() => RentabilidadModule.init());
+    Router.register('facturacion', () => FacturacionModule.init());
+    Router.register('ajustes',     () => AjustesModule.init());
+    Router.register('documentos',  () => DocumentosModule.init());
+
+    // Inicializar autenticación y permisos
+    Auth.init();
+
+    Router.navigate('despachos');
+  });
+</script>
+
+</body>
+</html>

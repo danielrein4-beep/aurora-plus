@@ -1,0 +1,5 @@
+# Los scripts .sh corren dentro de contenedores Linux (ver docker/backup/) —
+# si Git los convierte a CRLF al hacer checkout en Windows (comportamiento por
+# defecto de core.autocrlf), el shebang queda roto ("bad interpreter") y el
+# contenedor no arranca. Forzamos LF siempre, sin importar el SO de quien clona.
+*.sh text eol=lf

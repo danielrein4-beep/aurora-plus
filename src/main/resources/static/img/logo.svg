@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <!-- Franja Hexagonal Superior / Izquierda (Azul Corporativo) -->
+  <path d="M 250,42 L 415,137 L 358,170 L 250,108 L 135,174 L 135,316 L 75,350 L 75,147 Z" fill="#0284c7" />
+  
+  <!-- Franja Hexagonal Inferior / Derecha (Azul Corporativo) -->
+  <path d="M 250,458 L 85,363 L 142,330 L 250,392 L 365,326 L 365,184 L 425,150 L 425,353 Z" fill="#0284c7" />
+  
+  <!-- Letra 'T' Central Estilizada (Gris Grafito / Carbón) -->
+  <path d="M 180,182 L 150,212 L 180,242 L 222,242 L 222,318 L 250,348 L 278,318 L 278,242 L 320,242 L 350,212 L 320,182 Z" fill="#334155" />
+</svg>

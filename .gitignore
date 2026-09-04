@@ -1,0 +1,42 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+### Variables de entorno (secretos — nunca subir el .env real) ###
+.env
+
+### Respaldos de base de datos (datos reales de clientes — nunca al repo) ###
+/backups/
+!**/src/main/**/target/
+!**/src/test/**/target/
+.kotlin
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
