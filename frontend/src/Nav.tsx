@@ -67,11 +67,11 @@ export default function Nav() {
           ) : (
             <>
               <button onClick={() => navigate("/auth")}
-                className="text-sm text-white/70 hover:text-white transition-colors px-4 py-2 font-medium">
+                className="apple-glass-btn text-xs font-semibold text-white/90 hover:text-white px-4 py-2 rounded-full cursor-pointer">
                 Iniciar sesión
               </button>
               <button onClick={() => navigate("/onboarding")}
-                className="bg-white text-black hover:bg-teal-300 text-sm font-bold px-5 py-2.5 rounded-full transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:scale-105">
+                className="btn-cyber-neon text-white text-xs font-bold px-5 py-2 rounded-full cursor-pointer tracking-wide">
                 Solicitar demo
               </button>
             </>

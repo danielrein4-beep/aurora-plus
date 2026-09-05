@@ -202,18 +202,19 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Botón de Acción y Descripción */}
+              {/* Botón de Acción y Descripción con efecto Liquid Glass y Cyber Neon */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => navigate("/onboarding")}
-                    className="bg-white text-black hover:bg-teal-300 font-bold px-7 py-3.5 rounded-full text-sm transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105 flex items-center gap-2">
-                    Solicitar demo ahora
+                    className="btn-cyber-neon text-white font-bold px-8 py-3.5 rounded-full text-sm flex items-center gap-2 tracking-wide cursor-pointer">
+                    <span>Solicitar demo ahora</span>
+                    <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">↗</span>
                   </button>
                   <button
-                    onClick={() => navigate("/onboarding")}
-                    className="w-11 h-11 rounded-full bg-white text-black hover:bg-teal-300 flex items-center justify-center font-bold transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105">
-                    ↗
+                    onClick={() => navigate("/auth")}
+                    className="apple-glass-btn text-white/90 hover:text-white font-semibold px-6 py-3.5 rounded-full text-sm cursor-pointer">
+                    Iniciar sesión
                   </button>
                 </div>
                 <p className="text-white/45 text-xs sm:text-sm leading-relaxed max-w-sm">

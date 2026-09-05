@@ -110,10 +110,10 @@ html, body, #root {
 /* Apple-style Frosted Glass (Liquid Glassmorphism) */
 .apple-glass {
   background: rgba(12, 14, 28, 0.55);
-  backdrop-filter: blur(32px) saturate(190%);
-  -webkit-backdrop-filter: blur(32px) saturate(190%);
+  backdrop-filter: blur(36px) saturate(190%);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.25);
 }
 
 .apple-glass-pill {
@@ -122,6 +122,35 @@ html, body, #root {
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Apple Liquid Glass Button */
+.apple-glass-btn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-glass-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 100%);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6), 0 12px 32px rgba(0, 229, 184, 0.25);
+  transform: translateY(-2px);
+}
+
+/* Cyber Neon Button (Coral-Magenta to Electric Cyan) */
+.btn-cyber-neon {
+  background: linear-gradient(90deg, #ff3b80 0%, #a855f7 50%, #00f2fe 100%);
+  box-shadow: 0 8px 30px rgba(255, 59, 128, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-cyber-neon:hover {
+  box-shadow: 0 12px 40px rgba(255, 59, 128, 0.65), 0 0 20px rgba(0, 242, 254, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.7);
+  transform: translateY(-2px) scale(1.01);
 }
 
 /* Aurora Borealis Organic Waves (Living Night Sky) */

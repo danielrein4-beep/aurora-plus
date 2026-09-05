@@ -7,20 +7,20 @@ import { useAuth } from "../context/AuthContext";
 type Mode = "login" | "register";
 
 export default function Auth() {
-  const [mode, setMode] = useState<Mode>("register");
-  const [form, setForm] = useState({ nombre: "", email: "", password: "", confirmar: "", remember: true });
+  const [mode, setMode] = useState<Mode>("login");
+  const [form, setForm] = useState({ nombre: "", email: "", password: "", confirmar: "", remember: true, terms: true });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
   const { login, isLoggedIn } = useAuth();
 
   if (isLoggedIn) return <Navigate to="/dashboard" replace />;
 
-  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.nombre.trim() && mode === "register") e.nombre = "Ingresa tu nombre";
-    if (!form.email.includes("@")) e.email = "Correo inválido";
+    if (!form.email.includes("@")) e.email = "Ingresa un correo electrónico válido";
     if (form.password.length < 6) e.password = "Mínimo 6 caracteres";
     if (mode === "register" && form.password !== form.confirmar) e.confirmar = "Las contraseñas no coinciden";
     return e;
@@ -39,131 +39,238 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-full bg-[#060612] text-white flex items-center justify-center px-4 py-16 relative overflow-hidden">
+    <div className="min-h-screen bg-[#050614] text-white flex items-center justify-center px-4 sm:px-6 py-12 relative overflow-hidden">
       <AuroraGradientDef />
 
-      {/* Blobs */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="blob1 absolute -top-48 -left-48 w-[500px] h-[500px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(0,229,184,0.12) 0%, transparent 70%)" }} />
-        <div className="blob2 absolute -bottom-32 -right-48 w-[500px] h-[500px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(168,85,247,0.10) 0%, transparent 70%)" }} />
+      {/* ── FONDOS ATMOSFÉRICOS: AURORAS BOREALES 3D Y DESTELLOS DE NEÓN ── */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
+        <div className="aurora-ribbon-1 -top-32 -left-28 opacity-60" />
+        <div className="aurora-ribbon-2 -bottom-20 -right-28 opacity-70" />
+        <div className="cyber-grid absolute inset-0 opacity-20" />
+        
+        {/* Luces volumétricas estilo torus (Rosa / Cyan / Púrpura) */}
+        <div className="absolute w-[550px] h-[550px] rounded-full blur-[140px] bg-gradient-to-tr from-[#ff007f]/20 via-[#7928ca]/25 to-[#00f2fe]/20 -top-20" />
       </div>
 
-      <div className="relative w-full max-w-md">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <button onClick={() => navigate("/")} className="flex flex-col items-center gap-3 group">
-            <AuroraLogo size={64} animated />
-            <span className="font-['Outfit'] font-bold text-xl text-aurora">Aurora Plus</span>
+      {/* ── CONTENEDOR PRINCIPAL: TARJETA LIQUID GLASS ULTRA PREMIUM ── */}
+      <div className="relative z-10 w-full max-w-4xl apple-glass rounded-[32px] p-6 sm:p-10 shadow-[0_25px_70px_rgba(0,0,0,0.7)] border border-white/15">
+        
+        {/* Barra superior de la tarjeta */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-8 mb-8 border-b border-white/10">
+          <button onClick={() => navigate("/")} className="flex items-center gap-3.5 group">
+            <div className="p-2 rounded-2xl bg-white/5 border border-white/10 shadow-inner group-hover:scale-105 transition-transform duration-300">
+              <AuroraLogo size={34} animated />
+            </div>
+            <div className="text-left">
+              <div className="font-['Outfit'] font-black text-lg text-aurora leading-none">
+                Aurora Plus
+              </div>
+              <div className="text-white/35 text-[10px] uppercase tracking-widest mt-1">
+                Next-Gen ERP Platform
+              </div>
+            </div>
           </button>
-          <p className="text-white/35 text-sm mt-1">Software Administrativo</p>
+
+          {/* Toggle pill mode: Iniciar sesión / Crear cuenta */}
+          <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => { setMode("login"); setErrors({}); }}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 flex items-center gap-1.5 ${
+                mode === "login"
+                  ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]"
+                  : "text-white/50 hover:text-white"
+              }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${mode === "login" ? "bg-teal-500 animate-pulse" : "bg-white/30"}`} />
+              Iniciar sesión
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode("register"); setErrors({}); }}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 flex items-center gap-1.5 ${
+                mode === "register"
+                  ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]"
+                  : "text-white/50 hover:text-white"
+              }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${mode === "register" ? "bg-[#ff3b80] animate-pulse" : "bg-white/30"}`} />
+              Registrarse
+            </button>
+          </div>
         </div>
 
-        {/* Card */}
-        <div className="bg-[#0c0c20] border border-white/5 rounded-3xl overflow-hidden">
-          {/* Tabs */}
-          <div className="flex border-b border-white/5">
-            {(["register", "login"] as Mode[]).map((m) => (
-              <button key={m} onClick={() => { setMode(m); setErrors({}); }}
-                className={`flex-1 py-4 text-sm font-semibold transition-all ${
-                  mode === m ? "text-white border-b-2 border-teal-400" : "text-white/35 hover:text-white/60"
-                }`}>
-                {m === "register" ? "Crear cuenta" : "Iniciar sesión"}
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-8 space-y-4">
-            {mode === "register" && (
-              <div>
-                <label className="block text-white/40 text-xs mb-1.5 tracking-wide uppercase">Nombre completo</label>
-                <input type="text" placeholder="Tu nombre"
-                  value={form.nombre} onChange={(e) => set("nombre", e.target.value)}
-                  className={`w-full bg-white/5 border rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-colors ${errors.nombre ? "border-red-500/50" : "border-white/8 focus:border-teal-500/40"}`} />
-                {errors.nombre && <p className="text-red-400 text-xs mt-1">{errors.nombre}</p>}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-white/40 text-xs mb-1.5 tracking-wide uppercase">Correo electrónico</label>
-              <input type="email" placeholder="tu@empresa.com"
-                value={form.email} onChange={(e) => set("email", e.target.value)}
-                className={`w-full bg-white/5 border rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-colors ${errors.email ? "border-red-500/50" : "border-white/8 focus:border-teal-500/40"}`} />
-              {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
+        {/* Grid Principal: Formulario a la Izquierda + Panel Visual a la Derecha */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          
+          {/* Columna Izquierda: Formulario "Join the Future" */}
+          <div className="lg:col-span-7">
+            <div className="mb-6">
+              <h2 className="font-['Outfit'] font-black text-3xl sm:text-4xl text-white tracking-tight">
+                {mode === "register" ? "Join the Future" : "Welcome Back"}
+              </h2>
+              {/* Barra de acento bicolor estilo futurista */}
+              <div className="h-1 w-20 bg-gradient-to-r from-[#ff3b80] via-[#a855f7] to-[#00f2fe] rounded-full mt-2 shadow-[0_0_12px_rgba(255,59,128,0.5)]" />
             </div>
 
-            <div>
-              <label className="block text-white/40 text-xs mb-1.5 tracking-wide uppercase">Contraseña</label>
-              <input type="password" placeholder="••••••••"
-                value={form.password} onChange={(e) => set("password", e.target.value)}
-                className={`w-full bg-white/5 border rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-colors ${errors.password ? "border-red-500/50" : "border-white/8 focus:border-teal-500/40"}`} />
-              {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password}</p>}
-            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === "register" && (
+                <div>
+                  <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                    Nombre Completo
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Alejandro Ramos"
+                    value={form.nombre}
+                    onChange={(e) => set("nombre", e.target.value)}
+                    className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                  />
+                  {errors.nombre && <p className="text-[#ff3b80] text-xs mt-1">{errors.nombre}</p>}
+                </div>
+              )}
 
-            {mode === "register" && (
               <div>
-                <label className="block text-white/40 text-xs mb-1.5 tracking-wide uppercase">Confirmar contraseña</label>
-                <input type="password" placeholder="••••••••"
-                  value={form.confirmar} onChange={(e) => set("confirmar", e.target.value)}
-                  className={`w-full bg-white/5 border rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-colors ${errors.confirmar ? "border-red-500/50" : "border-white/8 focus:border-teal-500/40"}`} />
-                {errors.confirmar && <p className="text-red-400 text-xs mt-1">{errors.confirmar}</p>}
+                <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                  Correo Electrónico
+                </label>
+                <input
+                  type="email"
+                  placeholder="usuario@empresa.com"
+                  value={form.email}
+                  onChange={(e) => set("email", e.target.value)}
+                  className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                />
+                {errors.email && <p className="text-[#ff3b80] text-xs mt-1">{errors.email}</p>}
               </div>
-            )}
 
-            {mode === "login" && (
-              <div className="flex items-center justify-between">
-                {/* Chulito — mantener sesión activa */}
-                <label className="flex items-center gap-2.5 cursor-pointer group">
-                  <div
-                    onClick={() => setForm((f) => ({ ...f, remember: !f.remember }))}
-                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                      form.remember
-                        ? "g-aurora border-transparent"
-                        : "border-white/20 bg-white/5 hover:border-white/35"
-                    }`}>
-                    {form.remember && (
-                      <svg width="11" height="8" viewBox="0 0 11 8" fill="none">
-                        <path d="M1 4L4 7L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
+              <div>
+                <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  placeholder="••••••••••••"
+                  value={form.password}
+                  onChange={(e) => set("password", e.target.value)}
+                  className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                />
+                {errors.password && <p className="text-[#ff3b80] text-xs mt-1">{errors.password}</p>}
+                
+                {/* Indicador sutil de seguridad */}
+                {form.password.length > 0 && (
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <div className="h-1 flex-1 rounded-full bg-teal-400" />
+                    <div className={`h-1 flex-1 rounded-full ${form.password.length >= 6 ? "bg-teal-400" : "bg-white/10"}`} />
+                    <div className={`h-1 flex-1 rounded-full ${form.password.length >= 10 ? "bg-teal-400" : "bg-white/10"}`} />
+                    <span className="text-[10px] text-white/40 font-mono ml-1">
+                      {form.password.length < 6 ? "Débil" : form.password.length < 10 ? "Buena" : "Segura"}
+                    </span>
                   </div>
-                  <span className="text-xs text-white/50 group-hover:text-white/70 transition-colors select-none">
-                    Mantener sesión activa
+                )}
+              </div>
+
+              {mode === "register" && (
+                <div>
+                  <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                    Confirmar Contraseña
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••••••"
+                    value={form.confirmar}
+                    onChange={(e) => set("confirmar", e.target.value)}
+                    className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                  />
+                  {errors.confirmar && <p className="text-[#ff3b80] text-xs mt-1">{errors.confirmar}</p>}
+                </div>
+              )}
+
+              {/* Checkboxes de Sesión / Términos */}
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={mode === "login" ? form.remember : form.terms}
+                    onChange={(e) => set(mode === "login" ? "remember" : "terms", e.target.checked)}
+                    className="w-4 h-4 rounded border-white/20 bg-white/5 text-teal-400 focus:ring-0 focus:outline-none"
+                  />
+                  <span className="text-xs text-white/60 hover:text-white/80 transition-colors">
+                    {mode === "login" ? "Mantener sesión activa" : "Acepto los términos y condiciones"}
                   </span>
                 </label>
 
-                <button type="button" className="text-teal-400 hover:text-teal-300 text-xs transition-colors">
-                  ¿Olvidaste tu contraseña?
-                </button>
+                {mode === "login" && (
+                  <button type="button" className="text-xs text-teal-400 hover:text-teal-300 transition-colors">
+                    ¿Olvidaste tu clave?
+                  </button>
+                )}
               </div>
-            )}
 
-            <button type="submit"
-              className="w-full g-aurora glow-teal text-white font-semibold py-4 rounded-xl hover:opacity-90 transition-opacity text-sm mt-2">
-              {mode === "register" ? "Crear cuenta y continuar →" : "Ingresar"}
-            </button>
+              {/* Botón Principal Cyber Neon */}
+              <button
+                type="submit"
+                className="w-full btn-cyber-neon text-white font-bold py-3.5 rounded-full text-sm mt-4 cursor-pointer">
+                {mode === "register" ? "Crear cuenta y comenzar →" : "Ingresar a la plataforma →"}
+              </button>
 
-            {mode === "register" && (
-              <p className="text-white/25 text-xs text-center leading-relaxed">
-                Al crear tu cuenta aceptas nuestros{" "}
-                <span className="text-teal-400 cursor-pointer hover:text-teal-300">Términos de uso</span>{" "}
-                y{" "}
-                <span className="text-teal-400 cursor-pointer hover:text-teal-300">Política de privacidad</span>
+              {/* Proveedores de acceso rápido */}
+              <div className="pt-3">
+                <div className="flex items-center justify-center gap-2 text-xs text-white/40">
+                  <span>Acceso rápido:</span>
+                  <div className="flex items-center gap-1.5">
+                    {["Google", "Apple", "GitHub"].map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => login(`demo_${p.toLowerCase()}@auroraplus.com`, `Usuario ${p}`)}
+                        className="apple-glass-pill px-3 py-1 rounded-full text-[11px] text-white/70 hover:text-white hover:border-white/30 transition-all">
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Columna Derecha: Tarjeta Visual Futurista Apple Glass */}
+          <div className="lg:col-span-5 flex flex-col justify-between h-full space-y-6">
+            <div className="apple-glass rounded-2xl p-6 sm:p-7 relative overflow-hidden border border-white/10 shadow-2xl">
+              <div className="line-aurora absolute top-0 left-0 right-0" />
+              
+              <p className="text-sm sm:text-base text-white/80 leading-relaxed italic mb-4 font-light">
+                "Ingresa al futuro de la gestión operativa multi-empresa. Automatiza clínicas, fincas, minería, restaurantes y ferreterías con un motor central inteligente y multi-moneda."
               </p>
-            )}
-          </form>
-        </div>
+              
+              <div className="text-xs font-mono text-teal-400 font-semibold tracking-wider">
+                // Aurora Plus Next-Gen Enterprise
+              </div>
 
-        {mode === "register" && (
-          <div className="mt-6 bg-teal-500/8 border border-teal-500/15 rounded-2xl p-4 flex items-start gap-3">
-            <span className="text-teal-400 text-lg flex-shrink-0">🎁</span>
-            <div>
-              <div className="text-white/70 text-sm font-medium">1 mes gratis, sin tarjeta</div>
-              <div className="text-white/35 text-xs mt-0.5">Crea tu cuenta y activa tu licencia de prueba en 2 minutos.</div>
+              <div className="mt-6 pt-5 border-t border-white/10 space-y-2 text-xs text-white/50">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                  <span>7 Verticales Nativas en la misma sesión</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                  <span>Motor Financiero Multi-Moneda (USD/VES/COP)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                  <span>Offline-First POS & Idempotencia de Caja</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Badge inferior derecho de seguridad */}
+            <div className="flex justify-end">
+              <div className="apple-glass-pill rounded-full px-4 py-2 flex items-center gap-2 text-xs text-white/70 shadow-lg">
+                <span className="text-teal-400">🔒</span>
+                <span className="font-medium text-[11px] tracking-wide">Cifrado de Extremo a Extremo (AES-256)</span>
+              </div>
             </div>
           </div>
-        )}
+
+        </div>
       </div>
     </div>
   );
