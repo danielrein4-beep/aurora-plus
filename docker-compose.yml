@@ -24,6 +24,9 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: ${DB_PASSWORD:-1234}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET en .env antes de levantar en producción}
+      SUPER_ADMIN_USERNAME: ${SUPER_ADMIN_USERNAME:-admin}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?Defina SUPER_ADMIN_PASSWORD en .env antes de levantar en producción}
     ports:
       - "8080:8080"
 

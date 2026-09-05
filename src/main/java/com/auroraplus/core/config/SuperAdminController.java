@@ -1,5 +1,7 @@
 package com.auroraplus.core.config;
 
+import com.auroraplus.core.auth.entities.Usuario;
+import com.auroraplus.core.auth.services.AuthService;
 import com.auroraplus.core.config.entities.LicenciaTenant;
 import com.auroraplus.core.config.entities.ModuloTenant;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
@@ -18,11 +20,9 @@ import java.util.List;
  * licencias_tenant por SQL. Excluido del LicenciaInterceptor (ver WebConfig)
  * porque es quien gestiona las licencias de todos los demás.
  *
- * ADVERTENCIA DE SEGURIDAD: estos endpoints no tienen ninguna autenticación
- * todavía — el proyecto no tiene un sistema de login/roles construido. Antes
- * de exponer esto fuera de una red de confianza, hay que protegerlo (login +
- * rol super-admin como mínimo). No es un descuido: es un hueco conocido y
- * pendiente, documentado aquí a propósito.
+ * Protegido por TenantInterceptor: solo un token SUPER_ADMIN válido (ver
+ * core.auth) puede llegar hasta aquí — sin login correcto, 401 antes de
+ * ejecutar nada de este controlador.
  */
 @RestController
 @RequestMapping("/api/super-admin/tenants")
@@ -33,6 +33,9 @@ public class SuperAdminController {
 
     @Autowired
     private ModuloTenantRepository moduloTenantRepository;
+
+    @Autowired
+    private AuthService authService;
 
     @GetMapping
     public List<LicenciaTenant> listar() {
@@ -53,6 +56,12 @@ public class SuperAdminController {
         public String telefonoContacto;
         public Integer mesesVigencia; // opcional, por defecto 1 mes
         public String monedaBase; // opcional, por defecto USD (ver LicenciaTenant.monedaBase)
+        // Opcional: si se informan, se crea de una vez el usuario Dueño/Administrador
+        // inicial de este tenant (sin esto, el negocio quedaría dado de alta pero
+        // sin ningún usuario que pueda entrar — habría que crearlo aparte con
+        // POST /api/super-admin/tenants/{tenantId}/usuarios).
+        public String usuarioInicial;
+        public String passwordInicial;
     }
 
     /** Da de alta un cliente nuevo: le asigna un tenantId propio y su licencia inicial. */
@@ -96,6 +105,11 @@ public class SuperAdminController {
         moduloInicial.setModuloNombre(request.moduloPrincipal);
         moduloInicial.setActivo(true);
         moduloTenantRepository.save(moduloInicial);
+
+        if (request.usuarioInicial != null && !request.usuarioInicial.isBlank()) {
+            authService.crearUsuario(nuevoTenantId, request.usuarioInicial, request.passwordInicial,
+                Usuario.Rol.DUENO_ADMIN, request.nombreEmpresa);
+        }
 
         return ResponseEntity.ok(guardada);
     }
@@ -189,5 +203,24 @@ public class SuperAdminController {
             });
         modulo.setActivo(request.activo);
         return ResponseEntity.ok(moduloTenantRepository.save(modulo));
+    }
+
+    // --- Usuarios de un tenant: el super-admin puede crear/reiniciar el acceso
+    // de cualquier negocio (ej. el dueño olvidó su contraseña, o un tenant
+    // dado de alta antes de que existiera login todavía no tiene usuarios).
+
+    public static class CrearUsuarioTenantRequest {
+        public String username;
+        public String password;
+        public Usuario.Rol rol;
+        public String nombreCompleto;
+    }
+
+    @PostMapping("/{tenantId}/usuarios")
+    public ResponseEntity<Usuario> crearUsuarioTenant(@PathVariable Long tenantId, @RequestBody CrearUsuarioTenantRequest request) {
+        licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
+        Usuario.Rol rol = request.rol != null ? request.rol : Usuario.Rol.DUENO_ADMIN;
+        return ResponseEntity.ok(authService.crearUsuario(tenantId, request.username, request.password, rol, request.nombreCompleto));
     }
 }
