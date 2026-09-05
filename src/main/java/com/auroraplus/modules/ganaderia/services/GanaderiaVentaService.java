@@ -30,6 +30,9 @@ public class GanaderiaVentaService {
     @Autowired
     private IdempotenciaService idempotenciaService;
 
+    @Autowired
+    private GanaderiaSanidadService ganaderiaSanidadService;
+
     public static class ItemVentaAnimal {
         public Long animalId;
         public BigDecimal precioVenta;
@@ -81,6 +84,7 @@ public class GanaderiaVentaService {
             if (!"ACTIVO".equals(animal.getEstado())) {
                 throw new RuntimeException("El animal " + animal.getArete() + " no está activo (estado actual: " + animal.getEstado() + ")");
             }
+            ganaderiaSanidadService.validarAptoParaVentaConsumo(animal.getId());
 
             animal.setEstado("VENDIDO");
             animal.setPotrero(null);

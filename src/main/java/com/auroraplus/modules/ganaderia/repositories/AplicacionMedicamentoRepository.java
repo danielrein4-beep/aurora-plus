@@ -5,10 +5,17 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
 public interface AplicacionMedicamentoRepository extends JpaRepository<AplicacionMedicamento, Long> {
     @Query("SELECT a FROM AplicacionMedicamento a JOIN FETCH a.animal JOIN FETCH a.medicamento WHERE a.animal.id = :animalId ORDER BY a.fechaAplicacion DESC")
     List<AplicacionMedicamento> findByAnimalIdOrderByFechaAplicacionDesc(@Param("animalId") Long animalId);
+
+    @Query("SELECT a FROM AplicacionMedicamento a JOIN FETCH a.animal JOIN FETCH a.medicamento WHERE a.tenantId = :tenantId AND a.fechaFinRetiroLeche >= :hoy")
+    List<AplicacionMedicamento> findConRetiroLecheActivo(@Param("tenantId") Long tenantId, @Param("hoy") LocalDate hoy);
+
+    @Query("SELECT a FROM AplicacionMedicamento a JOIN FETCH a.animal JOIN FETCH a.medicamento WHERE a.tenantId = :tenantId AND a.fechaFinRetiroCarne >= :hoy")
+    List<AplicacionMedicamento> findConRetiroCarneActivo(@Param("tenantId") Long tenantId, @Param("hoy") LocalDate hoy);
 }

@@ -33,6 +33,29 @@ public class MesaController {
         return ResponseEntity.ok(mesaRepository.save(mesa));
     }
 
+    public static class PosicionRequest {
+        public Integer posX;
+        public Integer posY;
+        public Integer ancho;
+        public Integer alto;
+        public String forma;
+    }
+
+    /** Ubica/redimensiona la mesa en el plano — pensado para un arrastrar-y-soltar en el frontend, sin tocar el resto de sus datos (número, capacidad, zona). */
+    @PutMapping("/{id}/posicion")
+    public ResponseEntity<Mesa> actualizarPosicion(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody PosicionRequest request) {
+        Mesa mesa = mesaRepository.findById(id).orElseThrow(() -> new RuntimeException("Mesa no encontrada"));
+        if (!mesa.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Mesa no pertenece a este tenant");
+        }
+        mesa.setPosX(request.posX);
+        mesa.setPosY(request.posY);
+        if (request.ancho != null) mesa.setAncho(request.ancho);
+        if (request.alto != null) mesa.setAlto(request.alto);
+        if (request.forma != null) mesa.setForma(request.forma);
+        return ResponseEntity.ok(mesaRepository.save(mesa));
+    }
+
     /** Mapa de mesas: cada mesa con su estado (LIBRE/OCUPADA) según si tiene una comanda ABIERTA. */
     @GetMapping("/mapa")
     public List<Map<String, Object>> mapa() {

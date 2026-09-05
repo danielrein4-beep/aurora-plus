@@ -55,6 +55,13 @@ public class Animal {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Potrero potrero;
 
+    // Grupo de ordeño al que pertenece HOY (solo aplica a hembras en producción) — determina en
+    // qué orden se ordeña este animal dentro de la rutina diaria. Nulo si no está en ordeño.
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "grupo_ordeno_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private GrupoOrdeno grupoOrdeno;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "madre_id")
     private Animal madre;
@@ -97,6 +104,8 @@ public class Animal {
     public void setPesoActual(BigDecimal pesoActual) { this.pesoActual = pesoActual; }
     public Potrero getPotrero() { return potrero; }
     public void setPotrero(Potrero potrero) { this.potrero = potrero; }
+    public GrupoOrdeno getGrupoOrdeno() { return grupoOrdeno; }
+    public void setGrupoOrdeno(GrupoOrdeno grupoOrdeno) { this.grupoOrdeno = grupoOrdeno; }
     public Animal getMadre() { return madre; }
     public void setMadre(Animal madre) { this.madre = madre; }
     public Animal getPadre() { return padre; }

@@ -39,6 +39,21 @@ public class Potrero {
     @Column(name = "fecha_inicio_descanso")
     private LocalDate fechaInicioDescanso;
 
+    // Se fija cuando el potrero vuelve a ACTIVO (ver PotreroRotacionService) — permite avisar
+    // si un potrero lleva demasiado tiempo cargado sin rotar (sobrepastoreo).
+    @Column(name = "fecha_inicio_uso")
+    private LocalDate fechaInicioUso;
+
+    // Días mínimos que debe permanecer EN_DESCANSO antes de poder recibir animales de nuevo —
+    // sin esto, PotreroRotacionService no puede validar si un potrero "ya descansó lo suficiente".
+    @Column(name = "dias_descanso_minimo")
+    private Integer diasDescansoMinimo;
+
+    // Posición en la secuencia de rotación (1, 2, 3...) — define qué potrero sigue después de
+    // este en el ciclo de pastoreo rotacional (ver PotreroRotacionService.obtenerSiguienteEnRotacion).
+    @Column(name = "orden_rotacion")
+    private Integer ordenRotacion;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -55,10 +70,30 @@ public class Potrero {
     public void setEstado(String estado) { this.estado = estado; }
     public LocalDate getFechaInicioDescanso() { return fechaInicioDescanso; }
     public void setFechaInicioDescanso(LocalDate fechaInicioDescanso) { this.fechaInicioDescanso = fechaInicioDescanso; }
+    public LocalDate getFechaInicioUso() { return fechaInicioUso; }
+    public void setFechaInicioUso(LocalDate fechaInicioUso) { this.fechaInicioUso = fechaInicioUso; }
+    public Integer getDiasDescansoMinimo() { return diasDescansoMinimo; }
+    public void setDiasDescansoMinimo(Integer diasDescansoMinimo) { this.diasDescansoMinimo = diasDescansoMinimo; }
+    public Integer getOrdenRotacion() { return ordenRotacion; }
+    public void setOrdenRotacion(Integer ordenRotacion) { this.ordenRotacion = ordenRotacion; }
 
     @Transient
     public Long getDiasEnDescanso() {
         if (!"EN_DESCANSO".equals(estado) || fechaInicioDescanso == null) return null;
         return ChronoUnit.DAYS.between(fechaInicioDescanso, LocalDate.now());
+    }
+
+    @Transient
+    public Long getDiasEnUso() {
+        if (!"ACTIVO".equals(estado) || fechaInicioUso == null) return null;
+        return ChronoUnit.DAYS.between(fechaInicioUso, LocalDate.now());
+    }
+
+    /** true si ya cumplió los días mínimos de descanso (o si no se configuró un mínimo, cualquier descanso ya cuenta como suficiente). */
+    @Transient
+    public boolean isListoParaVolverAUso() {
+        Long dias = getDiasEnDescanso();
+        if (dias == null) return false;
+        return diasDescansoMinimo == null || dias >= diasDescansoMinimo;
     }
 }

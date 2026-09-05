@@ -22,7 +22,9 @@ public class GastoGanaderia {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    // Libre pero sugerida: MANO_DE_OBRA, VETERINARIO, MANTENIMIENTO_POTRERO, ALIMENTACION, TRANSPORTE, OTROS
+    // Libre pero sugerida: MANO_DE_OBRA, VETERINARIO, MANTENIMIENTO_POTRERO,
+    // ALIMENTACION_GANADO, COMBUSTIBLES_LUBRICANTES, MAQUINARIA (repuestos/reparación),
+    // TRANSPORTE, OTROS — no es una lista cerrada, se puede anotar cualquier categoría.
     @Column(nullable = false, length = 30)
     private String categoria;
 

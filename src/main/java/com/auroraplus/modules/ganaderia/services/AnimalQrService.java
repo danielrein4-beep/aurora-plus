@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.util.Base64;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -45,6 +46,11 @@ public class AnimalQrService {
     }
 
     public byte[] generarFichaQr(Animal animal) throws Exception {
+        return generarFichaQr(animal, null);
+    }
+
+    /** hierroBase64 (opcional): la marca de propiedad de la finca (ver LicenciaTenant.hierroBase64) — se estampa en la esquina de la ficha, junto al arete, para identificar de quién es el animal a simple vista. */
+    public byte[] generarFichaQr(Animal animal, String hierroBase64) throws Exception {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PDPage page = new PDPage(new PDRectangle(LABEL_WIDTH, LABEL_HEIGHT));
             document.addPage(page);
@@ -52,12 +58,27 @@ public class AnimalQrService {
             byte[] qrPng = generarQrPng(animal.getArete(), 300);
             PDImageXObject qrImg = PDImageXObject.createFromByteArray(document, qrPng, "qr-animal");
 
+            PDImageXObject hierroImg = null;
+            if (hierroBase64 != null && !hierroBase64.isBlank()) {
+                try {
+                    byte[] hierroBytes = Base64.getDecoder().decode(hierroBase64);
+                    hierroImg = PDImageXObject.createFromByteArray(document, hierroBytes, "hierro");
+                } catch (IllegalArgumentException ignorado) {
+                    // Base64 corrupto/inválido — la ficha se genera igual, solo sin el hierro.
+                }
+            }
+
             try (PDPageContentStream cs = new PDPageContentStream(document, page)) {
                 cs.beginText();
                 cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 8);
                 cs.newLineAtOffset(4, LABEL_HEIGHT - 12);
                 cs.showText("ARETE: " + animal.getArete());
                 cs.endText();
+
+                if (hierroImg != null) {
+                    float hierroSize = 20;
+                    cs.drawImage(hierroImg, LABEL_WIDTH - hierroSize - 4, LABEL_HEIGHT - hierroSize - 4, hierroSize, hierroSize);
+                }
 
                 float qrSize = LABEL_WIDTH - 20;
                 cs.drawImage(qrImg, (LABEL_WIDTH - qrSize) / 2, 20, qrSize, qrSize);

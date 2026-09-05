@@ -15,4 +15,12 @@ public interface AplicacionVacunaRepository extends JpaRepository<AplicacionVacu
 
     @Query("SELECT a FROM AplicacionVacuna a JOIN FETCH a.animal JOIN FETCH a.vacuna WHERE a.tenantId = :tenantId AND a.fechaProximaDosis BETWEEN :desde AND :hasta ORDER BY a.fechaProximaDosis ASC")
     List<AplicacionVacuna> findRefuerzosPendientes(@Param("tenantId") Long tenantId, @Param("desde") LocalDate desde, @Param("hasta") LocalDate hasta);
+
+    // Retiro sanitario todavía activo (el animal aún no es apto para venta/consumo de leche o carne) —
+    // base de las alertas de cumplimiento sanitario (ver GanaderiaSanidadService).
+    @Query("SELECT a FROM AplicacionVacuna a JOIN FETCH a.animal JOIN FETCH a.vacuna WHERE a.tenantId = :tenantId AND a.fechaFinRetiroLeche >= :hoy")
+    List<AplicacionVacuna> findConRetiroLecheActivo(@Param("tenantId") Long tenantId, @Param("hoy") LocalDate hoy);
+
+    @Query("SELECT a FROM AplicacionVacuna a JOIN FETCH a.animal JOIN FETCH a.vacuna WHERE a.tenantId = :tenantId AND a.fechaFinRetiroCarne >= :hoy")
+    List<AplicacionVacuna> findConRetiroCarneActivo(@Param("tenantId") Long tenantId, @Param("hoy") LocalDate hoy);
 }

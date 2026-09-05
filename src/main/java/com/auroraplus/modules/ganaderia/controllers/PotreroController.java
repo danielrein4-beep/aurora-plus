@@ -4,6 +4,8 @@ import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.Potrero;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.PotreroRepository;
+import com.auroraplus.modules.ganaderia.services.PotreroRotacionService;
+import com.auroraplus.modules.ganaderia.services.ReferenciaPastoreoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,34 +25,108 @@ public class PotreroController {
     @Autowired
     private AnimalRepository animalRepository;
 
+    @Autowired
+    private PotreroRotacionService potreroRotacionService;
+
+    @Autowired
+    private ReferenciaPastoreoService referenciaPastoreoService;
+
     @GetMapping
     public List<Potrero> listar() {
         return potreroRepository.findAll();
     }
 
+    /**
+     * Si no se indica capacidadAnimales y/o diasDescansoMinimo, se calculan
+     * automáticamente a partir del área y el tipo de pasto (ver
+     * ReferenciaPastoreoService) — así el usuario no necesita saber esos
+     * números de antemano; puede editarlos después si conoce el valor real
+     * de su terreno.
+     */
     @PostMapping
     public ResponseEntity<Potrero> crear(@RequestParam Long tenantId, @RequestBody Potrero potrero) {
         potrero.setTenantId(tenantId);
+        aplicarRecomendacionSiFalta(tenantId, potrero);
         return ResponseEntity.ok(potreroRepository.save(potrero));
     }
 
+    private void aplicarRecomendacionSiFalta(Long tenantId, Potrero potrero) {
+        if (potrero.getCapacidadAnimales() == null || potrero.getDiasDescansoMinimo() == null) {
+            ReferenciaPastoreoService.Recomendacion r = referenciaPastoreoService.calcular(tenantId, potrero.getAreaHectareas(), potrero.getTipoPasto());
+            if (potrero.getCapacidadAnimales() == null) potrero.setCapacidadAnimales(r.capacidadAnimalesRecomendada);
+            if (potrero.getDiasDescansoMinimo() == null) potrero.setDiasDescansoMinimo(r.diasDescansoRecomendado);
+        }
+    }
+
     @PutMapping("/{id}")
-    public ResponseEntity<Potrero> actualizar(@PathVariable Long id, @RequestBody Potrero datos) {
+    public ResponseEntity<Potrero> actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Potrero datos) {
         Potrero potrero = potreroRepository.findById(id).orElseThrow(() -> new RuntimeException("Potrero no encontrado"));
         potrero.setNombre(datos.getNombre());
         potrero.setAreaHectareas(datos.getAreaHectareas());
         potrero.setCapacidadAnimales(datos.getCapacidadAnimales());
         potrero.setTipoPasto(datos.getTipoPasto());
+        potrero.setDiasDescansoMinimo(datos.getDiasDescansoMinimo());
+        potrero.setOrdenRotacion(datos.getOrdenRotacion());
+        aplicarRecomendacionSiFalta(tenantId, potrero);
 
         // Al entrar en descanso se marca la fecha de inicio (para contar días); al
         // volver a activo se limpia, para que un descanso futuro cuente desde cero.
         boolean entraEnDescanso = "EN_DESCANSO".equals(datos.getEstado()) && !"EN_DESCANSO".equals(potrero.getEstado());
         boolean vuelveActivo = "ACTIVO".equals(datos.getEstado()) && !"ACTIVO".equals(potrero.getEstado());
-        if (entraEnDescanso) potrero.setFechaInicioDescanso(java.time.LocalDate.now());
-        if (vuelveActivo) potrero.setFechaInicioDescanso(null);
+        if (entraEnDescanso) {
+            potrero.setFechaInicioDescanso(java.time.LocalDate.now());
+            potrero.setFechaInicioUso(null);
+        }
+        if (vuelveActivo) {
+            potrero.setFechaInicioDescanso(null);
+            potrero.setFechaInicioUso(java.time.LocalDate.now());
+        }
 
         potrero.setEstado(datos.getEstado());
         return ResponseEntity.ok(potreroRepository.save(potrero));
+    }
+
+    /** Forma rápida de fijar el orden de rotación de todos los potreros de una vez, sin editar uno por uno. */
+    @PostMapping("/reordenar")
+    public List<Potrero> reordenar(@RequestParam Long tenantId, @RequestBody List<Long> potreroIdsEnOrden) {
+        return potreroRotacionService.reordenar(tenantId, potreroIdsEnOrden);
+    }
+
+    public static class RotarRequest {
+        public Long potreroDestinoId;
+        public List<Long> animalIds; // opcional: si se omite, se mueven TODOS los animales activos del origen
+    }
+
+    /** Mueve el hato del potrero {id} al destino indicado: origen queda EN_DESCANSO, destino queda ACTIVO. */
+    @PostMapping("/{id}/rotar")
+    public Map<String, Object> rotar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody RotarRequest request) {
+        return potreroRotacionService.rotar(tenantId, id, request.potreroDestinoId, request.animalIds);
+    }
+
+    /** Según el ordenRotacion configurado, cuál potrero sigue después de este en el ciclo. */
+    @GetMapping("/{id}/siguiente-rotacion")
+    public Potrero siguienteRotacion(@PathVariable Long id, @RequestParam Long tenantId) {
+        return potreroRotacionService.obtenerSiguienteEnRotacion(tenantId, id);
+    }
+
+    /** Sobrecarga de animales y potreros que ya cumplieron su descanso mínimo y podrían reactivarse. */
+    @GetMapping("/alertas")
+    public List<Map<String, Object>> alertas(@RequestParam Long tenantId) {
+        return potreroRotacionService.obtenerAlertas(tenantId);
+    }
+
+    /** Previsualiza la recomendación de capacidad/descanso ANTES de crear el potrero (ej. para mostrarla en el formulario mientras se llena). */
+    @GetMapping("/recomendacion")
+    public ReferenciaPastoreoService.Recomendacion recomendacionPreliminar(
+            @RequestParam Long tenantId, @RequestParam java.math.BigDecimal areaHectareas, @RequestParam(required = false) String tipoPasto) {
+        return referenciaPastoreoService.calcular(tenantId, areaHectareas, tipoPasto);
+    }
+
+    /** Recomendación para un potrero ya creado, según su área y tipo de pasto actuales. */
+    @GetMapping("/{id}/recomendacion")
+    public ReferenciaPastoreoService.Recomendacion recomendacion(@PathVariable Long id, @RequestParam Long tenantId) {
+        Potrero potrero = potreroRepository.findById(id).orElseThrow(() -> new RuntimeException("Potrero no encontrado"));
+        return referenciaPastoreoService.calcular(tenantId, potrero.getAreaHectareas(), potrero.getTipoPasto());
     }
 
     /** Mapa de potreros: cada potrero con sus animales actuales y % de ocupación — base para la vista visual del frontend. */

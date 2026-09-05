@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Aplicación de vacunas y medicamentos: calcula automáticamente las fechas de
@@ -91,5 +93,86 @@ public class GanaderiaSanidadService {
         aplicacion.setFechaFinRetiroCarne(fechaAplicacion.plusDays(medicamento.getDiasRetiroCarne()));
 
         return aplicacionMedicamentoRepository.save(aplicacion);
+    }
+
+    public static class AlertaSanitaria {
+        public String tipo; // REFUERZO_VACUNA_PENDIENTE, RETIRO_LECHE_ACTIVO, RETIRO_CARNE_ACTIVO
+        public Animal animal;
+        public String producto; // nombre de la vacuna o medicamento involucrado
+        public LocalDate fechaRelevante; // fecha del refuerzo, o fecha en que termina el retiro
+        public String mensaje;
+    }
+
+    /**
+     * Todas las alertas sanitarias vigentes del tenant en un solo lugar:
+     * refuerzos de vacuna pendientes en los próximos 30 días, y animales que
+     * TODAVÍA no son aptos para venta/consumo de leche o carne por estar en
+     * período de retiro (de vacuna o medicamento).
+     */
+    public List<AlertaSanitaria> obtenerAlertasSanitarias(Long tenantId) {
+        LocalDate hoy = LocalDate.now();
+        List<AlertaSanitaria> alertas = new ArrayList<>();
+
+        for (AplicacionVacuna a : aplicacionVacunaRepository.findRefuerzosPendientes(tenantId, hoy.minusDays(9999), hoy.plusDays(30))) {
+            AlertaSanitaria alerta = new AlertaSanitaria();
+            alerta.tipo = "REFUERZO_VACUNA_PENDIENTE";
+            alerta.animal = a.getAnimal();
+            alerta.producto = a.getVacuna().getNombre();
+            alerta.fechaRelevante = a.getFechaProximaDosis();
+            boolean vencido = a.getFechaProximaDosis().isBefore(hoy);
+            alerta.mensaje = (vencido ? "VENCIDO: " : "") + "Refuerzo de " + a.getVacuna().getNombre()
+                + " para " + a.getAnimal().getArete() + " el " + a.getFechaProximaDosis();
+            alertas.add(alerta);
+        }
+
+        for (AplicacionVacuna a : aplicacionVacunaRepository.findConRetiroLecheActivo(tenantId, hoy)) {
+            alertas.add(alertaRetiro("RETIRO_LECHE_ACTIVO", a.getAnimal(), a.getVacuna().getNombre(), a.getFechaFinRetiroLeche(), "leche"));
+        }
+        for (AplicacionVacuna a : aplicacionVacunaRepository.findConRetiroCarneActivo(tenantId, hoy)) {
+            alertas.add(alertaRetiro("RETIRO_CARNE_ACTIVO", a.getAnimal(), a.getVacuna().getNombre(), a.getFechaFinRetiroCarne(), "carne"));
+        }
+        for (AplicacionMedicamento a : aplicacionMedicamentoRepository.findConRetiroLecheActivo(tenantId, hoy)) {
+            alertas.add(alertaRetiro("RETIRO_LECHE_ACTIVO", a.getAnimal(), a.getMedicamento().getNombre(), a.getFechaFinRetiroLeche(), "leche"));
+        }
+        for (AplicacionMedicamento a : aplicacionMedicamentoRepository.findConRetiroCarneActivo(tenantId, hoy)) {
+            alertas.add(alertaRetiro("RETIRO_CARNE_ACTIVO", a.getAnimal(), a.getMedicamento().getNombre(), a.getFechaFinRetiroCarne(), "carne"));
+        }
+
+        return alertas;
+    }
+
+    /**
+     * Bloquea la venta si el animal todavía está en período de retiro de
+     * carne (por vacuna o medicamento aplicado) — sin esto, un ganadero podía
+     * vender y sacrificar un animal en pleno retiro sanitario sin ninguna
+     * advertencia, un riesgo sanitario/legal real que las alertas por sí
+     * solas (solo informativas) no evitaban.
+     */
+    public void validarAptoParaVentaConsumo(Long animalId) {
+        LocalDate hoy = LocalDate.now();
+
+        for (AplicacionVacuna a : aplicacionVacunaRepository.findByAnimalIdOrderByFechaAplicacionDesc(animalId)) {
+            if (a.getFechaFinRetiroCarne() != null && a.getFechaFinRetiroCarne().isAfter(hoy.minusDays(1))) {
+                throw new RuntimeException("No se puede vender " + a.getAnimal().getArete()
+                    + ": en período de retiro de carne por " + a.getVacuna().getNombre() + " hasta " + a.getFechaFinRetiroCarne());
+            }
+        }
+        for (AplicacionMedicamento a : aplicacionMedicamentoRepository.findByAnimalIdOrderByFechaAplicacionDesc(animalId)) {
+            if (a.getFechaFinRetiroCarne() != null && a.getFechaFinRetiroCarne().isAfter(hoy.minusDays(1))) {
+                throw new RuntimeException("No se puede vender " + a.getAnimal().getArete()
+                    + ": en período de retiro de carne por " + a.getMedicamento().getNombre() + " hasta " + a.getFechaFinRetiroCarne());
+            }
+        }
+    }
+
+    private AlertaSanitaria alertaRetiro(String tipo, Animal animal, String producto, LocalDate fechaFin, String tipoRetiro) {
+        AlertaSanitaria alerta = new AlertaSanitaria();
+        alerta.tipo = tipo;
+        alerta.animal = animal;
+        alerta.producto = producto;
+        alerta.fechaRelevante = fechaFin;
+        alerta.mensaje = animal.getArete() + " no apto para venta/consumo de " + tipoRetiro + " hasta " + fechaFin
+            + " (por " + producto + ")";
+        return alerta;
     }
 }

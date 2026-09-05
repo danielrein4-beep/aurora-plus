@@ -47,6 +47,15 @@ public class LicenciaTenant {
     @Column(name = "fecha_alta", nullable = false)
     private LocalDate fechaAlta = LocalDate.now();
 
+    // Logo del negocio (imagen codificada en Base64) — para membretar recibos, PDFs y fichas.
+    @Column(name = "logo_base64", columnDefinition = "TEXT")
+    private String logoBase64;
+
+    // Hierro/marca de propiedad del ganado (imagen codificada en Base64) — específico de
+    // Ganadería, se estampa en la ficha de identificación del animal (ver AnimalQrService).
+    @Column(name = "hierro_base64", columnDefinition = "TEXT")
+    private String hierroBase64;
+
     public enum TipoLicencia { BASICA, COMERCIAL, INDUSTRIAL }
 
     public Long getId() { return id; }
@@ -71,4 +80,8 @@ public class LicenciaTenant {
     public void setFechaAlta(LocalDate fechaAlta) { this.fechaAlta = fechaAlta; }
     public String getMonedaBase() { return monedaBase; }
     public void setMonedaBase(String monedaBase) { this.monedaBase = monedaBase; }
+    public String getLogoBase64() { return logoBase64; }
+    public void setLogoBase64(String logoBase64) { this.logoBase64 = logoBase64; }
+    public String getHierroBase64() { return hierroBase64; }
+    public void setHierroBase64(String hierroBase64) { this.hierroBase64 = hierroBase64; }
 }

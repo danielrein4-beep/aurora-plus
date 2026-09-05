@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 
 /** Registro de ordeño por animal y turno — base de los reportes de producción lechera. */
@@ -24,6 +25,14 @@ public class RegistroOrdeno {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Animal animal;
 
+    // Copiado de animal.grupoOrdeno AL MOMENTO de registrar (ver RegistroOrdenoController) — así
+    // el histórico no cambia si el animal se reasigna a otro grupo más adelante. Nulo si el
+    // animal no pertenecía a ningún grupo cuando se ordeñó.
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "grupo_ordeno_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private GrupoOrdeno grupoOrdeno;
+
     @Column(nullable = false)
     private LocalDate fecha;
 
@@ -32,6 +41,12 @@ public class RegistroOrdeno {
 
     @Column(name = "cantidad_litros", nullable = false, precision = 10, scale = 2)
     private BigDecimal cantidadLitros;
+
+    // Precio de venta del litro EN ESTE momento (el precio de la leche varía en el tiempo) —
+    // snapshot al registrar, igual que grupoOrdeno. Opcional: si no se indica, este registro
+    // solo cuenta para producción (litros), no para el reporte de ingresos.
+    @Column(name = "precio_venta_litro", precision = 10, scale = 4)
+    private BigDecimal precioVentaLitro;
 
     @Column(name = "porcentaje_grasa", precision = 5, scale = 2)
     private BigDecimal porcentajeGrasa;
@@ -45,6 +60,8 @@ public class RegistroOrdeno {
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
     public Animal getAnimal() { return animal; }
     public void setAnimal(Animal animal) { this.animal = animal; }
+    public GrupoOrdeno getGrupoOrdeno() { return grupoOrdeno; }
+    public void setGrupoOrdeno(GrupoOrdeno grupoOrdeno) { this.grupoOrdeno = grupoOrdeno; }
     public LocalDate getFecha() { return fecha; }
     public void setFecha(LocalDate fecha) { this.fecha = fecha; }
     public String getTurno() { return turno; }
@@ -55,4 +72,12 @@ public class RegistroOrdeno {
     public void setPorcentajeGrasa(BigDecimal porcentajeGrasa) { this.porcentajeGrasa = porcentajeGrasa; }
     public BigDecimal getPorcentajeProteina() { return porcentajeProteina; }
     public void setPorcentajeProteina(BigDecimal porcentajeProteina) { this.porcentajeProteina = porcentajeProteina; }
+    public BigDecimal getPrecioVentaLitro() { return precioVentaLitro; }
+    public void setPrecioVentaLitro(BigDecimal precioVentaLitro) { this.precioVentaLitro = precioVentaLitro; }
+
+    @Transient
+    public BigDecimal getMontoVenta() {
+        if (precioVentaLitro == null || cantidadLitros == null) return null;
+        return cantidadLitros.multiply(precioVentaLitro).setScale(2, RoundingMode.HALF_UP);
+    }
 }
