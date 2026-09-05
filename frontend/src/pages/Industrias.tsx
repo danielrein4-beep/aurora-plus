@@ -88,15 +88,15 @@ export default function Industrias() {
 
       {/* Header */}
       <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-16">
-        <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-4 py-1.5 text-xs text-teal-300 mb-6 font-medium">
+        <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-4 py-1.5 text-xs text-teal-600 dark:text-teal-300 mb-6 font-medium">
           <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
           18+ industrias cubiertas
         </div>
-        <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-white mb-5">
+        <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 dark:text-white mb-5">
           Hecho para tu industria,<br />
           <span className="text-aurora">no para todas en general</span>
         </h1>
-        <p className="text-white/45 text-lg max-w-2xl mx-auto leading-relaxed">
+        <p className="text-slate-500 dark:text-white/45 text-lg max-w-2xl mx-auto leading-relaxed">
           Cada vertical tiene sus propios módulos preconfigurados y flujos adaptados. Elige tu industria y ve exactamente qué incluye.
         </p>
       </section>
@@ -110,12 +110,12 @@ export default function Industrias() {
             {INDUSTRIES.map((ind) => (
               <button key={ind.name}
                 onClick={() => setActive(ind.name)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap lg:whitespace-normal flex-shrink-0 ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all whitespace-nowrap lg:whitespace-normal flex-shrink-0 cursor-pointer ${
                   active === ind.name
                     ? "g-aurora text-white shadow-lg"
-                    : "bg-white/5 text-white/50 hover:bg-white/8 hover:text-white/75 border border-white/5"
+                    : "bg-white/70 dark:bg-white/5 text-slate-700 dark:text-white/50 hover:bg-white dark:hover:bg-white/8 hover:text-black dark:hover:text-white border border-slate-200/80 dark:border-white/5"
                 }`}>
-                <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-teal-500/10 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
                   <ind.Icon size={16} />
                 </div>
                 {ind.name}
@@ -125,45 +125,44 @@ export default function Industrias() {
 
           {/* Detail panel */}
           <div className="flex-1 min-w-0">
-            <div className="relative bg-[#0c0c20] border border-white/5 rounded-3xl overflow-hidden">
+            <div className="relative apple-glass rounded-3xl overflow-hidden shadow-xl">
               <div className="line-aurora absolute top-0 left-0 right-0" />
 
               <div className="p-8 sm:p-10">
                 {/* Header */}
                 <div className="flex items-start gap-5 mb-6">
-                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${ind.color} flex items-center justify-center flex-shrink-0`}
-                    style={{ opacity: 0.9 }}>
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${ind.color} flex items-center justify-center flex-shrink-0 text-white shadow-md`}>
                     <ind.Icon size={30} />
                   </div>
                   <div>
-                    <div className="text-white/35 text-xs tracking-widest uppercase mb-1">{ind.tagline}</div>
-                    <h2 className="font-['Outfit'] font-bold text-3xl text-white">{ind.name}</h2>
+                    <div className="text-teal-600 dark:text-white/35 text-xs font-semibold tracking-widest uppercase mb-1">{ind.tagline}</div>
+                    <h2 className="font-['Outfit'] font-bold text-3xl text-slate-900 dark:text-white">{ind.name}</h2>
                   </div>
                 </div>
 
-                <p className="text-white/55 text-base leading-relaxed mb-8 max-w-2xl">{ind.desc}</p>
+                <p className="text-slate-600 dark:text-white/55 text-base leading-relaxed mb-8 max-w-2xl">{ind.desc}</p>
 
                 {/* Modules */}
                 <div className="mb-8">
-                  <p className="text-xs font-semibold tracking-widest text-teal-400 uppercase mb-4">Módulos incluidos</p>
+                  <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase mb-4">Módulos incluidos</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {ind.modulos.map((m) => (
-                      <div key={m} className="flex items-center gap-3 bg-white/3 border border-white/5 rounded-xl px-4 py-3">
-                        <span className="w-5 h-5 rounded-full bg-teal-500/15 text-teal-400 flex items-center justify-center text-[10px] flex-shrink-0">✓</span>
-                        <span className="text-white/65 text-sm">{m}</span>
+                      <div key={m} className="flex items-center gap-3 bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/70 dark:border-white/5 rounded-xl px-4 py-3">
+                        <span className="w-5 h-5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0">✓</span>
+                        <span className="text-slate-700 dark:text-white/65 text-sm font-medium">{m}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Case study */}
-                <div className="bg-gradient-to-r from-white/3 to-white/0 border border-white/8 rounded-2xl p-5 flex items-start gap-4">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${ind.color} flex items-center justify-center flex-shrink-0 text-white font-bold text-xs`}>
+                <div className="bg-slate-50/90 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/8 rounded-2xl p-5 flex items-start gap-4">
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${ind.color} flex items-center justify-center flex-shrink-0 text-white font-bold text-xs shadow-sm`}>
                     {ind.caso.empresa.slice(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <div className="text-white/35 text-xs mb-1">{ind.caso.empresa}</div>
-                    <div className="text-white/70 text-sm leading-relaxed italic">"{ind.caso.resultado}"</div>
+                    <div className="text-slate-400 dark:text-white/35 text-xs mb-1 font-medium">{ind.caso.empresa}</div>
+                    <div className="text-slate-700 dark:text-white/70 text-sm leading-relaxed italic">"{ind.caso.resultado}"</div>
                   </div>
                 </div>
               </div>
@@ -171,10 +170,10 @@ export default function Industrias() {
 
             {/* CTA */}
             <div className="mt-5 flex flex-col sm:flex-row gap-3">
-              <button className="g-aurora glow-teal text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm">
+              <button className="g-aurora glow-teal text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm shadow-md cursor-pointer">
                 Quiero una demo para {ind.name}
               </button>
-              <button className="border border-white/10 text-white/55 hover:border-white/25 hover:text-white px-6 py-3.5 rounded-xl text-sm transition-all">
+              <button className="bg-white/70 dark:bg-transparent border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white/55 hover:border-slate-400 dark:hover:border-white/25 hover:text-black dark:hover:text-white px-6 py-3.5 rounded-xl text-sm font-semibold transition-all cursor-pointer">
                 Ver precios →
               </button>
             </div>

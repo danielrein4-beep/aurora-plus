@@ -377,12 +377,12 @@ export default function Home() {
       </section>
 
       {/* ── TICKER ── */}
-      <div className="relative overflow-hidden py-4 border-y border-white/5">
+      <div className="relative overflow-hidden py-4 border-y border-slate-200/60 dark:border-white/5 transition-colors duration-500">
         <div className="line-aurora absolute top-0 left-0 right-0" />
         <div className="flex gap-6 whitespace-nowrap" style={{ animation: "ticker 22s linear infinite" }}>
           {[...MODULES, ...MODULES, ...MODULES].map((m, i) => (
-            <span key={i} className="text-sm text-white/30 font-medium flex items-center gap-3 flex-shrink-0">
-              <span className="text-aurora opacity-60">✦</span> {m}
+            <span key={i} className="text-sm text-slate-500 dark:text-white/30 font-medium flex items-center gap-3 flex-shrink-0">
+              <span className="text-aurora opacity-80">✦</span> {m}
             </span>
           ))}
         </div>
@@ -392,27 +392,27 @@ export default function Home() {
       {/* ── INDUSTRIES ── */}
       <section className="py-24 px-4 sm:px-6 max-w-7xl mx-auto">
         <div className="text-center mb-14">
-          <p className="text-xs font-semibold tracking-widest text-teal-400 uppercase mb-3">Para tu industria</p>
-          <h2 className="font-['Outfit'] font-bold text-4xl sm:text-5xl text-white">
+          <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase mb-3">Para tu industria</p>
+          <h2 className="font-['Outfit'] font-bold text-4xl sm:text-5xl text-slate-900 dark:text-white">
             Un sistema que entiende<br /><span className="text-aurora">cómo funciona tu negocio</span>
           </h2>
-          <p className="text-white/40 text-base mt-4 max-w-xl mx-auto">Más de 18 verticales con módulos preconfigurados y flujos adaptados a cada operación.</p>
+          <p className="text-slate-500 dark:text-white/40 text-base mt-4 max-w-xl mx-auto">Más de 18 verticales con módulos preconfigurados y flujos adaptados a cada operación.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {INDUSTRIES.map((ind) => (
             <div key={ind.name}
               onClick={() => navigate("/industrias")}
-              className="hover-card bg-[#0c0c20] border border-white/5 rounded-2xl p-5 cursor-pointer card-shadow">
-              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center mb-3">
+              className="hover-card apple-glass rounded-2xl p-5 cursor-pointer card-shadow">
+              <div className="w-10 h-10 rounded-xl bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8 flex items-center justify-center mb-3">
                 <ind.Icon size={20} />
               </div>
-              <h3 className="font-['Outfit'] font-semibold text-white text-base mb-1.5">{ind.name}</h3>
-              <p className="text-white/40 text-xs leading-relaxed">{ind.desc}</p>
+              <h3 className="font-['Outfit'] font-semibold text-slate-900 dark:text-white text-base mb-1.5">{ind.name}</h3>
+              <p className="text-slate-500 dark:text-white/40 text-xs leading-relaxed">{ind.desc}</p>
             </div>
           ))}
         </div>
         <div className="text-center mt-8">
-          <button onClick={() => navigate("/industrias")} className="text-teal-400 hover:text-teal-300 text-sm transition-colors">
+          <button onClick={() => navigate("/industrias")} className="text-teal-600 dark:text-teal-400 hover:text-teal-500 dark:hover:text-teal-300 text-sm font-semibold transition-colors cursor-pointer">
             Ver todas las industrias →
           </button>
         </div>
@@ -420,57 +420,57 @@ export default function Home() {
 
       {/* ── DASHBOARD PREVIEW ── */}
       <section className="py-20 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="relative bg-[#0c0c20] rounded-3xl border border-white/5 overflow-hidden">
+        <div className="relative apple-glass rounded-3xl overflow-hidden shadow-xl">
           <div className="line-aurora absolute top-0 left-0 right-0" />
           <div className="p-6 sm:p-10 flex flex-col lg:flex-row gap-10">
             <div className="lg:w-80 flex-shrink-0">
-              <p className="text-xs font-semibold tracking-widest text-violet-400 uppercase mb-3">Vista en vivo</p>
-              <h2 className="font-['Outfit'] font-bold text-3xl text-white leading-tight mb-4">Tu operación,<br />en tiempo real</h2>
-              <p className="text-white/45 text-sm leading-relaxed mb-6">Paneles configurables que muestran exactamente lo que necesitas ver.</p>
+              <p className="text-xs font-semibold tracking-widest text-violet-600 dark:text-violet-400 uppercase mb-3">Vista en vivo</p>
+              <h2 className="font-['Outfit'] font-bold text-3xl text-slate-900 dark:text-white leading-tight mb-4">Tu operación,<br />en tiempo real</h2>
+              <p className="text-slate-500 dark:text-white/45 text-sm leading-relaxed mb-6">Paneles configurables que muestran exactamente lo que necesitas ver.</p>
               <div className="flex flex-col gap-2">
                 {Object.keys(previewData).map((tab) => (
                   <button key={tab} onClick={() => setActiveTab(tab)}
-                    className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab ? "g-aurora text-white" : "bg-white/5 text-white/50 hover:bg-white/8 hover:text-white/75"}`}>
+                    className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${activeTab === tab ? "g-aurora text-white shadow-md font-semibold" : "bg-black/[0.03] dark:bg-white/5 text-slate-600 dark:text-white/50 hover:bg-black/[0.06] dark:hover:bg-white/8 hover:text-slate-950 dark:hover:text-white"}`}>
                     {tab}
                   </button>
                 ))}
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="bg-[#111128] rounded-2xl p-5 border border-white/5 space-y-4">
+              <div className="apple-glass rounded-2xl p-5 space-y-4 border border-slate-200/80 dark:border-white/5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-['Outfit'] font-semibold text-white">{activeTab} — Panel Principal</div>
-                    <div className="text-white/30 text-xs mt-0.5">Última actualización: hace 12 segundos</div>
+                    <div className="font-['Outfit'] font-semibold text-slate-900 dark:text-white">{activeTab} — Panel Principal</div>
+                    <div className="text-slate-400 dark:text-white/30 text-xs mt-0.5">Última actualización: hace 12 segundos</div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-                    <span className="text-xs text-teal-400">En vivo</span>
+                    <span className="text-xs font-semibold text-teal-600 dark:text-teal-400">En vivo</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {previewData[activeTab].map((m) => (
-                    <div key={m.metric} className="bg-[#0c0c20] rounded-xl p-4">
-                      <div className="text-white/35 text-xs mb-1">{m.metric}</div>
+                    <div key={m.metric} className="bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/70 dark:border-white/5 rounded-xl p-4">
+                      <div className="text-slate-400 dark:text-white/35 text-xs mb-1">{m.metric}</div>
                       <div className={`font-['Outfit'] font-bold text-xl ${m.color}`}>{m.value}</div>
-                      <div className="text-white/30 text-xs mt-0.5">{m.sub}</div>
+                      <div className="text-slate-400 dark:text-white/30 text-xs mt-0.5">{m.sub}</div>
                     </div>
                   ))}
                 </div>
-                <div className="bg-[#0c0c20] rounded-xl p-4">
+                <div className="bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/70 dark:border-white/5 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-white/40 text-xs">Actividad semanal</span>
-                    <span className="text-teal-400 text-xs">↑ 12.4%</span>
+                    <span className="text-slate-500 dark:text-white/40 text-xs font-medium">Actividad semanal</span>
+                    <span className="text-teal-600 dark:text-teal-400 text-xs font-semibold">↑ 12.4%</span>
                   </div>
                   <div className="flex items-end gap-1.5 h-20">
                     {[55,70,48,85,62,90,74].map((h, i) => (
                       <div key={i} className="flex-1 rounded-sm"
-                        style={{ height: `${h}%`, background: "linear-gradient(to top, rgba(0,229,184,0.9), rgba(14,165,233,0.4))", opacity: i === 5 ? 1 : 0.55 }} />
+                        style={{ height: `${h}%`, background: "linear-gradient(to top, rgba(0,229,184,0.9), rgba(14,165,233,0.4))", opacity: i === 5 ? 1 : 0.65 }} />
                     ))}
                   </div>
                   <div className="flex justify-between mt-2">
                     {["L","M","X","J","V","S","D"].map((d) => (
-                      <span key={d} className="flex-1 text-center text-white/20 text-[10px]">{d}</span>
+                      <span key={d} className="flex-1 text-center text-slate-400 dark:text-white/20 text-[10px] font-medium">{d}</span>
                     ))}
                   </div>
                 </div>
@@ -480,10 +480,10 @@ export default function Home() {
                     { label: "Alerta de stock: Producto X", time: "hace 8 min",  dot: "bg-amber-400" },
                     { label: "Cierre de caja registrado",   time: "hace 31 min", dot: "bg-violet-400" },
                   ].map((row) => (
-                    <div key={row.label} className="flex items-center gap-3 bg-[#0c0c20] rounded-lg px-3 py-2.5">
+                    <div key={row.label} className="flex items-center gap-3 bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-lg px-3 py-2.5">
                       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${row.dot}`} />
-                      <span className="text-white/60 text-xs flex-1">{row.label}</span>
-                      <span className="text-white/25 text-[11px]">{row.time}</span>
+                      <span className="text-slate-700 dark:text-white/60 text-xs flex-1 font-medium">{row.label}</span>
+                      <span className="text-slate-400 dark:text-white/25 text-[11px]">{row.time}</span>
                     </div>
                   ))}
                 </div>
@@ -496,25 +496,24 @@ export default function Home() {
       {/* ── FEATURES ── */}
       <section className="py-24 px-4 sm:px-6 max-w-7xl mx-auto">
         <div className="text-center mb-14">
-          <p className="text-xs font-semibold tracking-widest text-blue-400 uppercase mb-3">Características</p>
-          <h2 className="font-['Outfit'] font-bold text-4xl sm:text-5xl text-white">
+          <p className="text-xs font-semibold tracking-widest text-blue-600 dark:text-blue-400 uppercase mb-3">Características</p>
+          <h2 className="font-['Outfit'] font-bold text-4xl sm:text-5xl text-slate-900 dark:text-white">
             Construido para la<br /><span className="text-aurora-r">operación real</span>
           </h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {FEATURES.map((f) => (
-            <div key={f.title} className="hover-card bg-[#0c0c20] border border-white/5 rounded-2xl p-6 card-shadow">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div key={f.title} className="hover-card apple-glass rounded-2xl p-6 card-shadow">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8">
                 <f.Icon size={22} />
               </div>
-              <h3 className="font-['Outfit'] font-semibold text-white text-lg mb-2">{f.title}</h3>
-              <p className="text-white/45 text-sm leading-relaxed">{f.desc}</p>
+              <h3 className="font-['Outfit'] font-semibold text-slate-900 dark:text-white text-lg mb-2">{f.title}</h3>
+              <p className="text-slate-500 dark:text-white/45 text-sm leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
         <div className="text-center mt-8">
-          <button onClick={() => navigate("/soluciones")} className="text-teal-400 hover:text-teal-300 text-sm transition-colors">
+          <button onClick={() => navigate("/soluciones")} className="text-teal-600 dark:text-teal-400 hover:text-teal-500 dark:hover:text-teal-300 text-sm font-semibold transition-colors cursor-pointer">
             Ver todas las soluciones →
           </button>
         </div>
@@ -522,17 +521,17 @@ export default function Home() {
 
       {/* ── ANYWHERE ── */}
       <section className="py-20 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="relative bg-[#0c0c20] rounded-3xl border border-white/5 overflow-hidden">
+        <div className="relative apple-glass rounded-3xl overflow-hidden shadow-xl">
           <div className="line-aurora absolute top-0 left-0 right-0" />
           <div className="absolute inset-0 opacity-20"
             style={{ background: "radial-gradient(ellipse at 80% 50%, rgba(168,85,247,0.3) 0%, transparent 55%)" }} />
           <div className="relative p-8 sm:p-14 flex flex-col lg:flex-row items-center gap-12">
             <div className="flex-1 max-w-xl">
-              <p className="text-xs font-semibold tracking-widest text-violet-400 uppercase mb-4">Siempre conectado</p>
-              <h2 className="font-['Outfit'] font-black text-4xl sm:text-5xl text-white leading-tight mb-5">
+              <p className="text-xs font-semibold tracking-widest text-violet-600 dark:text-violet-400 uppercase mb-4">Siempre conectado</p>
+              <h2 className="font-['Outfit'] font-black text-4xl sm:text-5xl text-slate-900 dark:text-white leading-tight mb-5">
                 Tu negocio en la palma<br /><span className="text-aurora">de tu mano, donde estés</span>
               </h2>
-              <p className="text-white/50 text-base leading-relaxed mb-8">
+              <p className="text-slate-500 dark:text-white/50 text-base leading-relaxed mb-8">
                 Estés en la oficina, en una reunión o de viaje al otro lado del mundo — Aurora Plus viaja contigo. Monitorea ventas, aprueba operaciones y toma decisiones en tiempo real.
               </p>
               <div className="space-y-4">
@@ -542,12 +541,12 @@ export default function Home() {
                   { Icon: IconPlane,  title: "Desde cualquier lugar", desc: "Con o sin conexión estable. Sincronización automática en segundo plano." },
                 ].map((item) => (
                   <div key={item.title} className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8 flex items-center justify-center flex-shrink-0">
                       <item.Icon size={20} />
                     </div>
                     <div>
-                      <div className="text-white text-sm font-semibold">{item.title}</div>
-                      <div className="text-white/40 text-xs mt-0.5 leading-relaxed">{item.desc}</div>
+                      <div className="text-slate-900 dark:text-white text-sm font-semibold">{item.title}</div>
+                      <div className="text-slate-500 dark:text-white/40 text-xs mt-0.5 leading-relaxed">{item.desc}</div>
                     </div>
                   </div>
                 ))}
@@ -556,56 +555,56 @@ export default function Home() {
             {/* Device mockups */}
             <div className="flex-shrink-0 flex items-end gap-4">
               <div className="w-64 sm:w-72">
-                <div className="bg-[#111128] rounded-xl border border-white/10 overflow-hidden shadow-2xl">
-                  <div className="bg-[#0c0c20] px-3 py-2 flex items-center gap-1.5 border-b border-white/5">
+                <div className="bg-white dark:bg-[#111128] rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden shadow-2xl">
+                  <div className="bg-slate-100 dark:bg-[#0c0c20] px-3 py-2 flex items-center gap-1.5 border-b border-slate-200 dark:border-white/5">
                     <span className="w-2 h-2 rounded-full bg-red-500/60" /><span className="w-2 h-2 rounded-full bg-amber-500/60" /><span className="w-2 h-2 rounded-full bg-teal-500/60" />
-                    <div className="flex-1 mx-2 bg-white/5 rounded text-[9px] text-white/20 text-center py-0.5">app.auroraplus.com</div>
+                    <div className="flex-1 mx-2 bg-slate-200 dark:bg-white/5 rounded text-[9px] text-slate-500 dark:text-white/20 text-center py-0.5 font-mono">app.auroraplus.com</div>
                   </div>
                   <div className="p-3 space-y-2">
                     <div className="flex gap-2">
-                      {[{ label: "Ventas", val: "$8,240", color: "text-teal-400" }, { label: "Pedidos", val: "24", color: "text-sky-400" }].map((m) => (
-                        <div key={m.label} className="flex-1 bg-[#0c0c20] rounded-lg p-2">
-                          <div className="text-white/30 text-[9px]">{m.label}</div>
+                      {[{ label: "Ventas", val: "$8,240", color: "text-teal-600 dark:text-teal-400" }, { label: "Pedidos", val: "24", color: "text-sky-600 dark:text-sky-400" }].map((m) => (
+                        <div key={m.label} className="flex-1 bg-slate-50 dark:bg-[#0c0c20] rounded-lg p-2 border border-slate-200/60 dark:border-transparent">
+                          <div className="text-slate-400 dark:text-white/30 text-[9px]">{m.label}</div>
                           <div className={`font-['Outfit'] font-bold text-sm ${m.color}`}>{m.val}</div>
                         </div>
                       ))}
                     </div>
-                    <div className="bg-[#0c0c20] rounded-lg p-2">
-                      <div className="text-white/30 text-[9px] mb-1.5">Actividad hoy</div>
+                    <div className="bg-slate-50 dark:bg-[#0c0c20] rounded-lg p-2 border border-slate-200/60 dark:border-transparent">
+                      <div className="text-slate-400 dark:text-white/30 text-[9px] mb-1.5 font-medium">Actividad hoy</div>
                       <div className="flex items-end gap-0.5 h-10">
                         {[40,65,50,80,55,90,70,85,60,95,72,88].map((h, i) => (
                           <div key={i} className="flex-1 rounded-sm"
-                            style={{ height: `${h}%`, background: "linear-gradient(to top, rgba(0,229,184,0.8), rgba(14,165,233,0.3))", opacity: i === 10 ? 1 : 0.5 }} />
+                            style={{ height: `${h}%`, background: "linear-gradient(to top, rgba(0,229,184,0.8), rgba(14,165,233,0.3))", opacity: i === 10 ? 1 : 0.6 }} />
                         ))}
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="text-center mt-2 text-white/20 text-[10px]">Escritorio</div>
+                <div className="text-center mt-2 text-slate-400 dark:text-white/20 text-[10px] font-medium">Escritorio</div>
               </div>
               <div className="w-28 sm:w-32 mb-4">
-                <div className="bg-[#111128] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
-                  <div className="bg-[#0c0c20] flex justify-center pt-2 pb-1 border-b border-white/5">
-                    <div className="w-10 h-1.5 rounded-full bg-white/10" />
+                <div className="bg-white dark:bg-[#111128] rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden shadow-2xl">
+                  <div className="bg-slate-100 dark:bg-[#0c0c20] flex justify-center pt-2 pb-1 border-b border-slate-200 dark:border-white/5">
+                    <div className="w-10 h-1.5 rounded-full bg-slate-300 dark:bg-white/10" />
                   </div>
                   <div className="p-2.5 space-y-2">
-                    <div className="text-white/50 text-[9px] font-['Outfit'] font-semibold">Aurora Plus</div>
-                    <div className="bg-[#0c0c20] rounded-lg p-2">
-                      <div className="text-white/25 text-[8px]">Ventas hoy</div>
-                      <div className="font-['Outfit'] font-bold text-sm text-teal-400">$8,240</div>
-                      <div className="text-emerald-400 text-[8px]">↑ 12%</div>
+                    <div className="text-slate-700 dark:text-white/50 text-[9px] font-['Outfit'] font-semibold">Aurora Plus</div>
+                    <div className="bg-slate-50 dark:bg-[#0c0c20] rounded-lg p-2 border border-slate-200/60 dark:border-transparent">
+                      <div className="text-slate-400 dark:text-white/25 text-[8px]">Ventas hoy</div>
+                      <div className="font-['Outfit'] font-bold text-sm text-teal-600 dark:text-teal-400">$8,240</div>
+                      <div className="text-emerald-600 dark:text-emerald-400 text-[8px] font-semibold">↑ 12%</div>
                     </div>
-                    <div className="bg-[#0c0c20] rounded-lg p-2">
-                      <div className="text-white/25 text-[8px]">Alertas</div>
+                    <div className="bg-slate-50 dark:bg-[#0c0c20] rounded-lg p-2 border border-slate-200/60 dark:border-transparent">
+                      <div className="text-slate-400 dark:text-white/25 text-[8px]">Alertas</div>
                       <div className="space-y-1 mt-1">
-                        <div className="flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-amber-400" /><span className="text-white/35 text-[8px]">Stock bajo</span></div>
-                        <div className="flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-teal-400" /><span className="text-white/35 text-[8px]">Pedido listo</span></div>
+                        <div className="flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-amber-500" /><span className="text-slate-500 dark:text-white/35 text-[8px]">Stock bajo</span></div>
+                        <div className="flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-teal-500" /><span className="text-slate-500 dark:text-white/35 text-[8px]">Pedido listo</span></div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex justify-center pb-2 pt-1"><div className="w-8 h-1 rounded-full bg-white/10" /></div>
+                  <div className="flex justify-center pb-2 pt-1"><div className="w-8 h-1 rounded-full bg-slate-300 dark:bg-white/10" /></div>
                 </div>
-                <div className="text-center mt-2 text-white/20 text-[10px]">Móvil</div>
+                <div className="text-center mt-2 text-slate-400 dark:text-white/20 text-[10px] font-medium">Móvil</div>
               </div>
             </div>
           </div>
@@ -615,8 +614,8 @@ export default function Home() {
       {/* ── PRICING PREVIEW ── */}
       <section className="py-24 px-4 sm:px-6 max-w-7xl mx-auto">
         <div className="text-center mb-14">
-          <p className="text-xs font-semibold tracking-widest text-violet-400 uppercase mb-3">Planes</p>
-          <h2 className="font-['Outfit'] font-bold text-4xl sm:text-5xl text-white">
+          <p className="text-xs font-semibold tracking-widest text-violet-600 dark:text-violet-400 uppercase mb-3">Planes</p>
+          <h2 className="font-['Outfit'] font-bold text-4xl sm:text-5xl text-slate-900 dark:text-white">
             Inversión que escala<br /><span className="text-aurora">con tu empresa</span>
           </h2>
         </div>
@@ -625,38 +624,38 @@ export default function Home() {
             <div key={plan.name}
               className={`relative rounded-2xl p-6 transition-all duration-300 flex flex-col ${
                 plan.highlight
-                  ? "bg-gradient-to-b from-[#171740] to-[#0c0c20] border-2 border-teal-500/40 scale-[1.02] glow-teal"
+                  ? "apple-glass border-2 border-teal-500/50 scale-[1.02] shadow-xl"
                   : plan.name === "Página Web"
-                  ? "bg-gradient-to-b from-[#16102a] to-[#0c0c20] border border-violet-500/25 hover:border-violet-500/40"
-                  : "bg-[#0c0c20] border border-white/5 hover:border-white/15"
+                  ? "apple-glass border border-violet-500/30 hover:border-violet-500/50"
+                  : "apple-glass border border-slate-200/80 dark:border-white/5 hover:border-teal-400/30"
               }`}>
               {plan.badge && (
-                <div className={`absolute -top-3.5 left-1/2 -translate-x-1/2 text-white text-[11px] font-bold px-4 py-1 rounded-full whitespace-nowrap ${plan.badge === "NUEVO" ? "bg-gradient-to-r from-violet-500 to-purple-600" : "g-aurora"}`}>
+                <div className={`absolute -top-3.5 left-1/2 -translate-x-1/2 text-white text-[11px] font-bold px-4 py-1 rounded-full whitespace-nowrap shadow-md ${plan.badge === "NUEVO" ? "bg-gradient-to-r from-violet-500 to-purple-600" : "g-aurora"}`}>
                   {plan.badge}
                 </div>
               )}
               <div className="mb-5">
-                <h3 className="font-['Outfit'] font-bold text-white text-xl">{plan.name}</h3>
-                <p className="text-white/35 text-xs mt-0.5 leading-snug">{plan.desc}</p>
+                <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-xl">{plan.name}</h3>
+                <p className="text-slate-500 dark:text-white/35 text-xs mt-0.5 leading-snug">{plan.desc}</p>
                 <div className="mt-4 flex items-end gap-1">
-                  <span className={`font-['Outfit'] font-black leading-none ${plan.price === "Cotizable" ? "text-2xl text-aurora" : "text-4xl text-white"}`}>{plan.price}</span>
-                  {plan.period && <span className="text-white/35 text-sm mb-1">{plan.period}</span>}
+                  <span className={`font-['Outfit'] font-black leading-none ${plan.price === "Cotizable" ? "text-2xl text-aurora" : "text-4xl text-slate-900 dark:text-white"}`}>{plan.price}</span>
+                  {plan.period && <span className="text-slate-500 dark:text-white/35 text-sm mb-1">{plan.period}</span>}
                 </div>
               </div>
               <ul className="space-y-2.5 mb-6 flex-1">
                 {plan.features.map((feat) => (
-                  <li key={feat} className="flex items-start gap-2.5 text-xs text-white/55">
-                    <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] flex-shrink-0 ${plan.name === "Página Web" ? "bg-violet-500/15 text-violet-400" : "bg-teal-500/15 text-teal-400"}`}>✓</span>
+                  <li key={feat} className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-white/55">
+                    <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] flex-shrink-0 font-bold ${plan.name === "Página Web" ? "bg-violet-500/15 text-violet-600 dark:text-violet-400" : "bg-teal-500/15 text-teal-600 dark:text-teal-400"}`}>✓</span>
                     {feat}
                   </li>
                 ))}
               </ul>
               <button
                 onClick={() => navigate("/precios")}
-                className={`w-full py-3 rounded-xl text-sm font-semibold transition-all mt-auto ${
-                  plan.highlight ? "g-aurora text-white hover:opacity-90"
-                  : plan.name === "Página Web" ? "bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25"
-                  : "border border-white/10 text-white/60 hover:border-white/25 hover:text-white"
+                className={`w-full py-3 rounded-xl text-sm font-semibold transition-all mt-auto cursor-pointer ${
+                  plan.highlight ? "g-aurora text-white hover:opacity-90 shadow-md"
+                  : plan.name === "Página Web" ? "bg-violet-500/15 border border-violet-500/30 text-violet-600 dark:text-violet-300 hover:bg-violet-500/25"
+                  : "bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white/60 hover:border-slate-400 dark:hover:border-white/25 hover:text-black dark:hover:text-white"
                 }`}>
                 {plan.cta}
               </button>
@@ -668,21 +667,21 @@ export default function Home() {
       {/* ── TESTIMONIALS ── */}
       <section className="py-24 px-4 sm:px-6 max-w-7xl mx-auto">
         <div className="text-center mb-14">
-          <p className="text-xs font-semibold tracking-widest text-teal-400 uppercase mb-3">Casos de éxito</p>
-          <h2 className="font-['Outfit'] font-bold text-4xl sm:text-5xl text-white">
+          <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase mb-3">Casos de éxito</p>
+          <h2 className="font-['Outfit'] font-bold text-4xl sm:text-5xl text-slate-900 dark:text-white">
             Empresas reales,<br /><span className="text-aurora">resultados reales</span>
           </h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {TESTIMONIALS.map((t) => (
-            <div key={t.name} className="bg-[#0c0c20] border border-white/5 rounded-2xl p-6 card-shadow hover-card">
-              <div className="flex gap-1 mb-4">{[1,2,3,4,5].map((s) => <span key={s} className="text-amber-400 text-sm">★</span>)}</div>
-              <p className="text-white/65 text-sm leading-relaxed mb-6 italic">"{t.text}"</p>
+            <div key={t.name} className="apple-glass rounded-2xl p-6 card-shadow hover-card">
+              <div className="flex gap-1 mb-4">{[1,2,3,4,5].map((s) => <span key={s} className="text-amber-500 text-sm">★</span>)}</div>
+              <p className="text-slate-600 dark:text-white/65 text-sm leading-relaxed mb-6 italic">"{t.text}"</p>
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${t.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>{t.avatar}</div>
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${t.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-sm`}>{t.avatar}</div>
                 <div>
-                  <div className="text-white text-sm font-semibold">{t.name}</div>
-                  <div className="text-white/35 text-xs">{t.role}</div>
+                  <div className="text-slate-900 dark:text-white text-sm font-semibold">{t.name}</div>
+                  <div className="text-slate-400 dark:text-white/35 text-xs">{t.role}</div>
                 </div>
               </div>
             </div>
@@ -692,24 +691,24 @@ export default function Home() {
 
       {/* ── CTA FINAL ── */}
       <section className="py-24 px-4 sm:px-6 max-w-4xl mx-auto text-center">
-        <div className="relative bg-[#0c0c20] rounded-3xl border border-white/5 p-12 sm:p-16 overflow-hidden">
+        <div className="relative apple-glass rounded-3xl p-12 sm:p-16 overflow-hidden shadow-2xl">
           <div className="line-aurora absolute top-0 left-0 right-0" />
-          <div className="absolute inset-0 opacity-25"
+          <div className="absolute inset-0 opacity-20"
             style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(0,229,184,0.25) 0%, transparent 55%)" }} />
           <div className="relative">
             <div className="flex justify-center mb-6"><AuroraLogo size={64} animated /></div>
-            <h2 className="font-['Outfit'] font-black text-4xl sm:text-6xl text-white mb-4 leading-tight">
+            <h2 className="font-['Outfit'] font-black text-4xl sm:text-6xl text-slate-900 dark:text-white mb-4 leading-tight">
               ¿Listo para transformar<br /><span className="text-aurora">tu operación?</span>
             </h2>
-            <p className="text-white/45 text-lg mb-10 max-w-lg mx-auto">
+            <p className="text-slate-500 dark:text-white/45 text-lg mb-10 max-w-lg mx-auto">
               Implementación en menos de 2 semanas. Sin migraciones complicadas. Tu equipo trabajando mejor desde el primer día.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <button onClick={() => navigate("/precios")}
-                className="g-aurora glow-teal text-white font-semibold px-10 py-4 rounded-xl text-base hover:opacity-90 transition-opacity w-full sm:w-auto">
+                className="g-aurora glow-teal text-white font-semibold px-10 py-4 rounded-xl text-base hover:opacity-90 transition-opacity w-full sm:w-auto shadow-lg cursor-pointer">
                 Solicitar demo gratuita
               </button>
-              <button onClick={() => navigate("/nosotros")} className="text-white/45 hover:text-white transition-colors text-sm">
+              <button onClick={() => navigate("/nosotros")} className="text-slate-500 dark:text-white/45 hover:text-slate-900 dark:hover:text-white transition-colors text-sm font-semibold cursor-pointer">
                 Hablar con un especialista →
               </button>
             </div>

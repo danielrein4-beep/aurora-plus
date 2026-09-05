@@ -112,7 +112,7 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-full bg-[#060612] text-white flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden transition-colors duration-300">
       <AuroraGradientDef />
 
       <div className="absolute inset-0 pointer-events-none">
@@ -142,7 +142,7 @@ export default function Onboarding() {
         </div>
 
         {/* Card */}
-        <div className="bg-[#0c0c20] border border-white/5 rounded-3xl overflow-hidden">
+        <div className="apple-glass rounded-3xl overflow-hidden shadow-2xl">
           <div className="line-aurora" />
 
           <div className="p-8 sm:p-10">

@@ -59,15 +59,15 @@ export default function Soluciones() {
 
       {/* Header */}
       <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-20">
-        <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-4 py-1.5 text-xs text-teal-300 mb-6 font-medium">
+        <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-4 py-1.5 text-xs text-teal-600 dark:text-teal-300 mb-6 font-medium">
           <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
           Capacidades de la plataforma
         </div>
-        <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-white mb-5">
+        <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 dark:text-white mb-5">
           Una plataforma,<br />
           <span className="text-aurora">todas las herramientas</span>
         </h1>
-        <p className="text-white/45 text-lg max-w-2xl mx-auto leading-relaxed">
+        <p className="text-slate-500 dark:text-white/45 text-lg max-w-2xl mx-auto leading-relaxed">
           Aurora Plus reúne en un solo sistema todo lo que tu empresa necesita para operar con eficiencia — desde el primer día y sin complicaciones técnicas.
         </p>
       </section>
@@ -76,31 +76,29 @@ export default function Soluciones() {
       <section className="px-4 sm:px-6 max-w-7xl mx-auto space-y-5">
         {SOLUCIONES.map((sol, i) => (
           <div key={sol.title}
-            className={`relative bg-[#0c0c20] border border-white/5 rounded-3xl overflow-hidden flex flex-col ${
+            className={`relative apple-glass rounded-3xl overflow-hidden flex flex-col shadow-lg hover:shadow-2xl transition-all duration-300 ${
               i % 2 === 0 ? "lg:flex-row" : "lg:flex-row-reverse"
             }`}>
             <div className="absolute inset-x-0 top-0 h-px line-aurora" />
 
             {/* Icon panel */}
-            <div className={`lg:w-64 flex-shrink-0 flex items-center justify-center p-12 bg-gradient-to-br ${sol.color} bg-opacity-5`}
-              style={{ background: "rgba(255,255,255,0.02)" }}>
-              <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${sol.color} bg-opacity-10 flex items-center justify-center`}
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className={`lg:w-64 flex-shrink-0 flex items-center justify-center p-12 bg-slate-50/70 dark:bg-white/[0.02]`}>
+              <div className={`w-20 h-20 rounded-2xl bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8 flex items-center justify-center shadow-inner`}>
                 <sol.Icon size={36} />
               </div>
             </div>
 
             {/* Content */}
             <div className="flex-1 p-8 sm:p-10">
-              <div className="inline-block bg-white/5 border border-white/8 rounded-full px-3 py-1 text-xs text-white/40 tracking-widest uppercase mb-3">
+              <div className="inline-block bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8 rounded-full px-3 py-1 text-xs text-teal-600 dark:text-white/40 font-semibold tracking-widest uppercase mb-3">
                 {sol.tag}
               </div>
-              <h2 className="font-['Outfit'] font-bold text-2xl sm:text-3xl text-white mb-3">{sol.title}</h2>
-              <p className="text-white/50 text-base leading-relaxed mb-6 max-w-xl">{sol.desc}</p>
+              <h2 className="font-['Outfit'] font-bold text-2xl sm:text-3xl text-slate-900 dark:text-white mb-3">{sol.title}</h2>
+              <p className="text-slate-500 dark:text-white/50 text-base leading-relaxed mb-6 max-w-xl">{sol.desc}</p>
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {sol.puntos.map((p) => (
-                  <li key={p} className="flex items-center gap-2.5 text-sm text-white/55">
-                    <span className="w-4 h-4 rounded-full bg-teal-500/15 text-teal-400 flex items-center justify-center text-[10px] flex-shrink-0">✓</span>
+                  <li key={p} className="flex items-center gap-2.5 text-sm text-slate-700 dark:text-white/55 font-medium">
+                    <span className="w-4 h-4 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0">✓</span>
                     {p}
                   </li>
                 ))}
@@ -112,12 +110,12 @@ export default function Soluciones() {
 
       {/* CTA */}
       <section className="px-4 sm:px-6 max-w-3xl mx-auto text-center mt-24">
-        <h2 className="font-['Outfit'] font-bold text-3xl sm:text-4xl text-white mb-4">
+        <h2 className="font-['Outfit'] font-bold text-3xl sm:text-4xl text-slate-900 dark:text-white mb-4">
           ¿Quieres ver todo esto<br />
           <span className="text-aurora">funcionando en tu negocio?</span>
         </h2>
-        <p className="text-white/40 mb-8">Agenda una demo personalizada — te mostramos exactamente lo que necesitas, sin perder tu tiempo.</p>
-        <button className="g-aurora glow-teal text-white font-semibold px-10 py-4 rounded-xl hover:opacity-90 transition-opacity">
+        <p className="text-slate-500 dark:text-white/40 mb-8">Agenda una demo personalizada — te mostramos exactamente lo que necesitas, sin perder tu tiempo.</p>
+        <button className="g-aurora glow-teal text-white font-semibold px-10 py-4 rounded-xl hover:opacity-90 transition-opacity shadow-lg cursor-pointer">
           Solicitar demo gratuita
         </button>
       </section>

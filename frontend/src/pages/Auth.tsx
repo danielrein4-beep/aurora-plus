@@ -39,7 +39,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050614] text-white flex items-center justify-center px-4 sm:px-6 py-12 relative overflow-hidden">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center px-4 sm:px-6 py-12 relative overflow-hidden transition-colors duration-300">
       <AuroraGradientDef />
 
       {/* ── FONDOS ATMOSFÉRICOS: AURORAS BOREALES 3D Y DESTELLOS DE NEÓN ── */}
