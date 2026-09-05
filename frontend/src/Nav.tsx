@@ -34,38 +34,18 @@ export default function Nav() {
           </div>
         </button>
 
-        {/* Desktop links en Cápsula Frosted Glass idéntica a la referencia */}
-        <div className="hidden md:flex items-center gap-1 bg-[#101426]/75 backdrop-blur-2xl rounded-full p-1 border border-white/15 shadow-[0_10px_35px_rgba(0,0,0,0.55),inset_0_1px_1px_rgba(255,255,255,0.25)]">
-          {[
-            { label: "Inicio", path: "/", icon: "🏠" },
-            { label: "Soluciones", path: "/soluciones", icon: "⚡" },
-            { label: "Industrias", path: "/industrias", icon: "🏢" },
-            { label: "Precios", path: "/precios", icon: "💎" },
-            { label: "Nosotros", path: "/nosotros", icon: "✦" },
-          ].map((l) => (
-            <button
-              key={l.path}
-              onClick={() => navigate(l.path)}
-              className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-2 cursor-pointer ${
+        {/* Desktop links */}
+        <div className="hidden md:flex items-center gap-1">
+          {LINKS.map((l) => (
+            <button key={l.path} onClick={() => navigate(l.path)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 pathname === l.path
-                  ? "bg-white/20 text-white font-semibold shadow-[0_2px_14px_rgba(0,0,0,0.4),inset_0_1px_1.5px_rgba(255,255,255,0.5)] border border-white/30 backdrop-blur-md"
-                  : "text-white/65 hover:text-white hover:bg-white/10"
+                  ? "text-white bg-white/10"
+                  : "text-white/45 hover:text-white/80 hover:bg-white/5"
               }`}>
-              <span className="text-xs opacity-90">{l.icon}</span>
-              <span>{l.label}</span>
+              {l.label}
             </button>
           ))}
-          
-          {/* Separador vertical sutil como en la foto */}
-          <div className="h-4 w-px bg-white/20 mx-1.5" />
-          
-          {/* Icono de luna / modo oscuro sutil como en la foto */}
-          <button
-            type="button"
-            title="Modo Oscuro Activo"
-            className="w-7 h-7 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors text-xs cursor-pointer">
-            🌙
-          </button>
         </div>
 
         {/* CTA */}
