@@ -36,15 +36,15 @@ export default function Nav() {
         </button>
 
         {/* Desktop links en Cápsula Liquid Glass (Solo Texto, sin emojis) */}
-        <div className="hidden md:flex items-center gap-1 apple-glass-pill rounded-full p-1 border border-black/10 dark:border-white/15 bg-white/40 dark:bg-white/[0.04] backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)]">
+        <div className="hidden md:flex items-center gap-1 apple-glass-pill rounded-full p-1 border border-slate-300/80 dark:border-white/15 bg-slate-100/90 dark:bg-white/[0.04] backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.8),0_2px_10px_rgba(0,0,0,0.04)]">
           {LINKS.map((l) => (
             <button
               key={l.path}
               onClick={() => navigate(l.path)}
-              className={`px-5 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 cursor-pointer ${
+              className={`px-5 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 cursor-pointer ${
                 pathname === l.path
-                  ? "bg-white/80 dark:bg-white/18 text-slate-900 dark:text-white font-semibold shadow-[0_2px_14px_rgba(0,0,0,0.1),inset_0_1px_1.5px_rgba(255,255,255,0.8)] border border-white/60 dark:border-white/25 backdrop-blur-md"
-                  : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/8 hover:shadow-sm"
+                  ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.12),inset_0_1px_1.5px_rgba(255,255,255,1)] border border-slate-200 dark:bg-white/18 dark:text-white dark:border-white/25 backdrop-blur-md"
+                  : "text-slate-600 hover:text-slate-950 dark:text-white/60 dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/8 hover:shadow-xs"
               }`}>
               {l.label}
             </button>
@@ -59,21 +59,21 @@ export default function Nav() {
           {isLoggedIn ? (
             <>
               <button onClick={() => navigate("/dashboard")}
-                className="flex items-center gap-2 text-sm text-slate-600 dark:text-white/60 hover:text-slate-950 dark:hover:text-white transition-colors px-2 py-1.5 cursor-pointer">
+                className="flex items-center gap-2 text-sm text-slate-700 dark:text-white/60 hover:text-slate-950 dark:hover:text-white transition-colors px-2 py-1.5 cursor-pointer font-medium">
                 <span className="w-7 h-7 rounded-lg g-aurora flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
                   {user?.nombre?.charAt(0).toUpperCase() ?? "U"}
                 </span>
-                <span className="font-medium">{user?.nombre?.split(" ")[0]}</span>
+                <span>{user?.nombre?.split(" ")[0]}</span>
               </button>
               <button onClick={() => { logout(); navigate("/"); }}
-                className="text-sm text-slate-400 dark:text-white/35 hover:text-slate-700 dark:hover:text-white/70 transition-colors px-3 py-2 cursor-pointer">
+                className="text-sm text-slate-500 dark:text-white/35 hover:text-slate-800 dark:hover:text-white/70 transition-colors px-3 py-2 cursor-pointer font-medium">
                 Cerrar sesión
               </button>
             </>
           ) : (
             <>
               <button onClick={() => navigate("/auth")}
-                className="apple-glass-btn text-xs font-semibold text-slate-800 dark:text-white/90 hover:text-black dark:hover:text-white px-4 py-2 rounded-full cursor-pointer">
+                className="apple-glass-btn text-xs font-bold text-slate-900 dark:text-white/90 hover:text-black dark:hover:text-white px-4 py-2 rounded-full cursor-pointer bg-white border border-slate-300 dark:border-white/18 shadow-xs">
                 Iniciar sesión
               </button>
               <button onClick={() => navigate("/onboarding")}

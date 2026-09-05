@@ -129,24 +129,24 @@ export default function Home() {
           {/* Título Interactivo con Animación Orbital de Aurora y signos '+' SIEMPRE ACTIVA (y ultra smooth en hover) */}
           <div className="relative group cursor-default select-none inline-block px-4 sm:px-8 py-3 rounded-3xl transition-all duration-500">
             {/* Fondo translúcido orbital con anillos y '+' rotantes — Siempre visible, ultra smooth en hover */}
-            <div className="absolute inset-0 -inset-x-6 -inset-y-4 pointer-events-none opacity-80 group-hover:opacity-100 group-hover:scale-[1.03] transition-all duration-700 ease-out flex items-center justify-center overflow-visible">
-              {/* Resplandor ambiental de fondo muy suave y traslúcido */}
-              <div className="absolute w-[95%] h-[90%] rounded-[40px] bg-gradient-to-r from-teal-500/20 via-sky-500/15 to-purple-600/20 blur-2xl group-hover:blur-3xl transition-all duration-700" />
-              <div className="absolute inset-0 rounded-3xl bg-white/[0.03] dark:bg-white/[0.015] border border-teal-500/20 dark:border-teal-400/20 backdrop-blur-[2px] transition-all duration-500 shadow-[0_0_50px_rgba(0,229,184,0.12)] group-hover:shadow-[0_0_70px_rgba(0,229,184,0.25)]" />
+            <div className="absolute inset-0 -inset-x-6 -inset-y-4 pointer-events-none opacity-85 group-hover:opacity-100 group-hover:scale-[1.02] transition-all duration-700 ease-out flex items-center justify-center overflow-visible">
+              {/* Resplandor ambiental adaptativo: sutil en Light, vibrante en Dark */}
+              <div className="absolute w-[95%] h-[90%] rounded-[40px] bg-gradient-to-r from-teal-500/8 via-sky-500/6 to-purple-600/8 dark:from-teal-500/20 dark:via-sky-500/15 dark:to-purple-600/20 blur-2xl group-hover:blur-3xl transition-all duration-700" />
+              <div className="absolute inset-0 rounded-3xl bg-white/60 dark:bg-white/[0.015] border border-slate-200/80 dark:border-teal-400/20 backdrop-blur-md transition-all duration-500 shadow-[0_10px_35px_rgba(0,0,0,0.04)] dark:shadow-[0_0_50px_rgba(0,229,184,0.12)] group-hover:shadow-[0_15px_45px_rgba(0,0,0,0.08)] dark:group-hover:shadow-[0_0_70px_rgba(0,229,184,0.25)]" />
               
               {/* SVG de alta fidelidad con órbitas y signos '+' rotantes sincronizados tipo Logo Aurora */}
               <svg className="w-[115%] h-[150%] max-w-none absolute pointer-events-none" viewBox="0 0 800 260" fill="none">
                 <defs>
                   <linearGradient id="hero-title-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#00e5b8" stopOpacity="0.75" />
-                    <stop offset="50%" stopColor="#0ea5e9" stopOpacity="0.55" />
-                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0.75" />
+                    <stop offset="0%" stopColor="#00b894" stopOpacity="0.8" />
+                    <stop offset="50%" stopColor="#0284c7" stopOpacity="0.65" />
+                    <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.8" />
                   </linearGradient>
 
                   <linearGradient id="hero-title-gradient-2" x1="100%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.65" />
-                    <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.45" />
-                    <stop offset="100%" stopColor="#00e5b8" stopOpacity="0.65" />
+                    <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.7" />
+                    <stop offset="50%" stopColor="#0284c7" stopOpacity="0.5" />
+                    <stop offset="100%" stopColor="#00b894" stopOpacity="0.7" />
                   </linearGradient>
 
                   <filter id="hero-glow-soft" x="-20%" y="-20%" width="140%" height="140%">
@@ -162,7 +162,7 @@ export default function Home() {
                 <g filter="url(#hero-glow-soft)">
                   <ellipse cx="400" cy="130" rx="370" ry="110"
                     stroke="url(#hero-title-gradient-1)" strokeWidth="1.5"
-                    strokeDasharray="90 140" strokeLinecap="round" opacity="0.6">
+                    strokeDasharray="90 140" strokeLinecap="round" opacity="0.65">
                     <animateTransform attributeName="transform" type="rotate"
                       from="0 400 130" to="360 400 130" dur="18s" repeatCount="indefinite" />
                   </ellipse>
@@ -172,7 +172,7 @@ export default function Home() {
                 <g filter="url(#hero-glow-soft)">
                   <ellipse cx="400" cy="130" rx="290" ry="85"
                     stroke="url(#hero-title-gradient-2)" strokeWidth="1.2"
-                    strokeDasharray="60 100" strokeLinecap="round" opacity="0.5">
+                    strokeDasharray="60 100" strokeLinecap="round" opacity="0.55">
                     <animateTransform attributeName="transform" type="rotate"
                       from="360 400 130" to="0 400 130" dur="14s" repeatCount="indefinite" />
                   </ellipse>
@@ -181,7 +181,7 @@ export default function Home() {
                 {/* Anillo interior rotante 3 */}
                 <ellipse cx="400" cy="130" rx="210" ry="60"
                   stroke="url(#hero-title-gradient-1)" strokeWidth="1"
-                  strokeDasharray="40 70" strokeLinecap="round" opacity="0.4">
+                  strokeDasharray="40 70" strokeLinecap="round" opacity="0.45">
                   <animateTransform attributeName="transform" type="rotate"
                     from="0 400 130" to="360 400 130" dur="10s" repeatCount="indefinite" />
                 </ellipse>
@@ -192,13 +192,13 @@ export default function Home() {
                     from="0 400 130" to="360 400 130" dur="8s" repeatCount="indefinite" />
                   {/* Signo '+' Superior */}
                   <g transform="translate(400, 20)">
-                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#00e5b8" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
-                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#00e5b8" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
+                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#00b894" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
+                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#00b894" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
                   </g>
                   {/* Signo '+' Inferior */}
                   <g transform="translate(400, 240)">
-                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
-                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
+                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
+                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
                   </g>
                 </g>
 
@@ -208,21 +208,21 @@ export default function Home() {
                     from="360 400 130" to="0 400 130" dur="12s" repeatCount="indefinite" />
                   {/* Signo '+' Izquierdo */}
                   <g transform="translate(30, 130)">
-                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
-                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
+                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
+                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
                   </g>
                   {/* Signo '+' Derecho */}
                   <g transform="translate(770, 130)">
-                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#00e5b8" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
-                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#00e5b8" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
+                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#00b894" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
+                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#00b894" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
                   </g>
                 </g>
               </svg>
             </div>
 
-            <h1 className="relative font-['Outfit'] font-black text-4xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight text-slate-900 dark:text-white mb-6 drop-shadow-2xl transition-all duration-500 group-hover:scale-[1.018]">
+            <h1 className="relative font-['Outfit'] font-black text-4xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight text-[#0b0f19] dark:text-white mb-6 drop-shadow-sm dark:drop-shadow-2xl transition-all duration-500 group-hover:scale-[1.015]">
               Controla y escala tu empresa <br className="hidden sm:inline" />
-              <span className="text-aurora group-hover:drop-shadow-[0_0_45px_rgba(0,229,184,0.7)] transition-all duration-500">desde un solo lugar</span>
+              <span className="text-aurora group-hover:drop-shadow-[0_0_35px_rgba(0,184,148,0.5)] transition-all duration-500">desde un solo lugar</span>
             </h1>
           </div>
         </div>
