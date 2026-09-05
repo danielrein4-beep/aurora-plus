@@ -86,68 +86,188 @@ const previewData: Record<string, { metric: string; value: string; sub: string; 
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("Ferretería");
+  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
   const navigate = useNavigate();
 
+  const HERO_VERTICALS = [
+    { title: "Salud & Clínicas", subtitle: "Historias clínicas, citas y triaje", badge: "NUEVO", stat: "100% Digital", img: "🏥" },
+    { title: "Minería & Faenas", subtitle: "Control de mineral, cuadrillas y romana", badge: "ACTIVO", stat: "Balanza Real", img: "⛏️" },
+    { title: "Horeca & Restaurantes", subtitle: "Comandas POS, cocina y escandallo", badge: "POPULAR", stat: "Offline POS", img: "🍽️" },
+    { title: "Ganadería & Fincas", subtitle: "Hato, potreros y control sanitario", badge: "PRO", stat: "Trazabilidad", img: "🐂" },
+    { title: "Ferreterías & Retail", subtitle: "Kardex multi-unidad y listas por volumen", badge: "PRO", stat: "Stock en Vivo", img: "🔧" },
+    { title: "Moda & Boutique", subtitle: "Variantes talla/color y fidelización", badge: "SMART", stat: "Puntos & Gift", img: "👗" },
+    { title: "Tamanaco Industrial", subtitle: "Operación integral, tesorería y OCR", badge: "ENTERPRISE", stat: "Multi-Empresa", img: "🏭" },
+  ];
+
   return (
-    <main>
-      {/* ── HERO ── */}
-      <section className="relative pt-28 pb-20 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="text-center max-w-5xl mx-auto">
-          <div className="flex justify-center mb-6">
-            <div className="group flex items-center gap-4 cursor-default select-none">
-              <AuroraLogo size={96} animated />
-              <div className="overflow-hidden">
-                <div className="text-left transition-all duration-500 ease-in-out"
-                  style={{ maxWidth: 0, opacity: 0, transform: "translateX(-24px)" }}
-                  ref={(el) => {
-                    if (!el) return;
-                    const parent = el.closest(".group");
-                    const show = () => { el.style.maxWidth = "240px"; el.style.opacity = "1"; el.style.transform = "translateX(0)"; };
-                    const hide = () => { el.style.maxWidth = "0"; el.style.opacity = "0"; el.style.transform = "translateX(-24px)"; };
-                    parent?.addEventListener("mouseenter", show);
-                    parent?.addEventListener("mouseleave", hide);
-                  }}>
-                  <div className="font-['Outfit'] font-bold text-2xl leading-tight whitespace-nowrap"
-                    style={{ background: "linear-gradient(135deg,#00e5b8 0%,#0ea5e9 45%,#a855f7 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                    Aurora Plus
+    <main className="relative overflow-hidden">
+      {/* ── HERO MONUMENTAL CON CAPAS 3D ── */}
+      <section className="relative min-h-[92vh] flex flex-col justify-between pt-24 pb-12 px-4 sm:px-8 max-w-7xl mx-auto">
+        
+        {/* Capa de Fondo: Tipografía Monumental Gigante y Cuadrícula Cyber */}
+        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center overflow-hidden">
+          <div className="cyber-grid absolute inset-0 opacity-40" />
+          <div className="monumental-text text-[20vw] sm:text-[18vw] lg:text-[16vw] font-black leading-none tracking-widest text-center select-none -translate-y-12">
+            AURORA
+          </div>
+          {/* Luces volumétricas de neón */}
+          <div className="absolute w-[600px] h-[350px] bg-teal-500/15 rounded-full blur-[120px] -top-20 -left-20 animate-pulse" />
+          <div className="absolute w-[600px] h-[350px] bg-purple-600/15 rounded-full blur-[140px] top-1/3 -right-20 animate-pulse" />
+        </div>
+
+        {/* Capa Central: Título Superior y Automatización */}
+        <div className="relative z-10 text-center max-w-4xl mx-auto pt-6">
+          {/* Badge interactivo con pulso */}
+          <div className="inline-flex items-center gap-2.5 bg-white/5 border border-teal-500/30 backdrop-blur-xl rounded-full px-4 py-1.5 text-xs text-teal-300 mb-6 shadow-[0_0_20px_rgba(0,229,184,0.15)]">
+            <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
+            <span className="font-semibold tracking-wide">SOFTWARE ERP MULTI-INDUSTRIA & AUTOMATIZACIÓN</span>
+          </div>
+
+          <h1 className="font-['Outfit'] font-black text-4xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight text-white mb-6 drop-shadow-2xl">
+            Controla y escala tu empresa <br className="hidden sm:inline" />
+            <span className="text-aurora">desde un solo ecosistema</span>
+          </h1>
+        </div>
+
+        {/* Capa Flotante Visual de Automatización / Core */}
+        <div className="relative z-10 max-w-4xl mx-auto my-4 w-full">
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6)] relative overflow-hidden group">
+            <div className="line-aurora absolute top-0 left-0 right-0" />
+            
+            {/* Cabecera del panel de automatización */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-white/5">
+              <div className="flex items-center gap-3">
+                <AuroraLogo size={40} animated />
+                <div>
+                  <div className="font-['Outfit'] font-bold text-base text-white flex items-center gap-2">
+                    Aurora Core Engine <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-mono">v2.4 ONLINE</span>
                   </div>
-                  <div className="text-white/35 text-xs tracking-widest uppercase whitespace-nowrap mt-0.5">Software Administrativo</div>
+                  <div className="text-white/40 text-xs font-mono">Spring Boot 3.3 · Postgres Multi-Tenant · Offline Sync</div>
+                </div>
+              </div>
+
+              {/* Status Pills */}
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-teal-300 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" /> Multi-Moneda (USD/VES/COP)
+                </span>
+                <span className="hidden sm:inline-flex px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-purple-300 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400" /> 7 Verticales
+                </span>
+              </div>
+            </div>
+
+            {/* Grid de Nodos de Automatización */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6">
+              {[
+                { label: "Caja Central", val: "Sincronizada", icon: "💳", color: "text-teal-400" },
+                { label: "Kardex e Insumos", val: "Auto-Descuento", icon: "📦", color: "text-sky-400" },
+                { label: "Offline POS", val: "100% Idempotente", icon: "⚡", color: "text-purple-400" },
+                { label: "Roles & Privacidad", val: "RBAC Estricto", icon: "🛡️", color: "text-amber-400" },
+              ].map((n) => (
+                <div key={n.label} className="bg-black/30 rounded-2xl p-3.5 border border-white/5 hover:border-teal-500/30 transition-all">
+                  <div className="text-xl mb-1">{n.icon}</div>
+                  <div className="text-white font-medium text-xs">{n.label}</div>
+                  <div className={`text-[11px] font-mono mt-0.5 ${n.color}`}>{n.val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Capa Inferior (Métricas a la Izquierda + CTA + Preview Interactivo a la Derecha) */}
+        <div className="relative z-10 pt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
+            
+            {/* Lado Izquierdo: Métricas y Botón de Acción Principal */}
+            <div className="lg:col-span-7 space-y-6">
+              {/* Bloque de Métricas Estilo Monumental */}
+              <div className="grid grid-cols-3 gap-4 sm:gap-6 border-b border-white/10 pb-6">
+                <div>
+                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-white">7+</div>
+                  <div className="text-white/40 text-xs mt-1 font-medium leading-snug">Industrias nativas</div>
+                </div>
+                <div>
+                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-teal-400">100%</div>
+                  <div className="text-white/40 text-xs mt-1 font-medium leading-snug">Offline-First POS</div>
+                </div>
+                <div>
+                  <div className="font-['Outfit'] font-black text-2xl sm:text-3xl text-purple-400">Multi</div>
+                  <div className="text-white/40 text-xs mt-1 font-medium leading-snug">USD · VES · COP</div>
+                </div>
+              </div>
+
+              {/* Botón de Acción y Descripción */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => navigate("/onboarding")}
+                    className="bg-white text-black hover:bg-teal-300 font-bold px-7 py-3.5 rounded-full text-sm transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105 flex items-center gap-2">
+                    Solicitar demo ahora
+                  </button>
+                  <button
+                    onClick={() => navigate("/onboarding")}
+                    className="w-11 h-11 rounded-full bg-white text-black hover:bg-teal-300 flex items-center justify-center font-bold transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105">
+                    ↗
+                  </button>
+                </div>
+                <p className="text-white/45 text-xs sm:text-sm leading-relaxed max-w-sm">
+                  Automatiza clínicas, fincas, restaurantes, ferreterías y minería desde una sola plataforma.
+                </p>
+              </div>
+            </div>
+
+            {/* Lado Derecho: Tarjeta Flotante Interactiva de Verticales (01/07) */}
+            <div className="lg:col-span-5">
+              <div className="glass-panel rounded-2xl p-5 border border-white/10 shadow-2xl relative overflow-hidden">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{HERO_VERTICALS[activeHeroIndex].img}</span>
+                    <div>
+                      <h4 className="font-['Outfit'] font-bold text-white text-sm">
+                        {HERO_VERTICALS[activeHeroIndex].title}
+                      </h4>
+                      <p className="text-white/40 text-xs">
+                        {HERO_VERTICALS[activeHeroIndex].subtitle}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                    {HERO_VERTICALS[activeHeroIndex].badge}
+                  </span>
+                </div>
+
+                {/* Barra de progreso y Switcher 01/07 */}
+                <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs text-white/50">
+                  <span className="font-mono text-teal-400 font-bold">
+                    0{activeHeroIndex + 1} <span className="text-white/20">/ 07</span>
+                  </span>
+                  
+                  {/* Selector de pestañas */}
+                  <div className="flex items-center gap-1.5">
+                    {HERO_VERTICALS.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveHeroIndex(idx)}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${
+                          activeHeroIndex === idx ? "w-6 bg-teal-400 shadow-[0_0_10px_#00e5b8]" : "w-2 bg-white/20 hover:bg-white/40"
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setActiveHeroIndex((prev) => (prev + 1) % HERO_VERTICALS.length)}
+                    className="text-white/60 hover:text-teal-300 transition-colors font-semibold flex items-center gap-1">
+                    Siguiente →
+                  </button>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-4 py-1.5 text-xs text-teal-300 mb-8 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-            Software administrativo adaptable a tu negocio
-          </div>
-
-          <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-8xl leading-[0.95] tracking-tight mb-6">
-            Controla tu empresa<br />
-            <span className="text-aurora">desde un solo lugar</span>
-          </h1>
-          <p className="text-white/50 text-lg sm:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-            Aurora Plus es el software operativo y administrativo que se adapta a tu negocio — veterinarias, clínicas, ferreterías, mineras y más. Personalizable, sin complicaciones.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-14">
-            <button onClick={() => navigate("/precios")}
-              className="g-aurora glow-teal text-white font-semibold px-8 py-4 rounded-xl text-base hover:opacity-90 transition-opacity w-full sm:w-auto">
-              Solicitar demo gratuita
-            </button>
-            <button className="flex items-center gap-2.5 text-white/60 hover:text-white transition-colors px-6 py-4 rounded-xl border border-white/10 hover:border-white/20 w-full sm:w-auto justify-center">
-              <span className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-[10px]">▶</span>
-              Ver cómo funciona
-            </button>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 max-w-3xl mx-auto rounded-2xl overflow-hidden border border-white/5">
-            {STATS.map((s, i) => (
-              <div key={s.label} className={`bg-[#0c0c20] px-5 py-5 text-center ${i < 3 ? "border-r border-white/5" : ""}`}>
-                <div className="font-['Outfit'] font-black text-2xl text-aurora">{s.value}</div>
-                <div className="text-white/35 text-xs mt-1 leading-snug">{s.label}</div>
-              </div>
-            ))}
           </div>
         </div>
+
       </section>
 
       {/* ── TICKER ── */}
