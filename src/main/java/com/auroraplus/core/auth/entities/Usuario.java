@@ -19,7 +19,9 @@ public class Usuario {
     public enum Rol {
         DUENO_ADMIN,
         CAJERO_VENDEDOR,
-        ENCARGADO_INVENTARIO
+        ENCARGADO_INVENTARIO,
+        MEDICO,
+        RECEPCIONISTA
     }
 
     @Id

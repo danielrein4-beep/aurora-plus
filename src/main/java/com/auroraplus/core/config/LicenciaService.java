@@ -44,6 +44,7 @@ public class LicenciaService {
         NIVEL_REQUERIDO_POR_MODULO.put("repuestos", LicenciaTenant.TipoLicencia.COMERCIAL);
         NIVEL_REQUERIDO_POR_MODULO.put("moda", LicenciaTenant.TipoLicencia.COMERCIAL);
         NIVEL_REQUERIDO_POR_MODULO.put("ganaderia", LicenciaTenant.TipoLicencia.COMERCIAL);
+        NIVEL_REQUERIDO_POR_MODULO.put("salud", LicenciaTenant.TipoLicencia.COMERCIAL);
         NIVEL_REQUERIDO_POR_MODULO.put("tamanaco-comercial", LicenciaTenant.TipoLicencia.INDUSTRIAL);
         // Cualquier otro módulo (financiero, inventario, logística) se considera núcleo -> BASICA
     }
@@ -55,7 +56,7 @@ public class LicenciaService {
     // módulos núcleo (financiero, inventario, reportes, config) no están en
     // esta lista y siguen abiertos a cualquier tenant con licencia activa.
     private static final Set<String> VERTICALES_CONTROLADAS = Set.of(
-        "minero", "horeca", "repuestos", "moda", "ganaderia", "tamanaco-comercial"
+        "minero", "horeca", "repuestos", "moda", "ganaderia", "salud", "tamanaco-comercial"
     );
 
     public static class ResultadoValidacion {
