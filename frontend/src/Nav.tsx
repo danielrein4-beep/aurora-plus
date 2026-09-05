@@ -34,14 +34,16 @@ export default function Nav() {
           </div>
         </button>
 
-        {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-1">
+        {/* Desktop links en Cápsula Liquid Glass (Solo Texto, sin emojis) */}
+        <div className="hidden md:flex items-center gap-1 apple-glass-pill rounded-full p-1 border border-white/15 bg-white/[0.04] backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]">
           {LINKS.map((l) => (
-            <button key={l.path} onClick={() => navigate(l.path)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            <button
+              key={l.path}
+              onClick={() => navigate(l.path)}
+              className={`px-5 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 cursor-pointer ${
                 pathname === l.path
-                  ? "text-white bg-white/10"
-                  : "text-white/45 hover:text-white/80 hover:bg-white/5"
+                  ? "bg-white/18 text-white font-semibold shadow-[0_2px_14px_rgba(0,0,0,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.45)] border border-white/25 backdrop-blur-md"
+                  : "text-white/60 hover:text-white hover:bg-white/8 hover:shadow-sm"
               }`}>
               {l.label}
             </button>
