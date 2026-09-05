@@ -100,74 +100,79 @@ export default function Home() {
   ];
 
   return (
-    <main className="relative overflow-hidden">
-      {/* ── HERO MONUMENTAL CON CAPAS 3D ── */}
-      <section className="relative min-h-[92vh] flex flex-col justify-between pt-24 pb-12 px-4 sm:px-8 max-w-7xl mx-auto">
+    <main className="relative overflow-hidden bg-[#060714]">
+      {/* ── HERO MONUMENTAL CON AURORAS BOREALES Y GLASSMORPHISM ESTILO APPLE ── */}
+      <section className="relative min-h-[94vh] flex flex-col justify-between pt-24 pb-12 px-4 sm:px-8 max-w-7xl mx-auto">
         
-        {/* Capa de Fondo: Tipografía Monumental Gigante y Cuadrícula Cyber */}
-        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center overflow-hidden">
-          <div className="cyber-grid absolute inset-0 opacity-40" />
-          <div className="monumental-text text-[20vw] sm:text-[18vw] lg:text-[16vw] font-black leading-none tracking-widest text-center select-none -translate-y-12">
+        {/* Capa de Fondo: Auroras Boreales Orgánicas Animadas */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
+          {/* Ondas vivas de aurora boreal */}
+          <div className="aurora-ribbon-1 -top-24 -left-20" />
+          <div className="aurora-ribbon-2 top-1/4 -right-10" />
+          
+          <div className="cyber-grid absolute inset-0 opacity-25" />
+          
+          {/* Tipografía Monumental Gigante con destello */}
+          <div className="monumental-text text-[20vw] sm:text-[18vw] lg:text-[16vw] font-black leading-none tracking-widest text-center select-none -translate-y-10 drop-shadow-[0_0_80px_rgba(0,229,184,0.15)]">
             AURORA
           </div>
-          {/* Luces volumétricas de neón */}
-          <div className="absolute w-[600px] h-[350px] bg-teal-500/15 rounded-full blur-[120px] -top-20 -left-20 animate-pulse" />
-          <div className="absolute w-[600px] h-[350px] bg-purple-600/15 rounded-full blur-[140px] top-1/3 -right-20 animate-pulse" />
         </div>
 
         {/* Capa Central: Título Superior y Automatización */}
         <div className="relative z-10 text-center max-w-4xl mx-auto pt-6">
-          {/* Badge interactivo con pulso */}
-          <div className="inline-flex items-center gap-2.5 bg-white/5 border border-teal-500/30 backdrop-blur-xl rounded-full px-4 py-1.5 text-xs text-teal-300 mb-6 shadow-[0_0_20px_rgba(0,229,184,0.15)]">
+          {/* Badge interactivo estilo Apple Glass con pulso de neón */}
+          <div className="inline-flex items-center gap-2.5 apple-glass-pill rounded-full px-5 py-2 text-xs text-teal-300 mb-6 shadow-[0_4px_24px_rgba(0,229,184,0.2)] hover:scale-105 transition-transform duration-300">
             <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
-            <span className="font-semibold tracking-wide">SOFTWARE ERP MULTI-INDUSTRIA & AUTOMATIZACIÓN</span>
+            <span className="font-semibold tracking-wide">ECOSISTEMA ERP MULTI-INDUSTRIA & AUTOMATIZACIÓN</span>
           </div>
 
           <h1 className="font-['Outfit'] font-black text-4xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight text-white mb-6 drop-shadow-2xl">
             Controla y escala tu empresa <br className="hidden sm:inline" />
-            <span className="text-aurora">desde un solo ecosistema</span>
+            <span className="text-aurora">desde un solo lugar</span>
           </h1>
         </div>
 
-        {/* Capa Flotante Visual de Automatización / Core */}
-        <div className="relative z-10 max-w-4xl mx-auto my-4 w-full">
-          <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6)] relative overflow-hidden group">
+        {/* Capa Flotante Visual de Automatización (Apple Frosted Glass) */}
+        <div className="relative z-10 max-w-4xl mx-auto my-3 w-full">
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 relative overflow-hidden group hover:border-teal-500/30 transition-all duration-500">
             <div className="line-aurora absolute top-0 left-0 right-0" />
             
-            {/* Cabecera del panel de automatización */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-white/5">
-              <div className="flex items-center gap-3">
-                <AuroraLogo size={40} animated />
+            {/* Cabecera del panel */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-white/10">
+              <div className="flex items-center gap-3.5">
+                <div className="p-2 rounded-2xl bg-white/5 border border-white/10 shadow-inner">
+                  <AuroraLogo size={36} animated />
+                </div>
                 <div>
                   <div className="font-['Outfit'] font-bold text-base text-white flex items-center gap-2">
-                    Aurora Core Engine <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-mono">v2.4 ONLINE</span>
+                    Aurora Engine Core <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-300 font-mono border border-teal-400/30">ONLINE v2.4</span>
                   </div>
-                  <div className="text-white/40 text-xs font-mono">Spring Boot 3.3 · Postgres Multi-Tenant · Offline Sync</div>
+                  <div className="text-white/45 text-xs font-mono">Arquitectura Multi-Tenant · PostgreSQL · Offline Sync</div>
                 </div>
               </div>
 
-              {/* Status Pills */}
+              {/* Status Pills estilo Apple */}
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-teal-300 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" /> Multi-Moneda (USD/VES/COP)
+                <span className="px-3.5 py-1.5 rounded-xl bg-teal-500/10 border border-teal-500/25 text-xs text-teal-300 font-medium flex items-center gap-1.5 shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" /> Multi-Moneda (USD · VES · COP)
                 </span>
-                <span className="hidden sm:inline-flex px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-purple-300 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400" /> 7 Verticales
+                <span className="hidden sm:inline-flex px-3.5 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/25 text-xs text-purple-300 font-medium flex items-center gap-1.5 shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400" /> 7 Verticales Nativas
                 </span>
               </div>
             </div>
 
-            {/* Grid de Nodos de Automatización */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6">
+            {/* Grid de Nodos de Automatización con Micro-interacciones */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-5">
               {[
-                { label: "Caja Central", val: "Sincronizada", icon: "💳", color: "text-teal-400" },
-                { label: "Kardex e Insumos", val: "Auto-Descuento", icon: "📦", color: "text-sky-400" },
-                { label: "Offline POS", val: "100% Idempotente", icon: "⚡", color: "text-purple-400" },
-                { label: "Roles & Privacidad", val: "RBAC Estricto", icon: "🛡️", color: "text-amber-400" },
+                { label: "Caja Central", val: "Sincronizada", icon: "💳", color: "text-teal-300" },
+                { label: "Kardex e Insumos", val: "Auto-Descuento", icon: "📦", color: "text-sky-300" },
+                { label: "Offline POS", val: "100% Idempotente", icon: "⚡", color: "text-purple-300" },
+                { label: "Roles & Privacidad", val: "RBAC Estricto", icon: "🛡️", color: "text-amber-300" },
               ].map((n) => (
-                <div key={n.label} className="bg-black/30 rounded-2xl p-3.5 border border-white/5 hover:border-teal-500/30 transition-all">
-                  <div className="text-xl mb-1">{n.icon}</div>
-                  <div className="text-white font-medium text-xs">{n.label}</div>
+                <div key={n.label} className="bg-white/[0.03] hover:bg-white/[0.07] rounded-2xl p-4 border border-white/5 hover:border-teal-400/30 transition-all duration-300 hover:-translate-y-1 cursor-default">
+                  <div className="text-2xl mb-1.5">{n.icon}</div>
+                  <div className="text-white font-semibold text-xs tracking-tight">{n.label}</div>
                   <div className={`text-[11px] font-mono mt-0.5 ${n.color}`}>{n.val}</div>
                 </div>
               ))}
@@ -219,28 +224,32 @@ export default function Home() {
 
             {/* Lado Derecho: Tarjeta Flotante Interactiva de Verticales (01/07) */}
             <div className="lg:col-span-5">
-              <div className="glass-panel rounded-2xl p-5 border border-white/10 shadow-2xl relative overflow-hidden">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{HERO_VERTICALS[activeHeroIndex].img}</span>
+              <div className="apple-glass rounded-3xl p-6 relative overflow-hidden group shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-white/10 hover:border-teal-400/30 transition-all duration-500">
+                <div className="line-aurora absolute top-0 left-0 right-0 opacity-80" />
+                
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                      {HERO_VERTICALS[activeHeroIndex].img}
+                    </div>
                     <div>
-                      <h4 className="font-['Outfit'] font-bold text-white text-sm">
+                      <h4 className="font-['Outfit'] font-bold text-white text-base tracking-tight flex items-center gap-2">
                         {HERO_VERTICALS[activeHeroIndex].title}
                       </h4>
-                      <p className="text-white/40 text-xs">
+                      <p className="text-white/45 text-xs">
                         {HERO_VERTICALS[activeHeroIndex].subtitle}
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 shadow-sm">
                     {HERO_VERTICALS[activeHeroIndex].badge}
                   </span>
                 </div>
 
                 {/* Barra de progreso y Switcher 01/07 */}
-                <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs text-white/50">
-                  <span className="font-mono text-teal-400 font-bold">
-                    0{activeHeroIndex + 1} <span className="text-white/20">/ 07</span>
+                <div className="flex items-center justify-between pt-4 border-t border-white/10 text-xs text-white/50">
+                  <span className="font-mono text-teal-400 font-bold tracking-wider">
+                    0{activeHeroIndex + 1} <span className="text-white/25">/ 07</span>
                   </span>
                   
                   {/* Selector de pestañas */}
@@ -249,8 +258,9 @@ export default function Home() {
                       <button
                         key={idx}
                         onClick={() => setActiveHeroIndex(idx)}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${
-                          activeHeroIndex === idx ? "w-6 bg-teal-400 shadow-[0_0_10px_#00e5b8]" : "w-2 bg-white/20 hover:bg-white/40"
+                        aria-label={`Ver vertical ${idx + 1}`}
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          activeHeroIndex === idx ? "w-7 bg-teal-400 shadow-[0_0_12px_#00e5b8]" : "w-2 bg-white/20 hover:bg-white/40"
                         }`}
                       />
                     ))}
@@ -258,7 +268,7 @@ export default function Home() {
 
                   <button
                     onClick={() => setActiveHeroIndex((prev) => (prev + 1) % HERO_VERTICALS.length)}
-                    className="text-white/60 hover:text-teal-300 transition-colors font-semibold flex items-center gap-1">
+                    className="text-white/70 hover:text-teal-300 transition-colors font-semibold flex items-center gap-1">
                     Siguiente →
                   </button>
                 </div>
