@@ -126,10 +126,105 @@ export default function Home() {
             <span className="font-semibold tracking-wide">ECOSISTEMA ERP MULTI-INDUSTRIA & AUTOMATIZACIÓN</span>
           </div>
 
-          <h1 className="font-['Outfit'] font-black text-4xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight text-white mb-6 drop-shadow-2xl">
-            Controla y escala tu empresa <br className="hidden sm:inline" />
-            <span className="text-aurora">desde un solo lugar</span>
-          </h1>
+          {/* Título Interactivo con Animación Orbital de Aurora y signos '+' en Hover */}
+          <div className="relative group cursor-default select-none inline-block px-4 sm:px-8 py-3 rounded-3xl transition-all duration-500">
+            {/* Fondo translúcido orbital con anillos y '+' rotantes que se enciende en hover */}
+            <div className="absolute inset-0 -inset-x-6 -inset-y-4 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-out flex items-center justify-center overflow-visible">
+              {/* Resplandor ambiental de fondo muy suave y traslúcido */}
+              <div className="absolute w-[95%] h-[90%] rounded-[40px] bg-gradient-to-r from-teal-500/15 via-sky-500/10 to-purple-600/15 blur-2xl transition-all duration-700" />
+              <div className="absolute inset-0 rounded-3xl bg-white/[0.015] border border-teal-400/20 backdrop-blur-[2px] transition-all duration-500 shadow-[0_0_50px_rgba(0,229,184,0.15)]" />
+              
+              {/* SVG de alta fidelidad con órbitas y signos '+' rotantes sincronizados tipo Logo Aurora */}
+              <svg className="w-[115%] h-[150%] max-w-none absolute pointer-events-none" viewBox="0 0 800 260" fill="none">
+                <defs>
+                  <linearGradient id="hero-title-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#00e5b8" stopOpacity="0.7" />
+                    <stop offset="50%" stopColor="#0ea5e9" stopOpacity="0.5" />
+                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0.7" />
+                  </linearGradient>
+
+                  <linearGradient id="hero-title-gradient-2" x1="100%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.6" />
+                    <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.4" />
+                    <stop offset="100%" stopColor="#00e5b8" stopOpacity="0.6" />
+                  </linearGradient>
+
+                  <filter id="hero-glow-soft" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+
+                {/* Anillo exterior rotante 1 */}
+                <g filter="url(#hero-glow-soft)">
+                  <ellipse cx="400" cy="130" rx="370" ry="110"
+                    stroke="url(#hero-title-gradient-1)" strokeWidth="1.5"
+                    strokeDasharray="90 140" strokeLinecap="round" opacity="0.55">
+                    <animateTransform attributeName="transform" type="rotate"
+                      from="0 400 130" to="360 400 130" dur="18s" repeatCount="indefinite" />
+                  </ellipse>
+                </g>
+
+                {/* Anillo intermedio contrarotante 2 */}
+                <g filter="url(#hero-glow-soft)">
+                  <ellipse cx="400" cy="130" rx="290" ry="85"
+                    stroke="url(#hero-title-gradient-2)" strokeWidth="1.2"
+                    strokeDasharray="60 100" strokeLinecap="round" opacity="0.45">
+                    <animateTransform attributeName="transform" type="rotate"
+                      from="360 400 130" to="0 400 130" dur="14s" repeatCount="indefinite" />
+                  </ellipse>
+                </g>
+
+                {/* Anillo interior rotante 3 */}
+                <ellipse cx="400" cy="130" rx="210" ry="60"
+                  stroke="url(#hero-title-gradient-1)" strokeWidth="1"
+                  strokeDasharray="40 70" strokeLinecap="round" opacity="0.35">
+                  <animateTransform attributeName="transform" type="rotate"
+                    from="0 400 130" to="360 400 130" dur="10s" repeatCount="indefinite" />
+                </ellipse>
+
+                {/* Órbita 1 de Signos '+' con resplandor neón */}
+                <g filter="url(#hero-glow-soft)">
+                  <animateTransform attributeName="transform" type="rotate"
+                    from="0 400 130" to="360 400 130" dur="8s" repeatCount="indefinite" />
+                  {/* Signo '+' Superior */}
+                  <g transform="translate(400, 20)">
+                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#00e5b8" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" />
+                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#00e5b8" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" />
+                  </g>
+                  {/* Signo '+' Inferior */}
+                  <g transform="translate(400, 240)">
+                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" />
+                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" />
+                  </g>
+                </g>
+
+                {/* Órbita 2 de Signos '+' contrarotante */}
+                <g filter="url(#hero-glow-soft)">
+                  <animateTransform attributeName="transform" type="rotate"
+                    from="360 400 130" to="0 400 130" dur="12s" repeatCount="indefinite" />
+                  {/* Signo '+' Izquierdo */}
+                  <g transform="translate(30, 130)">
+                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+                  </g>
+                  {/* Signo '+' Derecho */}
+                  <g transform="translate(770, 130)">
+                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#00e5b8" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#00e5b8" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+                  </g>
+                </g>
+              </svg>
+            </div>
+
+            <h1 className="relative font-['Outfit'] font-black text-4xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight text-white mb-6 drop-shadow-2xl transition-all duration-500 group-hover:scale-[1.015]">
+              Controla y escala tu empresa <br className="hidden sm:inline" />
+              <span className="text-aurora group-hover:drop-shadow-[0_0_45px_rgba(0,229,184,0.7)] transition-all duration-500">desde un solo lugar</span>
+            </h1>
+          </div>
         </div>
 
         {/* Capa Flotante Visual de Automatización (Apple Frosted Glass) */}
