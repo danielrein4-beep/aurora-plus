@@ -100,7 +100,7 @@ export default function Home() {
   ];
 
   return (
-    <main className="relative overflow-hidden bg-[#060714]">
+    <main className="relative overflow-hidden bg-transparent transition-colors duration-500">
       {/* ── HERO MONUMENTAL CON AURORAS BOREALES Y GLASSMORPHISM ESTILO APPLE ── */}
       <section className="relative min-h-[94vh] flex flex-col justify-between pt-24 pb-12 px-4 sm:px-8 max-w-7xl mx-auto">
         
@@ -121,32 +121,32 @@ export default function Home() {
         {/* Capa Central: Título Superior y Automatización */}
         <div className="relative z-10 text-center max-w-4xl mx-auto pt-6">
           {/* Badge interactivo estilo Apple Glass con pulso de neón */}
-          <div className="inline-flex items-center gap-2.5 apple-glass-pill rounded-full px-5 py-2 text-xs text-teal-300 mb-6 shadow-[0_4px_24px_rgba(0,229,184,0.2)] hover:scale-105 transition-transform duration-300">
+          <div className="inline-flex items-center gap-2.5 apple-glass-pill rounded-full px-5 py-2 text-xs text-teal-600 dark:text-teal-300 mb-6 shadow-[0_4px_24px_rgba(0,229,184,0.2)] hover:scale-105 transition-transform duration-300">
             <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
             <span className="font-semibold tracking-wide">ECOSISTEMA ERP MULTI-INDUSTRIA & AUTOMATIZACIÓN</span>
           </div>
 
-          {/* Título Interactivo con Animación Orbital de Aurora y signos '+' en Hover */}
+          {/* Título Interactivo con Animación Orbital de Aurora y signos '+' SIEMPRE ACTIVA (y ultra smooth en hover) */}
           <div className="relative group cursor-default select-none inline-block px-4 sm:px-8 py-3 rounded-3xl transition-all duration-500">
-            {/* Fondo translúcido orbital con anillos y '+' rotantes que se enciende en hover */}
-            <div className="absolute inset-0 -inset-x-6 -inset-y-4 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-out flex items-center justify-center overflow-visible">
+            {/* Fondo translúcido orbital con anillos y '+' rotantes — Siempre visible, ultra smooth en hover */}
+            <div className="absolute inset-0 -inset-x-6 -inset-y-4 pointer-events-none opacity-80 group-hover:opacity-100 group-hover:scale-[1.03] transition-all duration-700 ease-out flex items-center justify-center overflow-visible">
               {/* Resplandor ambiental de fondo muy suave y traslúcido */}
-              <div className="absolute w-[95%] h-[90%] rounded-[40px] bg-gradient-to-r from-teal-500/15 via-sky-500/10 to-purple-600/15 blur-2xl transition-all duration-700" />
-              <div className="absolute inset-0 rounded-3xl bg-white/[0.015] border border-teal-400/20 backdrop-blur-[2px] transition-all duration-500 shadow-[0_0_50px_rgba(0,229,184,0.15)]" />
+              <div className="absolute w-[95%] h-[90%] rounded-[40px] bg-gradient-to-r from-teal-500/20 via-sky-500/15 to-purple-600/20 blur-2xl group-hover:blur-3xl transition-all duration-700" />
+              <div className="absolute inset-0 rounded-3xl bg-white/[0.03] dark:bg-white/[0.015] border border-teal-500/20 dark:border-teal-400/20 backdrop-blur-[2px] transition-all duration-500 shadow-[0_0_50px_rgba(0,229,184,0.12)] group-hover:shadow-[0_0_70px_rgba(0,229,184,0.25)]" />
               
               {/* SVG de alta fidelidad con órbitas y signos '+' rotantes sincronizados tipo Logo Aurora */}
               <svg className="w-[115%] h-[150%] max-w-none absolute pointer-events-none" viewBox="0 0 800 260" fill="none">
                 <defs>
                   <linearGradient id="hero-title-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#00e5b8" stopOpacity="0.7" />
-                    <stop offset="50%" stopColor="#0ea5e9" stopOpacity="0.5" />
-                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0.7" />
+                    <stop offset="0%" stopColor="#00e5b8" stopOpacity="0.75" />
+                    <stop offset="50%" stopColor="#0ea5e9" stopOpacity="0.55" />
+                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0.75" />
                   </linearGradient>
 
                   <linearGradient id="hero-title-gradient-2" x1="100%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.6" />
-                    <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.4" />
-                    <stop offset="100%" stopColor="#00e5b8" stopOpacity="0.6" />
+                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.65" />
+                    <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.45" />
+                    <stop offset="100%" stopColor="#00e5b8" stopOpacity="0.65" />
                   </linearGradient>
 
                   <filter id="hero-glow-soft" x="-20%" y="-20%" width="140%" height="140%">
@@ -162,7 +162,7 @@ export default function Home() {
                 <g filter="url(#hero-glow-soft)">
                   <ellipse cx="400" cy="130" rx="370" ry="110"
                     stroke="url(#hero-title-gradient-1)" strokeWidth="1.5"
-                    strokeDasharray="90 140" strokeLinecap="round" opacity="0.55">
+                    strokeDasharray="90 140" strokeLinecap="round" opacity="0.6">
                     <animateTransform attributeName="transform" type="rotate"
                       from="0 400 130" to="360 400 130" dur="18s" repeatCount="indefinite" />
                   </ellipse>
@@ -172,7 +172,7 @@ export default function Home() {
                 <g filter="url(#hero-glow-soft)">
                   <ellipse cx="400" cy="130" rx="290" ry="85"
                     stroke="url(#hero-title-gradient-2)" strokeWidth="1.2"
-                    strokeDasharray="60 100" strokeLinecap="round" opacity="0.45">
+                    strokeDasharray="60 100" strokeLinecap="round" opacity="0.5">
                     <animateTransform attributeName="transform" type="rotate"
                       from="360 400 130" to="0 400 130" dur="14s" repeatCount="indefinite" />
                   </ellipse>
@@ -181,7 +181,7 @@ export default function Home() {
                 {/* Anillo interior rotante 3 */}
                 <ellipse cx="400" cy="130" rx="210" ry="60"
                   stroke="url(#hero-title-gradient-1)" strokeWidth="1"
-                  strokeDasharray="40 70" strokeLinecap="round" opacity="0.35">
+                  strokeDasharray="40 70" strokeLinecap="round" opacity="0.4">
                   <animateTransform attributeName="transform" type="rotate"
                     from="0 400 130" to="360 400 130" dur="10s" repeatCount="indefinite" />
                 </ellipse>
@@ -192,13 +192,13 @@ export default function Home() {
                     from="0 400 130" to="360 400 130" dur="8s" repeatCount="indefinite" />
                   {/* Signo '+' Superior */}
                   <g transform="translate(400, 20)">
-                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#00e5b8" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" />
-                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#00e5b8" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" />
+                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#00e5b8" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
+                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#00e5b8" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
                   </g>
                   {/* Signo '+' Inferior */}
                   <g transform="translate(400, 240)">
-                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" />
-                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" />
+                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
+                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
                   </g>
                 </g>
 
@@ -208,19 +208,19 @@ export default function Home() {
                     from="360 400 130" to="0 400 130" dur="12s" repeatCount="indefinite" />
                   {/* Signo '+' Izquierdo */}
                   <g transform="translate(30, 130)">
-                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
-                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
+                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
                   </g>
                   {/* Signo '+' Derecho */}
                   <g transform="translate(770, 130)">
-                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#00e5b8" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
-                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#00e5b8" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#00e5b8" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
+                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#00e5b8" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
                   </g>
                 </g>
               </svg>
             </div>
 
-            <h1 className="relative font-['Outfit'] font-black text-4xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight text-white mb-6 drop-shadow-2xl transition-all duration-500 group-hover:scale-[1.015]">
+            <h1 className="relative font-['Outfit'] font-black text-4xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight text-slate-900 dark:text-white mb-6 drop-shadow-2xl transition-all duration-500 group-hover:scale-[1.018]">
               Controla y escala tu empresa <br className="hidden sm:inline" />
               <span className="text-aurora group-hover:drop-shadow-[0_0_45px_rgba(0,229,184,0.7)] transition-all duration-500">desde un solo lugar</span>
             </h1>
@@ -233,25 +233,25 @@ export default function Home() {
             <div className="line-aurora absolute top-0 left-0 right-0" />
             
             {/* Cabecera del panel */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-white/10">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-black/10 dark:border-white/10">
               <div className="flex items-center gap-3.5">
-                <div className="p-2 rounded-2xl bg-white/5 border border-white/10 shadow-inner">
+                <div className="p-2 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 shadow-inner">
                   <AuroraLogo size={36} animated />
                 </div>
-                <div>
-                  <div className="font-['Outfit'] font-bold text-base text-white flex items-center gap-2">
-                    Aurora Engine Core <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-300 font-mono border border-teal-400/30">ONLINE v2.4</span>
+                <div className="text-left">
+                  <div className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    Aurora Engine Core <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-600 dark:text-teal-300 font-mono border border-teal-400/30">ONLINE v2.4</span>
                   </div>
-                  <div className="text-white/45 text-xs font-mono">Arquitectura Multi-Tenant · PostgreSQL · Offline Sync</div>
+                  <div className="text-slate-500 dark:text-white/45 text-xs font-mono">Arquitectura Multi-Tenant · PostgreSQL · Offline Sync</div>
                 </div>
               </div>
 
               {/* Status Pills estilo Apple */}
               <div className="flex items-center gap-2">
-                <span className="px-3.5 py-1.5 rounded-xl bg-teal-500/10 border border-teal-500/25 text-xs text-teal-300 font-medium flex items-center gap-1.5 shadow-sm">
+                <span className="px-3.5 py-1.5 rounded-xl bg-teal-500/10 border border-teal-500/25 text-xs text-teal-600 dark:text-teal-300 font-medium flex items-center gap-1.5 shadow-sm">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" /> Multi-Moneda (USD · VES · COP)
                 </span>
-                <span className="hidden sm:inline-flex px-3.5 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/25 text-xs text-purple-300 font-medium flex items-center gap-1.5 shadow-sm">
+                <span className="hidden sm:inline-flex px-3.5 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/25 text-xs text-purple-600 dark:text-purple-300 font-medium flex items-center gap-1.5 shadow-sm">
                   <span className="w-1.5 h-1.5 rounded-full bg-purple-400" /> 7 Verticales Nativas
                 </span>
               </div>
@@ -260,14 +260,14 @@ export default function Home() {
             {/* Grid de Nodos de Automatización con Micro-interacciones */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-5">
               {[
-                { label: "Caja Central", val: "Sincronizada", icon: "💳", color: "text-teal-300" },
-                { label: "Kardex e Insumos", val: "Auto-Descuento", icon: "📦", color: "text-sky-300" },
-                { label: "Offline POS", val: "100% Idempotente", icon: "⚡", color: "text-purple-300" },
-                { label: "Roles & Privacidad", val: "RBAC Estricto", icon: "🛡️", color: "text-amber-300" },
+                { label: "Caja Central", val: "Sincronizada", icon: "💳", color: "text-teal-600 dark:text-teal-300" },
+                { label: "Kardex e Insumos", val: "Auto-Descuento", icon: "📦", color: "text-sky-600 dark:text-sky-300" },
+                { label: "Offline POS", val: "100% Idempotente", icon: "⚡", color: "text-purple-600 dark:text-purple-300" },
+                { label: "Roles & Privacidad", val: "RBAC Estricto", icon: "🛡️", color: "text-amber-600 dark:text-amber-300" },
               ].map((n) => (
-                <div key={n.label} className="bg-white/[0.03] hover:bg-white/[0.07] rounded-2xl p-4 border border-white/5 hover:border-teal-400/30 transition-all duration-300 hover:-translate-y-1 cursor-default">
+                <div key={n.label} className="bg-black/[0.02] dark:bg-white/[0.03] hover:bg-black/[0.05] dark:hover:bg-white/[0.07] rounded-2xl p-4 border border-black/5 dark:border-white/5 hover:border-teal-400/30 transition-all duration-300 hover:-translate-y-1 cursor-default">
                   <div className="text-2xl mb-1.5">{n.icon}</div>
-                  <div className="text-white font-semibold text-xs tracking-tight">{n.label}</div>
+                  <div className="text-slate-900 dark:text-white font-semibold text-xs tracking-tight">{n.label}</div>
                   <div className={`text-[11px] font-mono mt-0.5 ${n.color}`}>{n.val}</div>
                 </div>
               ))}
@@ -282,18 +282,18 @@ export default function Home() {
             {/* Lado Izquierdo: Métricas y Botón de Acción Principal */}
             <div className="lg:col-span-7 space-y-6">
               {/* Bloque de Métricas Estilo Monumental */}
-              <div className="grid grid-cols-3 gap-4 sm:gap-6 border-b border-white/10 pb-6">
+              <div className="grid grid-cols-3 gap-4 sm:gap-6 border-b border-slate-200/60 dark:border-white/10 pb-6 transition-colors duration-500">
                 <div>
-                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-white">7+</div>
-                  <div className="text-white/40 text-xs mt-1 font-medium leading-snug">Industrias nativas</div>
+                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-slate-900 dark:text-white">7+</div>
+                  <div className="text-slate-500 dark:text-white/40 text-xs mt-1 font-medium leading-snug">Industrias nativas</div>
                 </div>
                 <div>
-                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-teal-400">100%</div>
-                  <div className="text-white/40 text-xs mt-1 font-medium leading-snug">Offline-First POS</div>
+                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-teal-600 dark:text-teal-400">100%</div>
+                  <div className="text-slate-500 dark:text-white/40 text-xs mt-1 font-medium leading-snug">Offline-First POS</div>
                 </div>
                 <div>
-                  <div className="font-['Outfit'] font-black text-2xl sm:text-3xl text-purple-400">Multi</div>
-                  <div className="text-white/40 text-xs mt-1 font-medium leading-snug">USD · VES · COP</div>
+                  <div className="font-['Outfit'] font-black text-2xl sm:text-3xl text-purple-600 dark:text-purple-400">Multi</div>
+                  <div className="text-slate-500 dark:text-white/40 text-xs mt-1 font-medium leading-snug">USD · VES · COP</div>
                 </div>
               </div>
 
@@ -302,17 +302,17 @@ export default function Home() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => navigate("/onboarding")}
-                    className="btn-cyber-neon text-white font-bold px-8 py-3.5 rounded-full text-sm flex items-center gap-2 tracking-wide cursor-pointer">
+                    className="btn-cyber-neon text-white font-bold px-8 py-3.5 rounded-full text-sm flex items-center gap-2 tracking-wide cursor-pointer shadow-lg">
                     <span>Solicitar demo ahora</span>
                     <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">↗</span>
                   </button>
                   <button
                     onClick={() => navigate("/auth")}
-                    className="apple-glass-btn text-white/90 hover:text-white font-semibold px-6 py-3.5 rounded-full text-sm cursor-pointer">
+                    className="apple-glass-btn text-slate-800 dark:text-white/90 hover:text-black dark:hover:text-white font-semibold px-6 py-3.5 rounded-full text-sm cursor-pointer">
                     Iniciar sesión
                   </button>
                 </div>
-                <p className="text-white/45 text-xs sm:text-sm leading-relaxed max-w-sm">
+                <p className="text-slate-500 dark:text-white/45 text-xs sm:text-sm leading-relaxed max-w-sm">
                   Automatiza clínicas, fincas, restaurantes, ferreterías y minería desde una sola plataforma.
                 </p>
               </div>
@@ -320,32 +320,32 @@ export default function Home() {
 
             {/* Lado Derecho: Tarjeta Flotante Interactiva de Verticales (01/07) */}
             <div className="lg:col-span-5">
-              <div className="apple-glass rounded-3xl p-6 relative overflow-hidden group shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-white/10 hover:border-teal-400/30 transition-all duration-500">
+              <div className="apple-glass rounded-3xl p-6 relative overflow-hidden group shadow-[0_20px_60px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-black/5 dark:border-white/10 hover:border-teal-400/30 transition-all duration-500">
                 <div className="line-aurora absolute top-0 left-0 right-0 opacity-80" />
                 
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                    <div className="w-12 h-12 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform duration-300">
                       {HERO_VERTICALS[activeHeroIndex].img}
                     </div>
-                    <div>
-                      <h4 className="font-['Outfit'] font-bold text-white text-base tracking-tight flex items-center gap-2">
+                    <div className="text-left">
+                      <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base tracking-tight flex items-center gap-2">
                         {HERO_VERTICALS[activeHeroIndex].title}
                       </h4>
-                      <p className="text-white/45 text-xs">
+                      <p className="text-slate-500 dark:text-white/45 text-xs">
                         {HERO_VERTICALS[activeHeroIndex].subtitle}
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 shadow-sm">
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-500/20 text-teal-600 dark:text-teal-300 border border-teal-500/30 shadow-sm">
                     {HERO_VERTICALS[activeHeroIndex].badge}
                   </span>
                 </div>
 
                 {/* Barra de progreso y Switcher 01/07 */}
-                <div className="flex items-center justify-between pt-4 border-t border-white/10 text-xs text-white/50">
-                  <span className="font-mono text-teal-400 font-bold tracking-wider">
-                    0{activeHeroIndex + 1} <span className="text-white/25">/ 07</span>
+                <div className="flex items-center justify-between pt-4 border-t border-black/10 dark:border-white/10 text-xs text-slate-500 dark:text-white/50">
+                  <span className="font-mono text-teal-600 dark:text-teal-400 font-bold tracking-wider">
+                    0{activeHeroIndex + 1} <span className="text-slate-400 dark:text-white/25">/ 07</span>
                   </span>
                   
                   {/* Selector de pestañas */}
@@ -355,8 +355,8 @@ export default function Home() {
                         key={idx}
                         onClick={() => setActiveHeroIndex(idx)}
                         aria-label={`Ver vertical ${idx + 1}`}
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          activeHeroIndex === idx ? "w-7 bg-teal-400 shadow-[0_0_12px_#00e5b8]" : "w-2 bg-white/20 hover:bg-white/40"
+                        className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                          activeHeroIndex === idx ? "w-7 bg-teal-400 shadow-[0_0_12px_#00e5b8]" : "w-2 bg-slate-300 dark:bg-white/20 hover:bg-slate-400 dark:hover:bg-white/40"
                         }`}
                       />
                     ))}
@@ -364,7 +364,7 @@ export default function Home() {
 
                   <button
                     onClick={() => setActiveHeroIndex((prev) => (prev + 1) % HERO_VERTICALS.length)}
-                    className="text-white/70 hover:text-teal-300 transition-colors font-semibold flex items-center gap-1">
+                    className="text-slate-700 dark:text-white/70 hover:text-teal-600 dark:hover:text-teal-300 transition-colors font-semibold flex items-center gap-1 cursor-pointer">
                     Siguiente →
                   </button>
                 </div>

@@ -4,7 +4,7 @@ import { AuroraGradientDef } from "./Icons";
 
 export default function Layout() {
   return (
-    <div className="min-h-full bg-[#060612] text-white overflow-x-hidden">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 overflow-x-hidden">
       <AuroraGradientDef />
 
       {/* Ambient blobs */}
@@ -21,20 +21,20 @@ export default function Layout() {
       <Outlet />
 
       {/* Footer */}
-      <footer className="border-t border-white/5 py-12 px-4 sm:px-6 max-w-7xl mx-auto relative">
+      <footer className="border-t border-slate-200/60 dark:border-white/5 py-12 px-4 sm:px-6 max-w-7xl mx-auto relative transition-colors duration-500">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
             <div>
               <span className="font-['Outfit'] font-bold text-aurora text-sm">Aurora Plus</span>
-              <div className="text-white/25 text-[10px] tracking-widest uppercase">Software Administrativo</div>
+              <div className="text-slate-400 dark:text-white/25 text-[10px] tracking-widest uppercase">Software Administrativo</div>
             </div>
           </div>
-          <div className="flex flex-wrap justify-center gap-6 text-sm text-white/25">
+          <div className="flex flex-wrap justify-center gap-6 text-sm text-slate-500 dark:text-white/35">
             {["Privacidad", "Términos", "Soporte", "Documentación", "Blog", "Contacto"].map((l) => (
-              <button key={l} className="hover:text-white/55 transition-colors">{l}</button>
+              <button key={l} className="hover:text-slate-900 dark:hover:text-white/80 transition-colors cursor-pointer">{l}</button>
             ))}
           </div>
-          <p className="text-white/20 text-xs">© 2026 Aurora Plus. Todos los derechos reservados.</p>
+          <p className="text-slate-400 dark:text-white/20 text-xs">© 2026 Aurora Plus. Todos los derechos reservados.</p>
         </div>
       </footer>
     </div>
