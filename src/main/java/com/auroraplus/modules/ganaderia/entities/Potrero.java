@@ -54,6 +54,15 @@ public class Potrero {
     @Column(name = "orden_rotacion")
     private Integer ordenRotacion;
 
+    // Mapeo visual OPCIONAL del potrero en un plano de la finca (mismo patrón que Mesa en
+    // Horeca) — nulo por defecto: la rotación y las alertas funcionan igual sin esto. Solo
+    // para el ganadero que sí quiera ver un plano de su finca, no es obligatorio para nadie.
+    private Integer posX;
+    private Integer posY;
+    private Integer ancho;
+    private Integer alto;
+    private String forma = "RECTANGULAR"; // RECTANGULAR o REDONDA — cómo dibujarlo
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -76,6 +85,16 @@ public class Potrero {
     public void setDiasDescansoMinimo(Integer diasDescansoMinimo) { this.diasDescansoMinimo = diasDescansoMinimo; }
     public Integer getOrdenRotacion() { return ordenRotacion; }
     public void setOrdenRotacion(Integer ordenRotacion) { this.ordenRotacion = ordenRotacion; }
+    public Integer getPosX() { return posX; }
+    public void setPosX(Integer posX) { this.posX = posX; }
+    public Integer getPosY() { return posY; }
+    public void setPosY(Integer posY) { this.posY = posY; }
+    public Integer getAncho() { return ancho; }
+    public void setAncho(Integer ancho) { this.ancho = ancho; }
+    public Integer getAlto() { return alto; }
+    public void setAlto(Integer alto) { this.alto = alto; }
+    public String getForma() { return forma; }
+    public void setForma(String forma) { this.forma = forma; }
 
     @Transient
     public Long getDiasEnDescanso() {

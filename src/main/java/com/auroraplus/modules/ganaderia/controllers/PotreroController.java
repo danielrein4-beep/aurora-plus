@@ -36,6 +36,34 @@ public class PotreroController {
         return potreroRepository.findAll();
     }
 
+    public static class PosicionRequest {
+        public Integer posX;
+        public Integer posY;
+        public Integer ancho;
+        public Integer alto;
+        public String forma;
+    }
+
+    /**
+     * Mapeo visual OPCIONAL del potrero en un plano de la finca — solo para
+     * el ganadero que quiera verlo; la rotación y las alertas funcionan
+     * exactamente igual sin llamar nunca este endpoint. Mismo patrón que
+     * Mesa en Horeca (pensado para arrastrar-y-soltar en el frontend).
+     */
+    @PutMapping("/{id}/posicion")
+    public ResponseEntity<Potrero> actualizarPosicion(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody PosicionRequest request) {
+        Potrero potrero = potreroRepository.findById(id).orElseThrow(() -> new RuntimeException("Potrero no encontrado"));
+        if (!potrero.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Potrero no pertenece a este tenant");
+        }
+        potrero.setPosX(request.posX);
+        potrero.setPosY(request.posY);
+        if (request.ancho != null) potrero.setAncho(request.ancho);
+        if (request.alto != null) potrero.setAlto(request.alto);
+        if (request.forma != null) potrero.setForma(request.forma);
+        return ResponseEntity.ok(potreroRepository.save(potrero));
+    }
+
     /**
      * Si no se indica capacidadAnimales y/o diasDescansoMinimo, se calculan
      * automáticamente a partir del área y el tipo de pasto (ver
