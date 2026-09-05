@@ -34,14 +34,16 @@ export default function Nav() {
           </div>
         </button>
 
-        {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-1">
+        {/* Desktop links en Cápsula Liquid Glass estilo Apple VisionOS */}
+        <div className="hidden md:flex items-center gap-1 apple-glass-pill rounded-full p-1.5 border border-white/15 shadow-[0_4px_24px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.25)]">
           {LINKS.map((l) => (
-            <button key={l.path} onClick={() => navigate(l.path)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            <button
+              key={l.path}
+              onClick={() => navigate(l.path)}
+              className={`px-5 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 cursor-pointer ${
                 pathname === l.path
-                  ? "text-white bg-white/10"
-                  : "text-white/45 hover:text-white/80 hover:bg-white/5"
+                  ? "bg-white/15 text-white font-semibold shadow-[0_2px_16px_rgba(0,229,184,0.15),inset_0_1px_1px_rgba(255,255,255,0.45)] border border-white/25"
+                  : "text-white/55 hover:text-white hover:bg-white/8 hover:shadow-sm"
               }`}>
               {l.label}
             </button>
