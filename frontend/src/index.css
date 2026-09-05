@@ -414,24 +414,77 @@ html.light textarea:focus {
   transform: translateY(-2px) scale(1.01);
 }
 
-/* Aurora Borealis Organic Waves (Living Night Sky) */
-@keyframes aurora-wave-1 {
-  0%   { transform: translate(0, 0) rotate(0deg) scale(1); }
-  33%  { transform: translate(40px, -30px) rotate(6deg) scale(1.15); }
-  66%  { transform: translate(-30px, 25px) rotate(-4deg) scale(0.95); }
-  100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+/* =========================================================================
+   AURORA BOREALIS ORGANIC LIVING CURTAINS & FLOWING WAVE ENGINE
+   ========================================================================= */
+
+@keyframes aurora-flow-1 {
+  0%   { transform: translate(-5%, -2%) skewX(-4deg) scale(1); filter: hue-rotate(0deg) blur(24px); }
+  33%  { transform: translate(6%, 4%) skewX(6deg) scale(1.1); filter: hue-rotate(20deg) blur(28px); }
+  66%  { transform: translate(-4%, 5%) skewX(-8deg) scale(0.95); filter: hue-rotate(-15deg) blur(22px); }
+  100% { transform: translate(-5%, -2%) skewX(-4deg) scale(1); filter: hue-rotate(0deg) blur(24px); }
 }
 
-@keyframes aurora-wave-2 {
-  0%   { transform: translate(0, 0) rotate(0deg) scale(1.05); }
-  33%  { transform: translate(-50px, 35px) rotate(-8deg) scale(0.9); }
-  66%  { transform: translate(35px, -20px) rotate(5deg) scale(1.2); }
-  100% { transform: translate(0, 0) rotate(0deg) scale(1.05); }
+@keyframes aurora-flow-2 {
+  0%   { transform: translate(5%, 4%) skewY(3deg) scale(1.05); filter: hue-rotate(0deg) blur(30px); }
+  33%  { transform: translate(-6%, -3%) skewY(-5deg) scale(0.92); filter: hue-rotate(-25deg) blur(34px); }
+  66%  { transform: translate(4%, -5%) skewY(4deg) scale(1.15); filter: hue-rotate(30deg) blur(26px); }
+  100% { transform: translate(5%, 4%) skewY(3deg) scale(1.05); filter: hue-rotate(0deg) blur(30px); }
 }
 
-@keyframes aurora-shimmer {
-  0%, 100% { opacity: 0.35; filter: blur(75px) hue-rotate(0deg); }
-  50%      { opacity: 0.60; filter: blur(95px) hue-rotate(25deg); }
+@keyframes aurora-flow-3 {
+  0%   { transform: scaleX(1) scaleY(1) translateY(0); opacity: 0.55; }
+  50%  { transform: scaleX(1.18) scaleY(1.25) translateY(-8px); opacity: 0.85; }
+  100% { transform: scaleX(1) scaleY(1) translateY(0); opacity: 0.55; }
+}
+
+@keyframes aurora-stream-drift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes aurora-ray-pulse {
+  0%, 100% { opacity: 0.35; transform: scaleY(0.92) translateY(0); }
+  50%      { opacity: 0.75; transform: scaleY(1.12) translateY(-6px); }
+}
+
+.aurora-curtain-primary {
+  background: linear-gradient(120deg, 
+    rgba(0, 229, 184, 0.45) 0%, 
+    rgba(14, 165, 233, 0.40) 25%, 
+    rgba(168, 85, 247, 0.35) 60%, 
+    rgba(0, 242, 254, 0.40) 100%
+  );
+  background-size: 250% 250%;
+  animation: aurora-flow-1 12s ease-in-out infinite, aurora-stream-drift 16s ease infinite;
+}
+
+.aurora-curtain-secondary {
+  background: linear-gradient(240deg, 
+    rgba(168, 85, 247, 0.40) 0%, 
+    rgba(99, 102, 241, 0.45) 30%, 
+    rgba(0, 229, 184, 0.35) 70%, 
+    rgba(255, 59, 128, 0.25) 100%
+  );
+  background-size: 250% 250%;
+  animation: aurora-flow-2 15s ease-in-out infinite, aurora-stream-drift 20s ease infinite;
+}
+
+.aurora-curtain-rays {
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0px,
+    transparent 20px,
+    rgba(0, 229, 184, 0.15) 35px,
+    rgba(14, 165, 233, 0.20) 50px,
+    rgba(168, 85, 247, 0.15) 65px,
+    transparent 85px,
+    transparent 110px
+  );
+  animation: aurora-ray-pulse 8s ease-in-out infinite;
+  mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,1) 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,1) 70%, transparent 100%);
 }
 
 .aurora-ribbon-1 {
@@ -440,7 +493,7 @@ html.light textarea:focus {
   height: 450px;
   background: radial-gradient(ellipse at center, rgba(0, 245, 160, 0.35) 0%, rgba(0, 217, 245, 0.25) 40%, rgba(121, 40, 202, 0.15) 70%, transparent 80%);
   border-radius: 50%;
-  animation: aurora-wave-1 16s ease-in-out infinite, aurora-shimmer 10s ease-in-out infinite;
+  animation: aurora-flow-1 16s ease-in-out infinite;
   pointer-events: none;
   mix-blend-mode: screen;
 }
@@ -451,7 +504,7 @@ html.light textarea:focus {
   height: 400px;
   background: radial-gradient(ellipse at center, rgba(168, 85, 247, 0.35) 0%, rgba(14, 165, 233, 0.25) 45%, rgba(0, 229, 184, 0.15) 75%, transparent 85%);
   border-radius: 50%;
-  animation: aurora-wave-2 20s ease-in-out infinite, aurora-shimmer 12s ease-in-out infinite alternate;
+  animation: aurora-flow-2 20s ease-in-out infinite;
   pointer-events: none;
   mix-blend-mode: screen;
 }

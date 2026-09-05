@@ -126,31 +126,45 @@ export default function Home() {
             <span className="font-semibold tracking-wide">ECOSISTEMA ERP MULTI-INDUSTRIA & AUTOMATIZACIÓN</span>
           </div>
 
-          {/* Título Interactivo con Animación Orbital de Aurora y signos '+' SIEMPRE ACTIVA (y ultra smooth en hover) */}
-          <div className="relative group cursor-default select-none inline-block px-4 sm:px-8 py-3 rounded-3xl transition-all duration-500">
-            {/* Fondo translúcido orbital con anillos y '+' rotantes — Siempre visible, ultra smooth en hover */}
-            <div className="absolute inset-0 -inset-x-6 -inset-y-4 pointer-events-none opacity-85 group-hover:opacity-100 group-hover:scale-[1.02] transition-all duration-700 ease-out flex items-center justify-center overflow-visible">
-              {/* Resplandor ambiental adaptativo: sutil en Light, vibrante en Dark */}
-              <div className="absolute w-[95%] h-[90%] rounded-[40px] bg-gradient-to-r from-teal-500/8 via-sky-500/6 to-purple-600/8 dark:from-teal-500/20 dark:via-sky-500/15 dark:to-purple-600/20 blur-2xl group-hover:blur-3xl transition-all duration-700" />
-              <div className="absolute inset-0 rounded-3xl bg-white/60 dark:bg-white/[0.015] border border-slate-200/80 dark:border-teal-400/20 backdrop-blur-md transition-all duration-500 shadow-[0_10px_35px_rgba(0,0,0,0.04)] dark:shadow-[0_0_50px_rgba(0,229,184,0.12)] group-hover:shadow-[0_15px_45px_rgba(0,0,0,0.08)] dark:group-hover:shadow-[0_0_70px_rgba(0,229,184,0.25)]" />
+          {/* Título Interactivo con Auroras Boreales Animadas en Movimiento Fluido */}
+          <div className="relative group cursor-default select-none inline-block px-4 sm:px-8 py-4 rounded-3xl transition-all duration-500">
+            {/* Fondo de Auroras Boreales Orgánicas en Movimiento Continuo */}
+            <div className="absolute inset-0 -inset-x-8 -inset-y-6 pointer-events-none opacity-90 group-hover:opacity-100 group-hover:scale-[1.03] transition-all duration-700 ease-out flex items-center justify-center overflow-visible">
               
-              {/* SVG de alta fidelidad con órbitas y signos '+' rotantes sincronizados tipo Logo Aurora */}
-              <svg className="w-[115%] h-[150%] max-w-none absolute pointer-events-none" viewBox="0 0 800 260" fill="none">
+              {/* Resplandor ambiental de fondo */}
+              <div className="absolute w-[100%] h-[95%] rounded-[48px] bg-gradient-to-r from-teal-500/15 via-sky-500/20 to-purple-600/15 blur-3xl group-hover:blur-[64px] transition-all duration-700" />
+              
+              {/* Contenedor de cristal líquido sutil */}
+              <div className="absolute inset-0 rounded-3xl bg-white/40 dark:bg-white/[0.02] border border-slate-300/60 dark:border-teal-400/20 backdrop-blur-md transition-all duration-500 shadow-[0_10px_35px_rgba(0,0,0,0.04)] dark:shadow-[0_0_50px_rgba(0,229,184,0.12)]" />
+              
+              {/* Cortina 1 de Aurora Boreal (Esmeralda / Menta / Cyan Flotante) */}
+              <div className="absolute inset-x-2 -inset-y-4 rounded-full aurora-curtain-primary opacity-60 group-hover:opacity-90 blur-xl transition-opacity duration-700" />
+              
+              {/* Cortina 2 de Aurora Boreal (Púrpura / Índigo / Magenta Ondulante) */}
+              <div className="absolute inset-x-4 -inset-y-2 rounded-full aurora-curtain-secondary opacity-50 group-hover:opacity-85 blur-2xl transition-opacity duration-700" />
+              
+              {/* Rayos Verticales de Luz Boreal Especular (Auroral Light Pillars) */}
+              <div className="absolute inset-0 rounded-2xl aurora-curtain-rays opacity-45 group-hover:opacity-75 blur-sm transition-opacity duration-700 pointer-events-none" />
+
+              {/* Ondas vectoriales orgánicas boreales (SVG de ondas fluidas con gradientes vivos) */}
+              <svg className="w-[120%] h-[160%] max-w-none absolute pointer-events-none opacity-75 group-hover:opacity-100 transition-opacity duration-700" viewBox="0 0 900 300" fill="none">
                 <defs>
-                  <linearGradient id="hero-title-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#00b894" stopOpacity="0.8" />
-                    <stop offset="50%" stopColor="#0284c7" stopOpacity="0.65" />
-                    <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.8" />
+                  <linearGradient id="aurora-wave-grad-1" x1="0%" y1="50%" x2="100%" y2="50%">
+                    <stop offset="0%" stopColor="#00e5b8" stopOpacity="0.85" />
+                    <stop offset="35%" stopColor="#0ea5e9" stopOpacity="0.75" />
+                    <stop offset="70%" stopColor="#a855f7" stopOpacity="0.80" />
+                    <stop offset="100%" stopColor="#00f2fe" stopOpacity="0.90" />
                   </linearGradient>
 
-                  <linearGradient id="hero-title-gradient-2" x1="100%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.7" />
-                    <stop offset="50%" stopColor="#0284c7" stopOpacity="0.5" />
-                    <stop offset="100%" stopColor="#00b894" stopOpacity="0.7" />
+                  <linearGradient id="aurora-wave-grad-2" x1="100%" y1="50%" x2="0%" y2="50%">
+                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.8" />
+                    <stop offset="40%" stopColor="#6366f1" stopOpacity="0.7" />
+                    <stop offset="75%" stopColor="#00e5b8" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#ff3b80" stopOpacity="0.6" />
                   </linearGradient>
 
-                  <filter id="hero-glow-soft" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation="3" result="blur" />
+                  <filter id="aurora-blur-fluid" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="8" result="blur" />
                     <feMerge>
                       <feMergeNode in="blur" />
                       <feMergeNode in="SourceGraphic" />
@@ -158,65 +172,72 @@ export default function Home() {
                   </filter>
                 </defs>
 
-                {/* Anillo exterior rotante 1 */}
-                <g filter="url(#hero-glow-soft)">
-                  <ellipse cx="400" cy="130" rx="370" ry="110"
-                    stroke="url(#hero-title-gradient-1)" strokeWidth="1.5"
-                    strokeDasharray="90 140" strokeLinecap="round" opacity="0.65">
-                    <animateTransform attributeName="transform" type="rotate"
-                      from="0 400 130" to="360 400 130" dur="18s" repeatCount="indefinite" />
-                  </ellipse>
+                {/* Onda Boreal Fluida 1 */}
+                <g filter="url(#aurora-blur-fluid)">
+                  <path
+                    d="M 50 150 Q 250 80, 450 160 T 850 140"
+                    stroke="url(#aurora-wave-grad-1)"
+                    strokeWidth="16"
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity="0.7">
+                    <animate
+                      attributeName="d"
+                      dur="9s"
+                      repeatCount="indefinite"
+                      values="
+                        M 50 150 Q 250 80, 450 160 T 850 140;
+                        M 50 130 Q 250 190, 450 110 T 850 160;
+                        M 50 170 Q 250 100, 450 180 T 850 120;
+                        M 50 150 Q 250 80, 450 160 T 850 140
+                      "
+                    />
+                  </path>
                 </g>
 
-                {/* Anillo intermedio contrarotante 2 */}
-                <g filter="url(#hero-glow-soft)">
-                  <ellipse cx="400" cy="130" rx="290" ry="85"
-                    stroke="url(#hero-title-gradient-2)" strokeWidth="1.2"
-                    strokeDasharray="60 100" strokeLinecap="round" opacity="0.55">
-                    <animateTransform attributeName="transform" type="rotate"
-                      from="360 400 130" to="0 400 130" dur="14s" repeatCount="indefinite" />
-                  </ellipse>
+                {/* Onda Boreal Fluida 2 */}
+                <g filter="url(#aurora-blur-fluid)">
+                  <path
+                    d="M 60 170 Q 280 210, 480 130 T 840 170"
+                    stroke="url(#aurora-wave-grad-2)"
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                    fill="none"
+                    opacity="0.6">
+                    <animate
+                      attributeName="d"
+                      dur="12s"
+                      repeatCount="indefinite"
+                      values="
+                        M 60 170 Q 280 210, 480 130 T 840 170;
+                        M 60 140 Q 280 90, 480 180 T 840 130;
+                        M 60 190 Q 280 150, 480 100 T 840 180;
+                        M 60 170 Q 280 210, 480 130 T 840 170
+                      "
+                    />
+                  </path>
                 </g>
 
-                {/* Anillo interior rotante 3 */}
-                <ellipse cx="400" cy="130" rx="210" ry="60"
-                  stroke="url(#hero-title-gradient-1)" strokeWidth="1"
-                  strokeDasharray="40 70" strokeLinecap="round" opacity="0.45">
-                  <animateTransform attributeName="transform" type="rotate"
-                    from="0 400 130" to="360 400 130" dur="10s" repeatCount="indefinite" />
-                </ellipse>
-
-                {/* Órbita 1 de Signos '+' con resplandor neón */}
-                <g filter="url(#hero-glow-soft)">
-                  <animateTransform attributeName="transform" type="rotate"
-                    from="0 400 130" to="360 400 130" dur="8s" repeatCount="indefinite" />
-                  {/* Signo '+' Superior */}
-                  <g transform="translate(400, 20)">
-                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#00b894" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
-                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#00b894" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
-                  </g>
-                  {/* Signo '+' Inferior */}
-                  <g transform="translate(400, 240)">
-                    <line x1="0" y1="-7" x2="0" y2="7" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
-                    <line x1="-7" y1="0" x2="7" y2="0" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" opacity="0.95" />
-                  </g>
-                </g>
-
-                {/* Órbita 2 de Signos '+' contrarotante */}
-                <g filter="url(#hero-glow-soft)">
-                  <animateTransform attributeName="transform" type="rotate"
-                    from="360 400 130" to="0 400 130" dur="12s" repeatCount="indefinite" />
-                  {/* Signo '+' Izquierdo */}
-                  <g transform="translate(30, 130)">
-                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
-                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
-                  </g>
-                  {/* Signo '+' Derecho */}
-                  <g transform="translate(770, 130)">
-                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#00b894" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
-                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#00b894" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
-                  </g>
-                </g>
+                {/* Cinta Boreal Fina de Alta Velocidad */}
+                <path
+                  d="M 80 130 Q 300 160, 500 110 T 820 150"
+                  stroke="url(#aurora-wave-grad-1)"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  fill="none"
+                  opacity="0.85">
+                  <animate
+                    attributeName="d"
+                    dur="7s"
+                    repeatCount="indefinite"
+                    values="
+                      M 80 130 Q 300 160, 500 110 T 820 150;
+                      M 80 160 Q 300 110, 500 170 T 820 120;
+                      M 80 120 Q 300 170, 500 100 T 820 160;
+                      M 80 130 Q 300 160, 500 110 T 820 150
+                    "
+                  />
+                </path>
               </svg>
             </div>
 
