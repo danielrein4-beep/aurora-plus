@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,6 +26,8 @@ public class CompraInsumoHorecaController {
         public Long articuloId;
         public BigDecimal cantidad;
         public BigDecimal costoUnitario;
+        public Long presentacionId;
+        public LocalDate fechaVencimiento;
     }
 
     public static class CompraRequest {
@@ -46,6 +49,8 @@ public class CompraInsumoHorecaController {
             item.articuloId = itemReq.articuloId;
             item.cantidad = itemReq.cantidad;
             item.costoUnitario = itemReq.costoUnitario;
+            item.presentacionId = itemReq.presentacionId;
+            item.fechaVencimiento = itemReq.fechaVencimiento;
             items.add(item);
         }
         return ResponseEntity.ok(compraInsumoHorecaService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, items));

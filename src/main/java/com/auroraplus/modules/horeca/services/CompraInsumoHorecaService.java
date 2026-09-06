@@ -4,7 +4,11 @@ import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.services.MotorFinancieroService;
 import com.auroraplus.core.inventario.entities.Articulo;
 import com.auroraplus.core.inventario.entities.Kardex;
+import com.auroraplus.core.inventario.entities.LoteArticulo;
+import com.auroraplus.core.inventario.entities.PresentacionArticulo;
 import com.auroraplus.core.inventario.repositories.ArticuloRepository;
+import com.auroraplus.core.inventario.repositories.LoteArticuloRepository;
+import com.auroraplus.core.inventario.repositories.PresentacionArticuloRepository;
 import com.auroraplus.core.inventario.services.InventarioService;
 import com.auroraplus.modules.horeca.entities.CompraInsumoHoreca;
 import com.auroraplus.modules.horeca.entities.DetalleCompraInsumoHoreca;
@@ -16,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -45,10 +51,24 @@ public class CompraInsumoHorecaService {
     @Autowired
     private MotorFinancieroService motorFinancieroService;
 
+    @Autowired
+    private PresentacionArticuloRepository presentacionArticuloRepository;
+
+    @Autowired
+    private LoteArticuloRepository loteArticuloRepository;
+
     public static class ItemCompraInsumo {
         public Long articuloId;
         public BigDecimal cantidad;
         public BigDecimal costoUnitario;
+        // Opcional: si se compra por presentación (six-pack, bolsa x30, caja x24)
+        // en vez de la unidad base del artículo. "cantidad" y "costoUnitario" se
+        // siguen llenando en la unidad de la presentación (ej. 10 six-packs a $3
+        // el six-pack) — la conversión a unidad base se hace internamente.
+        public Long presentacionId;
+        // Opcional: si el artículo es perecedero, crea un LoteArticulo para poder
+        // avisar cuándo esté por vencer.
+        public LocalDate fechaVencimiento;
     }
 
     @Transactional
@@ -85,13 +105,44 @@ public class CompraInsumoHorecaService {
                 throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
             }
 
+            // Si se compró por presentación (six-pack, bolsa x30, etc.), se convierte
+            // a la unidad base del artículo — el stock y el costeo de recetas siempre
+            // se llevan en unidad base, la presentación es solo cómo llegó la mercancía.
+            BigDecimal cantidadBase = item.cantidad;
+            BigDecimal costoUnitarioBase = item.costoUnitario;
+            String detallePresentacion = "";
+            if (item.presentacionId != null) {
+                PresentacionArticulo presentacion = presentacionArticuloRepository.findById(item.presentacionId)
+                    .orElseThrow(() -> new RuntimeException("Presentación no encontrada: " + item.presentacionId));
+                if (!presentacion.getTenantId().equals(tenantId)) {
+                    throw new RuntimeException("Violación de seguridad: Presentación no pertenece a este tenant");
+                }
+                if (!presentacion.getArticulo().getId().equals(articulo.getId())) {
+                    throw new RuntimeException("La presentación no corresponde a este artículo");
+                }
+                cantidadBase = item.cantidad.multiply(presentacion.getUnidadesPorPresentacion());
+                costoUnitarioBase = item.costoUnitario.divide(presentacion.getUnidadesPorPresentacion(), 4, RoundingMode.HALF_UP);
+                detallePresentacion = " (" + item.cantidad + " x " + presentacion.getNombre() + ")";
+            }
+
             // El costo vigente se actualiza al último precio de compra — es lo que
             // alimenta el costeo dinámico de las recetas (EscandalloService.recalcularCosto).
-            articulo.setCostoUnitario(item.costoUnitario);
+            articulo.setCostoUnitario(costoUnitarioBase);
             articuloRepository.save(articulo);
 
             inventarioService.registrarMovimientoKardex(articulo.getId(), tenantId, Kardex.TipoOperacion.ENTRADA,
-                item.cantidad, item.costoUnitario, "Compra factura " + numeroFactura + " — Proveedor: " + proveedor.getNombre());
+                cantidadBase, costoUnitarioBase, "Compra factura " + numeroFactura + " — Proveedor: " + proveedor.getNombre() + detallePresentacion);
+
+            if (item.fechaVencimiento != null) {
+                LoteArticulo lote = new LoteArticulo();
+                lote.setTenantId(tenantId);
+                lote.setArticulo(articulo);
+                lote.setCantidadIngresada(cantidadBase);
+                lote.setCostoUnitario(costoUnitarioBase);
+                lote.setFechaVencimiento(item.fechaVencimiento);
+                lote.setReferenciaCompra(numeroFactura);
+                loteArticuloRepository.save(lote);
+            }
 
             BigDecimal subtotal = item.cantidad.multiply(item.costoUnitario);
             totalCompra = totalCompra.add(subtotal);
@@ -99,8 +150,8 @@ public class CompraInsumoHorecaService {
             DetalleCompraInsumoHoreca detalle = new DetalleCompraInsumoHoreca();
             detalle.setTenantId(tenantId);
             detalle.setArticulo(articulo);
-            detalle.setCantidad(item.cantidad);
-            detalle.setCostoUnitario(item.costoUnitario);
+            detalle.setCantidad(cantidadBase);
+            detalle.setCostoUnitario(costoUnitarioBase);
             detalle.setSubtotal(subtotal);
             compra.addItem(detalle);
         }
