@@ -28,8 +28,10 @@ public class SalaEsperaController {
     }
 
     @PostMapping("/{id}/llamar")
-    public ResponseEntity<SalaEspera> llamarAConsultorio(@PathVariable Long id, @RequestParam(required = false) String consultorio) {
-        return ResponseEntity.ok(salaEsperaService.llamarAConsultorio(id, consultorio));
+    public ResponseEntity<SalaEspera> llamarAConsultorio(@PathVariable Long id, @RequestParam(required = false) String consultorio,
+                                                          @RequestParam(required = false) Long medicoId,
+                                                          @RequestParam(required = false) String medicoNombre) {
+        return ResponseEntity.ok(salaEsperaService.llamarAConsultorio(id, consultorio, medicoId, medicoNombre));
     }
 
     @PostMapping("/{id}/finalizar")

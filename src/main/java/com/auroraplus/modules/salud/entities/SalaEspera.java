@@ -44,7 +44,10 @@ public class SalaEspera {
     @Column(name = "cita_id")
     private Long citaId;
 
-    @Column(name = "medico_id", nullable = false)
+    // Nulo hasta que se llama al paciente a consultorio — un walk-in sin cita previa
+    // hace check-in sin saber todavía qué médico lo atenderá (ver
+    // SalaEsperaService.llamarAConsultorio, que es donde se puede asignar).
+    @Column(name = "medico_id")
     private Long medicoId;
 
     @Column(name = "medico_nombre", length = 150)

@@ -46,12 +46,25 @@ public class SalaEsperaService {
 
     @Transactional
     public SalaEspera llamarAConsultorio(Long id, String consultorio) {
+        return llamarAConsultorio(id, consultorio, null, null);
+    }
+
+    /**
+     * medicoId/medicoNombre opcionales: para un walk-in sin cita previa, es
+     * en ESTE momento (no en el check-in) cuando recepción sabe a qué médico
+     * mandarlo — antes esto no se podía asignar nunca, porque medicoId era
+     * obligatorio desde el check-in.
+     */
+    @Transactional
+    public SalaEspera llamarAConsultorio(Long id, String consultorio, Long medicoId, String medicoNombre) {
         SalaEspera entrada = salaEsperaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Entrada de sala no encontrada con ID: " + id));
 
         entrada.setEstado(SalaEspera.EstadoEspera.EN_CONSULTA);
         entrada.setHoraLlamado(LocalDateTime.now());
         if (consultorio != null) entrada.setConsultorio(consultorio);
+        if (medicoId != null) entrada.setMedicoId(medicoId);
+        if (medicoNombre != null) entrada.setMedicoNombre(medicoNombre);
 
         if (entrada.getCitaId() != null) {
             citaMedicaRepository.findById(entrada.getCitaId()).ifPresent(c -> {
