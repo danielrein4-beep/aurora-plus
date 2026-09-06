@@ -107,7 +107,7 @@ export default function Onboarding() {
     setModules((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
 
   const handleActivate = () => {
-    completeOnboarding({ industry, empresa: user?.empresa });
+    completeOnboarding({ industry, modules, empresa: user?.empresa || "Mi Empresa" });
     navigate("/dashboard");
   };
 
