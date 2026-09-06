@@ -1,5 +1,8 @@
 package com.auroraplus.modules.salud.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auth.entities.Usuario;
+import com.auroraplus.core.auth.repositories.UsuarioRepository;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.BloqueoAgenda;
 import com.auroraplus.modules.salud.entities.CitaMedica;
@@ -11,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/salud/agenda")
@@ -18,6 +22,22 @@ public class AgendaMedicaController {
 
     @Autowired
     private AgendaMedicaService agendaMedicaService;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    /**
+     * Solo aplica a bloqueos (un médico bloqueando SU PROPIA agenda) — NO a
+     * citas, porque quien agenda una cita normalmente es recepción reservando
+     * para OTRO médico, así que ahí el medicoId sí debe venir explícito.
+     */
+    private void autocompletarMedicoPropio(Long tenantId, BloqueoAgenda bloqueo) {
+        if (bloqueo.getMedicoId() != null) return;
+        String username = AuthContext.getUsername();
+        if (username == null) return;
+        Optional<Usuario> usuario = usuarioRepository.buscarPorTenantYUsername(tenantId, username);
+        usuario.ifPresent(u -> bloqueo.setMedicoId(u.getId()));
+    }
 
     @GetMapping
     public List<CitaMedica> listarCitas(
@@ -55,6 +75,7 @@ public class AgendaMedicaController {
     @PostMapping("/bloqueos")
     public ResponseEntity<BloqueoAgenda> registrarBloqueo(@RequestParam(required = false) Long tenantId, @RequestBody BloqueoAgenda bloqueo) {
         Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        autocompletarMedicoPropio(tenantActivo, bloqueo);
         return ResponseEntity.ok(agendaMedicaService.registrarBloqueo(tenantActivo, bloqueo));
     }
 
