@@ -11,9 +11,14 @@ export default function Auth() {
   const [form, setForm] = useState({ nombre: "", email: "", password: "", confirmar: "", remember: true, terms: true });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
-  const { login, isLoggedIn } = useAuth();
+  const { login, register, isLoggedIn, user } = useAuth();
 
-  if (isLoggedIn) return <Navigate to="/dashboard" replace />;
+  if (isLoggedIn) {
+    if (user?.hasCompletedOnboarding === false) {
+      return <Navigate to="/onboarding" replace />;
+    }
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const set = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -30,13 +35,15 @@ export default function Auth() {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    login(form.email, form.nombre || form.email.split("@")[0]);
     if (mode === "register") {
+      register(form.email, form.nombre);
       navigate("/onboarding");
     } else {
+      login(form.email, form.nombre || form.email.split("@")[0]);
       navigate("/dashboard");
     }
   };
+
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center px-4 sm:px-6 py-12 relative overflow-hidden transition-colors duration-300">

@@ -169,8 +169,15 @@ export default function Dashboard() {
               }`}>
               👥 Equipo & Roles
             </button>
+            <button
+              onClick={() => navigate("/onboarding")}
+              title="Cambiar o configurar rubro"
+              className="px-2.5 py-1.5 rounded-full text-slate-500 dark:text-white/40 hover:text-teal-500 dark:hover:text-teal-300 font-medium transition-all text-[11px]">
+              ⚙️ Cambiar Rubro
+            </button>
           </div>
         </div>
+
 
         {/* Estado de Suscripción & Perfil */}
         <div className="flex items-center gap-3">

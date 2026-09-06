@@ -15,6 +15,7 @@ export interface User {
   empresa?: string;
   industry?: string;
   modules?: string[];
+  hasCompletedOnboarding?: boolean;
   trialStart?: string;
   plan?: string;
   planStatus?: "trial" | "active" | "expired";
@@ -24,6 +25,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   login: (email: string, nombre: string) => void;
+  register: (email: string, nombre: string) => void;
   completeOnboarding: (data: Partial<User>) => void;
   reportPayment: (payment: Omit<PaymentRecord, "id" | "fecha" | "estado">) => void;
   logout: () => void;
@@ -55,12 +57,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const login = (email: string, nombre: string) => {
+    setUser((prev) => {
+      if (prev && prev.email === email) {
+        return prev;
+      }
+      return {
+        email,
+        nombre: nombre || "Usuario",
+        empresa: prev?.empresa || "Mi Empresa C.A.",
+        industry: prev?.industry || "clinica",
+        modules: prev?.modules || ["expedientes", "agenda", "farmacia", "factura"],
+        hasCompletedOnboarding: prev?.hasCompletedOnboarding ?? true,
+        trialStart: prev?.trialStart || new Date().toISOString(),
+        plan: prev?.plan || "Estándar",
+        planStatus: prev?.planStatus || "trial",
+        payments: prev?.payments || [],
+      };
+    });
+  };
+
+  const register = (email: string, nombre: string) => {
     setUser({
       email,
-      nombre,
-      empresa: "Mi Empresa C.A.",
-      industry: "clinica",
-      modules: ["expedientes", "agenda", "farmacia", "factura"],
+      nombre: nombre || "Usuario",
+      empresa: "",
+      industry: "",
+      modules: [],
+      hasCompletedOnboarding: false,
       trialStart: new Date().toISOString(),
       plan: "Estándar",
       planStatus: "trial",
@@ -69,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const completeOnboarding = (data: Partial<User>) => {
-    setUser((prev) => (prev ? { ...prev, ...data } : null));
+    setUser((prev) => (prev ? { ...prev, ...data, hasCompletedOnboarding: true } : null));
   };
 
   const reportPayment = (payment: Omit<PaymentRecord, "id" | "fecha" | "estado">) => {
@@ -89,7 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const logout = () => setUser(null);
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem(STORAGE_KEY);
+  };
 
   const trialDaysLeft = (() => {
     if (!user?.trialStart) return 14;
@@ -103,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         login,
+        register,
         completeOnboarding,
         reportPayment,
         logout,
@@ -120,3 +147,4 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
 }
+
