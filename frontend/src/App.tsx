@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import Layout from "./Layout";
 import Home from "./pages/Home";
 import Soluciones from "./pages/Soluciones";
@@ -8,9 +8,15 @@ import Nosotros from "./pages/Nosotros";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
+import MediclinicApp from "./components/MediclinicApp";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+
+function MediclinicPage() {
+  const navigate = useNavigate();
+  return <MediclinicApp onSalir={() => navigate("/dashboard")} />;
+}
 
 export default function App() {
   return (
@@ -31,6 +37,7 @@ export default function App() {
             <Route path="/onboarding" element={<Onboarding />} />
             {/* Protected — requiere sesión activa */}
             <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/mediclinic" element={<ProtectedRoute><MediclinicPage /></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

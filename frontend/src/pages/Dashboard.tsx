@@ -109,15 +109,10 @@ const VERTICAL_METADATA: Record<string, {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, logout, trialDaysLeft, reportPayment, marcarPrimerIngresoCompletado } = useAuth();
-
-  // El Hub (launcher + hero de bienvenida) solo se muestra la primera vez que
-  // este tenant entra a su módulo — en el uso diario sería un estorbo, así que
-  // de ahí en adelante se entra directo al espacio de trabajo clínico.
-  const mostrarHero = user?.primerIngreso !== false;
+  const { user, logout, trialDaysLeft, reportPayment } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"vertical" | "billing" | "team" | "settings">("vertical");
-  const [workspaceTab, setWorkspaceTab] = useState<"kpis" | "patients" | "agenda" | "pos">(mostrarHero ? "kpis" : "patients");
+  const [workspaceTab, setWorkspaceTab] = useState<"kpis" | "patients" | "agenda" | "pos">("kpis");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     metodo: "Pago Móvil (Bolívares - Tasa BCV)",
@@ -140,11 +135,6 @@ export default function Dashboard() {
   const [citasReales, setCitasReales] = useState<CitaMedica[] | null>(null);
   const [ingresosHoy, setIngresosHoy] = useState<number | null>(null);
   const esClinicaReal = userIndustry === "clinica" && !!user?.tenantId;
-
-  // En visitas siguientes (no primer ingreso) se salta el Hub por completo y
-  // entra directo a la app de Mediclinic — igual que pasa al hacer clic en
-  // "Abrir Mediclinic Pro" la primera vez.
-  const [abrirMediclinicApp, setAbrirMediclinicApp] = useState(!mostrarHero);
 
   useEffect(() => {
     if (!esClinicaReal || !user?.tenantId) return;
@@ -172,10 +162,6 @@ export default function Dashboard() {
       setPaymentSuccessMsg("");
     }, 2000);
   };
-
-  if (esClinicaReal && abrirMediclinicApp) {
-    return <MediclinicApp onSalir={() => setAbrirMediclinicApp(false)} />;
-  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 relative overflow-hidden flex flex-col">
@@ -206,7 +192,7 @@ export default function Dashboard() {
           <div className="hidden md:flex items-center gap-1.5 apple-glass-pill rounded-full p-1 text-xs">
             {esClinicaReal && (
               <button
-                onClick={() => { setAbrirMediclinicApp(true); marcarPrimerIngresoCompletado(); }}
+                onClick={() => navigate("/mediclinic")}
                 className="btn-cyber-neon text-white text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-[0_0_15px_rgba(14,165,233,0.4)] hover:scale-105 transition-all"
                 title="Abrir Mediclinic Pro"
               >
@@ -219,7 +205,7 @@ export default function Dashboard() {
               className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
                 activeTab === "vertical" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/70 hover:text-black dark:hover:text-white"
               }`}>
-              <span className="inline-flex items-center gap-1.5"><VerticalIcon size={14} /> Vista General</span>
+              <span className="inline-flex items-center gap-1.5"><VerticalIcon size={14} /> Mis Sistemas</span>
             </button>
             <button
               onClick={() => setActiveTab("billing")}
@@ -304,8 +290,7 @@ export default function Dashboard() {
         {activeTab === "vertical" && (
           <div className="space-y-8">
             
-            {/* HERO LAUNCHER CARD — solo la primera vez (ver mostrarHero) */}
-            {mostrarHero && (
+            {/* HERO LAUNCHER CARD */}
             <div className="relative apple-glass rounded-3xl p-6 sm:p-8 overflow-hidden shadow-xl border border-teal-500/20">
               <div className="line-aurora absolute top-0 left-0 right-0" />
               
@@ -325,10 +310,10 @@ export default function Dashboard() {
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">
                     <button
-                      onClick={() => { setAbrirMediclinicApp(true); marcarPrimerIngresoCompletado(); }}
-                      className="btn-electric-blue text-xs sm:text-sm font-bold px-6 py-3 rounded-full flex items-center gap-2 shadow-lg cursor-pointer">
+                      onClick={() => navigate("/mediclinic")}
+                      className="btn-electric-blue text-xs sm:text-sm font-bold px-6 py-3 rounded-full flex items-center gap-2 shadow-lg cursor-pointer hover:scale-105 transition-all">
                       <IconRocket size={15} />
-                      <span>Abrir {vertical.name} (Cloud Web)</span>
+                      <span>Entrar a {vertical.name} (Cloud Web)</span>
                       <span>→</span>
                     </button>
 
@@ -371,7 +356,6 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            )}
 
             {/* SIMULADOR EN VIVO / WORKSPACE INTEGRADO */}
             <div className="apple-glass rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">

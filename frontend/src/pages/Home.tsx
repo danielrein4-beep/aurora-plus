@@ -278,7 +278,7 @@ export default function Home() {
                 </div>
 
                 <button
-                  onClick={() => navigate("/dashboard")}
+                  onClick={() => navigate("/mediclinic")}
                   className="btn-cyber-neon text-white font-extrabold px-7 py-3.5 rounded-2xl text-sm cursor-pointer whitespace-nowrap shadow-[0_0_30px_rgba(255,59,128,0.6)] hover:scale-105 transition-all flex items-center gap-2 group"
                 >
                   <span>Abrir Mediclinic Pro</span>

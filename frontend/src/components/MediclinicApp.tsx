@@ -259,6 +259,13 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       <main className="flex-1 flex flex-col overflow-y-auto">
         <header className="h-16 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between px-6 bg-white/30 dark:bg-black/10 backdrop-blur-md">
           <div className="flex items-center gap-3">
+            <button
+              onClick={onSalir}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border border-slate-300/60 dark:border-white/10"
+              title="Regresar al panel general de Aurora Hub"
+            >
+              <span>← Aurora Hub</span>
+            </button>
             <h2 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
               {NAV.find((n) => n.id === pagina)?.label}
             </h2>

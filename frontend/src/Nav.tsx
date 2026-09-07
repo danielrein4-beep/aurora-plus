@@ -60,20 +60,20 @@ export default function Nav() {
             <div className="flex items-center gap-2.5">
               {/* Botón directo y llamativo a Mis Sistemas */}
               <button
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/mediclinic")}
                 className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-full cursor-pointer flex items-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.45)] hover:scale-105 transition-all"
-                title="Abrir tu sistema clínico asignado"
+                title="Abrir Mediclinic Pro"
               >
                 <span className="w-2 h-2 rounded-full bg-teal-300 animate-pulse" />
                 <span className="font-semibold text-white/90">Mis Sistemas:</span>
                 <span className="text-teal-200 font-extrabold">🩺 Mediclinic Pro →</span>
               </button>
 
-              {/* Perfil del usuario */}
+              {/* Perfil del usuario (Aurora Hub) */}
               <div
                 onClick={() => navigate("/dashboard")}
                 className="flex items-center gap-2 apple-glass-pill px-3 py-1.5 rounded-full border border-slate-300/60 dark:border-white/10 cursor-pointer hover:border-teal-400/50 transition-colors"
-                title="Ver panel de cuenta"
+                title="Ir al Hub de Empresa (Facturación, Equipo, Ajustes)"
               >
                 <span className="w-6 h-6 rounded-full g-aurora flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-sm">
                   {user?.nombre?.charAt(0).toUpperCase() ?? "U"}
@@ -134,10 +134,16 @@ export default function Nav() {
             {isLoggedIn ? (
               <>
                 <button
-                  onClick={() => { navigate("/dashboard"); setMobileOpen(false); }}
+                  onClick={() => { navigate("/mediclinic"); setMobileOpen(false); }}
                   className="w-full btn-cyber-neon text-white text-sm font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md"
                 >
                   <span>🩺 Entrar a Mediclinic Pro →</span>
+                </button>
+                <button
+                  onClick={() => { navigate("/dashboard"); setMobileOpen(false); }}
+                  className="w-full apple-glass-btn text-white text-xs font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2"
+                >
+                  <span>🏢 Aurora Hub (Panel de Empresa)</span>
                 </button>
                 <div className="text-center text-xs text-white/60 py-1">
                   Usuario: <strong className="text-white">{user?.nombre || user?.email}</strong>
