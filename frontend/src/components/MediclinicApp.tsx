@@ -22,7 +22,7 @@ import {
 type Pagina = "general" | "pacientes" | "historias" | "procedimientos" | "sala-espera" | "agenda" | "financiero" | "configuracion";
 type RolVista = "MEDICO" | "SECRETARIA";
 
-const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element; roles?: RolVista[] }[] = [
+const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; roles?: RolVista[] }[] = [
   { id: "general", label: "Vista General", Icon: IconCustomize },
   { id: "pacientes", label: "Gestión de Pacientes", Icon: IconUsers },
   { id: "historias", label: "Historias Clínicas", Icon: IconFileText },
@@ -5046,7 +5046,7 @@ function AgendaMedica({
     if (pacientes && Array.isArray(pacientes)) {
       const match = pacientes.find((p) => coincide(p.identificacion));
       if (match) {
-        llenarCamposConPaciente(match.nombreCompleto, match.identificacion, match.telefono, "Base de Datos");
+        llenarCamposConPaciente(match.nombreCompleto, match.identificacion, match.telefono || "", "Base de Datos");
         return;
       }
     }

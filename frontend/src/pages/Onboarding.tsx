@@ -18,7 +18,7 @@ const METODOS_PAGO = [
 interface IndustryItem {
   id: string;
   label: string;
-  Icon: (props: { size?: number }) => JSX.Element;
+  Icon: (props: { size?: number }) => React.ReactNode;
   desc: string;
   badge: string;
   isReady: boolean;

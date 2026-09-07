@@ -183,7 +183,7 @@ export function generarPdfCierreCaja(data: CierreCajaData) {
 
     // Formatear estrictamente en la moneda en que fue cobrado
     let textoMonto = "";
-    if (c.moneda === "USD" || (c.montoUSD && c.montoUSD > 0 && (!c.moneda || c.moneda === "USD"))) {
+    if (c.moneda === "USD" || (!c.moneda && (c.montoUSD || 0) > 0)) {
       textoMonto = `$${(c.montoUSD || c.montoCobrado || 0).toFixed(2)} USD`;
       doc.setTextColor(16, 185, 129); // Emerald
     } else if (c.moneda === "VES" || (c.montoVES && c.montoVES > 0)) {

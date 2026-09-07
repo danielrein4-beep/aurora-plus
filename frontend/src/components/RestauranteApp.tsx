@@ -27,7 +27,7 @@ import {
 
 type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
 
-interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element; premium?: boolean }
+interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
 
 // Fase actual del negocio: Salón & Mesas y Cocina (KDS) quedan en pausa

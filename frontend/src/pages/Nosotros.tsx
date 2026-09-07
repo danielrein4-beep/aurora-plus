@@ -31,7 +31,13 @@ const CONTACTO_MEDIOS = [
 ];
 
 export default function Nosotros() {
-  const [form, setForm] = useState({ nombre: "", empresa: "", correo: "", mensaje: "" });
+  const [form, setForm] = useState({
+    nombre: "",
+    empresa: "",
+    email: "",
+    industria: "Ferretería & Retail",
+    mensaje: "",
+  });
   const [enviado, setEnviado] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
