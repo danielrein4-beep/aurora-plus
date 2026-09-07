@@ -3,7 +3,7 @@ import {
   AuroraGradientDef,
   IconStethoscope, IconUsers, IconFileText, IconPrescription, IconHourglass, IconCalendar,
   IconCard, IconCustomize, IconSearch, IconUser, IconCheck, IconTrash, IconRefresh,
-  IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconWarning, IconClose, IconBank
+  IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconUnlock, IconWarning, IconClose, IconBank
 } from "../Icons";
 import ThemeToggle from "./ThemeToggle";
 import { useAuth } from "../context/AuthContext";
@@ -5452,11 +5452,11 @@ function AgendaMedica({
                     )}
                   </div>
 
-                  {/* Badges de Citas o Bloqueado (solo candado sin texto) */}
+                  {/* Badges de Citas o Bloqueado (solo candado SVG limpio sin texto) */}
                   <div className="space-y-0.5 mt-0.5">
                     {estaBloq && (
-                      <div className="text-[10px] py-0.5 rounded-md bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center justify-center shadow-xs">
-                        <span>🔒</span>
+                      <div className="py-0.5 rounded-md bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center justify-center shadow-xs">
+                        <IconLock size={12} className="stroke-rose-600 dark:stroke-rose-400" />
                       </div>
                     )}
 
@@ -5504,7 +5504,17 @@ function AgendaMedica({
                     : "bg-slate-100 hover:bg-rose-500/10 text-slate-700 hover:text-rose-600 dark:bg-white/5 dark:text-white/80 dark:hover:bg-rose-500/20 border border-slate-300/80 dark:border-white/10 hover:border-rose-500/40"
                 }`}
               >
-                <span>{estaBloqueadaSeleccionada ? "🔓 Desbloquear Fecha (Habilitar Consultas)" : "🔒 Bloquear Esta Fecha (Vacaciones/Congreso)"}</span>
+                {estaBloqueadaSeleccionada ? (
+                  <>
+                    <IconUnlock size={14} className="stroke-white" />
+                    <span>Desbloquear Fecha (Habilitar Consultas)</span>
+                  </>
+                ) : (
+                  <>
+                    <IconLock size={14} className="stroke-rose-600 dark:stroke-rose-400" />
+                    <span>Bloquear Esta Fecha (Vacaciones/Congreso)</span>
+                  </>
+                )}
               </button>
             </div>
 
@@ -5512,7 +5522,7 @@ function AgendaMedica({
             <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
               {citasDelDiaSeleccionado.length === 0 ? (
                 <div className="py-6 text-center space-y-1.5">
-                  <div className="text-2xl">☕</div>
+                  <IconCalendar size={28} className="mx-auto text-slate-300 dark:text-white/20" />
                   <div className="text-xs font-bold text-slate-700 dark:text-white/80">
                     No hay citas agendadas para esta fecha
                   </div>
@@ -5542,7 +5552,7 @@ function AgendaMedica({
 
                     <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-white/70">
                       <div className="truncate max-w-[200px]" title={cita.motivo}>
-                        📋 {cita.motivo}
+                        {cita.motivo}
                       </div>
                       {cita.pacienteTelefono && cita.pacienteTelefono !== "S/T" && (
                         <a
@@ -5552,7 +5562,7 @@ function AgendaMedica({
                           className="text-emerald-600 hover:text-emerald-500 font-bold flex items-center gap-1 text-[10px]"
                           title="Enviar recordatorio WhatsApp"
                         >
-                          <span>💬</span>
+                          <span>WhatsApp:</span>
                           <span>{cita.pacienteTelefono}</span>
                         </a>
                       )}
@@ -5566,7 +5576,7 @@ function AgendaMedica({
                         className="px-2.5 py-1 rounded-lg bg-teal-500/15 text-teal-700 dark:text-teal-300 hover:bg-teal-500/25 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
                         title="Pasar paciente a Sala de Espera"
                       >
-                        <span>🚪</span>
+                        <IconHourglass size={11} />
                         <span>Sala Espera</span>
                       </button>
 
