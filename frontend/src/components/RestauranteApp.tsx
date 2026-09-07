@@ -2139,10 +2139,24 @@ function generarSku(nombre: string): string {
   return `${base || "ART"}-${Date.now().toString().slice(-5)}`;
 }
 
+/** Margen de utilidad bruta % = (precio - costo) / precio × 100 — null si no hay precio de venta cargado. */
+function calcularMargen(costo: number, precio: number): number | null {
+  if (!precio || precio <= 0) return null;
+  return ((precio - costo) / precio) * 100;
+}
+
+function BadgeMargen({ margen }: { margen: number | null }) {
+  if (margen === null) return <span className="text-[10px] text-slate-400">Sin precio de venta</span>;
+  const color = margen < 0 ? "text-red-500 bg-red-500/10" : margen < 20 ? "text-amber-600 dark:text-amber-400 bg-amber-500/10" : "text-teal-600 dark:text-teal-400 bg-teal-500/10";
+  return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${color}`}>Margen {margen.toFixed(1)}%</span>;
+}
+
 function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number; articulos: Articulo[] | null; onCambio: () => void }) {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [mostrarImportar, setMostrarImportar] = useState(false);
-  const [form, setForm] = useState({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", cantidadInicial: "", fechaVencimiento: "" });
+  const [busqueda, setBusqueda] = useState("");
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
+  const [form, setForm] = useState({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "" });
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -2153,8 +2167,13 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     ? (articulos || []).find((a) => a.nombre.trim().toLowerCase() === form.nombre.trim().toLowerCase())
     : null;
 
+  const margenForm = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
+
   const crear = async () => {
     if (!form.nombre.trim()) { setError("El nombre del artículo es obligatorio"); return; }
+    if (!form.categoria.trim()) { setError("La categoría es obligatoria"); return; }
+    if (!form.costoUnitario || Number(form.costoUnitario) < 0) { setError("El costo unitario es obligatorio"); return; }
+    if (!form.precioVenta || Number(form.precioVenta) <= 0) { setError("El precio de venta es obligatorio"); return; }
     setGuardando(true);
     setError(null);
     try {
@@ -2162,18 +2181,19 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
         sku: generarSku(form.nombre),
         nombre: form.nombre.trim(),
         unidadMedida: form.unidadMedida,
-        categoria: form.categoria || undefined,
-        costoUnitario: form.costoUnitario ? Number(form.costoUnitario) : undefined,
+        categoria: form.categoria.trim(),
+        costoUnitario: Number(form.costoUnitario),
+        precioVenta: Number(form.precioVenta),
       });
       if (form.cantidadInicial && Number(form.cantidadInicial) > 0) {
         await entradaArticulo(tenantId, nuevo.id, {
           cantidad: Number(form.cantidadInicial),
-          costoUnitario: form.costoUnitario ? Number(form.costoUnitario) : undefined,
+          costoUnitario: Number(form.costoUnitario),
           motivo: "Carga inicial de inventario",
           fechaVencimiento: form.fechaVencimiento || undefined,
         });
       }
-      setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", cantidadInicial: "", fechaVencimiento: "" });
+      setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "" });
       setMostrarForm(false);
       onCambio();
     } catch (e) {
@@ -2183,10 +2203,33 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     }
   };
 
+  const categorias = useMemo(() => Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).sort(), [articulos]);
+
+  const articulosFiltrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    return (articulos || []).filter((a) => {
+      if (categoriaFiltro && (a.categoria || "General") !== categoriaFiltro) return false;
+      if (!q) return true;
+      return a.nombre.toLowerCase().includes(q) || a.sku.toLowerCase().includes(q);
+    });
+  }, [articulos, categoriaFiltro, busqueda]);
+
+  const valorTotalInventario = (articulos || []).reduce((s, a) => s + Number(a.costoUnitario) * Number(a.stockActual), 0);
+  const alertasStock = (articulos || []).filter((a) => Number(a.stockActual) <= 0 || (a.stockMinimo != null && Number(a.stockActual) <= Number(a.stockMinimo))).length;
+
   return (
     <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <KpiCard label="Valor Total en Inventario" val={`$${valorTotalInventario.toFixed(2)}`} sub="Costo × stock actual" color="#0ea5e9" />
+        <KpiCard label="Total de Ítems" val={String((articulos || []).length)} sub={`${categorias.length} categoría${categorias.length === 1 ? "" : "s"}`} color="#a855f7" />
+        <KpiCard label="Alertas de Stock" val={String(alertasStock)} sub="Bajo mínimo o agotado" color={alertasStock > 0 ? "#ef4444" : "#64748b"} />
+      </div>
+
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm text-slate-500 dark:text-white/40">{(articulos || []).length} artículos/insumos en Inventario</p>
+        <div className="relative w-full sm:w-72">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={14} /></span>
+          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o SKU…" className="input-horeca w-full pl-8" />
+        </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setMostrarImportar(true)} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5">
             <IconDownload size={14} /> Importar Excel
@@ -2196,6 +2239,21 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
           </button>
         </div>
       </div>
+
+      {categorias.length > 1 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+          <button type="button" onClick={() => setCategoriaFiltro(null)}
+            className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap cursor-pointer flex-shrink-0 ${
+              categoriaFiltro === null ? "bg-teal-600 text-white" : "bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60"
+            }`}>Todas</button>
+          {categorias.map((c) => (
+            <button key={c} type="button" onClick={() => setCategoriaFiltro((prev) => (prev === c ? null : c))}
+              className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap cursor-pointer flex-shrink-0 ${
+                categoriaFiltro === c ? "bg-teal-600 text-white" : "bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60"
+              }`}>{c}</button>
+          ))}
+        </div>
+      )}
 
       {mostrarForm && (
         <div className="apple-glass rounded-2xl p-5 space-y-3">
@@ -2208,21 +2266,30 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
                 {["kg", "g", "l", "ml", "unidad"].map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
             </Campo>
-            <Campo label="Categoría (opcional)">
+            <Campo label="Categoría">
               <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} placeholder="Ej. Insumos secos" className="input-horeca" />
             </Campo>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-300/50 dark:border-white/10">
-            <Campo label="Costo unitario $ (opcional)">
-              <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" placeholder="0.00" className="input-horeca" />
+            <Campo label="Costo unitario $">
+              <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
-            <Campo label="Cantidad inicial en stock (opcional)">
-              <input value={form.cantidadInicial} onChange={(e) => setForm({ ...form, cantidadInicial: e.target.value })} type="number" step="0.001" placeholder="0" className="input-horeca" />
+            <Campo label="Precio de venta $">
+              <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
-            <Campo label="Fecha de vencimiento (opcional)">
-              <input value={form.fechaVencimiento} onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} type="date" className="input-horeca" />
+            <Campo label="Stock inicial">
+              <input value={form.cantidadInicial} onChange={(e) => setForm({ ...form, cantidadInicial: e.target.value })} type="number" step="0.001" min="0" placeholder="0" className="input-horeca" />
             </Campo>
           </div>
+          {(form.costoUnitario || form.precioVenta) && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-white/40">Margen de utilidad bruta:</span>
+              <BadgeMargen margen={margenForm} />
+            </div>
+          )}
+          <Campo label="Fecha de vencimiento (opcional)">
+            <input value={form.fechaVencimiento} onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} type="date" className="input-horeca sm:w-64" />
+          </Campo>
           {form.fechaVencimiento && (
             <p className={`text-[11px] font-semibold ${diasParaVencerTexto(form.fechaVencimiento).color}`}>
               {diasParaVencerTexto(form.fechaVencimiento).texto} — te avisaremos en Vencimientos cuando se acerque.
@@ -2241,11 +2308,15 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {(articulos || []).map((a) => (
-          <TarjetaArticulo key={a.id} tenantId={tenantId} articulo={a} onCambio={onCambio} />
-        ))}
-      </div>
+      {articulosFiltrados.length === 0 ? (
+        <p className="text-xs text-slate-400">Sin artículos {busqueda || categoriaFiltro ? "que coincidan con el filtro" : "cargados todavía"}.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {articulosFiltrados.map((a) => (
+            <TarjetaArticulo key={a.id} tenantId={tenantId} articulo={a} onCambio={onCambio} />
+          ))}
+        </div>
+      )}
 
       {mostrarImportar && (
         <ModalImportarInventario tenantId={tenantId} onClose={() => setMostrarImportar(false)} onImportado={onCambio} />
@@ -2425,19 +2496,30 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
 
 function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; articulo: Articulo; onCambio: () => void }) {
   const [modo, setModo] = useState<"ver" | "editar" | "ajustar">("ver");
-  const [form, setForm] = useState({ nombre: articulo.nombre, categoria: articulo.categoria || "", unidadMedida: articulo.unidadMedida || "unidad", costoUnitario: String(articulo.costoUnitario) });
+  const [form, setForm] = useState({
+    nombre: articulo.nombre, categoria: articulo.categoria || "", unidadMedida: articulo.unidadMedida || "unidad",
+    costoUnitario: String(articulo.costoUnitario), precioVenta: String(articulo.precioVenta ?? 0),
+  });
   const [stockReal, setStockReal] = useState(String(Number(articulo.stockActual)));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const margenEdicion = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
+  const margenActual = calcularMargen(Number(articulo.costoUnitario), Number(articulo.precioVenta ?? 0));
+  const sinStock = Number(articulo.stockActual) <= 0;
+  const stockBajo = !sinStock && articulo.stockMinimo != null && Number(articulo.stockActual) <= Number(articulo.stockMinimo);
+
   const guardarEdicion = async () => {
     if (!form.nombre.trim()) { setError("El nombre no puede quedar vacío"); return; }
+    if (!form.categoria.trim()) { setError("La categoría no puede quedar vacía"); return; }
+    if (!form.costoUnitario || Number(form.costoUnitario) < 0) { setError("El costo unitario es obligatorio"); return; }
+    if (!form.precioVenta || Number(form.precioVenta) <= 0) { setError("El precio de venta es obligatorio"); return; }
     setGuardando(true);
     setError(null);
     try {
       await editarArticulo(tenantId, articulo.id, {
         nombre: form.nombre.trim(), categoria: form.categoria.trim(), unidadMedida: form.unidadMedida.trim(),
-        costoUnitario: form.costoUnitario ? Number(form.costoUnitario) : undefined,
+        costoUnitario: Number(form.costoUnitario), precioVenta: Number(form.precioVenta),
       });
       setModo("ver");
       onCambio();
@@ -2486,7 +2568,14 @@ function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; a
             {["kg", "g", "l", "ml", "unidad"].map((u) => <option key={u} value={u}>{u}</option>)}
           </select>
         </div>
-        <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" className="input-horeca text-xs" placeholder="Costo unitario $" />
+        <div className="grid grid-cols-2 gap-2">
+          <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Costo unitario $" />
+          <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Precio de venta $" />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-slate-500 dark:text-white/40">Margen:</span>
+          <BadgeMargen margen={margenEdicion} />
+        </div>
         {error && <p className="text-[10px] text-red-500">{error}</p>}
         <div className="flex gap-2">
           <button onClick={guardarEdicion} disabled={guardando} className="flex-1 g-aurora text-white text-xs font-semibold py-2 rounded-lg cursor-pointer disabled:opacity-60">
@@ -2516,17 +2605,35 @@ function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; a
   }
 
   return (
-    <div className="apple-glass rounded-2xl p-5 space-y-1.5">
+    <div className={`apple-glass rounded-2xl p-5 space-y-2 border transition-colors ${
+      sinStock ? "border-red-500/40" : stockBajo ? "border-amber-500/40" : "border-transparent"
+    }`}>
       <div className="flex items-center justify-between gap-2">
         <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">{articulo.nombre}</h4>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <button onClick={() => setModo("ajustar")} title="Corregir stock (conteo físico)" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconRefresh size={13} /></button>
-          <button onClick={() => setModo("editar")} title="Editar nombre/categoría/costo" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconCustomize size={13} /></button>
+          <button onClick={() => setModo("editar")} title="Editar artículo" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconCustomize size={13} /></button>
           <button onClick={eliminar} disabled={guardando} title="Eliminar artículo" className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40"><IconTrash size={13} /></button>
         </div>
       </div>
-      <div className="text-xs text-slate-500 dark:text-white/40">{articulo.categoria || "Sin categoría"} · {articulo.unidadMedida}</div>
-      <div className="text-xs text-slate-500 dark:text-white/40">Stock: {Number(articulo.stockActual).toFixed(2)} · Costo: ${Number(articulo.costoUnitario).toFixed(2)}</div>
+
+      <div className="text-[11px] text-slate-500 dark:text-white/40 font-semibold uppercase tracking-wider">{articulo.categoria || "Sin categoría"} · {articulo.unidadMedida}</div>
+
+      <div className="flex items-end justify-between gap-2 pt-1">
+        <div>
+          <div className="text-[10px] text-slate-400 dark:text-white/30 uppercase tracking-wider">Precio de venta</div>
+          <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">${Number(articulo.precioVenta ?? 0).toFixed(2)}</div>
+        </div>
+        <BadgeMargen margen={margenActual} />
+      </div>
+
+      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-300/40 dark:border-white/10">
+        <span className={`font-semibold ${sinStock ? "text-red-500" : stockBajo ? "text-amber-600 dark:text-amber-400" : "text-slate-600 dark:text-white/60"}`}>
+          Stock: {Number(articulo.stockActual).toFixed(2)} {articulo.unidadMedida}
+          {sinStock ? " · Agotado" : stockBajo ? " · Bajo mínimo" : ""}
+        </span>
+        <span className="text-slate-400 dark:text-white/40 font-mono">Costo ${Number(articulo.costoUnitario).toFixed(2)}</span>
+      </div>
       {error && <p className="text-[10px] text-red-500">{error}</p>}
     </div>
   );

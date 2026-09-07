@@ -96,9 +96,11 @@ public class ArticuloController {
         public String categoria;
         public String unidadMedida;
         public BigDecimal costoUnitario;
+        public BigDecimal precioVenta;
+        public BigDecimal stockMinimo;
     }
 
-    /** Corrige datos del artículo (nombre, categoría, unidad, costo) — NO toca stockActual, que solo cambia vía Kardex (entrada/salida/ajuste) para no perder el rastro de auditoría. */
+    /** Corrige datos del artículo (nombre, categoría, unidad, costo, precio de venta, stock mínimo) — NO toca stockActual, que solo cambia vía Kardex (entrada/salida/ajuste) para no perder el rastro de auditoría. */
     @PutMapping("/{id}")
     public ResponseEntity<Articulo> editar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody EditarArticuloRequest request) {
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
@@ -109,6 +111,8 @@ public class ArticuloController {
         if (request.categoria != null) articulo.setCategoria(request.categoria.isBlank() ? "General" : request.categoria.trim());
         if (request.unidadMedida != null && !request.unidadMedida.isBlank()) articulo.setUnidadMedida(request.unidadMedida.trim());
         if (request.costoUnitario != null) articulo.setCostoUnitario(request.costoUnitario);
+        if (request.precioVenta != null) articulo.setPrecioVenta(request.precioVenta);
+        if (request.stockMinimo != null) articulo.setStockMinimo(request.stockMinimo);
         return ResponseEntity.ok(articuloRepository.save(articulo));
     }
 

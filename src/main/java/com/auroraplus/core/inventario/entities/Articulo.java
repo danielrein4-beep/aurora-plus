@@ -41,6 +41,12 @@ public class Articulo {
     @Column(name = "costo_unitario", nullable = false, precision = 18, scale = 4)
     private BigDecimal costoUnitario = BigDecimal.ZERO;
 
+    // Precio al que se vende (distinto del costo) — columnDefinition con default
+    // porque la tabla ya tiene filas: sin esto, Hibernate falla en silencio al
+    // agregar una columna NOT NULL a una tabla no vacía (ddl-auto=update).
+    @Column(name = "precio_venta", nullable = false, precision = 18, scale = 4, columnDefinition = "numeric(18,4) default 0")
+    private BigDecimal precioVenta = BigDecimal.ZERO;
+
     // Umbral para alertas de reposición — null significa "sin alerta configurada".
     @Column(name = "stock_minimo", precision = 18, scale = 4)
     private BigDecimal stockMinimo;
@@ -63,11 +69,21 @@ public class Articulo {
     public void setStockActual(BigDecimal stockActual) { this.stockActual = stockActual; }
     public BigDecimal getCostoUnitario() { return costoUnitario; }
     public void setCostoUnitario(BigDecimal costoUnitario) { this.costoUnitario = costoUnitario; }
+    public BigDecimal getPrecioVenta() { return precioVenta; }
+    public void setPrecioVenta(BigDecimal precioVenta) { this.precioVenta = precioVenta; }
     public BigDecimal getStockMinimo() { return stockMinimo; }
     public void setStockMinimo(BigDecimal stockMinimo) { this.stockMinimo = stockMinimo; }
 
     @Transient
     public boolean isStockBajoMinimo() {
         return stockMinimo != null && stockActual.compareTo(stockMinimo) < 0;
+    }
+
+    /** Margen de utilidad bruta % = (precio - costo) / precio * 100 — null si no hay precio de venta cargado. */
+    @Transient
+    public BigDecimal getMargenUtilidad() {
+        if (precioVenta == null || precioVenta.compareTo(BigDecimal.ZERO) <= 0) return null;
+        BigDecimal costo = costoUnitario != null ? costoUnitario : BigDecimal.ZERO;
+        return precioVenta.subtract(costo).divide(precioVenta, 4, java.math.RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
     }
 }

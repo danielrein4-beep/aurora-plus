@@ -938,6 +938,7 @@ export interface Articulo {
   categoria: string | null;
   stockActual: number;
   costoUnitario: number;
+  precioVenta: number;
   stockMinimo: number | null;
 }
 
@@ -945,7 +946,7 @@ export function listarArticulos(): Promise<Articulo[]> {
   return request(`/api/inventario/articulos`);
 }
 
-export function crearArticulo(tenantId: number, datos: { sku: string; nombre: string; unidadMedida?: string; categoria?: string; costoUnitario?: number; stockMinimo?: number }): Promise<Articulo> {
+export function crearArticulo(tenantId: number, datos: { sku: string; nombre: string; unidadMedida?: string; categoria?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number }): Promise<Articulo> {
   return request(`/api/inventario/articulos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
@@ -953,7 +954,7 @@ export function entradaArticulo(tenantId: number, articuloId: number, datos: { c
   return request(`/api/inventario/articulos/${articuloId}/entrada?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function editarArticulo(tenantId: number, articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number }): Promise<Articulo> {
+export function editarArticulo(tenantId: number, articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number }): Promise<Articulo> {
   return request(`/api/inventario/articulos/${articuloId}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
 }
 
