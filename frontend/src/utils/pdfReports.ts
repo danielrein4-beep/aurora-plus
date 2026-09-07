@@ -340,3 +340,123 @@ export function generarTextoWhatsAppConsulta(data: ConsultaReportData): string {
   ];
   return encodeURIComponent(lineas.filter(Boolean).join("\n"));
 }
+
+export interface CotizacionItem {
+  nombre: string;
+  costoUSD: number;
+  costoVES: number;
+  costoCOP: number;
+}
+
+export interface CotizacionData {
+  clinicaNombre: string;
+  doctorNombre: string;
+  pacienteNombre: string;
+  pacienteCedula: string;
+  fecha: string;
+  items: CotizacionItem[];
+  tasaBCV: number;
+  tasaCOP: number;
+  totalUSD: number;
+  totalVES: number;
+  totalCOP: number;
+  observaciones?: string;
+}
+
+/**
+ * Genera y descarga el PDF de Cotización / Presupuesto de Procedimientos
+ */
+export function generarPdfCotizacion(data: CotizacionData) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Encabezado
+  doc.setFillColor(14, 165, 233);
+  doc.rect(0, 0, pageWidth, 28, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(255, 255, 255);
+  doc.text(data.clinicaNombre.toUpperCase(), 14, 12);
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text("PRESUPUESTO / COTIZACIÓN DE PROCEDIMIENTOS MÉDICOS", 14, 19);
+  doc.text(`Fecha de Emisión: ${data.fecha} | Validez: 15 días`, 14, 24);
+
+  // Datos paciente
+  let y = 36;
+  doc.setTextColor(15, 23, 42);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text(`Paciente: ${data.pacienteNombre} (C.I: ${data.pacienteCedula})`, 14, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Tasas: 1 USD = Bs. ${data.tasaBCV.toFixed(2)} | 1 USD = $${data.tasaCOP.toLocaleString()} COP`, pageWidth - 14, y, { align: "right" });
+
+  // Tabla
+  y += 7;
+  doc.setFillColor(15, 23, 42);
+  doc.rect(14, y, pageWidth - 28, 7, "F");
+
+  doc.setFontSize(8);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.text("Procedimiento / Concepto", 18, y + 5);
+  doc.text("Precio USD", 110, y + 5, { align: "right" });
+  doc.text("Precio VES (Bs.)", 150, y + 5, { align: "right" });
+  doc.text("Precio COP", pageWidth - 16, y + 5, { align: "right" });
+
+  y += 7;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+
+  data.items.forEach((item, i) => {
+    if (i % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(14, y, pageWidth - 28, 6.5, "F");
+    }
+    doc.setTextColor(30, 41, 59);
+    doc.text(item.nombre, 18, y + 4.5);
+    doc.text(`$${item.costoUSD.toFixed(2)}`, 110, y + 4.5, { align: "right" });
+    doc.text(`Bs. ${item.costoVES.toFixed(2)}`, 150, y + 4.5, { align: "right" });
+    doc.text(`$${item.costoCOP.toLocaleString("es-CO")}`, pageWidth - 16, y + 4.5, { align: "right" });
+    y += 6.5;
+  });
+
+  // Totales
+  y += 4;
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(14, y, pageWidth - 28, 22, 2, 2, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(15, 23, 42);
+  doc.text("TOTAL ESTIMADO:", 20, y + 14);
+
+  doc.setTextColor(16, 185, 129); // USD
+  doc.text(`$${data.totalUSD.toFixed(2)} USD`, 80, y + 14);
+
+  doc.setTextColor(14, 165, 233); // VES
+  doc.text(`Bs. ${data.totalVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`, 125, y + 14);
+
+  doc.setTextColor(139, 92, 246); // COP
+  doc.text(`$${data.totalCOP.toLocaleString("es-CO")} COP`, pageWidth - 20, y + 14, { align: "right" });
+
+  // Pie y firma
+  const signY = 230;
+  doc.setDrawColor(148, 163, 184);
+  doc.line(70, signY, 140, signY);
+
+  doc.setFontSize(9);
+  doc.setTextColor(30, 41, 59);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Dr(a). ${data.doctorNombre}`, 105, signY + 5, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Firma y Sello de la Clínica", 105, signY + 9, { align: "center" });
+
+  const fileName = `Presupuesto_${data.pacienteNombre.replace(/\s+/g, "_")}_${data.fecha}.pdf`;
+  doc.save(fileName);
+}
+

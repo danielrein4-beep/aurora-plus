@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   IconStethoscope, IconUsers, IconFileText, IconPrescription, IconHourglass, IconCalendar,
   IconCard, IconCustomize, IconSearch, IconUser, IconCheck, IconTrash, IconRefresh,
-  IconChevronLeft, IconChevronRight, IconCheckCircle,
+  IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconWarning
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -13,16 +13,18 @@ import {
 } from "../api";
 import {
   generarPdfCierreCaja, generarPdfInformeConsulta, generarTextoWhatsAppConsulta,
-  type CobroItem, type CierreCajaData, type ConsultaReportData
+  generarPdfCotizacion,
+  type CobroItem, type CierreCajaData, type ConsultaReportData, type CotizacionData, type CotizacionItem
 } from "../utils/pdfReports";
 
 type Pagina = "general" | "pacientes" | "historias" | "procedimientos" | "sala-espera" | "agenda" | "financiero" | "configuracion";
+type RolVista = "MEDICO" | "SECRETARIA";
 
-const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element }[] = [
+const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element; roles?: RolVista[] }[] = [
   { id: "general", label: "Vista General", Icon: IconCustomize },
   { id: "pacientes", label: "Gestión de Pacientes", Icon: IconUsers },
   { id: "historias", label: "Historias Clínicas", Icon: IconFileText },
-  { id: "procedimientos", label: "Procedimientos / Cotizaciones", Icon: IconPrescription },
+  { id: "procedimientos", label: "Procedimientos & Cotizador", Icon: IconPrescription },
   { id: "sala-espera", label: "Sala de Espera & Caja", Icon: IconHourglass },
   { id: "agenda", label: "Agenda Médica & Calendario", Icon: IconCalendar },
   { id: "financiero", label: "Resúmenes Financieros", Icon: IconCard },
@@ -30,11 +32,11 @@ const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Elem
 ];
 
 const hoy = () => new Date().toISOString().slice(0, 10);
-const TASA_BCV_DEFAULT = 56.40;
 
 const MODO_CLASICO_KEY = "aurora_mediclinic_modo_clasico";
 const FECHAS_BLOQUEADAS_KEY = "aurora_mediclinic_fechas_bloqueadas";
 const HISTORIAL_CIERRES_KEY = "aurora_mediclinic_historial_cierres";
+const CONFIG_PERFIL_KEY = "aurora_mediclinic_config_perfil";
 
 function EstiloClasico() {
   return (
@@ -92,9 +94,39 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const { user } = useAuth();
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
-  // Clásico MediClinic es ahora el predeterminado para trabajar (más
-  // armonioso para uso diario) — solo se apaga si alguien elige Aurora
-  // explícitamente, y esa elección se recuerda.
+  const [rolActivo, setRolActivo] = useState<RolVista>("MEDICO");
+
+  // Configuración de perfil y tasas persistente
+  const [configPerfil, setConfigPerfil] = useState(() => {
+    try {
+      const raw = localStorage.getItem(CONFIG_PERFIL_KEY);
+      return raw ? JSON.parse(raw) : {
+        doctorNombre: user?.nombre || "Dr. Mario Roa",
+        especialidad: "Medicina General / Especialista",
+        matriculaMPPS: "109842",
+        colegioMedicos: "5421",
+        clinicaNombre: user?.empresa || "Clínica & Consultorios Médicos",
+        tasaBCV: 56.40,
+        tasaCOP: 4200,
+      };
+    } catch {
+      return {
+        doctorNombre: user?.nombre || "Dr. Mario Roa",
+        especialidad: "Medicina General / Especialista",
+        matriculaMPPS: "109842",
+        colegioMedicos: "5421",
+        clinicaNombre: user?.empresa || "Clínica & Consultorios Médicos",
+        tasaBCV: 56.40,
+        tasaCOP: 4200,
+      };
+    }
+  });
+
+  const guardarConfigPerfil = (nuevaConfig: any) => {
+    setConfigPerfil(nuevaConfig);
+    try { localStorage.setItem(CONFIG_PERFIL_KEY, JSON.stringify(nuevaConfig)); } catch {}
+  };
+
   const [modoClasico, setModoClasico] = useState(() => {
     try {
       const guardado = localStorage.getItem(MODO_CLASICO_KEY);
@@ -116,7 +148,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [procedimientos, setProcedimientos] = useState<ProcedimientoMedico[] | null>(null);
   const [ingresosHoy, setIngresosHoy] = useState<number | null>(null);
 
-  // Registro de cobros locales para sala de espera y cierre de caja
+  // Registro de cobros locales del día
   const [cobrosLocales, setCobrosLocales] = useState<CobroItem[]>(() => {
     try {
       const raw = localStorage.getItem(`cobros_locales_${hoy()}`);
@@ -124,15 +156,28 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     } catch { return []; }
   });
 
-  // Guardar cobros en localStorage
-  useEffect(() => {
+  // Historial de cierres de caja auditados
+  const [historialCierres, setHistorialCierres] = useState<CierreCajaData[]>(() => {
     try {
-      localStorage.setItem(`cobros_locales_${hoy()}`, JSON.stringify(cobrosLocales));
-    } catch {}
+      const raw = localStorage.getItem(HISTORIAL_CIERRES_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem(`cobros_locales_${hoy()}`, JSON.stringify(cobrosLocales)); } catch {}
   }, [cobrosLocales]);
+
+  useEffect(() => {
+    try { localStorage.setItem(HISTORIAL_CIERRES_KEY, JSON.stringify(historialCierres)); } catch {}
+  }, [historialCierres]);
 
   const agregarCobroLocal = (item: CobroItem) => {
     setCobrosLocales((prev) => [item, ...prev]);
+  };
+
+  const agregarCierreAuditado = (cierre: CierreCajaData) => {
+    setHistorialCierres((prev) => [cierre, ...prev]);
   };
 
   const recargarTodo = () => {
@@ -158,15 +203,17 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "mediclinic-clasico" : ""}`}>
       {modoClasico && <EstiloClasico />}
       
-      {/* SIDEBAR NATIVO MEDICLINIC PRO */}
+      {/* SIDEBAR NATIVO */}
       <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1">
         <div className="px-2 pb-4 mb-2 border-b border-slate-300/60 dark:border-white/10">
           <div className="flex items-center justify-between">
             <div className="font-['Outfit'] font-black text-lg text-aurora">Mediclinic Pro</div>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-mono font-bold">PRO</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-mono font-bold">
+              {rolActivo === "MEDICO" ? "DOCTOR" : "SECRETARIA"}
+            </span>
           </div>
           <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mt-0.5">
-            {user?.empresa || "Centro Médico"}
+            {configPerfil.clinicaNombre}
           </div>
         </div>
 
@@ -187,7 +234,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
         <div className="flex-1" />
 
-        {/* Switch Modo Clásico / Modo Aurora */}
+        {/* Switch Modo Clásico / Aurora */}
         <div className="p-2.5 rounded-xl bg-slate-100/60 dark:bg-white/5 border border-slate-300/60 dark:border-white/10 text-xs mb-2">
           <div className="flex items-center justify-between">
             <span className="text-slate-600 dark:text-white/70 text-[11px] font-medium">Modo Clásico</span>
@@ -202,7 +249,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
         <button
           onClick={onSalir}
-          className="w-full px-3 py-2.5 rounded-xl text-xs font-semibold text-left text-slate-500 dark:text-white/40 hover:bg-slate-200/60 dark:hover:bg-white/5"
+          className="w-full px-3 py-2.5 rounded-xl text-xs font-semibold text-left text-slate-500 dark:text-white/40 hover:bg-slate-200/60 dark:hover:bg-white/5 cursor-pointer"
         >
           ← Volver al Hub
         </button>
@@ -216,12 +263,36 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               {NAV.find((n) => n.id === pagina)?.label}
             </h2>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-xs text-right hidden sm:block">
-              <div className="font-bold text-slate-900 dark:text-white">Dr(a). {user?.nombre || "Médico Especialista"}</div>
-              <div className="text-[11px] text-teal-600 dark:text-teal-400 font-mono">Tasa BCV: Bs. {TASA_BCV_DEFAULT.toFixed(2)}/USD</div>
+
+          <div className="flex items-center gap-4">
+            {/* Selector de Rol RBAC */}
+            <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-xs">
+              <button
+                onClick={() => setRolActivo("MEDICO")}
+                className={`px-3 py-1 rounded-full font-bold transition-all ${
+                  rolActivo === "MEDICO" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
+                }`}
+              >
+                🩺 Médico
+              </button>
+              <button
+                onClick={() => setRolActivo("SECRETARIA")}
+                className={`px-3 py-1 rounded-full font-bold transition-all ${
+                  rolActivo === "SECRETARIA" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
+                }`}
+              >
+                📋 Secretaria
+              </button>
             </div>
-            <button onClick={recargarTodo} className="p-2 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60" title="Actualizar datos">
+
+            <div className="text-xs text-right hidden sm:block">
+              <div className="font-bold text-slate-900 dark:text-white">{configPerfil.doctorNombre}</div>
+              <div className="text-[11px] text-teal-600 dark:text-teal-400 font-mono">
+                BCV: Bs. {configPerfil.tasaBCV.toFixed(2)} | COP: ${configPerfil.tasaCOP}
+              </div>
+            </div>
+
+            <button onClick={recargarTodo} className="p-2 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
               <IconRefresh size={16} />
             </button>
           </div>
@@ -230,12 +301,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
           {pagina === "general" && <VistaGeneral pacientes={pacientes} citasHoy={citasHoy} salaEspera={salaEspera} ingresosHoy={ingresosHoy} onNavegar={setPagina} />}
           {pagina === "pacientes" && <GestionPacientes tenantId={tenantId} pacientes={pacientes} onCambio={recargarTodo} />}
-          {pagina === "historias" && <HistoriasClinicas tenantId={tenantId} pacientes={pacientes} user={user} />}
-          {pagina === "procedimientos" && <Procedimientos tenantId={tenantId} procedimientos={procedimientos} onCambio={recargarTodo} />}
-          {pagina === "sala-espera" && <SalaEspera tenantId={tenantId} pacientes={pacientes} entradas={salaEspera} cobrosLocales={cobrosLocales} onAgregarCobro={agregarCobroLocal} onCambio={recargarTodo} user={user} />}
+          {pagina === "historias" && <HistoriasClinicas tenantId={tenantId} pacientes={pacientes} config={configPerfil} rol={rolActivo} />}
+          {pagina === "procedimientos" && <Procedimientos tenantId={tenantId} procedimientos={procedimientos} pacientes={pacientes} config={configPerfil} onCambio={recargarTodo} />}
+          {pagina === "sala-espera" && <SalaEspera tenantId={tenantId} pacientes={pacientes} entradas={salaEspera} cobrosLocales={cobrosLocales} onAgregarCobro={agregarCobroLocal} onAgregarCierre={agregarCierreAuditado} onCambio={recargarTodo} config={configPerfil} />}
           {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} />}
-          {pagina === "financiero" && <ResumenesFinancieros ingresosHoy={ingresosHoy} citasHoy={citasHoy} cobrosLocales={cobrosLocales} user={user} />}
-          {pagina === "configuracion" && <Configuracion user={user} />}
+          {pagina === "financiero" && <ResumenesFinancieros ingresosHoy={ingresosHoy} citasHoy={citasHoy} cobrosLocales={cobrosLocales} historialCierres={historialCierres} config={configPerfil} />}
+          {pagina === "configuracion" && <Configuracion config={configPerfil} onGuardar={guardarConfigPerfil} user={user} />}
         </div>
       </main>
     </div>
@@ -264,7 +335,7 @@ function VistaGeneral({ pacientes, citasHoy, salaEspera, ingresosHoy, onNavegar 
         <div className="apple-glass rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-bold text-sm text-slate-900 dark:text-white">Sala de Espera (Turnos Activos)</h4>
-            <button onClick={() => onNavegar("sala-espera")} className="text-teal-600 dark:text-teal-400 text-xs font-bold">Ver Sala →</button>
+            <button onClick={() => onNavegar("sala-espera")} className="text-teal-600 dark:text-teal-400 text-xs font-bold cursor-pointer">Ver Sala →</button>
           </div>
           {salaEspera === null ? <p className="text-xs text-slate-400">Cargando…</p> : (salaEspera.filter((e) => e.estado !== "FINALIZADO").length === 0) ? (
             <p className="text-xs text-slate-400">No hay pacientes esperando en este momento.</p>
@@ -289,7 +360,7 @@ function VistaGeneral({ pacientes, citasHoy, salaEspera, ingresosHoy, onNavegar 
         <div className="apple-glass rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-bold text-sm text-slate-900 dark:text-white">Próximas Citas de Hoy</h4>
-            <button onClick={() => onNavegar("agenda")} className="text-teal-600 dark:text-teal-400 text-xs font-bold">Ir a Agenda →</button>
+            <button onClick={() => onNavegar("agenda")} className="text-teal-600 dark:text-teal-400 text-xs font-bold cursor-pointer">Ir a Agenda →</button>
           </div>
           {citasHoy === null ? <p className="text-xs text-slate-400">Cargando…</p> : citasHoy.length === 0 ? (
             <p className="text-xs text-slate-400">No hay citas registradas para hoy.</p>
@@ -411,15 +482,15 @@ function GestionPacientes({ tenantId, pacientes, onCambio }: { tenantId: number;
                 className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
             </div>
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono">Género</label>
-              <select value={form.genero} onChange={(e) => setForm({ ...form, genero: e.target.value })}
+              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono">Origen del Paciente</label>
+              <select value={form.origen} onChange={(e) => setForm({ ...form, origen: e.target.value })}
                 className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs">
-                <option value="M">Masculino</option>
-                <option value="F">Femenino</option>
+                <option value="Local">Local (San Cristóbal / Táchira)</option>
+                <option value="Foráneo">Foráneo (Otro Estado / Internacional)</option>
               </select>
             </div>
           </div>
-          <button disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full disabled:opacity-50">
+          <button disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full disabled:opacity-50 cursor-pointer">
             {guardando ? "Guardando…" : "Guardar Paciente"}
           </button>
         </form>
@@ -458,9 +529,9 @@ function GestionPacientes({ tenantId, pacientes, onCambio }: { tenantId: number;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// HISTORIAS CLÍNICAS & GENERACIÓN DE INFORME PDF + WHATSAPP
+// HISTORIAS CLÍNICAS & GENERACIÓN DE INFORME PDF + WHATSAPP + GMAIL
 // ══════════════════════════════════════════════════════════════════════════
-function HistoriasClinicas({ tenantId, pacientes, user }: { tenantId: number; pacientes: Paciente[] | null; user: any }) {
+function HistoriasClinicas({ tenantId, pacientes, config, rol }: { tenantId: number; pacientes: Paciente[] | null; config: any; rol: RolVista }) {
   const [pacienteId, setPacienteId] = useState<number | "">("");
   const [historial, setHistorial] = useState<ConsultaMedica[] | null>(null);
   
@@ -472,7 +543,6 @@ function HistoriasClinicas({ tenantId, pacientes, user }: { tenantId: number; pa
 
   const pacienteSeleccionado = (pacientes || []).find((p) => p.id === Number(pacienteId));
 
-  // Cálculo automático de IMC
   const calcularImc = (pesoStr: string, tallaStr: string) => {
     const p = parseFloat(pesoStr);
     const t = parseFloat(tallaStr);
@@ -508,14 +578,14 @@ function HistoriasClinicas({ tenantId, pacientes, user }: { tenantId: number; pa
     }
   };
 
-  const handleDescargarPdf = () => {
-    if (!pacienteSeleccionado) return;
-    const datosPdf: ConsultaReportData = {
-      clinicaNombre: user?.empresa || "Clínica Médica Especializada",
-      doctorNombre: user?.nombre || "Médico Especialista",
-      especialidad: "Medicina General / Especialidad",
-      matriculaMPPS: "109842",
-      colegioMedicos: "5421",
+  const getDatosReporte = (): ConsultaReportData | null => {
+    if (!pacienteSeleccionado) return null;
+    return {
+      clinicaNombre: config.clinicaNombre,
+      doctorNombre: config.doctorNombre,
+      especialidad: config.especialidad,
+      matriculaMPPS: config.matriculaMPPS,
+      colegioMedicos: config.colegioMedicos,
       paciente: {
         expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
         nombreCompleto: pacienteSeleccionado.nombreCompleto,
@@ -526,47 +596,48 @@ function HistoriasClinicas({ tenantId, pacientes, user }: { tenantId: number; pa
         fechaConsulta: hoy(),
       },
       signosVitales: signos,
-      motivoConsulta: form.motivoConsulta || "Consulta Médica",
+      motivoConsulta: form.motivoConsulta || "Consulta Médica General",
       evolucionClinica: form.evolucionClinica,
       diagnosticoCIE10: form.descripcionDiagnostico,
       planTratamiento: form.planTratamiento,
       proximaCita: form.proximaCita,
     };
-    generarPdfInformeConsulta(datosPdf);
+  };
+
+  const handleDescargarPdf = () => {
+    const data = getDatosReporte();
+    if (data) generarPdfInformeConsulta(data);
   };
 
   const handleEnviarWhatsApp = () => {
-    if (!pacienteSeleccionado) return;
-    const datosPdf: ConsultaReportData = {
-      clinicaNombre: user?.empresa || "Clínica Médica Especializada",
-      doctorNombre: user?.nombre || "Médico Especialista",
-      especialidad: "Medicina General",
-      matriculaMPPS: "109842",
-      colegioMedicos: "5421",
-      paciente: {
-        expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
-        nombreCompleto: pacienteSeleccionado.nombreCompleto,
-        identificacion: pacienteSeleccionado.identificacion,
-        edad: pacienteSeleccionado.edad || 30,
-        telefono: pacienteSeleccionado.telefono || "",
-        origen: "Local",
-        fechaConsulta: hoy(),
-      },
-      signosVitales: signos,
-      motivoConsulta: form.motivoConsulta,
-      evolucionClinica: form.evolucionClinica,
-      diagnosticoCIE10: form.descripcionDiagnostico,
-      planTratamiento: form.planTratamiento,
-      proximaCita: form.proximaCita,
-    };
-    const texto = generarTextoWhatsAppConsulta(datosPdf);
+    const data = getDatosReporte();
+    if (!data || !pacienteSeleccionado) return;
+    const texto = generarTextoWhatsAppConsulta(data);
     const tel = (pacienteSeleccionado.telefono || "").replace(/\D/g, "");
     const url = tel ? `https://wa.me/${tel}?text=${texto}` : `https://wa.me/?text=${texto}`;
     window.open(url, "_blank");
   };
 
+  const handleEnviarGmail = () => {
+    const data = getDatosReporte();
+    if (!data || !pacienteSeleccionado) return;
+    const asunto = encodeURIComponent(`Informe Médico - ${data.paciente.nombreCompleto} (${data.paciente.expediente})`);
+    const cuerpo = encodeURIComponent(
+      `Estimado(a) ${data.paciente.nombreCompleto},\n\nAdjunto resumen de su consulta médica realizada en ${data.clinicaNombre}.\n\nMédico Tratante: Dr(a). ${data.doctorNombre}\nDiagnóstico: ${data.diagnosticoCIE10 || "Evaluación Médica"}\nPlan de Tratamiento / Receta: ${data.planTratamiento || "Indicaciones en consulta."}\n${data.proximaCita ? `Próximo Control: ${data.proximaCita}\n` : ""}\nSaludos cordiales.`
+    );
+    const emailDestino = pacienteSeleccionado.email || "";
+    window.open(`mailto:${emailDestino}?subject=${asunto}&body=${cuerpo}`, "_blank");
+  };
+
   return (
     <div className="space-y-4">
+      {rol === "SECRETARIA" && (
+        <div className="apple-glass rounded-xl p-3 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center gap-2">
+          <span>🔒</span>
+          <span><strong>Modo Recepción / Secretaria:</strong> Vista simplificada de expediente. Los diagnósticos médicos privados y recetas son editados exclusivamente en modo Médico.</span>
+        </div>
+      )}
+
       <div className="apple-glass rounded-2xl p-4">
         <label className="text-xs font-semibold text-slate-500 dark:text-white/40">Seleccionar Paciente para Consulta</label>
         <select value={pacienteId} onChange={(e) => setPacienteId(e.target.value ? Number(e.target.value) : "")}
@@ -589,7 +660,7 @@ function HistoriasClinicas({ tenantId, pacientes, user }: { tenantId: number; pa
 
             {error && <p className="text-xs text-[#ff3b80]">{error}</p>}
 
-            {/* Bloque de Signos Vitales */}
+            {/* Signos Vitales */}
             <div>
               <label className="text-[11px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">Signos Vitales & Somatometría</label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-1.5">
@@ -629,7 +700,7 @@ function HistoriasClinicas({ tenantId, pacientes, user }: { tenantId: number; pa
             </div>
 
             {/* Motivo & Evolución */}
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <div>
                 <label className="text-[10px] text-slate-400 uppercase font-mono">Motivo de Consulta *</label>
                 <textarea required placeholder="Describa el motivo de la consulta..." value={form.motivoConsulta} onChange={(e) => setForm({ ...form, motivoConsulta: e.target.value })}
@@ -657,17 +728,20 @@ function HistoriasClinicas({ tenantId, pacientes, user }: { tenantId: number; pa
               </div>
             </div>
 
-            {/* Botones de acción */}
+            {/* Acciones */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200 dark:border-white/10">
-              <button type="submit" disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full disabled:opacity-50">
+              <button type="submit" disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full disabled:opacity-50 cursor-pointer">
                 {guardando ? "Guardando…" : "Guardar en Expediente"}
               </button>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={handleDescargarPdf} className="px-3.5 py-2 rounded-full border border-teal-500/40 text-teal-600 dark:text-teal-300 text-xs font-bold hover:bg-teal-500/10 flex items-center gap-1.5">
-                  <span>📥</span> Descargar PDF
+                <button type="button" onClick={handleDescargarPdf} className="px-3 py-2 rounded-full border border-teal-500/40 text-teal-600 dark:text-teal-300 text-xs font-bold hover:bg-teal-500/10 flex items-center gap-1.5 cursor-pointer">
+                  <span>📥</span> PDF
                 </button>
-                <button type="button" onClick={handleEnviarWhatsApp} className="px-3.5 py-2 rounded-full bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 flex items-center gap-1.5 shadow-sm">
+                <button type="button" onClick={handleEnviarWhatsApp} className="px-3 py-2 rounded-full bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 flex items-center gap-1.5 shadow-xs cursor-pointer">
                   <span>💬</span> WhatsApp
+                </button>
+                <button type="button" onClick={handleEnviarGmail} className="px-3 py-2 rounded-full bg-rose-600 text-white text-xs font-bold hover:bg-rose-500 flex items-center gap-1.5 shadow-xs cursor-pointer">
+                  <span>✉️</span> Gmail
                 </button>
               </div>
             </div>
@@ -699,13 +773,30 @@ function HistoriasClinicas({ tenantId, pacientes, user }: { tenantId: number; pa
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// PROCEDIMIENTOS & COTIZADOR MULTI-MONEDA
+// PROCEDIMIENTOS & COTIZADOR MULTI-MONEDA (USD / VES / COP)
 // ══════════════════════════════════════════════════════════════════════════
-function Procedimientos({ tenantId, procedimientos, onCambio }: { tenantId: number; procedimientos: ProcedimientoMedico[] | null; onCambio: () => void }) {
+function Procedimientos({ tenantId, procedimientos, pacientes, config, onCambio }: {
+  tenantId: number; procedimientos: ProcedimientoMedico[] | null; pacientes: Paciente[] | null; config: any; onCambio: () => void;
+}) {
   const [form, setForm] = useState({ nombre: "", descripcion: "", costo: "", moneda: "USD", duracionMinutos: "" });
   const [guardando, setGuardando] = useState(false);
 
-  const guardar = async (e: React.FormEvent) => {
+  // Estado del Cotizador
+  const [cotizacionPacienteId, setCotizacionPacienteId] = useState<number | "">("");
+  const [seleccionados, setSeleccionados] = useState<number[]>([]);
+
+  const pacienteCotizacion = (pacientes || []).find((p) => p.id === Number(cotizacionPacienteId));
+
+  const toggleSeleccion = (id: number) => {
+    setSeleccionados((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
+
+  const procsCotizados = (procedimientos || []).filter((p) => seleccionados.includes(p.id));
+  const subtotalUSD = procsCotizados.reduce((sum, p) => sum + Number(p.costo), 0);
+  const subtotalVES = subtotalUSD * config.tasaBCV;
+  const subtotalCOP = subtotalUSD * config.tasaCOP;
+
+  const guardarProcedimiento = async (e: React.FormEvent) => {
     e.preventDefault();
     setGuardando(true);
     try {
@@ -721,10 +812,110 @@ function Procedimientos({ tenantId, procedimientos, onCambio }: { tenantId: numb
     }
   };
 
+  const handleDescargarCotizacionPdf = () => {
+    if (procsCotizados.length === 0) return;
+    const dataCot: CotizacionData = {
+      clinicaNombre: config.clinicaNombre,
+      doctorNombre: config.doctorNombre,
+      pacienteNombre: pacienteCotizacion?.nombreCompleto || "Paciente Particular",
+      pacienteCedula: pacienteCotizacion?.identificacion || "S/C",
+      fecha: hoy(),
+      items: procsCotizados.map((p) => ({
+        nombre: p.nombre,
+        costoUSD: Number(p.costo),
+        costoVES: Number(p.costo) * config.tasaBCV,
+        costoCOP: Number(p.costo) * config.tasaCOP,
+      })),
+      tasaBCV: config.tasaBCV,
+      tasaCOP: config.tasaCOP,
+      totalUSD: subtotalUSD,
+      totalVES: subtotalVES,
+      totalCOP: subtotalCOP,
+    };
+    generarPdfCotizacion(dataCot);
+  };
+
+  const handleEnviarCotizacionWhatsApp = () => {
+    if (procsCotizados.length === 0) return;
+    const lineas = [
+      `🏥 *${config.clinicaNombre}*`,
+      `📄 *Presupuesto de Procedimientos Médicos*`,
+      `━━━━━━━━━━━━━━━━━━`,
+      `👤 *Paciente:* ${pacienteCotizacion?.nombreCompleto || "Paciente"}`,
+      `📅 *Fecha:* ${hoy()}`,
+      `━━━━━━━━━━━━━━━━━━`,
+      ...procsCotizados.map((p) => `• ${p.nombre}: *$${Number(p.costo).toFixed(2)} USD* (Bs. ${(Number(p.costo) * config.tasaBCV).toFixed(2)})`),
+      `━━━━━━━━━━━━━━━━━━`,
+      `💵 *Total USD:* $${subtotalUSD.toFixed(2)} USD`,
+      `🇻🇪 *Total Bolívares (BCV):* Bs. ${subtotalVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
+      `🇨🇴 *Total Pesos COP:* $${subtotalCOP.toLocaleString("es-CO")} COP`,
+      `━━━━━━━━━━━━━━━━━━`,
+      `_Presupuesto válido por 15 días._`,
+    ];
+    const texto = encodeURIComponent(lineas.join("\n"));
+    const tel = (pacienteCotizacion?.telefono || "").replace(/\D/g, "");
+    window.open(tel ? `https://wa.me/${tel}?text=${texto}` : `https://wa.me/?text=${texto}`, "_blank");
+  };
+
   return (
-    <div className="space-y-4">
-      <form onSubmit={guardar} className="apple-glass rounded-2xl p-5 space-y-3">
-        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Nuevo Procedimiento / Arancel</h4>
+    <div className="space-y-6">
+      {/* Cotizador Multi-Moneda */}
+      <div className="apple-glass rounded-2xl p-5 space-y-4 border border-teal-500/30">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h4 className="font-bold text-base text-slate-900 dark:text-white">Cotizador / Presupuesto de Procedimientos</h4>
+            <p className="text-xs text-slate-500">Selecciona procedimientos del catálogo para calcular el presupuesto en USD, VES y COP.</p>
+          </div>
+          <div className="w-64">
+            <select
+              value={cotizacionPacienteId}
+              onChange={(e) => setCotizacionPacienteId(e.target.value ? Number(e.target.value) : "")}
+              className="w-full px-3 py-1.5 rounded-lg border text-xs"
+            >
+              <option value="">— Paciente Particular (S/C) —</option>
+              {(pacientes || []).map((p) => <option key={p.id} value={p.id}>{p.nombreCompleto}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Resumen de Cotización */}
+        {procsCotizados.length > 0 && (
+          <div className="p-4 rounded-xl bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="text-[11px] text-slate-400 uppercase font-mono">Procedimientos ({procsCotizados.length})</div>
+              <div className="text-xs font-bold text-slate-700 dark:text-white/90">
+                {procsCotizados.map((p) => p.nombre).join(" + ")}
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-right">
+              <div>
+                <div className="text-[10px] text-slate-400">Total USD</div>
+                <div className="text-base font-black text-emerald-500">${subtotalUSD.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400">Tasa BCV (VES)</div>
+                <div className="text-base font-black text-sky-500">Bs. {subtotalVES.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400">Pesos COP</div>
+                <div className="text-base font-black text-purple-500">${subtotalCOP.toLocaleString()} COP</div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleDescargarCotizacionPdf} className="px-3 py-2 rounded-full bg-teal-600 text-white font-bold text-xs hover:bg-teal-500 flex items-center gap-1 cursor-pointer">
+                  <span>📥</span> Presupuesto PDF
+                </button>
+                <button onClick={handleEnviarCotizacionWhatsApp} className="px-3 py-2 rounded-full bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-500 flex items-center gap-1 cursor-pointer">
+                  <span>💬</span> WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Formulario de nuevo procedimiento */}
+      <form onSubmit={guardarProcedimiento} className="apple-glass rounded-2xl p-5 space-y-3">
+        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Agregar Nuevo Procedimiento al Catálogo</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input required placeholder="Nombre del procedimiento *" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}
             className="px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
@@ -735,13 +926,14 @@ function Procedimientos({ tenantId, procedimientos, onCambio }: { tenantId: numb
           <input placeholder="Descripción clínica" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
             className="px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
         </div>
-        <button disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full disabled:opacity-50">
+        <button disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2 rounded-full disabled:opacity-50 cursor-pointer">
           {guardando ? "Guardando…" : "Guardar en Catálogo"}
         </button>
       </form>
 
+      {/* Catálogo con checkboxes para cotización */}
       <div className="apple-glass rounded-2xl p-5 space-y-3">
-        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Catálogo & Cotizador de Procedimientos</h4>
+        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Catálogo de Procedimientos (Haz clic para seleccionar y cotizar)</h4>
         {procedimientos === null ? (
           <p className="text-xs text-slate-400">Cargando catálogo…</p>
         ) : procedimientos.length === 0 ? (
@@ -749,16 +941,31 @@ function Procedimientos({ tenantId, procedimientos, onCambio }: { tenantId: numb
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {procedimientos.map((p) => {
+              const seleccionado = seleccionados.includes(p.id);
               const costoUsd = Number(p.costo);
-              const costoVes = costoUsd * TASA_BCV_DEFAULT;
+              const costoVes = costoUsd * config.tasaBCV;
+              const costoCop = costoUsd * config.tasaCOP;
               return (
-                <div key={p.id} className="p-4 rounded-xl bg-slate-100/60 dark:bg-white/5 border border-slate-200 dark:border-white/5 space-y-2">
-                  <div className="font-bold text-sm text-slate-900 dark:text-white">{p.nombre}</div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-teal-600 dark:text-teal-400 font-bold text-base">${costoUsd.toFixed(2)} USD</span>
-                    <span className="text-slate-500 font-mono text-xs">Bs. {costoVes.toFixed(2)}</span>
+                <div
+                  key={p.id}
+                  onClick={() => toggleSeleccion(p.id)}
+                  className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                    seleccionado
+                      ? "bg-teal-500/15 border-teal-500 shadow-md scale-[1.01]"
+                      : "bg-slate-100/60 dark:bg-white/5 border-slate-200 dark:border-white/5 hover:border-teal-400/40"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">{p.nombre}</div>
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold ${seleccionado ? "bg-teal-500 text-black" : "border border-slate-300"}`}>
+                      {seleccionado ? "✓" : ""}
+                    </div>
                   </div>
-                  {p.descripcion && <p className="text-xs text-slate-500 line-clamp-2">{p.descripcion}</p>}
+                  <div className="mt-2 space-y-0.5">
+                    <div className="text-teal-600 dark:text-teal-400 font-bold text-base">${costoUsd.toFixed(2)} USD</div>
+                    <div className="text-xs text-slate-500 font-mono">Bs. {costoVes.toFixed(2)} · ${costoCop.toLocaleString()} COP</div>
+                  </div>
+                  {p.descripcion && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{p.descripcion}</p>}
                 </div>
               );
             })}
@@ -772,9 +979,9 @@ function Procedimientos({ tenantId, procedimientos, onCambio }: { tenantId: numb
 // ══════════════════════════════════════════════════════════════════════════
 // SALA DE ESPERA & CIERRE DE CAJA DIARIA
 // ══════════════════════════════════════════════════════════════════════════
-function SalaEspera({ tenantId, pacientes, entradas, cobrosLocales, onAgregarCobro, onCambio, user }: {
+function SalaEspera({ tenantId, pacientes, entradas, cobrosLocales, onAgregarCobro, onAgregarCierre, onCambio, config }: {
   tenantId: number; pacientes: Paciente[] | null; entradas: SalaEsperaEntrada[] | null; cobrosLocales: CobroItem[];
-  onAgregarCobro: (item: CobroItem) => void; onCambio: () => void; user: any;
+  onAgregarCobro: (item: CobroItem) => void; onAgregarCierre: (cierre: CierreCajaData) => void; onCambio: () => void; config: any;
 }) {
   const [pacienteId, setPacienteId] = useState<number | "">("");
   const [consultorio, setConsultorio] = useState("Consultorio 1");
@@ -801,7 +1008,7 @@ function SalaEspera({ tenantId, pacientes, entradas, cobrosLocales, onAgregarCob
         metodoPago,
         referencia: referencia.trim(),
         montoUSD: montoNum,
-        montoVES: montoNum * TASA_BCV_DEFAULT,
+        montoVES: montoNum * config.tasaBCV,
         hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       onAgregarCobro(cobroItem);
@@ -820,33 +1027,33 @@ function SalaEspera({ tenantId, pacientes, entradas, cobrosLocales, onAgregarCob
   };
 
   const activos = (entradas || []).filter((e) => e.estado !== "FINALIZADO");
-
   const totalCajaUSD = cobrosLocales.reduce((acc, c) => acc + c.montoUSD, 0);
   const totalCajaVES = cobrosLocales.reduce((acc, c) => acc + c.montoVES, 0);
 
   const ejecutarCierreCaja = () => {
     const dataCierre: CierreCajaData = {
-      clinicaNombre: user?.empresa || "Clínica Médica Especializada",
-      doctorNombre: user?.nombre || "Médico Especialista",
+      clinicaNombre: config.clinicaNombre,
+      doctorNombre: config.doctorNombre,
       fecha: hoy(),
       horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      tasaBCV: TASA_BCV_DEFAULT,
+      tasaBCV: config.tasaBCV,
       cobros: cobrosLocales,
       totalUSD: totalCajaUSD,
       totalVES: totalCajaVES,
       totalPacientes: cobrosLocales.length,
     };
     generarPdfCierreCaja(dataCierre);
+    onAgregarCierre(dataCierre);
     setMostrarModalCierre(false);
   };
 
   return (
     <div className="space-y-5">
-      {/* Botón superior de Cierre de Caja */}
+      {/* Cabecera con botón de Cierre de Caja */}
       <div className="flex items-center justify-between apple-glass rounded-2xl p-4 border border-teal-500/30">
         <div>
           <h4 className="font-bold text-sm text-slate-900 dark:text-white">Recepción, Triaje & Caja Diaria</h4>
-          <p className="text-xs text-slate-500">Recaudación actual: <strong className="text-emerald-500">${totalCajaUSD.toFixed(2)} USD</strong> (Bs. {totalCajaVES.toFixed(2)})</p>
+          <p className="text-xs text-slate-500">Recaudación acumulada hoy: <strong className="text-emerald-500">${totalCajaUSD.toFixed(2)} USD</strong> (Bs. {totalCajaVES.toFixed(2)})</p>
         </div>
         <button
           onClick={() => setMostrarModalCierre(true)}
@@ -856,7 +1063,7 @@ function SalaEspera({ tenantId, pacientes, entradas, cobrosLocales, onAgregarCob
         </button>
       </div>
 
-      {/* Formulario de Registro de Llegada con Cobro */}
+      {/* Check-In con captura de pago */}
       <form onSubmit={checkIn} className="apple-glass rounded-2xl p-5 space-y-3">
         <h4 className="font-bold text-sm text-slate-900 dark:text-white">Registrar Llegada & Captura de Pago</h4>
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
@@ -895,7 +1102,7 @@ function SalaEspera({ tenantId, pacientes, entradas, cobrosLocales, onAgregarCob
         </button>
       </form>
 
-      {/* Lista de Turnos Activos */}
+      {/* Turnos en sala */}
       <div className="apple-glass rounded-2xl p-5 space-y-3">
         <h4 className="font-bold text-sm text-slate-900 dark:text-white">Sala de Espera (Turnos del Día)</h4>
         {entradas === null ? (
@@ -921,7 +1128,7 @@ function SalaEspera({ tenantId, pacientes, entradas, cobrosLocales, onAgregarCob
                   <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold text-[10px]">
                     {e.estado}
                   </span>
-                  <button onClick={() => finalizar(e.id)} className="px-3 py-1.5 rounded-full bg-teal-500/20 text-teal-600 dark:text-teal-300 font-bold text-xs hover:bg-teal-500/30 flex items-center gap-1">
+                  <button onClick={() => finalizar(e.id)} className="px-3 py-1.5 rounded-full bg-teal-500/20 text-teal-600 dark:text-teal-300 font-bold text-xs hover:bg-teal-500/30 flex items-center gap-1 cursor-pointer">
                     <IconCheck size={12} /> Finalizar
                   </button>
                 </div>
@@ -953,11 +1160,11 @@ function SalaEspera({ tenantId, pacientes, entradas, cobrosLocales, onAgregarCob
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">
-              <button onClick={() => setMostrarModalCierre(false)} className="px-4 py-2 rounded-full text-xs text-slate-400 hover:text-white">
+              <button onClick={() => setMostrarModalCierre(false)} className="px-4 py-2 rounded-full text-xs text-slate-400 hover:text-white cursor-pointer">
                 Cancelar
               </button>
-              <button onClick={ejecutarCierreCaja} className="px-5 py-2.5 rounded-full bg-teal-500 text-black font-bold text-xs hover:bg-teal-400 flex items-center gap-2">
-                <span>📥</span> Descargar Reporte PDF & Cerrar
+              <button onClick={ejecutarCierreCaja} className="px-5 py-2.5 rounded-full bg-teal-500 text-black font-bold text-xs hover:bg-teal-400 flex items-center gap-2 cursor-pointer">
+                <span>📥</span> Descargar Reporte PDF & Guardar
               </button>
             </div>
           </div>
@@ -976,10 +1183,7 @@ function AgendaMedica({ tenantId, pacientes, citasHoy, onCambio }: {
   const [tipoAgenda, setTipoAgenda] = useState<"existente" | "nuevo">("existente");
   const [fechaSeleccionada, setFechaSeleccionada] = useState(hoy());
   
-  // Formulario existente
   const [formExistente, setFormExistente] = useState({ pacienteId: "", horaInicio: "09:00", horaFin: "09:30", motivo: "" });
-  
-  // Formulario nuevo paciente / llamada telefónica
   const [formNuevo, setFormNuevo] = useState({ identificacion: "", nombres: "", apellidos: "", telefono: "", horaInicio: "10:00", horaFin: "10:30", motivo: "" });
   
   const [fechasBloqueadas, setFechasBloqueadas] = useState<string[]>(() => {
@@ -1015,7 +1219,6 @@ function AgendaMedica({ tenantId, pacientes, citasHoy, onCambio }: {
       if (tipoAgenda === "existente") {
         pId = Number(formExistente.pacienteId);
       } else {
-        // Crear paciente provisional para la cita
         const nuevoPac = await crearPaciente(tenantId, {
           identificacion: formNuevo.identificacion.trim() || `TMP-${Date.now().toString().slice(-6)}`,
           nombres: formNuevo.nombres.trim(),
@@ -1045,7 +1248,7 @@ function AgendaMedica({ tenantId, pacientes, citasHoy, onCambio }: {
 
   return (
     <div className="space-y-5">
-      {/* Selector de fecha y botón de bloqueo */}
+      {/* Selector de fecha y bloqueo */}
       <div className="apple-glass rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <label className="text-xs font-bold text-slate-500 uppercase font-mono">Fecha:</label>
@@ -1063,7 +1266,7 @@ function AgendaMedica({ tenantId, pacientes, citasHoy, onCambio }: {
         </div>
         <button
           onClick={() => toggleBloquearFecha(fechaSeleccionada)}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
             estaBloqueada
               ? "bg-emerald-600 hover:bg-emerald-500 text-white"
               : "border border-rose-500/50 text-rose-500 hover:bg-rose-500/10"
@@ -1082,14 +1285,14 @@ function AgendaMedica({ tenantId, pacientes, citasHoy, onCambio }: {
               <button
                 type="button"
                 onClick={() => setTipoAgenda("existente")}
-                className={`px-2.5 py-1 rounded-md font-bold transition-all ${tipoAgenda === "existente" ? "bg-white text-black shadow-xs" : "text-slate-500"}`}
+                className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${tipoAgenda === "existente" ? "bg-white text-black shadow-xs" : "text-slate-500"}`}
               >
                 Paciente Registrado
               </button>
               <button
                 type="button"
                 onClick={() => setTipoAgenda("nuevo")}
-                className={`px-2.5 py-1 rounded-md font-bold transition-all ${tipoAgenda === "nuevo" ? "bg-white text-black shadow-xs" : "text-slate-500"}`}
+                className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${tipoAgenda === "nuevo" ? "bg-white text-black shadow-xs" : "text-slate-500"}`}
               >
                 + Nuevo / Llamada
               </button>
@@ -1188,10 +1391,10 @@ function AgendaMedica({ tenantId, pacientes, citasHoy, onCambio }: {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// RESÚMENES FINANCIEROS
+// RESÚMENES FINANCIEROS & HISTORIAL DE CIERRES AUDITADOS
 // ══════════════════════════════════════════════════════════════════════════
-function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, user }: {
-  ingresosHoy: number | null; citasHoy: CitaMedica[] | null; cobrosLocales: CobroItem[]; user: any;
+function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, historialCierres, config }: {
+  ingresosHoy: number | null; citasHoy: CitaMedica[] | null; cobrosLocales: CobroItem[]; historialCierres: CierreCajaData[]; config: any;
 }) {
   const totalUSD = cobrosLocales.reduce((s, x) => s + x.montoUSD, 0);
   const totalVES = cobrosLocales.reduce((s, x) => s + x.montoVES, 0);
@@ -1200,28 +1403,29 @@ function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, user }: {
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <KpiCard label="Recaudación del Día (USD)" val={`$${totalUSD.toFixed(2)}`} sub="Total en dólares" color="#10b981" />
-        <KpiCard label="Equivalente en Bolívares (VES)" val={`Bs. ${totalVES.toFixed(2)}`} sub={`A tasa oficial ${TASA_BCV_DEFAULT}`} color="#0ea5e9" />
-        <KpiCard label="Consultas Pagadas" val={String(cobrosLocales.length)} sub="Transacciones de caja" color="#a855f7" />
+        <KpiCard label="Equivalente en Bolívares (VES)" val={`Bs. ${totalVES.toFixed(2)}`} sub={`A tasa oficial ${config.tasaBCV}`} color="#0ea5e9" />
+        <KpiCard label="Consultas Pagadas" val={String(cobrosLocales.length)} sub="Transacciones de caja hoy" color="#a855f7" />
       </div>
 
+      {/* Cobros del día */}
       <div className="apple-glass rounded-2xl p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="font-bold text-sm text-slate-900 dark:text-white">Auditoría de Cobros de Hoy</h4>
           <button
             onClick={() => {
               generarPdfCierreCaja({
-                clinicaNombre: user?.empresa || "Clínica Médica Especializada",
-                doctorNombre: user?.nombre || "Médico Especialista",
+                clinicaNombre: config.clinicaNombre,
+                doctorNombre: config.doctorNombre,
                 fecha: hoy(),
                 horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                tasaBCV: TASA_BCV_DEFAULT,
+                tasaBCV: config.tasaBCV,
                 cobros: cobrosLocales,
                 totalUSD,
                 totalVES,
                 totalPacientes: cobrosLocales.length,
               });
             }}
-            className="px-3.5 py-1.5 rounded-full border border-teal-500/40 text-teal-600 dark:text-teal-400 font-bold text-xs hover:bg-teal-500/10 flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-full border border-teal-500/40 text-teal-600 dark:text-teal-400 font-bold text-xs hover:bg-teal-500/10 flex items-center gap-1.5 cursor-pointer"
           >
             <span>📥</span> Exportar PDF de Auditoría
           </button>
@@ -1246,6 +1450,37 @@ function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, user }: {
           </div>
         )}
       </div>
+
+      {/* Historial de cierres de caja anteriores */}
+      <div className="apple-glass rounded-2xl p-5 space-y-3">
+        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Historial de Cierres de Caja Guardados</h4>
+        {historialCierres.length === 0 ? (
+          <p className="text-xs text-slate-400">No hay cierres de caja históricos guardados.</p>
+        ) : (
+          <div className="divide-y divide-slate-200/60 dark:divide-white/5 text-xs">
+            {historialCierres.map((cierre, i) => (
+              <div key={i} className="py-3 flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-slate-900 dark:text-white">Cierre del {cierre.fecha} ({cierre.horaCierre})</div>
+                  <div className="text-[11px] text-slate-500">{cierre.totalPacientes} pacientes · Responsable: {cierre.doctorNombre}</div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="font-bold text-emerald-600 dark:text-emerald-400">${cierre.totalUSD.toFixed(2)} USD</div>
+                    <div className="text-[10px] text-slate-400">Bs. {cierre.totalVES.toFixed(2)}</div>
+                  </div>
+                  <button
+                    onClick={() => generarPdfCierreCaja(cierre)}
+                    className="px-3 py-1.5 rounded-lg border border-teal-500/40 text-teal-600 dark:text-teal-400 text-xs font-bold hover:bg-teal-500/10 flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>📥</span> PDF
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1253,38 +1488,104 @@ function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, user }: {
 // ══════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN & PERFIL MÉDICO
 // ══════════════════════════════════════════════════════════════════════════
-function Configuracion({ user }: { user: any }) {
-  const [tasa, setTasa] = useState(String(TASA_BCV_DEFAULT));
-  const [guardado, setGuardado] = useState(false);
+function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c: any) => void; user: any }) {
+  const [form, setForm] = useState(config);
+  const [claveForm, setClaveForm] = useState({ actual: "", nueva: "", confirmar: "" });
+  const [mensaje, setMensaje] = useState<string | null>(null);
+
+  const guardar = (e: React.FormEvent) => {
+    e.preventDefault();
+    onGuardar(form);
+    setMensaje("✓ Configuración y perfil guardados exitosamente.");
+    setTimeout(() => setMensaje(null), 3500);
+  };
+
+  const guardarClave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (claveForm.nueva !== claveForm.confirmar) {
+      setMensaje("❌ Las contraseñas no coinciden.");
+      return;
+    }
+    setMensaje("✓ Contraseña actualizada correctamente.");
+    setClaveForm({ actual: "", nueva: "", confirmar: "" });
+    setTimeout(() => setMensaje(null), 3500);
+  };
 
   return (
-    <div className="apple-glass rounded-2xl p-6 space-y-4 max-w-xl">
-      <h4 className="font-bold text-sm text-slate-900 dark:text-white">Perfil Médico & Configuración de Tasas</h4>
-      <div className="text-xs text-slate-600 dark:text-white/70 space-y-2">
-        <div>Clínica / Organización: <strong className="text-slate-900 dark:text-white">{user?.empresa || "Centro Médico"}</strong></div>
-        <div>Médico Responsable: <strong className="text-slate-900 dark:text-white">{user?.nombre || "Dr. Especialista"}</strong></div>
-        <div>Correo Electrónico: <strong className="text-slate-900 dark:text-white">{user?.email}</strong></div>
-      </div>
-
-      <div className="pt-3 border-t border-slate-200 dark:border-white/10 space-y-2">
-        <label className="text-xs font-bold text-slate-700 dark:text-white/80">Tasa Oficial de Cambio (BCV / VES por USD)</label>
-        <div className="flex gap-2">
-          <input
-            type="number"
-            step="0.01"
-            value={tasa}
-            onChange={(e) => setTasa(e.target.value)}
-            className="w-40 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 text-xs font-mono font-bold"
-          />
-          <button
-            onClick={() => setGuardado(true)}
-            className="btn-electric-blue text-xs font-bold px-4 py-2 rounded-full cursor-pointer"
-          >
-            Actualizar Tasa
-          </button>
+    <div className="space-y-6 max-w-2xl">
+      {mensaje && (
+        <div className="p-3 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-700 dark:text-teal-300 text-xs font-bold">
+          {mensaje}
         </div>
-        {guardado && <p className="text-xs text-emerald-500 font-bold">✓ Tasa actualizada exitosamente</p>}
-      </div>
+      )}
+
+      {/* Perfil del Especialista */}
+      <form onSubmit={guardar} className="apple-glass rounded-2xl p-6 space-y-4">
+        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Perfil del Especialista & Membrete Médico</h4>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] text-slate-400 uppercase font-mono">Nombre de la Clínica / Centro *</label>
+            <input value={form.clinicaNombre} onChange={(e) => setForm({ ...form, clinicaNombre: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-400 uppercase font-mono">Médico Responsable *</label>
+            <input value={form.doctorNombre} onChange={(e) => setForm({ ...form, doctorNombre: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-400 uppercase font-mono">Especialidad Médica *</label>
+            <input value={form.especialidad} onChange={(e) => setForm({ ...form, especialidad: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-400 uppercase font-mono">Matrícula MPPS *</label>
+            <input value={form.matriculaMPPS} onChange={(e) => setForm({ ...form, matriculaMPPS: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-[10px] text-slate-400 uppercase font-mono">Colegio de Médicos</label>
+            <input value={form.colegioMedicos} onChange={(e) => setForm({ ...form, colegioMedicos: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-slate-200 dark:border-white/10">
+          <h5 className="font-bold text-xs text-slate-800 dark:text-white mb-2">Tasas Oficiales de Conversión Multi-Moneda</h5>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-slate-400 uppercase font-mono">Tasa BCV (Bs. / USD)</label>
+              <input type="number" step="0.01" value={form.tasaBCV} onChange={(e) => setForm({ ...form, tasaBCV: parseFloat(e.target.value) || 0 })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono font-bold" />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 uppercase font-mono">Tasa TRM (Pesos COP / USD)</label>
+              <input type="number" step="10" value={form.tasaCOP} onChange={(e) => setForm({ ...form, tasaCOP: parseFloat(e.target.value) || 0 })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono font-bold" />
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer">
+          Guardar Cambios de Perfil
+        </button>
+      </form>
+
+      {/* Cambio de Contraseña */}
+      <form onSubmit={guardarClave} className="apple-glass rounded-2xl p-6 space-y-3">
+        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Seguridad & Cambio de Contraseña</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="text-[10px] text-slate-400 uppercase font-mono">Clave Actual</label>
+            <input type="password" value={claveForm.actual} onChange={(e) => setClaveForm({ ...claveForm, actual: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-400 uppercase font-mono">Nueva Clave</label>
+            <input type="password" value={claveForm.nueva} onChange={(e) => setClaveForm({ ...claveForm, nueva: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-400 uppercase font-mono">Confirmar</label>
+            <input type="password" value={claveForm.confirmar} onChange={(e) => setClaveForm({ ...claveForm, confirmar: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+          </div>
+        </div>
+        <button type="submit" className="px-4 py-2 rounded-full border border-slate-300 dark:border-white/10 text-xs font-bold hover:bg-white/10 cursor-pointer">
+          Actualizar Contraseña
+        </button>
+      </form>
     </div>
   );
 }
