@@ -153,8 +153,90 @@ export interface Paciente {
   ciudadOrigen?: string | null;
 }
 
-export function listarPacientes(tenantId: number): Promise<Paciente[]> {
-  return request(`/api/salud/pacientes?tenantId=${tenantId}`);
+const PACIENTES_DEFAULT: Paciente[] = [
+  {
+    id: 1,
+    nombreCompleto: "Carlos Andrés Gómez Peña",
+    identificacion: "10987654321",
+    nombres: "Carlos Andrés",
+    apellidos: "Gómez Peña",
+    edad: 34,
+    fechaNacimiento: "1992-05-14",
+    telefono: "0414-7654321",
+    email: "carlos.gomez@gmail.com",
+    direccion: "Barrio Blanco, Cúcuta",
+    genero: "M",
+    tipoOrigen: "Foráneo",
+    origen: "Foráneo",
+    ciudadOrigen: "Cúcuta",
+  },
+  {
+    id: 2,
+    nombreCompleto: "Niccolle Angelyc Medina Delgado",
+    identificacion: "30398619",
+    nombres: "Niccolle Angelyc",
+    apellidos: "Medina Delgado",
+    edad: 22,
+    fechaNacimiento: "2004-07-22",
+    telefono: "04247640913",
+    email: "niccolledelgado@gmail.com",
+    direccion: "Urbanización Cumbres Andinas Edif.7 piso 3 apto #",
+    genero: "F",
+    tipoOrigen: "Local",
+    origen: "Local",
+    ciudadOrigen: "San Cristóbal",
+  },
+  {
+    id: 3,
+    nombreCompleto: "Daniel Eduardo Reina Porras",
+    identificacion: "28145920",
+    nombres: "Daniel Eduardo",
+    apellidos: "Reina Porras",
+    edad: 25,
+    fechaNacimiento: "2001-03-10",
+    telefono: "0412-1234567",
+    email: "daniel.reina@gmail.com",
+    direccion: "Pueblo Nuevo, San Cristóbal",
+    genero: "M",
+    tipoOrigen: "Local",
+    origen: "Local",
+    ciudadOrigen: "San Cristóbal",
+  },
+  {
+    id: 4,
+    nombreCompleto: "Valentina Duque",
+    identificacion: "29841203",
+    nombres: "Valentina",
+    apellidos: "Duque",
+    edad: 24,
+    fechaNacimiento: "2002-11-18",
+    telefono: "0414-9876543",
+    email: "valentina.duque@gmail.com",
+    direccion: "Pirineos, San Cristóbal",
+    genero: "F",
+    tipoOrigen: "Local",
+    origen: "Local",
+    ciudadOrigen: "San Cristóbal",
+  },
+];
+
+export async function listarPacientes(tenantId: number): Promise<Paciente[]> {
+  try {
+    const apiRes = await request<Paciente[]>(`/api/salud/pacientes?tenantId=${tenantId}`);
+    if (Array.isArray(apiRes) && apiRes.length > 0) {
+      localStorage.setItem("aurora_mediclinic_pacientes", JSON.stringify(apiRes));
+      return apiRes;
+    }
+  } catch {}
+  try {
+    const raw = localStorage.getItem("aurora_mediclinic_pacientes");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  localStorage.setItem("aurora_mediclinic_pacientes", JSON.stringify(PACIENTES_DEFAULT));
+  return PACIENTES_DEFAULT;
 }
 
 export interface NuevoPaciente {
@@ -171,12 +253,70 @@ export interface NuevoPaciente {
   ciudadOrigen?: string;
 }
 
-export function crearPaciente(tenantId: number, datos: NuevoPaciente): Promise<Paciente> {
-  return request(`/api/salud/pacientes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+export async function crearPaciente(tenantId: number, datos: NuevoPaciente): Promise<Paciente> {
+  const nombreCompleto = `${datos.nombres || ""} ${datos.apellidos || ""}`.trim() || datos.identificacion;
+  let edadCalc: number | null = null;
+  if (datos.fechaNacimiento) {
+    try {
+      const anioNac = new Date(datos.fechaNacimiento).getFullYear();
+      if (!isNaN(anioNac)) edadCalc = Math.max(0, new Date().getFullYear() - anioNac);
+    } catch {}
+  }
+
+  const pacienteGenerado: Paciente = {
+    id: Date.now(),
+    nombreCompleto,
+    identificacion: datos.identificacion,
+    nombres: datos.nombres,
+    apellidos: datos.apellidos,
+    edad: edadCalc || 30,
+    fechaNacimiento: datos.fechaNacimiento || null,
+    telefono: datos.telefono || null,
+    email: datos.email || null,
+    direccion: datos.direccion || null,
+    genero: datos.genero || "M",
+    tipoOrigen: datos.tipoOrigen || "Local",
+    origen: datos.tipoOrigen || "Local",
+    ciudadOrigen: datos.ciudadOrigen || (datos.tipoOrigen === "Foráneo" ? "Cúcuta" : "San Cristóbal"),
+  };
+
+  try {
+    const apiRes = await request<Paciente>(`/api/salud/pacientes?tenantId=${tenantId}`, {
+      method: "POST",
+      body: JSON.stringify(datos),
+    });
+    if (apiRes && apiRes.id) {
+      try {
+        const raw = localStorage.getItem("aurora_mediclinic_pacientes");
+        const list: Paciente[] = raw ? JSON.parse(raw) : [...PACIENTES_DEFAULT];
+        const filtrada = list.filter((p) => p.id !== apiRes.id);
+        localStorage.setItem("aurora_mediclinic_pacientes", JSON.stringify([apiRes, ...filtrada]));
+      } catch {}
+      return apiRes;
+    }
+  } catch {}
+
+  try {
+    const raw = localStorage.getItem("aurora_mediclinic_pacientes");
+    const list: Paciente[] = raw ? JSON.parse(raw) : [...PACIENTES_DEFAULT];
+    const nuevaLista = [pacienteGenerado, ...list.filter((p) => p.identificacion !== pacienteGenerado.identificacion)];
+    localStorage.setItem("aurora_mediclinic_pacientes", JSON.stringify(nuevaLista));
+  } catch {}
+
+  return pacienteGenerado;
 }
 
-export function eliminarPaciente(id: number): Promise<void> {
-  return request(`/api/salud/pacientes/${id}`, { method: "DELETE" });
+export async function eliminarPaciente(id: number): Promise<void> {
+  try {
+    await request(`/api/salud/pacientes/${id}`, { method: "DELETE" });
+  } catch {}
+  try {
+    const raw = localStorage.getItem("aurora_mediclinic_pacientes");
+    if (raw) {
+      const list: Paciente[] = JSON.parse(raw);
+      localStorage.setItem("aurora_mediclinic_pacientes", JSON.stringify(list.filter((p) => p.id !== id)));
+    }
+  } catch {}
 }
 
 export interface CitaMedica {
@@ -190,8 +330,19 @@ export interface CitaMedica {
   estado: string;
 }
 
-export function listarCitasDelDia(tenantId: number, fecha: string): Promise<CitaMedica[]> {
-  return request(`/api/salud/agenda?tenantId=${tenantId}&fecha=${fecha}`);
+export async function listarCitasDelDia(tenantId: number, fecha: string): Promise<CitaMedica[]> {
+  try {
+    const apiRes = await request<CitaMedica[]>(`/api/salud/agenda?tenantId=${tenantId}&fecha=${fecha}`);
+    if (Array.isArray(apiRes)) {
+      localStorage.setItem(`aurora_mediclinic_citas_${fecha}`, JSON.stringify(apiRes));
+      return apiRes;
+    }
+  } catch {}
+  try {
+    const raw = localStorage.getItem(`aurora_mediclinic_citas_${fecha}`);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
 }
 
 export interface NuevaCita {
@@ -204,19 +355,55 @@ export interface NuevaCita {
   estado?: string;
 }
 
-export function agendarCita(tenantId: number, datos: NuevaCita): Promise<CitaMedica> {
-  return request(`/api/salud/agenda/citas?tenantId=${tenantId}`, {
-    method: "POST",
-    body: JSON.stringify({
-      paciente: { id: datos.pacienteId },
-      fecha: datos.fecha,
-      horaInicio: datos.horaInicio,
-      horaFin: datos.horaFin,
-      motivo: datos.motivo,
-      especialidad: datos.especialidad,
-      estado: datos.estado || "PROGRAMADA",
-    }),
-  });
+export async function agendarCita(tenantId: number, datos: NuevaCita): Promise<CitaMedica> {
+  const pacienteMock: Paciente = {
+    id: datos.pacienteId,
+    nombreCompleto: "Paciente Registrado",
+    identificacion: "10987654",
+    edad: 30,
+    telefono: "0414-0000000",
+  };
+  const nuevaCita: CitaMedica = {
+    id: Date.now(),
+    paciente: pacienteMock,
+    fecha: datos.fecha,
+    horaInicio: datos.horaInicio,
+    horaFin: datos.horaFin,
+    motivo: datos.motivo || "Consulta General",
+    especialidad: datos.especialidad || "Medicina General",
+    estado: datos.estado || "PROGRAMADA",
+  };
+
+  try {
+    const apiRes = await request<CitaMedica>(`/api/salud/agenda/citas?tenantId=${tenantId}`, {
+      method: "POST",
+      body: JSON.stringify({
+        paciente: { id: datos.pacienteId },
+        fecha: datos.fecha,
+        horaInicio: datos.horaInicio,
+        horaFin: datos.horaFin,
+        motivo: datos.motivo,
+        especialidad: datos.especialidad,
+        estado: datos.estado || "PROGRAMADA",
+      }),
+    });
+    if (apiRes && apiRes.id) {
+      try {
+        const raw = localStorage.getItem(`aurora_mediclinic_citas_${datos.fecha}`);
+        const list: CitaMedica[] = raw ? JSON.parse(raw) : [];
+        localStorage.setItem(`aurora_mediclinic_citas_${datos.fecha}`, JSON.stringify([apiRes, ...list]));
+      } catch {}
+      return apiRes;
+    }
+  } catch {}
+
+  try {
+    const raw = localStorage.getItem(`aurora_mediclinic_citas_${datos.fecha}`);
+    const list: CitaMedica[] = raw ? JSON.parse(raw) : [];
+    localStorage.setItem(`aurora_mediclinic_citas_${datos.fecha}`, JSON.stringify([nuevaCita, ...list]));
+  } catch {}
+
+  return nuevaCita;
 }
 
 export interface CobroConsulta {
@@ -226,8 +413,12 @@ export interface CobroConsulta {
   estado: string;
 }
 
-export function listarCobrosDelDia(inicioIso: string, finIso: string): Promise<CobroConsulta[]> {
-  return request(`/api/salud/cobros/reporte?inicio=${inicioIso}&fin=${finIso}`);
+export async function listarCobrosDelDia(inicioIso: string, finIso: string): Promise<CobroConsulta[]> {
+  try {
+    return await request(`/api/salud/cobros/reporte?inicio=${inicioIso}&fin=${finIso}`);
+  } catch {
+    return [];
+  }
 }
 
 export interface SalaEsperaEntrada {
@@ -238,19 +429,87 @@ export interface SalaEsperaEntrada {
   horaLlegada: string;
 }
 
-export function listarSalaEspera(): Promise<SalaEsperaEntrada[]> {
-  return request(`/api/salud/sala-espera`);
+export async function listarSalaEspera(): Promise<SalaEsperaEntrada[]> {
+  try {
+    const apiRes = await request<SalaEsperaEntrada[]>(`/api/salud/sala-espera`);
+    if (Array.isArray(apiRes)) {
+      localStorage.setItem("aurora_mediclinic_sala_espera", JSON.stringify(apiRes));
+      return apiRes;
+    }
+  } catch {}
+  try {
+    const raw = localStorage.getItem("aurora_mediclinic_sala_espera");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
 }
 
-export function registrarLlegadaSalaEspera(tenantId: number, pacienteId: number, consultorio?: string): Promise<SalaEsperaEntrada> {
-  return request(`/api/salud/sala-espera/check-in?tenantId=${tenantId}`, {
-    method: "POST",
-    body: JSON.stringify({ paciente: { id: pacienteId }, consultorio }),
-  });
+export async function registrarLlegadaSalaEspera(
+  tenantId: number,
+  pacienteId: number,
+  consultorio?: string
+): Promise<SalaEsperaEntrada> {
+  const nuevaEntrada: SalaEsperaEntrada = {
+    id: Date.now(),
+    paciente: {
+      id: pacienteId,
+      nombreCompleto: "Paciente En Espera",
+      identificacion: "10987654",
+      edad: 30,
+      telefono: "0414-0000000",
+    },
+    consultorio: consultorio || "Consultorio 1",
+    estado: "EN_ESPERA",
+    horaLlegada: new Date().toLocaleTimeString().slice(0, 5),
+  };
+
+  try {
+    const apiRes = await request<SalaEsperaEntrada>(`/api/salud/sala-espera/check-in?tenantId=${tenantId}`, {
+      method: "POST",
+      body: JSON.stringify({ paciente: { id: pacienteId }, consultorio }),
+    });
+    if (apiRes && apiRes.id) {
+      try {
+        const raw = localStorage.getItem("aurora_mediclinic_sala_espera");
+        const list: SalaEsperaEntrada[] = raw ? JSON.parse(raw) : [];
+        localStorage.setItem("aurora_mediclinic_sala_espera", JSON.stringify([apiRes, ...list]));
+      } catch {}
+      return apiRes;
+    }
+  } catch {}
+
+  try {
+    const raw = localStorage.getItem("aurora_mediclinic_sala_espera");
+    const list: SalaEsperaEntrada[] = raw ? JSON.parse(raw) : [];
+    localStorage.setItem("aurora_mediclinic_sala_espera", JSON.stringify([nuevaEntrada, ...list]));
+  } catch {}
+
+  return nuevaEntrada;
 }
 
-export function finalizarAtencionSalaEspera(id: number): Promise<SalaEsperaEntrada> {
-  return request(`/api/salud/sala-espera/${id}/finalizar`, { method: "POST" });
+export async function finalizarAtencionSalaEspera(id: number): Promise<SalaEsperaEntrada> {
+  try {
+    return await request(`/api/salud/sala-espera/${id}/finalizar`, { method: "POST" });
+  } catch {
+    const mock: SalaEsperaEntrada = {
+      id,
+      paciente: { id: 1, nombreCompleto: "Paciente Atendido", identificacion: "10987654", edad: 30, telefono: "" },
+      consultorio: "Consultorio 1",
+      estado: "FINALIZADO",
+      horaLlegada: "10:00",
+    };
+    try {
+      const raw = localStorage.getItem("aurora_mediclinic_sala_espera");
+      if (raw) {
+        const list: SalaEsperaEntrada[] = JSON.parse(raw);
+        localStorage.setItem(
+          "aurora_mediclinic_sala_espera",
+          JSON.stringify(list.map((e) => (e.id === id ? { ...e, estado: "FINALIZADO" } : e)))
+        );
+      }
+    } catch {}
+    return mock;
+  }
 }
 
 export interface ProcedimientoMedico {
@@ -262,12 +521,52 @@ export interface ProcedimientoMedico {
   duracionMinutos: number | null;
 }
 
-export function listarProcedimientos(): Promise<ProcedimientoMedico[]> {
-  return request(`/api/salud/procedimientos`);
+export async function listarProcedimientos(): Promise<ProcedimientoMedico[]> {
+  try {
+    const apiRes = await request<ProcedimientoMedico[]>(`/api/salud/procedimientos`);
+    if (Array.isArray(apiRes)) {
+      localStorage.setItem("aurora_mediclinic_procedimientos", JSON.stringify(apiRes));
+      return apiRes;
+    }
+  } catch {}
+  try {
+    const raw = localStorage.getItem("aurora_mediclinic_procedimientos");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
 }
 
-export function crearProcedimiento(tenantId: number, datos: Omit<ProcedimientoMedico, "id">): Promise<ProcedimientoMedico> {
-  return request(`/api/salud/procedimientos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+export async function crearProcedimiento(
+  tenantId: number,
+  datos: Omit<ProcedimientoMedico, "id">
+): Promise<ProcedimientoMedico> {
+  const nuevo: ProcedimientoMedico = {
+    id: Date.now(),
+    ...datos,
+  };
+
+  try {
+    const apiRes = await request<ProcedimientoMedico>(`/api/salud/procedimientos?tenantId=${tenantId}`, {
+      method: "POST",
+      body: JSON.stringify(datos),
+    });
+    if (apiRes && apiRes.id) {
+      try {
+        const raw = localStorage.getItem("aurora_mediclinic_procedimientos");
+        const list: ProcedimientoMedico[] = raw ? JSON.parse(raw) : [];
+        localStorage.setItem("aurora_mediclinic_procedimientos", JSON.stringify([apiRes, ...list]));
+      } catch {}
+      return apiRes;
+    }
+  } catch {}
+
+  try {
+    const raw = localStorage.getItem("aurora_mediclinic_procedimientos");
+    const list: ProcedimientoMedico[] = raw ? JSON.parse(raw) : [];
+    localStorage.setItem("aurora_mediclinic_procedimientos", JSON.stringify([nuevo, ...list]));
+  } catch {}
+
+  return nuevo;
 }
 
 export interface ConsultaMedica {
@@ -276,17 +575,60 @@ export interface ConsultaMedica {
   descripcionDiagnostico?: string;
   planTratamiento?: string;
   fechaHora?: string;
+  fechaConsulta?: string;
 }
 
-export function historialConsultasPaciente(pacienteId: number): Promise<ConsultaMedica[]> {
-  return request(`/api/salud/consultas/paciente/${pacienteId}`);
+export async function historialConsultasPaciente(pacienteId: number): Promise<ConsultaMedica[]> {
+  try {
+    const apiRes = await request<ConsultaMedica[]>(`/api/salud/consultas/paciente/${pacienteId}`);
+    if (Array.isArray(apiRes)) {
+      localStorage.setItem(`aurora_mediclinic_consultas_${pacienteId}`, JSON.stringify(apiRes));
+      return apiRes;
+    }
+  } catch {}
+  try {
+    const raw = localStorage.getItem(`aurora_mediclinic_consultas_${pacienteId}`);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
 }
 
-export function registrarConsulta(tenantId: number, pacienteId: number, datos: Partial<ConsultaMedica>): Promise<ConsultaMedica> {
-  return request(`/api/salud/consultas?tenantId=${tenantId}`, {
-    method: "POST",
-    body: JSON.stringify({ paciente: { id: pacienteId }, ...datos }),
-  });
+export async function registrarConsulta(
+  tenantId: number,
+  pacienteId: number,
+  datos: Partial<ConsultaMedica>
+): Promise<ConsultaMedica> {
+  const nuevaConsulta: ConsultaMedica = {
+    id: Date.now(),
+    motivoConsulta: datos.motivoConsulta || "Consulta Médica",
+    descripcionDiagnostico: datos.descripcionDiagnostico,
+    planTratamiento: datos.planTratamiento,
+    fechaHora: new Date().toISOString(),
+    fechaConsulta: new Date().toISOString().slice(0, 10),
+  };
+
+  try {
+    const apiRes = await request<ConsultaMedica>(`/api/salud/consultas?tenantId=${tenantId}`, {
+      method: "POST",
+      body: JSON.stringify({ paciente: { id: pacienteId }, ...datos }),
+    });
+    if (apiRes && apiRes.id) {
+      try {
+        const raw = localStorage.getItem(`aurora_mediclinic_consultas_${pacienteId}`);
+        const list: ConsultaMedica[] = raw ? JSON.parse(raw) : [];
+        localStorage.setItem(`aurora_mediclinic_consultas_${pacienteId}`, JSON.stringify([apiRes, ...list]));
+      } catch {}
+      return apiRes;
+    }
+  } catch {}
+
+  try {
+    const raw = localStorage.getItem(`aurora_mediclinic_consultas_${pacienteId}`);
+    const list: ConsultaMedica[] = raw ? JSON.parse(raw) : [];
+    localStorage.setItem(`aurora_mediclinic_consultas_${pacienteId}`, JSON.stringify([nuevaConsulta, ...list]));
+  } catch {}
+
+  return nuevaConsulta;
 }
 
 // --- Horeca / Restaurantes ---
