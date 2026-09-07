@@ -30,6 +30,21 @@ export function borrarSesion() {
 
 export class ApiError extends Error {}
 
+const SESSION_USER_KEY = "aurora_session_user";
+
+// Sesión vencida o inválida (401 de TenantInterceptor): antes esto solo se
+// mostraba como un texto rojo suelto en el formulario donde tocara, sin
+// avisar que había que volver a iniciar sesión — quien no leyera el detalle
+// del error se quedaba dando vueltas pensando que la app estaba rota.
+// Limpia la sesión y manda al login de una, en cualquier pantalla.
+function manejarSesionVencida() {
+  borrarSesion();
+  try { localStorage.removeItem(SESSION_USER_KEY); } catch {}
+  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/auth")) {
+    window.location.href = "/auth";
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const sesion = leerSesion();
   const headers: Record<string, string> = {
@@ -41,6 +56,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   const res = await fetch(path, { ...options, headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
   if (!res.ok) {
     let mensaje = `Error ${res.status}`;
     try {
@@ -65,6 +84,10 @@ async function requestText(path: string, options: RequestInit = {}): Promise<str
     headers["Authorization"] = `Bearer ${sesion.token}`;
   }
   const res = await fetch(path, { ...options, headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
   if (!res.ok) throw new ApiError(`Error ${res.status}`);
   return res.text();
 }
@@ -316,6 +339,10 @@ export function crearMesa(tenantId: number, datos: { numero: number; capacidad?:
   return request(`/api/horeca/mesas-fisicas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
+export function actualizarPosicionMesa(tenantId: number, mesaId: number, datos: { posX: number; posY: number; ancho?: number; alto?: number; forma?: string }): Promise<Mesa> {
+  return request(`/api/horeca/mesas-fisicas/${mesaId}/posicion?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
 export function mapaDeMesas(): Promise<MapaMesaEntrada[]> {
   return request(`/api/horeca/mesas-fisicas/mapa`);
 }
@@ -534,6 +561,40 @@ export interface ResumenPeriodoAbierto {
 
 export function resumenPeriodoAbierto(tenantId: number, moneda: string): Promise<ResumenPeriodoAbierto> {
   return request(`/api/financiero/tesoreria/resumen-periodo-abierto?tenantId=${tenantId}&moneda=${moneda}`);
+}
+
+export interface ArqueoCaja {
+  id: number;
+  tenantId: number;
+  idCajero: string;
+  moneda: string;
+  montoDeclarado: number;
+  montoEsperado: number;
+  diferencia: number;
+  fechaArqueo: string;
+}
+
+export function cerrarCaja(tenantId: number, datos: { idCajero: string; montoDeclarado: number; moneda: string }): Promise<ArqueoCaja> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), idCajero: datos.idCajero, montoDeclarado: String(datos.montoDeclarado), moneda: datos.moneda });
+  return request(`/api/financiero/tesoreria/cerrar-caja?${params}`, { method: "POST" });
+}
+
+export function historialCierres(): Promise<ArqueoCaja[]> {
+  return request(`/api/financiero/tesoreria/historial-cierres`);
+}
+
+// Descarga el PDF del cierre autenticado (no puede ser un <a href> plano — necesita el Bearer token).
+export async function descargarCierrePdf(tenantId: number, arqueoId: number): Promise<Blob> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const res = await fetch(`/api/financiero/tesoreria/cierre/${arqueoId}/pdf?tenantId=${tenantId}`, { headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) throw new ApiError(`Error ${res.status}`);
+  return res.blob();
 }
 
 export function monedaBase(tenantId: number): Promise<string> {

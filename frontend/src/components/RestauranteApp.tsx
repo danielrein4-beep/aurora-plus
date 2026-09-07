@@ -12,12 +12,14 @@ import {
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase,
   tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
+  cerrarCaja, historialCierres, descargarCierrePdf,
   type MapaMesaEntrada, type Comanda, type ItemComanda, type EstadoItemComanda,
   type EscandalloReceta, type DetalleReceta, type FastBarTrago, type ProveedorHoreca,
   type Articulo, type ItemCompraInsumo, type LoteArticulo, type TasaCambio, type MovimientoCaja,
+  type ResumenPeriodoAbierto, type ArqueoCaja,
 } from "../api";
 
-type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "vencimientos" | "finanzas" | "cuentas" | "configuracion";
+type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "inventario" | "administracion" | "configuracion";
 
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element }
 interface NavGrupo { titulo: string; items: NavItem[] }
@@ -35,12 +37,11 @@ const NAV_GRUPOS: NavGrupo[] = [
     ],
   },
   {
-    titulo: "Administración",
+    titulo: "Gestión",
     items: [
       { id: "compras", label: "Compras & Proveedores", Icon: IconUsers },
-      { id: "vencimientos", label: "Vencimientos", Icon: IconWarning },
-      { id: "finanzas", label: "Ingresos & Gastos", Icon: IconCheckCircle },
-      { id: "cuentas", label: "Cuentas x Cobrar/Pagar", Icon: IconBank },
+      { id: "inventario", label: "Inventario", Icon: IconWarning },
+      { id: "administracion", label: "Administración", Icon: IconBank },
       { id: "configuracion", label: "Configuración", Icon: IconCustomize },
     ],
   },
@@ -245,7 +246,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             <div key={grupo.titulo} className="space-y-1">
               <div className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/25">{grupo.titulo}</div>
               {grupo.items.map((n) => {
-                const alertaVencimiento = n.id === "vencimientos" && (lotesPorVencer || []).length > 0;
+                const alertaVencimiento = n.id === "inventario" && (lotesPorVencer || []).length > 0;
                 return (
                   <button
                     key={n.id}
@@ -335,9 +336,8 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "compras" && (
             <ComprasProveedores tenantId={tenantId} proveedores={proveedores} articulos={articulos} onCambio={recargarTodo} />
           )}
-          {pagina === "vencimientos" && <Vencimientos tenantId={tenantId} onCambio={recargarTodo} />}
-          {pagina === "finanzas" && <Finanzas tenantId={tenantId} />}
-          {pagina === "cuentas" && <CuentasPorCobrarPagar tenantId={tenantId} />}
+          {pagina === "inventario" && <Inventario tenantId={tenantId} articulos={articulos} onCambio={recargarTodo} />}
+          {pagina === "administracion" && <Administracion tenantId={tenantId} />}
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
         </div>
       </main>
@@ -370,7 +370,7 @@ function VistaGeneral({ mesasOcupadas, totalMesas, comandasAbiertas, totalVentas
         <KpiCard label="Comandas Abiertas" val={String(comandasAbiertas)} sub="Salón, delivery y recoger" color="#a855f7" onClick={() => onNavegar("salon")} />
         <KpiCard label="Ventas del Día" val={`$${totalVentasHoy.toFixed(2)}`} sub="Comandas y Fast-Bar cerrados" color="#10b981" onClick={() => onNavegar("salon")} />
         <KpiCard label="Platos en Cocina" val={String(kdsCounts)} sub="Pendientes + en preparación" color="#f59e0b" onClick={() => onNavegar("cocina")} />
-        <KpiCard label="Por Vencer" val={String(vencimientos)} sub="Lotes vencidos o próximos" color={vencimientos > 0 ? "#ef4444" : "#64748b"} onClick={() => onNavegar("vencimientos")} />
+        <KpiCard label="Por Vencer" val={String(vencimientos)} sub="Lotes vencidos o próximos" color={vencimientos > 0 ? "#ef4444" : "#64748b"} onClick={() => onNavegar("inventario")} />
       </div>
       <button onClick={() => onNavegar("ventarapida")}
         className="w-full btn-cyber-neon text-white rounded-2xl p-5 flex items-center justify-between cursor-pointer shadow-lg hover:scale-[1.01] transition-all">
@@ -1004,7 +1004,7 @@ function FastBar({ tenantId, fastbar, onVenta, onCambio }: { tenantId: number; f
 function ComprasProveedores({ tenantId, proveedores, articulos, onCambio }: {
   tenantId: number; proveedores: ProveedorHoreca[] | null; articulos: Articulo[] | null; onCambio: () => void;
 }) {
-  const [tab, setTab] = useState<"compra" | "proveedores" | "articulos">("compra");
+  const [tab, setTab] = useState<"compra" | "proveedores">("compra");
   const [mostrarFormProveedor, setMostrarFormProveedor] = useState(false);
   const [formProveedor, setFormProveedor] = useState({ nombre: "", rif: "", telefono: "", contacto: "" });
   const [error, setError] = useState<string | null>(null);
@@ -1032,7 +1032,6 @@ function ComprasProveedores({ tenantId, proveedores, articulos, onCambio }: {
         {[
           { id: "compra", label: "Registrar Compra" },
           { id: "proveedores", label: "Proveedores" },
-          { id: "articulos", label: "Artículos" },
         ].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id as typeof tab)}
             className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === t.id ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"}`}>
@@ -1042,8 +1041,6 @@ function ComprasProveedores({ tenantId, proveedores, articulos, onCambio }: {
       </div>
 
       {tab === "compra" && <RegistrarCompra tenantId={tenantId} proveedores={proveedores} articulos={articulos} onCambio={onCambio} />}
-
-      {tab === "articulos" && <GestionArticulos tenantId={tenantId} articulos={articulos} onCambio={onCambio} />}
 
       {tab === "proveedores" && (
         <div className="space-y-5">
@@ -1090,6 +1087,32 @@ function ComprasProveedores({ tenantId, proveedores, articulos, onCambio }: {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// INVENTARIO — artículos + alertas de vencimiento, unidos en un solo lugar
+// ══════════════════════════════════════════════════════════════════════════
+function Inventario({ tenantId, articulos, onCambio }: { tenantId: number; articulos: Articulo[] | null; onCambio: () => void }) {
+  const [tab, setTab] = useState<"articulos" | "vencimientos">("articulos");
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+        {[
+          { id: "articulos", label: "Artículos" },
+          { id: "vencimientos", label: "Vencimientos" },
+        ].map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id as typeof tab)}
+            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === t.id ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "articulos" && <GestionArticulos tenantId={tenantId} articulos={articulos} onCambio={onCambio} />}
+      {tab === "vencimientos" && <Vencimientos tenantId={tenantId} onCambio={onCambio} />}
     </div>
   );
 }
@@ -1581,6 +1604,167 @@ function VentaRapida({ tenantId, escandallos, fastbar, onVenta }: {
           className="w-full btn-cyber-neon text-white text-sm font-bold py-3.5 rounded-xl cursor-pointer disabled:opacity-50">
           {procesando ? "Procesando…" : exito ? "✓ Venta registrada" : `Cobrar $${total.toFixed(2)}`}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ADMINISTRACIÓN — ingresos/gastos + cuentas x cobrar/pagar + cierre de caja, unidos
+// ══════════════════════════════════════════════════════════════════════════
+function Administracion({ tenantId }: { tenantId: number }) {
+  const [tab, setTab] = useState<"finanzas" | "cuentas" | "cierre">("finanzas");
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit flex-wrap">
+        {[
+          { id: "finanzas", label: "Ingresos & Gastos" },
+          { id: "cuentas", label: "Cuentas x Cobrar/Pagar" },
+          { id: "cierre", label: "Cierre de Caja" },
+        ].map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id as typeof tab)}
+            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === t.id ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "finanzas" && <Finanzas tenantId={tenantId} />}
+      {tab === "cuentas" && <CuentasPorCobrarPagar tenantId={tenantId} />}
+      {tab === "cierre" && <CierreDeCaja tenantId={tenantId} />}
+    </div>
+  );
+}
+
+function CierreDeCaja({ tenantId }: { tenantId: number }) {
+  const MONEDAS = ["USD", "VES", "COP"];
+  const [moneda, setMoneda] = useState("USD");
+  const [resumen, setResumen] = useState<ResumenPeriodoAbierto | null>(null);
+  const [idCajero, setIdCajero] = useState("");
+  const [montoDeclarado, setMontoDeclarado] = useState("");
+  const [cerrando, setCerrando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [historial, setHistorial] = useState<ArqueoCaja[] | null>(null);
+  const [descargandoId, setDescargandoId] = useState<number | null>(null);
+
+  const cargarResumen = () => {
+    resumenPeriodoAbierto(tenantId, moneda).then(setResumen).catch(() => setResumen(null));
+  };
+  const cargarHistorial = () => {
+    historialCierres().then(setHistorial).catch(() => setHistorial([]));
+  };
+  useEffect(() => { cargarResumen(); }, [tenantId, moneda]);
+  useEffect(() => { cargarHistorial(); }, [tenantId]);
+
+  const descargarPdf = async (arqueoId: number) => {
+    setDescargandoId(arqueoId);
+    try {
+      const blob = await descargarCierrePdf(tenantId, arqueoId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo generar el PDF");
+    } finally {
+      setDescargandoId(null);
+    }
+  };
+
+  const confirmarCierre = async () => {
+    setError(null);
+    if (!idCajero.trim()) { setError("Indica quién está cerrando la caja"); return; }
+    if (!montoDeclarado || Number(montoDeclarado) < 0) { setError("Ingresa el monto contado en efectivo"); return; }
+    setCerrando(true);
+    try {
+      const arqueo = await cerrarCaja(tenantId, { idCajero: idCajero.trim(), montoDeclarado: Number(montoDeclarado), moneda });
+      setMontoDeclarado("");
+      cargarResumen();
+      cargarHistorial();
+      await descargarPdf(arqueo.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cerrar la caja");
+    } finally {
+      setCerrando(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+        {MONEDAS.map((m) => (
+          <button key={m} onClick={() => setMoneda(m)} className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer ${moneda === m ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
+            {m}
+          </button>
+        ))}
+      </div>
+
+      <div className="apple-glass rounded-2xl p-5 space-y-4">
+        <div>
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Período abierto desde el último cierre</h3>
+          <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">
+            {resumen ? `Desde ${new Date(resumen.desde).toLocaleString()}` : "Cargando…"}
+          </p>
+        </div>
+
+        {resumen && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Ingresos</div>
+              <div className="font-['Outfit'] font-black text-lg text-teal-600 dark:text-teal-400">{Number(resumen.totalIngresos).toFixed(2)}</div>
+            </div>
+            <div className="bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Egresos</div>
+              <div className="font-['Outfit'] font-black text-lg text-red-500">{Number(resumen.totalEgresos).toFixed(2)}</div>
+            </div>
+            <div className="bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Esperado en caja</div>
+              <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{Number(resumen.montoEsperadoEnCaja).toFixed(2)}</div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-300/50 dark:border-white/10">
+          <Campo label="Cajero / Responsable">
+            <input value={idCajero} onChange={(e) => setIdCajero(e.target.value)} placeholder="Nombre de quien cierra" className="input-horeca" />
+          </Campo>
+          <Campo label={`Efectivo contado (${moneda})`}>
+            <input value={montoDeclarado} onChange={(e) => setMontoDeclarado(e.target.value)} type="number" step="0.01" placeholder="0.00" className="input-horeca" />
+          </Campo>
+        </div>
+
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <button onClick={confirmarCierre} disabled={cerrando} className="btn-cyber-neon text-white text-sm font-bold px-6 py-3 rounded-xl cursor-pointer disabled:opacity-60">
+          {cerrando ? "Cerrando caja…" : "Cuadrar y Cerrar Caja (genera PDF)"}
+        </button>
+        <p className="text-[11px] text-slate-400">Al cerrar se genera automáticamente el comprobante en PDF con el desglose de movimientos del período.</p>
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Historial de cierres</h3>
+        {historial === null ? (
+          <p className="text-xs text-slate-400">Cargando…</p>
+        ) : historial.length === 0 ? (
+          <p className="text-xs text-slate-400">Aún no se ha cerrado ninguna caja.</p>
+        ) : (
+          historial.map((a) => (
+            <div key={a.id} className="flex items-center justify-between apple-glass rounded-xl px-4 py-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                  {a.idCajero} · {new Date(a.fechaArqueo).toLocaleString()}
+                </div>
+                <div className={`text-[11px] mt-0.5 ${Number(a.diferencia) === 0 ? "text-teal-600 dark:text-teal-400" : "text-amber-500"}`}>
+                  Declarado: {Number(a.montoDeclarado).toFixed(2)} {a.moneda} · Esperado: {Number(a.montoEsperado).toFixed(2)} {a.moneda}
+                  {Number(a.diferencia) !== 0 && ` · Diferencia: ${Number(a.diferencia).toFixed(2)}`}
+                </div>
+              </div>
+              <button onClick={() => descargarPdf(a.id)} disabled={descargandoId === a.id}
+                className="text-teal-600 dark:text-teal-400 text-xs font-semibold cursor-pointer disabled:opacity-50">
+                {descargandoId === a.id ? "Generando…" : "Ver PDF →"}
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
