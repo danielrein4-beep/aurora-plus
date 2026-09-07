@@ -4534,7 +4534,7 @@ function CierreDeCaja({ tenantId }: { tenantId: number }) {
     resumenPeriodoAbierto(tenantId, moneda).then(setResumen).catch(() => setResumen(null));
   };
   const cargarHistorial = () => {
-    historialCierres().then(setHistorial).catch(() => setHistorial([]));
+    historialCierres(tenantId).then(setHistorial).catch(() => setHistorial([]));
   };
   useEffect(() => { cargarResumen(); }, [tenantId, moneda]);
   useEffect(() => { cargarHistorial(); }, [tenantId]);
@@ -4635,9 +4635,9 @@ function CierreDeCaja({ tenantId }: { tenantId: number }) {
                 <div className="text-sm font-semibold text-slate-900 dark:text-white">
                   {a.idCajero} · {new Date(a.fechaArqueo).toLocaleString()}
                 </div>
-                <div className={`text-[11px] mt-0.5 ${Number(a.diferencia) === 0 ? "text-teal-600 dark:text-teal-400" : "text-amber-500"}`}>
-                  Declarado: {Number(a.montoDeclarado).toFixed(2)} {a.moneda} · Esperado: {Number(a.montoEsperado).toFixed(2)} {a.moneda}
-                  {Number(a.diferencia) !== 0 && ` · Diferencia: ${Number(a.diferencia).toFixed(2)}`}
+                <div className={`text-[11px] mt-0.5 ${a.diferencia == null || Number(a.diferencia) === 0 ? "text-teal-600 dark:text-teal-400" : "text-amber-500"}`}>
+                  Declarado: {Number(a.montoDeclarado).toFixed(2)} {a.moneda} · Esperado: {a.montoEsperado != null ? Number(a.montoEsperado).toFixed(2) : "—"} {a.moneda}
+                  {a.diferencia != null && Number(a.diferencia) !== 0 && ` · Diferencia: ${Number(a.diferencia).toFixed(2)}`}
                 </div>
               </div>
               <button onClick={() => descargarPdf(a.id)} disabled={descargandoId === a.id}

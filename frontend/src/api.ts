@@ -1068,8 +1068,8 @@ export interface ArqueoCaja {
   idCajero: string;
   moneda: string;
   montoDeclarado: number;
-  montoEsperado: number;
-  diferencia: number;
+  montoEsperado: number | null;
+  diferencia: number | null;
   fechaArqueo: string;
 }
 
@@ -1078,8 +1078,8 @@ export function cerrarCaja(tenantId: number, datos: { idCajero: string; montoDec
   return request(`/api/financiero/tesoreria/cerrar-caja?${params}`, { method: "POST" });
 }
 
-export function historialCierres(): Promise<ArqueoCaja[]> {
-  return request(`/api/financiero/tesoreria/historial-cierres`);
+export function historialCierres(tenantId: number): Promise<ArqueoCaja[]> {
+  return request(`/api/financiero/tesoreria/historial-cierres?tenantId=${tenantId}`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
