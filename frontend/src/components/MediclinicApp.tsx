@@ -3946,14 +3946,9 @@ function SalaEspera({
     onCambio();
   };
 
-  // Llamar a consulta directamente
+  // Llamar a consulta directamente (marcar como EN_CONSULTA en sala de espera)
   const handleLlamarConsulta = (turno: TurnoSalaEspera) => {
     handleCambiarEstado(turno.id, "EN_CONSULTA");
-    if (turno.pacienteId && onSeleccionarPacienteParaConsulta) {
-      onSeleccionarPacienteParaConsulta(turno.pacienteId);
-    } else if (onNavegar) {
-      onNavegar("historias");
-    }
   };
 
   // Registrar/Modificar pago de un turno
