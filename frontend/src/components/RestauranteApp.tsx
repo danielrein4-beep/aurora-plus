@@ -163,7 +163,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
   const [ventaRapidaAbierta, setVentaRapidaAbierta] = useState(false);
-  const [bloqueoTasa, setBloqueoTasa] = useState<"ventarapida" | null>(null);
+  const [bloqueoTasa, setBloqueoTasa] = useState<"ventarapida" | "embebido" | null>(null);
   const [moduloPremiumClic, setModuloPremiumClic] = useState<Pagina | null>(null);
 
   const [config, setConfig] = useState(() => {
@@ -376,7 +376,10 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "general" && (
             <VistaGeneral totalVentasHoy={totalVentasHoy} valorInventario={valorInventario} vencimientos={(lotesPorVencer || []).length}
               onNavegar={irA}
-              onVentaRapida={abrirVentaRapida} />
+              tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
+              ventasHoy={ventasHoy} nombreLocal={config.nombreLocal} tasaValida={tasaValida}
+              onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
+              onRegistrarTasa={() => setBloqueoTasa("embebido")} />
           )}
           {pagina === "salon" && (esPremium("salon")
             ? <BloqueoPremium modulo="Salón & Mesas" />
@@ -416,9 +419,14 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           tenantId={tenantId}
           onCancelar={() => setBloqueoTasa(null)}
           onRegistrada={() => {
+            // Solo el overlay de pantalla completa (sidebar → abrirVentaRapida)
+            // se auto-abre al registrar la tasa; el panel embebido en la
+            // Vista General ya está ahí mismo y se desbloquea solo al
+            // refrescar tasaBcv, sin duplicar la experiencia con el overlay.
+            const veniaDelOverlay = bloqueoTasa === "ventarapida";
             setBloqueoTasa(null);
             recargarTodo();
-            setVentaRapidaAbierta(true);
+            if (veniaDelOverlay) setVentaRapidaAbierta(true);
           }}
         />
       )}
@@ -631,9 +639,14 @@ function KpiCard({ label, val, sub, color, onClick }: { label: string; val: stri
 // ══════════════════════════════════════════════════════════════════════════
 // VISTA GENERAL
 // ══════════════════════════════════════════════════════════════════════════
-function VistaGeneral({ totalVentasHoy, valorInventario, vencimientos, onNavegar, onVentaRapida }: {
-  totalVentasHoy: number; valorInventario: number; vencimientos: number;
-  onNavegar: (p: Pagina) => void; onVentaRapida: () => void;
+function VistaGeneral({
+  totalVentasHoy, valorInventario, vencimientos, onNavegar,
+  tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, tasaValida, onVenta, onRegistrarTasa,
+}: {
+  totalVentasHoy: number; valorInventario: number; vencimientos: number; onNavegar: (p: Pagina) => void;
+  tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
+  tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
+  tasaValida: boolean; onVenta: (monto: number, metodo: string) => void; onRegistrarTasa: () => void;
 }) {
   return (
     <div className="space-y-6">
@@ -641,35 +654,20 @@ function VistaGeneral({ totalVentasHoy, valorInventario, vencimientos, onNavegar
           del paywall Pro, así que el protagonismo va para lo que sí está
           activo en el plan base: ventas e inventario. */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiCard label="Ventas del Día" val={`$${totalVentasHoy.toFixed(2)}`} sub="Comandas y Fast-Bar cerrados" color="#10b981" onClick={onVentaRapida} />
+        <KpiCard label="Ventas del Día" val={`$${totalVentasHoy.toFixed(2)}`} sub="Comandas y Fast-Bar cerrados" color="#10b981" />
         <KpiCard label="Valor del Inventario" val={`$${valorInventario.toFixed(2)}`} sub="Costo total en bodega" color="#0ea5e9" onClick={() => onNavegar("inventario")} />
         <KpiCard label="Por Vencer" val={String(vencimientos)} sub="Lotes vencidos o próximos" color={vencimientos > 0 ? "#ef4444" : "#64748b"} onClick={() => onNavegar("inventario")} />
       </div>
-      <button onClick={onVentaRapida}
-        className="w-full btn-cyber-neon text-white rounded-2xl p-5 flex items-center justify-between cursor-pointer shadow-lg hover:scale-[1.01] transition-all">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center"><IconBolt size={22} /></div>
-          <div className="text-left">
-            <div className="font-['Outfit'] font-black text-base">Venta Rápida</div>
-          </div>
-        </div>
-        <span className="text-xl">→</span>
-      </button>
 
-      <div className="apple-glass rounded-2xl p-6">
-        <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-3">Accesos rápidos</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button onClick={onVentaRapida} className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
-            <IconBolt size={20} /><div className="text-sm font-semibold mt-2 text-slate-900 dark:text-white">Nueva Venta Rápida</div>
-          </button>
-          <button onClick={() => onNavegar("recetas")} className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
-            <IconFileText size={20} /><div className="text-sm font-semibold mt-2 text-slate-900 dark:text-white">Registrar Receta / Costo</div>
-          </button>
-          <button onClick={() => onNavegar("administracion")} className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
-            <IconBank size={20} /><div className="text-sm font-semibold mt-2 text-slate-900 dark:text-white">Corte de Caja / Turnos</div>
-          </button>
-        </div>
-      </div>
+      {/* El POS vive acá directo — sin banner ni "Accesos rápidos" que solo
+          llevaban a la misma pantalla con un clic extra. Buscar un producto
+          y cobrar pasa a ser la mitad inferior del dashboard, no una vista
+          aparte. */}
+      <VentaRapida
+        embebido tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos}
+        tasaBcv={tasaBcv} tasaCop={tasaCop} ventasHoy={ventasHoy} nombreLocal={nombreLocal}
+        tasaValida={tasaValida} onRegistrarTasa={onRegistrarTasa} onVenta={onVenta}
+      />
     </div>
   );
 }
@@ -2868,10 +2866,14 @@ function TasasDeCambio({ tenantId }: { tenantId: number }) {
 const CATEGORIA_RECETAS = "__RECETAS__";
 const CATEGORIA_FASTBAR = "__FASTBAR__";
 
-function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, onVenta, onCerrar }: {
+function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, onVenta, onCerrar, embebido, tasaValida, onRegistrarTasa }: {
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
   tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
-  onVenta: (monto: number, metodo: string) => void; onCerrar: () => void;
+  onVenta: (monto: number, metodo: string) => void; onCerrar?: () => void;
+  // Embebido: se monta directo en la Vista General (sin overlay de pantalla
+  // completa ni header propio, que duplicarían lo que el dashboard ya
+  // muestra) en vez de como modal flotante independiente.
+  embebido?: boolean; tasaValida?: boolean; onRegistrarTasa?: () => void;
 }) {
   interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
   interface ReciboVenta { comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string }
@@ -3077,51 +3079,74 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-40 bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col">
-      {/* HEADER OPERATIVO */}
-      <header className="h-14 flex-shrink-0 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between px-5 bg-white/50 dark:bg-black/20 backdrop-blur-md">
-        <div className="flex items-center gap-4 min-w-0">
-          <button onClick={onCerrar} title="Salir de Venta Rápida"
-            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer border border-slate-300/60 dark:border-white/10 flex-shrink-0">
-            <IconClose size={14} /> Salir
+  if (embebido && !tasaValida) {
+    // Mismo candado financiero que ya bloqueaba Venta Rápida como overlay —
+    // embebida en la Vista General no puede saltárselo solo porque ahora
+    // vive siempre montada ahí.
+    return (
+      <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
+        <IconWarning size={28} />
+        <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar Venta Rápida.</p>
+        {onRegistrarTasa && (
+          <button onClick={onRegistrarTasa} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer">
+            Registrar tasa ahora
           </button>
-          <div className="flex items-center gap-2 min-w-0">
-            <IconBolt size={16} className="text-teal-500 flex-shrink-0" />
-            <span className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white truncate">Venta Rápida</span>
-            <span className="text-[11px] text-slate-400 dark:text-white/30 truncate hidden sm:inline">{nombreLocal}</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
-          <div className="text-right hidden md:block">
-            <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Turno de caja</div>
-            {turno === undefined ? (
-              <div className="text-[11px] text-slate-400">Cargando…</div>
-            ) : turno ? (
-              <div className="text-[11px] font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1 justify-end">
-                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0" /> Abierto · {turno.idCajero}
-              </div>
-            ) : (
-              <div className="text-[11px] font-bold text-amber-500 flex items-center gap-1 justify-end">
-                <IconWarning size={11} /> Sin turno abierto
-              </div>
-            )}
-          </div>
-          <div className="text-right hidden sm:block">
-            <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Tasa</div>
-            <div className="text-[11px] font-bold font-mono text-emerald-500">
-              {tasaBcv && Number(tasaBcv.tasa) > 0 ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa"}
-              {tasaCop && Number(tasaCop.tasa) > 0 && ` · COP ${Number(tasaCop.tasa).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={embebido
+      ? "apple-glass rounded-2xl flex flex-col h-[640px] overflow-hidden"
+      : "fixed inset-0 z-40 bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col"}>
+      {/* HEADER OPERATIVO — solo en el overlay de pantalla completa; embebida
+          en la Vista General, el dashboard ya trae su propio header con la
+          tasa y ventas del día, repetirlo ahí sería ruido duplicado. */}
+      {!embebido && (
+        <header className="h-14 flex-shrink-0 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between px-5 bg-white/50 dark:bg-black/20 backdrop-blur-md">
+          <div className="flex items-center gap-4 min-w-0">
+            <button onClick={onCerrar} title="Salir de Venta Rápida"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer border border-slate-300/60 dark:border-white/10 flex-shrink-0">
+              <IconClose size={14} /> Salir
+            </button>
+            <div className="flex items-center gap-2 min-w-0">
+              <IconBolt size={16} className="text-teal-500 flex-shrink-0" />
+              <span className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white truncate">Venta Rápida</span>
+              <span className="text-[11px] text-slate-400 dark:text-white/30 truncate hidden sm:inline">{nombreLocal}</span>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Ventas del día</div>
-            <div className="text-[11px] font-bold font-mono text-slate-900 dark:text-white">
-              ${(ventasHoy?.total ?? 0).toFixed(2)}
+          <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
+            <div className="text-right hidden md:block">
+              <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Turno de caja</div>
+              {turno === undefined ? (
+                <div className="text-[11px] text-slate-400">Cargando…</div>
+              ) : turno ? (
+                <div className="text-[11px] font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1 justify-end">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0" /> Abierto · {turno.idCajero}
+                </div>
+              ) : (
+                <div className="text-[11px] font-bold text-amber-500 flex items-center gap-1 justify-end">
+                  <IconWarning size={11} /> Sin turno abierto
+                </div>
+              )}
+            </div>
+            <div className="text-right hidden sm:block">
+              <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Tasa</div>
+              <div className="text-[11px] font-bold font-mono text-emerald-500">
+                {tasaBcv && Number(tasaBcv.tasa) > 0 ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa"}
+                {tasaCop && Number(tasaCop.tasa) > 0 && ` · COP ${Number(tasaCop.tasa).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Ventas del día</div>
+              <div className="text-[11px] font-bold font-mono text-slate-900 dark:text-white">
+                ${(ventasHoy?.total ?? 0).toFixed(2)}
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Selector de panel en móvil/tablet angosto — abajo de "lg" no cabe catálogo + comanda lado a lado */}
       <div className="lg:hidden flex-shrink-0 flex border-b border-slate-300/60 dark:border-white/10">
