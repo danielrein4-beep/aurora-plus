@@ -62,6 +62,17 @@ const NAV_GRUPOS: NavGrupo[] = [
 // Lista plana — usada donde no importa el agrupamiento (ej. título del header por página activa)
 const NAV: NavItem[] = NAV_GRUPOS.flatMap((g) => g.items);
 
+// Plan de licencia actual del tenant. Mientras no exista todavía un plan real
+// consultado al backend, el negocio opera en Plan Base — los módulos Premium
+// (Salón & Mesas, Cocina KDS) ni siquiera se listan en el sidebar para este
+// plan, no solo se deshabilitan visualmente (ver `sidebarItemsVisibles`).
+type PlanLicencia = "BASE" | "PRO";
+const PLAN_ACTUAL: string = "BASE" as PlanLicencia;
+
+/** Entradas del sidebar visibles para el plan actual — un ítem Premium desaparece del DOM por completo en Plan Base, no queda como "entrada fantasma" bloqueada. */
+const sidebarItemsVisibles = (items: NavItem[]): NavItem[] =>
+  PLAN_ACTUAL === ("PRO" as PlanLicencia) ? items : items.filter((n) => !n.premium);
+
 const ESTACIONES = ["COCINA", "PARRILLA", "BAR", "COCINA_FRIA"];
 const hoy = () => new Date().toISOString().slice(0, 10);
 
@@ -281,7 +292,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {NAV_GRUPOS.map((grupo) => (
             <div key={grupo.titulo} className="space-y-1">
               <div className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/25">{grupo.titulo}</div>
-              {grupo.items.map((n) => {
+              {sidebarItemsVisibles(grupo.items).map((n) => {
                 const alertaVencimiento = n.id === "inventario" && (lotesPorVencer || []).length > 0;
                 return (
                   <button
@@ -497,8 +508,11 @@ function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizada
         <IconCustomize size={11} />
       </button>
 
+      {/* Fondo 100% sólido a propósito (no apple-glass/backdrop-blur) — un
+          popover translúcido flotando sobre KPIs y tarjetas se leía mal;
+          acá la prioridad es legibilidad, no el efecto vidrio. */}
       {abierto && (
-        <div className="absolute right-0 mt-2 z-[9999] w-72 apple-glass rounded-xl p-4 shadow-lg border border-slate-300/60 dark:border-white/10">
+        <div className="absolute right-0 mt-2 z-[9999] w-72 bg-white dark:bg-slate-800 rounded-xl p-4 shadow-2xl border border-slate-200 dark:border-white/10">
           <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2">Actualizar tasas de cambio</p>
 
           <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">Tasa Bs. (1 USD =)</label>
