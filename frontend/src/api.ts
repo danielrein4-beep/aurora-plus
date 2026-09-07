@@ -757,6 +757,30 @@ export function utilidadDiaria(tenantId: number, fecha?: string): Promise<Resume
   return request(`/api/horeca/mesas/reportes/utilidad-diaria?${params}`);
 }
 
+export interface ReporteTicket {
+  comandaId: number;
+  numeroTicket: string;
+  fecha: string;
+  totalUsd: number;
+  totalBs: number | null; // null si no había tasa BCV registrada para ese día
+  metodoPago: string | null;
+  estado: "ABIERTA" | "PAGADA" | "ANULADA";
+  canal: string;
+  numeroMesa: number | null;
+}
+
+/** Reportes Operativos: listado de tickets con filtros dinámicos (todos opcionales) — motor de solo lectura, aparte del flujo del POS. */
+export function reporteTickets(tenantId: number, filtros: {
+  fechaInicio?: string; fechaFin?: string; metodoPago?: string; estado?: "ABIERTA" | "PAGADA" | "ANULADA";
+}): Promise<ReporteTicket[]> {
+  const params = new URLSearchParams({ tenantId: String(tenantId) });
+  if (filtros.fechaInicio) params.set("fechaInicio", filtros.fechaInicio);
+  if (filtros.fechaFin) params.set("fechaFin", filtros.fechaFin);
+  if (filtros.metodoPago) params.set("metodoPago", filtros.metodoPago);
+  if (filtros.estado) params.set("estado", filtros.estado);
+  return request(`/api/horeca/reportes/tickets?${params}`);
+}
+
 export function dividirCuenta(tenantId: number, comandaId: number, numeroPersonas: number): Promise<number[]> {
   return request(`/api/horeca/mesas/comandas/${comandaId}/dividir?tenantId=${tenantId}&numeroPersonas=${numeroPersonas}`, { method: "POST" });
 }

@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import {
   IconRestaurant, IconCustomize, IconUsers, IconHourglass, IconCard, IconFileText,
   IconCheck, IconTrash, IconRefresh, IconCheckCircle, IconWarning, IconSearch, IconClose,
-  IconBolt, IconBank,
+  IconBolt, IconBank, IconChart, IconDownload,
 } from "../Icons";
+import * as XLSX from "xlsx";
 import { useAuth } from "../context/AuthContext";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
@@ -13,14 +14,14 @@ import {
   editarArticulo, ajustarStockArticulo, eliminarArticulo,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
   tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
-  cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria,
+  cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria, reporteTickets,
   type Mesa, type MapaMesaEntrada, type Comanda, type ItemComanda, type EstadoItemComanda,
   type EscandalloReceta, type DetalleReceta, type FastBarTrago, type ProveedorHoreca,
   type Articulo, type ItemCompraInsumo, type LoteArticulo, type TasaCambio, type MovimientoCaja,
-  type ResumenPeriodoAbierto, type ArqueoCaja, type PagoParcial, type ResumenUtilidadProducto,
+  type ResumenPeriodoAbierto, type ArqueoCaja, type PagoParcial, type ResumenUtilidadProducto, type ReporteTicket,
 } from "../api";
 
-type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "inventario" | "administracion" | "configuracion";
+type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "inventario" | "administracion" | "reportes" | "configuracion";
 
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element }
 interface NavGrupo { titulo: string; items: NavItem[] }
@@ -43,6 +44,7 @@ const NAV_GRUPOS: NavGrupo[] = [
       { id: "compras", label: "Compras & Proveedores", Icon: IconUsers },
       { id: "inventario", label: "Inventario", Icon: IconWarning },
       { id: "administracion", label: "Administración", Icon: IconBank },
+      { id: "reportes", label: "Reportes Operativos", Icon: IconChart },
       { id: "configuracion", label: "Configuración", Icon: IconCustomize },
     ],
   },
@@ -350,6 +352,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           )}
           {pagina === "inventario" && <Inventario tenantId={tenantId} articulos={articulos} onCambio={recargarTodo} />}
           {pagina === "administracion" && <Administracion tenantId={tenantId} />}
+          {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
           {pagina === "salon" && !tasaValida && (
             <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
@@ -2649,6 +2652,158 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVen
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// REPORTES OPERATIVOS — Fase 1 del plan de escalamiento: motor de consultas
+// de solo lectura (ReporteService/JPA Specifications) sobre las comandas
+// pagadas, con exportación a Excel 100% local (SheetJS) — el backend nunca
+// genera el .xlsx, solo entrega el JSON ya filtrado.
+// ══════════════════════════════════════════════════════════════════════════
+function ReportesOperativos({ tenantId }: { tenantId: number }) {
+  const [fechaInicio, setFechaInicio] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10);
+  });
+  const [fechaFin, setFechaFin] = useState(hoy());
+  const [metodoPago, setMetodoPago] = useState("");
+  const [estado, setEstado] = useState<"PAGADA" | "ABIERTA" | "ANULADA" | "">("PAGADA");
+  const [tickets, setTickets] = useState<ReporteTicket[] | null>(null);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const buscar = () => {
+    setCargando(true);
+    setError(null);
+    reporteTickets(tenantId, {
+      fechaInicio: fechaInicio || undefined, fechaFin: fechaFin || undefined,
+      metodoPago: metodoPago || undefined, estado: estado || undefined,
+    })
+      .then(setTickets)
+      .catch((e) => setError(e instanceof Error ? e.message : "No se pudo cargar el reporte"))
+      .finally(() => setCargando(false));
+  };
+  useEffect(() => { buscar(); }, [tenantId]);
+
+  const totales = (tickets || []).reduce(
+    (acc, t) => ({ usd: acc.usd + Number(t.totalUsd), bs: acc.bs + Number(t.totalBs || 0) }),
+    { usd: 0, bs: 0 }
+  );
+
+  // Toma el JSON YA renderizado en la tabla (no vuelve a pedirle nada al
+  // backend) y arma el .xlsx en el navegador — el servidor no sabe que esto
+  // pasó, ni carga con generarlo.
+  const exportarExcel = () => {
+    if (!tickets || tickets.length === 0) return;
+    const filas = tickets.map((t) => ({
+      "Fecha": new Date(t.fecha).toLocaleString(),
+      "Nro. Ticket": t.numeroTicket,
+      "Total USD": Number(t.totalUsd),
+      "Total Bs": t.totalBs != null ? Number(t.totalBs) : "",
+      "Método de Pago": (t.metodoPago || "-").replace("_", " "),
+      "Estado": t.estado,
+      "Canal": t.canal,
+      "Mesa": t.numeroMesa ?? "-",
+    }));
+    const hoja = XLSX.utils.json_to_sheet(filas);
+    hoja["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 10 }, { wch: 16 }, { wch: 8 }];
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Tickets");
+    XLSX.writeFile(libro, `reporte-tickets_${fechaInicio}_a_${fechaFin}.xlsx`);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="apple-glass rounded-2xl p-5 space-y-3">
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Filtros</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Campo label="Desde">
+            <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="input-horeca" />
+          </Campo>
+          <Campo label="Hasta">
+            <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="input-horeca" />
+          </Campo>
+          <Campo label="Método de pago">
+            <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} className="input-horeca">
+              <option value="">Todos</option>
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="TARJETA">Tarjeta</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="BILLETERA_DIGITAL">Billetera digital</option>
+              <option value="MIXTO">Mixto</option>
+            </select>
+          </Campo>
+          <Campo label="Estado">
+            <select value={estado} onChange={(e) => setEstado(e.target.value as typeof estado)} className="input-horeca">
+              <option value="">Todos</option>
+              <option value="PAGADA">Pagada</option>
+              <option value="ABIERTA">Abierta</option>
+              <option value="ANULADA">Anulada</option>
+            </select>
+          </Campo>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={buscar} disabled={cargando} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+            {cargando ? "Buscando…" : "Buscar"}
+          </button>
+          <button onClick={exportarExcel} disabled={!tickets || tickets.length === 0}
+            className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-40 flex items-center gap-1.5">
+            <IconDownload size={14} /> Exportar a Excel
+          </button>
+          {tickets && <span className="text-[11px] text-slate-400">{tickets.length} ticket{tickets.length === 1 ? "" : "s"}</span>}
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+      </div>
+
+      <div className="apple-glass rounded-2xl p-5">
+        {tickets === null ? (
+          <p className="text-xs text-slate-400">Cargando…</p>
+        ) : tickets.length === 0 ? (
+          <p className="text-xs text-slate-400">Sin tickets en este rango/filtro.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-400 dark:text-white/40 uppercase text-[10px] tracking-wider border-b border-slate-300/50 dark:border-white/10">
+                  <th className="py-2 pr-3">Fecha</th>
+                  <th className="py-2 px-3">Nro. Ticket</th>
+                  <th className="py-2 px-3 text-right">Total USD</th>
+                  <th className="py-2 px-3 text-right">Total Bs</th>
+                  <th className="py-2 px-3">Método de Pago</th>
+                  <th className="py-2 pl-3">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tickets.map((t) => (
+                  <tr key={t.comandaId} className="border-b border-slate-200/50 dark:border-white/5">
+                    <td className="py-2 pr-3 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fecha).toLocaleString()}</td>
+                    <td className="py-2 px-3 font-mono font-semibold text-slate-800 dark:text-white">{t.numeroTicket}</td>
+                    <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white">${Number(t.totalUsd).toFixed(2)}</td>
+                    <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.totalBs != null ? `Bs ${Number(t.totalBs).toFixed(2)}` : "—"}</td>
+                    <td className="py-2 px-3 text-slate-600 dark:text-white/60">{(t.metodoPago || "-").replace("_", " ")}</td>
+                    <td className="py-2 pl-3">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        t.estado === "PAGADA" ? "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+                        : t.estado === "ANULADA" ? "bg-red-500/15 text-red-500"
+                        : "bg-amber-500/15 text-amber-600 dark:text-amber-300"
+                      }`}>{t.estado}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="font-bold text-slate-900 dark:text-white border-t-2 border-slate-300/60 dark:border-white/10">
+                  <td className="py-2 pr-3" colSpan={2}>Total</td>
+                  <td className="py-2 px-3 text-right font-mono">${totales.usd.toFixed(2)}</td>
+                  <td className="py-2 px-3 text-right font-mono">Bs {totales.bs.toFixed(2)}</td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
