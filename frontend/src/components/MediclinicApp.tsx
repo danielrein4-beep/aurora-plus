@@ -3732,8 +3732,11 @@ export interface TurnoSalaEspera {
   estado: "EN_ESPERA" | "EN_CONSULTA" | "ATENDIDO" | "CANCELADO";
   estadoPago: "PAGADO" | "PENDIENTE" | "EXONERADO" | "PARCIAL";
   metodoPago?: string;
+  moneda?: "USD" | "VES" | "COP";
+  montoCobrado?: number;
   montoUSD?: number;
   montoVES?: number;
+  montoCOP?: number;
   referenciaPago?: string;
 }
 
@@ -3883,7 +3886,24 @@ function SalaEspera({
       const nuevoNumero = maxNumero + 1;
       const codigoTurno = `T-${String(nuevoNumero).padStart(2, "0")}`;
       const montoNum = parseFloat(admitirMontoUSD) || 0;
-      const montoVesNum = montoNum * tasaBCV;
+
+      // Determinar la moneda exacta según el método de pago seleccionado
+      let monedaCobro: "USD" | "VES" | "COP" = "USD";
+      let montoUSDNum = 0;
+      let montoVESNum = 0;
+      let montoCOPNum = 0;
+
+      const metodoNorm = (admitirMetodoPago || "").toUpperCase();
+      if (metodoNorm.includes("VES") || metodoNorm.includes("BOLÍVAR") || metodoNorm.includes("BOLIVAR") || metodoNorm.includes("PAGO MÓVIL") || metodoNorm.includes("PAGO MOVIL") || metodoNorm.includes("PUNTO")) {
+        monedaCobro = "VES";
+        montoVESNum = montoNum;
+      } else if (metodoNorm.includes("COP") || metodoNorm.includes("PESO")) {
+        monedaCobro = "COP";
+        montoCOPNum = montoNum;
+      } else {
+        monedaCobro = "USD";
+        montoUSDNum = montoNum;
+      }
 
       const nuevoTurno: TurnoSalaEspera = {
         id: `turno-${Date.now()}`,
@@ -3900,8 +3920,11 @@ function SalaEspera({
         estado: "EN_ESPERA",
         estadoPago: admitirEstadoPago,
         metodoPago: admitirEstadoPago === "PAGADO" ? admitirMetodoPago : undefined,
-        montoUSD: admitirEstadoPago === "PAGADO" ? montoNum : 0,
-        montoVES: admitirEstadoPago === "PAGADO" ? montoVesNum : 0,
+        moneda: admitirEstadoPago === "PAGADO" ? monedaCobro : undefined,
+        montoCobrado: admitirEstadoPago === "PAGADO" ? montoNum : 0,
+        montoUSD: admitirEstadoPago === "PAGADO" ? montoUSDNum : 0,
+        montoVES: admitirEstadoPago === "PAGADO" ? montoVESNum : 0,
+        montoCOP: admitirEstadoPago === "PAGADO" ? montoCOPNum : 0,
         referenciaPago: admitirEstadoPago === "PAGADO" ? admitirReferencia.trim() : undefined,
       };
 
@@ -3914,8 +3937,11 @@ function SalaEspera({
           concepto: admitirMotivo.trim() || "Consulta Médica",
           metodoPago: admitirMetodoPago,
           referencia: admitirReferencia.trim() || "N/A",
-          montoUSD: montoNum,
-          montoVES: montoVesNum,
+          moneda: monedaCobro,
+          montoCobrado: montoNum,
+          montoUSD: montoUSDNum,
+          montoVES: montoVESNum,
+          montoCOP: montoCOPNum,
           hora: nuevoTurno.horaLlegada,
         };
         onAgregarCobro(cobroItem);
@@ -3963,7 +3989,22 @@ function SalaEspera({
     if (!modalPago) return;
 
     const montoNum = parseFloat(pagoMontoUSD) || 0;
-    const montoVesNum = montoNum * tasaBCV;
+    let monedaCobro: "USD" | "VES" | "COP" = "USD";
+    let montoUSDNum = 0;
+    let montoVESNum = 0;
+    let montoCOPNum = 0;
+
+    const metodoNorm = (pagoMetodo || "").toUpperCase();
+    if (metodoNorm.includes("VES") || metodoNorm.includes("BOLÍVAR") || metodoNorm.includes("BOLIVAR") || metodoNorm.includes("PAGO MÓVIL") || metodoNorm.includes("PAGO MOVIL") || metodoNorm.includes("PUNTO")) {
+      monedaCobro = "VES";
+      montoVESNum = montoNum;
+    } else if (metodoNorm.includes("COP") || metodoNorm.includes("PESO")) {
+      monedaCobro = "COP";
+      montoCOPNum = montoNum;
+    } else {
+      monedaCobro = "USD";
+      montoUSDNum = montoNum;
+    }
 
     setTurnos((prev) =>
       prev.map((t) =>
@@ -3972,8 +4013,11 @@ function SalaEspera({
               ...t,
               estadoPago: "PAGADO",
               metodoPago: pagoMetodo,
-              montoUSD: montoNum,
-              montoVES: montoVesNum,
+              moneda: monedaCobro,
+              montoCobrado: montoNum,
+              montoUSD: montoUSDNum,
+              montoVES: montoVESNum,
+              montoCOP: montoCOPNum,
               referenciaPago: pagoReferencia.trim(),
             }
           : t
@@ -3988,8 +4032,11 @@ function SalaEspera({
         concepto: modalPago.motivo || "Consulta Médica",
         metodoPago: pagoMetodo,
         referencia: pagoReferencia.trim() || "N/A",
-        montoUSD: montoNum,
-        montoVES: montoVesNum,
+        moneda: monedaCobro,
+        montoCobrado: montoNum,
+        montoUSD: montoUSDNum,
+        montoVES: montoVESNum,
+        montoCOP: montoCOPNum,
         hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       onAgregarCobro(cobroItem);
@@ -4010,9 +4057,18 @@ function SalaEspera({
     }
   };
 
-  // Total de caja acumulada
-  const totalCajaUSD = cobrosLocales.reduce((acc, c) => acc + c.montoUSD, 0);
-  const totalCajaVES = cobrosLocales.reduce((acc, c) => acc + c.montoVES, 0);
+  // Totales de caja acumulada estrictamente por moneda recibida
+  const totalCajaUSD = cobrosLocales
+    .filter((c) => c.moneda === "USD" || (!c.moneda && (c.metodoPago?.toUpperCase().includes("USD") || (c.montoUSD !== undefined && c.montoUSD > 0 && !c.montoVES))))
+    .reduce((acc, c) => acc + (c.montoUSD || (c.moneda === "USD" ? c.montoCobrado || 0 : 0)), 0);
+
+  const totalCajaVES = cobrosLocales
+    .filter((c) => c.moneda === "VES" || (!c.moneda && (c.metodoPago?.toUpperCase().includes("VES") || c.metodoPago?.toUpperCase().includes("PUNTO") || c.metodoPago?.toUpperCase().includes("PAGO M") || (c.montoVES !== undefined && c.montoVES > 0 && !c.montoUSD))))
+    .reduce((acc, c) => acc + (c.montoVES || (c.moneda === "VES" ? c.montoCobrado || 0 : 0)), 0);
+
+  const totalCajaCOP = cobrosLocales
+    .filter((c) => c.moneda === "COP" || (!c.moneda && (c.metodoPago?.toUpperCase().includes("COP") || (c.montoCOP !== undefined && c.montoCOP > 0))))
+    .reduce((acc, c) => acc + (c.montoCOP || (c.moneda === "COP" ? c.montoCobrado || 0 : 0)), 0);
 
   // Cierre de caja
   const ejecutarCierreCaja = () => {
@@ -4022,9 +4078,11 @@ function SalaEspera({
       fecha: hoy(),
       horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       tasaBCV: config?.tasaBCV || tasaBCV,
+      tasaCOP: config?.tasaCOP || 4200,
       cobros: cobrosLocales,
       totalUSD: totalCajaUSD,
       totalVES: totalCajaVES,
+      totalCOP: totalCajaCOP,
       totalPacientes: cobrosLocales.length,
     };
     generarPdfCierreCaja(dataCierre);
@@ -4092,8 +4150,26 @@ function SalaEspera({
             <h3 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">
               Turnos y Pacientes en Espera (Hoy)
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-white/50">
-              Recaudación hoy: <strong className="text-emerald-600 dark:text-emerald-400 font-mono">${totalCajaUSD.toFixed(2)} USD</strong> (Bs. {totalCajaVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })})
+            <p className="text-[11px] text-slate-500 dark:text-white/50 flex flex-wrap items-center gap-1.5 mt-0.5">
+              <span>Recaudación hoy:</span>
+              {totalCajaUSD > 0 && (
+                <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                  ${totalCajaUSD.toFixed(2)} USD
+                </span>
+              )}
+              {totalCajaVES > 0 && (
+                <span className="font-bold font-mono text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded">
+                  Bs. {totalCajaVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                </span>
+              )}
+              {totalCajaCOP > 0 && (
+                <span className="font-bold font-mono text-purple-600 dark:text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded">
+                  ${totalCajaCOP.toLocaleString("es-CO")} COP
+                </span>
+              )}
+              {totalCajaUSD === 0 && totalCajaVES === 0 && totalCajaCOP === 0 && (
+                <span className="font-mono text-slate-400">$0.00 USD</span>
+              )}
             </p>
           </div>
 
@@ -4224,150 +4300,160 @@ function SalaEspera({
                   </td>
                 </tr>
               ) : (
-                turnosFiltrados.map((t) => (
-                  <tr key={t.id} className="hover:bg-teal-500/5 transition-colors group">
-                    {/* Turno */}
-                    <td className="py-3 px-3">
-                      <div className="inline-flex items-center px-2.5 py-1 rounded-lg bg-teal-500/15 text-teal-700 dark:text-teal-300 font-mono font-black text-xs border border-teal-500/25">
-                        {t.codigoTurno}
-                      </div>
-                    </td>
+                turnosFiltrados.map((t) => {
+                  const esVes = t.moneda === "VES" || (t.montoVES !== undefined && t.montoVES > 0 && !t.montoUSD);
+                  const esCop = t.moneda === "COP" || (t.montoCOP !== undefined && t.montoCOP > 0);
+                  const montoFmt = esVes
+                    ? `Bs. ${(t.montoVES || t.montoCobrado || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}`
+                    : esCop
+                    ? `$${(t.montoCOP || t.montoCobrado || 0).toLocaleString("es-CO")} COP`
+                    : `$${(t.montoUSD || t.montoCobrado || 0).toFixed(2)} USD`;
 
-                    {/* Paciente */}
-                    <td className="py-3 px-3">
-                      <div className="font-bold text-slate-900 dark:text-white">
-                        {t.pacienteNombre}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        C.I: {t.pacienteCedula}
-                      </div>
-                    </td>
+                  return (
+                    <tr key={t.id} className="hover:bg-teal-500/5 transition-colors group">
+                      {/* Turno */}
+                      <td className="py-3 px-3">
+                        <div className="inline-flex items-center px-2.5 py-1 rounded-lg bg-teal-500/15 text-teal-700 dark:text-teal-300 font-mono font-black text-xs border border-teal-500/25">
+                          {t.codigoTurno}
+                        </div>
+                      </td>
 
-                    {/* Teléfono */}
-                    <td className="py-3 px-3">
-                      <div className="text-slate-600 dark:text-white/80 font-mono text-[11px] flex items-center gap-1.5">
-                        <span>{t.pacienteTelefono}</span>
-                        {t.pacienteTelefono && t.pacienteTelefono !== "S/T" && (
+                      {/* Paciente */}
+                      <td className="py-3 px-3">
+                        <div className="font-bold text-slate-900 dark:text-white">
+                          {t.pacienteNombre}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          C.I: {t.pacienteCedula}
+                        </div>
+                      </td>
+
+                      {/* Teléfono */}
+                      <td className="py-3 px-3">
+                        <div className="text-slate-600 dark:text-white/80 font-mono text-[11px] flex items-center gap-1.5">
+                          <span>{t.pacienteTelefono}</span>
+                          {t.pacienteTelefono && t.pacienteTelefono !== "S/T" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const tel = t.pacienteTelefono.replace(/\D/g, "");
+                                window.open(`https://wa.me/${tel}?text=Hola%20${encodeURIComponent(t.pacienteNombre)},%20le%20escribimos%20de%20la%20cl%C3%ADnica%20para%20su%20turno%20m%C3%A9dico.`, "_blank");
+                              }}
+                              className="text-emerald-600 hover:text-emerald-500 text-xs cursor-pointer"
+                              title="Enviar mensaje por WhatsApp"
+                            >
+                              💬
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Hora */}
+                      <td className="py-3 px-3 font-mono text-slate-700 dark:text-white/80 font-medium">
+                        {t.horaLlegada}
+                        <div className="text-[10px] text-slate-400 font-normal">
+                          {t.consultorio}
+                        </div>
+                      </td>
+
+                      {/* Motivo */}
+                      <td className="py-3 px-3 max-w-[180px]">
+                        <div className="font-medium text-slate-800 dark:text-white/90 truncate" title={t.motivo}>
+                          {t.motivo}
+                        </div>
+                      </td>
+
+                      {/* Estado */}
+                      <td className="py-3 px-3 text-center">
+                        <select
+                          value={t.estado}
+                          onChange={(e: any) => handleCambiarEstado(t.id, e.target.value)}
+                          className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border focus:outline-none cursor-pointer ${
+                            t.estado === "EN_ESPERA"
+                              ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30"
+                              : t.estado === "EN_CONSULTA"
+                              ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-400/30"
+                              : t.estado === "ATENDIDO"
+                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30"
+                              : "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-400/30"
+                          }`}
+                        >
+                          <option value="EN_ESPERA">EN ESPERA</option>
+                          <option value="EN_CONSULTA">EN CONSULTA</option>
+                          <option value="ATENDIDO">ATENDIDO</option>
+                          <option value="CANCELADO">CANCELADO</option>
+                        </select>
+                      </td>
+
+                      {/* Estado de Pago */}
+                      <td className="py-3 px-3 text-center">
+                        {t.estadoPago === "PAGADO" ? (
+                          <div className="inline-flex flex-col items-center">
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-400/30 font-bold text-[10px]">
+                              {montoFmt}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-mono mt-0.5">
+                              {t.metodoPago || "Efectivo"}
+                            </span>
+                          </div>
+                        ) : t.estadoPago === "PENDIENTE" ? (
                           <button
                             type="button"
                             onClick={() => {
-                              const tel = t.pacienteTelefono.replace(/\D/g, "");
-                              window.open(`https://wa.me/${tel}?text=Hola%20${encodeURIComponent(t.pacienteNombre)},%20le%20escribimos%20de%20la%20cl%C3%ADnica%20para%20su%20turno%20m%C3%A9dico.`, "_blank");
+                              setModalPago(t);
+                              setPagoMontoUSD("25");
                             }}
-                            className="text-emerald-600 hover:text-emerald-500 text-xs cursor-pointer"
-                            title="Enviar mensaje por WhatsApp"
+                            className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-400/30 font-bold text-[10px] hover:bg-amber-500/25 cursor-pointer"
+                            title="Haz clic para registrar cobro"
                           >
-                            💬
+                            PENDIENTE 💳
                           </button>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md bg-slate-500/15 text-slate-600 dark:text-slate-300 border border-slate-400/30 font-bold text-[10px]">
+                            {t.estadoPago}
+                          </span>
                         )}
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Hora */}
-                    <td className="py-3 px-3 font-mono text-slate-700 dark:text-white/80 font-medium">
-                      {t.horaLlegada}
-                      <div className="text-[10px] text-slate-400 font-normal">
-                        {t.consultorio}
-                      </div>
-                    </td>
-
-                    {/* Motivo */}
-                    <td className="py-3 px-3 max-w-[180px]">
-                      <div className="font-medium text-slate-800 dark:text-white/90 truncate" title={t.motivo}>
-                        {t.motivo}
-                      </div>
-                    </td>
-
-                    {/* Estado */}
-                    <td className="py-3 px-3 text-center">
-                      <select
-                        value={t.estado}
-                        onChange={(e: any) => handleCambiarEstado(t.id, e.target.value)}
-                        className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border focus:outline-none cursor-pointer ${
-                          t.estado === "EN_ESPERA"
-                            ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30"
-                            : t.estado === "EN_CONSULTA"
-                            ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-400/30"
-                            : t.estado === "ATENDIDO"
-                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30"
-                            : "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-400/30"
-                        }`}
-                      >
-                        <option value="EN_ESPERA">EN ESPERA</option>
-                        <option value="EN_CONSULTA">EN CONSULTA</option>
-                        <option value="ATENDIDO">ATENDIDO</option>
-                        <option value="CANCELADO">CANCELADO</option>
-                      </select>
-                    </td>
-
-                    {/* Estado de Pago */}
-                    <td className="py-3 px-3 text-center">
-                      {t.estadoPago === "PAGADO" ? (
-                        <div className="inline-flex flex-col items-center">
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-400/30 font-bold text-[10px]">
-                            PAGADO (${t.montoUSD || 0})
-                          </span>
-                          <span className="text-[9px] text-slate-400 font-mono mt-0.5">
-                            {t.metodoPago || "Efectivo"}
-                          </span>
-                        </div>
-                      ) : t.estadoPago === "PENDIENTE" ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setModalPago(t);
-                            setPagoMontoUSD("25");
-                          }}
-                          className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-400/30 font-bold text-[10px] hover:bg-amber-500/25 cursor-pointer"
-                          title="Haz clic para registrar cobro"
-                        >
-                          PENDIENTE 💳
-                        </button>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-md bg-slate-500/15 text-slate-600 dark:text-slate-300 border border-slate-400/30 font-bold text-[10px]">
-                          {t.estadoPago}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Acciones */}
-                    <td className="py-3 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {/* Llamar a Consulta */}
-                        <button
-                          type="button"
-                          onClick={() => handleLlamarConsulta(t)}
-                          className="p-1.5 rounded-lg text-teal-600 hover:bg-teal-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                          title="Llamar a Consulta médica"
-                        >
-                          <IconStethoscope size={15} />
-                        </button>
-
-                        {/* Finalizar */}
-                        {t.estado !== "ATENDIDO" && (
+                      {/* Acciones */}
+                      <td className="py-3 px-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {/* Llamar a Consulta */}
                           <button
                             type="button"
-                            onClick={() => handleCambiarEstado(t.id, "ATENDIDO")}
-                            className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                            title="Marcar como Atendido"
+                            onClick={() => handleLlamarConsulta(t)}
+                            className="p-1.5 rounded-lg text-teal-600 hover:bg-teal-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                            title="Llamar a Consulta médica"
                           >
-                            <IconCheck size={15} />
+                            <IconStethoscope size={15} />
                           </button>
-                        )}
 
-                        {/* Eliminar */}
-                        <button
-                          type="button"
-                          onClick={() => handleEliminarTurno(t.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                          title="Eliminar de sala de espera"
-                        >
-                          <IconTrash size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          {/* Finalizar */}
+                          {t.estado !== "ATENDIDO" && (
+                            <button
+                              type="button"
+                              onClick={() => handleCambiarEstado(t.id, "ATENDIDO")}
+                              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                              title="Marcar como Atendido"
+                            >
+                              <IconCheck size={15} />
+                            </button>
+                          )}
+
+                          {/* Eliminar */}
+                          <button
+                            type="button"
+                            onClick={() => handleEliminarTurno(t.id)}
+                            className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                            title="Eliminar Turno"
+                          >
+                            <IconTrash size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -4377,14 +4463,14 @@ function SalaEspera({
       {/* ── MODAL DE ADMISIÓN DE PACIENTE (NUEVO TURNO) ── */}
       {modalAdmitir && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="relative w-full max-w-lg apple-glass rounded-3xl p-6 sm:p-7 shadow-2xl border border-white/20 bg-white/95 dark:bg-[#071a2e]/95 text-slate-900 dark:text-white space-y-4">
+          <div className="relative w-full max-w-lg apple-glass rounded-3xl p-6 sm:p-7 shadow-2xl border border-white/20 bg-white/95 dark:bg-[#071a2e]/95 text-slate-900 dark:text-white space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-teal-500/20 text-teal-600 dark:text-teal-300">
+                <div className="p-2 rounded-xl bg-teal-500/20 text-teal-600 dark:text-teal-400">
                   <IconHourglass size={20} />
                 </div>
                 <div>
-                  <h3 className="font-['Outfit'] font-black text-base">Admitir Paciente a Sala de Espera</h3>
+                  <h3 className="font-['Outfit'] font-black text-base sm:text-lg">Admitir Paciente a Sala de Espera</h3>
                   <p className="text-[11px] text-slate-500 dark:text-white/50">Asignar turno y registrar cobro inicial</p>
                 </div>
               </div>
@@ -4541,32 +4627,38 @@ function SalaEspera({
                         className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 text-xs font-medium"
                       >
                         <option value="Efectivo USD">Efectivo USD ($)</option>
-                        <option value="Pago Móvil VES">Pago Móvil (VES)</option>
                         <option value="Zelle USD">Zelle (USD)</option>
+                        <option value="Transferencia USD">Transferencia (USD)</option>
+                        <option value="Pago Móvil VES">Pago Móvil (VES)</option>
                         <option value="Transferencia VES">Transferencia (VES)</option>
-                        <option value="Punto de Venta">Punto de Venta / Tarjeta</option>
+                        <option value="Punto de Venta">Punto de Venta / Tarjeta (VES)</option>
+                        <option value="Efectivo COP">Efectivo Pesos (COP)</option>
+                        <option value="Transferencia COP">Transferencia Pesos (COP)</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="text-[10px] text-slate-400">Monto USD ($)</label>
+                      <label className="text-[10px] text-slate-400">
+                        {admitirMetodoPago.includes("VES") || admitirMetodoPago.includes("Punto") || admitirMetodoPago.includes("Pago Móvil")
+                          ? "Monto en Bolívares (Bs.)"
+                          : admitirMetodoPago.includes("COP")
+                          ? "Monto en Pesos (COP)"
+                          : "Monto en Dólares ($)"}
+                      </label>
                       <input
                         type="number"
-                        step="1"
+                        step="any"
                         value={admitirMontoUSD}
                         onChange={(e) => setAdmitirMontoUSD(e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono"
                       />
-                      <div className="text-[9px] text-slate-400 font-mono mt-0.5">
-                        Bs. {((parseFloat(admitirMontoUSD) || 0) * tasaBCV).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                      </div>
                     </div>
 
                     <div>
                       <label className="text-[10px] text-slate-400">Ref. / Recibo</label>
                       <input
                         type="text"
-                        placeholder="Últimos 4 dígitos"
+                        placeholder="Últimos 4 dígitos / N/A"
                         value={admitirReferencia}
                         onChange={(e) => setAdmitirReferencia(e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 text-xs"
@@ -4627,32 +4719,38 @@ function SalaEspera({
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 font-medium"
                 >
                   <option value="Efectivo USD">Efectivo USD ($)</option>
-                  <option value="Pago Móvil VES">Pago Móvil (VES)</option>
                   <option value="Zelle USD">Zelle (USD)</option>
+                  <option value="Transferencia USD">Transferencia (USD)</option>
+                  <option value="Pago Móvil VES">Pago Móvil (VES)</option>
                   <option value="Transferencia VES">Transferencia (VES)</option>
-                  <option value="Punto de Venta">Punto de Venta / Tarjeta</option>
+                  <option value="Punto de Venta">Punto de Venta / Tarjeta (VES)</option>
+                  <option value="Efectivo COP">Efectivo Pesos (COP)</option>
+                  <option value="Transferencia COP">Transferencia Pesos (COP)</option>
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="font-bold text-slate-700 dark:text-white/80">Monto en USD ($)</label>
+                <label className="font-bold text-slate-700 dark:text-white/80">
+                  {pagoMetodo.includes("VES") || pagoMetodo.includes("Punto") || pagoMetodo.includes("Pago Móvil")
+                    ? "Monto en Bolívares (Bs.)"
+                    : pagoMetodo.includes("COP")
+                    ? "Monto en Pesos (COP)"
+                    : "Monto en Dólares ($)"}
+                </label>
                 <input
                   type="number"
-                  step="1"
+                  step="any"
                   value={pagoMontoUSD}
                   onChange={(e) => setPagoMontoUSD(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 font-black text-emerald-600 dark:text-emerald-400 text-sm font-mono"
                 />
-                <div className="text-[10px] text-slate-400 font-mono">
-                  Equivalente en VES: Bs. {((parseFloat(pagoMontoUSD) || 0) * tasaBCV).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                </div>
               </div>
 
               <div className="space-y-1">
                 <label className="font-bold text-slate-700 dark:text-white/80">Nro. de Referencia / Comprobante</label>
                 <input
                   type="text"
-                  placeholder="Ej. Ref #9843"
+                  placeholder="Ej. Ref #9843 / N/A"
                   value={pagoReferencia}
                   onChange={(e) => setPagoReferencia(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30"
@@ -4702,16 +4800,22 @@ function SalaEspera({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
               <div>
-                <div className="text-[10px] text-slate-400 uppercase font-mono">Total Recaudado USD</div>
+                <div className="text-[10px] text-slate-400 uppercase font-mono">Dólares Recibidos (USD)</div>
                 <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">${totalCajaUSD.toFixed(2)}</div>
               </div>
               <div>
-                <div className="text-[10px] text-slate-400 uppercase font-mono">Total Recaudado VES</div>
+                <div className="text-[10px] text-slate-400 uppercase font-mono">Bolívares Recibidos (VES)</div>
                 <div className="text-xl font-black text-sky-600 dark:text-sky-400 font-mono">Bs. {totalCajaVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</div>
               </div>
-              <div className="col-span-2 pt-2 border-t border-slate-200 dark:border-white/10 flex items-center justify-between text-xs text-slate-600 dark:text-white/70">
+              {totalCajaCOP > 0 && (
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-mono">Pesos Recibidos (COP)</div>
+                  <div className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono">${totalCajaCOP.toLocaleString("es-CO")}</div>
+                </div>
+              )}
+              <div className="col-span-full pt-2 border-t border-slate-200 dark:border-white/10 flex items-center justify-between text-xs text-slate-600 dark:text-white/70">
                 <span>Transacciones de cobro: <strong>{cobrosLocales.length}</strong></span>
                 <span>Pacientes atendidos hoy: <strong>{conteoAtendidos}</strong></span>
               </div>
@@ -4963,21 +5067,34 @@ function AgendaMedica({ tenantId, pacientes, citasHoy, onCambio }: {
 function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, historialCierres, config }: {
   ingresosHoy: number | null; citasHoy: CitaMedica[] | null; cobrosLocales: CobroItem[]; historialCierres: CierreCajaData[]; config: any;
 }) {
-  const totalUSD = cobrosLocales.reduce((s, x) => s + x.montoUSD, 0);
-  const totalVES = cobrosLocales.reduce((s, x) => s + x.montoVES, 0);
+  const totalUSD = cobrosLocales
+    .filter((c) => c.moneda === "USD" || (!c.moneda && (c.metodoPago?.toUpperCase().includes("USD") || (c.montoUSD !== undefined && c.montoUSD > 0 && !c.montoVES))))
+    .reduce((s, x) => s + (x.montoUSD || (x.moneda === "USD" ? x.montoCobrado || 0 : 0)), 0);
+
+  const totalVES = cobrosLocales
+    .filter((c) => c.moneda === "VES" || (!c.moneda && (c.metodoPago?.toUpperCase().includes("VES") || c.metodoPago?.toUpperCase().includes("PUNTO") || c.metodoPago?.toUpperCase().includes("PAGO M") || (c.montoVES !== undefined && c.montoVES > 0 && !c.montoUSD))))
+    .reduce((s, x) => s + (x.montoVES || (x.moneda === "VES" ? x.montoCobrado || 0 : 0)), 0);
+
+  const totalCOP = cobrosLocales
+    .filter((c) => c.moneda === "COP" || (!c.moneda && (c.metodoPago?.toUpperCase().includes("COP") || (c.montoCOP !== undefined && c.montoCOP > 0))))
+    .reduce((s, x) => s + (x.montoCOP || (x.moneda === "COP" ? x.montoCobrado || 0 : 0)), 0);
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiCard label="Recaudación del Día (USD)" val={`$${totalUSD.toFixed(2)}`} sub="Total en dólares" color="#10b981" />
-        <KpiCard label="Equivalente en Bolívares (VES)" val={`Bs. ${totalVES.toFixed(2)}`} sub={`A tasa oficial ${config.tasaBCV}`} color="#0ea5e9" />
-        <KpiCard label="Consultas Pagadas" val={String(cobrosLocales.length)} sub="Transacciones de caja hoy" color="#a855f7" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard label="Dólares Recibidos (USD)" val={`$${totalUSD.toFixed(2)}`} sub="Recaudación en divisas USD" color="#10b981" />
+        <KpiCard label="Bolívares Recibidos (VES)" val={`Bs. ${totalVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`} sub="Recaudación en moneda nacional" color="#0ea5e9" />
+        <KpiCard label="Pesos Recibidos (COP)" val={`$${totalCOP.toLocaleString("es-CO")}`} sub="Recaudación en Pesos COP" color="#a855f7" />
+        <KpiCard label="Consultas Pagadas" val={String(cobrosLocales.length)} sub="Transacciones de caja hoy" color="#f59e0b" />
       </div>
 
       {/* Cobros del día */}
       <div className="apple-glass rounded-2xl p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="font-bold text-sm text-slate-900 dark:text-white">Auditoría de Cobros de Hoy</h4>
+          <div>
+            <h4 className="font-bold text-sm text-slate-900 dark:text-white">Auditoría de Cobros de Hoy</h4>
+            <p className="text-[11px] text-slate-500 dark:text-white/50">Montos clasificados estrictamente por la moneda recibida</p>
+          </div>
           <button
             onClick={() => {
               generarPdfCierreCaja({
@@ -4986,9 +5103,11 @@ function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, historialC
                 fecha: hoy(),
                 horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                 tasaBCV: config.tasaBCV,
+                tasaCOP: config.tasaCOP || 4200,
                 cobros: cobrosLocales,
                 totalUSD,
                 totalVES,
+                totalCOP,
                 totalPacientes: cobrosLocales.length,
               });
             }}
@@ -5002,18 +5121,38 @@ function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, historialC
           <p className="text-xs text-slate-400">No hay cobros registrados en la caja de hoy.</p>
         ) : (
           <div className="divide-y divide-slate-200/60 dark:divide-white/5 text-xs">
-            {cobrosLocales.map((c, i) => (
-              <div key={i} className="py-3 flex items-center justify-between">
-                <div>
-                  <div className="font-bold text-slate-900 dark:text-white">{c.pacienteNombre} <span className="text-slate-400 font-normal">({c.identificacion})</span></div>
-                  <div className="text-[11px] text-slate-500">{c.metodoPago} {c.referencia ? `· Ref: ${c.referencia}` : ""} · {c.hora}</div>
+            {cobrosLocales.map((c, i) => {
+              const esVes = c.moneda === "VES" || (c.montoVES !== undefined && c.montoVES > 0 && !c.montoUSD);
+              const esCop = c.moneda === "COP" || (c.montoCOP !== undefined && c.montoCOP > 0);
+
+              return (
+                <div key={i} className="py-3 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-slate-900 dark:text-white">
+                      {c.pacienteNombre} <span className="text-slate-400 font-normal">({c.identificacion})</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      {c.metodoPago} {c.referencia && c.referencia !== "N/A" ? `· Ref: ${c.referencia}` : ""} · {c.hora}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {esVes ? (
+                      <div className="font-bold text-sky-600 dark:text-sky-400 font-mono">
+                        Bs. {(c.montoVES || c.montoCobrado || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                      </div>
+                    ) : esCop ? (
+                      <div className="font-bold text-purple-600 dark:text-purple-400 font-mono">
+                        ${(c.montoCOP || c.montoCobrado || 0).toLocaleString("es-CO")} COP
+                      </div>
+                    ) : (
+                      <div className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                        ${(c.montoUSD || c.montoCobrado || 0).toFixed(2)} USD
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-bold text-emerald-600 dark:text-emerald-400">${c.montoUSD.toFixed(2)} USD</div>
-                  <div className="text-[10px] text-slate-400">Bs. {c.montoVES.toFixed(2)}</div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -5032,9 +5171,22 @@ function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, historialC
                   <div className="text-[11px] text-slate-500">{cierre.totalPacientes} pacientes · Responsable: {cierre.doctorNombre}</div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="font-bold text-emerald-600 dark:text-emerald-400">${cierre.totalUSD.toFixed(2)} USD</div>
-                    <div className="text-[10px] text-slate-400">Bs. {cierre.totalVES.toFixed(2)}</div>
+                  <div className="text-right text-xs">
+                    {cierre.totalUSD > 0 && (
+                      <div className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                        ${cierre.totalUSD.toFixed(2)} USD
+                      </div>
+                    )}
+                    {cierre.totalVES > 0 && (
+                      <div className="font-bold text-sky-600 dark:text-sky-400 font-mono">
+                        Bs. {cierre.totalVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                      </div>
+                    )}
+                    {(cierre.totalCOP || 0) > 0 && (
+                      <div className="font-bold text-purple-600 dark:text-purple-400 font-mono">
+                        ${(cierre.totalCOP || 0).toLocaleString("es-CO")} COP
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => generarPdfCierreCaja(cierre)}

@@ -7,8 +7,11 @@ export interface CobroItem {
   concepto: string;
   metodoPago: string;
   referencia: string;
-  montoUSD: number;
-  montoVES: number;
+  moneda?: "USD" | "VES" | "COP";
+  montoCobrado?: number;
+  montoUSD?: number;
+  montoVES?: number;
+  montoCOP?: number;
   hora: string;
 }
 
@@ -18,9 +21,11 @@ export interface CierreCajaData {
   fecha: string;
   horaCierre: string;
   tasaBCV: number;
+  tasaCOP?: number;
   cobros: CobroItem[];
   totalUSD: number;
   totalVES: number;
+  totalCOP?: number;
   totalPacientes: number;
 }
 
@@ -58,6 +63,7 @@ export interface ConsultaReportData {
 
 /**
  * Genera y descarga el PDF de Cierre de Caja Diario (Audit Report)
+ * Muestra estrictamente las cantidades en las monedas que fueron recibidas.
  */
 export function generarPdfCierreCaja(data: CierreCajaData) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
@@ -84,34 +90,66 @@ export function generarPdfCierreCaja(data: CierreCajaData) {
   doc.text(`Médico / Administrador: ${data.doctorNombre}`, 14, 36);
   doc.text(`Tasa Oficial BCV: Bs. ${data.tasaBCV.toFixed(2)} / USD`, pageWidth - 14, 36, { align: "right" });
 
-  // ── TARJETAS DE RESUMEN ──
+  // ── TARJETAS DE RESUMEN POR MONEDA RECIBIDA ──
+  const tieneCOP = (data.totalCOP || 0) > 0;
+  const cardW = tieneCOP ? 42 : 58;
+  const gap = tieneCOP ? 6 : 7;
+  let startX = 14;
+
+  // Card 1: USD
   doc.setFillColor(241, 245, 249);
-  doc.roundedRect(14, 42, 58, 20, 2, 2, "F");
-  doc.roundedRect(79, 42, 58, 20, 2, 2, "F");
-  doc.roundedRect(144, 42, 58, 20, 2, 2, "F");
-
-  doc.setFontSize(8);
+  doc.roundedRect(startX, 42, cardW, 20, 2, 2, "F");
+  doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text("TOTAL EN DÓLARES", 18, 48);
-  doc.text("TOTAL EN BOLÍVARES", 83, 48);
-  doc.text("PACIENTES ATENDIDOS", 148, 48);
-
-  doc.setFontSize(13);
+  doc.text("DÓLARES EN CAJA (USD)", startX + 4, 48);
+  doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(16, 185, 129); // Emerald
-  doc.text(`$${data.totalUSD.toFixed(2)} USD`, 18, 57);
+  doc.text(`$${data.totalUSD.toFixed(2)} USD`, startX + 4, 57);
 
+  // Card 2: VES
+  startX += cardW + gap;
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(startX, 42, cardW, 20, 2, 2, "F");
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text("BOLÍVARES EN CAJA (VES)", startX + 4, 48);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
   doc.setTextColor(14, 165, 233); // Sky
-  doc.text(`Bs. ${data.totalVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`, 83, 57);
+  doc.text(`Bs. ${data.totalVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`, startX + 4, 57);
 
+  // Card 3: COP (si hay) o Pacientes
+  if (tieneCOP) {
+    startX += cardW + gap;
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(startX, 42, cardW, 20, 2, 2, "F");
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text("PESOS EN CAJA (COP)", startX + 4, 48);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(168, 85, 247); // Purple
+    doc.text(`$${(data.totalCOP || 0).toLocaleString("es-CO")} COP`, startX + 4, 57);
+  }
+
+  // Card Final: Pacientes
+  startX += cardW + gap;
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(startX, 42, cardW, 20, 2, 2, "F");
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text("TRANSACCIONES", startX + 4, 48);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42); // Dark
-  doc.text(`${data.totalPacientes} Pacientes`, 148, 57);
+  doc.text(`${data.totalPacientes} Pacientes`, startX + 4, 57);
 
   // ── TABLA DE COBROS ──
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text("Detalle de Transacciones del Día", 14, 71);
+  doc.text("Detalle de Transacciones del Día (Monedas Recibidas)", 14, 71);
 
   // Table header
   let y = 76;
@@ -123,10 +161,9 @@ export function generarPdfCierreCaja(data: CierreCajaData) {
   doc.text("#", 16, y + 5);
   doc.text("Hora", 23, y + 5);
   doc.text("Paciente", 36, y + 5);
-  doc.text("Cédula", 82, y + 5);
-  doc.text("Método / Ref", 110, y + 5);
-  doc.text("Monto USD", 156, y + 5, { align: "right" });
-  doc.text("Monto VES", pageWidth - 16, y + 5, { align: "right" });
+  doc.text("Cédula", 86, y + 5);
+  doc.text("Método / Referencia", 116, y + 5);
+  doc.text("Monto Recibido", pageWidth - 16, y + 5, { align: "right" });
 
   y += 7;
   doc.setFont("helvetica", "normal");
@@ -140,11 +177,28 @@ export function generarPdfCierreCaja(data: CierreCajaData) {
     doc.setTextColor(30, 41, 59);
     doc.text(String(c.turno), 16, y + 4.5);
     doc.text(c.hora, 23, y + 4.5);
-    doc.text(c.pacienteNombre.slice(0, 24), 36, y + 4.5);
-    doc.text(c.identificacion, 82, y + 4.5);
-    doc.text(`${c.metodoPago}${c.referencia ? ` (${c.referencia.slice(0, 8)})` : ""}`.slice(0, 26), 110, y + 4.5);
-    doc.text(`$${c.montoUSD.toFixed(2)}`, 156, y + 4.5, { align: "right" });
-    doc.text(`Bs. ${c.montoVES.toFixed(2)}`, pageWidth - 16, y + 4.5, { align: "right" });
+    doc.text(c.pacienteNombre.slice(0, 25), 36, y + 4.5);
+    doc.text(c.identificacion, 86, y + 4.5);
+    doc.text(`${c.metodoPago}${c.referencia && c.referencia !== "N/A" ? ` (${c.referencia})` : ""}`.slice(0, 30), 116, y + 4.5);
+
+    // Formatear estrictamente en la moneda en que fue cobrado
+    let textoMonto = "";
+    if (c.moneda === "USD" || (c.montoUSD && c.montoUSD > 0 && (!c.moneda || c.moneda === "USD"))) {
+      textoMonto = `$${(c.montoUSD || c.montoCobrado || 0).toFixed(2)} USD`;
+      doc.setTextColor(16, 185, 129); // Emerald
+    } else if (c.moneda === "VES" || (c.montoVES && c.montoVES > 0)) {
+      textoMonto = `Bs. ${(c.montoVES || c.montoCobrado || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}`;
+      doc.setTextColor(14, 165, 233); // Sky
+    } else if (c.moneda === "COP" || (c.montoCOP && c.montoCOP > 0)) {
+      textoMonto = `$${(c.montoCOP || c.montoCobrado || 0).toLocaleString("es-CO")} COP`;
+      doc.setTextColor(168, 85, 247); // Purple
+    } else {
+      textoMonto = `$${(c.montoUSD || 0).toFixed(2)} USD`;
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.text(textoMonto, pageWidth - 16, y + 4.5, { align: "right" });
+    doc.setFont("helvetica", "normal");
     y += 6.5;
   });
 
