@@ -239,8 +239,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   useEffect(() => { recargarTodo(); }, [tenantId]);
 
   const totalVentasHoy = ventasHoy?.total ?? 0;
-  const mesasOcupadas = (mapa || []).filter((m) => m.estado === "OCUPADA").length;
-  const comandasAbiertas = (mapa || []).filter((m) => m.comandaAbierta).length;
+  const valorInventario = (articulos || []).reduce((s, a) => s + Number(a.costoUnitario) * Number(a.stockActual), 0);
 
   // Sin tasa BCV del día, un cobro mixto en Bs o el total bimoneda del
   // carrito estarían calculando con una tasa vencida o en cero — bloquea
@@ -358,8 +357,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
 
         <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
           {pagina === "general" && (
-            <VistaGeneral mesasOcupadas={mesasOcupadas} totalMesas={(mapa || []).length} comandasAbiertas={comandasAbiertas}
-              totalVentasHoy={totalVentasHoy} kdsCounts={kdsCounts} vencimientos={(lotesPorVencer || []).length}
+            <VistaGeneral totalVentasHoy={totalVentasHoy} valorInventario={valorInventario} vencimientos={(lotesPorVencer || []).length}
               onNavegar={irA}
               onVentaRapida={abrirVentaRapida} />
           )}
@@ -588,17 +586,18 @@ function KpiCard({ label, val, sub, color, onClick }: { label: string; val: stri
 // ══════════════════════════════════════════════════════════════════════════
 // VISTA GENERAL
 // ══════════════════════════════════════════════════════════════════════════
-function VistaGeneral({ mesasOcupadas, totalMesas, comandasAbiertas, totalVentasHoy, kdsCounts, vencimientos, onNavegar, onVentaRapida }: {
-  mesasOcupadas: number; totalMesas: number; comandasAbiertas: number; totalVentasHoy: number; kdsCounts: number; vencimientos: number;
+function VistaGeneral({ totalVentasHoy, valorInventario, vencimientos, onNavegar, onVentaRapida }: {
+  totalVentasHoy: number; valorInventario: number; vencimientos: number;
   onNavegar: (p: Pagina) => void; onVentaRapida: () => void;
 }) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <KpiCard label="Mesas Ocupadas" val={`${mesasOcupadas}/${totalMesas || "…"}`} sub="Mapa del salón" color="#0ea5e9" onClick={() => onNavegar("salon")} />
-        <KpiCard label="Comandas Abiertas" val={String(comandasAbiertas)} sub="Salón, delivery y recoger" color="#a855f7" onClick={() => onNavegar("salon")} />
-        <KpiCard label="Ventas del Día" val={`$${totalVentasHoy.toFixed(2)}`} sub="Comandas y Fast-Bar cerrados" color="#10b981" onClick={() => onNavegar("salon")} />
-        <KpiCard label="Platos en Cocina" val={String(kdsCounts)} sub="Pendientes + en preparación" color="#f59e0b" onClick={() => onNavegar("cocina")} />
+      {/* Mesas, comandas y cocina quedan fuera de estos KPIs — están detrás
+          del paywall Pro, así que el protagonismo va para lo que sí está
+          activo en el plan base: ventas e inventario. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <KpiCard label="Ventas del Día" val={`$${totalVentasHoy.toFixed(2)}`} sub="Comandas y Fast-Bar cerrados" color="#10b981" onClick={onVentaRapida} />
+        <KpiCard label="Valor del Inventario" val={`$${valorInventario.toFixed(2)}`} sub="Costo total en bodega" color="#0ea5e9" onClick={() => onNavegar("inventario")} />
         <KpiCard label="Por Vencer" val={String(vencimientos)} sub="Lotes vencidos o próximos" color={vencimientos > 0 ? "#ef4444" : "#64748b"} onClick={() => onNavegar("inventario")} />
       </div>
       <button onClick={onVentaRapida}
@@ -615,14 +614,14 @@ function VistaGeneral({ mesasOcupadas, totalMesas, comandasAbiertas, totalVentas
       <div className="apple-glass rounded-2xl p-6">
         <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-3">Accesos rápidos</h4>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button onClick={() => onNavegar("salon")} className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
-            <IconRestaurant size={20} /><div className="text-sm font-semibold mt-2 text-slate-900 dark:text-white">Abrir mesa / comanda</div>
-          </button>
-          <button onClick={() => onNavegar("cocina")} className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
-            <IconHourglass size={20} /><div className="text-sm font-semibold mt-2 text-slate-900 dark:text-white">Ver tablero de cocina</div>
+          <button onClick={onVentaRapida} className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
+            <IconBolt size={20} /><div className="text-sm font-semibold mt-2 text-slate-900 dark:text-white">Nueva Venta Rápida</div>
           </button>
           <button onClick={() => onNavegar("recetas")} className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
-            <IconFileText size={20} /><div className="text-sm font-semibold mt-2 text-slate-900 dark:text-white">Registrar receta / costo</div>
+            <IconFileText size={20} /><div className="text-sm font-semibold mt-2 text-slate-900 dark:text-white">Registrar Receta / Costo</div>
+          </button>
+          <button onClick={() => onNavegar("administracion")} className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
+            <IconBank size={20} /><div className="text-sm font-semibold mt-2 text-slate-900 dark:text-white">Corte de Caja / Turnos</div>
           </button>
         </div>
       </div>
