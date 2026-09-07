@@ -11,14 +11,14 @@ import { useAuth } from "../context/AuthContext";
 import { listarPacientes, listarCitasDelDia, listarCobrosDelDia, type Paciente, type CitaMedica } from "../api";
 import MediclinicApp from "../components/MediclinicApp";
 
-const VERTICAL_ICON: Record<string, (props: { size?: number }) => JSX.Element> = {
+const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNode> = {
   clinica: IconClinic,
   veterinaria: IconVet,
   ferreteria: IconHardware,
   restaurante: IconRestaurant,
 };
 
-const ACTION_ICON: Record<string, (props: { size?: number }) => JSX.Element> = {
+const ACTION_ICON: Record<string, (props: { size?: number }) => React.ReactNode> = {
   "Nueva Consulta": IconStethoscope,
   "Agendar Cita": IconCalendar,
   "Emitir Receta": IconPrescription,
