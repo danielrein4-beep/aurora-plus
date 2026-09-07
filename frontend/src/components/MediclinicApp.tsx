@@ -230,12 +230,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "mediclinic-clasico" : ""}`}>
       {modoClasico && <EstiloClasico />}
       
-      {/* SIDEBAR NATIVO */}
-      <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1">
-        <div className="px-2 pb-4 mb-2 border-b border-slate-300/60 dark:border-white/10">
+      {/* SIDEBAR NATIVO ESTILO MEDICLINIC */}
+      <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1.5 bg-slate-50/50 dark:bg-black/10">
+        <div className="px-2 pb-3 mb-2 border-b border-slate-300/60 dark:border-white/10">
           <div className="flex items-center justify-between">
             <div className="font-['Outfit'] font-black text-lg text-aurora">Mediclinic Pro</div>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-mono font-bold">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-300 font-mono font-bold">
               {rolActivo === "MEDICO" ? "DOCTOR" : "SECRETARIA"}
             </span>
           </div>
@@ -244,30 +244,42 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           </div>
         </div>
 
-        {NAV.map((n) => (
-          <button
-            key={n.id}
-            onClick={() => setPagina(n.id)}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all ${
-              pagina === n.id
-                ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 shadow-sm"
-                : "text-slate-600 dark:text-white/60 hover:bg-slate-200/60 dark:hover:bg-white/5"
-            }`}
-          >
-            <n.Icon size={16} />
-            <span>{n.label}</span>
-          </button>
-        ))}
+        <div className="px-2 pb-1 text-[11px] font-bold text-slate-400 dark:text-white/40 uppercase tracking-wider">
+          PANEL DEL DOCTOR
+        </div>
 
-        <div className="flex-1" />
+        <div className="space-y-1">
+          {NAV.map((n) => {
+            const activo = pagina === n.id;
+            return (
+              <button
+                key={n.id}
+                onClick={() => setPagina(n.id)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                  activo
+                    ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 font-bold border-l-4 border-sky-600 dark:border-sky-400 shadow-xs"
+                    : "text-slate-600 dark:text-white/60 hover:bg-slate-200/60 dark:hover:bg-white/5"
+                }`}
+              >
+                <n.Icon size={16} />
+                <span className="truncate">{n.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex-1 min-h-[10px]" />
+
+        {/* WIDGET CALENDARIO EN SIDEBAR */}
+        <MiniCalendarioSidebar />
 
         {/* Switch Modo Clásico / Aurora */}
-        <div className="p-2.5 rounded-xl bg-slate-100/60 dark:bg-white/5 border border-slate-300/60 dark:border-white/10 text-xs mb-2">
+        <div className="p-2 rounded-xl bg-slate-200/50 dark:bg-white/5 border border-slate-300/60 dark:border-white/10 text-xs mt-2">
           <div className="flex items-center justify-between">
             <span className="text-slate-600 dark:text-white/70 text-[11px] font-medium">Modo Clásico</span>
             <button
               onClick={alternarModo}
-              className={`w-9 h-5 rounded-full transition-colors relative p-0.5 ${modoClasico ? "bg-teal-600" : "bg-slate-400/40"}`}
+              className={`w-9 h-5 rounded-full transition-colors relative p-0.5 cursor-pointer ${modoClasico ? "bg-teal-600" : "bg-slate-400/40"}`}
             >
               <div className={`w-4 h-4 rounded-full bg-white transition-transform ${modoClasico ? "translate-x-4" : "translate-x-0"}`} />
             </button>
@@ -276,7 +288,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
         <button
           onClick={onSalir}
-          className="w-full px-3 py-2.5 rounded-xl text-xs font-semibold text-left text-slate-500 dark:text-white/40 hover:bg-slate-200/60 dark:hover:bg-white/5 cursor-pointer"
+          className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-slate-500 dark:text-white/40 hover:bg-slate-200/60 dark:hover:bg-white/5 cursor-pointer"
         >
           ← Volver al Hub
         </button>
@@ -284,8 +296,9 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
       {/* ÁREA PRINCIPAL */}
       <main className="flex-1 flex flex-col overflow-y-auto">
-        <header className="h-16 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between px-6 bg-white/30 dark:bg-black/10 backdrop-blur-md">
-          <div className="flex items-center gap-3">
+        <header className="py-3.5 px-6 border-b border-slate-300/60 dark:border-white/10 flex flex-wrap items-center justify-between gap-4 bg-white/40 dark:bg-black/15 backdrop-blur-md">
+          {/* Lado Izquierdo: Saludo con rol y especialidad */}
+          <div className="flex items-center gap-3 sm:gap-4">
             <button
               onClick={onSalir}
               className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border border-slate-300/60 dark:border-white/10"
@@ -293,17 +306,29 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             >
               <span>← Aurora Hub</span>
             </button>
-            <h2 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-              {NAV.find((n) => n.id === pagina)?.label}
-            </h2>
+
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="font-['Outfit'] font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
+                  ¡Bienvenido {configPerfil.doctorNombre}!
+                </h1>
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950/80 border border-sky-300/50 dark:border-sky-500/30 text-sky-700 dark:text-sky-300 font-extrabold uppercase tracking-wider">
+                  {rolActivo === "MEDICO" ? "MÉDICO TITULAR" : "SECRETARÍA CLÍNICA"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-white/50 font-medium mt-0.5">
+                {configPerfil.especialidad} {configPerfil.matriculaMPPS ? `| MPPS-${configPerfil.matriculaMPPS}` : ""}
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Lado Derecho: Píldora de Tasas del Día con botón Actualizar Tasas */}
+          <div className="flex items-center gap-3 flex-wrap">
             {/* Selector de Rol RBAC */}
             <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-xs">
               <button
                 onClick={() => setRolActivo("MEDICO")}
-                className={`px-3 py-1 rounded-full font-bold transition-all ${
+                className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
                   rolActivo === "MEDICO" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
                 }`}
               >
@@ -311,7 +336,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               </button>
               <button
                 onClick={() => setRolActivo("SECRETARIA")}
-                className={`px-3 py-1 rounded-full font-bold transition-all ${
+                className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
                   rolActivo === "SECRETARIA" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
                 }`}
               >
@@ -319,29 +344,32 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               </button>
             </div>
 
-            {/* Widget / Botón Interactivo de Cambio Rápido de Tasas */}
-            <button
-              type="button"
-              onClick={abrirModalTasas}
-              className="text-xs text-right hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-300/60 dark:border-white/10 hover:border-teal-500/50 hover:bg-teal-500/5 transition-all cursor-pointer group"
-              title="Cambiar tasas de cambio manualmente"
-            >
-              <div className="flex flex-col items-end">
-                <div className="font-bold text-slate-900 dark:text-white leading-tight">
-                  {configPerfil.doctorNombre}
-                </div>
-                <div className="text-[11px] text-teal-600 dark:text-teal-400 font-mono leading-tight mt-0.5">
-                  BCV: Bs. {Number(configPerfil.tasaBCV || 56.4).toFixed(2)} | COP: ${Number(configPerfil.tasaCOP || 4200).toLocaleString()}
-                </div>
-              </div>
+            {/* Píldora de Tasas del Día con botón Actualizar Tasas */}
+            <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/70 dark:bg-white/5 border border-slate-300/60 dark:border-white/15 shadow-sm text-xs">
+              <span className="font-bold text-slate-700 dark:text-white/80 flex items-center gap-1">
+                💵 <span>Tasas del Día:</span>
+              </span>
+              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                VES: Bs. {Number(configPerfil.tasaBCV || 56.4).toFixed(2)}
+              </span>
+              <span className="text-slate-300 dark:text-white/20">|</span>
+              <span className="font-mono font-bold text-sky-600 dark:text-sky-400">
+                COP: ${Number(configPerfil.tasaCOP || 4200).toLocaleString()}
+              </span>
 
-              {/* Lápiz minimalista sin texto */}
-              <div className="p-1.5 rounded-lg bg-slate-200/60 dark:bg-white/5 group-hover:bg-teal-500/20 text-slate-400 dark:text-white/40 group-hover:text-teal-600 dark:group-hover:text-teal-300 transition-all flex items-center justify-center">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {/* Botón Actualizar Tasas */}
+              <button
+                type="button"
+                onClick={abrirModalTasas}
+                className="ml-1 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-teal-500 hover:text-white dark:bg-white/10 dark:hover:bg-teal-500 text-slate-700 dark:text-white/80 text-[11px] font-bold border border-slate-300/60 dark:border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                title="Cambiar tasas de cambio manualmente"
+              >
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                 </svg>
-              </div>
-            </button>
+                <span>Actualizar Tasas</span>
+              </button>
+            </div>
 
             <button onClick={recargarTodo} className="p-2 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
               <IconRefresh size={16} />
@@ -358,7 +386,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         )}
 
         <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-          {pagina === "general" && <VistaGeneral pacientes={pacientes} citasHoy={citasHoy} salaEspera={salaEspera} ingresosHoy={ingresosHoy} onNavegar={setPagina} />}
+          {pagina === "general" && <VistaGeneral pacientes={pacientes} citasHoy={citasHoy} salaEspera={salaEspera} procedimientos={procedimientos} ingresosHoy={ingresosHoy} onNavegar={setPagina} />}
           {pagina === "pacientes" && <GestionPacientes tenantId={tenantId} pacientes={pacientes} onCambio={recargarTodo} />}
           {pagina === "historias" && <HistoriasClinicas tenantId={tenantId} pacientes={pacientes} config={configPerfil} rol={rolActivo} />}
           {pagina === "procedimientos" && <Procedimientos tenantId={tenantId} procedimientos={procedimientos} pacientes={pacientes} config={configPerfil} onCambio={recargarTodo} />}
@@ -500,21 +528,292 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// MINI CALENDARIO EN SIDEBAR (ESTILO NATIVO)
+// ══════════════════════════════════════════════════════════════════════════
+function MiniCalendarioSidebar() {
+  const [fechaBase, setFechaBase] = useState(() => new Date());
+
+  const diasSemana = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const meses = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ];
+
+  const año = fechaBase.getFullYear();
+  const mes = fechaBase.getMonth();
+
+  const primerDiaSemana = new Date(año, mes, 1).getDay();
+  const totalDiasMes = new Date(año, mes + 1, 0).getDate();
+  const totalDiasMesAnterior = new Date(año, mes, 0).getDate();
+
+  const hoyObj = new Date();
+  const hoyDia = hoyObj.getDate();
+  const hoyMes = hoyObj.getMonth();
+  const hoyAño = hoyObj.getFullYear();
+
+  const celdas = [];
+  // Días mes anterior
+  for (let i = primerDiaSemana - 1; i >= 0; i--) {
+    celdas.push({ dia: totalDiasMesAnterior - i, mesActual: false });
+  }
+  // Días mes actual
+  for (let i = 1; i <= totalDiasMes; i++) {
+    celdas.push({
+      dia: i,
+      mesActual: true,
+      esHoy: i === hoyDia && mes === hoyMes && año === hoyAño,
+    });
+  }
+  // Días mes siguiente
+  const totalCeldasNecesarias = celdas.length <= 35 ? 35 : 42;
+  const restantes = totalCeldasNecesarias - celdas.length;
+  for (let i = 1; i <= restantes; i++) {
+    celdas.push({ dia: i, mesActual: false });
+  }
+
+  const nombreDia = new Intl.DateTimeFormat("es-ES", { weekday: "long" }).format(hoyObj);
+  const diaNum = hoyObj.getDate();
+  const mesNom = meses[hoyObj.getMonth()].toLowerCase();
+
+  return (
+    <div className="p-3 rounded-2xl bg-white/60 dark:bg-black/25 border border-slate-300/60 dark:border-white/10 text-xs shadow-xs space-y-2 mt-auto">
+      <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 dark:border-white/10">
+        <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-white text-xs">
+          <span>📅 Calendario</span>
+        </div>
+        <span className="font-mono text-[11px] font-bold text-slate-400">{año}</span>
+      </div>
+
+      <div className="text-[11px] text-slate-600 dark:text-white/70 capitalize font-semibold">
+        {nombreDia}, {diaNum} de {mesNom}
+      </div>
+
+      <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-white/80 pt-0.5">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setFechaBase(new Date(año, mes - 1, 1))}
+            className="px-1 hover:text-sky-500 font-bold cursor-pointer"
+          >
+            ‹
+          </button>
+          <span>{meses[mes]}</span>
+          <button
+            type="button"
+            onClick={() => setFechaBase(new Date(año, mes + 1, 1))}
+            className="px-1 hover:text-sky-500 font-bold cursor-pointer"
+          >
+            ›
+          </button>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setFechaBase(new Date(año - 1, mes, 1))}
+            className="px-1 hover:text-sky-500 font-bold cursor-pointer"
+          >
+            ‹
+          </button>
+          <span>{año}</span>
+          <button
+            type="button"
+            onClick={() => setFechaBase(new Date(año + 1, mes, 1))}
+            className="px-1 hover:text-sky-500 font-bold cursor-pointer"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400">
+        {diasSemana.map((d) => (
+          <span key={d}>{d}</span>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px]">
+        {celdas.map((c, i) => (
+          <div
+            key={i}
+            className={`h-5 w-5 mx-auto flex items-center justify-center rounded-full font-mono ${
+              c.esHoy
+                ? "bg-sky-600 text-white font-bold shadow-xs scale-110"
+                : c.mesActual
+                ? "text-slate-700 dark:text-white/80"
+                : "text-slate-300 dark:text-white/20"
+            }`}
+          >
+            {c.dia}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // VISTA GENERAL / DASHBOARD
 // ══════════════════════════════════════════════════════════════════════════
-function VistaGeneral({ pacientes, citasHoy, salaEspera, ingresosHoy, onNavegar }: {
-  pacientes: Paciente[] | null; citasHoy: CitaMedica[] | null; salaEspera: SalaEsperaEntrada[] | null; ingresosHoy: number | null;
+function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingresosHoy, onNavegar }: {
+  pacientes: Paciente[] | null; citasHoy: CitaMedica[] | null; salaEspera: SalaEsperaEntrada[] | null;
+  procedimientos: ProcedimientoMedico[] | null; ingresosHoy: number | null;
   onNavegar: (p: Pagina) => void;
 }) {
+  const [busquedaRapida, setBusquedaRapida] = useState("");
   const enEspera = (salaEspera || []).filter((e) => e.estado !== "FINALIZADO").length;
+
+  const handleBuscar = (e: React.FormEvent) => {
+    e.preventDefault();
+    onNavegar("pacientes");
+  };
 
   return (
     <div className="space-y-6">
+      {/* ── CARD: MOTOR DE BÚSQUEDA INSTANTÁNEA DE PACIENTES ── */}
+      <div className="apple-glass rounded-2xl p-5 sm:p-6 border border-slate-300/60 dark:border-white/15 shadow-sm space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white text-base">
+            <IconSearch size={18} />
+            <span>Motor de Búsqueda Instantánea de Pacientes</span>
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">
+            Búsqueda por Cédula o Historia
+          </span>
+        </div>
+
+        <form onSubmit={handleBuscar} className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="relative flex-1 w-full">
+            <input
+              type="text"
+              placeholder="Ingresa la cédula (ej. V-18456789 o 18456789) o número de expediente..."
+              value={busquedaRapida}
+              onChange={(e) => setBusquedaRapida(e.target.value)}
+              className="w-full pl-4 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-inner"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <IconSearch size={15} />
+            <span>Buscar</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavegar("pacientes")}
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 border border-slate-300/60 dark:border-white/10 text-slate-700 dark:text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <span>+ Nuevo Paciente</span>
+          </button>
+        </form>
+      </div>
+
+      {/* ── 4 KPI CARDS CON BORDE LATERAL COLOREADO (EXACTO A LA IMAGEN) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Pacientes Registrados" val={pacientes ? String(pacientes.length) : "…"} sub="Expedientes en sistema" color="#0ea5e9" onClick={() => onNavegar("pacientes")} />
-        <KpiCard label="Citas para Hoy" val={citasHoy ? String(citasHoy.length) : "…"} sub="Agenda del día" color="#a855f7" onClick={() => onNavegar("agenda")} />
-        <KpiCard label="En Sala de Espera" val={String(enEspera)} sub="Pacientes en turno" color="#f59e0b" onClick={() => onNavegar("sala-espera")} />
-        <KpiCard label="Ingresos del Día" val={ingresosHoy !== null ? `$${ingresosHoy.toFixed(2)}` : "…"} sub="Recaudación en USD" color="#10b981" onClick={() => onNavegar("financiero")} />
+        {/* Card 1: EN SALA DE ESPERA (Borde ámbar / amarillo) */}
+        <div
+          onClick={() => onNavegar("sala-espera")}
+          className="apple-glass rounded-2xl p-4 sm:p-5 border-l-4 border-l-amber-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
+        >
+          <div className="text-[11px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
+            EN SALA DE ESPERA
+          </div>
+          <div className="text-3xl font-black text-amber-500 font-['Outfit'] mt-1">
+            {String(enEspera)}
+          </div>
+          <div className="text-[11px] text-amber-600/80 dark:text-amber-400/80 font-medium mt-1">
+            Turnos pendientes hoy
+          </div>
+        </div>
+
+        {/* Card 2: PACIENTES ATENDIDOS HOY (Borde azul / cyan) */}
+        <div
+          onClick={() => onNavegar("historias")}
+          className="apple-glass rounded-2xl p-4 sm:p-5 border-l-4 border-l-sky-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
+        >
+          <div className="text-[11px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
+            PACIENTES ATENDIDOS HOY
+          </div>
+          <div className="text-3xl font-black text-sky-500 font-['Outfit'] mt-1">
+            {citasHoy ? String(citasHoy.length) : "0"}
+          </div>
+          <div className="text-[11px] text-sky-600/80 dark:text-sky-400/80 font-medium mt-1">
+            Consultas registradas
+          </div>
+        </div>
+
+        {/* Card 3: EXPEDIENTES REGISTRADOS (Borde verde / esmeralda) */}
+        <div
+          onClick={() => onNavegar("pacientes")}
+          className="apple-glass rounded-2xl p-4 sm:p-5 border-l-4 border-l-teal-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
+        >
+          <div className="text-[11px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
+            EXPEDIENTES REGISTRADOS
+          </div>
+          <div className="text-3xl font-black text-teal-600 dark:text-teal-400 font-['Outfit'] mt-1">
+            {pacientes ? String(pacientes.length) : "0"}
+          </div>
+          <div className="text-[11px] text-teal-600/80 dark:text-teal-400/80 font-medium mt-1">
+            Pacientes en base de datos
+          </div>
+        </div>
+
+        {/* Card 4: PROCEDIMIENTOS SEMANA (Borde morado / índigo) */}
+        <div
+          onClick={() => onNavegar("procedimientos")}
+          className="apple-glass rounded-2xl p-4 sm:p-5 border-l-4 border-l-purple-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
+        >
+          <div className="text-[11px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
+            PROCEDIMIENTOS SEMANA
+          </div>
+          <div className="text-3xl font-black text-purple-600 dark:text-purple-400 font-['Outfit'] mt-1">
+            {procedimientos ? String(procedimientos.length) : "0"}
+          </div>
+          <div className="text-[11px] text-purple-600/80 dark:text-purple-400/80 font-medium mt-1">
+            Cotizaciones multimoneda
+          </div>
+        </div>
+      </div>
+
+      {/* ── CARD: PANEL DE CONTROL MÉDICO (ACCIONES RÁPIDAS) ── */}
+      <div className="apple-glass rounded-2xl p-5 sm:p-6 border border-slate-300/60 dark:border-white/15 shadow-sm space-y-4">
+        <div>
+          <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
+            Panel de Control Médico
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-white/60 mt-0.5">
+            Gestiona expedientes de pacientes locales y foráneos, historias clínicas de consulta, cotizaciones multidivisa y estadísticas clínicas en tiempo real.
+          </p>
+        </div>
+
+        <div className="pt-3 border-t border-slate-200 dark:border-white/10 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onNavegar("pacientes")}
+            className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer flex items-center gap-2"
+          >
+            <IconUsers size={16} />
+            <span>Ver Directorio de Pacientes</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavegar("historias")}
+            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 border border-slate-300/60 dark:border-white/10 text-slate-700 dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center gap-2"
+          >
+            <IconFileText size={16} />
+            <span>Ver Historias Clínicas</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavegar("procedimientos")}
+            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 border border-slate-300/60 dark:border-white/10 text-slate-700 dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center gap-2"
+          >
+            <IconPrescription size={16} />
+            <span>Cotizaciones y Procedimientos</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
