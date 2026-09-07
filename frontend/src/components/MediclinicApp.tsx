@@ -2708,8 +2708,39 @@ function HistoriasClinicas({
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// PROCEDIMIENTOS & COTIZADOR MULTI-MONEDA (USD / VES / COP)
+// PROCEDIMIENTOS & COTIZACIONES MULTIDIVISA (USD / VES / COP)
 // ══════════════════════════════════════════════════════════════════════════
+
+export interface CotizacionGuardada {
+  id: string;
+  pacienteId: number | null;
+  pacienteNombre: string;
+  pacienteCedula: string;
+  pacienteTelefono?: string;
+  procedimientoNombre: string;
+  descripcion?: string;
+  costoUSD: number;
+  costoVES: number;
+  costoCOP: number;
+  tasaBCV: number;
+  tasaCOP: number;
+  estado: "COTIZADA" | "PLANIFICADA" | "REALIZADA" | "CANCELADA";
+  fecha: string;
+  fechaPlanificada?: string;
+}
+
+const COTIZACIONES_STORAGE_KEY = "aurora_mediclinic_cotizaciones";
+
+const PROCEDIMIENTOS_SUGERIDOS = [
+  { nombre: "Cirugía Menor Ambulatoria", precio: 250, desc: "Intervención ambulatoria con anestesia local y curación" },
+  { nombre: "Resección de quiste sebáceo", precio: 180, desc: "Resección quirúrgica completa con hemostasia y sutura intradérmica" },
+  { nombre: "Biopsia de piel y partes blandas", precio: 120, desc: "Toma de muestra tisular por punch o incisión con estudio histológico" },
+  { nombre: "Extirpación de nevus / lunar", precio: 90, desc: "Exéresis con margen de seguridad y cierre primario" },
+  { nombre: "Cauterización de verrugas múltiples", precio: 75, desc: "Electrocauterización o crioterapia en lesiones cutáneas" },
+  { nombre: "Drenaje de absceso superficial", precio: 85, desc: "Incisión, drenaje, desbridamiento y colocación de mecha" },
+  { nombre: "Consulta Médica Especializada", precio: 50, desc: "Evaluación clínica integral, diagnóstico y plan terapéutico" },
+];
+
 function Procedimientos({
   tenantId,
   procedimientos,
@@ -2725,206 +2756,884 @@ function Procedimientos({
   onCambio: () => void;
   pacienteInicialId?: number | null;
 }) {
-  const [form, setForm] = useState({ nombre: "", descripcion: "", costo: "", moneda: "USD", duracionMinutos: "" });
-  const [guardando, setGuardando] = useState(false);
-
-  // Estado del Cotizador
-  const [cotizacionPacienteId, setCotizacionPacienteId] = useState<number | "">(pacienteInicialId || "");
-  const [seleccionados, setSeleccionados] = useState<number[]>([]);
-
-  useEffect(() => {
-    if (pacienteInicialId) {
-      setCotizacionPacienteId(pacienteInicialId);
+  // Lista de Cotizaciones Guardadas
+  const [cotizaciones, setCotizaciones] = useState<CotizacionGuardada[]>(() => {
+    try {
+      const guardado = localStorage.getItem(COTIZACIONES_STORAGE_KEY);
+      if (guardado) {
+        return JSON.parse(guardado);
+      }
+    } catch {
+      // Ignorar error de parseo
     }
-  }, [pacienteInicialId]);
+    // Datos de demostración iniciales
+    return [
+      {
+        id: "cot-1",
+        pacienteId: 1,
+        pacienteNombre: "Valentina Duque",
+        pacienteCedula: "V-28.450.123",
+        pacienteTelefono: "+584121234567",
+        procedimientoNombre: "Cirugía Menor Ambulatoria",
+        descripcion: "Resección de quiste sebáceo en región dorsal con anestesia local",
+        costoUSD: 250,
+        costoVES: 250 * (config?.tasaBCV || 950),
+        costoCOP: 250 * (config?.tasaCOP || 4000),
+        tasaBCV: config?.tasaBCV || 950,
+        tasaCOP: config?.tasaCOP || 4000,
+        estado: "COTIZADA",
+        fecha: "2026-09-06",
+        fechaPlanificada: "2026-09-12",
+      },
+    ];
+  });
 
-  const pacienteCotizacion = (pacientes || []).find((p) => p.id === Number(cotizacionPacienteId));
+  // Guardar en localStorage cuando cambie
+  useEffect(() => {
+    try {
+      localStorage.setItem(COTIZACIONES_STORAGE_KEY, JSON.stringify(cotizaciones));
+    } catch {
+      // ignore
+    }
+  }, [cotizaciones]);
 
-  const toggleSeleccion = (id: number) => {
-    setSeleccionados((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  // Formulario de Nueva Cotización / Procedimiento
+  const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
+  const [busquedaPaciente, setBusquedaPaciente] = useState("");
+  const [mostrarDropdownPacientes, setMostrarDropdownPacientes] = useState(false);
+
+  const [nombreProcedimiento, setNombreProcedimiento] = useState("");
+  const [descripcionClinica, setDescripcionClinica] = useState("");
+  const [precioUSD, setPrecioUSD] = useState<number | string>("");
+  const [estadoInicial, setEstadoInicial] = useState<"COTIZADA" | "PLANIFICADA" | "REALIZADA" | "CANCELADA">("COTIZADA");
+  const [fechaPlanificada, setFechaPlanificada] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [toastExito, setToastExito] = useState<string | null>(null);
+
+  // Modal para ajuste rápido de tasas
+  const [modalTasas, setModalTasas] = useState(false);
+  const [tempTasaBCV, setTempTasaBCV] = useState(config?.tasaBCV || 950);
+  const [tempTasaCOP, setTempTasaCOP] = useState(config?.tasaCOP || 4000);
+
+  // Filtros del Historial
+  const [filtroTexto, setFiltroTexto] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<"TODOS" | "COTIZADA" | "PLANIFICADA" | "REALIZADA" | "CANCELADA">("TODOS");
+
+  // Si llega pacienteInicialId por props, preseleccionarlo
+  useEffect(() => {
+    if (pacienteInicialId && pacientes) {
+      const p = pacientes.find((item) => item.id === pacienteInicialId);
+      if (p) {
+        setPacienteSeleccionado(p);
+        setBusquedaPaciente(p.nombreCompleto);
+      }
+    }
+  }, [pacienteInicialId, pacientes]);
+
+  // Cálculo en tiempo real
+  const tasaBCV = Number(config?.tasaBCV) || 950;
+  const tasaCOP = Number(config?.tasaCOP) || 4000;
+  const usdNum = parseFloat(String(precioUSD)) || 0;
+  const vesNum = usdNum * tasaBCV;
+  const copNum = usdNum * tasaCOP;
+
+  // Pacientes filtrados en el buscador
+  const pacientesFiltrados = useMemo(() => {
+    if (!busquedaPaciente.trim()) return pacientes || [];
+    const q = busquedaPaciente.toLowerCase();
+    return (pacientes || []).filter(
+      (p) =>
+        p.nombreCompleto.toLowerCase().includes(q) ||
+        p.identificacion.toLowerCase().includes(q) ||
+        (p.telefono && p.telefono.toLowerCase().includes(q))
+    );
+  }, [pacientes, busquedaPaciente]);
+
+  // Limpiar formulario
+  const limpiarFormulario = () => {
+    setPacienteSeleccionado(null);
+    setBusquedaPaciente("");
+    setNombreProcedimiento("");
+    setDescripcionClinica("");
+    setPrecioUSD("");
+    setEstadoInicial("COTIZADA");
+    setFechaPlanificada("");
+    setMostrarDropdownPacientes(false);
   };
 
-  const procsCotizados = (procedimientos || []).filter((p) => seleccionados.includes(p.id));
-  const subtotalUSD = procsCotizados.reduce((sum, p) => sum + Number(p.costo), 0);
-  const subtotalVES = subtotalUSD * config.tasaBCV;
-  const subtotalCOP = subtotalUSD * config.tasaCOP;
+  // Mostrar mensaje de éxito temporal
+  const dispararToast = (msg: string) => {
+    setToastExito(msg);
+    setTimeout(() => setToastExito(null), 3500);
+  };
 
-  const guardarProcedimiento = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Guardar Cotización
+  const handleGuardarCotizacion = async (generarPdfDespues = false) => {
+    if (!busquedaPaciente.trim() && !pacienteSeleccionado) {
+      alert("Por favor selecciona o ingresa el nombre del paciente.");
+      return;
+    }
+    if (!nombreProcedimiento.trim()) {
+      alert("Por favor ingresa el nombre del procedimiento o cirugía.");
+      return;
+    }
+    if (usdNum <= 0) {
+      alert("Por favor ingresa un precio base en USD mayor a 0.");
+      return;
+    }
+
     setGuardando(true);
     try {
-      await crearProcedimiento(tenantId, {
-        nombre: form.nombre, descripcion: form.descripcion || null,
-        costo: Number(form.costo), moneda: form.moneda,
-        duracionMinutos: form.duracionMinutos ? Number(form.duracionMinutos) : null,
-      });
-      setForm({ nombre: "", descripcion: "", costo: "", moneda: "USD", duracionMinutos: "" });
+      const nombrePac = pacienteSeleccionado ? pacienteSeleccionado.nombreCompleto : busquedaPaciente.trim();
+      const cedulaPac = pacienteSeleccionado ? pacienteSeleccionado.identificacion : "S/C";
+      const telPac = pacienteSeleccionado?.telefono || "";
+
+      const nuevaCot: CotizacionGuardada = {
+        id: `cot-${Date.now()}`,
+        pacienteId: pacienteSeleccionado ? pacienteSeleccionado.id : null,
+        pacienteNombre: nombrePac,
+        pacienteCedula: cedulaPac,
+        pacienteTelefono: telPac,
+        procedimientoNombre: nombreProcedimiento.trim(),
+        descripcion: descripcionClinica.trim() || undefined,
+        costoUSD: usdNum,
+        costoVES: vesNum,
+        costoCOP: copNum,
+        tasaBCV,
+        tasaCOP,
+        estado: estadoInicial,
+        fecha: hoy(),
+        fechaPlanificada: fechaPlanificada || undefined,
+      };
+
+      // Si no existe en el catálogo del backend, guardarlo en background
+      if (tenantId) {
+        crearProcedimiento(tenantId, {
+          nombre: nombreProcedimiento.trim(),
+          descripcion: descripcionClinica.trim() || null,
+          costo: usdNum,
+          moneda: "USD",
+          duracionMinutos: 45,
+        }).catch(() => {});
+      }
+
+      setCotizaciones((prev) => [nuevaCot, ...prev]);
+      dispararToast("¡Cotización / Procedimiento registrado exitosamente!");
+
+      if (generarPdfDespues) {
+        ejecutarPdfCotizacion(nuevaCot);
+      }
+
+      limpiarFormulario();
       onCambio();
     } finally {
       setGuardando(false);
     }
   };
 
-  const handleDescargarCotizacionPdf = () => {
-    if (procsCotizados.length === 0) return;
+  // Generar PDF para una cotización dada
+  const ejecutarPdfCotizacion = (cot: CotizacionGuardada) => {
     const dataCot: CotizacionData = {
-      clinicaNombre: config.clinicaNombre,
-      doctorNombre: config.doctorNombre,
-      pacienteNombre: pacienteCotizacion?.nombreCompleto || "Paciente Particular",
-      pacienteCedula: pacienteCotizacion?.identificacion || "S/C",
-      fecha: hoy(),
-      items: procsCotizados.map((p) => ({
-        nombre: p.nombre,
-        costoUSD: Number(p.costo),
-        costoVES: Number(p.costo) * config.tasaBCV,
-        costoCOP: Number(p.costo) * config.tasaCOP,
-      })),
-      tasaBCV: config.tasaBCV,
-      tasaCOP: config.tasaCOP,
-      totalUSD: subtotalUSD,
-      totalVES: subtotalVES,
-      totalCOP: subtotalCOP,
+      clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
+      doctorNombre: config?.doctorNombre || "Dr. Daniel Reina",
+      pacienteNombre: cot.pacienteNombre,
+      pacienteCedula: cot.pacienteCedula,
+      fecha: cot.fecha,
+      items: [
+        {
+          nombre: cot.procedimientoNombre + (cot.descripcion ? ` - ${cot.descripcion}` : ""),
+          costoUSD: cot.costoUSD,
+          costoVES: cot.costoVES,
+          costoCOP: cot.costoCOP,
+        },
+      ],
+      tasaBCV: cot.tasaBCV || tasaBCV,
+      tasaCOP: cot.tasaCOP || tasaCOP,
+      totalUSD: cot.costoUSD,
+      totalVES: cot.costoVES,
+      totalCOP: cot.costoCOP,
     };
     generarPdfCotizacion(dataCot);
   };
 
-  const handleEnviarCotizacionWhatsApp = () => {
-    if (procsCotizados.length === 0) return;
+  // Enviar WhatsApp para una cotización
+  const ejecutarWhatsAppCotizacion = (cot: CotizacionGuardada) => {
     const lineas = [
-      `🏥 *${config.clinicaNombre}*`,
-      `📄 *Presupuesto de Procedimientos Médicos*`,
+      `🏥 *${config?.clinicaNombre || "Centro Médico Especializado"}*`,
+      `👨‍⚕️ *${config?.doctorNombre || "Dr. Daniel Reina"}*`,
       `━━━━━━━━━━━━━━━━━━`,
-      `👤 *Paciente:* ${pacienteCotizacion?.nombreCompleto || "Paciente"}`,
-      `📅 *Fecha:* ${hoy()}`,
+      `📄 *PRESUPUESTO MÉDICO OFICIAL*`,
+      `👤 *Paciente:* ${cot.pacienteNombre}`,
+      `🪪 *Identificación:* ${cot.pacienteCedula}`,
+      `📅 *Fecha de Emisión:* ${cot.fecha}`,
+      cot.fechaPlanificada ? `🗓️ *Fecha Planificada:* ${cot.fechaPlanificada}` : ``,
       `━━━━━━━━━━━━━━━━━━`,
-      ...procsCotizados.map((p) => `• ${p.nombre}: *$${Number(p.costo).toFixed(2)} USD* (Bs. ${(Number(p.costo) * config.tasaBCV).toFixed(2)})`),
+      `🔬 *Procedimiento / Cirugía:*`,
+      `*${cot.procedimientoNombre}*`,
+      cot.descripcion ? `📝 _${cot.descripcion}_` : ``,
       `━━━━━━━━━━━━━━━━━━`,
-      `💵 *Total USD:* $${subtotalUSD.toFixed(2)} USD`,
-      `🇻🇪 *Total Bolívares (BCV):* Bs. ${subtotalVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
-      `🇨🇴 *Total Pesos COP:* $${subtotalCOP.toLocaleString("es-CO")} COP`,
+      `💵 *Total Dólares:* $${cot.costoUSD.toFixed(2)} USD`,
+      `🇻🇪 *Total Bolívares (VES):* Bs. ${cot.costoVES.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `🇨🇴 *Total Pesos COP:* $${cot.costoCOP.toLocaleString("es-CO")} COP`,
       `━━━━━━━━━━━━━━━━━━`,
-      `_Presupuesto válido por 15 días._`,
-    ];
+      `📌 *Tasas Aplicadas:*`,
+      `• 1 USD = Bs. ${(cot.tasaBCV || tasaBCV).toFixed(2)} (BCV)`,
+      `• 1 USD = $${(cot.tasaCOP || tasaCOP).toLocaleString("es-CO")} COP`,
+      `━━━━━━━━━━━━━━━━━━`,
+      `_Presupuesto válido por 15 días continuos._`,
+    ].filter(Boolean);
+
     const texto = encodeURIComponent(lineas.join("\n"));
-    const tel = (pacienteCotizacion?.telefono || "").replace(/\D/g, "");
-    window.open(tel ? `https://wa.me/${tel}?text=${texto}` : `https://wa.me/?text=${texto}`, "_blank");
+    const telLimpio = (cot.pacienteTelefono || "").replace(/\D/g, "");
+    window.open(telLimpio ? `https://wa.me/${telLimpio}?text=${texto}` : `https://wa.me/?text=${texto}`, "_blank");
   };
 
+  // Cambiar estado de una cotización en el historial
+  const cambiarEstado = (id: string, nuevoEstado: CotizacionGuardada["estado"]) => {
+    setCotizaciones((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, estado: nuevoEstado } : c))
+    );
+    dispararToast(`Estado actualizado a: ${nuevoEstado}`);
+  };
+
+  // Eliminar una cotización
+  const eliminarCotizacion = (id: string) => {
+    if (confirm("¿Estás seguro de eliminar este registro del historial?")) {
+      setCotizaciones((prev) => prev.filter((c) => c.id !== id));
+      dispararToast("Registro eliminado.");
+    }
+  };
+
+  // Filtrado de la tabla de historial
+  const cotizacionesFiltradas = useMemo(() => {
+    return cotizaciones.filter((c) => {
+      if (filtroEstado !== "TODOS" && c.estado !== filtroEstado) {
+        return false;
+      }
+      if (!filtroTexto.trim()) return true;
+      const q = filtroTexto.toLowerCase();
+      return (
+        c.pacienteNombre.toLowerCase().includes(q) ||
+        c.pacienteCedula.toLowerCase().includes(q) ||
+        c.procedimientoNombre.toLowerCase().includes(q) ||
+        (c.descripcion && c.descripcion.toLowerCase().includes(q))
+      );
+    });
+  }, [cotizaciones, filtroEstado, filtroTexto]);
+
+  // Contadores por estado
+  const conteos = useMemo(() => {
+    return {
+      todos: cotizaciones.length,
+      cotizada: cotizaciones.filter((c) => c.estado === "COTIZADA").length,
+      planificada: cotizaciones.filter((c) => c.estado === "PLANIFICADA").length,
+      realizada: cotizaciones.filter((c) => c.estado === "REALIZADA").length,
+      cancelada: cotizaciones.filter((c) => c.estado === "CANCELADA").length,
+    };
+  }, [cotizaciones]);
+
   return (
-    <div className="space-y-6">
-      {/* Cotizador Multi-Moneda */}
-      <div className="apple-glass rounded-2xl p-5 space-y-4 border border-teal-500/30">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-6 animate-fade-in text-slate-900 dark:text-white">
+      {/* Toast Notification */}
+      {toastExito && (
+        <div className="fixed bottom-6 right-6 z-50 bg-teal-600 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-teal-400/30 animate-bounce">
+          <IconCheckCircle size={20} />
+          <span className="text-xs sm:text-sm font-semibold">{toastExito}</span>
+        </div>
+      )}
+
+      {/* ── HEADER SUPERIOR ── */}
+      <div className="apple-glass rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border border-slate-200/80 dark:border-white/10 shadow-sm">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center border border-teal-500/30 shadow-inner">
+            <IconPrescription size={24} />
+          </div>
           <div>
-            <h4 className="font-bold text-base text-slate-900 dark:text-white">Cotizador / Presupuesto de Procedimientos</h4>
-            <p className="text-xs text-slate-500">Selecciona procedimientos del catálogo para calcular el presupuesto en USD, VES y COP.</p>
-          </div>
-          <div className="w-64">
-            <select
-              value={cotizacionPacienteId}
-              onChange={(e) => setCotizacionPacienteId(e.target.value ? Number(e.target.value) : "")}
-              className="w-full px-3 py-1.5 rounded-lg border text-xs"
-            >
-              <option value="">— Paciente Particular (S/C) —</option>
-              {(pacientes || []).map((p) => <option key={p.id} value={p.id}>{p.nombreCompleto}</option>)}
-            </select>
+            <h2 className="font-['Outfit'] font-black text-lg sm:text-xl text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              Módulo de Procedimientos & Cotizaciones Multidivisa
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-white/60">
+              Gestión de cirugías, procedimientos y presupuestos en tiempo real (USD, VES, COP)
+            </p>
           </div>
         </div>
 
-        {/* Resumen de Cotización */}
-        {procsCotizados.length > 0 && (
-          <div className="p-4 rounded-xl bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div className="text-[11px] text-slate-400 uppercase font-mono">Procedimientos ({procsCotizados.length})</div>
-              <div className="text-xs font-bold text-slate-700 dark:text-white/90">
-                {procsCotizados.map((p) => p.nombre).join(" + ")}
-              </div>
-            </div>
-            <div className="flex items-center gap-4 text-right">
-              <div>
-                <div className="text-[10px] text-slate-400">Total USD</div>
-                <div className="text-base font-black text-emerald-500">${subtotalUSD.toFixed(2)}</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-slate-400">Tasa BCV (VES)</div>
-                <div className="text-base font-black text-sky-500">Bs. {subtotalVES.toFixed(2)}</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-slate-400">Pesos COP</div>
-                <div className="text-base font-black text-purple-500">${subtotalCOP.toLocaleString()} COP</div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={handleDescargarCotizacionPdf} className="px-3 py-2 rounded-full bg-teal-600 text-white font-bold text-xs hover:bg-teal-500 flex items-center gap-1 cursor-pointer">
-                  <span>📥</span> Presupuesto PDF
-                </button>
-                <button onClick={handleEnviarCotizacionWhatsApp} className="px-3 py-2 rounded-full bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-500 flex items-center gap-1 cursor-pointer">
-                  <span>💬</span> WhatsApp
-                </button>
-              </div>
-            </div>
+        {/* Pill de Tasas Activas */}
+        <div className="flex items-center gap-3 bg-slate-100/90 dark:bg-white/5 px-4 py-2 rounded-2xl border border-slate-200 dark:border-white/10">
+          <div className="flex items-center gap-2 text-xs font-semibold">
+            <span className="text-slate-400 font-normal">Tasas Activas:</span>
+            <span className="text-sky-600 dark:text-sky-400 font-mono">
+              VES: Bs. {tasaBCV.toFixed(2)}
+            </span>
+            <span className="text-slate-300 dark:text-white/20">|</span>
+            <span className="text-purple-600 dark:text-purple-400 font-mono">
+              COP: ${tasaCOP.toLocaleString("es-CO")}
+            </span>
           </div>
-        )}
+          <button
+            onClick={() => setModalTasas(true)}
+            className="px-3 py-1 rounded-xl text-xs font-bold bg-white dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white border border-slate-300 dark:border-white/20 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Ajustar tasas de cambio"
+          >
+            <IconBank size={14} />
+            <span>Tasas</span>
+          </button>
+        </div>
       </div>
 
-      {/* Formulario de nuevo procedimiento */}
-      <form onSubmit={guardarProcedimiento} className="apple-glass rounded-2xl p-5 space-y-3">
-        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Agregar Nuevo Procedimiento al Catálogo</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input required placeholder="Nombre del procedimiento *" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
-          <input required type="number" step="0.01" placeholder="Precio en USD *" value={form.costo} onChange={(e) => setForm({ ...form, costo: e.target.value })}
-            className="px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
-          <input placeholder="Duración aproximada (minutos)" type="number" value={form.duracionMinutos} onChange={(e) => setForm({ ...form, duracionMinutos: e.target.value })}
-            className="px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
-          <input placeholder="Descripción clínica" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-            className="px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
-        </div>
-        <button disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2 rounded-full disabled:opacity-50 cursor-pointer">
-          {guardando ? "Guardando…" : "Guardar en Catálogo"}
-        </button>
-      </form>
+      {/* ── CUERPO PRINCIPAL: 2 COLUMNAS RESPONSIVAS ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* ══════════════════════════════════════════════════════════════
+            COLUMNA IZQUIERDA: FORMULARIO NUEVA COTIZACIÓN / PROCEDIMIENTO
+            ══════════════════════════════════════════════════════════════ */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="apple-glass rounded-2xl p-5 sm:p-6 border border-slate-200/80 dark:border-white/10 shadow-sm space-y-5">
+            {/* Header del formulario */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-white/10">
+              <h3 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white flex items-center gap-2">
+                <span className="text-teal-600 dark:text-teal-400 font-bold text-lg">+</span>
+                Nueva Cotización / Procedimiento
+              </h3>
+              <button
+                type="button"
+                onClick={limpiarFormulario}
+                className="px-3 py-1 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-white/60 dark:hover:text-white bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <IconRefresh size={12} />
+                <span>Limpiar</span>
+              </button>
+            </div>
 
-      {/* Catálogo con checkboxes para cotización */}
-      <div className="apple-glass rounded-2xl p-5 space-y-3">
-        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Catálogo de Procedimientos (Haz clic para seleccionar y cotizar)</h4>
-        {procedimientos === null ? (
-          <p className="text-xs text-slate-400">Cargando catálogo…</p>
-        ) : procedimientos.length === 0 ? (
-          <p className="text-xs text-slate-400">Sin procedimientos registrados.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {procedimientos.map((p) => {
-              const seleccionado = seleccionados.includes(p.id);
-              const costoUsd = Number(p.costo);
-              const costoVes = costoUsd * config.tasaBCV;
-              const costoCop = costoUsd * config.tasaCOP;
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => toggleSeleccion(p.id)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                    seleccionado
-                      ? "bg-teal-500/15 border-teal-500 shadow-md scale-[1.01]"
-                      : "bg-slate-100/60 dark:bg-white/5 border-slate-200 dark:border-white/5 hover:border-teal-400/40"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="font-bold text-sm text-slate-900 dark:text-white">{p.nombre}</div>
-                    <div className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold ${seleccionado ? "bg-teal-500 text-black" : "border border-slate-300"}`}>
-                      {seleccionado ? "✓" : ""}
-                    </div>
-                  </div>
-                  <div className="mt-2 space-y-0.5">
-                    <div className="text-teal-600 dark:text-teal-400 font-bold text-base">${costoUsd.toFixed(2)} USD</div>
-                    <div className="text-xs text-slate-500 font-mono">Bs. {costoVes.toFixed(2)} · ${costoCop.toLocaleString()} COP</div>
-                  </div>
-                  {p.descripcion && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{p.descripcion}</p>}
+            {/* 1. SELECCIONAR PACIENTE */}
+            <div className="space-y-1.5 relative">
+              <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                1. Seleccionar Paciente <span className="text-teal-500">*</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <IconSearch size={15} />
                 </div>
-              );
-            })}
+                <input
+                  type="text"
+                  placeholder="Buscar paciente por nombre o cédula..."
+                  value={busquedaPaciente}
+                  onFocus={() => setMostrarDropdownPacientes(true)}
+                  onChange={(e) => {
+                    setBusquedaPaciente(e.target.value);
+                    setMostrarDropdownPacientes(true);
+                    if (pacienteSeleccionado && e.target.value !== pacienteSeleccionado.nombreCompleto) {
+                      setPacienteSeleccionado(null);
+                    }
+                  }}
+                  className="w-full pl-9 pr-9 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+                {busquedaPaciente && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBusquedaPaciente("");
+                      setPacienteSeleccionado(null);
+                      setMostrarDropdownPacientes(false);
+                    }}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                  >
+                    <IconClose size={15} />
+                  </button>
+                )}
+              </div>
+
+              {/* Paciente seleccionado indicador */}
+              {pacienteSeleccionado && (
+                <div className="mt-1.5 flex items-center justify-between px-3 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/30 text-teal-700 dark:text-teal-300 text-[11px]">
+                  <div className="flex items-center gap-2">
+                    <IconCheck size={13} className="text-teal-600 dark:text-teal-400" />
+                    <span className="font-semibold">{pacienteSeleccionado.nombreCompleto}</span>
+                    <span className="opacity-75">({pacienteSeleccionado.identificacion})</span>
+                  </div>
+                  {pacienteSeleccionado.telefono && (
+                    <span className="text-[10px] font-mono opacity-80">{pacienteSeleccionado.telefono}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Dropdown de autocompletado de pacientes */}
+              {mostrarDropdownPacientes && pacientesFiltrados.length > 0 && !pacienteSeleccionado && (
+                <div className="absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-white/20 bg-white dark:bg-[#071a2e] shadow-2xl z-30 divide-y divide-slate-100 dark:divide-white/5">
+                  {pacientesFiltrados.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => {
+                        setPacienteSeleccionado(p);
+                        setBusquedaPaciente(p.nombreCompleto);
+                        setMostrarDropdownPacientes(false);
+                      }}
+                      className="px-3.5 py-2.5 hover:bg-teal-50 dark:hover:bg-white/10 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                    >
+                      <div>
+                        <div className="font-bold text-slate-800 dark:text-white">{p.nombreCompleto}</div>
+                        <div className="text-[10px] text-slate-400">C.I: {p.identificacion}</div>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/70">
+                        Seleccionar
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 2. PROCEDIMIENTO / CIRUGÍA */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                2. Procedimiento / Cirugía <span className="text-teal-500">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Ingresa el nombre del procedimiento o cirugía (ej. Resección...)"
+                value={nombreProcedimiento}
+                onChange={(e) => setNombreProcedimiento(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+
+              {/* Sugerencias Rápidas de Procedimientos Comunes */}
+              <div className="pt-1 flex flex-wrap gap-1.5">
+                {PROCEDIMIENTOS_SUGERIDOS.slice(0, 4).map((sug) => (
+                  <button
+                    key={sug.nombre}
+                    type="button"
+                    onClick={() => {
+                      setNombreProcedimiento(sug.nombre);
+                      if (!descripcionClinica) setDescripcionClinica(sug.desc);
+                      if (!precioUSD || Number(precioUSD) === 0) setPrecioUSD(sug.precio);
+                    }}
+                    className="text-[10px] px-2 py-1 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-teal-500/15 hover:text-teal-600 dark:hover:text-teal-300 border border-slate-200/80 dark:border-white/10 transition-all cursor-pointer text-slate-600 dark:text-white/70"
+                  >
+                    + {sug.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* DESCRIPCIÓN / DETALLE CLÍNICO */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                Descripción / Detalle Clínico
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Ej. Resección de quiste sebáceo en región dorsal con anestesia local..."
+                value={descripcionClinica}
+                onChange={(e) => setDescripcionClinica(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+              />
+            </div>
+
+            {/* 3. PRECIO BASE EN DÓLARES (USD) & CÁLCULO AUTOMÁTICO */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                  3. Precio Base en Dólares (USD) <span className="text-teal-500">*</span>
+                </label>
+                <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-md flex items-center gap-1 border border-teal-500/20">
+                  <IconRefresh size={10} className="animate-spin" />
+                  Cálculo Automático
+                </span>
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-emerald-600 dark:text-emerald-400 font-black text-sm">
+                  USD $
+                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={precioUSD}
+                  onChange={(e) => setPrecioUSD(e.target.value)}
+                  className="w-full pl-18 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-base font-black text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+
+              {/* Tarjetas de Conversión Multidivisa en Vivo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {/* Bolívares (VES) */}
+                <div className="p-3.5 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200/90 dark:border-sky-500/25 space-y-1">
+                  <div className="text-[11px] font-bold text-sky-800 dark:text-sky-300">
+                    Bolívares (VES)
+                  </div>
+                  <div className="text-lg sm:text-xl font-black text-sky-600 dark:text-sky-400 font-mono tracking-tight">
+                    Bs. {vesNum.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-white/50">
+                    Tasa: 1 USD = Bs. {tasaBCV.toFixed(2)}
+                  </div>
+                </div>
+
+                {/* Pesos Colombianos (COP) */}
+                <div className="p-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200/90 dark:border-purple-500/25 space-y-1">
+                  <div className="text-[11px] font-bold text-purple-800 dark:text-purple-300">
+                    Pesos Colombianos (COP)
+                  </div>
+                  <div className="text-lg sm:text-xl font-black text-purple-600 dark:text-purple-400 font-mono tracking-tight">
+                    COP {Math.round(copNum).toLocaleString("es-CO")}
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-white/50">
+                    Tasa: 1 USD = ${tasaCOP.toLocaleString("es-CO")}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ESTADO INICIAL Y FECHA PLANIFICADA */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                  Estado Inicial
+                </label>
+                <select
+                  value={estadoInicial}
+                  onChange={(e: any) => setEstadoInicial(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                >
+                  <option value="COTIZADA">COTIZADA</option>
+                  <option value="PLANIFICADA">PLANIFICADA</option>
+                  <option value="REALIZADA">REALIZADA</option>
+                  <option value="CANCELADA">CANCELADA</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                  Fecha Planificada (Opcional)
+                </label>
+                <input
+                  type="date"
+                  value={fechaPlanificada}
+                  onChange={(e) => setFechaPlanificada(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+
+            {/* BOTONES DE ACCIÓN */}
+            <div className="pt-2 flex flex-wrap gap-2.5">
+              <button
+                type="button"
+                disabled={guardando}
+                onClick={() => handleGuardarCotizacion(false)}
+                className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-teal-600 to-sky-600 hover:from-teal-500 hover:to-sky-500 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <IconCheck size={16} />
+                <span>{guardando ? "Guardando..." : "Guardar Cotización"}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={guardando}
+                onClick={() => handleGuardarCotizacion(true)}
+                className="py-2.5 px-4 rounded-xl text-xs font-bold text-teal-700 dark:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Guardar y generar comprobante PDF"
+              >
+                <IconFileText size={16} />
+                <span>Guardar y PDF</span>
+              </button>
+            </div>
           </div>
-        )}
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════
+            COLUMNA DERECHA: HISTORIAL DE COTIZACIONES & PROCEDIMIENTOS
+            ══════════════════════════════════════════════════════════════ */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="apple-glass rounded-2xl p-5 sm:p-6 border border-slate-200/80 dark:border-white/10 shadow-sm space-y-4">
+            {/* Header del Historial con Buscador */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/60 dark:border-white/10">
+              <h3 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white flex items-center gap-2">
+                Historial de Cotizaciones & Procedimientos
+              </h3>
+
+              <div className="w-full sm:w-64 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <IconSearch size={14} />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Filtrar por paciente, cédula..."
+                  value={filtroTexto}
+                  onChange={(e) => setFiltroTexto(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+
+            {/* Chips de Filtrado por Estado */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] text-slate-400 mr-1 font-medium">Filtrar:</span>
+              <button
+                type="button"
+                onClick={() => setFiltroEstado("TODOS")}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  filtroEstado === "TODOS"
+                    ? "bg-teal-600 text-white shadow-sm"
+                    : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
+                }`}
+              >
+                Todos ({conteos.todos})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFiltroEstado("COTIZADA")}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  filtroEstado === "COTIZADA"
+                    ? "bg-sky-600 text-white shadow-sm"
+                    : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
+                }`}
+              >
+                $ Cotizadas ({conteos.cotizada})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFiltroEstado("PLANIFICADA")}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  filtroEstado === "PLANIFICADA"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
+                }`}
+              >
+                📅 Planificadas ({conteos.planificada})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFiltroEstado("REALIZADA")}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  filtroEstado === "REALIZADA"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
+                }`}
+              >
+                ✓ Realizadas ({conteos.realizada})
+              </button>
+            </div>
+
+            {/* TABLA DE COTIZACIONES Y PROCEDIMIENTOS */}
+            <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-white/10">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-100/90 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/70 font-semibold">
+                    <th className="py-2.5 px-3">Paciente</th>
+                    <th className="py-2.5 px-3">Procedimiento</th>
+                    <th className="py-2.5 px-2 text-right">USD</th>
+                    <th className="py-2.5 px-2 text-right">VES</th>
+                    <th className="py-2.5 px-2 text-right">COP</th>
+                    <th className="py-2.5 px-2 text-center">Estado</th>
+                    <th className="py-2.5 px-2 text-center">Fecha</th>
+                    <th className="py-2.5 px-3 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                  {cotizacionesFiltradas.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        No hay cotizaciones registradas con los filtros seleccionados.
+                      </td>
+                    </tr>
+                  ) : (
+                    cotizacionesFiltradas.map((cot) => (
+                      <tr
+                        key={cot.id}
+                        className="hover:bg-teal-500/5 transition-colors group"
+                      >
+                        {/* Paciente */}
+                        <td className="py-3 px-3">
+                          <div className="font-bold text-slate-900 dark:text-white">
+                            {cot.pacienteNombre}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            {cot.pacienteCedula}
+                          </div>
+                        </td>
+
+                        {/* Procedimiento */}
+                        <td className="py-3 px-3 max-w-[170px]">
+                          <div className="font-semibold text-slate-800 dark:text-white/90 truncate" title={cot.procedimientoNombre}>
+                            {cot.procedimientoNombre}
+                          </div>
+                          {cot.descripcion && (
+                            <div className="text-[10px] text-slate-400 truncate" title={cot.descripcion}>
+                              {cot.descripcion}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* USD */}
+                        <td className="py-3 px-2 text-right font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                          ${cot.costoUSD.toFixed(2)}
+                        </td>
+
+                        {/* VES */}
+                        <td className="py-3 px-2 text-right font-mono text-sky-600 dark:text-sky-400 text-[11px]">
+                          Bs. {cot.costoVES.toLocaleString("es-VE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </td>
+
+                        {/* COP */}
+                        <td className="py-3 px-2 text-right font-mono text-purple-600 dark:text-purple-400 text-[11px]">
+                          ${cot.costoCOP.toLocaleString("es-CO")}
+                        </td>
+
+                        {/* Estado con selector de cambio rápido */}
+                        <td className="py-3 px-2 text-center">
+                          <select
+                            value={cot.estado}
+                            onChange={(e: any) => cambiarEstado(cot.id, e.target.value)}
+                            className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg border focus:outline-none cursor-pointer ${
+                              cot.estado === "COTIZADA"
+                                ? "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-400/30"
+                                : cot.estado === "PLANIFICADA"
+                                ? "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-400/30"
+                                : cot.estado === "REALIZADA"
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-400/30"
+                                : "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-400/30"
+                            }`}
+                          >
+                            <option value="COTIZADA">COTIZADA</option>
+                            <option value="PLANIFICADA">PLANIFICADA</option>
+                            <option value="REALIZADA">REALIZADA</option>
+                            <option value="CANCELADA">CANCELADA</option>
+                          </select>
+                        </td>
+
+                        {/* Fecha */}
+                        <td className="py-3 px-2 text-center text-[10px] text-slate-500 dark:text-white/60 font-mono">
+                          {cot.fecha}
+                          {cot.fechaPlanificada && (
+                            <div className="text-indigo-600 dark:text-indigo-400 font-bold">
+                              Plan: {cot.fechaPlanificada.slice(5)}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="py-3 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {/* PDF */}
+                            <button
+                              type="button"
+                              onClick={() => ejecutarPdfCotizacion(cot)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                              title="Descargar presupuesto en PDF"
+                            >
+                              <IconFileText size={15} />
+                            </button>
+
+                            {/* WhatsApp */}
+                            <button
+                              type="button"
+                              onClick={() => ejecutarWhatsAppCotizacion(cot)}
+                              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                              title="Enviar por WhatsApp"
+                            >
+                              <span className="font-bold text-xs">💬</span>
+                            </button>
+
+                            {/* Eliminar */}
+                            <button
+                              type="button"
+                              onClick={() => eliminarCotizacion(cot.id)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                              title="Eliminar del historial"
+                            >
+                              <IconTrash size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* ── MODAL DE AJUSTE RÁPIDO DE TASAS DE CAMBIO ── */}
+      {modalTasas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-sm apple-glass rounded-3xl p-6 shadow-2xl border border-white/20 bg-white/95 dark:bg-[#071a2e]/95 text-slate-900 dark:text-white space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-teal-500/20 text-teal-600 dark:text-teal-300">
+                  <IconBank size={20} />
+                </div>
+                <h3 className="font-['Outfit'] font-black text-base">Tasas de Cotización</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalTasas(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-white/80">Tasa BCV (Bs. / USD):</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={tempTasaBCV}
+                  onChange={(e) => setTempTasaBCV(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 font-bold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-white/80">Tasa COP (Pesos / USD):</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={tempTasaCOP}
+                  onChange={(e) => setTempTasaCOP(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalTasas(false)}
+                className="flex-1 py-2 rounded-xl border border-slate-300 dark:border-white/20 text-xs font-bold hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (config) {
+                    config.tasaBCV = tempTasaBCV;
+                    config.tasaCOP = tempTasaCOP;
+                    try {
+                      localStorage.setItem("aurora_mediclinic_config_perfil", JSON.stringify(config));
+                    } catch {}
+                  }
+                  setModalTasas(false);
+                  dispararToast("Tasas actualizadas correctamente.");
+                  onCambio();
+                }}
+                className="flex-1 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold cursor-pointer"
+              >
+                Guardar Tasas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
