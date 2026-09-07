@@ -148,6 +148,9 @@ export interface Paciente {
   email?: string | null;
   direccion?: string | null;
   genero?: string;
+  tipoOrigen?: string | null;
+  origen?: string | null;
+  ciudadOrigen?: string | null;
 }
 
 export function listarPacientes(tenantId: number): Promise<Paciente[]> {
@@ -163,10 +166,17 @@ export interface NuevoPaciente {
   fechaNacimiento?: string;
   direccion?: string;
   genero?: string;
+  tipoOrigen?: string;
+  origen?: string;
+  ciudadOrigen?: string;
 }
 
 export function crearPaciente(tenantId: number, datos: NuevoPaciente): Promise<Paciente> {
   return request(`/api/salud/pacientes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function eliminarPaciente(id: number): Promise<void> {
+  return request(`/api/salud/pacientes/${id}`, { method: "DELETE" });
 }
 
 export interface CitaMedica {
