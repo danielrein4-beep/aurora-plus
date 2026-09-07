@@ -1958,245 +1958,748 @@ function HistoriasClinicas({
   rol: RolVista;
   pacienteInicialId?: number | null;
 }) {
-  const [pacienteId, setPacienteId] = useState<number | "">(pacienteInicialId || "");
+  const [pacienteId, setPacienteId] = useState<number | "">(() => {
+    if (pacienteInicialId) return pacienteInicialId;
+    if (pacientes && pacientes.length > 0) return pacientes[0].id;
+    return "";
+  });
+  const [busquedaCedula, setBusquedaCedula] = useState("");
   const [historial, setHistorial] = useState<ConsultaMedica[] | null>(null);
+  const [consultaDetalle, setConsultaDetalle] = useState<ConsultaMedica | null>(null);
+
+  const [form, setForm] = useState({
+    motivoConsulta: "",
+    talla: "1.75",
+    peso: "70.0",
+    observacionFisica: "",
+    evolucionClinica: "",
+    descripcionDiagnostico: "",
+    planTratamiento: "",
+    proximaCita: "",
+  });
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
 
   useEffect(() => {
     if (pacienteInicialId) {
       setPacienteId(pacienteInicialId);
+    } else if (!pacienteId && pacientes && pacientes.length > 0) {
+      setPacienteId(pacientes[0].id);
     }
-  }, [pacienteInicialId]);
-  
-  // Signos vitales completos
-  const [signos, setSignos] = useState({ ta: "120/80", fc: "75", fr: "18", temp: "36.8", peso: "70", talla: "1.72", imc: "23.6", satO2: "99" });
-  const [form, setForm] = useState({ motivoConsulta: "", evolucionClinica: "", descripcionDiagnostico: "", planTratamiento: "", proximaCita: "" });
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  }, [pacienteInicialId, pacientes]);
 
-  const pacienteSeleccionado = (pacientes || []).find((p) => p.id === Number(pacienteId));
-
-  const calcularImc = (pesoStr: string, tallaStr: string) => {
-    const p = parseFloat(pesoStr);
-    const t = parseFloat(tallaStr);
-    if (p > 0 && t > 0) {
-      const imcCalc = (p / (t * t)).toFixed(1);
-      setSignos((s) => ({ ...s, peso: pesoStr, talla: tallaStr, imc: imcCalc }));
-    } else {
-      setSignos((s) => ({ ...s, peso: pesoStr, talla: tallaStr }));
-    }
-  };
+  const pacienteSeleccionado = useMemo(() => {
+    if (!pacienteId && pacientes && pacientes.length > 0) return pacientes[0];
+    return (pacientes || []).find((p) => p.id === Number(pacienteId)) || null;
+  }, [pacientes, pacienteId]);
 
   useEffect(() => {
-    if (!pacienteId) { setHistorial(null); return; }
-    historialConsultasPaciente(Number(pacienteId)).then(setHistorial).catch(() => setHistorial([]));
-  }, [pacienteId]);
+    if (!pacienteSeleccionado) {
+      setHistorial(null);
+      return;
+    }
+    historialConsultasPaciente(Number(pacienteSeleccionado.id))
+      .then(setHistorial)
+      .catch(() => setHistorial([]));
+  }, [pacienteSeleccionado]);
 
-  const guardar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pacienteId) return;
-    setError(null);
-    setGuardando(true);
-    try {
-      await registrarConsulta(tenantId, Number(pacienteId), {
-        motivoConsulta: form.motivoConsulta,
-        descripcionDiagnostico: form.descripcionDiagnostico,
-        planTratamiento: form.planTratamiento,
-      });
-      historialConsultasPaciente(Number(pacienteId)).then(setHistorial);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar consulta");
-    } finally {
-      setGuardando(false);
+  const handleBuscarCedula = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const query = busquedaCedula.trim().toLowerCase();
+    if (!query || !pacientes) return;
+    const encontrado = pacientes.find((p) => {
+      const ced = (p.identificacion || "").toLowerCase();
+      const nom = (p.nombreCompleto || "").toLowerCase();
+      const exp = `hc-2026-${String(p.id).padStart(4, "0")}`.toLowerCase();
+      return ced.includes(query) || nom.includes(query) || exp.includes(query);
+    });
+    if (encontrado) {
+      setPacienteId(encontrado.id);
+      setBusquedaCedula("");
+      setError(null);
+    } else {
+      setError(`No se encontró ningún paciente con: "${busquedaCedula}"`);
+      setTimeout(() => setError(null), 3500);
     }
   };
 
-  const getDatosReporte = (): ConsultaReportData | null => {
+  const limpiarFormulario = () => {
+    setForm({
+      motivoConsulta: "",
+      talla: "1.75",
+      peso: "70.0",
+      observacionFisica: "",
+      evolucionClinica: "",
+      descripcionDiagnostico: "",
+      planTratamiento: "",
+      proximaCita: "",
+    });
+    setError(null);
+  };
+
+  const construirReportData = (): ConsultaReportData | null => {
     if (!pacienteSeleccionado) return null;
+    const pKg = parseFloat(form.peso) || 70;
+    const tM = parseFloat(form.talla) || 1.75;
+    const imcCalc = (pKg / (tM * tM)).toFixed(1);
+
+    const esForaneo =
+      pacienteSeleccionado.tipoOrigen === "Foráneo" ||
+      pacienteSeleccionado.tipoOrigen === "FORANEO" ||
+      (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
+
     return {
-      clinicaNombre: config.clinicaNombre,
-      doctorNombre: config.doctorNombre,
-      especialidad: config.especialidad,
-      matriculaMPPS: config.matriculaMPPS,
-      colegioMedicos: config.colegioMedicos,
+      clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
+      doctorNombre: config.doctorNombre || "Dr. Mario Roa",
+      especialidad: config.especialidad || "Dermatología / Medicina General",
+      matriculaMPPS: config.matriculaMPPS || "109842",
+      colegioMedicos: config.colegioMedicos || "5421",
       paciente: {
         expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
         nombreCompleto: pacienteSeleccionado.nombreCompleto,
         identificacion: pacienteSeleccionado.identificacion,
-        edad: pacienteSeleccionado.edad || 30,
-        telefono: pacienteSeleccionado.telefono || "N/A",
-        origen: "Local",
+        edad: pacienteSeleccionado.fechaNacimiento
+          ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
+          : pacienteSeleccionado.edad || 34,
+        telefono: pacienteSeleccionado.telefono || "No registrado",
+        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: hoy(),
       },
-      signosVitales: signos,
-      motivoConsulta: form.motivoConsulta || "Consulta Médica General",
+      signosVitales: {
+        ta: "120/80",
+        fc: "75",
+        fr: "18",
+        temp: "36.8",
+        peso: `${form.peso || "70"} kg`,
+        talla: `${form.talla || "1.75"} m`,
+        imc: imcCalc,
+        satO2: "99%",
+      },
+      motivoConsulta: form.motivoConsulta || "Control de rutina y evolución clínica",
       evolucionClinica: form.evolucionClinica,
-      diagnosticoCIE10: form.descripcionDiagnostico,
+      diagnosticoCIE10: form.descripcionDiagnostico || "Evaluación Clínica General",
       planTratamiento: form.planTratamiento,
       proximaCita: form.proximaCita,
     };
   };
 
-  const handleDescargarPdf = () => {
-    const data = getDatosReporte();
-    if (data) generarPdfInformeConsulta(data);
+  const ejecutarGuardado = async () => {
+    if (!pacienteSeleccionado) {
+      setError("Por favor selecciona un paciente");
+      return null;
+    }
+    if (!form.motivoConsulta.trim()) {
+      setError("El motivo de consulta es obligatorio");
+      return null;
+    }
+    if (!form.descripcionDiagnostico.trim()) {
+      setError("El diagnóstico clínico es obligatorio");
+      return null;
+    }
+
+    setError(null);
+    setGuardando(true);
+    try {
+      const res = await registrarConsulta(tenantId, Number(pacienteSeleccionado.id), {
+        motivoConsulta: form.motivoConsulta,
+        descripcionDiagnostico: form.descripcionDiagnostico,
+        planTratamiento: form.planTratamiento,
+      });
+
+      // Refrescar historial
+      const nuevoHistorial = await historialConsultasPaciente(Number(pacienteSeleccionado.id));
+      setHistorial(nuevoHistorial);
+
+      setMensajeExito("¡Consulta médica registrada con éxito en el expediente!");
+      setTimeout(() => setMensajeExito(null), 3500);
+
+      const repData = construirReportData();
+      return repData;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al registrar la consulta");
+      return null;
+    } finally {
+      setGuardando(false);
+    }
   };
 
-  const handleEnviarWhatsApp = () => {
-    const data = getDatosReporte();
-    if (!data || !pacienteSeleccionado) return;
+  const handleGuardarSolo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await ejecutarGuardado();
+  };
+
+  const handleGuardarYGenerarPdf = async () => {
+    const data = await ejecutarGuardado();
+    if (data) {
+      generarPdfInformeConsulta(data);
+    }
+  };
+
+  const handleDescargarPdfConsulta = (c: ConsultaMedica) => {
+    if (!pacienteSeleccionado) return;
+    const esForaneo =
+      pacienteSeleccionado.tipoOrigen === "Foráneo" ||
+      pacienteSeleccionado.tipoOrigen === "FORANEO" ||
+      (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
+
+    const data: ConsultaReportData = {
+      clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
+      doctorNombre: config.doctorNombre || "Dr. Mario Roa",
+      especialidad: config.especialidad || "Dermatología / Medicina General",
+      matriculaMPPS: config.matriculaMPPS || "109842",
+      colegioMedicos: config.colegioMedicos || "5421",
+      paciente: {
+        expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
+        nombreCompleto: pacienteSeleccionado.nombreCompleto,
+        identificacion: pacienteSeleccionado.identificacion,
+        edad: pacienteSeleccionado.fechaNacimiento
+          ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
+          : pacienteSeleccionado.edad || 34,
+        telefono: pacienteSeleccionado.telefono || "No registrado",
+        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
+        fechaConsulta: c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy(),
+      },
+      signosVitales: {
+        ta: "120/80",
+        fc: "75",
+        fr: "18",
+        temp: "36.8",
+        peso: "70 kg",
+        talla: "1.75 m",
+        imc: "22.8",
+        satO2: "99%",
+      },
+      motivoConsulta: c.motivoConsulta || "Consulta Médica",
+      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
+      planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
+      proximaCita: undefined,
+    };
+    generarPdfInformeConsulta(data);
+  };
+
+  const handleEnviarWhatsAppConsulta = (c: ConsultaMedica) => {
+    if (!pacienteSeleccionado) return;
+    const esForaneo =
+      pacienteSeleccionado.tipoOrigen === "Foráneo" ||
+      pacienteSeleccionado.tipoOrigen === "FORANEO" ||
+      (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
+
+    const data: ConsultaReportData = {
+      clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
+      doctorNombre: config.doctorNombre || "Dr. Mario Roa",
+      especialidad: config.especialidad || "Dermatología / Medicina General",
+      matriculaMPPS: config.matriculaMPPS || "109842",
+      colegioMedicos: config.colegioMedicos || "5421",
+      paciente: {
+        expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
+        nombreCompleto: pacienteSeleccionado.nombreCompleto,
+        identificacion: pacienteSeleccionado.identificacion,
+        edad: pacienteSeleccionado.fechaNacimiento
+          ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
+          : pacienteSeleccionado.edad || 34,
+        telefono: pacienteSeleccionado.telefono || "No registrado",
+        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
+        fechaConsulta: c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy(),
+      },
+      signosVitales: {
+        ta: "120/80",
+        fc: "75",
+        fr: "18",
+        temp: "36.8",
+        peso: "70 kg",
+        talla: "1.75 m",
+        imc: "22.8",
+        satO2: "99%",
+      },
+      motivoConsulta: c.motivoConsulta || "Consulta Médica",
+      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
+      planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
+      proximaCita: undefined,
+    };
     const texto = generarTextoWhatsAppConsulta(data);
     const tel = (pacienteSeleccionado.telefono || "").replace(/\D/g, "");
     const url = tel ? `https://wa.me/${tel}?text=${texto}` : `https://wa.me/?text=${texto}`;
     window.open(url, "_blank");
   };
 
-  const handleEnviarGmail = () => {
-    const data = getDatosReporte();
-    if (!data || !pacienteSeleccionado) return;
-    const asunto = encodeURIComponent(`Informe Médico - ${data.paciente.nombreCompleto} (${data.paciente.expediente})`);
-    const cuerpo = encodeURIComponent(
-      `Estimado(a) ${data.paciente.nombreCompleto},\n\nAdjunto resumen de su consulta médica realizada en ${data.clinicaNombre}.\n\nMédico Tratante: Dr(a). ${data.doctorNombre}\nDiagnóstico: ${data.diagnosticoCIE10 || "Evaluación Médica"}\nPlan de Tratamiento / Receta: ${data.planTratamiento || "Indicaciones en consulta."}\n${data.proximaCita ? `Próximo Control: ${data.proximaCita}\n` : ""}\nSaludos cordiales.`
-    );
-    const emailDestino = pacienteSeleccionado.email || "";
-    window.open(`mailto:${emailDestino}?subject=${asunto}&body=${cuerpo}`, "_blank");
-  };
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* ── ALERTA DE ROL SECRETARÍA SI APLICA ── */}
       {rol === "SECRETARIA" && (
-        <div className="apple-glass rounded-xl p-3 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center gap-2">
-          <span>🔒</span>
-          <span><strong>Modo Recepción / Secretaria:</strong> Vista simplificada de expediente. Los diagnósticos médicos privados y recetas son editados exclusivamente en modo Médico.</span>
+        <div className="apple-glass rounded-2xl p-3.5 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center gap-2">
+          <IconLock size={15} />
+          <span>
+            <strong>Modo Recepción / Secretaría:</strong> Vista de consulta de expedientes. La edición de diagnósticos y prescripciones es reservada para el Médico Titular.
+          </span>
         </div>
       )}
 
-      <div className="apple-glass rounded-2xl p-4">
-        <label className="text-xs font-semibold text-slate-500 dark:text-white/40">Seleccionar Paciente para Consulta</label>
-        <select value={pacienteId} onChange={(e) => setPacienteId(e.target.value ? Number(e.target.value) : "")}
-          className="w-full mt-1 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-sm">
-          <option value="">— Elige un paciente de la lista —</option>
-          {(pacientes || []).map((p) => <option key={p.id} value={p.id}>{p.nombreCompleto} (C.I: {p.identificacion})</option>)}
-        </select>
+      {/* ── 1. BARRA SUPERIOR: SELECTOR DE PACIENTES & BÚSQUEDA POR CÉDULA ── */}
+      <div className="apple-glass rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-white/10 shadow-sm bg-white/80 dark:bg-[#071a2e]/60 flex flex-col md:flex-row items-center justify-between gap-4">
+        {/* Selector Dropdown */}
+        <div className="flex items-center gap-3 w-full md:w-auto flex-1">
+          <div className="flex items-center gap-2 text-slate-700 dark:text-white/90 font-bold text-xs whitespace-nowrap">
+            <IconUser size={18} className="text-teal-600 dark:text-teal-400 flex-shrink-0" />
+            <span>Seleccionar Paciente:</span>
+          </div>
+
+          <div className="relative flex-1 max-w-md">
+            <select
+              value={pacienteSeleccionado?.id || ""}
+              onChange={(e) => setPacienteId(e.target.value ? Number(e.target.value) : "")}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs cursor-pointer"
+            >
+              <option value="">— Elige un paciente de la lista —</option>
+              {(pacientes || []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombreCompleto} (C.I: {p.identificacion})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Buscador Rápido por Cédula */}
+        <form onSubmit={handleBuscarCedula} className="flex items-center gap-2 w-full md:w-auto">
+          <input
+            type="text"
+            placeholder="O buscar por Cédula..."
+            value={busquedaCedula}
+            onChange={(e) => setBusquedaCedula(e.target.value)}
+            className="w-full md:w-60 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
+          />
+          <button
+            type="submit"
+            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-teal-500 hover:text-white dark:bg-white/10 dark:hover:bg-teal-500 text-slate-700 dark:text-white/90 text-xs font-bold border border-slate-300/80 dark:border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs whitespace-nowrap"
+          >
+            <IconSearch size={14} />
+            <span>Buscar</span>
+          </button>
+        </form>
       </div>
 
-      {pacienteId && pacienteSeleccionado && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Formulario de Consulta */}
-          <form onSubmit={guardar} className="lg:col-span-8 apple-glass rounded-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3">
-              <div>
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white">Consulta Médica & Prescripción</h4>
-                <p className="text-[11px] text-teal-600 dark:text-teal-400">Paciente: {pacienteSeleccionado.nombreCompleto} (HC-2026-{String(pacienteSeleccionado.id).padStart(4, "0")})</p>
-              </div>
+      {/* ── 2. FICHA / BANNER RESUMEN DEL PACIENTE SELECCIONADO ── */}
+      {pacienteSeleccionado ? (
+        <div className="rounded-2xl p-4 sm:p-5 bg-white dark:bg-[#071a2e]/80 border border-slate-200/80 dark:border-white/10 shadow-md relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* Barra Vertical Izquierda de Acento Cyan */}
+          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-sky-400 via-teal-500 to-emerald-500" />
+
+          <div className="flex items-center gap-4 pl-2 min-w-0">
+            {/* Avatar Icon Box */}
+            <div className="w-12 h-12 rounded-2xl bg-sky-100/90 dark:bg-sky-950/80 border border-sky-300 dark:border-sky-500/30 flex items-center justify-center text-sky-600 dark:text-sky-300 flex-shrink-0 shadow-xs">
+              <IconUser size={24} />
             </div>
 
-            {error && <p className="text-xs text-[#ff3b80]">{error}</p>}
+            {/* Datos Principales */}
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h3 className="font-['Outfit'] font-black text-lg sm:text-xl text-slate-900 dark:text-white leading-tight truncate">
+                  {pacienteSeleccionado.nombreCompleto}
+                </h3>
 
-            {/* Signos Vitales */}
-            <div>
-              <label className="text-[11px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">Signos Vitales & Somatometría</label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-1.5">
-                <div>
-                  <span className="text-[10px] text-slate-400">T/A (mmHg)</span>
-                  <input value={signos.ta} onChange={(e) => setSignos({ ...signos, ta: e.target.value })} placeholder="120/80" className="w-full px-2.5 py-1.5 rounded-lg border text-xs" />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400">FC (lpm)</span>
-                  <input value={signos.fc} onChange={(e) => setSignos({ ...signos, fc: e.target.value })} placeholder="75" className="w-full px-2.5 py-1.5 rounded-lg border text-xs" />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400">FR (rpm)</span>
-                  <input value={signos.fr} onChange={(e) => setSignos({ ...signos, fr: e.target.value })} placeholder="18" className="w-full px-2.5 py-1.5 rounded-lg border text-xs" />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400">Temp (°C)</span>
-                  <input value={signos.temp} onChange={(e) => setSignos({ ...signos, temp: e.target.value })} placeholder="36.8" className="w-full px-2.5 py-1.5 rounded-lg border text-xs" />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400">Peso (kg)</span>
-                  <input value={signos.peso} onChange={(e) => calcularImc(e.target.value, signos.talla)} placeholder="70" className="w-full px-2.5 py-1.5 rounded-lg border text-xs" />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400">Talla (m)</span>
-                  <input value={signos.talla} onChange={(e) => calcularImc(signos.peso, e.target.value)} placeholder="1.72" className="w-full px-2.5 py-1.5 rounded-lg border text-xs" />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400">IMC (calc)</span>
-                  <input value={signos.imc} readOnly className="w-full px-2.5 py-1.5 rounded-lg border bg-slate-100 text-xs font-bold text-teal-600" />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400">SatO2 (%)</span>
-                  <input value={signos.satO2} onChange={(e) => setSignos({ ...signos, satO2: e.target.value })} placeholder="99" className="w-full px-2.5 py-1.5 rounded-lg border text-xs" />
-                </div>
+                {pacienteSeleccionado.tipoOrigen === "Foráneo" ||
+                pacienteSeleccionado.tipoOrigen === "FORANEO" ||
+                (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo")) ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border border-purple-300/60 dark:border-purple-500/40 text-[11px] font-bold">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+                    </svg>
+                    <span>Foráneo ({pacienteSeleccionado.ciudadOrigen || "Cúcuta"})</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-500/40 text-[11px] font-bold">
+                    <span>Local ({pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Fila de Metadatos */}
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs text-slate-600 dark:text-white/70">
+                <span className="font-mono font-bold text-sky-600 dark:text-sky-400">
+                  C.I: {pacienteSeleccionado.identificacion}
+                </span>
+                <span className="text-slate-300 dark:text-white/20">·</span>
+                <span className="font-mono text-slate-500 dark:text-white/60">
+                  Expediente: HC-2026-{String(pacienteSeleccionado.id).padStart(4, "0")}
+                </span>
+                <span className="text-slate-300 dark:text-white/20">·</span>
+                <span>
+                  Edad:{" "}
+                  {pacienteSeleccionado.fechaNacimiento
+                    ? `${calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)} años`
+                    : pacienteSeleccionado.edad
+                    ? `${pacienteSeleccionado.edad} años`
+                    : "34 años"}
+                </span>
+                <span className="text-slate-300 dark:text-white/20">·</span>
+                <span>Tel: {pacienteSeleccionado.telefono || "No registrado"}</span>
               </div>
             </div>
+          </div>
+        </div>
+      ) : (
+        <div className="p-8 text-center rounded-2xl border border-dashed border-slate-300 dark:border-white/10 text-slate-400 text-xs">
+          Selecciona o busca un paciente para ver su ficha y gestionar su consulta.
+        </div>
+      )}
 
-            {/* Motivo & Evolución */}
-            <div className="space-y-2.5">
-              <div>
-                <label className="text-[10px] text-slate-400 uppercase font-mono">Motivo de Consulta *</label>
-                <textarea required placeholder="Describa el motivo de la consulta..." value={form.motivoConsulta} onChange={(e) => setForm({ ...form, motivoConsulta: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 text-xs" rows={2} />
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-400 uppercase font-mono">Examen Físico / Evolución Clínica</label>
-                <textarea placeholder="Hallazgos al examen físico y evolución..." value={form.evolucionClinica} onChange={(e) => setForm({ ...form, evolucionClinica: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 text-xs" rows={2} />
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-400 uppercase font-mono">Diagnóstico (CIE-10)</label>
-                <input placeholder="Ej. J00 Rinofaringitis aguda (resfriado común)" value={form.descripcionDiagnostico} onChange={(e) => setForm({ ...form, descripcionDiagnostico: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 text-xs" />
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-400 uppercase font-mono">Plan de Tratamiento & Receta Médica (Rx)</label>
-                <textarea placeholder="1. Medicamento X 500mg - 1 tab cada 8 horas por 5 días..." value={form.planTratamiento} onChange={(e) => setForm({ ...form, planTratamiento: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 text-xs" rows={3} />
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-400 uppercase font-mono">Próxima Cita / Control (opcional)</label>
-                <input type="date" value={form.proximaCita} onChange={(e) => setForm({ ...form, proximaCita: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 text-xs" />
-              </div>
-            </div>
-
-            {/* Acciones */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200 dark:border-white/10">
-              <button type="submit" disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full disabled:opacity-50 cursor-pointer">
-                {guardando ? "Guardando…" : "Guardar en Expediente"}
-              </button>
+      {/* ── 3. WORKSPACE EN 2 COLUMNAS: HISTORIAL (IZQ) + FORMULARIO (DER) ── */}
+      {pacienteSeleccionado && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* ── COLUMNA IZQUIERDA: HISTORIAL DE CONSULTAS MÉDICAS ── */}
+          <div className="lg:col-span-12 xl:col-span-5 apple-glass rounded-3xl p-5 border border-slate-200/80 dark:border-white/10 shadow-sm bg-white/80 dark:bg-[#071a2e]/60 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-white/10 pb-3">
               <div className="flex items-center gap-2">
-                <button type="button" onClick={handleDescargarPdf} className="px-3 py-2 rounded-full border border-teal-500/40 text-teal-600 dark:text-teal-300 text-xs font-bold hover:bg-teal-500/10 flex items-center gap-1.5 cursor-pointer">
-                  <span>📥</span> PDF
+                <IconFileText size={18} className="text-teal-600 dark:text-teal-400" />
+                <h4 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">
+                  Historial de Consultas Médicas
+                </h4>
+              </div>
+              <span className="text-xs text-slate-500 dark:text-white/50 font-mono font-bold">
+                {historial?.length || 0} consulta(s) registrada(s)
+              </span>
+            </div>
+
+            {/* Tabla del Historial */}
+            <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/60 dark:bg-black/20">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200/80 dark:border-white/10 bg-slate-100/70 dark:bg-white/5 text-[11px] font-bold text-slate-500 dark:text-white/50 uppercase tracking-wider">
+                    <th className="py-2.5 px-3 whitespace-nowrap">Fecha / H...</th>
+                    <th className="py-2.5 px-3">Motivo</th>
+                    <th className="py-2.5 px-3">Diagnóstico</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">Próx...</th>
+                    <th className="py-2.5 px-3 text-center">Acciones...</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200/60 dark:divide-white/5 text-xs">
+                  {historial === null ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-slate-400">
+                        Cargando historial de consultas…
+                      </td>
+                    </tr>
+                  ) : historial.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-16 text-center text-slate-400 dark:text-white/40">
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-slate-500 dark:text-white/60">
+                            Tabla sin contenido
+                          </p>
+                          <p className="text-[11px] text-slate-400/80">
+                            No hay consultas registradas para este paciente todavía.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    historial.map((c) => {
+                      const fechaC = c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy();
+                      return (
+                        <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors">
+                          <td className="py-3 px-3 font-mono font-bold text-teal-600 dark:text-teal-400 whitespace-nowrap">
+                            {fechaC}
+                          </td>
+                          <td className="py-3 px-3 text-slate-800 dark:text-white/90 truncate max-w-[120px]" title={c.motivoConsulta}>
+                            {c.motivoConsulta || "—"}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-700 dark:text-teal-300 text-[10px] font-bold border border-teal-500/20 truncate block max-w-[110px]" title={c.descripcionDiagnostico}>
+                              {c.descripcionDiagnostico || "Sin Dx"}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-mono text-slate-500 dark:text-white/60 whitespace-nowrap">
+                            —
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                title="Descargar Informe PDF"
+                                onClick={() => handleDescargarPdfConsulta(c)}
+                                className="w-7 h-7 rounded-lg bg-teal-500/10 hover:bg-teal-600 hover:text-white text-teal-700 dark:text-teal-300 flex items-center justify-center transition-colors cursor-pointer"
+                              >
+                                <IconFileText size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                title="Enviar por WhatsApp"
+                                onClick={() => handleEnviarWhatsAppConsulta(c)}
+                                className="w-7 h-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 flex items-center justify-center transition-colors cursor-pointer"
+                              >
+                                <IconBank size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                title="Ver detalles completos"
+                                onClick={() => setConsultaDetalle(c)}
+                                className="w-7 h-7 rounded-lg bg-slate-200/80 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-white flex items-center justify-center transition-colors cursor-pointer"
+                              >
+                                <IconSearch size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── COLUMNA DERECHA: REGISTRAR NUEVA CONSULTA ── */}
+          <form
+            onSubmit={handleGuardarSolo}
+            className="lg:col-span-12 xl:col-span-7 apple-glass rounded-3xl p-6 border border-slate-200/80 dark:border-white/10 shadow-sm bg-white/90 dark:bg-[#071a2e]/80 space-y-4"
+          >
+            {/* Header del Formulario */}
+            <div className="border-b border-slate-200/80 dark:border-white/10 pb-3">
+              <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                <span className="text-teal-600 dark:text-teal-400 font-black text-xl leading-none">+</span>
+                <span>Registrar Nueva Consulta</span>
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5">
+                Ingresa los datos físicos, motivo, diagnóstico y récipe del paciente.
+              </p>
+            </div>
+
+            {/* Mensajes de Estado */}
+            {error && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-300 text-xs font-bold flex items-center gap-2">
+                <IconWarning size={16} className="text-red-500 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {mensajeExito && (
+              <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-700 dark:text-teal-300 text-xs font-bold flex items-center gap-2">
+                <IconCheck size={16} className="text-teal-500 flex-shrink-0" />
+                <span>{mensajeExito}</span>
+              </div>
+            )}
+
+            {/* 1. Motivo de Consulta */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                Motivo de Consulta *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Ej. Dolor abdominal agudo, Control de rutina..."
+                value={form.motivoConsulta}
+                onChange={(e) => setForm({ ...form, motivoConsulta: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
+              />
+            </div>
+
+            {/* 2. Subpanel: Datos Físicos con ícono de lápiz */}
+            <div className="rounded-2xl p-4 border border-sky-200/80 dark:border-sky-500/20 bg-sky-50/40 dark:bg-sky-950/20 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-sky-700 dark:text-sky-300">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                </svg>
+                <span>Datos Físicos</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Talla (m)</span>
+                  <input
+                    type="text"
+                    placeholder="Ej. 1.75"
+                    value={form.talla}
+                    onChange={(e) => setForm({ ...form, talla: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Peso (kg)</span>
+                  <input
+                    type="text"
+                    placeholder="Ej. 70.0"
+                    value={form.peso}
+                    onChange={(e) => setForm({ ...form, peso: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Observación Física</span>
+                  <input
+                    type="text"
+                    placeholder="Contextura, estado general..."
+                    value={form.observacionFisica}
+                    onChange={(e) => setForm({ ...form, observacionFisica: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Anotaciones y Evolución Médica */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                Anotaciones y Evolución Médica
+              </label>
+              <textarea
+                rows={3}
+                placeholder="Antecedentes, hallazgos en examen físico, evolución clínica..."
+                value={form.evolucionClinica}
+                onChange={(e) => setForm({ ...form, evolucionClinica: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
+              />
+            </div>
+
+            {/* 4. Diagnóstico Clínico (Dx) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                Diagnóstico Clínico (Dx) *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Ej. Gastritis aguda / Hipertensión arterial estadio 1"
+                value={form.descripcionDiagnostico}
+                onChange={(e) => setForm({ ...form, descripcionDiagnostico: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
+              />
+            </div>
+
+            {/* 5. Prescripción Farmacológica / Récipe (Rx) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                Prescripción Farmacológica / Récipe (Rx)
+              </label>
+              <textarea
+                rows={3}
+                placeholder={"1. Medicamento A - 500mg cada 8 horas por 7 días\n2. Medicamento B - 1 comprimido diario en ayunas"}
+                value={form.planTratamiento}
+                onChange={(e) => setForm({ ...form, planTratamiento: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-teal-500 shadow-xs"
+              />
+            </div>
+
+            {/* 6. Fecha Sugerida de Próxima Cita (Control) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                Fecha Sugerida de Próxima Cita (Control)
+              </label>
+              <input
+                type="date"
+                value={form.proximaCita}
+                onChange={(e) => setForm({ ...form, proximaCita: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
+              />
+            </div>
+
+            {/* 7. Botones de Acción */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200/80 dark:border-white/10">
+              <button
+                type="button"
+                onClick={limpiarFormulario}
+                className="p-2.5 rounded-xl border border-slate-300 dark:border-white/15 text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                title="Limpiar formulario"
+              >
+                <IconRefresh size={15} />
+              </button>
+
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <button
+                  type="submit"
+                  disabled={guardando}
+                  className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer transition-all"
+                >
+                  <IconCheck size={15} />
+                  <span>{guardando ? "Guardando..." : "Guardar Consulta"}</span>
                 </button>
-                <button type="button" onClick={handleEnviarWhatsApp} className="px-3 py-2 rounded-full bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 flex items-center gap-1.5 shadow-xs cursor-pointer">
-                  <span>💬</span> WhatsApp
-                </button>
-                <button type="button" onClick={handleEnviarGmail} className="px-3 py-2 rounded-full bg-rose-600 text-white text-xs font-bold hover:bg-rose-500 flex items-center gap-1.5 shadow-xs cursor-pointer">
-                  <span>✉️</span> Gmail
+
+                <button
+                  type="button"
+                  onClick={handleGuardarYGenerarPdf}
+                  disabled={guardando}
+                  className="btn-electric-blue px-5 py-2.5 rounded-xl text-white font-bold text-xs flex items-center gap-2 shadow-md disabled:opacity-50 cursor-pointer transition-all"
+                >
+                  <IconFileText size={15} />
+                  <span>Guardar y Generar PDF</span>
                 </button>
               </div>
             </div>
           </form>
+        </div>
+      )}
 
-          {/* Historial previo */}
-          <div className="lg:col-span-4 apple-glass rounded-2xl p-5 space-y-3">
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white">Consultas Anteriores</h4>
-            {historial === null ? (
-              <p className="text-xs text-slate-400">Cargando…</p>
-            ) : historial.length === 0 ? (
-              <p className="text-xs text-slate-400">No hay consultas previas para este paciente.</p>
-            ) : (
-              <div className="space-y-2.5 max-h-[450px] overflow-y-auto pr-1">
-                {historial.map((c) => (
-                  <div key={c.id} className="p-3 rounded-xl bg-slate-100/60 dark:bg-white/5 text-xs space-y-1">
-                    <div className="font-bold text-slate-900 dark:text-white">{c.motivoConsulta}</div>
-                    {c.descripcionDiagnostico && <div className="text-teal-600 dark:text-teal-400 text-[11px]">Dx: {c.descripcionDiagnostico}</div>}
-                    {c.planTratamiento && <div className="text-slate-500 text-[11px] line-clamp-2">Rx: {c.planTratamiento}</div>}
-                  </div>
-                ))}
+      {/* ── MODAL DE DETALLE DE CONSULTA PREVIA ── */}
+      {consultaDetalle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="apple-glass rounded-3xl p-6 max-w-lg w-full bg-white dark:bg-[#071a2e] border border-slate-200 dark:border-teal-500/30 text-slate-900 dark:text-white space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
+              <div>
+                <h4 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">
+                  Detalle de Consulta Médica
+                </h4>
+                <p className="text-xs text-teal-600 dark:text-teal-400 font-mono">
+                  Fecha: {consultaDetalle.fechaConsulta ? consultaDetalle.fechaConsulta.slice(0, 10) : hoy()}
+                </p>
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => setConsultaDetalle(null)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+              >
+                <IconClose size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <span className="font-bold text-slate-500 dark:text-white/50 block">Motivo:</span>
+                <p className="text-slate-900 dark:text-white font-medium mt-0.5">{consultaDetalle.motivoConsulta}</p>
+              </div>
+
+              <div>
+                <span className="font-bold text-slate-500 dark:text-white/50 block">Diagnóstico (Dx):</span>
+                <p className="text-teal-700 dark:text-teal-300 font-bold mt-0.5">{consultaDetalle.descripcionDiagnostico || "Sin diagnóstico registrado"}</p>
+              </div>
+
+              <div>
+                <span className="font-bold text-slate-500 dark:text-white/50 block">Prescripción / Récipe (Rx):</span>
+                <pre className="p-3 rounded-xl bg-slate-100 dark:bg-black/30 font-mono text-[11px] text-slate-800 dark:text-white/90 whitespace-pre-wrap mt-1">
+                  {consultaDetalle.planTratamiento || "Sin récipe farmacológico"}
+                </pre>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => handleDescargarPdfConsulta(consultaDetalle)}
+                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <IconFileText size={14} />
+                <span>Descargar PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleEnviarWhatsAppConsulta(consultaDetalle)}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <IconBank size={14} />
+                <span>WhatsApp</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setConsultaDetalle(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
