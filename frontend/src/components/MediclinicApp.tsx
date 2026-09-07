@@ -6,7 +6,7 @@ import {
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import {
-  listarPacientes, crearPaciente, listarCitasDelDia, agendarCita, listarCobrosDelDia,
+  listarPacientes, crearPaciente, eliminarPaciente, listarCitasDelDia, agendarCita, listarCobrosDelDia,
   listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera,
   listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta,
   type Paciente, type CitaMedica, type SalaEsperaEntrada, type ProcedimientoMedico, type ConsultaMedica,
@@ -143,12 +143,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   };
 
   const [pacientes, setPacientes] = useState<Paciente[] | null>(null);
+  const [pacienteSeleccionadoId, setPacienteSeleccionadoId] = useState<number | null>(null);
   const [citasHoy, setCitasHoy] = useState<CitaMedica[] | null>(null);
   const [salaEspera, setSalaEspera] = useState<SalaEsperaEntrada[] | null>(null);
   const [procedimientos, setProcedimientos] = useState<ProcedimientoMedico[] | null>(null);
   const [ingresosHoy, setIngresosHoy] = useState<number | null>(null);
 
-  // Registro de cobros locales del día
   const [cobrosLocales, setCobrosLocales] = useState<CobroItem[]>(() => {
     try {
       const raw = localStorage.getItem(`cobros_locales_${hoy()}`);
@@ -156,7 +156,6 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     } catch { return []; }
   });
 
-  // Historial de cierres de caja auditados
   const [historialCierres, setHistorialCierres] = useState<CierreCajaData[]>(() => {
     try {
       const raw = localStorage.getItem(HISTORIAL_CIERRES_KEY);
@@ -164,7 +163,6 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     } catch { return []; }
   });
 
-  // Modal de cambio rápido manual de tasas (esquina superior derecha)
   const [modalTasasRapidas, setModalTasasRapidas] = useState(false);
   const [tasaBCVInput, setTasaBCVInput] = useState<string>("");
   const [tasaCOPInput, setTasaCOPInput] = useState<string>("");
@@ -230,7 +228,6 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "mediclinic-clasico" : ""}`}>
       {modoClasico && <EstiloClasico />}
       
-      {/* SIDEBAR NATIVO ESTILO MEDICLINIC */}
       <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1.5 bg-slate-50/50 dark:bg-black/10">
         <div className="px-2 pb-3 mb-2 border-b border-slate-300/60 dark:border-white/10">
           <div className="flex items-center justify-between">
@@ -270,10 +267,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
         <div className="flex-1 min-h-[10px]" />
 
-        {/* WIDGET CALENDARIO EN SIDEBAR */}
         <MiniCalendarioSidebar />
 
-        {/* Switch Modo Clásico / Aurora */}
         <div className="p-2 rounded-xl bg-slate-200/50 dark:bg-white/5 border border-slate-300/60 dark:border-white/10 text-xs mt-2">
           <div className="flex items-center justify-between">
             <span className="text-slate-600 dark:text-white/70 text-[11px] font-medium">Modo Clásico</span>
@@ -294,10 +289,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         </button>
       </aside>
 
-      {/* ÁREA PRINCIPAL */}
       <main className="flex-1 flex flex-col overflow-y-auto">
         <header className="py-3.5 px-6 border-b border-slate-300/60 dark:border-white/10 flex flex-wrap items-center justify-between gap-4 bg-white/40 dark:bg-black/15 backdrop-blur-md">
-          {/* Lado Izquierdo: Saludo con rol y especialidad */}
           <div className="flex items-center gap-3 sm:gap-4">
             <button
               onClick={onSalir}
@@ -322,9 +315,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             </div>
           </div>
 
-          {/* Lado Derecho: Píldora de Tasas del Día con botón Actualizar Tasas */}
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Selector de Rol RBAC */}
             <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-xs">
               <button
                 onClick={() => setRolActivo("MEDICO")}
@@ -346,7 +337,6 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               </button>
             </div>
 
-            {/* Píldora de Tasas del Día con botón Actualizar Tasas */}
             <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/70 dark:bg-white/5 border border-slate-300/60 dark:border-white/15 shadow-sm text-xs">
               <span className="font-bold text-slate-700 dark:text-white/80 flex items-center gap-1.5">
                 <IconBank size={14} className="text-teal-600 dark:text-teal-400" />
@@ -360,7 +350,6 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 COP: ${Number(configPerfil.tasaCOP || 4200).toLocaleString()}
               </span>
 
-              {/* Botón Actualizar Tasas */}
               <button
                 type="button"
                 onClick={abrirModalTasas}
@@ -380,7 +369,6 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           </div>
         </header>
 
-        {/* TOAST DE NOTIFICACIÓN RÁPIDA DE TASAS */}
         {toastTasa && (
           <div className="fixed top-20 right-6 z-50 p-3.5 rounded-2xl bg-teal-600 text-white font-bold text-xs shadow-2xl flex items-center gap-2 animate-bounce">
             <IconCheck size={18} />
@@ -390,9 +378,41 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
         <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
           {pagina === "general" && <VistaGeneral pacientes={pacientes} citasHoy={citasHoy} salaEspera={salaEspera} procedimientos={procedimientos} ingresosHoy={ingresosHoy} onNavegar={setPagina} />}
-          {pagina === "pacientes" && <GestionPacientes tenantId={tenantId} pacientes={pacientes} onCambio={recargarTodo} />}
-          {pagina === "historias" && <HistoriasClinicas tenantId={tenantId} pacientes={pacientes} config={configPerfil} rol={rolActivo} />}
-          {pagina === "procedimientos" && <Procedimientos tenantId={tenantId} procedimientos={procedimientos} pacientes={pacientes} config={configPerfil} onCambio={recargarTodo} />}
+          {pagina === "pacientes" && (
+            <GestionPacientes
+              tenantId={tenantId}
+              pacientes={pacientes}
+              onCambio={recargarTodo}
+              onNavegar={setPagina}
+              onSeleccionarPacienteParaConsulta={(id) => {
+                setPacienteSeleccionadoId(id);
+                setPagina("historias");
+              }}
+              onSeleccionarPacienteParaCotizacion={(id) => {
+                setPacienteSeleccionadoId(id);
+                setPagina("procedimientos");
+              }}
+            />
+          )}
+          {pagina === "historias" && (
+            <HistoriasClinicas
+              tenantId={tenantId}
+              pacientes={pacientes}
+              config={configPerfil}
+              rol={rolActivo}
+              pacienteInicialId={pacienteSeleccionadoId}
+            />
+          )}
+          {pagina === "procedimientos" && (
+            <Procedimientos
+              tenantId={tenantId}
+              procedimientos={procedimientos}
+              pacientes={pacientes}
+              config={configPerfil}
+              onCambio={recargarTodo}
+              pacienteInicialId={pacienteSeleccionadoId}
+            />
+          )}
           {pagina === "sala-espera" && <SalaEspera tenantId={tenantId} pacientes={pacientes} entradas={salaEspera} cobrosLocales={cobrosLocales} onAgregarCobro={agregarCobroLocal} onAgregarCierre={agregarCierreAuditado} onCambio={recargarTodo} config={configPerfil} />}
           {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} />}
           {pagina === "financiero" && <ResumenesFinancieros ingresosHoy={ingresosHoy} citasHoy={citasHoy} cobrosLocales={cobrosLocales} historialCierres={historialCierres} config={configPerfil} />}
@@ -882,39 +902,130 @@ function KpiCard({ label, val, sub, color, onClick }: { label: string; val: stri
   );
 }
 
+function calcularEdadAnios(fechaNac?: string | null): number {
+  if (!fechaNac) return 30;
+  const birth = new Date(fechaNac);
+  if (isNaN(birth.getTime())) return 30;
+  const hoy = new Date();
+  let age = hoy.getFullYear() - birth.getFullYear();
+  const m = hoy.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age > 0 ? age : 0;
+}
+
+function formatearFechaNac(fechaStr?: string | null): string {
+  if (!fechaStr) return "N/D";
+  try {
+    const [y, m, d] = fechaStr.split("-");
+    if (y && m && d) return `${d.padStart(2, "0")}/${m.padStart(2, "0")}/${y}`;
+    return fechaStr;
+  } catch {
+    return fechaStr;
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════
-// GESTIÓN DE PACIENTES
+// GESTIÓN DE PACIENTES (DIRECTORIO + FICHA DETALLADA EN 2 COLUMNAS)
 // ══════════════════════════════════════════════════════════════════════════
-function GestionPacientes({ tenantId, pacientes, onCambio }: { tenantId: number; pacientes: Paciente[] | null; onCambio: () => void }) {
+function GestionPacientes({
+  tenantId,
+  pacientes,
+  onCambio,
+  onNavegar,
+  onSeleccionarPacienteParaConsulta,
+  onSeleccionarPacienteParaCotizacion,
+}: {
+  tenantId: number;
+  pacientes: Paciente[] | null;
+  onCambio: () => void;
+  onNavegar: (p: Pagina) => void;
+  onSeleccionarPacienteParaConsulta: (id: number) => void;
+  onSeleccionarPacienteParaCotizacion: (id: number) => void;
+}) {
   const [busqueda, setBusqueda] = useState("");
+  const [pacienteSeleccionadoId, setPacienteSeleccionadoId] = useState<number | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ identificacion: "", nombres: "", apellidos: "", telefono: "", email: "", fechaNacimiento: "", direccion: "", genero: "M", origen: "Local" });
+  const [pacienteAEliminar, setPacienteAEliminar] = useState<Paciente | null>(null);
+  const [eliminando, setEliminando] = useState(false);
+
+  const [form, setForm] = useState({
+    identificacion: "",
+    nombres: "",
+    apellidos: "",
+    telefono: "",
+    email: "",
+    fechaNacimiento: "",
+    direccion: "",
+    genero: "M",
+    tipoOrigen: "Local",
+    ciudadOrigen: "San Cristóbal",
+  });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const filtrados = (pacientes || []).filter((p) => {
-    const q = busqueda.toLowerCase();
-    return p.nombreCompleto?.toLowerCase().includes(q) || p.identificacion?.toLowerCase().includes(q) || (p.telefono && p.telefono.includes(q));
-  });
+  const filtrados = useMemo(() => {
+    const q = busqueda.toLowerCase().trim();
+    if (!q) return pacientes || [];
+    return (pacientes || []).filter((p) => {
+      const nombre = p.nombreCompleto?.toLowerCase() || `${p.nombres || ""} ${p.apellidos || ""}`.toLowerCase();
+      const cedula = p.identificacion?.toLowerCase() || "";
+      const tel = p.telefono?.toLowerCase() || "";
+      const numHistoria = `hc-2026-${String(p.id).padStart(4, "0")}`.toLowerCase();
+      return (
+        nombre.includes(q) ||
+        cedula.includes(q) ||
+        tel.includes(q) ||
+        numHistoria.includes(q)
+      );
+    });
+  }, [pacientes, busqueda]);
+
+  // Paciente activo en la ficha derecha: si hay seleccionado y está en la lista filtrada o total, o el primero de la lista
+  const pacienteActivo = useMemo(() => {
+    if (filtrados.length === 0) return null;
+    if (pacienteSeleccionadoId) {
+      const encontrado = filtrados.find((p) => p.id === pacienteSeleccionadoId);
+      if (encontrado) return encontrado;
+    }
+    return filtrados[0] || null;
+  }, [filtrados, pacienteSeleccionadoId]);
 
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setGuardando(true);
     try {
-      await crearPaciente(tenantId, {
+      const nuevo = await crearPaciente(tenantId, {
         identificacion: form.identificacion.trim(),
         nombres: form.nombres.trim(),
         apellidos: form.apellidos.trim(),
         telefono: form.telefono.trim() || undefined,
         email: form.email.trim() || undefined,
         fechaNacimiento: form.fechaNacimiento || undefined,
-        direccion: form.direccion || undefined,
+        direccion: form.direccion.trim() || undefined,
         genero: form.genero,
+        tipoOrigen: form.tipoOrigen,
+        ciudadOrigen: form.ciudadOrigen,
       });
-      setForm({ identificacion: "", nombres: "", apellidos: "", telefono: "", email: "", fechaNacimiento: "", direccion: "", genero: "M", origen: "Local" });
+      setForm({
+        identificacion: "",
+        nombres: "",
+        apellidos: "",
+        telefono: "",
+        email: "",
+        fechaNacimiento: "",
+        direccion: "",
+        genero: "M",
+        tipoOrigen: "Local",
+        ciudadOrigen: "San Cristóbal",
+      });
       setMostrarForm(false);
       onCambio();
+      if (nuevo?.id) {
+        setPacienteSeleccionadoId(nuevo.id);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al registrar paciente");
     } finally {
@@ -922,97 +1033,477 @@ function GestionPacientes({ tenantId, pacientes, onCambio }: { tenantId: number;
     }
   };
 
+  const ejecutarEliminacion = async () => {
+    if (!pacienteAEliminar) return;
+    setEliminando(true);
+    try {
+      await eliminarPaciente(pacienteAEliminar.id);
+    } catch (err) {
+      console.warn("Aviso al eliminar paciente:", err);
+    } finally {
+      setEliminando(false);
+      setPacienteAEliminar(null);
+      onCambio();
+    }
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-md">
+    <div className="space-y-6">
+      {/* BARRA SUPERIOR DE BÚSQUEDA Y REGISTRO NUEVO */}
+      <div className="flex items-center gap-3 w-full">
+        <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Buscar por cédula, nombre o teléfono..."
+            placeholder="Buscar paciente por Cédula, Nombres, Apellidos o Nº de Historia..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+            className="w-full pl-11 pr-10 py-3 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-[#071a2e]/70 text-slate-900 dark:text-white text-xs sm:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 shadow-xs"
           />
-          <div className="absolute left-3 top-3 text-slate-400"><IconSearch size={14} /></div>
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+            <IconSearch size={17} />
+          </div>
+          {busqueda && (
+            <button
+              type="button"
+              onClick={() => setBusqueda("")}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              title="Limpiar búsqueda"
+            >
+              <IconClose size={14} />
+            </button>
+          )}
         </div>
-        <button onClick={() => setMostrarForm(!mostrarForm)} className="btn-electric-blue text-xs font-bold px-4 py-2.5 rounded-full flex items-center gap-1.5 cursor-pointer">
-          <span>+</span> {mostrarForm ? "Cerrar Formulario" : "Nuevo Paciente"}
+
+        <button
+          type="button"
+          onClick={() => setMostrarForm(!mostrarForm)}
+          className="btn-electric-blue text-xs sm:text-sm font-bold px-5 py-3 rounded-2xl flex items-center gap-2 cursor-pointer shadow-md flex-shrink-0 transition-all"
+        >
+          <span className="text-base leading-none">{mostrarForm ? "✕" : "+"}</span>
+          <span>{mostrarForm ? "Cerrar Formulario" : "Registrar Nuevo Paciente"}</span>
         </button>
       </div>
 
+      {/* FORMULARIO DE REGISTRO */}
       {mostrarForm && (
-        <form onSubmit={guardar} className="apple-glass rounded-2xl p-5 space-y-4 border border-teal-500/30">
-          <h4 className="font-bold text-sm text-slate-900 dark:text-white">Registrar Nuevo Paciente</h4>
-          {error && <p className="text-xs text-[#ff3b80]">{error}</p>}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <form onSubmit={guardar} className="apple-glass rounded-3xl p-6 sm:p-7 space-y-5 border border-teal-500/40 shadow-xl bg-white/95 dark:bg-[#06182c]/95">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-teal-500/20 text-teal-600 dark:text-teal-400">
+                <IconUser size={20} />
+              </div>
+              <div>
+                <h4 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">Registrar Nuevo Paciente</h4>
+                <p className="text-[11px] text-slate-500 dark:text-white/50">Completa los datos para apertura de historia clínica</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMostrarForm(false)}
+              className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 cursor-pointer"
+            >
+              <IconClose size={18} />
+            </button>
+          </div>
+
+          {error && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 text-xs font-bold">
+              {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono">Cédula / DNI *</label>
-              <input required placeholder="V-12345678" value={form.identificacion} onChange={(e) => setForm({ ...form, identificacion: e.target.value })}
-                className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
+              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Cédula / DNI / Pasaporte *</label>
+              <input
+                required
+                placeholder="Ej. V-10987654"
+                value={form.identificacion}
+                onChange={(e) => setForm({ ...form, identificacion: e.target.value })}
+                className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+              />
             </div>
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono">Nombres *</label>
-              <input required placeholder="Ej. Carlos Eduardo" value={form.nombres} onChange={(e) => setForm({ ...form, nombres: e.target.value })}
-                className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
+              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Nombres *</label>
+              <input
+                required
+                placeholder="Ej. Carlos Andrés"
+                value={form.nombres}
+                onChange={(e) => setForm({ ...form, nombres: e.target.value })}
+                className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+              />
             </div>
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono">Apellidos *</label>
-              <input required placeholder="Ej. Pérez Gómez" value={form.apellidos} onChange={(e) => setForm({ ...form, apellidos: e.target.value })}
-                className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
+              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Apellidos *</label>
+              <input
+                required
+                placeholder="Ej. Gómez Peña"
+                value={form.apellidos}
+                onChange={(e) => setForm({ ...form, apellidos: e.target.value })}
+                className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+              />
             </div>
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono">Teléfono WhatsApp</label>
-              <input placeholder="+58 412 1234567" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
+              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Teléfono WhatsApp</label>
+              <input
+                placeholder="0414-7654321"
+                value={form.telefono}
+                onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+              />
             </div>
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono">Fecha de Nacimiento</label>
-              <input type="date" value={form.fechaNacimiento} onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })}
-                className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
+              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Email de Contacto</label>
+              <input
+                type="email"
+                placeholder="carlos.gomez@gmail.com"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+              />
             </div>
             <div>
-              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono">Origen del Paciente</label>
-              <select value={form.origen} onChange={(e) => setForm({ ...form, origen: e.target.value })}
-                className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs">
+              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Fecha de Nacimiento</label>
+              <input
+                type="date"
+                value={form.fechaNacimiento}
+                onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })}
+                className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Origen / Condición</label>
+              <select
+                value={form.tipoOrigen}
+                onChange={(e) => setForm({ ...form, tipoOrigen: e.target.value, ciudadOrigen: e.target.value === "Foráneo" ? "Cúcuta" : "San Cristóbal" })}
+                className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+              >
                 <option value="Local">Local (San Cristóbal / Táchira)</option>
-                <option value="Foráneo">Foráneo (Otro Estado / Internacional)</option>
+                <option value="Foráneo">Foráneo (Cúcuta / Otro Estado / Internacional)</option>
               </select>
             </div>
+            <div>
+              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Ciudad de Procedencia</label>
+              <input
+                placeholder="Ej. Cúcuta / San Cristóbal"
+                value={form.ciudadOrigen}
+                onChange={(e) => setForm({ ...form, ciudadOrigen: e.target.value })}
+                className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Dirección de Habitación</label>
+              <input
+                placeholder="Ej. Barrio Blanco, Cúcuta"
+                value={form.direccion}
+                onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+                className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+              />
+            </div>
           </div>
-          <button disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full disabled:opacity-50 cursor-pointer">
-            {guardando ? "Guardando…" : "Guardar Paciente"}
-          </button>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setMostrarForm(false)}
+              className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 text-xs font-bold hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer text-slate-600 dark:text-white/70"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={guardando}
+              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl disabled:opacity-50 cursor-pointer shadow-md"
+            >
+              {guardando ? "Guardando…" : "Guardar Paciente"}
+            </button>
+          </div>
         </form>
       )}
 
-      <div className="apple-glass rounded-2xl overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between">
-          <h4 className="font-bold text-sm text-slate-900 dark:text-white">Directorio de Pacientes ({filtrados.length})</h4>
+      {/* ── DISTRIBUCIÓN EN 2 COLUMNAS: DIRECTORIO (IZQ) + FICHA DETALLE (DER) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* COLUMNA IZQUIERDA: DIRECTORIO DE PACIENTES */}
+        <div className="lg:col-span-7 xl:col-span-8 apple-glass rounded-2xl overflow-hidden border border-slate-200/80 dark:border-white/10 shadow-sm bg-white/80 dark:bg-[#071a2e]/40">
+          <div className="p-4 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between bg-slate-50/60 dark:bg-white/[0.02]">
+            <h4 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">
+              Directorio de Pacientes
+            </h4>
+            <span className="text-xs text-slate-500 dark:text-white/50 font-medium">
+              Total en archivo: {filtrados.length} {filtrados.length === 1 ? "paciente" : "pacientes"}
+            </span>
+          </div>
+
+          {pacientes === null ? (
+            <p className="p-8 text-xs text-slate-400 text-center">Cargando directorio de pacientes…</p>
+          ) : filtrados.length === 0 ? (
+            <div className="p-12 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/5 mx-auto flex items-center justify-center text-slate-400">
+                <IconUsers size={22} />
+              </div>
+              <p className="text-sm font-bold text-slate-700 dark:text-white/80">No se encontraron pacientes</p>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                No hay pacientes que coincidan con los criterios de búsqueda o aún no se han registrado.
+              </p>
+              <button
+                onClick={() => setMostrarForm(true)}
+                className="mt-2 btn-electric-blue text-xs font-bold px-4 py-2 rounded-xl cursor-pointer"
+              >
+                + Registrar Primer Paciente
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200/80 dark:border-white/10 bg-slate-100/60 dark:bg-white/5 text-[11px] font-bold text-slate-500 dark:text-white/50 uppercase tracking-wider">
+                    <th className="py-3 px-3">Nº Hist...</th>
+                    <th className="py-3 px-3">Cédula</th>
+                    <th className="py-3 px-3">Nombre Compl...</th>
+                    <th className="py-3 px-3">Origen</th>
+                    <th className="py-3 px-3">Teléfono</th>
+                    <th className="py-3 px-3">Fecha Nac....</th>
+                    <th className="py-3 px-3 text-center">Acci...</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200/60 dark:divide-white/5 text-xs">
+                  {filtrados.map((p) => {
+                    const isSeleccionado = pacienteActivo?.id === p.id;
+                    const esForaneo = p.tipoOrigen === "Foráneo" || p.tipoOrigen === "FORANEO" || (p.origen && p.origen.includes("Foráneo"));
+                    const origenTexto = esForaneo
+                      ? `Foráneo (${p.ciudadOrigen || "Cúcuta"})`
+                      : `Local - ${p.ciudadOrigen || "San Cristóbal"}`;
+
+                    return (
+                      <tr
+                        key={p.id}
+                        onClick={() => setPacienteSeleccionadoId(p.id)}
+                        className={`transition-colors cursor-pointer ${
+                          isSeleccionado
+                            ? "bg-sky-50 dark:bg-sky-950/40 border-l-4 border-l-sky-500 font-medium"
+                            : "hover:bg-slate-100/50 dark:hover:bg-white/5"
+                        }`}
+                      >
+                        <td className="py-3 px-3 font-mono font-bold text-teal-600 dark:text-teal-400 whitespace-nowrap">
+                          HC-2026-{String(p.id).padStart(4, "0")}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-slate-700 dark:text-white/80 whitespace-nowrap">
+                          {p.identificacion}
+                        </td>
+                        <td className="py-3 px-3 font-bold text-slate-900 dark:text-white truncate max-w-[140px]" title={p.nombreCompleto}>
+                          {p.nombreCompleto}
+                        </td>
+                        <td className="py-3 px-3 text-slate-600 dark:text-white/70 truncate max-w-[130px]" title={origenTexto}>
+                          {origenTexto}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-slate-600 dark:text-white/70 whitespace-nowrap">
+                          {p.telefono || "—"}
+                        </td>
+                        <td className="py-3 px-3 text-slate-500 dark:text-white/60 font-mono whitespace-nowrap">
+                          {formatearFechaNac(p.fechaNacimiento)}
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              title="Ver ficha del paciente"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPacienteSeleccionadoId(p.id);
+                              }}
+                              className="w-7 h-7 rounded-full bg-slate-200/80 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 flex items-center justify-center font-bold text-xs transition-colors cursor-pointer"
+                            >
+                              ···
+                            </button>
+                            <button
+                              type="button"
+                              title="Eliminar paciente"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPacienteAEliminar(p);
+                              }}
+                              className="w-7 h-7 rounded-full bg-red-500/15 hover:bg-red-600 text-red-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                            >
+                              <IconTrash size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-        {pacientes === null ? (
-          <p className="p-5 text-xs text-slate-400">Cargando lista…</p>
-        ) : filtrados.length === 0 ? (
-          <p className="p-5 text-xs text-slate-400">No se encontraron pacientes registrados.</p>
-        ) : (
-          <div className="divide-y divide-slate-200/60 dark:divide-white/5 text-xs">
-            {filtrados.map((p) => (
-              <div key={p.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
-                <div>
-                  <div className="font-bold text-slate-900 dark:text-white text-sm">{p.nombreCompleto}</div>
-                  <div className="text-slate-500 text-[11px] mt-0.5">
-                    Cédula: <strong className="text-slate-700 dark:text-white/80">{p.identificacion}</strong> · Tel: {p.telefono || "Sin teléfono"} · Edad: {p.edad ? `${p.edad} años` : "N/D"}
+
+        {/* COLUMNA DERECHA: FICHA DEL PACIENTE SELECCIONADO */}
+        <div className="lg:col-span-5 xl:col-span-4">
+          {pacienteActivo ? (
+            <div className="apple-glass rounded-3xl p-6 border border-slate-200/80 dark:border-white/10 shadow-lg bg-white/90 dark:bg-[#06182c]/80 space-y-5 sticky top-4">
+              {/* Header de la Ficha: Avatar e Identificación */}
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-sky-100 dark:bg-sky-950/80 border border-sky-300 dark:border-sky-500/30 flex items-center justify-center text-sky-600 dark:text-sky-300 flex-shrink-0 shadow-xs">
+                  <IconUser size={28} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white leading-tight truncate" title={pacienteActivo.nombreCompleto}>
+                    {pacienteActivo.nombreCompleto}
+                  </h3>
+                  <div className="text-sky-600 dark:text-sky-400 font-bold text-xs font-mono mt-0.5">
+                    Historia Nº HC-2026-{String(pacienteActivo.id).padStart(4, "0")}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 font-mono font-semibold text-[10px]">
-                    HC-2026-{String(p.id).padStart(4, "0")}
+              </div>
+
+              <div className="border-t border-slate-200/80 dark:border-white/10" />
+
+              {/* Lista de Detalles del Paciente */}
+              <div className="space-y-3 text-xs">
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-500 dark:text-white/50 font-bold">Identificación:</span>
+                  <span className="font-mono font-extrabold text-slate-900 dark:text-white">
+                    C.I: {pacienteActivo.identificacion}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-500 dark:text-white/50 font-bold">Condición:</span>
+                  <div>
+                    {pacienteActivo.tipoOrigen === "Foráneo" || pacienteActivo.tipoOrigen === "FORANEO" || (pacienteActivo.origen && pacienteActivo.origen.includes("Foráneo")) ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border border-purple-300/60 dark:border-purple-500/40 text-[11px] font-bold">
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+                        </svg>
+                        <span>Foráneo ({pacienteActivo.ciudadOrigen || "Cúcuta"})</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-500/40 text-[11px] font-bold">
+                        <span>Local ({pacienteActivo.ciudadOrigen || "San Cristóbal"})</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-500 dark:text-white/50 font-bold">Teléfono:</span>
+                  <span className="font-mono text-slate-800 dark:text-white/90">
+                    {pacienteActivo.telefono || "No registrado"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-500 dark:text-white/50 font-bold">Email:</span>
+                  <span className="text-slate-800 dark:text-white/90 truncate max-w-[180px]" title={pacienteActivo.email || ""}>
+                    {pacienteActivo.email || "No registrado"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-500 dark:text-white/50 font-bold">Edad:</span>
+                  <span className="text-slate-800 dark:text-white/90 font-mono">
+                    {pacienteActivo.fechaNacimiento
+                      ? `${formatearFechaNac(pacienteActivo.fechaNacimiento)} (${calcularEdadAnios(pacienteActivo.fechaNacimiento)} años)`
+                      : pacienteActivo.edad
+                      ? `${pacienteActivo.edad} años`
+                      : "No registrada"}
+                  </span>
+                </div>
+
+                <div className="flex flex-col py-1 space-y-1">
+                  <span className="text-slate-500 dark:text-white/50 font-bold">Dirección:</span>
+                  <span className="text-slate-800 dark:text-white/90">
+                    {pacienteActivo.direccion || "Barrio Blanco, Cúcuta"}
                   </span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className="border-t border-slate-200/80 dark:border-white/10" />
+
+              {/* Botones de Acciones Rápidas */}
+              <div className="space-y-2.5">
+                <div className="text-[10px] font-bold text-slate-400 dark:text-white/40 uppercase tracking-wider">
+                  Acciones Rápidas
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onSeleccionarPacienteParaConsulta(pacienteActivo.id)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
+                >
+                  <IconFileText size={15} />
+                  <span>Iniciar Consulta / Historia</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onSeleccionarPacienteParaCotizacion(pacienteActivo.id)}
+                  className="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-white/15 bg-slate-50/50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-800 dark:text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+                >
+                  <IconPrescription size={15} className="text-teal-600 dark:text-teal-400" />
+                  <span>Cotizar Procedimiento</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPacienteAEliminar(pacienteActivo)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-red-600/10 hover:bg-red-600 hover:text-white text-red-600 dark:text-red-400 border border-red-500/30 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+                >
+                  <IconTrash size={15} />
+                  <span>Eliminar Paciente</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="apple-glass rounded-3xl p-6 border border-slate-200/80 dark:border-white/10 bg-white/60 dark:bg-[#06182c]/60 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/5 mx-auto flex items-center justify-center text-slate-400">
+                <IconUser size={24} />
+              </div>
+              <p className="text-xs font-bold text-slate-600 dark:text-white/70">Ficha del Paciente</p>
+              <p className="text-[11px] text-slate-400">
+                Selecciona un paciente del directorio o registra uno nuevo para ver su ficha completa y opciones rápidas.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN DE PACIENTE */}
+      {pacienteAEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="apple-glass rounded-3xl p-6 max-w-sm w-full bg-white dark:bg-[#071a2e] border border-red-500/30 text-slate-900 dark:text-white space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-red-500/20 text-red-600">
+                <IconWarning size={22} />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm">¿Eliminar Paciente?</h4>
+                <p className="text-[11px] text-slate-500 dark:text-white/60">Esta acción no se puede deshacer.</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-white/80">
+              Se eliminará permanentemente la ficha de <strong className="text-slate-900 dark:text-white">{pacienteAEliminar.nombreCompleto}</strong> (C.I: {pacienteAEliminar.identificacion}) junto con su historial asociado.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setPacienteAEliminar(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={ejecutarEliminacion}
+                disabled={eliminando}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white cursor-pointer shadow-md disabled:opacity-50"
+              >
+                {eliminando ? "Eliminando..." : "Sí, Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1020,9 +1511,27 @@ function GestionPacientes({ tenantId, pacientes, onCambio }: { tenantId: number;
 // ══════════════════════════════════════════════════════════════════════════
 // HISTORIAS CLÍNICAS & GENERACIÓN DE INFORME PDF + WHATSAPP + GMAIL
 // ══════════════════════════════════════════════════════════════════════════
-function HistoriasClinicas({ tenantId, pacientes, config, rol }: { tenantId: number; pacientes: Paciente[] | null; config: any; rol: RolVista }) {
-  const [pacienteId, setPacienteId] = useState<number | "">("");
+function HistoriasClinicas({
+  tenantId,
+  pacientes,
+  config,
+  rol,
+  pacienteInicialId,
+}: {
+  tenantId: number;
+  pacientes: Paciente[] | null;
+  config: any;
+  rol: RolVista;
+  pacienteInicialId?: number | null;
+}) {
+  const [pacienteId, setPacienteId] = useState<number | "">(pacienteInicialId || "");
   const [historial, setHistorial] = useState<ConsultaMedica[] | null>(null);
+
+  useEffect(() => {
+    if (pacienteInicialId) {
+      setPacienteId(pacienteInicialId);
+    }
+  }, [pacienteInicialId]);
   
   // Signos vitales completos
   const [signos, setSignos] = useState({ ta: "120/80", fc: "75", fr: "18", temp: "36.8", peso: "70", talla: "1.72", imc: "23.6", satO2: "99" });
@@ -1264,15 +1773,33 @@ function HistoriasClinicas({ tenantId, pacientes, config, rol }: { tenantId: num
 // ══════════════════════════════════════════════════════════════════════════
 // PROCEDIMIENTOS & COTIZADOR MULTI-MONEDA (USD / VES / COP)
 // ══════════════════════════════════════════════════════════════════════════
-function Procedimientos({ tenantId, procedimientos, pacientes, config, onCambio }: {
-  tenantId: number; procedimientos: ProcedimientoMedico[] | null; pacientes: Paciente[] | null; config: any; onCambio: () => void;
+function Procedimientos({
+  tenantId,
+  procedimientos,
+  pacientes,
+  config,
+  onCambio,
+  pacienteInicialId,
+}: {
+  tenantId: number;
+  procedimientos: ProcedimientoMedico[] | null;
+  pacientes: Paciente[] | null;
+  config: any;
+  onCambio: () => void;
+  pacienteInicialId?: number | null;
 }) {
   const [form, setForm] = useState({ nombre: "", descripcion: "", costo: "", moneda: "USD", duracionMinutos: "" });
   const [guardando, setGuardando] = useState(false);
 
   // Estado del Cotizador
-  const [cotizacionPacienteId, setCotizacionPacienteId] = useState<number | "">("");
+  const [cotizacionPacienteId, setCotizacionPacienteId] = useState<number | "">(pacienteInicialId || "");
   const [seleccionados, setSeleccionados] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (pacienteInicialId) {
+      setCotizacionPacienteId(pacienteInicialId);
+    }
+  }, [pacienteInicialId]);
 
   const pacienteCotizacion = (pacientes || []).find((p) => p.id === Number(cotizacionPacienteId));
 
