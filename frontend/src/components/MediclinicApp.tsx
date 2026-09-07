@@ -328,26 +328,29 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-xs">
               <button
                 onClick={() => setRolActivo("MEDICO")}
-                className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   rolActivo === "MEDICO" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
                 }`}
               >
-                🩺 Médico
+                <IconStethoscope size={13} />
+                <span>Médico</span>
               </button>
               <button
                 onClick={() => setRolActivo("SECRETARIA")}
-                className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   rolActivo === "SECRETARIA" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
                 }`}
               >
-                📋 Secretaria
+                <IconFileText size={13} />
+                <span>Secretaria</span>
               </button>
             </div>
 
             {/* Píldora de Tasas del Día con botón Actualizar Tasas */}
             <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/70 dark:bg-white/5 border border-slate-300/60 dark:border-white/15 shadow-sm text-xs">
-              <span className="font-bold text-slate-700 dark:text-white/80 flex items-center gap-1">
-                💵 <span>Tasas del Día:</span>
+              <span className="font-bold text-slate-700 dark:text-white/80 flex items-center gap-1.5">
+                <IconBank size={14} className="text-teal-600 dark:text-teal-400" />
+                <span>Tasas del Día:</span>
               </span>
               <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                 VES: Bs. {Number(configPerfil.tasaBCV || 56.4).toFixed(2)}
@@ -425,7 +428,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               {/* Tasa BCV */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-white/80 flex items-center justify-between">
-                  <span>🇻🇪 Tasa BCV (Bs. / USD)</span>
+                  <span>Tasa BCV (Bs. / USD)</span>
                   <span className="text-[10px] font-mono text-teal-600 dark:text-teal-400">Bolívares por Dólar</span>
                 </label>
                 <div className="relative flex items-center">
@@ -460,7 +463,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               {/* Tasa COP */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-white/80 flex items-center justify-between">
-                  <span>🇨🇴 Tasa TRM (Pesos COP / USD)</span>
+                  <span>Tasa TRM (Pesos COP / USD)</span>
                   <span className="text-[10px] font-mono text-teal-600 dark:text-teal-400">Pesos por Dólar</span>
                 </label>
                 <div className="relative flex items-center">
@@ -494,7 +497,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               {/* Vista previa en vivo */}
               <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs space-y-1 font-mono">
                 <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider font-sans font-bold">
-                  💡 Simulación de Conversión ($10.00 USD):
+                  Simulación de Conversión ($10.00 USD):
                 </div>
                 <div className="flex items-center justify-between text-teal-700 dark:text-teal-300 font-bold">
                   <span>Bs. {((parseFloat(tasaBCVInput) || 0) * 10).toFixed(2)} VES</span>
@@ -579,7 +582,8 @@ function MiniCalendarioSidebar() {
     <div className="p-3 rounded-2xl bg-white/60 dark:bg-black/25 border border-slate-300/60 dark:border-white/10 text-xs shadow-xs space-y-2 mt-auto">
       <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 dark:border-white/10">
         <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-white text-xs">
-          <span>📅 Calendario</span>
+          <IconCalendar size={13} />
+          <span>Calendario</span>
         </div>
         <span className="font-mono text-[11px] font-bold text-slate-400">{año}</span>
       </div>
