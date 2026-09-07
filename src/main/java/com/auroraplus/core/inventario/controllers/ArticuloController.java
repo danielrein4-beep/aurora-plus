@@ -98,6 +98,7 @@ public class ArticuloController {
         public BigDecimal costoUnitario;
         public BigDecimal precioVenta;
         public BigDecimal stockMinimo;
+        public String sku;
     }
 
     /** Corrige datos del artículo (nombre, categoría, unidad, costo, precio de venta, stock mínimo) — NO toca stockActual, que solo cambia vía Kardex (entrada/salida/ajuste) para no perder el rastro de auditoría. */
@@ -113,6 +114,7 @@ public class ArticuloController {
         if (request.costoUnitario != null) articulo.setCostoUnitario(request.costoUnitario);
         if (request.precioVenta != null) articulo.setPrecioVenta(request.precioVenta);
         if (request.stockMinimo != null) articulo.setStockMinimo(request.stockMinimo);
+        if (request.sku != null && !request.sku.isBlank()) articulo.setSku(request.sku.trim());
         return ResponseEntity.ok(articuloRepository.save(articulo));
     }
 

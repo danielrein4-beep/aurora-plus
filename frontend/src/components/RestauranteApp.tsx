@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   IconRestaurant, IconCustomize, IconUsers, IconUser, IconHourglass, IconCard, IconFileText,
   IconCheck, IconTrash, IconRefresh, IconCheckCircle, IconWarning, IconSearch, IconClose,
@@ -2121,6 +2122,7 @@ function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
   const [form, setForm] = useState({
     nombre: articulo.nombre, categoria: articulo.categoria || "", unidadMedida: articulo.unidadMedida || "unidad",
     costoUnitario: String(articulo.costoUnitario), precioVenta: String(articulo.precioVenta ?? 0),
+    sku: articulo.sku || "",
   });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2138,6 +2140,7 @@ function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
       const actualizado = await editarArticulo(tenantId, articulo.id, {
         nombre: form.nombre.trim(), categoria: form.categoria.trim(), unidadMedida: form.unidadMedida.trim(),
         costoUnitario: Number(form.costoUnitario), precioVenta: Number(form.precioVenta),
+        sku: form.sku.trim() || undefined,
       });
       onGuardado(actualizado);
       onClose();
@@ -2161,6 +2164,7 @@ function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
           <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Costo unitario $" />
           <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Precio de venta $" />
         </div>
+        <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="input-horeca text-xs font-mono" placeholder="Código de barras / SKU" />
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold text-slate-500 dark:text-white/40">Margen:</span>
           <BadgeMargen margen={margen} />
@@ -4719,9 +4723,12 @@ function CuentasPorCobrarPagar({ tenantId }: { tenantId: number }) {
 // COMPONENTES COMPARTIDOS
 // ══════════════════════════════════════════════════════════════════════════
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
+  // Sin variante dark: a propósito — Campo se usa exclusivamente dentro de
+  // Modal, que es siempre de fondo claro sólido (ver comentario en Modal).
+  // text-white/40 sobre esa tarjeta blanca queda casi invisible.
   return (
     <div>
-      <label className="block text-slate-500 dark:text-white/40 text-[11px] font-medium uppercase tracking-wider mb-1">{label}</label>
+      <label className="block text-slate-500 text-[11px] font-medium uppercase tracking-wider mb-1">{label}</label>
       {children}
     </div>
   );
@@ -4740,15 +4747,23 @@ function Modal({ titulo, onClose, children, ancho }: { titulo: string; onClose: 
   // fondo oscuro, invisible). Fijar la tarjeta a blanco/texto oscuro sin
   // depender de dark: evita la colisión en el modo en que de verdad se
   // usa la app.
-  return (
+  // Portal a document.body: cualquier ancestro con backdrop-filter/filter/
+  // transform (ej. .apple-glass en las tarjetas de TarjetaArticulo, que trae
+  // backdrop-filter: blur(...)) crea un containing block nuevo para
+  // position: fixed y "atrapa" al modal dentro de la caja de la tarjeta,
+  // cortándolo o descentrándolo. Renderizar el modal fuera del árbol de la
+  // tarjeta, directo bajo <body>, lo vuelve un overlay de viewport real sin
+  // importar qué ancestro lo dispare.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className={`bg-white rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-200`}>
+      <div onClick={(e) => e.stopPropagation()} className={`bg-white text-slate-900 rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-200`}>
         <div className="flex items-center justify-between mb-4">
           <div role="heading" aria-level={3} className="font-['Outfit'] font-bold text-lg text-slate-900">{titulo}</div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"><IconClose size={18} /></button>
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -954,7 +954,7 @@ export function entradaArticulo(tenantId: number, articuloId: number, datos: { c
   return request(`/api/inventario/articulos/${articuloId}/entrada?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function editarArticulo(tenantId: number, articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number }): Promise<Articulo> {
+export function editarArticulo(tenantId: number, articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; sku?: string }): Promise<Articulo> {
   return request(`/api/inventario/articulos/${articuloId}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
 }
 
