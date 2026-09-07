@@ -348,10 +348,8 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           <div className="flex items-center gap-4">
             <div className="text-xs text-right hidden sm:block">
               <div className="font-bold text-slate-900 dark:text-white">{config.nombreLocal}</div>
-              <div className="text-[11px] text-teal-600 dark:text-teal-400 font-mono">
-                {tasaBcv ? `BCV: Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "BCV: sin tasa registrada"}
-              </div>
             </div>
+            <TasaBadge tenantId={tenantId} tasaBcv={tasaBcv} onActualizada={setTasaBcv} />
             <button onClick={recargarTodo} className="p-2 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
               <IconRefresh size={16} />
             </button>
@@ -412,6 +410,91 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
 
       {moduloPremiumClic && (
         <ModalPremium modulo={NAV.find((n) => n.id === moduloPremiumClic)?.label || ""} onClose={() => setModuloPremiumClic(null)} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Indicador de tasa de cambio en el header — clickeable: abre un popover
+ * de edición rápida con auto-focus y actualiza el valor en el propio
+ * header al confirmar, sin recargar la página ni navegar fuera de la
+ * vista actual (Ventas, Inventario, Reportes, etc.).
+ */
+function TasaBadge({ tenantId, tasaBcv, onActualizada }: {
+  tenantId: number; tasaBcv: TasaCambio | null; onActualizada: (t: TasaCambio) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [tasa, setTasa] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    setTasa(tasaBcv ? String(Number(tasaBcv.tasa)) : "");
+    setError(null);
+    const id = setTimeout(() => inputRef.current?.focus(), 0);
+    return () => clearTimeout(id);
+  }, [abierto, tasaBcv]);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) setAbierto(false);
+    };
+    const handlerEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setAbierto(false); };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", handlerEsc);
+    return () => { document.removeEventListener("mousedown", handler); document.removeEventListener("keydown", handlerEsc); };
+  }, [abierto]);
+
+  const actualizar = async () => {
+    const valor = Number(tasa);
+    if (!valor || valor <= 0) { setError("Ingresa una tasa válida mayor a cero"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      const nueva = await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: valor, origen: "MANUAL" });
+      onActualizada(nueva);
+      setAbierto(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo actualizar la tasa");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="relative" ref={popoverRef}>
+      <button type="button" onClick={() => setAbierto((v) => !v)} title="Clic para actualizar la tasa de cambio"
+        className={`flex items-center gap-1.5 text-[11px] font-mono font-bold px-2.5 py-1.5 rounded-full cursor-pointer border transition-colors ${
+          tasaBcv
+            ? "text-teal-600 dark:text-teal-400 bg-teal-500/10 border-teal-500/25 hover:bg-teal-500/20"
+            : "text-amber-500 bg-amber-500/10 border-amber-500/25 hover:bg-amber-500/20"
+        }`}>
+        <span>{tasaBcv ? `Tasa: Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa registrada"}</span>
+        <IconCustomize size={11} />
+      </button>
+
+      {abierto && (
+        <div className="absolute right-0 top-full mt-2 z-50 w-64 apple-glass rounded-xl p-4 shadow-lg border border-slate-300/60 dark:border-white/10">
+          <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2">Actualizar tasa (1 USD = Bs.)</p>
+          <input
+            ref={inputRef}
+            value={tasa}
+            onChange={(e) => setTasa(e.target.value)}
+            type="number" step="0.01" min="0" placeholder="Ej. 56.40"
+            className="input-horeca w-full"
+            onKeyDown={(e) => e.key === "Enter" && actualizar()}
+          />
+          {error && <p className="text-[10px] text-red-500 mt-1.5">{error}</p>}
+          <button onClick={actualizar} disabled={guardando}
+            className="w-full mt-2.5 g-aurora text-white text-xs font-bold py-2 rounded-lg cursor-pointer disabled:opacity-60">
+            {guardando ? "Actualizando…" : "Actualizar"}
+          </button>
+        </div>
       )}
     </div>
   );
