@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import {
+  AuroraGradientDef,
   IconStethoscope, IconUsers, IconFileText, IconPrescription, IconHourglass, IconCalendar,
   IconCard, IconCustomize, IconSearch, IconUser, IconCheck, IconTrash, IconRefresh,
   IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconWarning, IconClose, IconBank
 } from "../Icons";
+import ThemeToggle from "./ThemeToggle";
 import { useAuth } from "../context/AuthContext";
 import {
   listarPacientes, crearPaciente, eliminarPaciente, listarCitasDelDia, agendarCita, listarCobrosDelDia,
@@ -107,47 +109,50 @@ function SelectorPerfilesNetflix({
   onSalir: () => void;
 }) {
   return (
-    <div className="min-h-screen w-full bg-[#051322] text-white flex flex-col justify-between p-6 sm:p-10 relative overflow-hidden select-none">
+    <div className="min-h-screen w-full bg-slate-50 text-slate-900 dark:bg-[#051322] dark:text-white flex flex-col justify-between p-6 sm:p-10 relative overflow-hidden select-none transition-colors duration-300">
       {/* Luces de fondo ambient */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-[#00FFC2]/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-[#0B3D91]/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-teal-500/10 dark:bg-[#00FFC2]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-sky-500/10 dark:bg-[#0B3D91]/30 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header Superior */}
       <div className="flex items-center justify-between w-full max-w-6xl mx-auto z-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#00FFC2] to-[#0B3D91] flex items-center justify-center p-0.5 shadow-lg">
-            <div className="w-full h-full bg-[#051322] rounded-[14px] flex items-center justify-center text-[#00FFC2]">
-              <IconStethoscope size={22} />
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-teal-500 to-sky-600 dark:from-[#00FFC2] dark:to-[#0B3D91] flex items-center justify-center p-0.5 shadow-md">
+            <div className="w-full h-full bg-white dark:bg-[#051322] rounded-[14px] flex items-center justify-center text-teal-600 dark:text-[#00FFC2]">
+              <IconStethoscope size={20} />
             </div>
           </div>
           <div>
-            <div className="font-['Outfit'] font-black text-xl text-white tracking-tight">
-              Mediclinic <span className="text-[#00FFC2]">Pro</span>
+            <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white tracking-tight">
+              Mediclinic <span className="text-teal-600 dark:text-[#00FFC2]">Pro</span>
             </div>
-            <div className="text-[10px] text-white/50 uppercase font-mono tracking-widest">
+            <div className="text-[10px] text-slate-500 dark:text-white/50 uppercase font-mono tracking-widest">
               {configPerfil.clinicaNombre || "Centro Médico Especializado"}
             </div>
           </div>
         </div>
 
-        <button
-          onClick={onSalir}
-          className="px-4 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all flex items-center gap-2 cursor-pointer border border-white/10"
-        >
-          <span>← Volver a Aurora Hub</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <button
+            onClick={onSalir}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-white dark:bg-white/10 hover:bg-slate-100 dark:hover:bg-white/20 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-2 cursor-pointer border border-slate-200 dark:border-white/10 shadow-sm"
+          >
+            <span>← Volver a Aurora Hub</span>
+          </button>
+        </div>
       </div>
 
       {/* Contenido Central: ¿Quién eres? */}
       <div className="w-full max-w-4xl mx-auto py-8 sm:py-12 flex flex-col items-center text-center z-10 space-y-10">
         <div className="space-y-3">
-          <span className="px-3.5 py-1 rounded-full bg-teal-500/15 text-[#00FFC2] border border-teal-500/30 text-xs font-bold font-mono tracking-wider uppercase">
+          <span className="px-3.5 py-1 rounded-full bg-teal-500/10 dark:bg-teal-500/15 text-teal-700 dark:text-[#00FFC2] border border-teal-500/30 text-xs font-bold font-mono tracking-wider uppercase">
             Gestión Segura por Roles & Seguridad
           </span>
-          <h1 className="font-['Outfit'] font-black text-3xl sm:text-5xl text-white tracking-tight">
+          <h1 className="font-['Outfit'] font-black text-3xl sm:text-5xl text-slate-900 dark:text-white tracking-tight">
             ¿Quién está ingresando hoy?
           </h1>
-          <p className="text-slate-400 text-sm sm:text-base max-w-md mx-auto">
+          <p className="text-slate-600 dark:text-slate-400 text-sm sm:text-base max-w-md mx-auto">
             Selecciona tu perfil de trabajo para acceder a tus herramientas clínicas
           </p>
         </div>
@@ -157,34 +162,39 @@ function SelectorPerfilesNetflix({
           {/* Perfil 1: Doctor / Médico Titular */}
           <div
             onClick={onSeleccionarDoctor}
-            className="group relative p-7 rounded-3xl bg-white/[0.04] hover:bg-white/[0.08] border-2 border-white/10 hover:border-[#00FFC2] transition-all duration-300 transform hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(0,255,194,0.15)] cursor-pointer flex flex-col items-center text-center space-y-4"
+            className="group relative p-7 rounded-3xl bg-white dark:bg-white/[0.04] hover:bg-teal-50/40 dark:hover:bg-white/[0.08] border-2 border-slate-200 dark:border-white/10 hover:border-teal-500 dark:hover:border-[#00FFC2] shadow-xl hover:shadow-[0_20px_40px_rgba(20,184,166,0.18)] dark:hover:shadow-[0_20px_40px_rgba(0,255,194,0.15)] transition-all duration-300 transform hover:-translate-y-2 cursor-pointer flex flex-col items-center text-center space-y-4"
           >
             {/* Indicador de Lock */}
-            <div className="absolute top-4 right-4 p-2 rounded-xl bg-teal-500/10 text-[#00FFC2] border border-teal-500/30 group-hover:scale-110 transition-transform">
+            <div className="absolute top-4 right-4 p-2 rounded-xl bg-teal-500/10 text-teal-600 dark:text-[#00FFC2] border border-teal-500/20 dark:border-teal-500/30 group-hover:scale-110 transition-transform">
               <IconLock size={15} />
             </div>
 
             {/* Avatar Grande */}
-            <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-[#00FFC2] via-[#008B8B] to-[#0B3D91] p-1 shadow-2xl group-hover:ring-4 group-hover:ring-[#00FFC2]/40 transition-all flex items-center justify-center">
-              <div className="w-full h-full rounded-[22px] bg-[#051322] flex items-center justify-center text-[#00FFC2]">
-                <IconStethoscope size={50} />
+            <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-teal-400 via-teal-600 to-indigo-700 dark:from-[#00FFC2] dark:via-[#008B8B] dark:to-[#0B3D91] p-1 shadow-2xl group-hover:ring-4 group-hover:ring-teal-500/40 dark:group-hover:ring-[#00FFC2]/40 transition-all flex items-center justify-center">
+              <div className="w-full h-full rounded-[22px] bg-slate-100 dark:bg-[#051322] flex items-center justify-center text-teal-600 dark:text-[#00FFC2]">
+                <svg width={52} height={52} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4.5 3v5a4.5 4.5 0 0 0 9 0V3" />
+                  <path d="M4.5 3H3m1.5 0H6m6 0h1.5m0 0H15" />
+                  <path d="M9 12.5v3.5a3 3 0 0 0 3 3h2" />
+                  <circle cx="17.5" cy="19" r="2.5" />
+                </svg>
               </div>
             </div>
 
             <div className="space-y-1">
-              <h3 className="font-['Outfit'] font-black text-xl text-white group-hover:text-[#00FFC2] transition-colors">
+              <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-[#00FFC2] transition-colors">
                 {configPerfil.doctorNombre || "Dr. Mario Roa"}
               </h3>
-              <p className="text-xs text-teal-300/80 font-medium">
+              <p className="text-xs text-teal-600 dark:text-teal-300/90 font-medium">
                 {configPerfil.especialidad || "Médico Titular & Administrador"}
               </p>
-              <p className="text-[11px] text-slate-400 font-mono mt-1">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-1">
                 Acceso Total: Historias, Cierres, Configuración & Auditoría
               </p>
             </div>
 
             <div className="pt-2 w-full">
-              <div className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#00FFC2]/20 to-[#008B8B]/20 border border-[#00FFC2]/40 text-[#00FFC2] text-xs font-bold flex items-center justify-center gap-2 group-hover:bg-[#00FFC2] group-hover:text-[#051322] transition-all shadow-sm">
+              <div className="w-full py-2.5 px-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 dark:bg-gradient-to-r dark:from-[#00FFC2]/20 dark:to-[#008B8B]/20 dark:border-[#00FFC2]/40 dark:text-[#00FFC2] text-xs font-bold flex items-center justify-center gap-2 group-hover:bg-teal-600 group-hover:text-white dark:group-hover:bg-[#00FFC2] dark:group-hover:text-[#051322] transition-all shadow-sm">
                 <IconLock size={14} />
                 <span>Ingresar con PIN / Clave</span>
               </div>
@@ -194,34 +204,39 @@ function SelectorPerfilesNetflix({
           {/* Perfil 2: Secretaría / Recepción */}
           <div
             onClick={onSeleccionarSecretaria}
-            className="group relative p-7 rounded-3xl bg-white/[0.04] hover:bg-white/[0.08] border-2 border-white/10 hover:border-sky-400 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(56,189,248,0.15)] cursor-pointer flex flex-col items-center text-center space-y-4"
+            className="group relative p-7 rounded-3xl bg-white dark:bg-white/[0.04] hover:bg-sky-50/40 dark:hover:bg-white/[0.08] border-2 border-slate-200 dark:border-white/10 hover:border-sky-500 dark:hover:border-sky-400 shadow-xl hover:shadow-[0_20px_40px_rgba(56,189,248,0.18)] dark:hover:shadow-[0_20px_40px_rgba(56,189,248,0.15)] transition-all duration-300 transform hover:-translate-y-2 cursor-pointer flex flex-col items-center text-center space-y-4"
           >
             {/* Indicador de Acceso Libre */}
-            <div className="absolute top-4 right-4 p-2 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/30 group-hover:scale-110 transition-transform">
+            <div className="absolute top-4 right-4 p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 dark:border-sky-500/30 group-hover:scale-110 transition-transform">
               <IconCheckCircle size={15} />
             </div>
 
             {/* Avatar Grande */}
-            <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-sky-400 via-indigo-600 to-[#0B3D91] p-1 shadow-2xl group-hover:ring-4 group-hover:ring-sky-400/40 transition-all flex items-center justify-center">
-              <div className="w-full h-full rounded-[22px] bg-[#051322] flex items-center justify-center text-sky-300">
-                <IconUsers size={50} />
+            <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-sky-400 via-indigo-600 to-blue-800 dark:from-sky-400 dark:via-indigo-600 dark:to-[#0B3D91] p-1 shadow-2xl group-hover:ring-4 group-hover:ring-sky-400/40 transition-all flex items-center justify-center">
+              <div className="w-full h-full rounded-[22px] bg-slate-100 dark:bg-[#051322] flex items-center justify-center text-sky-600 dark:text-sky-300">
+                <svg width={52} height={52} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
               </div>
             </div>
 
             <div className="space-y-1">
-              <h3 className="font-['Outfit'] font-black text-xl text-white group-hover:text-sky-400 transition-colors">
+              <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
                 Secretaría & Recepción
               </h3>
-              <p className="text-xs text-sky-300/80 font-medium">
+              <p className="text-xs text-sky-600 dark:text-sky-300/90 font-medium">
                 Atención Clínica & Sala de Espera
               </p>
-              <p className="text-[11px] text-slate-400 font-mono mt-1">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-1">
                 Gestión de Pacientes, Citas, Llegadas & Cobros
               </p>
             </div>
 
             <div className="pt-2 w-full">
-              <div className="w-full py-2.5 px-4 rounded-xl bg-sky-500/20 border border-sky-400/40 text-sky-300 text-xs font-bold flex items-center justify-center gap-2 group-hover:bg-sky-400 group-hover:text-[#051322] transition-all shadow-sm">
+              <div className="w-full py-2.5 px-4 rounded-xl bg-sky-50 border border-sky-200 text-sky-700 dark:bg-sky-500/20 dark:border-sky-400/40 dark:text-sky-300 text-xs font-bold flex items-center justify-center gap-2 group-hover:bg-sky-600 group-hover:text-white dark:group-hover:bg-sky-400 dark:group-hover:text-[#051322] transition-all shadow-sm">
                 <IconCheckCircle size={14} />
                 <span>Acceso Directo (Sin clave)</span>
               </div>
@@ -231,7 +246,7 @@ function SelectorPerfilesNetflix({
       </div>
 
       {/* Footer */}
-      <div className="w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 z-10 pt-4 border-t border-white/5 gap-2">
+      <div className="w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 dark:text-slate-400 z-10 pt-4 border-t border-slate-200 dark:border-white/5 gap-2">
         <div>Mediclinic Pro v2.4 · Sistema de Control Médico Multiusuario</div>
         <div className="text-[11px] font-mono">El perfil del Doctor está protegido con encriptación y PIN</div>
       </div>
@@ -270,43 +285,43 @@ function ModalClaveDoctor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-md rounded-3xl p-6 sm:p-7 bg-[#071a2e] border border-teal-500/30 text-white space-y-5 shadow-2xl">
-        <div className="flex items-center justify-between pb-3 border-b border-white/10">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/75 backdrop-blur-md animate-fade-in">
+      <div className="relative w-full max-w-md rounded-3xl p-6 sm:p-7 bg-white dark:bg-[#071a2e] border border-slate-200 dark:border-teal-500/30 text-slate-900 dark:text-white space-y-5 shadow-2xl transition-colors duration-300">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-teal-500/20 text-[#00FFC2] flex items-center justify-center border border-teal-500/30">
+            <div className="w-12 h-12 rounded-2xl bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-[#00FFC2] flex items-center justify-center border border-teal-500/20 dark:border-teal-500/30">
               <IconLock size={22} />
             </div>
             <div>
-              <h3 className="font-['Outfit'] font-black text-lg leading-tight text-white">
+              <h3 className="font-['Outfit'] font-black text-lg leading-tight text-slate-900 dark:text-white">
                 Autenticación Médica
               </h3>
-              <p className="text-[11px] text-teal-300/70">{doctorNombre}</p>
+              <p className="text-[11px] text-teal-600 dark:text-teal-300/70">{doctorNombre}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onCancelar}
-            className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
           >
             <IconClose size={20} />
           </button>
         </div>
 
         <form onSubmit={validar} className="space-y-4">
-          <p className="text-xs text-slate-300 leading-relaxed">
+          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
             Ingresa el <strong>PIN o Contraseña</strong> del Médico Titular para acceder a la administración clínica completa.
           </p>
 
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/40 text-red-300 text-xs font-bold flex items-center gap-2">
-              <IconWarning size={16} className="text-red-400 flex-shrink-0" />
+            <div className="p-3 rounded-xl bg-red-500/10 dark:bg-red-500/15 border border-red-500/30 dark:border-red-500/40 text-red-600 dark:text-red-300 text-xs font-bold flex items-center gap-2">
+              <IconWarning size={16} className="text-red-500 flex-shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-mono font-bold text-slate-400 uppercase">
+            <label className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase">
               PIN / Contraseña del Doctor *
             </label>
             <div className="relative flex items-center">
@@ -314,21 +329,18 @@ function ModalClaveDoctor({
                 type={mostrarClave ? "text" : "password"}
                 autoFocus
                 required
-                placeholder="Ingresa PIN (predeterminado: 1234)"
+                placeholder="Ingresa tu PIN o contraseña"
                 value={clave}
                 onChange={(e) => setClave(e.target.value)}
-                className="w-full pl-4 pr-16 py-3 rounded-xl border border-white/15 bg-black/40 text-white font-mono text-sm tracking-widest focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
+                className="w-full pl-4 pr-16 py-3 rounded-xl border border-slate-300 bg-slate-50 text-slate-900 dark:border-white/15 dark:bg-black/40 dark:text-white font-mono text-sm tracking-widest focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
               />
               <button
                 type="button"
                 onClick={() => setMostrarClave(!mostrarClave)}
-                className="absolute right-3 text-slate-400 hover:text-white p-1 cursor-pointer text-xs font-mono font-bold"
+                className="absolute right-3 text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 cursor-pointer text-xs font-mono font-bold"
               >
                 {mostrarClave ? "OCULTAR" : "VER"}
               </button>
-            </div>
-            <div className="text-[10px] text-slate-500 pt-1">
-              (PIN por defecto: <strong className="text-teal-400 font-mono">1234</strong> · Puedes personalizarlo en Configuración)
             </div>
           </div>
 
@@ -336,13 +348,13 @@ function ModalClaveDoctor({
             <button
               type="button"
               onClick={onCancelar}
-              className="px-4 py-2.5 rounded-xl border border-white/10 text-xs font-bold text-slate-400 hover:text-white hover:bg-white/5 cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-lg flex items-center gap-2"
+              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-lg flex items-center gap-2 text-white"
             >
               <IconCheck size={16} />
               <span>Entrar al Panel Médico</span>
@@ -557,6 +569,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   if (perfilActivo === null) {
     return (
       <>
+        <AuroraGradientDef />
         <SelectorPerfilesNetflix
           configPerfil={configPerfil}
           onSeleccionarDoctor={seleccionarDoctor}
@@ -586,6 +599,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   return (
     <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "mediclinic-clasico" : ""}`}>
+      <AuroraGradientDef />
       {modoClasico && <EstiloClasico />}
       
       <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1.5 bg-slate-50/50 dark:bg-black/10">
