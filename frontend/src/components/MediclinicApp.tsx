@@ -27,10 +27,44 @@ const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Elem
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
+// Modo visual "Clásico MediClinic" — opcional, apagado por defecto (Aurora se
+// mantiene como identidad principal). Reproduce la paleta propia que tenía
+// el MediClinic original (azul cielo/teal clínico) solo dentro de esta app,
+// sin tocar el resto de Aurora. Se activa desde el sidebar y se recuerda por
+// navegador.
+const MODO_CLASICO_KEY = "aurora_mediclinic_modo_clasico";
+
+function EstiloClasico() {
+  return (
+    <style>{`
+      .mediclinic-clasico { --mc-primary: #0ea5e9; --mc-secondary: #0d9488; }
+      .mediclinic-clasico .btn-electric-blue {
+        background: linear-gradient(135deg, #0ea5e9, #0d9488) !important;
+        box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
+      }
+      .mediclinic-clasico .text-teal-600, .mediclinic-clasico .text-teal-500,
+      .mediclinic-clasico .text-aurora { color: #0d9488 !important; }
+      .mediclinic-clasico :is(.dark) .text-teal-300, .mediclinic-clasico :is(.dark) .text-teal-400 { color: #38bdf8 !important; }
+      .mediclinic-clasico .bg-teal-500\\/15 { background-color: rgba(14,165,233,0.12) !important; }
+      .mediclinic-clasico .border-teal-500\\/30 { border-color: rgba(13,148,136,0.4) !important; }
+    `}</style>
+  );
+}
+
 export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const { user } = useAuth();
   const tenantId = user!.tenantId!;
   const [pagina, setPagina] = useState<Pagina>("general");
+  const [modoClasico, setModoClasico] = useState(() => {
+    try { return localStorage.getItem(MODO_CLASICO_KEY) === "1"; } catch { return false; }
+  });
+  const alternarModo = () => {
+    setModoClasico((v) => {
+      const nuevo = !v;
+      try { localStorage.setItem(MODO_CLASICO_KEY, nuevo ? "1" : "0"); } catch {}
+      return nuevo;
+    });
+  };
 
   const [pacientes, setPacientes] = useState<Paciente[] | null>(null);
   const [citasHoy, setCitasHoy] = useState<CitaMedica[] | null>(null);
@@ -51,12 +85,22 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   useEffect(() => { recargarTodo(); }, [tenantId]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex">
+    <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "mediclinic-clasico" : ""}`}>
+      {modoClasico && <EstiloClasico />}
       {/* SIDEBAR */}
       <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1">
-        <div className="px-2 pb-4 mb-2 border-b border-slate-300/60 dark:border-white/10">
-          <div className="font-['Outfit'] font-black text-lg text-aurora">Mediclinic Pro</div>
-          <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mt-0.5">Panel del Médico</div>
+        <div className="px-2 pb-4 mb-2 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between gap-2">
+          <div>
+            <div className="font-['Outfit'] font-black text-lg text-aurora">Mediclinic Pro</div>
+            <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mt-0.5">Panel del Médico</div>
+          </div>
+          <button
+            onClick={alternarModo}
+            title="Alternar entre la identidad Aurora y el look clásico de MediClinic"
+            className="text-[9px] font-bold px-2 py-1 rounded-full border border-slate-300 dark:border-white/15 text-slate-500 dark:text-white/50 hover:text-teal-600 dark:hover:text-teal-300 flex-shrink-0"
+          >
+            {modoClasico ? "Clásico" : "Aurora"}
+          </button>
         </div>
         {NAV.map((n) => (
           <button
