@@ -79,12 +79,24 @@ export default function Auth() {
         <div className="absolute w-[550px] h-[550px] rounded-full blur-[140px] bg-gradient-to-tr from-[#ff007f]/20 via-[#7928ca]/25 to-[#00f2fe]/20 -top-20" />
       </div>
 
+      {/* ── BOTÓN FLOTANTE SUPERIOR: VOLVER A PÁGINA PRINCIPAL ── */}
+      <button
+        type="button"
+        onClick={() => navigate("/")}
+        className="absolute top-6 left-6 z-30 apple-glass-pill px-4 py-2 rounded-full text-xs font-semibold text-white/80 hover:text-white hover:border-[#00FFC2]/60 hover:bg-white/10 transition-all duration-300 flex items-center gap-2 cursor-pointer group shadow-xl"
+        title="Volver a la página principal">
+        <svg className="w-4 h-4 transition-transform duration-300 group-hover:-translate-x-1 text-[#00FFC2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        <span>Volver a la página principal</span>
+      </button>
+
       {/* ── CONTENEDOR PRINCIPAL: TARJETA LIQUID GLASS ULTRA PREMIUM ── */}
-      <div className="relative z-10 w-full max-w-4xl apple-glass rounded-[32px] p-6 sm:p-10 shadow-[0_25px_70px_rgba(0,0,0,0.7)] border border-white/15">
+      <div className="relative z-10 w-full max-w-4xl apple-glass rounded-[32px] p-6 sm:p-10 shadow-[0_25px_70px_rgba(0,0,0,0.7)] border border-white/15 mt-10 sm:mt-0">
         
         {/* Barra superior de la tarjeta */}
         <div className="flex flex-wrap items-center justify-between gap-4 pb-8 mb-8 border-b border-white/10">
-          <button onClick={() => navigate("/")} className="flex items-center gap-3.5 group">
+          <button onClick={() => navigate("/")} className="flex items-center gap-3.5 group cursor-pointer" title="Ir a la página principal">
             <div className="p-2 rounded-2xl bg-white/5 border border-white/10 shadow-inner group-hover:scale-105 transition-transform duration-300">
               <AuroraLogo size={34} animated />
             </div>
@@ -98,30 +110,44 @@ export default function Auth() {
             </div>
           </button>
 
-          {/* Toggle pill mode: Iniciar sesión / Crear cuenta */}
-          <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1">
+          {/* Acciones de la barra superior: Volver a inicio + Toggle de modo */}
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
             <button
               type="button"
-              onClick={() => { setMode("login"); setErrors({}); }}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 flex items-center gap-1.5 ${
-                mode === "login"
-                  ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]"
-                  : "text-white/50 hover:text-white"
-              }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${mode === "login" ? "bg-teal-500 animate-pulse" : "bg-white/30"}`} />
-              Iniciar sesión
+              onClick={() => navigate("/")}
+              className="apple-glass-pill px-3.5 py-1.5 rounded-full text-xs font-semibold text-white/70 hover:text-white hover:border-[#00FFC2]/50 hover:bg-white/10 transition-all duration-300 flex items-center gap-1.5 cursor-pointer group shadow-sm"
+              title="Volver al inicio">
+              <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#00FFC2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span>Inicio</span>
             </button>
-            <button
-              type="button"
-              onClick={() => { setMode("register"); setErrors({}); }}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 flex items-center gap-1.5 ${
-                mode === "register"
-                  ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]"
-                  : "text-white/50 hover:text-white"
-              }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${mode === "register" ? "bg-[#00FFC2] animate-pulse" : "bg-white/30"}`} />
-              Registrarse
-            </button>
+
+            {/* Toggle pill mode: Iniciar sesión / Crear cuenta */}
+            <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => { setMode("login"); setErrors({}); }}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                  mode === "login"
+                    ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]"
+                    : "text-white/50 hover:text-white"
+                }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${mode === "login" ? "bg-teal-500 animate-pulse" : "bg-white/30"}`} />
+                Iniciar sesión
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode("register"); setErrors({}); }}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                  mode === "register"
+                    ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]"
+                    : "text-white/50 hover:text-white"
+                }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${mode === "register" ? "bg-[#00FFC2] animate-pulse" : "bg-white/30"}`} />
+                Registrarse
+              </button>
+            </div>
           </div>
         </div>
 
