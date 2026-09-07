@@ -285,7 +285,10 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
         <div className="px-2 pb-4 mb-2 border-b border-slate-300/60 dark:border-white/10">
           <div className="flex items-center justify-between">
             <div className="font-['Outfit'] font-black text-lg text-aurora">Aurora Horeca</div>
-            {kdsCounts > 0 && (
+            {/* El badge "N en cocina" depende del módulo KDS, que está
+                detrás del paywall Pro — en Plan Base no debe existir en
+                el DOM, ni siquiera oculto por CSS. */}
+            {PLAN_ACTUAL === ("PRO" as PlanLicencia) && kdsCounts > 0 && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 font-mono font-bold">{kdsCounts} en cocina</span>
             )}
           </div>
@@ -3335,7 +3338,15 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             flexbox) el hijo "flex-1 overflow-y-auto" de abajo no tiene un
             límite real de alto contra el cual hacer scroll — en vez de
             desplazarse, empuja/aplasta el pie de totales y cobro. */}
-        <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex lg:col-span-6 flex-1 min-w-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col h-full min-h-0 bg-white/30 dark:bg-black/10`}>
+        {/* overflow-y-auto de respaldo en el panel entero: en un viewport
+            bajo, cabecera (cliente) + piso de la lista (150px) + pie de
+            cobro (shrink-0, nunca se comprime) pueden sumar más alto que
+            el panel disponible. Sin esto, lo que no entra queda cortado
+            por el overflow-hidden del contenedor raíz del POS — el botón
+            "Cobrar y Cerrar" desaparece de la vista aunque siga en el DOM.
+            Con esto, en vez de desaparecer, el panel completo se puede
+            desplazar hasta él. */}
+        <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex lg:col-span-6 flex-1 min-w-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col h-full min-h-0 overflow-y-auto bg-white/30 dark:bg-black/10`}>
           {/* Cabecera: cliente CRM */}
           <div className="p-4 border-b border-slate-300/50 dark:border-white/10 flex-shrink-0">
             <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1.5">Cliente (opcional)</p>
