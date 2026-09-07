@@ -173,85 +173,102 @@ export default function Dashboard() {
         <div className="aurora-ribbon-2 top-1/3 -right-20 opacity-35" />
       </div>
 
-      {/* ── HEADER SUPERIOR DEL PORTAL DE CLIENTE ── */}
-      <header className="nav-glass border-b border-slate-300/60 dark:border-white/10 px-4 sm:px-8 h-18 flex items-center justify-between relative z-30 sticky top-0 transition-colors duration-500">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/")}>
-            <AuroraLogo size={34} animated />
+      {/* ── HEADER SUPERIOR DEL PORTAL DE CLIENTE: ULTRA PREMIUM APPLE GLASS ── */}
+      <header className="nav-glass border-b border-slate-300/60 dark:border-white/10 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-4 relative z-30 sticky top-0 transition-colors duration-500 backdrop-blur-2xl">
+        {/* Izquierda: Logo + Nombre del Hub + Empresa */}
+        <div className="flex items-center gap-3.5">
+          <button
+            onClick={() => navigate("/")}
+            className="flex items-center gap-3 cursor-pointer group text-left"
+          >
+            <div className="p-1.5 rounded-xl bg-white/5 border border-white/10 group-hover:scale-105 transition-transform">
+              <AuroraLogo size={32} animated />
+            </div>
             <div>
-              <div className="font-['Outfit'] font-black text-lg text-aurora leading-none">Aurora Hub</div>
-              <div className="text-slate-500 dark:text-white/40 text-[10px] tracking-wider uppercase mt-0.5">
-                {user?.empresa || "Portal de Empresa"}
+              <div className="font-['Outfit'] font-black text-lg text-aurora leading-none">
+                Aurora Hub
+              </div>
+              <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-medium flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                <span>{user?.empresa || "Clínica & Consultorios Médicos"}</span>
               </div>
             </div>
-          </div>
-
-          <div className="h-6 w-[1px] bg-slate-300 dark:bg-white/10 hidden md:block mx-1" />
-
-          {/* Selector de navegación del Dashboard */}
-          <div className="hidden md:flex items-center gap-1.5 apple-glass-pill rounded-full p-1 text-xs">
-            {esClinicaReal && (
-              <button
-                onClick={() => navigate("/mediclinic")}
-                className="btn-cyber-neon text-white text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-[0_0_15px_rgba(14,165,233,0.4)] hover:scale-105 transition-all"
-                title="Abrir Mediclinic Pro"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-teal-300 animate-pulse" />
-                <span>🚀 Abrir {vertical.name}</span>
-              </button>
-            )}
-            <button
-              onClick={() => setActiveTab("vertical")}
-              className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
-                activeTab === "vertical" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/70 hover:text-black dark:hover:text-white"
-              }`}>
-              <span className="inline-flex items-center gap-1.5"><VerticalIcon size={14} /> Mis Sistemas</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("billing")}
-              className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
-                activeTab === "billing" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/70 hover:text-black dark:hover:text-white"
-              }`}>
-              <span className="inline-flex items-center gap-1.5"><IconCard size={14} /> Facturación & Pagos</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("team")}
-              className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
-                activeTab === "team" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/70 hover:text-black dark:hover:text-white"
-              }`}>
-              <span className="inline-flex items-center gap-1.5"><IconUsers size={14} /> Equipo & Roles</span>
-            </button>
-            <button
-              onClick={() => navigate("/onboarding")}
-              title="Cambiar o configurar rubro"
-              className="px-2.5 py-1.5 rounded-full text-slate-500 dark:text-white/40 hover:text-teal-500 dark:hover:text-teal-300 font-medium transition-all text-[11px]">
-              <span className="inline-flex items-center gap-1.5"><IconCustomize size={13} /> Cambiar Rubro</span>
-            </button>
-          </div>
+          </button>
         </div>
 
+        {/* Centro: Pestañas de Navegación en 1 sola línea fluida (Segmented Pill) */}
+        <nav className="flex items-center gap-1.5 apple-glass-pill rounded-full p-1.5 border border-slate-300/80 dark:border-white/15 bg-slate-100/90 dark:bg-white/[0.04] shadow-inner text-xs overflow-x-auto whitespace-nowrap">
+          <button
+            onClick={() => setActiveTab("vertical")}
+            className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+              activeTab === "vertical"
+                ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
+                : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
+            }`}>
+            <VerticalIcon size={15} />
+            <span>Mis Sistemas</span>
+          </button>
 
-        {/* Estado de Suscripción & Perfil */}
-        <div className="flex items-center gap-3">
-          {/* Badge de Licencia */}
-          <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold ${
+          <button
+            onClick={() => setActiveTab("billing")}
+            className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+              activeTab === "billing"
+                ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
+                : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
+            }`}>
+            <IconCard size={15} />
+            <span>Facturación & Pagos</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("team")}
+            className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+              activeTab === "team"
+                ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
+                : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
+            }`}>
+            <IconUsers size={15} />
+            <span>Equipo & Roles</span>
+          </button>
+
+          <button
+            onClick={() => navigate("/onboarding")}
+            title="Cambiar o explorar otras verticales de Aurora"
+            className="px-3.5 py-2 rounded-full font-medium transition-all duration-300 text-slate-500 dark:text-white/40 hover:text-teal-500 dark:hover:text-teal-300 hover:bg-white/40 dark:hover:bg-white/8 flex items-center gap-1.5 text-xs">
+            <IconCustomize size={14} />
+            <span>Cambiar Rubro</span>
+          </button>
+        </nav>
+
+        {/* Derecha: Botón Directo a Mediclinic + Estado + Salir */}
+        <div className="flex items-center gap-2.5 whitespace-nowrap">
+          {/* Botón Destacado: Entrar a Mediclinic Pro */}
+          {esClinicaReal && (
+            <button
+              onClick={() => navigate("/mediclinic")}
+              className="btn-cyber-neon text-white text-xs font-extrabold px-4 py-2 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.5)] hover:scale-105 transition-all cursor-pointer"
+              title="Abrir el entorno clínico de Mediclinic Pro"
+            >
+              <span className="w-2 h-2 rounded-full bg-teal-300 animate-pulse" />
+              <span>Entrar a Mediclinic Pro →</span>
+            </button>
+          )}
+
+          {/* Badge de Licencia compacto en 1 línea */}
+          <div className={`hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold ${
             isTrial
               ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
               : "bg-teal-500/10 border-teal-500/30 text-teal-700 dark:text-teal-300"
           }`}>
             <span className={`w-2 h-2 rounded-full ${isTrial ? "bg-amber-400 animate-ping" : "bg-teal-400"}`} />
-            <span>{isTrial ? `Trial (${daysLeft} días restantes)` : "Licencia ACTIVA Pro"}</span>
+            <span>{isTrial ? `Trial (${daysLeft}d)` : "Plan Activo"}</span>
           </div>
 
           <button
-            onClick={() => setShowPaymentModal(true)}
-            className="btn-electric-blue text-xs font-bold px-4 py-2 rounded-full cursor-pointer shadow-md">
-            {isTrial ? "Activar Plan Pro" : "Gestionar Pago"}
-          </button>
-
-          <button
             onClick={logout}
-            className="apple-glass-btn text-xs font-semibold px-3.5 py-2 rounded-full text-slate-700 dark:text-white/80 cursor-pointer">
+            className="apple-glass-btn text-xs font-semibold px-3.5 py-2 rounded-full text-slate-700 dark:text-white/70 hover:text-red-500 dark:hover:text-red-400 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer"
+            title="Cerrar sesión de Aurora"
+          >
             Salir
           </button>
         </div>
@@ -260,27 +277,27 @@ export default function Dashboard() {
       {/* ── CONTENIDO PRINCIPAL ── */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10 space-y-8">
         
-        {/* BARRA DE RECORDATORIO DE TRIAL / PAGO */}
+        {/* BARRA DE RECORDATORIO DE TRIAL / PAGO (DISEÑO PREMIUM EN 1 LÍNEA) */}
         {isTrial && (
-          <div className="apple-glass border-l-4 border-l-teal-500 rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 shadow-md">
+          <div className="apple-glass rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border border-teal-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.06)] bg-gradient-to-r from-teal-500/10 via-transparent to-purple-500/10 backdrop-blur-xl">
             <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-teal-500/15 text-teal-600 dark:text-teal-300 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-600 dark:text-teal-300 flex items-center justify-center shadow-inner flex-shrink-0">
                 <IconHourglass size={20} />
               </div>
               <div>
                 <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
                   Estás disfrutando de tu prueba gratuita de {vertical.name}
                 </h4>
-                <p className="text-slate-500 dark:text-white/45 text-xs mt-0.5">
-                  Te quedan <strong className="text-teal-600 dark:text-teal-400">{daysLeft} días</strong> de acceso completo. Tus historias clínicas y datos quedarán guardados de forma permanente.
+                <p className="text-slate-500 dark:text-white/50 text-xs mt-0.5">
+                  Te quedan <strong className="text-teal-600 dark:text-teal-400 font-bold">{daysLeft} días</strong> de acceso completo. Tus datos e historias clínicas se guardan permanentemente.
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowPaymentModal(true)}
-                className="g-aurora text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer hover:opacity-90">
-                Pagar Suscripción ($35/mes) →
+                className="btn-electric-blue text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md cursor-pointer hover:scale-105 transition-all">
+                Activar Plan Pro ($35/mes) →
               </button>
             </div>
           </div>
@@ -290,67 +307,68 @@ export default function Dashboard() {
         {activeTab === "vertical" && (
           <div className="space-y-8">
             
-            {/* HERO LAUNCHER CARD */}
-            <div className="relative apple-glass rounded-3xl p-6 sm:p-8 overflow-hidden shadow-xl border border-teal-500/20">
+            {/* HERO LAUNCHER CARD — DISEÑO REDONDEADO Y ELEGANTE ESTILO APPLE LIQUID GLASS */}
+            <div className="relative apple-glass rounded-[32px] p-6 sm:p-9 overflow-hidden shadow-2xl border border-teal-500/30 bg-gradient-to-br from-slate-900/95 via-[#0c1424]/95 to-slate-900/95 backdrop-blur-2xl">
               <div className="line-aurora absolute top-0 left-0 right-0" />
               
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                <div className="lg:col-span-8 space-y-4 text-left">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-xs font-bold text-teal-600 dark:text-teal-300">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+                {/* Lado Izquierdo: Presentación y Botones Principales */}
+                <div className="lg:col-span-7 space-y-5 text-left">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-500/15 border border-teal-500/30 text-xs font-extrabold text-teal-300 tracking-wider uppercase shadow-xs">
+                    <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
                     <span>{vertical.badge}</span>
                   </div>
 
-                  <h2 className="font-['Outfit'] font-black text-3xl sm:text-4xl text-slate-900 dark:text-white leading-tight">
-                    {vertical.name} — Centro de Operaciones
+                  <h2 className="font-['Outfit'] font-black text-3xl sm:text-4xl text-white leading-tight tracking-tight">
+                    <span className="text-aurora">{vertical.name}</span> — Centro de Operaciones
                   </h2>
 
-                  <p className="text-slate-600 dark:text-white/60 text-sm sm:text-base leading-relaxed max-w-2xl">
-                    {vertical.desc} Administra consultas, pacientes, especialistas, citas y recetas desde la nube o sincroniza sin internet en tu consultorio.
+                  <p className="text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
+                    {vertical.desc} Administra consultas médicas, historias clínicas, agenda de especialistas, sala de espera reactiva y cotizaciones multi-moneda en tiempo real.
                   </p>
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">
                     <button
                       onClick={() => navigate("/mediclinic")}
-                      className="btn-electric-blue text-xs sm:text-sm font-bold px-6 py-3 rounded-full flex items-center gap-2 shadow-lg cursor-pointer hover:scale-105 transition-all">
-                      <IconRocket size={15} />
-                      <span>Entrar a {vertical.name} (Cloud Web)</span>
-                      <span>→</span>
+                      className="btn-cyber-neon text-white text-xs sm:text-sm font-extrabold px-7 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_0_30px_rgba(255,59,128,0.5)] cursor-pointer hover:scale-105 transition-all">
+                      <IconRocket size={17} />
+                      <span>Entrar a Mediclinic Pro (Cloud Web)</span>
+                      <span className="text-base">→</span>
                     </button>
 
                     <a
                       href="https://github.com"
                       target="_blank"
                       rel="noreferrer"
-                      className="apple-glass-btn text-xs sm:text-sm font-semibold px-5 py-3 rounded-full flex items-center gap-2 text-slate-800 dark:text-white cursor-pointer">
+                      className="apple-glass-btn text-xs sm:text-sm font-semibold px-5 py-3.5 rounded-2xl flex items-center gap-2 text-white/90 hover:text-white border border-white/15 cursor-pointer hover:border-teal-400/40 transition-all">
                       <IconDownload size={15} />
                       <span>Descargar para Windows (.exe)</span>
                     </a>
 
                     <button
                       onClick={() => alert("Tu API Token de Licencia: AURORA-MED-PRO-9842-SECURE")}
-                      className="apple-glass-btn text-xs font-mono px-4 py-3 rounded-full text-slate-600 dark:text-white/60 cursor-pointer flex items-center gap-2">
+                      className="apple-glass-btn text-xs font-mono px-4 py-3.5 rounded-2xl text-white/60 hover:text-white border border-white/10 cursor-pointer flex items-center gap-2 transition-all">
                       <IconKey size={14} />
                       <span>Clave de Licencia</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Métricas destacadas del día — reales para Mediclinic Pro cuando hay
-                    sesión de un tenant real; el resto de verticales aún es demo. */}
-                <div className="lg:col-span-4 grid grid-cols-2 gap-3">
+                {/* Lado Derecho: Métricas Reales en Grid 2x2 Estilo Glassmorphism */}
+                <div className="lg:col-span-5 grid grid-cols-2 gap-3.5">
                   {(esClinicaReal
                     ? [
-                        { label: "Pacientes Registrados", val: pacientesReales ? String(pacientesReales.length) : "…", change: "Total en el consultorio", color: "text-teal-500 dark:text-teal-400" },
-                        { label: "Citas de Hoy", val: citasReales ? String(citasReales.length) : "…", change: citasReales ? `${citasReales.filter(c => c.estado === "CONFIRMADA").length} confirmadas` : "", color: "text-sky-500 dark:text-sky-400" },
-                        { label: "Ingresos del Día", val: ingresosHoy !== null ? `$${ingresosHoy.toFixed(2)}` : "…", change: "Multi-moneda (USD/VES/COP)", color: "text-purple-500 dark:text-purple-400" },
-                        { label: "Módulo Farmacia", val: "—", change: "Próximamente", color: "text-amber-500 dark:text-amber-400" },
+                        { label: "Pacientes Registrados", val: pacientesReales ? String(pacientesReales.length) : "0", change: "Total en el consultorio", color: "text-teal-400" },
+                        { label: "Citas de Hoy", val: citasReales ? String(citasReales.length) : "0", change: citasReales ? `${citasReales.filter(c => c.estado === "CONFIRMADA").length} confirmadas` : "0 confirmadas", color: "text-sky-400" },
+                        { label: "Ingresos del Día", val: ingresosHoy !== null ? `$${ingresosHoy.toFixed(2)}` : "$0.00", change: "Multi-moneda (USD/VES/COP)", color: "text-purple-400" },
+                        { label: "Módulo Farmacia", val: "Activo", change: "Control de insumos", color: "text-amber-400" },
                       ]
                     : vertical.stats
                   ).map((s) => (
-                    <div key={s.label} className="apple-glass rounded-2xl p-4 text-left border border-white/10 shadow-sm">
-                      <div className="text-slate-500 dark:text-white/40 text-[11px] font-medium leading-tight">{s.label}</div>
-                      <div className={`font-['Outfit'] font-black text-2xl mt-1 ${s.color}`}>{s.val}</div>
-                      <div className="text-[10px] text-slate-400 dark:text-white/30 mt-0.5">{s.change}</div>
+                    <div key={s.label} className="apple-glass rounded-2xl p-4 sm:p-5 text-left border border-white/10 shadow-md hover:border-teal-400/40 transition-all duration-300">
+                      <div className="text-white/50 text-[11px] font-medium leading-tight">{s.label}</div>
+                      <div className={`font-['Outfit'] font-black text-2xl sm:text-3xl mt-1.5 ${s.color}`}>{s.val}</div>
+                      <div className="text-[10px] text-white/40 mt-1">{s.change}</div>
                     </div>
                   ))}
                 </div>
