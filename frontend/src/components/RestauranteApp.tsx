@@ -2863,6 +2863,11 @@ function TasasDeCambio({ tenantId }: { tenantId: number }) {
 // ══════════════════════════════════════════════════════════════════════════
 // VENTA RÁPIDA — para lo que no pasa por una mesa (mostrador, para llevar)
 // ══════════════════════════════════════════════════════════════════════════
+interface ItemCatalogo {
+  key: string; tipo: "articulo" | "receta" | "fastbar"; id: number; nombre: string; precio: number; categoria: string;
+  unidadMedida?: string; stockActual?: number; estacionCocina?: string; sku?: string;
+}
+
 const CATEGORIA_RECETAS = "__RECETAS__";
 const CATEGORIA_FASTBAR = "__FASTBAR__";
 
@@ -2875,12 +2880,8 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   // muestra) en vez de como modal flotante independiente.
   embebido?: boolean; tasaValida?: boolean; onRegistrarTasa?: () => void;
 }) {
-  interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
+  interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string; notas?: string }
   interface ReciboVenta { comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string }
-  interface ItemCatalogo {
-    key: string; tipo: "articulo" | "receta" | "fastbar"; id: number; nombre: string; precio: number; categoria: string;
-    unidadMedida?: string; stockActual?: number; estacionCocina?: string; sku?: string;
-  }
 
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
   // Por debajo de "lg" no hay espacio para catálogo + comanda lado a lado
@@ -2896,6 +2897,11 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   const [imprimiendoEscPos, setImprimiendoEscPos] = useState(false);
   const [moneda, setMoneda] = useState("USD");
   const [mostrarProductoLibre, setMostrarProductoLibre] = useState(false);
+  // Panel de detalle del ítem — se abre SIEMPRE al elegir un producto del
+  // catálogo (clic en la tarjeta o Enter sobre el buscador); nunca se
+  // agrega una unidad de una sola vez sin pasar por acá a confirmar
+  // cantidad y notas.
+  const [itemDetalle, setItemDetalle] = useState<ItemCatalogo | null>(null);
   const [nombreLibre, setNombreLibre] = useState("");
   const [precioLibre, setPrecioLibre] = useState("");
   const [cantidadLibre, setCantidadLibre] = useState("1");
@@ -2973,24 +2979,42 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   };
   const quitarLinea = (key: string) => setCarrito((prev) => prev.filter((l) => l.key !== key));
 
-  // Click en la tarjeta del catálogo = agregado instantáneo al carrito
-  // (cantidad 1) — mismo camino que usaría un escáner de código de barras.
-  const agregarDesdeTarjeta = (item: ItemCatalogo) => {
+  // Elegir un producto del catálogo (clic en la tarjeta o Enter sobre el
+  // buscador) SIEMPRE abre el panel de detalle a confirmar cantidad/notas
+  // — nunca agrega una unidad de una sola vez sin pasar por ahí.
+  const abrirDetalleItem = (item: ItemCatalogo) => {
     setError(null);
+    setItemDetalle(item);
+  };
+
+  // Suma TODAS las líneas del carrito que vienen de este artículo (una nota
+  // distinta crea una línea nueva en vez de mezclar cantidades), no solo la
+  // que coincide en texto exacto — si no, dos líneas con distinta nota del
+  // mismo artículo podrían juntas superar el stock sin que se detecte.
+  const yaEnCarritoDe = (item: ItemCatalogo) =>
+    item.tipo === "articulo" ? carrito.filter((l) => l.articuloId === item.id).reduce((s, l) => s + l.cantidad, 0) : 0;
+
+  const confirmarDetalleItem = (cantidad: number, notas: string) => {
+    const item = itemDetalle;
+    if (!item) return;
     if (item.tipo === "articulo") {
-      const yaEnCarrito = carrito.find((l) => l.key === item.key)?.cantidad || 0;
-      if (yaEnCarrito + 1 > (item.stockActual ?? 0)) {
+      const yaEnCarrito = yaEnCarritoDe(item);
+      if (yaEnCarrito + cantidad > (item.stockActual ?? 0)) {
         setError(`Solo hay ${item.stockActual} ${item.unidadMedida} disponibles de ${item.nombre} en inventario`);
         return;
       }
     }
+    const notaLimpia = notas.trim();
     agregarConCantidad({
-      key: item.key, nombre: item.nombre, precio: item.precio,
+      key: notaLimpia ? `${item.key}-nota-${notaLimpia.toLowerCase()}` : item.key,
+      nombre: notaLimpia ? `${item.nombre} (${notaLimpia})` : item.nombre, precio: item.precio,
       articuloId: item.tipo === "articulo" ? item.id : undefined,
       escandalloId: item.tipo === "receta" ? item.id : undefined,
       estacionCocina: item.tipo === "receta" ? item.estacionCocina : item.tipo === "fastbar" ? "BAR" : undefined,
-    }, 1);
+      notas: notaLimpia || undefined,
+    }, cantidad);
     setBusqueda("");
+    setItemDetalle(null);
   };
 
   // Producto libre: para lo que no está en el catálogo (o necesita un precio
@@ -3098,7 +3122,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
 
   return (
     <div className={embebido
-      ? "apple-glass rounded-2xl flex flex-col h-[640px] overflow-hidden"
+      ? "relative apple-glass rounded-2xl flex flex-col h-[640px] overflow-hidden"
       : "fixed inset-0 z-40 bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col"}>
       {/* HEADER OPERATIVO — solo en el overlay de pantalla completa; embebida
           en la Vista General, el dashboard ya trae su propio header con la
@@ -3173,7 +3197,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               onKeyDown={(e) => {
                 if (e.key !== "Enter") return;
                 e.preventDefault();
-                if (catalogoFiltrado.length >= 1) agregarDesdeTarjeta(catalogoFiltrado[0]);
+                if (catalogoFiltrado.length >= 1) abrirDetalleItem(catalogoFiltrado[0]);
               }}
               placeholder="Buscar o escanear código de barras… ej. Torta de Queso, Doritos, Mojito"
               className="input-horeca w-full pl-9 pr-8"
@@ -3211,7 +3235,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 {catalogoFiltrado.map((item) => {
                   const sinStock = item.tipo === "articulo" && (item.stockActual ?? 0) <= 0;
                   return (
-                    <button key={item.key} type="button" disabled={sinStock} onClick={() => agregarDesdeTarjeta(item)}
+                    <button key={item.key} type="button" disabled={sinStock} onClick={() => abrirDetalleItem(item)}
                       className={`apple-glass rounded-xl p-3.5 text-left transition-all border border-transparent ${
                         sinStock ? "opacity-40 cursor-not-allowed" : "hover:border-teal-500/40 hover:scale-[1.02] cursor-pointer active:scale-[0.98]"
                       }`}>
@@ -3323,6 +3347,16 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
         </div>
       </div>
 
+      {itemDetalle && (
+        <ItemDetailSidebar
+          key={itemDetalle.key}
+          item={itemDetalle}
+          yaEnCarrito={yaEnCarritoDe(itemDetalle)}
+          onCancelar={() => setItemDetalle(null)}
+          onConfirmar={confirmarDetalleItem}
+        />
+      )}
+
       {mostrarProductoLibre && (
         <Modal onClose={() => setMostrarProductoLibre(false)} titulo="Producto libre">
           <div className="space-y-3">
@@ -3399,6 +3433,122 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/**
+ * Panel flotante de detalle del ítem — se abre SIEMPRE al elegir un
+ * producto del catálogo (nunca se agrega 1 unidad de una sola vez sin
+ * pasar por acá) para confirmar cantidad y notas antes de sumarlo a la
+ * comanda. Se desliza desde el borde derecho, ocupando una franja ancha
+ * (~38% en desktop) en vez de un modal centrado angosto.
+ */
+function ItemDetailSidebar({ item, yaEnCarrito, onCancelar, onConfirmar }: {
+  item: ItemCatalogo; yaEnCarrito: number; onCancelar: () => void; onConfirmar: (cantidad: number, notas: string) => void;
+}) {
+  const esArticulo = item.tipo === "articulo";
+  const esFraccionable = esArticulo && ["kg", "g", "l", "ml"].includes(item.unidadMedida || "");
+  const paso = esFraccionable ? 0.1 : 1;
+  const stockDisponible = esArticulo ? Math.max(0, (item.stockActual ?? 0) - yaEnCarrito) : null;
+
+  const [cantidad, setCantidad] = useState(paso);
+  const [notas, setNotas] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  // Un frame después de montar, para que la transición de deslizamiento
+  // realmente se vea (si arranca ya en su posición final, no hay nada que animar).
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const cerrar = () => { setVisible(false); setTimeout(onCancelar, 150); };
+
+  const bajar = () => setCantidad((c) => Math.max(paso, Number((c - paso).toFixed(3))));
+  const subir = () => setCantidad((c) => Number((c + paso).toFixed(3)));
+
+  const confirmar = () => {
+    if (!cantidad || cantidad <= 0) { setError("Indica una cantidad válida"); return; }
+    if (stockDisponible !== null && cantidad > stockDisponible) {
+      setError(`Solo hay ${stockDisponible} ${item.unidadMedida} disponibles de ${item.nombre} en inventario`);
+      return;
+    }
+    onConfirmar(cantidad, notas);
+  };
+
+  const subtotal = cantidad * item.precio;
+
+  return (
+    <div className="absolute inset-0 z-50 flex justify-end">
+      <div className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`} onClick={cerrar} />
+      {/* apple-glass (no bg-white/dark:bg-slate-900 a mano): es la única
+          clase de fondo en esta app que ya se resuelve bien en los tres
+          modos de color soportados (oscuro real, claro real y Modo
+          Clásico) — un fondo armado a mano acá se ve bien en un modo y
+          deja texto invisible en otro. */}
+      <div className={`relative w-full sm:w-[380px] lg:w-[38%] max-w-[460px] h-full apple-glass shadow-2xl flex flex-col transition-transform duration-200 ease-out ${
+        visible ? "translate-x-0" : "translate-x-full"
+      }`}>
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-200 dark:border-white/10 flex-shrink-0">
+          <span className={`text-[9px] font-bold px-2 py-1 rounded-full ${
+            item.tipo === "receta" ? "bg-purple-500/15 text-purple-600 dark:text-purple-300"
+            : item.tipo === "fastbar" ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"
+            : "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+          }`}>{item.tipo === "receta" ? "RECETA" : item.tipo === "fastbar" ? "FAST-BAR" : "INVENTARIO"}</span>
+          <button onClick={cerrar} className="text-slate-400 hover:text-red-500 cursor-pointer"><IconClose size={20} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-7">
+          <div>
+            <h3 className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white leading-tight">{item.nombre}</h3>
+            <p className="text-xl font-mono font-bold text-teal-600 dark:text-teal-400 mt-1.5">
+              ${item.precio.toFixed(2)} <span className="text-xs text-slate-400 dark:text-white/40 font-sans font-normal">c/u</span>
+            </p>
+            {esArticulo && (
+              <p className={`text-xs mt-1.5 font-semibold ${stockDisponible === 0 ? "text-red-500" : "text-slate-400 dark:text-white/40"}`}>
+                {stockDisponible} {item.unidadMedida} disponibles
+              </p>
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2.5">Cantidad</p>
+            <div className="flex items-center gap-3">
+              <button onClick={bajar} title="Restar"
+                className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-white/10 text-2xl font-bold text-slate-700 dark:text-white/80 hover:bg-slate-200 dark:hover:bg-white/20 cursor-pointer flex items-center justify-center flex-shrink-0">−</button>
+              <input value={cantidad} onChange={(e) => setCantidad(Number(e.target.value) || 0)} type="number" min="0" step={paso}
+                className="input-horeca flex-1 text-center text-2xl font-black h-14" />
+              <button onClick={subir} title="Sumar"
+                className="w-14 h-14 rounded-2xl bg-teal-600 text-white text-2xl font-bold hover:bg-teal-700 cursor-pointer flex items-center justify-center flex-shrink-0">+</button>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2.5">Notas / modificadores (opcional)</p>
+            <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3}
+              placeholder="Ej. sin cebolla, extra picante, para llevar…"
+              className="input-horeca w-full resize-none text-sm" />
+          </div>
+
+          {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
+        </div>
+
+        <div className="flex-shrink-0 p-5 border-t border-slate-200 dark:border-white/10 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-slate-500 dark:text-white/40">Subtotal</span>
+            <span className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">${subtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={cerrar} className="flex-1 apple-glass-btn text-sm font-bold py-4 rounded-xl cursor-pointer">Cancelar</button>
+            <button onClick={confirmar} disabled={stockDisponible === 0}
+              className="flex-[2] g-aurora text-white text-sm font-bold py-4 rounded-xl cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+              Añadir · {cantidad} × ${item.precio.toFixed(2)} = ${subtotal.toFixed(2)}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
