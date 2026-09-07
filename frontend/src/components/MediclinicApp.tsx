@@ -4846,17 +4846,70 @@ function SalaEspera({
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// AGENDA MÉDICA & CALENDARIO MENSUAL CON BLOQUEO DE FECHAS
+// AGENDA MÉDICA & CALENDARIO MENSUAL CON BLOQUEO DE FECHAS & GESTIÓN SINCRONIZADA
 // ══════════════════════════════════════════════════════════════════════════
-function AgendaMedica({ tenantId, pacientes, citasHoy, onCambio }: {
-  tenantId: number; pacientes: Paciente[] | null; citasHoy: CitaMedica[] | null; onCambio: () => void;
+
+export interface CitaAgendaItem {
+  id: string;
+  pacienteId?: number | null;
+  pacienteNombre: string;
+  pacienteCedula: string;
+  pacienteTelefono: string;
+  fecha: string; // YYYY-MM-DD
+  hora: string;  // e.g. "09:00 AM"
+  motivo: string;
+  estado: "PROGRAMADA" | "CONFIRMADA" | "CANCELADA" | "ATENDIDA";
+  creadoEn: string;
+}
+
+const CITAS_STORE_KEY = "aurora_mediclinic_citas_store_v2";
+
+const HORAS_DISPONIBLES_AGENDA = [
+  "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM",
+  "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
+  "12:00 PM", "01:00 PM", "01:30 PM", "02:00 PM",
+  "02:30 PM", "03:00 PM", "03:30 PM", "04:00 PM",
+  "04:30 PM", "05:00 PM", "05:30 PM", "06:00 PM",
+];
+
+const MESES_NOMBRES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+];
+
+const DIAS_SEMANA_HEADERS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
+
+function AgendaMedica({
+  tenantId,
+  pacientes,
+  citasHoy,
+  onCambio,
+}: {
+  tenantId: number;
+  pacientes: Paciente[] | null;
+  citasHoy: CitaMedica[] | null;
+  onCambio: () => void;
 }) {
-  const [tipoAgenda, setTipoAgenda] = useState<"existente" | "nuevo">("existente");
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(hoy());
-  
-  const [formExistente, setFormExistente] = useState({ pacienteId: "", horaInicio: "09:00", horaFin: "09:30", motivo: "" });
-  const [formNuevo, setFormNuevo] = useState({ identificacion: "", nombres: "", apellidos: "", telefono: "", horaInicio: "10:00", horaFin: "10:30", motivo: "" });
-  
+  // Fecha seleccionada actual (YYYY-MM-DD)
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(() => hoy());
+
+  // Mes y Año en visualización del calendario
+  const [mesActual, setMesActual] = useState<number>(() => new Date().getMonth());
+  const [añoActual, setAñoActual] = useState<number>(() => new Date().getFullYear());
+
+  // Store de Citas
+  const [citas, setCitas] = useState<CitaAgendaItem[]>(() => {
+    try {
+      const raw = localStorage.getItem(CITAS_STORE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  // Fechas bloqueadas (días no laborables / feriados / congresos)
   const [fechasBloqueadas, setFechasBloqueadas] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(FECHAS_BLOQUEADAS_KEY);
@@ -4864,199 +4917,901 @@ function AgendaMedica({ tenantId, pacientes, citasHoy, onCambio }: {
     } catch { return []; }
   });
 
+  // Formulario Agendar Cita
+  const [formCedula, setFormCedula] = useState("");
+  const [formNombres, setFormNombres] = useState("");
+  const [formApellidos, setFormApellidos] = useState("");
+  const [formTelefono, setFormTelefono] = useState("");
+  const [formHora, setFormHora] = useState("09:00 AM");
+  const [formMotivo, setFormMotivo] = useState("");
   const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [toastAgenda, setToastAgenda] = useState<string | null>(null);
 
-  const toggleBloquearFecha = (f: string) => {
-    setFechasBloqueadas((prev) => {
-      const next = prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f];
-      try { localStorage.setItem(FECHAS_BLOQUEADAS_KEY, JSON.stringify(next)); } catch {}
-      return next;
+  // Modal Reprogramar Cita
+  const [citaParaReprogramar, setCitaParaReprogramar] = useState<CitaAgendaItem | null>(null);
+  const [reprogFecha, setReprogFecha] = useState("");
+  const [reprogHora, setReprogHora] = useState("09:00 AM");
+
+  const dispararToast = (msg: string) => {
+    setToastAgenda(msg);
+    setTimeout(() => setToastAgenda(null), 3500);
+  };
+
+  // Guardar en localStorage y sincronizar en tiempo real entre Doctor y Secretaria
+  const guardarCitasStore = (nuevasCitas: CitaAgendaItem[]) => {
+    setCitas(nuevasCitas);
+    try {
+      localStorage.setItem(CITAS_STORE_KEY, JSON.stringify(nuevasCitas));
+      window.dispatchEvent(new Event("aurora_agenda_updated"));
+    } catch {}
+    onCambio();
+  };
+
+  // Listener para sincronización simultánea e instantánea entre roles y ventanas
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const raw = localStorage.getItem(CITAS_STORE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setCitas(parsed);
+        }
+        const rawBloq = localStorage.getItem(FECHAS_BLOQUEADAS_KEY);
+        if (rawBloq) setFechasBloqueadas(JSON.parse(rawBloq));
+      } catch {}
+    };
+
+    window.addEventListener("storage", handleSync);
+    window.addEventListener("aurora_agenda_updated", handleSync);
+    return () => {
+      window.removeEventListener("storage", handleSync);
+      window.removeEventListener("aurora_agenda_updated", handleSync);
+    };
+  }, []);
+
+  // Navegación de Meses
+  const mesAnterior = () => {
+    if (mesActual === 0) {
+      setMesActual(11);
+      setAñoActual((a) => a - 1);
+    } else {
+      setMesActual((m) => m - 1);
+    }
+  };
+
+  const mesSiguiente = () => {
+    if (mesActual === 11) {
+      setMesActual(0);
+      setAñoActual((a) => a + 1);
+    } else {
+      setMesActual((m) => m + 1);
+    }
+  };
+
+  const irAHoy = () => {
+    const hoyDate = new Date();
+    setMesActual(hoyDate.getMonth());
+    setAñoActual(hoyDate.getFullYear());
+    setFechaSeleccionada(hoy());
+  };
+
+  // Bloquear / Desbloquear fecha seleccionada
+  const toggleBloqueoFecha = (f: string) => {
+    const yaBloqueada = fechasBloqueadas.includes(f);
+    const nuevas = yaBloqueada ? fechasBloqueadas.filter((x) => x !== f) : [...fechasBloqueadas, f];
+    setFechasBloqueadas(nuevas);
+    try {
+      localStorage.setItem(FECHAS_BLOQUEADAS_KEY, JSON.stringify(nuevas));
+      window.dispatchEvent(new Event("aurora_agenda_updated"));
+    } catch {}
+    dispararToast(yaBloqueada ? `✓ Fecha ${f} desbloqueada para consultas.` : `🔒 Fecha ${f} bloqueada (No laborable).`);
+    onCambio();
+  };
+
+  const estaBloqueadaSeleccionada = fechasBloqueadas.includes(fechaSeleccionada);
+
+  // Estado de paciente detectado automáticamente
+  const [pacienteDetectado, setPacienteDetectado] = useState<{
+    nombre: string;
+    cedula: string;
+    telefono: string;
+    origen: string;
+  } | null>(null);
+
+  const autoDetectarPaciente = (queryRaw: string) => {
+    const qTrim = queryRaw.trim();
+    if (!qTrim || qTrim.length < 3) {
+      setPacienteDetectado(null);
+      return;
+    }
+
+    const cleanQ = qTrim.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const rawDigitsQ = qTrim.replace(/\D/g, "");
+
+    // Función de comparación flexible de identificaciones
+    const coincide = (idVal?: string | null) => {
+      if (!idVal) return false;
+      const str = idVal.trim().toLowerCase();
+      const cleanStr = str.replace(/[^a-z0-9]/g, "");
+      const rawDigitsStr = str.replace(/\D/g, "");
+      return (
+        cleanStr === cleanQ ||
+        (rawDigitsQ.length >= 4 && rawDigitsStr === rawDigitsQ) ||
+        (rawDigitsQ.length >= 5 && rawDigitsStr.endsWith(rawDigitsQ)) ||
+        str === qTrim.toLowerCase()
+      );
+    };
+
+    // 1. Buscar en lista de pacientes recibida por props
+    if (pacientes && Array.isArray(pacientes)) {
+      const match = pacientes.find((p) => coincide(p.identificacion));
+      if (match) {
+        llenarCamposConPaciente(match.nombreCompleto, match.identificacion, match.telefono, "Base de Datos");
+        return;
+      }
+    }
+
+    // 2. Buscar en Historias Clínicas y Pacientes guardados en localStorage
+    const clavesHistorias = [
+      "aurora_mediclinic_historias_v2",
+      "aurora_mediclinic_historias",
+      "aurora_mediclinic_historias_locales",
+      "aurora_mediclinic_pacientes"
+    ];
+    for (const key of clavesHistorias) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const found = list.find((item: any) =>
+              coincide(item.pacienteCedula || item.cedula || item.identificacion || item.idCard)
+            );
+            if (found) {
+              const nom = found.pacienteNombre || found.nombreCompleto || `${found.nombres || ""} ${found.apellidos || ""}`.trim();
+              const ced = found.pacienteCedula || found.cedula || found.identificacion || qTrim;
+              const tel = found.pacienteTelefono || found.telefono || found.phone || "";
+              if (nom) {
+                llenarCamposConPaciente(nom, ced, tel, "Historia Clínica");
+                return;
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Buscar en Citas previas o Sala de Espera
+    const clavesOtras = [CITAS_STORE_KEY, SALA_ESPERA_TURNOS_KEY, "aurora_mediclinic_presupuestos"];
+    for (const key of clavesOtras) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const found = list.find((item: any) =>
+              coincide(item.pacienteCedula || item.cedula)
+            );
+            if (found) {
+              const nom = found.pacienteNombre || `${found.nombres || ""} ${found.apellidos || ""}`.trim();
+              const ced = found.pacienteCedula || found.cedula || qTrim;
+              const tel = found.pacienteTelefono || found.telefono || "";
+              if (nom) {
+                llenarCamposConPaciente(nom, ced, tel, "Registro Previo");
+                return;
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    setPacienteDetectado(null);
+  };
+
+  const llenarCamposConPaciente = (nombreCompleto: string, cedula: string, telefono: string, origen: string) => {
+    const partes = nombreCompleto.trim().split(" ");
+    if (partes.length >= 2) {
+      setFormNombres(partes.slice(0, Math.ceil(partes.length / 2)).join(" "));
+      setFormApellidos(partes.slice(Math.ceil(partes.length / 2)).join(" "));
+    } else {
+      setFormNombres(nombreCompleto.trim());
+      setFormApellidos("");
+    }
+    if (telefono && telefono !== "S/T") {
+      setFormTelefono(telefono);
+    }
+    setPacienteDetectado({
+      nombre: nombreCompleto.trim(),
+      cedula,
+      telefono: telefono || "",
+      origen
     });
   };
 
-  const estaBloqueada = fechasBloqueadas.includes(fechaSeleccionada);
+  // Buscar paciente por cédula manual (al hacer clic en botón de lupa)
+  const handleBuscarCedula = () => {
+    autoDetectarPaciente(formCedula);
+    if (!formCedula.trim()) {
+      dispararToast("Ingresa un número de cédula para buscar.");
+    }
+  };
 
-  const guardarCita = async (e: React.FormEvent) => {
+  const limpiarFormulario = () => {
+    setFormCedula("");
+    setFormNombres("");
+    setFormApellidos("");
+    setFormTelefono("");
+    setFormHora("09:00 AM");
+    setFormMotivo("");
+    setPacienteDetectado(null);
+  };
+
+  // Guardar nueva cita
+  const handleGuardarCita = (e: React.FormEvent) => {
     e.preventDefault();
-    if (estaBloqueada) {
-      setError("La fecha seleccionada se encuentra BLOQUEADA (Día no laborable / Feriado).");
+    if (estaBloqueadaSeleccionada) {
+      alert("⚠️ La fecha seleccionada se encuentra BLOQUEADA. Desbloquéala primero para poder agendar pacientes.");
       return;
     }
-    setError(null);
+    const nombreCompleto = `${formNombres.trim()} ${formApellidos.trim()}`.trim();
+    if (!nombreCompleto) {
+      alert("Por favor ingresa el nombre del paciente.");
+      return;
+    }
+
     setGuardando(true);
     try {
-      let pId: number;
-      if (tipoAgenda === "existente") {
-        pId = Number(formExistente.pacienteId);
-      } else {
-        const nuevoPac = await crearPaciente(tenantId, {
-          identificacion: formNuevo.identificacion.trim() || `TMP-${Date.now().toString().slice(-6)}`,
-          nombres: formNuevo.nombres.trim(),
-          apellidos: formNuevo.apellidos.trim(),
-          telefono: formNuevo.telefono.trim() || undefined,
-        });
-        pId = nuevoPac.id;
-      }
-
-      await agendarCita(tenantId, {
-        pacienteId: pId,
+      const nueva: CitaAgendaItem = {
+        id: `cita-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        pacienteNombre: nombreCompleto,
+        pacienteCedula: formCedula.trim() || "S/C",
+        pacienteTelefono: formTelefono.trim() || "S/T",
         fecha: fechaSeleccionada,
-        horaInicio: tipoAgenda === "existente" ? formExistente.horaInicio : formNuevo.horaInicio,
-        horaFin: tipoAgenda === "existente" ? formExistente.horaFin : formNuevo.horaFin,
-        motivo: tipoAgenda === "existente" ? formExistente.motivo : formNuevo.motivo,
-      });
+        hora: formHora,
+        motivo: formMotivo.trim() || "Consulta Médica",
+        estado: "PROGRAMADA",
+        creadoEn: new Date().toISOString(),
+      };
 
-      setFormExistente({ pacienteId: "", horaInicio: "09:00", horaFin: "09:30", motivo: "" });
-      setFormNuevo({ identificacion: "", nombres: "", apellidos: "", telefono: "", horaInicio: "10:00", horaFin: "10:30", motivo: "" });
-      onCambio();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al agendar cita");
+      guardarCitasStore([nueva, ...citas]);
+      limpiarFormulario();
+      dispararToast(`¡Cita agendada con éxito para ${nombreCompleto} a las ${formHora}!`);
     } finally {
       setGuardando(false);
     }
   };
 
+  // Eliminar cita
+  const handleEliminarCita = (id: string) => {
+    if (confirm("¿Estás seguro de eliminar esta cita de la agenda?")) {
+      const filtradas = citas.filter((c) => c.id !== id);
+      guardarCitasStore(filtradas);
+      dispararToast("Cita eliminada de la agenda.");
+    }
+  };
+
+  // Reprogramar cita
+  const abrirModalReprogramar = (cita: CitaAgendaItem) => {
+    setCitaParaReprogramar(cita);
+    setReprogFecha(cita.fecha);
+    setReprogHora(cita.hora || "09:00 AM");
+  };
+
+  const ejecutarReprogramacion = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!citaParaReprogramar) return;
+    if (fechasBloqueadas.includes(reprogFecha)) {
+      alert("La fecha destino está bloqueada. Elige otra fecha.");
+      return;
+    }
+
+    const actualizadas = citas.map((c) =>
+      c.id === citaParaReprogramar.id
+        ? { ...c, fecha: reprogFecha, hora: reprogHora }
+        : c
+    );
+    guardarCitasStore(actualizadas);
+    dispararToast(`✓ Cita reprogramada para el ${reprogFecha} a las ${reprogHora}`);
+    setCitaParaReprogramar(null);
+  };
+
+  // Pasar paciente directamente a sala de espera
+  const handlePasarASalaEspera = (cita: CitaAgendaItem) => {
+    try {
+      const turnosRaw = localStorage.getItem(SALA_ESPERA_TURNOS_KEY);
+      const turnosList: TurnoSalaEspera[] = turnosRaw ? JSON.parse(turnosRaw) : [];
+      const maxNum = turnosList.reduce((max, t) => Math.max(max, t.turnoNumero || 0), 0);
+      const nuevoNumero = maxNum + 1;
+      const codigoTurno = `T-${String(nuevoNumero).padStart(2, "0")}`;
+
+      const nuevoTurno: TurnoSalaEspera = {
+        id: `turno-${Date.now()}`,
+        turnoNumero: nuevoNumero,
+        codigoTurno,
+        pacienteId: null,
+        pacienteNombre: cita.pacienteNombre,
+        pacienteCedula: cita.pacienteCedula,
+        pacienteTelefono: cita.pacienteTelefono,
+        horaLlegada: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        fecha: hoy(),
+        motivo: cita.motivo,
+        consultorio: "Consultorio 1 (Doctor)",
+        estado: "EN_ESPERA",
+        estadoPago: "PENDIENTE",
+      };
+
+      localStorage.setItem(SALA_ESPERA_TURNOS_KEY, JSON.stringify([...turnosList, nuevoTurno]));
+      dispararToast(`¡${cita.pacienteNombre} ingresado a Sala de Espera con Turno ${codigoTurno}!`);
+      onCambio();
+    } catch {
+      alert("Error al transferir paciente a sala de espera.");
+    }
+  };
+
+  // Mapeo de citas agrupadas por fecha (para conteos en el calendario)
+  const citasPorFecha = useMemo(() => {
+    const map: Record<string, CitaAgendaItem[]> = {};
+    citas.forEach((c) => {
+      if (!map[c.fecha]) map[c.fecha] = [];
+      map[c.fecha].push(c);
+    });
+    return map;
+  }, [citas]);
+
+  // Citas del día seleccionado
+  const citasDelDiaSeleccionado = useMemo(() => {
+    return (citasPorFecha[fechaSeleccionada] || []).sort((a, b) => a.hora.localeCompare(b.hora));
+  }, [citasPorFecha, fechaSeleccionada]);
+
+  // Generación de celdas para el Calendario Mensual Interactivo (Lunes a Domingo)
+  const celdasCalendario = useMemo(() => {
+    const getDiaSemanaLunes = (d: Date) => {
+      const day = d.getDay();
+      return day === 0 ? 6 : day - 1;
+    };
+
+    const primerDia = new Date(añoActual, mesActual, 1);
+    const primerDiaSemana = getDiaSemanaLunes(primerDia);
+    const diasEnMes = new Date(añoActual, mesActual + 1, 0).getDate();
+    const diasEnMesAnterior = new Date(añoActual, mesActual, 0).getDate();
+
+    const celdas: { dia: number; fechaIso: string; mesActual: boolean; esHoy: boolean }[] = [];
+    const hoyStr = hoy();
+
+    // Días remanentes mes anterior
+    for (let i = primerDiaSemana - 1; i >= 0; i--) {
+      const diaNum = diasEnMesAnterior - i;
+      const mesAnt = mesActual === 0 ? 11 : mesActual - 1;
+      const añoAnt = mesActual === 0 ? añoActual - 1 : añoActual;
+      const fechaIso = `${añoAnt}-${String(mesAnt + 1).padStart(2, "0")}-${String(diaNum).padStart(2, "0")}`;
+      celdas.push({ dia: diaNum, fechaIso, mesActual: false, esHoy: fechaIso === hoyStr });
+    }
+
+    // Días del mes actual
+    for (let i = 1; i <= diasEnMes; i++) {
+      const fechaIso = `${añoActual}-${String(mesActual + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
+      celdas.push({ dia: i, fechaIso, mesActual: true, esHoy: fechaIso === hoyStr });
+    }
+
+    // Días mes siguiente para completar la cuadrícula de 35 o 42 celdas
+    const totalCeldas = celdas.length <= 35 ? 35 : 42;
+    const restantes = totalCeldas - celdas.length;
+    for (let i = 1; i <= restantes; i++) {
+      const mesSig = mesActual === 11 ? 0 : mesActual + 1;
+      const añoSig = mesActual === 11 ? añoActual + 1 : añoActual;
+      const fechaIso = `${añoSig}-${String(mesSig + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
+      celdas.push({ dia: i, fechaIso, mesActual: false, esHoy: fechaIso === hoyStr });
+    }
+
+    return celdas;
+  }, [añoActual, mesActual]);
+
+  // Formato de texto de la fecha seleccionada en español
+  const textoFechaLargo = useMemo(() => {
+    try {
+      const [y, m, d] = fechaSeleccionada.split("-").map(Number);
+      const date = new Date(y, m - 1, d);
+      const diasSemana = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+      const diaNom = diasSemana[date.getDay()];
+      const mesNom = MESES_NOMBRES[m - 1].toLowerCase();
+      return `${diaNom}, ${d} de ${mesNom} de ${y}`;
+    } catch {
+      return fechaSeleccionada;
+    }
+  }, [fechaSeleccionada]);
+
+  const [selY, selM, selD] = fechaSeleccionada.split("-");
+  const fechaCortaFmt = `${selD}/${selM}/${selY}`;
+
   return (
-    <div className="space-y-5">
-      {/* Selector de fecha y bloqueo */}
-      <div className="apple-glass rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <label className="text-xs font-bold text-slate-500 uppercase font-mono">Fecha:</label>
-          <input
-            type="date"
-            value={fechaSeleccionada}
-            onChange={(e) => setFechaSeleccionada(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 text-xs font-bold"
-          />
-          {estaBloqueada && (
-            <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 font-bold text-xs flex items-center gap-1">
-              ⛔ DÍA BLOQUEADO
-            </span>
-          )}
+    <div className="space-y-6 animate-fade-in text-slate-900 dark:text-white">
+      {/* Toast Notification */}
+      {toastAgenda && (
+        <div className="fixed bottom-6 right-6 z-50 bg-teal-600 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-teal-400/30 animate-bounce">
+          <IconCheckCircle size={20} />
+          <span className="text-xs sm:text-sm font-semibold">{toastAgenda}</span>
         </div>
-        <button
-          onClick={() => toggleBloquearFecha(fechaSeleccionada)}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-            estaBloqueada
-              ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-              : "border border-rose-500/50 text-rose-500 hover:bg-rose-500/10"
-          }`}
-        >
-          {estaBloqueada ? "✓ Desbloquear esta Fecha" : "⛔ Bloquear Fecha (No Laborable)"}
-        </button>
+      )}
+
+      {/* ── BARRA SUPERIOR DE ENCABEZADO Y NAVEGACIÓN ── */}
+      <div className="apple-glass rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border border-slate-200/80 dark:border-white/10 shadow-sm">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-sky-500/15 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-500/30 shadow-inner">
+            <IconCalendar size={24} />
+          </div>
+          <div>
+            <h2 className="font-['Outfit'] font-black text-lg sm:text-xl text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              Agenda Médica & Calendario Interactivo
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-white/60">
+              Programación y gestión sincronizada de citas médicas entre Doctor y Secretaría en tiempo real
+            </p>
+          </div>
+        </div>
+
+        {/* Controles de Navegación del Calendario */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10">
+            <button
+              type="button"
+              onClick={mesAnterior}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-white/80 hover:bg-white dark:hover:bg-white/10 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+              title="Mes Anterior"
+            >
+              <span>◀</span>
+              <span>Anterior</span>
+            </button>
+            <button
+              type="button"
+              onClick={irAHoy}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-white/15 text-teal-600 dark:text-teal-300 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+              title="Ir a la fecha de hoy"
+            >
+              <IconCalendar size={13} />
+              <span>Hoy</span>
+            </button>
+            <button
+              type="button"
+              onClick={mesSiguiente}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-white/80 hover:bg-white dark:hover:bg-white/10 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+              title="Mes Siguiente"
+            >
+              <span>Siguiente</span>
+              <span>▶</span>
+            </button>
+          </div>
+
+          <div className="font-['Outfit'] font-black text-lg sm:text-xl text-sky-600 dark:text-sky-400 pl-2">
+            {MESES_NOMBRES[mesActual]} {añoActual}
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Formulario de agendamiento */}
-        <div className="lg:col-span-7 apple-glass rounded-2xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white">Reservar Nueva Cita</h4>
-            <div className="flex gap-1 p-0.5 rounded-lg bg-slate-200/60 dark:bg-white/5 text-[11px]">
+      {/* ── CUADRÍCULA PRINCIPAL (CALENDARIO A LA IZQUIERDA + DETALLE & AGENDAR A LA DERECHA) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* ══════════════════════════════════════════════════════════════
+            COLUMNA IZQUIERDA: CALENDARIO MENSUAL INTERACTIVO COMPACTO (5 COLS)
+            ══════════════════════════════════════════════════════════════ */}
+        <div className="lg:col-span-5 apple-glass rounded-3xl p-4 sm:p-5 border border-slate-200/80 dark:border-white/10 shadow-sm space-y-2.5">
+          {/* Cabecera de días de la semana */}
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {DIAS_SEMANA_HEADERS.map((diaH) => (
+              <div
+                key={diaH}
+                className="text-[10px] font-extrabold font-mono text-slate-500 dark:text-white/60 py-1 uppercase"
+              >
+                {diaH}
+              </div>
+            ))}
+          </div>
+
+          {/* Celdas de Días Compactas */}
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+            {celdasCalendario.map((celda, idx) => {
+              const citasEnDia = citasPorFecha[celda.fechaIso] || [];
+              const estaBloq = fechasBloqueadas.includes(celda.fechaIso);
+              const esSeleccionada = celda.fechaIso === fechaSeleccionada;
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => setFechaSeleccionada(celda.fechaIso)}
+                  className={`min-h-[42px] sm:min-h-[48px] p-1 sm:p-1.5 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between select-none relative group ${
+                    esSeleccionada
+                      ? "border-2 border-sky-500 bg-sky-500/15 dark:bg-sky-500/25 shadow-md ring-1 ring-sky-500/30"
+                      : estaBloq
+                      ? "bg-rose-50/60 dark:bg-rose-950/20 border-rose-200/70 dark:border-rose-500/20 hover:border-rose-400"
+                      : celda.mesActual
+                      ? "bg-white/70 dark:bg-white/[0.03] border-slate-200/80 dark:border-white/10 hover:border-sky-400 hover:bg-sky-50/30 dark:hover:bg-white/[0.08]"
+                      : "bg-slate-50/40 dark:bg-black/20 border-slate-100 dark:border-white/5 opacity-40 hover:opacity-80"
+                  }`}
+                >
+                  {/* Número del día */}
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-[11px] font-mono font-black ${
+                        esSeleccionada
+                          ? "text-sky-700 dark:text-sky-300 text-xs font-black"
+                          : celda.esHoy
+                          ? "text-teal-600 dark:text-teal-400 font-bold"
+                          : celda.mesActual
+                          ? "text-slate-800 dark:text-white"
+                          : "text-slate-400 dark:text-white/40"
+                      }`}
+                    >
+                      {celda.dia}
+                    </span>
+
+                    {celda.esHoy && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shadow-xs" title="Hoy" />
+                    )}
+                  </div>
+
+                  {/* Badges de Citas o Bloqueado */}
+                  <div className="space-y-0.5 mt-0.5">
+                    {estaBloq && (
+                      <div className="text-[8px] font-bold px-1 py-0.2 rounded bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center justify-center gap-0.5 truncate">
+                        <span>🔒</span>
+                        <span className="hidden sm:inline">Bloq</span>
+                      </div>
+                    )}
+
+                    {citasEnDia.length > 0 && (
+                      <div className="text-[8.5px] font-black px-1 py-0.5 rounded-md bg-sky-500 text-white dark:bg-sky-600 flex items-center justify-center gap-0.5 shadow-xs truncate">
+                        <span>📅</span>
+                        <span>{citasEnDia.length}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════
+            COLUMNA DERECHA: CITAS DEL DÍA + FORMULARIO DE AGENDAMIENTO (7 COLS)
+            ══════════════════════════════════════════════════════════════ */}
+        <div className="lg:col-span-7 space-y-4">
+          {/* ── CARD SUPERIOR: GESTIÓN DE CITAS PARA LA FECHA SELECCIONADA ── */}
+          <div className="apple-glass rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-white/10 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-white/10">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white capitalize">
+                  {textoFechaLargo}
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-white/50">
+                  Gestión de citas para el {fechaCortaFmt}
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-sky-50 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-300/60 dark:border-sky-500/30 text-xs font-bold font-mono shadow-xs">
+                {citasDelDiaSeleccionado.length} {citasDelDiaSeleccionado.length === 1 ? "cita" : "citas"}
+              </span>
+            </div>
+
+            {/* Botón de Bloqueo / Desbloqueo de la fecha */}
+            <div>
               <button
                 type="button"
-                onClick={() => setTipoAgenda("existente")}
-                className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${tipoAgenda === "existente" ? "bg-white text-black shadow-xs" : "text-slate-500"}`}
+                onClick={() => toggleBloqueoFecha(fechaSeleccionada)}
+                className={`w-full py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs ${
+                  estaBloqueadaSeleccionada
+                    ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                    : "bg-slate-100 hover:bg-rose-500/10 text-slate-700 hover:text-rose-600 dark:bg-white/5 dark:text-white/80 dark:hover:bg-rose-500/20 border border-slate-300/80 dark:border-white/10 hover:border-rose-500/40"
+                }`}
               >
-                Paciente Registrado
+                <span>{estaBloqueadaSeleccionada ? "🔓 Desbloquear Fecha (Habilitar Consultas)" : "🔒 Bloquear Esta Fecha (Vacaciones/Congreso)"}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setTipoAgenda("nuevo")}
-                className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${tipoAgenda === "nuevo" ? "bg-white text-black shadow-xs" : "text-slate-500"}`}
-              >
-                + Nuevo / Llamada
-              </button>
+            </div>
+
+            {/* Listado de citas agendadas */}
+            <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+              {citasDelDiaSeleccionado.length === 0 ? (
+                <div className="py-6 text-center space-y-1.5">
+                  <div className="text-2xl">☕</div>
+                  <div className="text-xs font-bold text-slate-700 dark:text-white/80">
+                    No hay citas agendadas para esta fecha
+                  </div>
+                  <div className="text-[11px] text-slate-400 dark:text-white/50">
+                    Usa el formulario inferior para programar una nueva cita
+                  </div>
+                </div>
+              ) : (
+                citasDelDiaSeleccionado.map((cita) => (
+                  <div
+                    key={cita.id}
+                    className="p-3.5 rounded-2xl bg-white/70 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 hover:border-sky-400/60 transition-all space-y-2 group shadow-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-lg bg-sky-500/15 text-sky-700 dark:text-sky-300 font-mono font-black text-xs border border-sky-500/25">
+                          {cita.hora}
+                        </span>
+                        <span className="font-bold text-slate-900 dark:text-white text-xs">
+                          {cita.pacienteNombre}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {cita.pacienteCedula}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-white/70">
+                      <div className="truncate max-w-[200px]" title={cita.motivo}>
+                        📋 {cita.motivo}
+                      </div>
+                      {cita.pacienteTelefono && cita.pacienteTelefono !== "S/T" && (
+                        <a
+                          href={`https://wa.me/${cita.pacienteTelefono.replace(/\D/g, "")}?text=Hola%20${encodeURIComponent(cita.pacienteNombre)},%20le%20recordamos%20su%20cita%20m%C3%A9dica%20para%20el%20${fechaCortaFmt}%20a%20las%20${cita.hora}.`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-emerald-600 hover:text-emerald-500 font-bold flex items-center gap-1 text-[10px]"
+                          title="Enviar recordatorio WhatsApp"
+                        >
+                          <span>💬</span>
+                          <span>{cita.pacienteTelefono}</span>
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Acciones de Cita */}
+                    <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-slate-100 dark:border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => handlePasarASalaEspera(cita)}
+                        className="px-2.5 py-1 rounded-lg bg-teal-500/15 text-teal-700 dark:text-teal-300 hover:bg-teal-500/25 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                        title="Pasar paciente a Sala de Espera"
+                      >
+                        <span>🚪</span>
+                        <span>Sala Espera</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => abrirModalReprogramar(cita)}
+                        className="px-2.5 py-1 rounded-lg bg-sky-500/15 text-sky-700 dark:text-sky-300 hover:bg-sky-500/25 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <IconCalendar size={11} />
+                        <span>Reprogramar</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleEliminarCita(cita.id)}
+                        className="p-1 rounded-lg text-rose-500 hover:bg-rose-500/10 text-[11px] transition-all cursor-pointer"
+                        title="Eliminar Cita"
+                      >
+                        <IconTrash size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
-          {error && <p className="text-xs text-[#ff3b80]">{error}</p>}
+          {/* ── CARD INFERIOR: FORMULARIO AGENDAR NUEVA CITA (+ AGENDAR NUEVA CITA) ── */}
+          <div className="apple-glass rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-white/10 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-white/10">
+              <h3 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white flex items-center gap-2">
+                <span className="text-sky-600 dark:text-sky-400 text-lg font-black">+</span>
+                <span>Agendar Nueva Cita</span>
+              </h3>
 
-          <form onSubmit={guardarCita} className="space-y-3">
-            {tipoAgenda === "existente" ? (
-              <div>
-                <label className="text-[10px] text-slate-400 uppercase font-mono">Seleccionar Paciente *</label>
-                <select required value={formExistente.pacienteId} onChange={(e) => setFormExistente({ ...formExistente, pacienteId: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs">
-                  <option value="">— Elige un paciente existente —</option>
-                  {(pacientes || []).map((p) => <option key={p.id} value={p.id}>{p.nombreCompleto} ({p.identificacion})</option>)}
-                </select>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label className="text-[10px] text-slate-400 uppercase font-mono">Cédula / DNI</label>
-                  <input placeholder="V-12345678" value={formNuevo.identificacion} onChange={(e) => setFormNuevo({ ...formNuevo, identificacion: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-400 uppercase font-mono">Teléfono</label>
-                  <input placeholder="0412-1234567" value={formNuevo.telefono} onChange={(e) => setFormNuevo({ ...formNuevo, telefono: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-400 uppercase font-mono">Nombres *</label>
-                  <input required placeholder="Nombres" value={formNuevo.nombres} onChange={(e) => setFormNuevo({ ...formNuevo, nombres: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-400 uppercase font-mono">Apellidos *</label>
-                  <input required placeholder="Apellidos" value={formNuevo.apellidos} onChange={(e) => setFormNuevo({ ...formNuevo, apellidos: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <div>
-                <label className="text-[10px] text-slate-400 uppercase font-mono">Hora Inicio *</label>
-                <input required type="time" value={tipoAgenda === "existente" ? formExistente.horaInicio : formNuevo.horaInicio}
-                  onChange={(e) => tipoAgenda === "existente" ? setFormExistente({ ...formExistente, horaInicio: e.target.value }) : setFormNuevo({ ...formNuevo, horaInicio: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono font-bold" />
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-400 uppercase font-mono">Hora Fin *</label>
-                <input required type="time" value={tipoAgenda === "existente" ? formExistente.horaFin : formNuevo.horaFin}
-                  onChange={(e) => tipoAgenda === "existente" ? setFormExistente({ ...formExistente, horaFin: e.target.value }) : setFormNuevo({ ...formNuevo, horaFin: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono font-bold" />
-              </div>
+              <button
+                type="button"
+                onClick={limpiarFormulario}
+                className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-white/15 text-[10px] font-bold text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <span>⟲</span>
+                <span>Limpiar</span>
+              </button>
             </div>
 
-            <div>
-              <label className="text-[10px] text-slate-400 uppercase font-mono">Motivo de la Cita</label>
-              <input placeholder="Ej. Control de hipertensión, primera consulta..." value={tipoAgenda === "existente" ? formExistente.motivo : formNuevo.motivo}
-                onChange={(e) => tipoAgenda === "existente" ? setFormExistente({ ...formExistente, motivo: e.target.value }) : setFormNuevo({ ...formNuevo, motivo: e.target.value })}
-                className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
-            </div>
+            <form onSubmit={handleGuardarCita} className="space-y-3.5 text-xs">
+              {/* Cédula de Identidad con buscador */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700 dark:text-white/90 flex items-center justify-between">
+                  <span>Cédula de Identidad *</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    required
+                    type="text"
+                    placeholder="Ej. V-30398619 o 1098765432 (Venezuela / Colombia)"
+                    value={formCedula}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setFormCedula(v);
+                      autoDetectarPaciente(v);
+                    }}
+                    className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleBuscarCedula}
+                    className="p-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-white hover:bg-sky-500 hover:text-white transition-all cursor-pointer border border-slate-300 dark:border-white/15 shadow-xs"
+                    title="Buscar paciente registrado por cédula"
+                  >
+                    <IconSearch size={15} />
+                  </button>
+                </div>
 
-            <button disabled={guardando || estaBloqueada} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full disabled:opacity-40 cursor-pointer">
-              {guardando ? "Agendando…" : "Confirmar Cita en Agenda"}
-            </button>
-          </form>
-        </div>
-
-        {/* Citas del día seleccionado */}
-        <div className="lg:col-span-5 apple-glass rounded-2xl p-5 space-y-3">
-          <h4 className="font-bold text-sm text-slate-900 dark:text-white">Citas Programadas ({fechaSeleccionada})</h4>
-          {citasHoy === null ? (
-            <p className="text-xs text-slate-400">Cargando citas…</p>
-          ) : citasHoy.length === 0 ? (
-            <p className="text-xs text-slate-400">No hay citas programadas para esta fecha.</p>
-          ) : (
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-              {citasHoy.map((c) => (
-                <div key={c.id} className="p-3.5 rounded-xl bg-slate-100/60 dark:bg-white/5 border border-slate-200 dark:border-white/5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900 dark:text-white text-sm">{c.paciente?.nombreCompleto}</span>
-                    <span className="text-teal-600 dark:text-teal-400 font-mono font-bold">{c.horaInicio} – {c.horaFin}</span>
+                {/* Badge de detección de paciente */}
+                {pacienteDetectado && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold animate-fade-in shadow-xs">
+                    <IconCheckCircle size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>
+                      ✓ Paciente detectado ({pacienteDetectado.origen}): <strong className="font-black underline">{pacienteDetectado.nombre}</strong>
+                    </span>
                   </div>
-                  <div className="text-slate-500 text-[11px] mt-1">{c.motivo || "Consulta médica"}</div>
+                )}
+              </div>
+
+              {/* Nombres y Apellidos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-white/90">
+                    Nombres *
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="Nombres"
+                    value={formNombres}
+                    onChange={(e) => setFormNombres(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-white/90">
+                    Apellidos *
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="Apellidos"
+                    value={formApellidos}
+                    onChange={(e) => setFormApellidos(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+              </div>
+
+              {/* Teléfono / WhatsApp */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-white/90">
+                  Teléfono / WhatsApp *
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="Ej. 0414-1234567"
+                  value={formTelefono}
+                  onChange={(e) => setFormTelefono(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
+                />
+              </div>
+
+              {/* Hora de la Cita & Motivo / Consulta */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-white/90">
+                    Hora de la Cita *
+                  </label>
+                  <select
+                    value={formHora}
+                    onChange={(e) => setFormHora(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                  >
+                    {HORAS_DISPONIBLES_AGENDA.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-white/90">
+                    Motivo / Consulta
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Control, Evaluación..."
+                    value={formMotivo}
+                    onChange={(e) => setFormMotivo(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+              </div>
+
+              {/* Botón Guardar Cita en Agenda */}
+              <button
+                type="submit"
+                disabled={guardando || estaBloqueadaSeleccionada}
+                className="w-full py-3 px-4 rounded-xl text-xs font-black text-white bg-gradient-to-r from-sky-600 via-sky-500 to-teal-600 hover:from-sky-500 hover:to-teal-500 shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+              >
+                <IconCalendar size={16} />
+                <span>{guardando ? "Agendando..." : "Guardar Cita en Agenda"}</span>
+              </button>
+            </form>
+          </div>
         </div>
       </div>
+
+      {/* ── MODAL DE REPROGRAMACIÓN DE CITA ── */}
+      {citaParaReprogramar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-sm apple-glass rounded-3xl p-6 shadow-2xl border border-white/20 bg-white/95 dark:bg-[#071a2e]/95 text-slate-900 dark:text-white space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-sky-500/20 text-sky-600 dark:text-sky-300">
+                  <IconCalendar size={18} />
+                </div>
+                <h3 className="font-['Outfit'] font-black text-base">Reprogramar Cita Médica</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCitaParaReprogramar(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <div className="text-xs space-y-1">
+              <div className="font-bold text-slate-800 dark:text-white">{citaParaReprogramar.pacienteNombre}</div>
+              <div className="text-slate-500 font-mono">C.I: {citaParaReprogramar.pacienteCedula} · Motivo: {citaParaReprogramar.motivo}</div>
+            </div>
+
+            <form onSubmit={ejecutarReprogramacion} className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-white/80">Nueva Fecha de Consulta</label>
+                <input
+                  required
+                  type="date"
+                  value={reprogFecha}
+                  onChange={(e) => setReprogFecha(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 font-bold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-white/80">Nueva Hora de Consulta</label>
+                <select
+                  value={reprogHora}
+                  onChange={(e) => setReprogHora(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 font-mono font-bold cursor-pointer"
+                >
+                  {HORAS_DISPONIBLES_AGENDA.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCitaParaReprogramar(null)}
+                  className="flex-1 py-2 rounded-xl border border-slate-300 dark:border-white/20 text-xs font-bold hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-md cursor-pointer"
+                >
+                  Confirmar Cambio
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
