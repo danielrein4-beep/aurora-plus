@@ -2167,9 +2167,14 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
 }) {
   interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
   interface ReciboVenta { comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string }
+  type ResultadoBusqueda =
+    | { tipo: "articulo"; id: number; nombre: string; unidadMedida: string; stockActual: number; costoUnitario: number }
+    | { tipo: "receta"; id: number; nombre: string; precioVenta: number; estacionCocina: string }
+    | { tipo: "fastbar"; id: number; nombre: string; precioVenta: number };
+
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
   const [busqueda, setBusqueda] = useState("");
-  const [articuloSel, setArticuloSel] = useState<Articulo | null>(null);
+  const [seleccion, setSeleccion] = useState<ResultadoBusqueda | null>(null);
   const [cantidadManual, setCantidadManual] = useState("1");
   const [precioManual, setPrecioManual] = useState("");
   const [procesando, setProcesando] = useState(false);
@@ -2180,11 +2185,29 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
 
   useEffect(() => { monedaBase(tenantId).then(setMoneda).catch(() => setMoneda("USD")); }, [tenantId]);
 
+  // Un solo buscador para recetas, tragos de Fast-Bar y artículos de
+  // inventario — antes las recetas aparecían como botones sueltos arriba,
+  // duplicando la forma de encontrar lo mismo.
   const resultadosBusqueda = useMemo(() => {
-    if (articuloSel || !busqueda.trim()) return [];
+    if (seleccion || !busqueda.trim()) return [];
     const q = busqueda.trim().toLowerCase();
-    return (articulos || []).filter((a) => a.nombre.toLowerCase().includes(q)).slice(0, 6);
-  }, [busqueda, articuloSel, articulos]);
+    const recetas: ResultadoBusqueda[] = (escandallos || [])
+      .filter((e) => e.activo !== false && e.nombrePlato.toLowerCase().includes(q))
+      .map((e) => ({ tipo: "receta", id: e.id, nombre: e.nombrePlato, precioVenta: Number(e.precioVenta), estacionCocina: e.estacionCocina }));
+    const tragos: ResultadoBusqueda[] = (fastbar || [])
+      .filter((t) => t.nombreTrago.toLowerCase().includes(q))
+      .map((t) => ({ tipo: "fastbar", id: t.id, nombre: t.nombreTrago, precioVenta: Number(t.precioVenta) }));
+    const insumos: ResultadoBusqueda[] = (articulos || [])
+      .filter((a) => a.nombre.toLowerCase().includes(q))
+      .map((a) => ({ tipo: "articulo", id: a.id, nombre: a.nombre, unidadMedida: a.unidadMedida || "unidad", stockActual: Number(a.stockActual), costoUnitario: Number(a.costoUnitario) }));
+    return [...recetas, ...tragos, ...insumos].slice(0, 8);
+  }, [busqueda, seleccion, escandallos, fastbar, articulos]);
+
+  const elegirResultado = (r: ResultadoBusqueda) => {
+    setSeleccion(r);
+    setBusqueda("");
+    setPrecioManual(r.tipo === "articulo" ? "" : String(r.precioVenta));
+  };
 
   const agregarConCantidad = (linea: Omit<LineaCarrito, "cantidad">, cant: number) => {
     setCarrito((prev) => {
@@ -2193,7 +2216,6 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
       return [...prev, { ...linea, cantidad: cant }];
     });
   };
-  const agregarAlCarrito = (linea: Omit<LineaCarrito, "cantidad">) => agregarConCantidad(linea, 1);
   const cambiarCantidad = (key: string, delta: number) => {
     setCarrito((prev) => prev.map((l) => (l.key === key ? { ...l, cantidad: Math.max(1, l.cantidad + delta) } : l)).filter((l) => l.cantidad > 0));
   };
@@ -2201,26 +2223,27 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
 
   const handleAgregarProducto = () => {
     setError(null);
-    const nombre = articuloSel ? articuloSel.nombre : busqueda.trim();
-    if (!nombre) { setError("Busca en tu inventario o escribe qué vas a vender"); return; }
+    const nombre = seleccion ? seleccion.nombre : busqueda.trim();
+    if (!nombre) { setError("Busca una receta, un trago o un artículo — o escribe qué vas a vender"); return; }
     if (!precioManual || Number(precioManual) <= 0) { setError("Indica el precio de venta"); return; }
     const cant = parseFloat(cantidadManual);
     if (!cant || cant <= 0) { setError("Indica una cantidad válida (acepta decimales: kg, L, etc.)"); return; }
-    if (articuloSel) {
-      const yaEnCarrito = carrito.find((l) => l.key === `articulo-${articuloSel.id}`)?.cantidad || 0;
-      if (yaEnCarrito + cant > Number(articuloSel.stockActual)) {
-        setError(`Solo hay ${articuloSel.stockActual} ${articuloSel.unidadMedida || "unidades"} disponibles de ${articuloSel.nombre} en inventario`);
+    if (seleccion?.tipo === "articulo") {
+      const yaEnCarrito = carrito.find((l) => l.key === `articulo-${seleccion.id}`)?.cantidad || 0;
+      if (yaEnCarrito + cant > seleccion.stockActual) {
+        setError(`Solo hay ${seleccion.stockActual} ${seleccion.unidadMedida} disponibles de ${seleccion.nombre} en inventario`);
         return;
       }
     }
     agregarConCantidad({
-      key: articuloSel ? `articulo-${articuloSel.id}` : `manual-${Date.now()}`,
+      key: seleccion ? `${seleccion.tipo}-${seleccion.id}` : `manual-${Date.now()}`,
       nombre,
       precio: Number(precioManual),
-      articuloId: articuloSel?.id,
-      estacionCocina: articuloSel ? undefined : "COCINA",
+      articuloId: seleccion?.tipo === "articulo" ? seleccion.id : undefined,
+      escandalloId: seleccion?.tipo === "receta" ? seleccion.id : undefined,
+      estacionCocina: seleccion?.tipo === "receta" ? seleccion.estacionCocina : seleccion?.tipo === "fastbar" ? "BAR" : seleccion?.tipo === "articulo" ? undefined : "COCINA",
     }, cant);
-    setArticuloSel(null); setBusqueda(""); setCantidadManual("1"); setPrecioManual("");
+    setSeleccion(null); setBusqueda(""); setCantidadManual("1"); setPrecioManual("");
   };
 
   const total = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0);
@@ -2270,69 +2293,61 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
-      {/* Catálogo rápido */}
+      {/* Buscador único: recetas, Fast-Bar e inventario */}
       <div className="space-y-4">
-        <p className="text-xs text-slate-500 dark:text-white/40">Toca un producto para agregarlo — ideal para ventas de mostrador que no pasan por una mesa.</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {(escandallos || []).filter((e) => e.activo !== false).map((e) => (
-            <button key={`plato-${e.id}`}
-              onClick={() => agregarAlCarrito({ key: `plato-${e.id}`, nombre: e.nombrePlato, precio: Number(e.precioVenta), escandalloId: e.id, estacionCocina: e.estacionCocina })}
-              className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
-              <div className="font-bold text-sm text-slate-900 dark:text-white">{e.nombrePlato}</div>
-              <div className="text-xs text-teal-600 dark:text-teal-400 font-mono mt-1">${Number(e.precioVenta).toFixed(2)}</div>
-            </button>
-          ))}
-          {(fastbar || []).map((t) => (
-            <button key={`trago-${t.id}`}
-              onClick={() => agregarAlCarrito({ key: `trago-${t.id}`, nombre: t.nombreTrago, precio: Number(t.precioVenta), estacionCocina: "BAR" })}
-              className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
-              <div className="font-bold text-sm text-slate-900 dark:text-white">{t.nombreTrago}</div>
-              <div className="text-xs text-teal-600 dark:text-teal-400 font-mono mt-1">${Number(t.precioVenta).toFixed(2)}</div>
-            </button>
-          ))}
-        </div>
+        <p className="text-xs text-slate-500 dark:text-white/40">Busca lo que vas a vender — receta, trago o artículo de inventario — ideal para ventas de mostrador que no pasan por una mesa.</p>
 
         <div className="apple-glass rounded-xl p-4 space-y-2.5">
-          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Buscar producto en inventario</p>
+          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Buscar producto</p>
           <div className="relative">
             <input
-              value={articuloSel ? articuloSel.nombre : busqueda}
-              onChange={(e) => { setBusqueda(e.target.value); setArticuloSel(null); }}
-              placeholder="Escribe para buscar… ej. Doritos, Refresco"
+              value={seleccion ? seleccion.nombre : busqueda}
+              onChange={(e) => { setBusqueda(e.target.value); setSeleccion(null); }}
+              placeholder="Escribe para buscar… ej. Torta de Queso, Doritos, Mojito"
               className="input-horeca w-full pr-8"
             />
-            {articuloSel && (
-              <button type="button" onClick={() => { setArticuloSel(null); setBusqueda(""); }}
+            {seleccion && (
+              <button type="button" onClick={() => { setSeleccion(null); setBusqueda(""); setPrecioManual(""); }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 cursor-pointer">
                 <IconClose size={14} />
               </button>
             )}
-            {!articuloSel && busqueda.trim() && resultadosBusqueda.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-48 overflow-y-auto shadow-lg">
-                {resultadosBusqueda.map((a) => (
-                  <button key={a.id} type="button" onClick={() => { setArticuloSel(a); setBusqueda(""); }}
+            {!seleccion && busqueda.trim() && resultadosBusqueda.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-56 overflow-y-auto shadow-lg">
+                {resultadosBusqueda.map((r) => (
+                  <button key={`${r.tipo}-${r.id}`} type="button" onClick={() => elegirResultado(r)}
                     className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer flex items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-800 dark:text-white truncate">{a.nombre}</span>
-                    <span className="text-slate-400 font-mono flex-shrink-0">{a.stockActual} {a.unidadMedida || "u."}</span>
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                        r.tipo === "receta" ? "bg-purple-500/15 text-purple-600 dark:text-purple-300"
+                        : r.tipo === "fastbar" ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"
+                        : "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+                      }`}>{r.tipo === "receta" ? "RECETA" : r.tipo === "fastbar" ? "FAST-BAR" : "INVENTARIO"}</span>
+                      <span className="font-semibold text-slate-800 dark:text-white truncate">{r.nombre}</span>
+                    </span>
+                    <span className="text-slate-400 font-mono flex-shrink-0">
+                      {r.tipo === "articulo" ? `${r.stockActual} ${r.unidadMedida}` : `$${r.precioVenta.toFixed(2)}`}
+                    </span>
                   </button>
                 ))}
               </div>
             )}
-            {!articuloSel && busqueda.trim() && resultadosBusqueda.length === 0 && (
-              <p className="text-[10px] text-slate-400 mt-1">Sin resultados en inventario — puedes venderlo igual así, pero no descontará stock.</p>
+            {!seleccion && busqueda.trim() && resultadosBusqueda.length === 0 && (
+              <p className="text-[10px] text-slate-400 mt-1">Sin resultados — puedes venderlo igual así, pero no descontará stock ni recetas.</p>
             )}
           </div>
-          {articuloSel && (
+          {seleccion?.tipo === "articulo" && (
             <div className="text-[10px] text-teal-600 dark:text-teal-300">
-              En inventario: {Number(articuloSel.stockActual)} {articuloSel.unidadMedida || "unidades"} · Costo ${Number(articuloSel.costoUnitario).toFixed(2)} c/u
+              En inventario: {seleccion.stockActual} {seleccion.unidadMedida} · Costo ${seleccion.costoUnitario.toFixed(2)} c/u
             </div>
           )}
           <div className="flex items-center gap-2">
             <div className="relative w-24 flex-shrink-0">
               <input value={cantidadManual} onChange={(e) => setCantidadManual(e.target.value)} type="number" min="0.001" step="0.001"
-                placeholder="Cant." className="input-horeca w-full" title={`Cantidad${articuloSel ? ` (${articuloSel.unidadMedida || "unidades"})` : ""} — acepta decimales para kg/L`} />
-              {articuloSel?.unidadMedida && (
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 pointer-events-none">{articuloSel.unidadMedida}</span>
+                placeholder="Cant." className="input-horeca w-full"
+                title={`Cantidad${seleccion?.tipo === "articulo" ? ` (${seleccion.unidadMedida})` : ""} — acepta decimales para kg/L`} />
+              {seleccion?.tipo === "articulo" && (
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 pointer-events-none">{seleccion.unidadMedida}</span>
               )}
             </div>
             <input value={precioManual} onChange={(e) => setPrecioManual(e.target.value)} type="number" step="0.01" placeholder="Precio de venta $" className="input-horeca flex-1" />
