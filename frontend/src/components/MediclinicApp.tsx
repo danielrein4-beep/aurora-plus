@@ -371,17 +371,10 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
   
-  // Estado del perfil activo (null muestra el selector estilo Netflix)
-  const [perfilActivo, setPerfilActivo] = useState<RolVista | null>(() => {
-    try {
-      const guardado = localStorage.getItem(PERFIL_ACTIVO_KEY);
-      return guardado === "MEDICO" || guardado === "SECRETARIA" ? (guardado as RolVista) : null;
-    } catch {
-      return null;
-    }
-  });
+  // Estado del perfil activo: siempre null al montar para mostrar la pantalla de selección estilo Netflix
+  const [perfilActivo, setPerfilActivo] = useState<RolVista | null>(null);
 
-  const [rolActivo, setRolActivo] = useState<RolVista>(perfilActivo || "MEDICO");
+  const [rolActivo, setRolActivo] = useState<RolVista>("MEDICO");
   const [modalClaveDoctor, setModalClaveDoctor] = useState(false);
   const [accionPendienteDoctor, setAccionPendienteDoctor] = useState<(() => void) | null>(null);
 
@@ -424,7 +417,6 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       setRolActivo("MEDICO");
       setPerfilActivo("MEDICO");
       setPagina("general");
-      try { localStorage.setItem(PERFIL_ACTIVO_KEY, "MEDICO"); } catch {}
     });
   };
 
@@ -432,12 +424,17 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     setRolActivo("SECRETARIA");
     setPerfilActivo("SECRETARIA");
     setPagina("sala-espera");
-    try { localStorage.setItem(PERFIL_ACTIVO_KEY, "SECRETARIA"); } catch {}
   };
 
   const cerrarSesionPerfil = () => {
     setPerfilActivo(null);
     try { localStorage.removeItem(PERFIL_ACTIVO_KEY); } catch {}
+  };
+
+  const handleSalirAlHub = () => {
+    setPerfilActivo(null);
+    try { localStorage.removeItem(PERFIL_ACTIVO_KEY); } catch {}
+    onSalir();
   };
 
   const intentarNavegar = (p: Pagina) => {
@@ -580,7 +577,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           configPerfil={configPerfil}
           onSeleccionarDoctor={seleccionarDoctor}
           onSeleccionarSecretaria={seleccionarSecretaria}
-          onSalir={onSalir}
+          onSalir={handleSalirAlHub}
         />
         {modalClaveDoctor && (
           <ModalClaveDoctor
@@ -685,7 +682,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           </button>
 
           <button
-            onClick={onSalir}
+            onClick={handleSalirAlHub}
             className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-slate-500 dark:text-white/40 hover:bg-slate-200/60 dark:hover:bg-white/5 cursor-pointer"
           >
             ← Volver a Aurora Hub
