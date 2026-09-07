@@ -25,7 +25,7 @@ import {
   type ItemImportacionArticulo, type ResultadoImportacionArticulos, type Cliente, type MetricasCliente,
 } from "../api";
 
-type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
+type Pagina = "general" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
 
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
@@ -38,7 +38,6 @@ const NAV_GRUPOS: NavGrupo[] = [
     titulo: "Operación",
     items: [
       { id: "general", label: "Vista General", Icon: IconCustomize },
-      { id: "ventarapida", label: "Venta Rápida", Icon: IconBolt },
       { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant, premium: true },
       { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass, premium: true },
       { id: "recetas", label: "Recetas & Escandallo", Icon: IconFileText },
@@ -162,8 +161,10 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const { user } = useAuth();
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
-  const [ventaRapidaAbierta, setVentaRapidaAbierta] = useState(false);
-  const [bloqueoTasa, setBloqueoTasa] = useState<"ventarapida" | "embebido" | null>(null);
+  // Venta Rápida ya no es una pantalla aparte con su propio overlay — vive
+  // fusionada directo en la Vista General (ver VistaGeneral). Este candado
+  // solo se dispara desde ahí cuando falta registrar la tasa BCV del día.
+  const [bloqueoTasa, setBloqueoTasa] = useState(false);
   const [moduloPremiumClic, setModuloPremiumClic] = useState<Pagina | null>(null);
 
   const [config, setConfig] = useState(() => {
@@ -264,7 +265,6 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   // Venta Rápida hasta que se registre, en vez de dejar operar con números
   // que no cuadran.
   const tasaValida = tasaBcv != null && Number(tasaBcv.tasa) > 0;
-  const abrirVentaRapida = () => { if (!tasaValida) { setBloqueoTasa("ventarapida"); return; } setVentaRapidaAbierta(true); };
 
   // Paywall: Salón & Mesas y Cocina (KDS) quedan marcados premium en
   // NAV_GRUPOS — esta es la ÚNICA puerta de entrada para cambiar de página,
@@ -301,7 +301,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                 return (
                   <button
                     key={n.id}
-                    onClick={() => (n.id === "ventarapida" ? abrirVentaRapida() : irA(n.id))}
+                    onClick={() => irA(n.id)}
                     className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                       n.premium
                         ? "text-slate-400 dark:text-white/30 hover:bg-slate-200/40 dark:hover:bg-white/5"
@@ -384,7 +384,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
               tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
               ventasHoy={ventasHoy} nombreLocal={config.nombreLocal} tasaValida={tasaValida}
               onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
-              onRegistrarTasa={() => setBloqueoTasa("embebido")}
+              onRegistrarTasa={() => setBloqueoTasa(true)}
               onArticuloActualizado={actualizarArticuloEnEstado} />
           )}
           {pagina === "salon" && (esPremium("salon")
@@ -413,27 +413,16 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
         </div>
       </main>
 
-      {ventaRapidaAbierta && (
-        <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
-          ventasHoy={ventasHoy} nombreLocal={config.nombreLocal}
-          onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
-          onCerrar={() => setVentaRapidaAbierta(false)}
-          onArticuloActualizado={actualizarArticuloEnEstado} />
-      )}
-
       {bloqueoTasa && (
         <ModalTasaRequerida
           tenantId={tenantId}
-          onCancelar={() => setBloqueoTasa(null)}
+          onCancelar={() => setBloqueoTasa(false)}
           onRegistrada={() => {
-            // Solo el overlay de pantalla completa (sidebar → abrirVentaRapida)
-            // se auto-abre al registrar la tasa; el panel embebido en la
-            // Vista General ya está ahí mismo y se desbloquea solo al
-            // refrescar tasaBcv, sin duplicar la experiencia con el overlay.
-            const veniaDelOverlay = bloqueoTasa === "ventarapida";
-            setBloqueoTasa(null);
+            // El panel de Venta Rápida vive embebido en la Vista General —
+            // al registrar la tasa alcanza con refrescar tasaBcv para que
+            // se desbloquee solo ahí mismo, sin overlay aparte.
+            setBloqueoTasa(false);
             recargarTodo();
-            if (veniaDelOverlay) setVentaRapidaAbierta(true);
           }}
         />
       )}
