@@ -1126,7 +1126,7 @@ function MiniCalendarioSidebar() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// VISTA GENERAL / DASHBOARD
+// VISTA GENERAL / DASHBOARD (SINCRONIZACIÓN EN TIEMPO REAL)
 // ══════════════════════════════════════════════════════════════════════════
 function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingresosHoy, onNavegar }: {
   pacientes: Paciente[] | null; citasHoy: CitaMedica[] | null; salaEspera: SalaEsperaEntrada[] | null;
@@ -1134,7 +1134,54 @@ function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingreso
   onNavegar: (p: Pagina) => void;
 }) {
   const [busquedaRapida, setBusquedaRapida] = useState("");
-  const enEspera = (salaEspera || []).filter((e) => e.estado !== "FINALIZADO").length;
+
+  // Cargar turnos y cotizaciones en tiempo real desde el almacenamiento
+  const [turnosVivos, setTurnosVivos] = useState<TurnoSalaEspera[]>(() => {
+    try {
+      const raw = localStorage.getItem("aurora_mediclinic_sala_espera_turnos_v2");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+  });
+
+  const [cotizacionesVivas, setCotizacionesVivas] = useState<any[]>(() => {
+    try {
+      const raw = localStorage.getItem("aurora_mediclinic_cotizaciones");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+  });
+
+  // Efecto para escuchar cambios de storage o re-render
+  useEffect(() => {
+    const refrescarDatos = () => {
+      try {
+        const rawT = localStorage.getItem("aurora_mediclinic_sala_espera_turnos_v2");
+        if (rawT) setTurnosVivos(JSON.parse(rawT));
+        const rawC = localStorage.getItem("aurora_mediclinic_cotizaciones");
+        if (rawC) setCotizacionesVivas(JSON.parse(rawC));
+      } catch {}
+    };
+    refrescarDatos();
+    window.addEventListener("storage", refrescarDatos);
+    return () => window.removeEventListener("storage", refrescarDatos);
+  }, []);
+
+  // Cálculos en tiempo real
+  const enEspera = turnosVivos.length > 0
+    ? turnosVivos.filter((e) => e.estado === "EN_ESPERA" || e.estado === "EN_CONSULTA").length
+    : (salaEspera || []).filter((e) => e.estado !== "FINALIZADO").length;
+
+  const atendidosHoy = turnosVivos.length > 0
+    ? turnosVivos.filter((e) => e.estado === "ATENDIDO").length
+    : (citasHoy ? citasHoy.length : 0);
+
+  const totalPacientes = pacientes ? pacientes.length : 0;
+  const totalProcedimientos = (procedimientos ? procedimientos.length : 0) + cotizacionesVivas.length;
+
+  const turnosActivosLista = turnosVivos.length > 0
+    ? turnosVivos.filter((t) => t.estado === "EN_ESPERA" || t.estado === "EN_CONSULTA")
+    : (salaEspera || []).filter((e) => e.estado !== "FINALIZADO");
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1196,23 +1243,23 @@ function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingreso
             {String(enEspera)}
           </div>
           <div className="text-[11px] text-amber-600/80 dark:text-amber-400/80 font-medium mt-1">
-            Turnos pendientes hoy
+            Turnos activos hoy
           </div>
         </div>
 
         {/* Card 2: PACIENTES ATENDIDOS HOY (Borde azul / cyan) */}
         <div
-          onClick={() => onNavegar("historias")}
+          onClick={() => onNavegar("sala-espera")}
           className="apple-glass rounded-2xl p-4 sm:p-5 border-l-4 border-l-sky-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
         >
           <div className="text-[11px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
             PACIENTES ATENDIDOS HOY
           </div>
           <div className="text-3xl font-black text-sky-500 font-['Outfit'] mt-1">
-            {citasHoy ? String(citasHoy.length) : "0"}
+            {String(atendidosHoy)}
           </div>
           <div className="text-[11px] text-sky-600/80 dark:text-sky-400/80 font-medium mt-1">
-            Consultas registradas
+            Consultas completadas
           </div>
         </div>
 
@@ -1225,7 +1272,7 @@ function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingreso
             EXPEDIENTES REGISTRADOS
           </div>
           <div className="text-3xl font-black text-teal-600 dark:text-teal-400 font-['Outfit'] mt-1">
-            {pacientes ? String(pacientes.length) : "0"}
+            {String(totalPacientes)}
           </div>
           <div className="text-[11px] text-teal-600/80 dark:text-teal-400/80 font-medium mt-1">
             Pacientes en base de datos
@@ -1241,10 +1288,10 @@ function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingreso
             PROCEDIMIENTOS SEMANA
           </div>
           <div className="text-3xl font-black text-purple-600 dark:text-purple-400 font-['Outfit'] mt-1">
-            {procedimientos ? String(procedimientos.length) : "0"}
+            {String(totalProcedimientos)}
           </div>
           <div className="text-[11px] text-purple-600/80 dark:text-purple-400/80 font-medium mt-1">
-            Cotizaciones multimoneda
+            Cotizaciones y catálogo
           </div>
         </div>
       </div>
@@ -1291,31 +1338,41 @@ function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingreso
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Sala de Espera Activa */}
         <div className="apple-glass rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-bold text-sm text-slate-900 dark:text-white">Sala de Espera (Turnos Activos)</h4>
             <button onClick={() => onNavegar("sala-espera")} className="text-teal-600 dark:text-teal-400 text-xs font-bold cursor-pointer">Ver Sala →</button>
           </div>
-          {salaEspera === null ? <p className="text-xs text-slate-400">Cargando…</p> : (salaEspera.filter((e) => e.estado !== "FINALIZADO").length === 0) ? (
+          {turnosActivosLista.length === 0 ? (
             <p className="text-xs text-slate-400">No hay pacientes esperando en este momento.</p>
           ) : (
             <div className="space-y-2">
-              {salaEspera.filter((e) => e.estado !== "FINALIZADO").slice(0, 4).map((e, idx) => (
-                <div key={e.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-100/60 dark:bg-white/5 text-xs">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-500 font-bold flex items-center justify-center text-[10px]">#{idx + 1}</span>
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">{e.paciente?.nombreCompleto}</div>
-                      <div className="text-[10px] text-slate-500">{new Date(e.horaLlegada).toLocaleTimeString()}</div>
+              {turnosActivosLista.slice(0, 4).map((item: any, idx: number) => {
+                const nombre = item.pacienteNombre || item.paciente?.nombreCompleto || "Paciente";
+                const codigo = item.codigoTurno || `#${idx + 1}`;
+                const hora = item.horaLlegada || "Hoy";
+                const estado = item.estado || "EN_ESPERA";
+                return (
+                  <div key={item.id || idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-100/60 dark:bg-white/5 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold font-mono text-[11px]">{codigo}</span>
+                      <div>
+                        <div className="font-bold text-slate-900 dark:text-white">{nombre}</div>
+                        <div className="text-[10px] text-slate-500">{hora} · {item.motivo || "Consulta General"}</div>
+                      </div>
                     </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${estado === "EN_CONSULTA" ? "bg-sky-500/15 text-sky-600" : "bg-amber-500/15 text-amber-600"}`}>
+                      {estado.replace("_", " ")}
+                    </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold">{e.estado}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
+        {/* Próximas Citas de Hoy */}
         <div className="apple-glass rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-bold text-sm text-slate-900 dark:text-white">Próximas Citas de Hoy</h4>
