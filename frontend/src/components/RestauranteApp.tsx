@@ -221,6 +221,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const [lotesPorVencer, setLotesPorVencer] = useState<LoteArticulo[] | null>(null);
   const [kdsCounts, setKdsCounts] = useState<number>(0);
   const [tasaBcv, setTasaBcv] = useState<TasaCambio | null>(null);
+  const [tasaCop, setTasaCop] = useState<TasaCambio | null>(null);
 
   const recargarTodo = () => {
     mapaDeMesas().then(setMapa).catch(() => setMapa([]));
@@ -230,6 +231,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     listarArticulos().then(setArticulos).catch(() => setArticulos([]));
     alertasVencimiento(tenantId, 7).then(setLotesPorVencer).catch(() => setLotesPorVencer([]));
     tasaVigente(tenantId, "USD", "VES").then(setTasaBcv).catch(() => setTasaBcv(null));
+    tasaVigente(tenantId, "USD", "COP").then(setTasaCop).catch(() => setTasaCop(null));
     cargarVentasHoy();
     Promise.all(ESTACIONES.map((e) => obtenerTableroKds(tenantId, e).catch(() => [])))
       .then((listas) => setKdsCounts(listas.reduce((sum, l) => sum + l.filter((i) => i.estadoItem !== "ENTREGADO").length, 0)))
@@ -332,7 +334,11 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
 
       {/* ÁREA PRINCIPAL */}
       <main className="flex-1 flex flex-col overflow-y-auto">
-        <header className="h-16 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between px-6 bg-white/30 dark:bg-black/10 backdrop-blur-md">
+        {/* relative + z-30: el header usa backdrop-blur, que crea su propio contexto de
+            apilamiento — sin un z-index explícito acá, el popover de la tasa (aunque
+            tenga su propio z-index alto) queda atrapado dentro de ese contexto y las
+            tarjetas de la Vista General (que vienen después en el DOM) lo tapan. */}
+        <header className="relative z-30 h-16 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between px-6 bg-white/30 dark:bg-black/10 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <button
               onClick={onSalir}
@@ -348,7 +354,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             <div className="text-xs text-right hidden sm:block">
               <div className="font-bold text-slate-900 dark:text-white">{config.nombreLocal}</div>
             </div>
-            <TasaBadge tenantId={tenantId} tasaBcv={tasaBcv} onActualizada={setTasaBcv} />
+            <TasaBadge tenantId={tenantId} tasaBcv={tasaBcv} tasaCop={tasaCop} onActualizadaBcv={setTasaBcv} onActualizadaCop={setTasaCop} />
             <button onClick={recargarTodo} className="p-2 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
               <IconRefresh size={16} />
             </button>
@@ -419,11 +425,15 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
  * header al confirmar, sin recargar la página ni navegar fuera de la
  * vista actual (Ventas, Inventario, Reportes, etc.).
  */
-function TasaBadge({ tenantId, tasaBcv, onActualizada }: {
-  tenantId: number; tasaBcv: TasaCambio | null; onActualizada: (t: TasaCambio) => void;
+const fmtTasa = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizadaCop }: {
+  tenantId: number; tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null;
+  onActualizadaBcv: (t: TasaCambio) => void; onActualizadaCop: (t: TasaCambio) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
-  const [tasa, setTasa] = useState("");
+  const [tasaBs, setTasaBs] = useState("");
+  const [tasaCopVal, setTasaCopVal] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -431,11 +441,12 @@ function TasaBadge({ tenantId, tasaBcv, onActualizada }: {
 
   useEffect(() => {
     if (!abierto) return;
-    setTasa(tasaBcv ? String(Number(tasaBcv.tasa)) : "");
+    setTasaBs(tasaBcv ? String(Number(tasaBcv.tasa)) : "");
+    setTasaCopVal(tasaCop ? String(Number(tasaCop.tasa)) : "");
     setError(null);
     const id = setTimeout(() => inputRef.current?.focus(), 0);
     return () => clearTimeout(id);
-  }, [abierto, tasaBcv]);
+  }, [abierto, tasaBcv, tasaCop]);
 
   useEffect(() => {
     if (!abierto) return;
@@ -449,13 +460,18 @@ function TasaBadge({ tenantId, tasaBcv, onActualizada }: {
   }, [abierto]);
 
   const actualizar = async () => {
-    const valor = Number(tasa);
-    if (!valor || valor <= 0) { setError("Ingresa una tasa válida mayor a cero"); return; }
+    const valorBs = Number(tasaBs);
+    const valorCop = Number(tasaCopVal);
+    const bsValido = tasaBs.trim() !== "" && valorBs > 0;
+    const copValido = tasaCopVal.trim() !== "" && valorCop > 0;
+    if (!bsValido && !copValido) { setError("Ingresa al menos una tasa válida mayor a cero"); return; }
     setGuardando(true);
     setError(null);
     try {
-      const nueva = await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: valor, origen: "MANUAL" });
-      onActualizada(nueva);
+      const tareas: Promise<void>[] = [];
+      if (bsValido) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: valorBs, origen: "MANUAL" }).then(onActualizadaBcv));
+      if (copValido) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: valorCop, origen: "MANUAL" }).then(onActualizadaCop));
+      await Promise.all(tareas);
       setAbierto(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo actualizar la tasa");
@@ -466,27 +482,42 @@ function TasaBadge({ tenantId, tasaBcv, onActualizada }: {
 
   return (
     <div className="relative" ref={popoverRef}>
-      <button type="button" onClick={() => setAbierto((v) => !v)} title="Clic para actualizar la tasa de cambio"
+      <button type="button" onClick={() => setAbierto((v) => !v)} title="Clic para actualizar las tasas de cambio"
         className={`flex items-center gap-1.5 text-[11px] font-mono font-bold px-2.5 py-1.5 rounded-full cursor-pointer border transition-colors ${
           tasaBcv
             ? "text-teal-600 dark:text-teal-400 bg-teal-500/10 border-teal-500/25 hover:bg-teal-500/20"
             : "text-amber-500 bg-amber-500/10 border-amber-500/25 hover:bg-amber-500/20"
         }`}>
-        <span>{tasaBcv ? `Tasa: Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa registrada"}</span>
+        <span>
+          {tasaBcv ? `Bs. ${fmtTasa(Number(tasaBcv.tasa))}` : "Sin tasa"}
+          {tasaCop && <span className="text-slate-400 dark:text-white/30 font-normal"> · COP {fmtTasa(Number(tasaCop.tasa))}</span>}
+        </span>
         <IconCustomize size={11} />
       </button>
 
       {abierto && (
-        <div className="absolute right-0 top-full mt-2 z-50 w-64 apple-glass rounded-xl p-4 shadow-lg border border-slate-300/60 dark:border-white/10">
-          <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2">Actualizar tasa (1 USD = Bs.)</p>
+        <div className="absolute right-0 mt-2 z-[9999] w-72 apple-glass rounded-xl p-4 shadow-lg border border-slate-300/60 dark:border-white/10">
+          <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2">Actualizar tasas de cambio</p>
+
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">Tasa Bs. (1 USD =)</label>
           <input
             ref={inputRef}
-            value={tasa}
-            onChange={(e) => setTasa(e.target.value)}
-            type="number" step="0.01" min="0" placeholder="Ej. 56.40"
+            value={tasaBs}
+            onChange={(e) => setTasaBs(e.target.value)}
+            type="number" step="0.01" min="0" placeholder="Ej. 62.75"
+            className="input-horeca w-full mb-2.5"
+            onKeyDown={(e) => e.key === "Enter" && actualizar()}
+          />
+
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">Tasa COP (1 USD =)</label>
+          <input
+            value={tasaCopVal}
+            onChange={(e) => setTasaCopVal(e.target.value)}
+            type="number" step="0.01" min="0" placeholder="Ej. 4100"
             className="input-horeca w-full"
             onKeyDown={(e) => e.key === "Enter" && actualizar()}
           />
+
           {error && <p className="text-[10px] text-red-500 mt-1.5">{error}</p>}
           <button onClick={actualizar} disabled={guardando}
             className="w-full mt-2.5 g-aurora text-white text-xs font-bold py-2 rounded-lg cursor-pointer disabled:opacity-60">
