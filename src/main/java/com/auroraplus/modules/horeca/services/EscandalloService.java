@@ -136,10 +136,12 @@ public class EscandalloService {
             throw new RuntimeException("Referencia circular de sub-recetas detectada en el escandallo " + escandallo.getId());
         }
         try {
+            // Una receta sin ingredientes configurados es válida — un negocio
+            // puede querer vender un plato ya con su precio antes de terminar
+            // de cargar el costeo. Se vende igual, solo que sin descuento de
+            // inventario ni costo real (queda en $0 hasta que se complete el
+            // escandallo desde Recetas & Escandallo).
             List<DetalleReceta> ingredientes = detalleRecetaRepository.findByEscandalloId(escandallo.getId());
-            if (ingredientes.isEmpty()) {
-                throw new RuntimeException("El escandallo '" + escandallo.getNombrePlato() + "' no tiene ingredientes configurados");
-            }
 
             BigDecimal costoTotal = BigDecimal.ZERO;
 

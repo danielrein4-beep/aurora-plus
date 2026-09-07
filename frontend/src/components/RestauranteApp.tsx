@@ -9,7 +9,7 @@ import {
   mapaDeMesas, crearMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
   dividirCuenta, cerrarComanda, listarEscandallos, crearEscandallo, agregarIngredienteEscandallo,
   listarIngredientesEscandallo, listarFastBar, crearTragoFastBar, venderTragoRapido,
-  listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo,
+  listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase,
   tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
   cerrarCaja, historialCierres, descargarCierrePdf,
@@ -331,7 +331,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
               escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
           )}
           {pagina === "cocina" && <Cocina onCambio={recargarTodo} />}
-          {pagina === "recetas" && <Recetas tenantId={tenantId} escandallos={escandallos} onCambio={recargarTodo} />}
+          {pagina === "recetas" && <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} onCambio={recargarTodo} />}
           {pagina === "fastbar" && <FastBar tenantId={tenantId} fastbar={fastbar} onVenta={registrarVenta} onCambio={recargarTodo} />}
           {pagina === "compras" && (
             <ComprasProveedores tenantId={tenantId} proveedores={proveedores} articulos={articulos} onCambio={recargarTodo} />
@@ -419,6 +419,7 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
   const [nuevaMesa, setNuevaMesa] = useState({ numero: "", capacidad: "", zona: "SALON_PRINCIPAL" });
   const [errorMesa, setErrorMesa] = useState<string | null>(null);
   const [guardandoMesa, setGuardandoMesa] = useState(false);
+  const [vista, setVista] = useState<"lista" | "plano">("plano");
 
   const siguienteNumero = (mapa || []).reduce((max, m) => Math.max(max, m.mesa.numero), 0) + 1;
 
@@ -782,7 +783,7 @@ function Cocina({ onCambio }: { onCambio: () => void }) {
 // ══════════════════════════════════════════════════════════════════════════
 // RECETAS & ESCANDALLO
 // ══════════════════════════════════════════════════════════════════════════
-function Recetas({ tenantId, escandallos, onCambio }: { tenantId: number; escandallos: EscandalloReceta[] | null; onCambio: () => void }) {
+function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: number; escandallos: EscandalloReceta[] | null; articulos: Articulo[] | null; onCambio: () => void }) {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [form, setForm] = useState({ nombrePlato: "", estacionCocina: "COCINA", precioVenta: "" });
   const [guardando, setGuardando] = useState(false);
@@ -852,15 +853,15 @@ function Recetas({ tenantId, escandallos, onCambio }: { tenantId: number; escand
       </div>
 
       {seleccionado && (
-        <IngredientesModal tenantId={tenantId} escandallo={seleccionado} onClose={() => setSeleccionado(null)} onCambio={onCambio} />
+        <IngredientesModal tenantId={tenantId} escandallo={seleccionado} articulos={articulos} onClose={() => setSeleccionado(null)} onCambio={onCambio} />
       )}
     </div>
   );
 }
 
-function IngredientesModal({ tenantId, escandallo, onClose, onCambio }: { tenantId: number; escandallo: EscandalloReceta; onClose: () => void; onCambio: () => void }) {
+function IngredientesModal({ tenantId, escandallo, articulos, onClose, onCambio }: { tenantId: number; escandallo: EscandalloReceta; articulos: Articulo[] | null; onClose: () => void; onCambio: () => void }) {
   const [ingredientes, setIngredientes] = useState<DetalleReceta[] | null>(null);
-  const [sku, setSku] = useState("");
+  const [articuloId, setArticuloId] = useState("");
   const [pesoNeto, setPesoNeto] = useState("");
   const [merma, setMerma] = useState("0");
   const [error, setError] = useState<string | null>(null);
@@ -870,12 +871,13 @@ function IngredientesModal({ tenantId, escandallo, onClose, onCambio }: { tenant
   useEffect(() => { cargar(); }, [escandallo.id]);
 
   const agregar = async () => {
-    if (!sku.trim() || !pesoNeto) { setError("SKU del ingrediente y peso neto son obligatorios"); return; }
+    const articulo = (articulos || []).find((a) => String(a.id) === articuloId);
+    if (!articulo || !pesoNeto) { setError("Elige el ingrediente del inventario e indica el peso neto"); return; }
     setGuardando(true);
     setError(null);
     try {
-      await agregarIngredienteEscandallo(tenantId, escandallo.id, { ingredienteSku: sku.trim(), pesoNeto: Number(pesoNeto), porcentajeMerma: Number(merma) || 0 });
-      setSku(""); setPesoNeto(""); setMerma("0");
+      await agregarIngredienteEscandallo(tenantId, escandallo.id, { ingredienteSku: articulo.sku, pesoNeto: Number(pesoNeto), porcentajeMerma: Number(merma) || 0 });
+      setArticuloId(""); setPesoNeto(""); setMerma("0");
       cargar();
       onCambio();
     } catch (e) {
@@ -892,22 +894,31 @@ function IngredientesModal({ tenantId, escandallo, onClose, onCambio }: { tenant
           <p className="text-xs text-slate-400">Sin ingredientes registrados todavía.</p>
         ) : (
           <div className="space-y-2">
-            {ingredientes.map((d) => (
-              <div key={d.id} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3.5 py-2.5 text-sm">
-                <span className="text-slate-900 dark:text-white">{d.subReceta ? `Sub-receta: ${d.subReceta.nombrePlato}` : d.ingredienteSku}</span>
-                <span className="font-mono text-xs text-slate-500 dark:text-white/40">{Number(d.cantidadRequerida).toFixed(3)}</span>
-              </div>
-            ))}
+            {ingredientes.map((d) => {
+              const articuloIngrediente = (articulos || []).find((a) => a.sku === d.ingredienteSku);
+              return (
+                <div key={d.id} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3.5 py-2.5 text-sm">
+                  <span className="text-slate-900 dark:text-white">{d.subReceta ? `Sub-receta: ${d.subReceta.nombrePlato}` : articuloIngrediente?.nombre || d.ingredienteSku}</span>
+                  <span className="font-mono text-xs text-slate-500 dark:text-white/40">{Number(d.cantidadRequerida).toFixed(3)}</span>
+                </div>
+              );
+            })}
           </div>
         )}
 
         <div className="apple-glass rounded-xl p-4 space-y-2.5 border-t border-slate-300/50 dark:border-white/10">
-          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Agregar ingrediente directo (SKU del artículo en Inventario)</p>
+          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Agregar ingrediente desde Inventario</p>
           <div className="grid grid-cols-3 gap-2">
-            <input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU artículo" className="input-horeca" />
-            <input value={pesoNeto} onChange={(e) => setPesoNeto(e.target.value)} type="number" step="0.001" placeholder="Peso neto" className="input-horeca" />
+            <select value={articuloId} onChange={(e) => setArticuloId(e.target.value)} className="input-horeca">
+              <option value="">— Ingrediente —</option>
+              {(articulos || []).map((a) => <option key={a.id} value={a.id}>{a.nombre} ({a.unidadMedida})</option>)}
+            </select>
+            <input value={pesoNeto} onChange={(e) => setPesoNeto(e.target.value)} type="number" step="0.001" placeholder="Cantidad" className="input-horeca" />
             <input value={merma} onChange={(e) => setMerma(e.target.value)} type="number" step="0.1" placeholder="% merma" className="input-horeca" />
           </div>
+          {(articulos || []).length === 0 && (
+            <p className="text-[11px] text-amber-500">Todavía no tienes artículos en Inventario — agrega uno primero para poder elegirlo aquí.</p>
+          )}
           {error && <p className="text-xs text-red-500">{error}</p>}
           <button onClick={agregar} disabled={guardando} className="w-full g-aurora text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
             {guardando ? "Agregando…" : "+ Agregar ingrediente"}
@@ -1117,19 +1128,40 @@ function Inventario({ tenantId, articulos, onCambio }: { tenantId: number; artic
   );
 }
 
+function generarSku(nombre: string): string {
+  const base = nombre.trim().toUpperCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // quita tildes
+    .replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return `${base || "ART"}-${Date.now().toString().slice(-5)}`;
+}
+
 function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number; articulos: Articulo[] | null; onCambio: () => void }) {
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ sku: "", nombre: "", unidadMedida: "kg", categoria: "" });
+  const [form, setForm] = useState({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", cantidadInicial: "", fechaVencimiento: "" });
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
   const crear = async () => {
-    if (!form.sku.trim() || !form.nombre.trim()) { setError("SKU y nombre son obligatorios"); return; }
+    if (!form.nombre.trim()) { setError("El nombre del artículo es obligatorio"); return; }
     setGuardando(true);
     setError(null);
     try {
-      await crearArticulo(tenantId, { sku: form.sku.trim(), nombre: form.nombre.trim(), unidadMedida: form.unidadMedida, categoria: form.categoria || undefined });
-      setForm({ sku: "", nombre: "", unidadMedida: "kg", categoria: "" });
+      const nuevo = await crearArticulo(tenantId, {
+        sku: generarSku(form.nombre),
+        nombre: form.nombre.trim(),
+        unidadMedida: form.unidadMedida,
+        categoria: form.categoria || undefined,
+        costoUnitario: form.costoUnitario ? Number(form.costoUnitario) : undefined,
+      });
+      if (form.cantidadInicial && Number(form.cantidadInicial) > 0) {
+        await entradaArticulo(tenantId, nuevo.id, {
+          cantidad: Number(form.cantidadInicial),
+          costoUnitario: form.costoUnitario ? Number(form.costoUnitario) : undefined,
+          motivo: "Carga inicial de inventario",
+          fechaVencimiento: form.fechaVencimiento || undefined,
+        });
+      }
+      setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", cantidadInicial: "", fechaVencimiento: "" });
       setMostrarForm(false);
       onCambio();
     } catch (e) {
@@ -1150,14 +1182,35 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
 
       {mostrarForm && (
         <div className="apple-glass rounded-2xl p-5 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} placeholder="SKU" className="input-horeca" />
-            <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Nombre del insumo" className="input-horeca" />
-            <select value={form.unidadMedida} onChange={(e) => setForm({ ...form, unidadMedida: e.target.value })} className="input-horeca">
-              {["kg", "g", "l", "ml", "unidad"].map((u) => <option key={u} value={u}>{u}</option>)}
-            </select>
-            <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} placeholder="Categoría (opcional)" className="input-horeca" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Campo label="Nombre del insumo">
+              <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ej. Harina de maíz" className="input-horeca" />
+            </Campo>
+            <Campo label="Unidad de medida">
+              <select value={form.unidadMedida} onChange={(e) => setForm({ ...form, unidadMedida: e.target.value })} className="input-horeca">
+                {["kg", "g", "l", "ml", "unidad"].map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </Campo>
+            <Campo label="Categoría (opcional)">
+              <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} placeholder="Ej. Insumos secos" className="input-horeca" />
+            </Campo>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-300/50 dark:border-white/10">
+            <Campo label="Costo unitario $ (opcional)">
+              <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" placeholder="0.00" className="input-horeca" />
+            </Campo>
+            <Campo label="Cantidad inicial en stock (opcional)">
+              <input value={form.cantidadInicial} onChange={(e) => setForm({ ...form, cantidadInicial: e.target.value })} type="number" step="0.001" placeholder="0" className="input-horeca" />
+            </Campo>
+            <Campo label="Fecha de vencimiento (opcional)">
+              <input value={form.fechaVencimiento} onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })} type="date" className="input-horeca" />
+            </Campo>
+          </div>
+          {form.fechaVencimiento && (
+            <p className={`text-[11px] font-semibold ${diasParaVencerTexto(form.fechaVencimiento).color}`}>
+              {diasParaVencerTexto(form.fechaVencimiento).texto} — te avisaremos en Vencimientos cuando se acerque.
+            </p>
+          )}
           {error && <p className="text-xs text-red-500">{error}</p>}
           <button onClick={crear} disabled={guardando} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
             {guardando ? "Guardando…" : "Guardar artículo"}
@@ -1169,7 +1222,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
         {(articulos || []).map((a) => (
           <div key={a.id} className="apple-glass rounded-2xl p-5 space-y-1.5">
             <h4 className="font-bold text-slate-900 dark:text-white text-sm">{a.nombre}</h4>
-            <div className="text-xs text-slate-500 dark:text-white/40">SKU: {a.sku} · {a.unidadMedida}</div>
+            <div className="text-xs text-slate-500 dark:text-white/40">{a.categoria || "Sin categoría"} · {a.unidadMedida}</div>
             <div className="text-xs text-slate-500 dark:text-white/40">Stock: {Number(a.stockActual).toFixed(2)} · Costo: ${Number(a.costoUnitario).toFixed(2)}</div>
           </div>
         ))}

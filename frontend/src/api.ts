@@ -502,6 +502,10 @@ export function crearArticulo(tenantId: number, datos: { sku: string; nombre: st
   return request(`/api/inventario/articulos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
+export function entradaArticulo(tenantId: number, articuloId: number, datos: { cantidad: number; costoUnitario?: number; motivo?: string; fechaVencimiento?: string }): Promise<unknown> {
+  return request(`/api/inventario/articulos/${articuloId}/entrada?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
 export interface ItemCompraInsumo {
   articuloId: number;
   cantidad: number;

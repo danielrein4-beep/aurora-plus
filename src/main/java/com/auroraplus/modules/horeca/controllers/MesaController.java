@@ -33,6 +33,41 @@ public class MesaController {
         return ResponseEntity.ok(mesaRepository.save(mesa));
     }
 
+    public static class EditarMesaRequest {
+        public Integer numero;
+        public Integer capacidad;
+        public String zona;
+    }
+
+    /** Edita número, capacidad o zona de una mesa ya existente — sin tocar su posición en el plano. */
+    @PutMapping("/{id}")
+    public ResponseEntity<Mesa> editar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody EditarMesaRequest request) {
+        Mesa mesa = mesaRepository.findById(id).orElseThrow(() -> new RuntimeException("Mesa no encontrada"));
+        if (!mesa.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Mesa no pertenece a este tenant");
+        }
+        if (request.numero != null) mesa.setNumero(request.numero);
+        if (request.capacidad != null) mesa.setCapacidad(request.capacidad);
+        if (request.zona != null) mesa.setZona(request.zona);
+        return ResponseEntity.ok(mesaRepository.save(mesa));
+    }
+
+    /** Elimina una mesa — rechaza si tiene una comanda ABIERTA para no perder el rastro de una cuenta en curso. */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+        Mesa mesa = mesaRepository.findById(id).orElseThrow(() -> new RuntimeException("Mesa no encontrada"));
+        if (!mesa.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Mesa no pertenece a este tenant");
+        }
+        boolean tieneComandaAbierta = comandaRepository.findAll().stream()
+            .anyMatch(c -> c.getEstado() == Comanda.EstadoComanda.ABIERTA && mesa.getNumero().equals(c.getNumeroMesa()));
+        if (tieneComandaAbierta) {
+            throw new RuntimeException("No se puede eliminar la mesa " + mesa.getNumero() + ": tiene una comanda abierta. Ciérrala primero.");
+        }
+        mesaRepository.delete(mesa);
+        return ResponseEntity.noContent().build();
+    }
+
     public static class PosicionRequest {
         public Integer posX;
         public Integer posY;

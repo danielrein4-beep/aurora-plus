@@ -3,8 +3,10 @@ package com.auroraplus.core.inventario.controllers;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.inventario.entities.Articulo;
 import com.auroraplus.core.inventario.entities.Kardex;
+import com.auroraplus.core.inventario.entities.LoteArticulo;
 import com.auroraplus.core.inventario.repositories.ArticuloRepository;
 import com.auroraplus.core.inventario.repositories.KardexRepository;
+import com.auroraplus.core.inventario.repositories.LoteArticuloRepository;
 import com.auroraplus.core.inventario.services.InventarioService;
 import jakarta.persistence.EntityManager;
 import org.hibernate.Session;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 /** CRUD de artículos de inventario base (Fase 1.4) — no existía ningún controller para esto todavía. */
@@ -31,6 +34,9 @@ public class ArticuloController {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private LoteArticuloRepository loteArticuloRepository;
 
     @GetMapping
     public List<Articulo> listar() {
@@ -87,6 +93,11 @@ public class ArticuloController {
         public BigDecimal cantidad;
         public BigDecimal costoUnitario;
         public String motivo;
+        // Opcional: si el artículo es perecedero, crea de una vez un LoteArticulo
+        // rastreable para las alertas de vencimiento — mismo comportamiento que
+        // una compra con factura, pero sin necesitar un proveedor para el alta
+        // rápida de un artículo nuevo desde Inventario.
+        public LocalDate fechaVencimiento;
     }
 
     /** Entrada de stock (compra/reposición) — actualiza también el costo unitario vigente del artículo. */
@@ -100,9 +111,22 @@ public class ArticuloController {
             articulo.setCostoUnitario(request.costoUnitario);
             articuloRepository.save(articulo);
         }
-        return ResponseEntity.ok(inventarioService.registrarMovimientoKardex(id, tenantId, Kardex.TipoOperacion.ENTRADA,
-            request.cantidad, request.costoUnitario != null ? request.costoUnitario : articulo.getCostoUnitario(),
-            request.motivo != null ? request.motivo : "Entrada de stock"));
+        BigDecimal costoAplicado = request.costoUnitario != null ? request.costoUnitario : articulo.getCostoUnitario();
+        Kardex movimiento = inventarioService.registrarMovimientoKardex(id, tenantId, Kardex.TipoOperacion.ENTRADA,
+            request.cantidad, costoAplicado, request.motivo != null ? request.motivo : "Entrada de stock");
+
+        if (request.fechaVencimiento != null) {
+            LoteArticulo lote = new LoteArticulo();
+            lote.setTenantId(tenantId);
+            lote.setArticulo(articulo);
+            lote.setCantidadIngresada(request.cantidad);
+            lote.setCostoUnitario(costoAplicado);
+            lote.setFechaVencimiento(request.fechaVencimiento);
+            lote.setReferenciaCompra(request.motivo != null ? request.motivo : "Entrada de stock");
+            loteArticuloRepository.save(lote);
+        }
+
+        return ResponseEntity.ok(movimiento);
     }
 
     @GetMapping("/{id}/kardex")
