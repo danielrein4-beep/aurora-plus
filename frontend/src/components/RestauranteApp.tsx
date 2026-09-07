@@ -396,7 +396,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
       </main>
 
       {ventaRapidaAbierta && (
-        <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv}
+        <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
           ventasHoy={ventasHoy} nombreLocal={config.nombreLocal}
           onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
           onCerrar={() => setVentaRapidaAbierta(false)} />
@@ -2822,9 +2822,9 @@ function TasasDeCambio({ tenantId }: { tenantId: number }) {
 const CATEGORIA_RECETAS = "__RECETAS__";
 const CATEGORIA_FASTBAR = "__FASTBAR__";
 
-function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, ventasHoy, nombreLocal, onVenta, onCerrar }: {
+function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, onVenta, onCerrar }: {
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
-  tasaBcv: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
+  tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
   onVenta: (monto: number, metodo: string) => void; onCerrar: () => void;
 }) {
   interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
@@ -3059,9 +3059,10 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, venta
             )}
           </div>
           <div className="text-right hidden sm:block">
-            <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Tasa BCV</div>
+            <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Tasa</div>
             <div className="text-[11px] font-bold font-mono text-emerald-500">
               {tasaBcv && Number(tasaBcv.tasa) > 0 ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa"}
+              {tasaCop && Number(tasaCop.tasa) > 0 && ` · COP ${Number(tasaCop.tasa).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </div>
           </div>
           <div className="text-right">
@@ -3235,6 +3236,11 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, venta
                   <span className="text-[11px] font-semibold text-slate-400">≈ Bs</span><span>{(total * Number(tasaBcv.tasa)).toFixed(2)}</span>
                 </div>
               )}
+              {tasaCop && Number(tasaCop.tasa) > 0 && (
+                <div className="flex items-center justify-between text-sm text-sky-600 dark:text-sky-400 font-mono font-bold mt-0.5">
+                  <span className="text-[11px] font-semibold text-slate-400">≈ COP</span><span>{(total * Number(tasaCop.tasa)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              )}
             </div>
             {carrito.length > 0 && (
               <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
@@ -3291,6 +3297,11 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, venta
               {tasaBcv && Number(tasaBcv.tasa) > 0 && (
                 <div className="flex items-center justify-between text-xs text-teal-600 dark:text-teal-400 font-mono mt-0.5">
                   <span>≈ Bs</span><span>{(recibo.total * Number(tasaBcv.tasa)).toFixed(2)}</span>
+                </div>
+              )}
+              {tasaCop && Number(tasaCop.tasa) > 0 && (
+                <div className="flex items-center justify-between text-xs text-sky-600 dark:text-sky-400 font-mono mt-0.5">
+                  <span>≈ COP</span><span>{(recibo.total * Number(tasaCop.tasa)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               )}
             </div>
