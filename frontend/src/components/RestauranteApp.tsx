@@ -2582,7 +2582,6 @@ function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; a
       <div className="flex items-center justify-between gap-2">
         <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">{articulo.nombre}</h4>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button onClick={() => setModo("reabastecer")} title="Reabastecer (entrada rápida de stock)" className="text-slate-400 hover:text-emerald-500 cursor-pointer"><IconDownload size={13} /></button>
           <button onClick={() => setModo("ajustar")} title="Corregir stock (conteo físico)" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconRefresh size={13} /></button>
           <button onClick={() => setModo("editar")} title="Editar artículo" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconCustomize size={13} /></button>
           <button onClick={eliminar} disabled={guardando} title="Eliminar artículo" className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40"><IconTrash size={13} /></button>
@@ -2606,6 +2605,14 @@ function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; a
         </span>
         <span className="text-slate-400 dark:text-white/40 font-mono">Costo ${Number(articulo.costoUnitario).toFixed(2)}</span>
       </div>
+
+      {/* Botón grande y con texto a propósito — el ícono chiquito de antes
+          era demasiado sutil, un cajero reportó que no encontraba ninguna
+          forma de recargar stock desde la tarjeta. */}
+      <button onClick={() => setModo("reabastecer")}
+        className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 py-2 rounded-xl cursor-pointer transition-colors">
+        <IconDownload size={13} /> Reabastecer stock
+      </button>
       {error && <p className="text-[10px] text-red-500">{error}</p>}
 
       {modo === "editar" && (
