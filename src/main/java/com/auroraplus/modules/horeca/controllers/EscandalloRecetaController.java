@@ -9,6 +9,7 @@ import com.auroraplus.modules.horeca.services.EscandalloService;
 import jakarta.persistence.EntityManager;
 import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -126,5 +127,32 @@ public class EscandalloRecetaController {
     @PostMapping("/{id}/recalcular-costo")
     public ResponseEntity<EscandalloReceta> recalcularCosto(@PathVariable Long id, @RequestParam Long tenantId) {
         return ResponseEntity.ok(escandalloService.recalcularCosto(id, tenantId));
+    }
+
+    /**
+     * Elimina una receta y sus líneas de ingredientes (ej. datos de prueba).
+     * Si ya se vendió alguna vez o se usa como sub-receta de otra, la base de
+     * datos rechaza el borrado por la referencia (FK) — se traduce a un error
+     * claro en vez de un 500 crudo.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+        EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
+        if (!escandallo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Escandallo no pertenece a este tenant");
+        }
+
+        detalleRecetaRepository.deleteAll(detalleRecetaRepository.findByEscandalloId(id));
+
+        try {
+            escandalloRecetaRepository.delete(escandallo);
+            escandalloRecetaRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new RuntimeException("No se puede eliminar \"" + escandallo.getNombrePlato()
+                + "\": ya tiene ventas registradas o se usa como sub-receta de otro plato.");
+        }
+
+        return ResponseEntity.noContent().build();
     }
 }

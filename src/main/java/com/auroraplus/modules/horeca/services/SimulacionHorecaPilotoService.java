@@ -57,7 +57,7 @@ public class SimulacionHorecaPilotoService {
                 // escandallo y descuenta el inventario internamente (antes esto se hacía
                 // aparte, desconectado del flujo real de comanda; ya está corregido).
                 horecaService.agregarItemComanda(comanda.getId(), tenantId, datos.escandalloId, null,
-                    null, 1, new BigDecimal("18.00"));
+                    null, BigDecimal.ONE, new BigDecimal("18.00"));
                 resultado.totalCostoInsumosConsumidos = resultado.totalCostoInsumosConsumidos.add(
                     escandalloRecetaRepository.findById(datos.escandalloId).orElseThrow().getCostoTotalProduccion());
 

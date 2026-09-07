@@ -7,7 +7,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
-  dividirCuenta, cerrarComandaMixto, listarEscandallos, crearEscandallo, agregarIngredienteEscandallo,
+  dividirCuenta, cerrarComandaMixto, listarEscandallos, crearEscandallo, eliminarEscandallo, agregarIngredienteEscandallo,
   listarIngredientesEscandallo, listarFastBar, crearTragoFastBar, venderTragoRapido,
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda,
@@ -1262,6 +1262,22 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seleccionado, setSeleccionado] = useState<EscandalloReceta | null>(null);
+  const [eliminandoId, setEliminandoId] = useState<number | null>(null);
+
+  const eliminar = async (e: React.MouseEvent, escandallo: EscandalloReceta) => {
+    e.stopPropagation();
+    if (!window.confirm(`¿Eliminar la receta "${escandallo.nombrePlato}"? Esto no se puede deshacer.`)) return;
+    setEliminandoId(escandallo.id);
+    setError(null);
+    try {
+      await eliminarEscandallo(tenantId, escandallo.id);
+      onCambio();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo eliminar la receta");
+    } finally {
+      setEliminandoId(null);
+    }
+  };
 
   const crear = async () => {
     if (!form.nombrePlato.trim() || !form.precioVenta) { setError("Nombre y precio de venta son obligatorios"); return; }
@@ -1309,9 +1325,15 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
           const margen = Number(e.precioVenta) - Number(e.costoTotalProduccion || 0);
           return (
             <div key={e.id} onClick={() => setSeleccionado(e)} className="apple-glass rounded-2xl p-5 hover-card cursor-pointer space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <h4 className="font-bold text-slate-900 dark:text-white text-sm">{e.nombrePlato}</h4>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-white/10 text-slate-500 dark:text-white/40">{e.estacionCocina}</span>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-white/10 text-slate-500 dark:text-white/40">{e.estacionCocina}</span>
+                  <button onClick={(ev) => eliminar(ev, e)} disabled={eliminandoId === e.id} title="Eliminar receta"
+                    className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40">
+                    <IconTrash size={13} />
+                  </button>
+                </div>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-500 dark:text-white/40">Precio: <strong className="text-slate-900 dark:text-white">${Number(e.precioVenta).toFixed(2)}</strong></span>
@@ -2038,7 +2060,8 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
     const nombre = articuloSel ? articuloSel.nombre : busqueda.trim();
     if (!nombre) { setError("Busca en tu inventario o escribe qué vas a vender"); return; }
     if (!precioManual || Number(precioManual) <= 0) { setError("Indica el precio de venta"); return; }
-    const cant = Math.max(1, parseInt(cantidadManual, 10) || 1);
+    const cant = parseFloat(cantidadManual);
+    if (!cant || cant <= 0) { setError("Indica una cantidad válida (acepta decimales: kg, L, etc.)"); return; }
     if (articuloSel) {
       const yaEnCarrito = carrito.find((l) => l.key === `articulo-${articuloSel.id}`)?.cantidad || 0;
       if (yaEnCarrito + cant > Number(articuloSel.stockActual)) {
@@ -2161,7 +2184,13 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
             </div>
           )}
           <div className="flex items-center gap-2">
-            <input value={cantidadManual} onChange={(e) => setCantidadManual(e.target.value)} type="number" min="1" className="input-horeca w-16" title="Cantidad" />
+            <div className="relative w-24 flex-shrink-0">
+              <input value={cantidadManual} onChange={(e) => setCantidadManual(e.target.value)} type="number" min="0.001" step="0.001"
+                placeholder="Cant." className="input-horeca w-full" title={`Cantidad${articuloSel ? ` (${articuloSel.unidadMedida || "unidades"})` : ""} — acepta decimales para kg/L`} />
+              {articuloSel?.unidadMedida && (
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 pointer-events-none">{articuloSel.unidadMedida}</span>
+              )}
+            </div>
             <input value={precioManual} onChange={(e) => setPrecioManual(e.target.value)} type="number" step="0.01" placeholder="Precio de venta $" className="input-horeca flex-1" />
             <button onClick={handleAgregarProducto} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer whitespace-nowrap">
               + Agregar

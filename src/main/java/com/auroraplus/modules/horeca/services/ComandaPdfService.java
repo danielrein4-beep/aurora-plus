@@ -65,10 +65,11 @@ public class ComandaPdfService {
                     if (nombre.length() > 22) nombre = nombre.substring(0, 22);
                     cs.beginText();
                     cs.newLineAtOffset(x, y);
-                    cs.showText(item.getCantidad() + "x " + nombre);
+                    String cantidadTexto = item.getCantidad().stripTrailingZeros().toPlainString();
+                    cs.showText(cantidadTexto + "x " + nombre);
                     cs.endText();
 
-                    String subtotal = item.getPrecioUnitario().multiply(java.math.BigDecimal.valueOf(item.getCantidad()))
+                    String subtotal = item.getPrecioUnitario().multiply(item.getCantidad())
                         .setScale(2, RoundingMode.HALF_UP).toString();
                     cs.beginText();
                     cs.newLineAtOffset(TICKET_WIDTH - x - 35, y);

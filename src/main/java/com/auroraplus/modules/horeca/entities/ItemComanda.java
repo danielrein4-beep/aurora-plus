@@ -37,8 +37,10 @@ public class ItemComanda {
     @Column(name = "estado_item", nullable = false, length = 20)
     private EstadoItem estadoItem;
 
-    @Column(nullable = false)
-    private Integer cantidad;
+    // BigDecimal (no Integer) para poder vender por peso/volumen fraccionario
+    // (ej. 2.5 kg de harina, 1.5 L de aceite), no solo por unidades enteras.
+    @Column(nullable = false, precision = 18, scale = 4)
+    private BigDecimal cantidad;
 
     @Column(name = "precio_unitario", nullable = false, precision = 18, scale = 2)
     private BigDecimal precioUnitario;
@@ -73,8 +75,8 @@ public class ItemComanda {
     public void setEstacionCocina(String estacionCocina) { this.estacionCocina = estacionCocina; }
     public EstadoItem getEstadoItem() { return estadoItem; }
     public void setEstadoItem(EstadoItem estadoItem) { this.estadoItem = estadoItem; }
-    public Integer getCantidad() { return cantidad; }
-    public void setCantidad(Integer cantidad) { this.cantidad = cantidad; }
+    public BigDecimal getCantidad() { return cantidad; }
+    public void setCantidad(BigDecimal cantidad) { this.cantidad = cantidad; }
     public BigDecimal getPrecioUnitario() { return precioUnitario; }
     public void setPrecioUnitario(BigDecimal precioUnitario) { this.precioUnitario = precioUnitario; }
     public Articulo getArticulo() { return articulo; }

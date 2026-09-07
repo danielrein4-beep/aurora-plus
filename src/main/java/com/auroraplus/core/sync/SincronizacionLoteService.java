@@ -117,7 +117,7 @@ public class SincronizacionLoteService {
         public Long escandalloId;
         public String nombrePlato;
         public String estacionCocina;
-        public Integer cantidad;
+        public BigDecimal cantidad;
         public BigDecimal precioUnitario;
     }
 

@@ -834,6 +834,10 @@ export function crearEscandallo(tenantId: number, datos: { nombrePlato: string; 
   return request(`/api/horeca/escandallos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
+export function eliminarEscandallo(tenantId: number, escandalloId: number): Promise<void> {
+  return request(`/api/horeca/escandallos/${escandalloId}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
 export function agregarIngredienteEscandallo(tenantId: number, escandalloId: number, datos: {
   ingredienteSku?: string; subEscandalloId?: number; cantidadRequerida?: number; pesoNeto?: number; porcentajeMerma?: number;
 }): Promise<EscandalloReceta> {

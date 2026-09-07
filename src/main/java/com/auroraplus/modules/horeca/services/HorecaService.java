@@ -388,7 +388,7 @@ public class HorecaService {
      */
     @Transactional
     public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, String nombrePlato,
-                                           String estacionCocina, Integer cantidad, BigDecimal precioUnitario) {
+                                           String estacionCocina, BigDecimal cantidad, BigDecimal precioUnitario) {
         return agregarItemComanda(comandaId, tenantId, escandalloId, null, nombrePlato, estacionCocina, cantidad, precioUnitario, null);
     }
 
@@ -400,7 +400,7 @@ public class HorecaService {
      */
     @Transactional
     public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, String nombrePlato,
-                                           String estacionCocina, Integer cantidad, BigDecimal precioUnitario,
+                                           String estacionCocina, BigDecimal cantidad, BigDecimal precioUnitario,
                                            String claveIdempotencia) {
         return agregarItemComanda(comandaId, tenantId, escandalloId, null, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia);
     }
@@ -417,7 +417,7 @@ public class HorecaService {
      */
     @Transactional
     public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, Long articuloId, String nombrePlato,
-                                           String estacionCocina, Integer cantidad, BigDecimal precioUnitario,
+                                           String estacionCocina, BigDecimal cantidad, BigDecimal precioUnitario,
                                            String claveIdempotencia) {
         java.util.Optional<Long> existente = idempotenciaService.obtenerSiYaProcesada(tenantId, claveIdempotencia);
         if (existente.isPresent()) {
@@ -437,6 +437,9 @@ public class HorecaService {
         }
         if (escandalloId != null && articuloId != null) {
             throw new RuntimeException("Indique escandalloId o articuloId, no ambos");
+        }
+        if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("La cantidad debe ser mayor a cero");
         }
 
         ItemComanda item = new ItemComanda();
@@ -459,7 +462,7 @@ public class HorecaService {
             item.setNombrePlato(escandallo.getNombrePlato());
             item.setEstacionCocina(escandallo.getEstacionCocina());
             item.setPrecioUnitario(escandallo.getPrecioVenta() != null ? escandallo.getPrecioVenta() : precioUnitario);
-            item.setCostoUnitario(costoTotalConsumido.divide(BigDecimal.valueOf(cantidad), 4, RoundingMode.HALF_UP));
+            item.setCostoUnitario(costoTotalConsumido.divide(cantidad, 4, RoundingMode.HALF_UP));
             item.setEstadoItem(ItemComanda.EstadoItem.PENDIENTE);
         } else if (articuloId != null) {
             Articulo articulo = articuloRepository.findById(articuloId)
@@ -474,7 +477,7 @@ public class HorecaService {
             // Descuenta el stock ANTES de aceptar el ítem: si no alcanza, revienta aquí
             // (InventarioService) y la transacción completa se revierte.
             inventarioService.registrarMovimientoKardex(articulo.getId(), tenantId, Kardex.TipoOperacion.SALIDA,
-                BigDecimal.valueOf(cantidad), articulo.getCostoUnitario(), "Venta directa: " + articulo.getNombre());
+                cantidad, articulo.getCostoUnitario(), "Venta directa: " + articulo.getNombre());
 
             item.setArticulo(articulo);
             item.setNombrePlato(articulo.getNombre());
@@ -494,7 +497,7 @@ public class HorecaService {
 
         ItemComanda guardado = itemComandaRepository.save(item);
 
-        BigDecimal montoItem = item.getPrecioUnitario().multiply(BigDecimal.valueOf(cantidad));
+        BigDecimal montoItem = item.getPrecioUnitario().multiply(cantidad);
         agregarConsumo(comandaId, tenantId, montoItem);
 
         idempotenciaService.registrar(tenantId, claveIdempotencia, "agregar_item_comanda_horeca", guardado.getId());
@@ -545,8 +548,8 @@ public class HorecaService {
             for (ItemComanda item : itemComandaRepository.findByComandaId(comanda.getId())) {
                 if (item.getCostoUnitario() == null) continue;
                 ResumenUtilidadProducto r = acumulado.computeIfAbsent(item.getNombrePlato(), ResumenUtilidadProducto::new);
-                BigDecimal cant = BigDecimal.valueOf(item.getCantidad());
-                r.cantidadVendida += item.getCantidad();
+                BigDecimal cant = item.getCantidad();
+                r.cantidadVendida = r.cantidadVendida.add(cant);
                 r.ingresoTotal = r.ingresoTotal.add(item.getPrecioUnitario().multiply(cant));
                 r.costoTotal = r.costoTotal.add(item.getCostoUnitario().multiply(cant));
             }

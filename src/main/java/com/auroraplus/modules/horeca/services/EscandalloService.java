@@ -104,8 +104,8 @@ public class EscandalloService {
      * involucrado.
      */
     @Transactional
-    public BigDecimal registrarVentaPlato(Long escandalloId, Long tenantId, Integer cantidadVendida) {
-        if (cantidadVendida == null || cantidadVendida <= 0) {
+    public BigDecimal registrarVentaPlato(Long escandalloId, Long tenantId, BigDecimal cantidadVendida) {
+        if (cantidadVendida == null || cantidadVendida.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("La cantidad vendida debe ser mayor a cero");
         }
 
@@ -115,7 +115,7 @@ public class EscandalloService {
             throw new RuntimeException("Violación de seguridad: Escandallo no pertenece a este tenant");
         }
 
-        BigDecimal costoTotalConsumido = explotarIngredientes(escandallo, BigDecimal.valueOf(cantidadVendida), tenantId,
+        BigDecimal costoTotalConsumido = explotarIngredientes(escandallo, cantidadVendida, tenantId,
             "Consumo por venta de plato: " + escandallo.getNombrePlato(), new HashSet<>());
 
         recalcularCosto(escandalloId, tenantId);

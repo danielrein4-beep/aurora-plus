@@ -99,7 +99,7 @@ public class HorecaController {
             @RequestParam(required = false) Long articuloId,
             @RequestParam(required = false) String nombrePlato,
             @RequestParam(required = false) String estacionCocina,
-            @RequestParam Integer cantidad,
+            @RequestParam BigDecimal cantidad,
             @RequestParam(required = false) BigDecimal precioUnitario,
             @RequestParam(required = false) String claveIdempotencia) {
         return ResponseEntity.ok(horecaService.agregarItemComanda(
