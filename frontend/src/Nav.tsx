@@ -57,19 +57,40 @@ export default function Nav() {
           <ThemeToggle />
 
           {isLoggedIn ? (
-            <>
-              <button onClick={() => navigate("/dashboard")}
-                className="flex items-center gap-2 text-sm text-slate-700 dark:text-white/60 hover:text-slate-950 dark:hover:text-white transition-colors px-2 py-1.5 cursor-pointer font-medium">
-                <span className="w-7 h-7 rounded-lg g-aurora flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+            <div className="flex items-center gap-2.5">
+              {/* Botón directo y llamativo a Mis Sistemas */}
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-full cursor-pointer flex items-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.45)] hover:scale-105 transition-all"
+                title="Abrir tu sistema clínico asignado"
+              >
+                <span className="w-2 h-2 rounded-full bg-teal-300 animate-pulse" />
+                <span className="font-semibold text-white/90">Mis Sistemas:</span>
+                <span className="text-teal-200 font-extrabold">🩺 Mediclinic Pro →</span>
+              </button>
+
+              {/* Perfil del usuario */}
+              <div
+                onClick={() => navigate("/dashboard")}
+                className="flex items-center gap-2 apple-glass-pill px-3 py-1.5 rounded-full border border-slate-300/60 dark:border-white/10 cursor-pointer hover:border-teal-400/50 transition-colors"
+                title="Ver panel de cuenta"
+              >
+                <span className="w-6 h-6 rounded-full g-aurora flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-sm">
                   {user?.nombre?.charAt(0).toUpperCase() ?? "U"}
                 </span>
-                <span>{user?.nombre?.split(" ")[0]}</span>
-              </button>
-              <button onClick={() => { logout(); navigate("/"); }}
-                className="text-sm text-slate-500 dark:text-white/35 hover:text-slate-800 dark:hover:text-white/70 transition-colors px-3 py-2 cursor-pointer font-medium">
+                <span className="text-xs font-semibold text-slate-800 dark:text-white/90">
+                  {user?.nombre || user?.email?.split("@")[0]}
+                </span>
+              </div>
+
+              {/* Cerrar sesión */}
+              <button
+                onClick={() => { logout(); navigate("/"); }}
+                className="text-xs text-slate-500 dark:text-white/40 hover:text-red-500 dark:hover:text-red-400 transition-colors px-2 py-1.5 cursor-pointer font-medium"
+              >
                 Cerrar sesión
               </button>
-            </>
+            </div>
           ) : (
             <>
               <button onClick={() => navigate("/auth")}
@@ -112,15 +133,17 @@ export default function Nav() {
           <div className="pt-3 space-y-2 border-t border-white/5 mt-3">
             {isLoggedIn ? (
               <>
-                <button onClick={() => { navigate("/dashboard"); setMobileOpen(false); }}
-                  className="w-full text-sm text-white/70 py-2 flex items-center justify-center gap-2">
-                  <span className="w-6 h-6 rounded-lg g-aurora flex items-center justify-center text-xs font-bold text-white">
-                    {user?.nombre?.charAt(0).toUpperCase() ?? "U"}
-                  </span>
-                  Mi cuenta
+                <button
+                  onClick={() => { navigate("/dashboard"); setMobileOpen(false); }}
+                  className="w-full btn-cyber-neon text-white text-sm font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md"
+                >
+                  <span>🩺 Entrar a Mediclinic Pro →</span>
                 </button>
+                <div className="text-center text-xs text-white/60 py-1">
+                  Usuario: <strong className="text-white">{user?.nombre || user?.email}</strong>
+                </div>
                 <button onClick={() => { logout(); navigate("/"); setMobileOpen(false); }}
-                  className="w-full text-sm text-white/35 py-2">
+                  className="w-full text-sm text-white/40 hover:text-red-400 py-2">
                   Cerrar sesión
                 </button>
               </>

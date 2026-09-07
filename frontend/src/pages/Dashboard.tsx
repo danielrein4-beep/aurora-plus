@@ -204,12 +204,22 @@ export default function Dashboard() {
 
           {/* Selector de navegación del Dashboard */}
           <div className="hidden md:flex items-center gap-1.5 apple-glass-pill rounded-full p-1 text-xs">
+            {esClinicaReal && (
+              <button
+                onClick={() => { setAbrirMediclinicApp(true); marcarPrimerIngresoCompletado(); }}
+                className="btn-cyber-neon text-white text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-[0_0_15px_rgba(14,165,233,0.4)] hover:scale-105 transition-all"
+                title="Abrir Mediclinic Pro"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-300 animate-pulse" />
+                <span>🚀 Abrir {vertical.name}</span>
+              </button>
+            )}
             <button
               onClick={() => setActiveTab("vertical")}
               className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
                 activeTab === "vertical" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/70 hover:text-black dark:hover:text-white"
               }`}>
-              <span className="inline-flex items-center gap-1.5"><VerticalIcon size={14} /> {vertical.name}</span>
+              <span className="inline-flex items-center gap-1.5"><VerticalIcon size={14} /> Vista General</span>
             </button>
             <button
               onClick={() => setActiveTab("billing")}

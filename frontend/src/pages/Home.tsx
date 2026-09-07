@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
+import { useAuth } from "../context/AuthContext";
 import {
   IconVet, IconClinic, IconHardware, IconMining,
   IconRestaurant, IconFarm, IconEducation, IconRetail,
@@ -89,6 +90,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("Ferretería");
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
   const navigate = useNavigate();
+  const { isLoggedIn, user } = useAuth();
 
   const HERO_VERTICALS = [
     { title: "Salud & Clínicas", subtitle: "Historias clínicas, citas y triaje", badge: "NUEVO", stat: "100% Digital", Icon: IconClinic },
@@ -248,6 +250,44 @@ export default function Home() {
             </h1>
           </div>
         </div>
+
+        {/* ── ACCESO DIRECTO DESTACADO PARA USUARIOS EN SESIÓN: MIS SISTEMAS ── */}
+        {isLoggedIn && (
+          <div className="relative z-20 max-w-4xl mx-auto my-4 w-full animate-fadeIn">
+            <div className="apple-glass rounded-3xl p-6 sm:p-7 relative overflow-hidden border-2 border-teal-400/50 shadow-[0_15px_60px_rgba(0,229,184,0.25)] bg-slate-900/95 backdrop-blur-2xl">
+              <div className="line-aurora absolute top-0 left-0 right-0" />
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4 text-left">
+                  <div className="w-14 h-14 rounded-2xl g-aurora flex items-center justify-center text-white shadow-[0_0_25px_rgba(14,165,233,0.6)] flex-shrink-0">
+                    <IconClinic size={30} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-400/20 text-teal-300 border border-teal-400/30 tracking-wider uppercase">
+                        🟢 Tu Sistema Asignado & Activo
+                      </span>
+                      <span className="text-xs text-white/50">• {user?.empresa || "Clínica & Consultorios"}</span>
+                    </div>
+                    <h3 className="text-xl font-black text-white font-['Outfit'] mt-1">
+                      Mediclinic Pro — Espacio Clínico de {user?.nombre || user?.email?.split("@")[0]}
+                    </h3>
+                    <p className="text-xs text-white/70 mt-0.5">
+                      Historias clínicas digitales, agenda médica, sala de espera reactiva, cotizador y caja diaria.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => navigate("/dashboard")}
+                  className="btn-cyber-neon text-white font-extrabold px-7 py-3.5 rounded-2xl text-sm cursor-pointer whitespace-nowrap shadow-[0_0_30px_rgba(255,59,128,0.6)] hover:scale-105 transition-all flex items-center gap-2 group"
+                >
+                  <span>Abrir Mediclinic Pro</span>
+                  <span className="text-lg group-hover:translate-x-1 transition-transform">→</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Capa Flotante Visual de Automatización (Apple Frosted Glass) */}
         <div className="relative z-10 max-w-4xl mx-auto my-3 w-full">
