@@ -416,7 +416,7 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [mostrarNuevaMesa, setMostrarNuevaMesa] = useState(false);
-  const [nuevaMesa, setNuevaMesa] = useState({ numero: "", capacidad: "", zona: "SALON_PRINCIPAL" });
+  const [nuevaMesa, setNuevaMesa] = useState({ numero: "", capacidad: "", zona: "SALON_PRINCIPAL", forma: "RECTANGULAR" });
   const [errorMesa, setErrorMesa] = useState<string | null>(null);
   const [guardandoMesa, setGuardandoMesa] = useState(false);
   const [vista, setVista] = useState<"lista" | "plano">("plano");
@@ -432,8 +432,9 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
         numero: Number(nuevaMesa.numero) || siguienteNumero,
         capacidad: nuevaMesa.capacidad ? Number(nuevaMesa.capacidad) : undefined,
         zona: nuevaMesa.zona,
+        forma: nuevaMesa.forma,
       });
-      setNuevaMesa({ numero: "", capacidad: "", zona: "SALON_PRINCIPAL" });
+      setNuevaMesa({ numero: "", capacidad: "", zona: "SALON_PRINCIPAL", forma: "RECTANGULAR" });
       setMostrarNuevaMesa(false);
       onCambio();
     } catch (e) {
@@ -479,7 +480,7 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
             <button onClick={() => setVista("lista")} className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${vista === "lista" ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>Lista</button>
           </div>
         </div>
-        <button onClick={() => { setMostrarNuevaMesa((v) => !v); setNuevaMesa({ numero: String(siguienteNumero), capacidad: "", zona: "SALON_PRINCIPAL" }); }}
+        <button onClick={() => { setMostrarNuevaMesa((v) => !v); setNuevaMesa({ numero: String(siguienteNumero), capacidad: "", zona: "SALON_PRINCIPAL", forma: "RECTANGULAR" }); }}
           className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
           {mostrarNuevaMesa ? "Cancelar" : "+ Nueva mesa"}
         </button>
@@ -487,13 +488,17 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
 
       {mostrarNuevaMesa && (
         <div className="apple-glass rounded-2xl p-5 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <input value={nuevaMesa.numero} onChange={(e) => setNuevaMesa({ ...nuevaMesa, numero: e.target.value })} type="number" placeholder="Número de mesa" className="input-horeca" />
             <input value={nuevaMesa.capacidad} onChange={(e) => setNuevaMesa({ ...nuevaMesa, capacidad: e.target.value })} type="number" placeholder="Capacidad (pax)" className="input-horeca" />
             <select value={nuevaMesa.zona} onChange={(e) => setNuevaMesa({ ...nuevaMesa, zona: e.target.value })} className="input-horeca">
               <option value="SALON_PRINCIPAL">Salón principal</option>
               <option value="TERRAZA">Terraza</option>
               <option value="BARRA">Barra</option>
+            </select>
+            <select value={nuevaMesa.forma} onChange={(e) => setNuevaMesa({ ...nuevaMesa, forma: e.target.value })} className="input-horeca">
+              <option value="RECTANGULAR">Cuadrada</option>
+              <option value="CIRCULAR">Redonda</option>
             </select>
           </div>
           {errorMesa && <p className="text-xs text-red-500">{errorMesa}</p>}
@@ -601,7 +606,7 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
 // EDITAR / ELIMINAR MESA
 // ══════════════════════════════════════════════════════════════════════════
 function EditarMesaModal({ tenantId, mesa, onClose, onCambio }: { tenantId: number; mesa: Mesa; onClose: () => void; onCambio: () => void }) {
-  const [form, setForm] = useState({ numero: String(mesa.numero), capacidad: mesa.capacidad != null ? String(mesa.capacidad) : "", zona: mesa.zona || "SALON_PRINCIPAL" });
+  const [form, setForm] = useState({ numero: String(mesa.numero), capacidad: mesa.capacidad != null ? String(mesa.capacidad) : "", zona: mesa.zona || "SALON_PRINCIPAL", forma: mesa.forma || "RECTANGULAR" });
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
@@ -615,6 +620,7 @@ function EditarMesaModal({ tenantId, mesa, onClose, onCambio }: { tenantId: numb
         numero: Number(form.numero) || mesa.numero,
         capacidad: form.capacidad ? Number(form.capacidad) : undefined,
         zona: form.zona,
+        forma: form.forma,
       });
       onCambio();
       onClose();
@@ -641,7 +647,7 @@ function EditarMesaModal({ tenantId, mesa, onClose, onCambio }: { tenantId: numb
   return (
     <Modal onClose={onClose} titulo={`Editar Mesa ${mesa.numero}`}>
       <div className="space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Campo label="Número">
             <input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} type="number" className="input-horeca" />
           </Campo>
@@ -653,6 +659,12 @@ function EditarMesaModal({ tenantId, mesa, onClose, onCambio }: { tenantId: numb
               <option value="SALON_PRINCIPAL">Salón principal</option>
               <option value="TERRAZA">Terraza</option>
               <option value="BARRA">Barra</option>
+            </select>
+          </Campo>
+          <Campo label="Forma">
+            <select value={form.forma} onChange={(e) => setForm({ ...form, forma: e.target.value })} className="input-horeca">
+              <option value="RECTANGULAR">Cuadrada</option>
+              <option value="CIRCULAR">Redonda</option>
             </select>
           </Campo>
         </div>
@@ -684,19 +696,27 @@ function EditarMesaModal({ tenantId, mesa, onClose, onCambio }: { tenantId: numb
 // ══════════════════════════════════════════════════════════════════════════
 // PLANO VISUAL DE MESAS — arrastrar y soltar
 // ══════════════════════════════════════════════════════════════════════════
+const ZONAS_INFO: Record<string, { label: string; color: string }> = {
+  SALON_PRINCIPAL: { label: "Salón principal", color: "#0ea5e9" },
+  TERRAZA: { label: "Terraza", color: "#22c55e" },
+  BARRA: { label: "Barra", color: "#a855f7" },
+};
+
 function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, onCambio }: {
   tenantId: number; mapa: MapaMesaEntrada[]; onAbrirMesa: (m: MapaMesaEntrada) => void; onVerComanda: (c: Comanda) => void; onEditarMesa: (m: Mesa) => void; onCambio: () => void;
 }) {
-  const ANCHO_DEFECTO = 90;
-  const posicionPorDefecto = (idx: number) => ({ x: 20 + (idx % 6) * 110, y: 20 + Math.floor(idx / 6) * 110 });
+  const ANCHO_DEFECTO = 96;
+  const posicionPorDefecto = (idx: number) => ({ x: 24 + (idx % 6) * 120, y: 24 + Math.floor(idx / 6) * 120 });
 
+  // El plano abre en modo "Ver" — arrastrar solo está permitido en modo
+  // "Editar", activado a propósito. Así queda estructuralmente imposible
+  // mover una mesa por accidente mientras se está tomando una comanda.
+  const [modoEdicion, setModoEdicion] = useState(false);
   const [posiciones, setPosiciones] = useState<Record<number, { x: number; y: number }>>({});
   const [arrastrando, setArrastrando] = useState<number | null>(null);
   const contenedorRef = useRef<HTMLDivElement | null>(null);
   const offsetRef = useRef({ x: 0, y: 0 });
   const inicioRef = useRef({ x: 0, y: 0 });
-  // Distingue un clic (abrir mesa) de un arrastre real — sin esto, soltar el
-  // mouse tras mover la mesa dispara igual el onClick del contenedor.
   const seMovioRef = useRef(false);
 
   useEffect(() => {
@@ -712,8 +732,10 @@ function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, o
     });
   }, [mapa]);
 
+  const sinColocar = mapa.filter((m) => m.mesa.posX == null || m.mesa.posY == null).length;
+
   const iniciarArrastre = (e: React.MouseEvent, mesaId: number) => {
-    if (e.button !== 0) return;
+    if (!modoEdicion || e.button !== 0) return;
     const pos = posiciones[mesaId];
     if (!pos || !contenedorRef.current) return;
     const rect = contenedorRef.current.getBoundingClientRect();
@@ -752,32 +774,84 @@ function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, o
   }, [arrastrando]);
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-slate-400">Arrastrá cada mesa para ubicarla como en tu salón real. Un clic la abre; el ícono de arriba la edita.</p>
-      <div ref={contenedorRef} className="relative apple-glass rounded-2xl overflow-hidden" style={{ height: 460, backgroundImage: "radial-gradient(currentColor 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
+    <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4">
+      {/* Leyenda */}
+      <div className="apple-glass rounded-2xl p-4 space-y-4 h-fit">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/30 mb-2">Estado en vivo</p>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-white/70"><span className="w-2.5 h-2.5 rounded-full bg-teal-500" /> Libre</div>
+            <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-white/70"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Ocupada</div>
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/30 mb-2">Zonas</p>
+          <div className="space-y-1.5">
+            {Object.entries(ZONAS_INFO).map(([key, z]) => (
+              <div key={key} className="flex items-center gap-2 text-xs text-slate-700 dark:text-white/70">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: z.color }} /> {z.label}
+              </div>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={() => setModoEdicion((v) => !v)}
+          className={`w-full text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all ${
+            modoEdicion ? "bg-teal-600 text-white" : "apple-glass-btn text-slate-700 dark:text-white/70"
+          }`}
+        >
+          {modoEdicion ? "✓ Listo (ver salón)" : "✏️ Editar plano"}
+        </button>
+        {modoEdicion && <p className="text-[10px] text-slate-400 leading-relaxed">Arrastrá cada mesa para ubicarla como en tu salón real.</p>}
+        {sinColocar > 0 && (
+          <div className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/25 rounded-lg p-2 leading-relaxed">
+            {sinColocar} mesa{sinColocar === 1 ? "" : "s"} sin ubicar en el plano. Activá "Editar plano" para acomodarla{sinColocar === 1 ? "" : "s"}.
+          </div>
+        )}
+      </div>
+
+      {/* Canvas */}
+      <div
+        ref={contenedorRef}
+        className="relative apple-glass rounded-2xl overflow-hidden"
+        style={{ height: 480, backgroundImage: "radial-gradient(currentColor 1px, transparent 1px)", backgroundSize: "24px 24px", cursor: modoEdicion ? "default" : "default" }}
+      >
         {mapa.map((m) => {
-          const pos = posiciones[m.mesa.id] || { x: 20, y: 20 };
+          const pos = posiciones[m.mesa.id] || { x: 24, y: 24 };
+          const esRedonda = m.mesa.forma === "CIRCULAR";
+          const zonaColor = ZONAS_INFO[m.mesa.zona || ""]?.color || "#94a3b8";
+          const ocupada = m.estado === "OCUPADA";
           return (
             <div
               key={m.mesa.id}
               onMouseDown={(e) => iniciarArrastre(e, m.mesa.id)}
-              style={{ left: pos.x, top: pos.y, width: ANCHO_DEFECTO, height: ANCHO_DEFECTO }}
-              className={`absolute rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 select-none transition-shadow ${
-                arrastrando === m.mesa.id ? "cursor-grabbing shadow-2xl z-10 scale-105" : "cursor-grab hover:scale-[1.03]"
-              } ${m.estado === "OCUPADA" ? "bg-amber-500/20 border-amber-500/60 text-amber-700 dark:text-amber-300" : "bg-teal-500/15 border-teal-500/50 text-teal-700 dark:text-teal-300"}`}
+              style={{
+                left: pos.x, top: pos.y, width: ANCHO_DEFECTO, height: ANCHO_DEFECTO,
+                borderRadius: esRedonda ? "50%" : "20px",
+                borderColor: ocupada ? "#f59e0b" : "#14b8a6",
+              }}
+              className={`absolute border-[3px] flex flex-col items-center justify-center gap-0.5 select-none shadow-md transition-shadow ${
+                arrastrando === m.mesa.id ? "shadow-2xl z-10 scale-105" : modoEdicion ? "hover:scale-[1.03]" : "hover:scale-[1.03]"
+              } ${modoEdicion ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${
+                ocupada ? "bg-amber-500/20 text-amber-700 dark:text-amber-300" : "bg-teal-500/15 text-teal-700 dark:text-teal-300"
+              }`}
               onClick={() => {
                 if (seMovioRef.current) { seMovioRef.current = false; return; }
-                (m.estado === "OCUPADA" && m.comandaAbierta) ? onVerComanda(m.comandaAbierta) : onAbrirMesa(m);
+                if (modoEdicion) return;
+                (ocupada && m.comandaAbierta) ? onVerComanda(m.comandaAbierta) : onAbrirMesa(m);
               }}
             >
-              <span className="font-['Outfit'] font-black text-sm">Mesa {m.mesa.numero}</span>
-              <span className="text-[9px] uppercase font-bold tracking-wider">{m.estado}</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); onEditarMesa(m.mesa); }}
-                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-white dark:bg-slate-800 border border-slate-300/60 dark:border-white/15 flex items-center justify-center text-slate-500 dark:text-white/60 hover:text-teal-600 cursor-pointer shadow-sm"
-              >
-                <IconCustomize size={10} />
-              </button>
+              <span className="absolute top-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: zonaColor }} title={ZONAS_INFO[m.mesa.zona || ""]?.label} />
+              <span className="font-['Outfit'] font-black text-sm mt-1">M{m.mesa.numero}</span>
+              {m.mesa.capacidad != null && <span className="text-[9px] opacity-80">{m.mesa.capacidad}p</span>}
+              {modoEdicion && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEditarMesa(m.mesa); }}
+                  className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-white dark:bg-slate-800 border border-slate-300/60 dark:border-white/15 flex items-center justify-center text-slate-500 dark:text-white/60 hover:text-teal-600 cursor-pointer shadow-sm"
+                >
+                  <IconCustomize size={10} />
+                </button>
+              )}
             </div>
           );
         })}

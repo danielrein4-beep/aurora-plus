@@ -54,9 +54,10 @@ public class MesaController {
         public Integer numero;
         public Integer capacidad;
         public String zona;
+        public String forma;
     }
 
-    /** Edita número, capacidad o zona de una mesa ya existente — sin tocar su posición en el plano. */
+    /** Edita número, capacidad, zona o forma de una mesa ya existente — sin tocar su posición en el plano. */
     @PutMapping("/{id}")
     public ResponseEntity<Mesa> editar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody EditarMesaRequest request) {
         Mesa mesa = mesaRepository.findById(id).orElseThrow(() -> new RuntimeException("Mesa no encontrada"));
@@ -66,6 +67,7 @@ public class MesaController {
         if (request.numero != null) mesa.setNumero(request.numero);
         if (request.capacidad != null) mesa.setCapacidad(request.capacidad);
         if (request.zona != null) mesa.setZona(request.zona);
+        if (request.forma != null) mesa.setForma(request.forma);
         return ResponseEntity.ok(mesaRepository.save(mesa));
     }
 

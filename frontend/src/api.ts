@@ -687,7 +687,7 @@ export function listarMesas(): Promise<Mesa[]> {
   return request(`/api/horeca/mesas-fisicas`);
 }
 
-export function crearMesa(tenantId: number, datos: { numero: number; capacidad?: number; zona?: string }): Promise<Mesa> {
+export function crearMesa(tenantId: number, datos: { numero: number; capacidad?: number; zona?: string; forma?: string }): Promise<Mesa> {
   return request(`/api/horeca/mesas-fisicas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
@@ -695,7 +695,7 @@ export function actualizarPosicionMesa(tenantId: number, mesaId: number, datos: 
   return request(`/api/horeca/mesas-fisicas/${mesaId}/posicion?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
 }
 
-export function editarMesa(tenantId: number, mesaId: number, datos: { numero?: number; capacidad?: number; zona?: string }): Promise<Mesa> {
+export function editarMesa(tenantId: number, mesaId: number, datos: { numero?: number; capacidad?: number; zona?: string; forma?: string }): Promise<Mesa> {
   return request(`/api/horeca/mesas-fisicas/${mesaId}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
 }
 
