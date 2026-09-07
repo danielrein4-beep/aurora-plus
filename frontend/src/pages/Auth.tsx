@@ -119,7 +119,7 @@ export default function Auth() {
                   ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]"
                   : "text-white/50 hover:text-white"
               }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${mode === "register" ? "bg-[#ff3b80] animate-pulse" : "bg-white/30"}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${mode === "register" ? "bg-[#00FFC2] animate-pulse" : "bg-white/30"}`} />
               Registrarse
             </button>
           </div>
@@ -134,8 +134,8 @@ export default function Auth() {
               <h2 className="font-['Outfit'] font-black text-3xl sm:text-4xl text-white tracking-tight">
                 {mode === "register" ? "Join the Future" : "Welcome Back"}
               </h2>
-              {/* Barra de acento bicolor estilo futurista */}
-              <div className="h-1 w-20 bg-gradient-to-r from-[#ff3b80] via-[#a855f7] to-[#00f2fe] rounded-full mt-2 shadow-[0_0_12px_rgba(255,59,128,0.5)]" />
+              {/* Barra de acento aurora estilo futurista */}
+              <div className="h-1 w-20 bg-gradient-to-r from-[#00FFC2] via-[#00C9A7] to-[#0B3D91] rounded-full mt-2 shadow-[0_0_12px_rgba(0,255,194,0.5)]" />
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
