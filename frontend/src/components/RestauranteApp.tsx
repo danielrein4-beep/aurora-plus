@@ -649,11 +649,15 @@ function VistaGeneral({
   tasaValida: boolean; onVenta: (monto: number, metodo: string) => void; onRegistrarTasa: () => void;
 }) {
   return (
-    <div className="space-y-6">
+    // h-[calc(100vh-250px)]: descuenta el header de la app + estos KPIs +
+    // paddings de arriba, para que el POS embebido de abajo tenga un techo
+    // real contra el cual repartir su alto (flex-1 min-h-0) en vez de
+    // apoyarse en un h-[Npx] fijo que colapsa en pantallas más chicas.
+    <div className="flex flex-col h-[calc(100vh-250px)] gap-6">
       {/* Mesas, comandas y cocina quedan fuera de estos KPIs — están detrás
           del paywall Pro, así que el protagonismo va para lo que sí está
           activo en el plan base: ventas e inventario. */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-shrink-0">
         <KpiCard label="Ventas del Día" val={`$${totalVentasHoy.toFixed(2)}`} sub="Comandas y Fast-Bar cerrados" color="#10b981" />
         <KpiCard label="Valor del Inventario" val={`$${valorInventario.toFixed(2)}`} sub="Costo total en bodega" color="#0ea5e9" onClick={() => onNavegar("inventario")} />
         <KpiCard label="Por Vencer" val={String(vencimientos)} sub="Lotes vencidos o próximos" color={vencimientos > 0 ? "#ef4444" : "#64748b"} onClick={() => onNavegar("inventario")} />
@@ -3098,7 +3102,11 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
 
   return (
     <div className={embebido
-      ? "apple-glass rounded-2xl flex flex-col h-[640px] overflow-hidden"
+      // flex-1 min-h-0 (no un h-[Npx] fijo): toma exactamente el espacio que
+      // le sobra al contenedor h-[calc(100vh-250px)] de la Vista General,
+      // sin desbordarse ni depender de un número mágico que colapsa en
+      // pantallas más chicas.
+      ? "apple-glass rounded-2xl flex flex-col flex-1 min-h-0 overflow-hidden"
       : "fixed inset-0 z-40 bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col"}>
       {/* HEADER OPERATIVO — solo en el overlay de pantalla completa; embebida
           en la Vista General, el dashboard ya trae su propio header con la
@@ -3277,24 +3285,31 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             )}
           </div>
 
-          {/* Cuerpo: líneas del carrito */}
-          <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-2">
+          {/* Cuerpo: líneas del carrito — flex-1 lo deja crecer con el
+              espacio disponible, min-h-[150px] le pone un piso real para
+              que nunca quede aplastado a casi nada aunque el pie de cobro
+              (shrink-0, nunca se comprime) sea alto. */}
+          <div className="flex-1 overflow-y-auto min-h-[150px] p-4 space-y-2">
             <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-1">Comanda activa</h3>
             {carrito.length === 0 ? (
               <p className="text-xs text-slate-400">Toca un producto del catálogo para agregarlo aquí.</p>
             ) : (
               carrito.map((l) => (
                 <div key={l.key} className="flex items-center justify-between gap-2 bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2">
-                  <div className="flex-1 min-w-0">
+                  {/* Nombre: flex-1 truncate — un nombre largo ("COCA COLA
+                      255ML") nunca empuja ni deforma los botones de cantidad. */}
+                  <div className="flex-1 min-w-0 truncate">
                     <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{l.nombre}</div>
                     <div className="text-[10px] text-slate-500 dark:text-white/40 font-mono">${l.precio.toFixed(2)} c/u</div>
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button onClick={() => cambiarCantidad(l.key, -1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer flex-shrink-0">−</button>
-                    <span className="text-xs font-bold w-5 text-center flex-shrink-0">{l.cantidad}</span>
-                    <button onClick={() => cambiarCantidad(l.key, 1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer flex-shrink-0">+</button>
+                  {/* Botones de cantidad: shrink-0 — mantienen su tamaño fijo
+                      sin comprimirse ni deformarse verticalmente. */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => cambiarCantidad(l.key, -1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer shrink-0">−</button>
+                    <span className="text-xs font-bold w-5 text-center shrink-0">{l.cantidad}</span>
+                    <button onClick={() => cambiarCantidad(l.key, 1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer shrink-0">+</button>
                     <button onClick={() => quitarLinea(l.key)} title="Quitar de la venta"
-                      className="w-6 h-6 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer flex-shrink-0 ml-0.5">
+                      className="w-6 h-6 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer shrink-0 ml-0.5">
                       <IconTrash size={13} />
                     </button>
                   </div>
@@ -3303,8 +3318,10 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             )}
           </div>
 
-          {/* Pie: totales + cobrar */}
-          <div className="flex-shrink-0 p-4 border-t border-slate-300/50 dark:border-white/10 space-y-3">
+          {/* Pie: totales + cobrar — shrink-0 obligatorio: nunca se
+              comprime, así el carrito largo scrollea por dentro en vez de
+              aplastar este bloque contra el borde. */}
+          <div className="shrink-0 p-4 border-t border-slate-300/50 dark:border-white/10 space-y-3">
             <div>
               <div className="flex items-center justify-between font-black text-2xl text-slate-900 dark:text-white">
                 <span className="text-sm font-bold text-slate-500 dark:text-white/40">Total</span><span className="font-mono">${total.toFixed(2)}</span>
