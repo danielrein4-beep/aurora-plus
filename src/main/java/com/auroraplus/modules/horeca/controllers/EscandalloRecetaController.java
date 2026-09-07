@@ -1,10 +1,13 @@
 package com.auroraplus.modules.horeca.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.horeca.entities.DetalleReceta;
 import com.auroraplus.modules.horeca.entities.EscandalloReceta;
 import com.auroraplus.modules.horeca.repositories.DetalleRecetaRepository;
 import com.auroraplus.modules.horeca.repositories.EscandalloRecetaRepository;
 import com.auroraplus.modules.horeca.services.EscandalloService;
+import jakarta.persistence.EntityManager;
+import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,8 +29,15 @@ public class EscandalloRecetaController {
     @Autowired
     private EscandalloService escandalloService;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    // Mismo hallazgo de seguridad que ArticuloController/MesaController: sin
+    // esto, findAll() devuelve recetas de todos los tenants mezcladas.
     @GetMapping
     public List<EscandalloReceta> listar() {
+        entityManager.unwrap(Session.class).enableFilter("tenantFilter")
+            .setParameter("tenantId", TenantContext.getCurrentTenant());
         return escandalloRecetaRepository.findAll();
     }
 

@@ -1,9 +1,12 @@
 package com.auroraplus.modules.horeca.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.horeca.entities.Comanda;
 import com.auroraplus.modules.horeca.entities.Mesa;
 import com.auroraplus.modules.horeca.repositories.ComandaRepository;
 import com.auroraplus.modules.horeca.repositories.MesaRepository;
+import jakarta.persistence.EntityManager;
+import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,8 +25,22 @@ public class MesaController {
     @Autowired
     private ComandaRepository comandaRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    // Hallazgo de seguridad (mismo patrón ya documentado en ArticuloController):
+    // el enableFilter del TenantInterceptor no llega vivo a la sesión que
+    // ejecuta este findAll() — sin re-habilitarlo acá, devolvía mesas de
+    // TODOS los tenants mezcladas (confirmado en pruebas: apareció una mesa
+    // de otro tenant en la respuesta).
+    private void asegurarFiltroTenant() {
+        entityManager.unwrap(Session.class).enableFilter("tenantFilter")
+            .setParameter("tenantId", TenantContext.getCurrentTenant());
+    }
+
     @GetMapping
     public List<Mesa> listar() {
+        asegurarFiltroTenant();
         return mesaRepository.findAll();
     }
 
@@ -59,8 +76,8 @@ public class MesaController {
         if (!mesa.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Mesa no pertenece a este tenant");
         }
-        boolean tieneComandaAbierta = comandaRepository.findAll().stream()
-            .anyMatch(c -> c.getEstado() == Comanda.EstadoComanda.ABIERTA && mesa.getNumero().equals(c.getNumeroMesa()));
+        boolean tieneComandaAbierta = comandaRepository.findByTenantIdAndEstadoOrderByFechaAperturaDesc(tenantId, Comanda.EstadoComanda.ABIERTA).stream()
+            .anyMatch(c -> mesa.getNumero().equals(c.getNumeroMesa()));
         if (tieneComandaAbierta) {
             throw new RuntimeException("No se puede eliminar la mesa " + mesa.getNumero() + ": tiene una comanda abierta. Ciérrala primero.");
         }
@@ -94,6 +111,7 @@ public class MesaController {
     /** Mapa de mesas: cada mesa con su estado (LIBRE/OCUPADA) según si tiene una comanda ABIERTA. */
     @GetMapping("/mapa")
     public List<Map<String, Object>> mapa() {
+        asegurarFiltroTenant();
         List<Mesa> mesas = mesaRepository.findAll();
         List<Comanda> comandasAbiertas = comandaRepository.findAll().stream()
             .filter(c -> c.getEstado() == Comanda.EstadoComanda.ABIERTA)

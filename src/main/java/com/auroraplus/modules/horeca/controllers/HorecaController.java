@@ -104,8 +104,11 @@ public class HorecaController {
     }
 
     @GetMapping(value = "/comandas/{comandaId}/ticket", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> ticket(@PathVariable Long comandaId) throws Exception {
+    public ResponseEntity<byte[]> ticket(@PathVariable Long comandaId, @RequestParam Long tenantId) throws Exception {
         Comanda comanda = horecaService.obtenerComanda(comandaId);
+        if (!comanda.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Comanda no pertenece a este tenant");
+        }
         List<ItemComanda> items = itemComandaRepository.findByComandaId(comandaId);
         byte[] pdf = comandaPdfService.generarTicket(comanda, items);
         String identificador = comanda.getNumeroMesa() != null ? "mesa-" + comanda.getNumeroMesa() : "comanda-" + comanda.getId();

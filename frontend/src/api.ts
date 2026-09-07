@@ -353,6 +353,14 @@ export function actualizarPosicionMesa(tenantId: number, mesaId: number, datos: 
   return request(`/api/horeca/mesas-fisicas/${mesaId}/posicion?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
 }
 
+export function editarMesa(tenantId: number, mesaId: number, datos: { numero?: number; capacidad?: number; zona?: string }): Promise<Mesa> {
+  return request(`/api/horeca/mesas-fisicas/${mesaId}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function eliminarMesa(tenantId: number, mesaId: number): Promise<void> {
+  return request(`/api/horeca/mesas-fisicas/${mesaId}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
 export function mapaDeMesas(): Promise<MapaMesaEntrada[]> {
   return request(`/api/horeca/mesas-fisicas/mapa`);
 }
@@ -598,6 +606,19 @@ export function historialCierres(): Promise<ArqueoCaja[]> {
 }
 
 // Descarga el PDF del cierre autenticado (no puede ser un <a href> plano — necesita el Bearer token).
+export async function descargarTicketComanda(tenantId: number, comandaId: number): Promise<Blob> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const res = await fetch(`/api/horeca/mesas/comandas/${comandaId}/ticket?tenantId=${tenantId}`, { headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) throw new ApiError(`Error ${res.status}`);
+  return res.blob();
+}
+
 export async function descargarCierrePdf(tenantId: number, arqueoId: number): Promise<Blob> {
   const sesion = leerSesion();
   const headers: Record<string, string> = {};

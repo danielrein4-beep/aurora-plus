@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   IconRestaurant, IconCustomize, IconUsers, IconHourglass, IconCard, IconFileText,
   IconCheck, IconTrash, IconRefresh, IconCheckCircle, IconWarning, IconSearch, IconClose,
@@ -6,14 +6,14 @@ import {
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import {
-  mapaDeMesas, crearMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
+  mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
   dividirCuenta, cerrarComanda, listarEscandallos, crearEscandallo, agregarIngredienteEscandallo,
   listarIngredientesEscandallo, listarFastBar, crearTragoFastBar, venderTragoRapido,
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
-  registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase,
+  registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda,
   tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
   cerrarCaja, historialCierres, descargarCierrePdf,
-  type MapaMesaEntrada, type Comanda, type ItemComanda, type EstadoItemComanda,
+  type Mesa, type MapaMesaEntrada, type Comanda, type ItemComanda, type EstadoItemComanda,
   type EscandalloReceta, type DetalleReceta, type FastBarTrago, type ProveedorHoreca,
   type Articulo, type ItemCompraInsumo, type LoteArticulo, type TasaCambio, type MovimientoCaja,
   type ResumenPeriodoAbierto, type ArqueoCaja,
@@ -420,6 +420,7 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
   const [errorMesa, setErrorMesa] = useState<string | null>(null);
   const [guardandoMesa, setGuardandoMesa] = useState(false);
   const [vista, setVista] = useState<"lista" | "plano">("plano");
+  const [mesaEditando, setMesaEditando] = useState<Mesa | null>(null);
 
   const siguienteNumero = (mapa || []).reduce((max, m) => Math.max(max, m.mesa.numero), 0) + 1;
 
@@ -470,8 +471,14 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500 dark:text-white/40">{(mapa || []).length} mesas registradas</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-slate-500 dark:text-white/40">{(mapa || []).length} mesas registradas</p>
+          <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs">
+            <button onClick={() => setVista("plano")} className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${vista === "plano" ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>Plano</button>
+            <button onClick={() => setVista("lista")} className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${vista === "lista" ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>Lista</button>
+          </div>
+        </div>
         <button onClick={() => { setMostrarNuevaMesa((v) => !v); setNuevaMesa({ numero: String(siguienteNumero), capacidad: "", zona: "SALON_PRINCIPAL" }); }}
           className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
           {mostrarNuevaMesa ? "Cancelar" : "+ Nueva mesa"}
@@ -502,25 +509,38 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
         <div className="apple-glass rounded-2xl p-8 text-center">
           <p className="text-slate-500 dark:text-white/40 text-sm">Aún no tienes mesas registradas. Usa "+ Nueva mesa" arriba para agregar la primera.</p>
         </div>
-      ) : (
+      ) : vista === "lista" ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {mapa.map((m) => (
-            <button
-              key={m.mesa.id}
-              onClick={() => (m.estado === "OCUPADA" && m.comandaAbierta ? setComandaActiva(m.comandaAbierta) : setAbriendo(m))}
-              className={`aspect-square rounded-2xl p-4 flex flex-col items-center justify-center gap-1.5 border-2 transition-all cursor-pointer hover:scale-[1.03] ${
-                m.estado === "OCUPADA"
-                  ? "bg-amber-500/15 border-amber-500/50 text-amber-600 dark:text-amber-300"
-                  : "bg-teal-500/10 border-teal-500/30 text-teal-600 dark:text-teal-300"
-              }`}
-            >
-              <IconRestaurant size={22} />
-              <span className="font-['Outfit'] font-black text-lg">Mesa {m.mesa.numero}</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider">{m.estado}</span>
-              {m.mesa.capacidad != null && <span className="text-[10px] opacity-70">{m.mesa.capacidad} pax</span>}
-            </button>
+            <div key={m.mesa.id} className="relative group">
+              <button
+                onClick={() => (m.estado === "OCUPADA" && m.comandaAbierta ? setComandaActiva(m.comandaAbierta) : setAbriendo(m))}
+                className={`w-full aspect-square rounded-2xl p-4 flex flex-col items-center justify-center gap-1.5 border-2 transition-all cursor-pointer hover:scale-[1.03] ${
+                  m.estado === "OCUPADA"
+                    ? "bg-amber-500/15 border-amber-500/50 text-amber-600 dark:text-amber-300"
+                    : "bg-teal-500/10 border-teal-500/30 text-teal-600 dark:text-teal-300"
+                }`}
+              >
+                <IconRestaurant size={22} />
+                <span className="font-['Outfit'] font-black text-lg">Mesa {m.mesa.numero}</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider">{m.estado}</span>
+                {m.mesa.capacidad != null && <span className="text-[10px] opacity-70">{m.mesa.capacidad} pax</span>}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setMesaEditando(m.mesa); }}
+                title="Editar mesa"
+                className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/90 dark:bg-black/60 border border-slate-300/60 dark:border-white/15 flex items-center justify-center text-slate-500 dark:text-white/60 hover:text-teal-600 dark:hover:text-teal-300 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
+                <IconCustomize size={12} />
+              </button>
+            </div>
           ))}
         </div>
+      ) : (
+        <PlanoMesas tenantId={tenantId} mapa={mapa} onAbrirMesa={setAbriendo} onVerComanda={setComandaActiva} onEditarMesa={setMesaEditando} onCambio={onCambio} />
+      )}
+
+      {mesaEditando && (
+        <EditarMesaModal tenantId={tenantId} mesa={mesaEditando} onClose={() => setMesaEditando(null)} onCambio={onCambio} />
       )}
 
       {/* Modal: abrir comanda */}
@@ -573,6 +593,195 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
           onClose={() => setComandaActiva(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// EDITAR / ELIMINAR MESA
+// ══════════════════════════════════════════════════════════════════════════
+function EditarMesaModal({ tenantId, mesa, onClose, onCambio }: { tenantId: number; mesa: Mesa; onClose: () => void; onCambio: () => void }) {
+  const [form, setForm] = useState({ numero: String(mesa.numero), capacidad: mesa.capacidad != null ? String(mesa.capacidad) : "", zona: mesa.zona || "SALON_PRINCIPAL" });
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+  const [confirmarEliminar, setConfirmarEliminar] = useState(false);
+
+  const guardar = async () => {
+    setError(null);
+    setGuardando(true);
+    try {
+      await editarMesa(tenantId, mesa.id, {
+        numero: Number(form.numero) || mesa.numero,
+        capacidad: form.capacidad ? Number(form.capacidad) : undefined,
+        zona: form.zona,
+      });
+      onCambio();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la mesa");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const eliminar = async () => {
+    setError(null);
+    setEliminando(true);
+    try {
+      await eliminarMesa(tenantId, mesa.id);
+      onCambio();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo eliminar la mesa");
+      setEliminando(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} titulo={`Editar Mesa ${mesa.numero}`}>
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Campo label="Número">
+            <input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} type="number" className="input-horeca" />
+          </Campo>
+          <Campo label="Capacidad (pax)">
+            <input value={form.capacidad} onChange={(e) => setForm({ ...form, capacidad: e.target.value })} type="number" className="input-horeca" />
+          </Campo>
+          <Campo label="Zona">
+            <select value={form.zona} onChange={(e) => setForm({ ...form, zona: e.target.value })} className="input-horeca">
+              <option value="SALON_PRINCIPAL">Salón principal</option>
+              <option value="TERRAZA">Terraza</option>
+              <option value="BARRA">Barra</option>
+            </select>
+          </Campo>
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <button onClick={guardar} disabled={guardando} className="w-full g-aurora text-white text-sm font-semibold py-3 rounded-xl cursor-pointer disabled:opacity-60">
+          {guardando ? "Guardando…" : "Guardar cambios"}
+        </button>
+
+        <div className="pt-3 border-t border-slate-300/50 dark:border-white/10">
+          {!confirmarEliminar ? (
+            <button onClick={() => setConfirmarEliminar(true)} className="text-red-500 text-xs font-semibold cursor-pointer">
+              🗑 Eliminar esta mesa
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-600 dark:text-white/60">¿Seguro? No se puede deshacer.</span>
+              <button onClick={eliminar} disabled={eliminando} className="text-red-500 text-xs font-bold cursor-pointer disabled:opacity-60">
+                {eliminando ? "Eliminando…" : "Sí, eliminar"}
+              </button>
+              <button onClick={() => setConfirmarEliminar(false)} className="text-slate-400 text-xs cursor-pointer">Cancelar</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PLANO VISUAL DE MESAS — arrastrar y soltar
+// ══════════════════════════════════════════════════════════════════════════
+function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, onCambio }: {
+  tenantId: number; mapa: MapaMesaEntrada[]; onAbrirMesa: (m: MapaMesaEntrada) => void; onVerComanda: (c: Comanda) => void; onEditarMesa: (m: Mesa) => void; onCambio: () => void;
+}) {
+  const ANCHO_DEFECTO = 90;
+  const posicionPorDefecto = (idx: number) => ({ x: 20 + (idx % 6) * 110, y: 20 + Math.floor(idx / 6) * 110 });
+
+  const [posiciones, setPosiciones] = useState<Record<number, { x: number; y: number }>>({});
+  const [arrastrando, setArrastrando] = useState<number | null>(null);
+  const contenedorRef = useRef<HTMLDivElement | null>(null);
+  const offsetRef = useRef({ x: 0, y: 0 });
+  const inicioRef = useRef({ x: 0, y: 0 });
+  // Distingue un clic (abrir mesa) de un arrastre real — sin esto, soltar el
+  // mouse tras mover la mesa dispara igual el onClick del contenedor.
+  const seMovioRef = useRef(false);
+
+  useEffect(() => {
+    setPosiciones((prev) => {
+      const nuevo = { ...prev };
+      mapa.forEach((m, idx) => {
+        if (nuevo[m.mesa.id]) return;
+        nuevo[m.mesa.id] = m.mesa.posX != null && m.mesa.posY != null
+          ? { x: m.mesa.posX, y: m.mesa.posY }
+          : posicionPorDefecto(idx);
+      });
+      return nuevo;
+    });
+  }, [mapa]);
+
+  const iniciarArrastre = (e: React.MouseEvent, mesaId: number) => {
+    if (e.button !== 0) return;
+    const pos = posiciones[mesaId];
+    if (!pos || !contenedorRef.current) return;
+    const rect = contenedorRef.current.getBoundingClientRect();
+    offsetRef.current = { x: e.clientX - rect.left - pos.x, y: e.clientY - rect.top - pos.y };
+    inicioRef.current = { x: e.clientX, y: e.clientY };
+    seMovioRef.current = false;
+    setArrastrando(mesaId);
+  };
+
+  useEffect(() => {
+    if (arrastrando == null) return;
+    const moverMouse = (e: MouseEvent) => {
+      if (!contenedorRef.current) return;
+      if (Math.abs(e.clientX - inicioRef.current.x) > 4 || Math.abs(e.clientY - inicioRef.current.y) > 4) {
+        seMovioRef.current = true;
+      }
+      const rect = contenedorRef.current.getBoundingClientRect();
+      const x = Math.max(0, Math.min(rect.width - ANCHO_DEFECTO, e.clientX - rect.left - offsetRef.current.x));
+      const y = Math.max(0, Math.min(rect.height - ANCHO_DEFECTO, e.clientY - rect.top - offsetRef.current.y));
+      setPosiciones((prev) => ({ ...prev, [arrastrando]: { x, y } }));
+    };
+    const soltarMouse = () => {
+      if (seMovioRef.current) {
+        const pos = posiciones[arrastrando];
+        if (pos) actualizarPosicionMesa(tenantId, arrastrando, { posX: Math.round(pos.x), posY: Math.round(pos.y), ancho: ANCHO_DEFECTO, alto: ANCHO_DEFECTO }).catch(() => {});
+      }
+      setArrastrando(null);
+    };
+    window.addEventListener("mousemove", moverMouse);
+    window.addEventListener("mouseup", soltarMouse);
+    return () => {
+      window.removeEventListener("mousemove", moverMouse);
+      window.removeEventListener("mouseup", soltarMouse);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arrastrando]);
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-slate-400">Arrastrá cada mesa para ubicarla como en tu salón real. Un clic la abre; el ícono de arriba la edita.</p>
+      <div ref={contenedorRef} className="relative apple-glass rounded-2xl overflow-hidden" style={{ height: 460, backgroundImage: "radial-gradient(currentColor 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
+        {mapa.map((m) => {
+          const pos = posiciones[m.mesa.id] || { x: 20, y: 20 };
+          return (
+            <div
+              key={m.mesa.id}
+              onMouseDown={(e) => iniciarArrastre(e, m.mesa.id)}
+              style={{ left: pos.x, top: pos.y, width: ANCHO_DEFECTO, height: ANCHO_DEFECTO }}
+              className={`absolute rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 select-none transition-shadow ${
+                arrastrando === m.mesa.id ? "cursor-grabbing shadow-2xl z-10 scale-105" : "cursor-grab hover:scale-[1.03]"
+              } ${m.estado === "OCUPADA" ? "bg-amber-500/20 border-amber-500/60 text-amber-700 dark:text-amber-300" : "bg-teal-500/15 border-teal-500/50 text-teal-700 dark:text-teal-300"}`}
+              onClick={() => {
+                if (seMovioRef.current) { seMovioRef.current = false; return; }
+                (m.estado === "OCUPADA" && m.comandaAbierta) ? onVerComanda(m.comandaAbierta) : onAbrirMesa(m);
+              }}
+            >
+              <span className="font-['Outfit'] font-black text-sm">Mesa {m.mesa.numero}</span>
+              <span className="text-[9px] uppercase font-bold tracking-wider">{m.estado}</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); onEditarMesa(m.mesa); }}
+                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-white dark:bg-slate-800 border border-slate-300/60 dark:border-white/15 flex items-center justify-center text-slate-500 dark:text-white/60 hover:text-teal-600 cursor-pointer shadow-sm"
+              >
+                <IconCustomize size={10} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -632,6 +841,14 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
     setError(null);
     try {
       await cerrarComanda(tenantId, comanda.id, { metodoPago });
+      try {
+        const blob = await descargarTicketComanda(tenantId, comanda.id);
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      } catch {
+        // El cobro ya se procesó — si el recibo falla al generarse no debe bloquear el cierre.
+      }
       onCerrar(totalLocal, metodoPago);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cerrar la comanda");
@@ -1526,13 +1743,15 @@ function VentaRapida({ tenantId, escandallos, fastbar, onVenta }: {
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; onVenta: (monto: number, metodo: string) => void;
 }) {
   interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; estacionCocina?: string }
+  interface ReciboVenta { comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string }
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
   const [nombreManual, setNombreManual] = useState("");
   const [precioManual, setPrecioManual] = useState("");
   const [metodoPago, setMetodoPago] = useState("EFECTIVO");
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [exito, setExito] = useState(false);
+  const [recibo, setRecibo] = useState<ReciboVenta | null>(null);
+  const [abriendoTicket, setAbriendoTicket] = useState(false);
 
   const agregarAlCarrito = (linea: Omit<LineaCarrito, "cantidad">) => {
     setCarrito((prev) => {
@@ -1565,13 +1784,27 @@ function VentaRapida({ tenantId, escandallos, fastbar, onVenta }: {
       }
       await cerrarComanda(tenantId, comanda.id, { metodoPago });
       onVenta(total, metodoPago);
+      setRecibo({ comandaId: comanda.id, lineas: carrito, total, metodoPago, fecha: new Date().toLocaleString() });
       setCarrito([]);
-      setExito(true);
-      setTimeout(() => setExito(false), 2000);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo procesar la venta");
     } finally {
       setProcesando(false);
+    }
+  };
+
+  const verTicket = async () => {
+    if (!recibo) return;
+    setAbriendoTicket(true);
+    try {
+      const blob = await descargarTicketComanda(tenantId, recibo.comandaId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo generar el recibo en PDF");
+    } finally {
+      setAbriendoTicket(false);
     }
   };
 
@@ -1655,9 +1888,47 @@ function VentaRapida({ tenantId, escandallos, fastbar, onVenta }: {
         {error && <p className="text-xs text-red-500">{error}</p>}
         <button onClick={cobrar} disabled={procesando || carrito.length === 0}
           className="w-full btn-cyber-neon text-white text-sm font-bold py-3.5 rounded-xl cursor-pointer disabled:opacity-50">
-          {procesando ? "Procesando…" : exito ? "✓ Venta registrada" : `Cobrar $${total.toFixed(2)}`}
+          {procesando ? "Procesando…" : `Cobrar $${total.toFixed(2)}`}
         </button>
       </div>
+
+      {recibo && (
+        <Modal onClose={() => setRecibo(null)} titulo="Venta registrada">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0"><IconCheckCircle size={22} /></div>
+              <div>
+                <div className="font-['Outfit'] font-bold text-slate-900 dark:text-white">Cobro exitoso</div>
+                <div className="text-xs text-slate-500 dark:text-white/40">{recibo.fecha}</div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              {recibo.lineas.map((l) => (
+                <div key={l.key} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-700 dark:text-white/70">{l.cantidad}× {l.nombre}</span>
+                  <span className="font-mono text-slate-900 dark:text-white">${(l.precio * l.cantidad).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-300/50 dark:border-white/10 font-bold text-slate-900 dark:text-white">
+              <span>Total</span><span className="font-mono">${recibo.total.toFixed(2)}</span>
+            </div>
+            <div className="text-xs text-slate-500 dark:text-white/40">Pagado con: {recibo.metodoPago.replace("_", " ")}</div>
+
+            <div className="flex gap-2 pt-2">
+              <button onClick={verTicket} disabled={abriendoTicket}
+                className="flex-1 g-aurora text-white text-xs font-semibold py-3 rounded-xl cursor-pointer disabled:opacity-60">
+                {abriendoTicket ? "Generando…" : "🧾 Ver / Imprimir recibo"}
+              </button>
+              <button onClick={() => setRecibo(null)} className="flex-1 apple-glass-btn text-xs font-semibold py-3 rounded-xl cursor-pointer">
+                Nueva venta
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
