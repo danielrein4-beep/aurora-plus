@@ -2326,8 +2326,9 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
             <Campo label="Precio de venta $">
               <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
-            <Campo label="Stock inicial">
+            <Campo label={`Cantidad a ingresar ahora (${form.unidadMedida})`}>
               <input value={form.cantidadInicial} onChange={(e) => setForm({ ...form, cantidadInicial: e.target.value })} type="number" step="0.001" min="0" placeholder="0" className="input-horeca" />
+              <p className="text-[10px] text-slate-400 mt-1">Cuánto tenés físicamente de este producto ahora mismo. Podés dejarlo en 0 y cargar stock después con "Reabastecer".</p>
             </Campo>
           </div>
           {(form.costoUnitario || form.precioVenta) && (
