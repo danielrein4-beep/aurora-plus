@@ -13,11 +13,14 @@ import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /** CRUD de artículos de inventario base (Fase 1.4) — no existía ningún controller para esto todavía. */
 @RestController
@@ -211,5 +214,72 @@ public class ArticuloController {
             throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
         }
         return kardexRepository.findByArticuloIdOrderByIdDesc(id);
+    }
+
+    public static class ItemImportacion {
+        public String sku;
+        public String nombre;
+        public String unidadMedida;
+        public String categoria;
+        public BigDecimal costoUnitario;
+        public BigDecimal stockInicial; // opcional — si viene, registra una entrada de Kardex de una vez
+    }
+
+    public static class FilaConError {
+        public int fila;
+        public String motivo;
+        public FilaConError(int fila, String motivo) { this.fila = fila; this.motivo = motivo; }
+    }
+
+    public static class ResultadoImportacion {
+        public int creados = 0;
+        public int actualizados = 0;
+        public List<FilaConError> errores = new ArrayList<>();
+    }
+
+    /**
+     * Carga masiva de artículos (esquema preparado para la próxima
+     * importación desde Excel/CSV — el frontend parsea el archivo con
+     * SheetJS y manda esta misma lista de filas ya como JSON, no el archivo
+     * crudo). Por SKU: si ya existe para este tenant, ACTUALIZA nombre/
+     * categoría/unidad/costo; si no existe, lo CREA. Una fila con error no
+     * aborta el resto del lote — se acumula en `errores` con el número de
+     * fila para que el usuario pueda corregir solo esas líneas.
+     */
+    @PostMapping("/importar-lote")
+    @Transactional
+    public ResponseEntity<ResultadoImportacion> importarLote(@RequestParam Long tenantId, @RequestBody List<ItemImportacion> items) {
+        ResultadoImportacion resultado = new ResultadoImportacion();
+        for (int i = 0; i < items.size(); i++) {
+            ItemImportacion item = items.get(i);
+            try {
+                if (item.sku == null || item.sku.isBlank()) throw new RuntimeException("Falta el SKU");
+                if (item.nombre == null || item.nombre.isBlank()) throw new RuntimeException("Falta el nombre");
+
+                Optional<Articulo> existente = articuloRepository.findBySkuAndTenantId(item.sku.trim(), tenantId);
+                Articulo articulo = existente.orElseGet(Articulo::new);
+                boolean esNuevo = articulo.getId() == null;
+
+                articulo.setTenantId(tenantId);
+                articulo.setSku(item.sku.trim());
+                articulo.setNombre(item.nombre.trim());
+                articulo.setUnidadMedida(item.unidadMedida != null && !item.unidadMedida.isBlank() ? item.unidadMedida.trim() : "unidad");
+                articulo.setCategoria(item.categoria != null && !item.categoria.isBlank() ? item.categoria.trim() : "General");
+                if (item.costoUnitario != null) articulo.setCostoUnitario(item.costoUnitario);
+                if (esNuevo) articulo.setPorcentajeImpuesto(BigDecimal.ZERO);
+
+                articulo = articuloRepository.save(articulo);
+
+                if (item.stockInicial != null && item.stockInicial.compareTo(BigDecimal.ZERO) > 0) {
+                    inventarioService.registrarMovimientoKardex(articulo.getId(), tenantId, Kardex.TipoOperacion.ENTRADA,
+                        item.stockInicial, articulo.getCostoUnitario(), "Carga masiva de inventario");
+                }
+
+                if (esNuevo) resultado.creados++; else resultado.actualizados++;
+            } catch (Exception e) {
+                resultado.errores.add(new FilaConError(i + 1, e.getMessage()));
+            }
+        }
+        return ResponseEntity.ok(resultado);
     }
 }

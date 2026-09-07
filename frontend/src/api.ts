@@ -1056,6 +1056,49 @@ export function historialCierres(): Promise<ArqueoCaja[]> {
   return request(`/api/financiero/tesoreria/historial-cierres`);
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// CONTROL DE CAJA POR TURNOS — apertura con monto base, egresos y Cierre Z
+// ═══════════════════════════════════════════════════════════════════════
+export interface Turno {
+  id: number;
+  tenantId: number;
+  idCajero: string;
+  moneda: string;
+  montoBase: number;
+  fechaApertura: string;
+  fechaCierre: string | null;
+  montoDeclarado: number | null;
+  montoEsperado: number | null;
+  descuadre: number | null;
+  estado: "ABIERTO" | "CERRADO";
+}
+
+export function abrirTurno(tenantId: number, datos: { idCajero: string; montoBase: number; moneda: string }): Promise<Turno> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), idCajero: datos.idCajero, montoBase: String(datos.montoBase), moneda: datos.moneda });
+  return request(`/api/financiero/turnos/abrir?${params}`, { method: "POST" });
+}
+
+/** null si no hay ningún turno abierto en esa moneda ahora mismo. */
+export async function turnoAbierto(tenantId: number, moneda: string): Promise<Turno | null> {
+  const resultado = await request<Turno | undefined>(`/api/financiero/turnos/abierto?tenantId=${tenantId}&moneda=${moneda}`);
+  return resultado ?? null;
+}
+
+export function historialTurnos(tenantId: number): Promise<Turno[]> {
+  return request(`/api/financiero/turnos/historial?tenantId=${tenantId}`);
+}
+
+export function registrarEgresoTurno(tenantId: number, turnoId: number, monto: number, concepto?: string): Promise<MovimientoCaja> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), monto: String(monto) });
+  if (concepto) params.set("concepto", concepto);
+  return request(`/api/financiero/turnos/${turnoId}/egresos?${params}`, { method: "POST" });
+}
+
+export function cerrarTurno(tenantId: number, turnoId: number, montoDeclarado: number): Promise<Turno> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), montoDeclarado: String(montoDeclarado) });
+  return request(`/api/financiero/turnos/${turnoId}/cerrar?${params}`, { method: "POST" });
+}
+
 // Descarga el PDF del cierre autenticado (no puede ser un <a href> plano — necesita el Bearer token).
 export async function descargarTicketComanda(tenantId: number, comandaId: number): Promise<Blob> {
   const sesion = leerSesion();

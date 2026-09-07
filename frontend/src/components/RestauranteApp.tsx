@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import {
   IconRestaurant, IconCustomize, IconUsers, IconHourglass, IconCard, IconFileText,
   IconCheck, IconTrash, IconRefresh, IconCheckCircle, IconWarning, IconSearch, IconClose,
-  IconBolt, IconBank, IconChart, IconDownload,
+  IconBolt, IconBank, IconChart, IconDownload, IconLock,
 } from "../Icons";
 import * as XLSX from "xlsx";
 import { useAuth } from "../context/AuthContext";
@@ -15,25 +15,29 @@ import {
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
   tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
   cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria, reporteTickets,
+  abrirTurno, turnoAbierto, historialTurnos, registrarEgresoTurno, cerrarTurno,
   type Mesa, type MapaMesaEntrada, type Comanda, type ItemComanda, type EstadoItemComanda,
   type EscandalloReceta, type DetalleReceta, type FastBarTrago, type ProveedorHoreca,
   type Articulo, type ItemCompraInsumo, type LoteArticulo, type TasaCambio, type MovimientoCaja,
-  type ResumenPeriodoAbierto, type ArqueoCaja, type PagoParcial, type ResumenUtilidadProducto, type ReporteTicket,
+  type ResumenPeriodoAbierto, type ArqueoCaja, type PagoParcial, type ResumenUtilidadProducto, type ReporteTicket, type Turno,
 } from "../api";
 
 type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "inventario" | "administracion" | "reportes" | "configuracion";
 
-interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element }
+interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
 
+// Fase actual del negocio: Salón & Mesas y Cocina (KDS) quedan en pausa
+// como módulos Premium mientras nos concentramos en Ventas, Administración,
+// Logística e Inventario — no se borra nada, solo se bloquea el acceso.
 const NAV_GRUPOS: NavGrupo[] = [
   {
     titulo: "Operación",
     items: [
       { id: "general", label: "Vista General", Icon: IconCustomize },
       { id: "ventarapida", label: "Venta Rápida", Icon: IconBolt },
-      { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant },
-      { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass },
+      { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant, premium: true },
+      { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass, premium: true },
       { id: "recetas", label: "Recetas & Escandallo", Icon: IconFileText },
       { id: "fastbar", label: "Fast-Bar", Icon: IconCard },
     ],
@@ -144,7 +148,8 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
   const [ventaRapidaAbierta, setVentaRapidaAbierta] = useState(false);
-  const [bloqueoTasa, setBloqueoTasa] = useState<"salon" | "ventarapida" | null>(null);
+  const [bloqueoTasa, setBloqueoTasa] = useState<"ventarapida" | null>(null);
+  const [moduloPremiumClic, setModuloPremiumClic] = useState<Pagina | null>(null);
 
   const [config, setConfig] = useState(() => {
     try {
@@ -235,11 +240,21 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
 
   // Sin tasa BCV del día, un cobro mixto en Bs o el total bimoneda del
   // carrito estarían calculando con una tasa vencida o en cero — bloquea
-  // Venta Rápida y Salón hasta que se registre, en vez de dejar operar con
-  // números que no cuadran.
+  // Venta Rápida hasta que se registre, en vez de dejar operar con números
+  // que no cuadran.
   const tasaValida = tasaBcv != null && Number(tasaBcv.tasa) > 0;
-  const irASalon = () => { if (!tasaValida) { setBloqueoTasa("salon"); return; } setPagina("salon"); };
   const abrirVentaRapida = () => { if (!tasaValida) { setBloqueoTasa("ventarapida"); return; } setVentaRapidaAbierta(true); };
+
+  // Paywall: Salón & Mesas y Cocina (KDS) quedan marcados premium en
+  // NAV_GRUPOS — esta es la ÚNICA puerta de entrada para cambiar de página,
+  // así que también protege contra que algo intente forzar `pagina` a un
+  // módulo premium sin pasar por acá (el switch de abajo vuelve a validar
+  // de todas formas, por si acaso).
+  const esPremium = (p: Pagina) => NAV.find((n) => n.id === p)?.premium === true;
+  const irA = (p: Pagina) => {
+    if (esPremium(p)) { setModuloPremiumClic(p); return; }
+    setPagina(p);
+  };
 
   return (
     <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "horeca-clasico" : ""}`}>
@@ -265,9 +280,11 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                 return (
                   <button
                     key={n.id}
-                    onClick={() => (n.id === "ventarapida" ? abrirVentaRapida() : n.id === "salon" ? irASalon() : setPagina(n.id))}
+                    onClick={() => (n.id === "ventarapida" ? abrirVentaRapida() : irA(n.id))}
                     className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
-                      pagina === n.id
+                      n.premium
+                        ? "text-slate-400 dark:text-white/30 hover:bg-slate-200/40 dark:hover:bg-white/5"
+                        : pagina === n.id
                         ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 shadow-sm"
                         : alertaVencimiento
                         ? "text-red-600 dark:text-red-300 hover:bg-red-500/10"
@@ -275,7 +292,11 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                     }`}
                   >
                     <span className="flex items-center gap-2.5"><n.Icon size={16} /><span>{n.label}</span></span>
-                    {alertaVencimiento && (
+                    {n.premium ? (
+                      <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500">
+                        <IconLock size={10} /> PRO
+                      </span>
+                    ) : alertaVencimiento && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 font-bold">{(lotesPorVencer || []).length}</span>
                     )}
                   </button>
@@ -337,14 +358,22 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "general" && (
             <VistaGeneral mesasOcupadas={mesasOcupadas} totalMesas={(mapa || []).length} comandasAbiertas={comandasAbiertas}
               totalVentasHoy={totalVentasHoy} kdsCounts={kdsCounts} vencimientos={(lotesPorVencer || []).length}
-              onNavegar={(p) => (p === "salon" ? irASalon() : setPagina(p))}
+              onNavegar={irA}
               onVentaRapida={abrirVentaRapida} />
           )}
-          {pagina === "salon" && tasaValida && (
-            <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
-              escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
+          {pagina === "salon" && (esPremium("salon")
+            ? <BloqueoPremium modulo="Salón & Mesas" />
+            : tasaValida
+              ? <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
+                  escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
+              : (
+                <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
+                  <IconWarning size={28} />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar el salón.</p>
+                </div>
+              )
           )}
-          {pagina === "cocina" && <Cocina tenantId={tenantId} onCambio={recargarTodo} />}
+          {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} />)}
           {pagina === "recetas" && <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} onCambio={recargarTodo} />}
           {pagina === "fastbar" && <FastBar tenantId={tenantId} fastbar={fastbar} onVenta={registrarVenta} onCambio={recargarTodo} />}
           {pagina === "compras" && (
@@ -354,15 +383,6 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "administracion" && <Administracion tenantId={tenantId} />}
           {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
-          {pagina === "salon" && !tasaValida && (
-            <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
-              <IconWarning size={28} />
-              <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar el salón.</p>
-              <button onClick={() => setBloqueoTasa("salon")} className="g-aurora text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer">
-                Registrar tasa ahora
-              </button>
-            </div>
-          )}
         </div>
       </main>
 
@@ -376,24 +396,25 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
       {bloqueoTasa && (
         <ModalTasaRequerida
           tenantId={tenantId}
-          destino={bloqueoTasa}
           onCancelar={() => setBloqueoTasa(null)}
           onRegistrada={() => {
-            const destino = bloqueoTasa;
             setBloqueoTasa(null);
             recargarTodo();
-            if (destino === "salon") setPagina("salon");
-            if (destino === "ventarapida") setVentaRapidaAbierta(true);
+            setVentaRapidaAbierta(true);
           }}
         />
+      )}
+
+      {moduloPremiumClic && (
+        <ModalPremium modulo={NAV.find((n) => n.id === moduloPremiumClic)?.label || ""} onClose={() => setModuloPremiumClic(null)} />
       )}
     </div>
   );
 }
 
-/** Bloquea Venta Rápida/Salón hasta que se registre la tasa BCV del día — sin tasa, un cobro en Bs o el total bimoneda calcularían con un número vencido o en cero. */
-function ModalTasaRequerida({ tenantId, destino, onCancelar, onRegistrada }: {
-  tenantId: number; destino: "salon" | "ventarapida"; onCancelar: () => void; onRegistrada: () => void;
+/** Bloquea Venta Rápida hasta que se registre la tasa BCV del día — sin tasa, un cobro en Bs o el total bimoneda calcularían con un número vencido o en cero. */
+function ModalTasaRequerida({ tenantId, onCancelar, onRegistrada }: {
+  tenantId: number; onCancelar: () => void; onRegistrada: () => void;
 }) {
   const [tasa, setTasa] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -420,7 +441,7 @@ function ModalTasaRequerida({ tenantId, destino, onCancelar, onRegistrada }: {
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-amber-500/15 text-amber-500 flex items-center justify-center flex-shrink-0"><IconWarning size={20} /></div>
           <p className="text-sm text-slate-600 dark:text-white/70">
-            No hay tasa BCV registrada hoy (o es $0). {destino === "salon" ? "El salón" : "Venta Rápida"} necesita una tasa vigente para calcular
+            No hay tasa BCV registrada hoy (o es $0). Venta Rápida necesita una tasa vigente para calcular
             el total en bolívares y el vuelto en cualquier cobro mixto — regístrala para continuar.
           </p>
         </div>
@@ -436,6 +457,32 @@ function ModalTasaRequerida({ tenantId, destino, onCancelar, onRegistrada }: {
         </button>
       </div>
     </Modal>
+  );
+}
+
+/** Intercepta el click en un módulo Premium (Salón & Mesas, Cocina KDS) en vez de navegar a la vista. */
+function ModalPremium({ modulo, onClose }: { modulo: string; onClose: () => void }) {
+  return (
+    <Modal onClose={onClose} titulo="Módulo Premium">
+      <div className="space-y-4 text-center">
+        <div className="w-14 h-14 rounded-full bg-amber-500/15 text-amber-500 flex items-center justify-center mx-auto"><IconLock size={26} /></div>
+        <p className="text-sm text-slate-600 dark:text-white/70">
+          <strong className="text-slate-900 dark:text-white">{modulo}</strong> es un módulo Premium. Mejora tu plan para activar la gestión de mesas y pantallas de cocina.
+        </p>
+        <button onClick={onClose} className="w-full g-aurora text-white text-sm font-bold py-3 rounded-xl cursor-pointer">Entendido</button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Bloqueo inline por si `pagina` llega a un módulo premium por cualquier otra vía que no sea el sidebar/ModalPremium — la vista real nunca se monta. */
+function BloqueoPremium({ modulo }: { modulo: string }) {
+  return (
+    <div className="apple-glass rounded-2xl p-10 text-center space-y-3">
+      <div className="w-14 h-14 rounded-full bg-amber-500/15 text-amber-500 flex items-center justify-center mx-auto"><IconLock size={26} /></div>
+      <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-lg">{modulo} — Módulo Premium</h3>
+      <p className="text-sm text-slate-500 dark:text-white/40 max-w-md mx-auto">Mejora tu plan para activar la gestión de mesas y pantallas de cocina.</p>
+    </div>
   );
 }
 
@@ -2812,12 +2859,13 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
 // ADMINISTRACIÓN — ingresos/gastos + cuentas x cobrar/pagar + cierre de caja, unidos
 // ══════════════════════════════════════════════════════════════════════════
 function Administracion({ tenantId }: { tenantId: number }) {
-  const [tab, setTab] = useState<"finanzas" | "cuentas" | "cierre" | "resumen">("finanzas");
+  const [tab, setTab] = useState<"turnos" | "finanzas" | "cuentas" | "cierre" | "resumen">("turnos");
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit flex-wrap">
         {[
+          { id: "turnos", label: "Control de Caja (Turnos)" },
           { id: "finanzas", label: "Ingresos & Gastos" },
           { id: "cuentas", label: "Cuentas x Cobrar/Pagar" },
           { id: "cierre", label: "Cierre de Caja" },
@@ -2830,10 +2878,219 @@ function Administracion({ tenantId }: { tenantId: number }) {
         ))}
       </div>
 
+      {tab === "turnos" && <TurnosCaja tenantId={tenantId} />}
       {tab === "finanzas" && <Finanzas tenantId={tenantId} />}
       {tab === "cuentas" && <CuentasPorCobrarPagar tenantId={tenantId} />}
       {tab === "cierre" && <CierreDeCaja tenantId={tenantId} />}
       {tab === "resumen" && <ResumenDiario tenantId={tenantId} />}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// CONTROL DE CAJA POR TURNOS — apertura con monto base, egresos y Cierre Z
+// (compara lo esperado en sistema — base + ventas − egresos — contra lo que
+// el cajero declara tener físicamente).
+// ══════════════════════════════════════════════════════════════════════════
+function TurnosCaja({ tenantId }: { tenantId: number }) {
+  const MONEDAS = ["USD", "VES", "COP"];
+  const [moneda, setMoneda] = useState("USD");
+  const [turno, setTurno] = useState<Turno | null | undefined>(undefined); // undefined = cargando
+  const [historial, setHistorial] = useState<Turno[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [idCajero, setIdCajero] = useState("");
+  const [montoBase, setMontoBase] = useState("");
+  const [abriendo, setAbriendo] = useState(false);
+
+  const [montoEgreso, setMontoEgreso] = useState("");
+  const [conceptoEgreso, setConceptoEgreso] = useState("");
+  const [registrandoEgreso, setRegistrandoEgreso] = useState(false);
+
+  const [montoDeclarado, setMontoDeclarado] = useState("");
+  const [cerrando, setCerrando] = useState(false);
+  const [ultimoCierre, setUltimoCierre] = useState<Turno | null>(null);
+
+  const cargarTurno = () => {
+    setTurno(undefined);
+    turnoAbierto(tenantId, moneda).then(setTurno).catch(() => setTurno(null));
+  };
+  const cargarHistorial = () => { historialTurnos(tenantId).then(setHistorial).catch(() => setHistorial([])); };
+  useEffect(() => { cargarTurno(); }, [tenantId, moneda]);
+  useEffect(() => { cargarHistorial(); }, [tenantId]);
+
+  const abrir = async () => {
+    setError(null);
+    if (!idCajero.trim()) { setError("Indica quién abre la caja"); return; }
+    if (montoBase === "" || Number(montoBase) < 0) { setError("Indica el monto base de apertura"); return; }
+    setAbriendo(true);
+    try {
+      await abrirTurno(tenantId, { idCajero: idCajero.trim(), montoBase: Number(montoBase), moneda });
+      setMontoBase("");
+      cargarTurno();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo abrir el turno");
+    } finally {
+      setAbriendo(false);
+    }
+  };
+
+  const registrarEgreso = async () => {
+    if (!turno) return;
+    setError(null);
+    if (!montoEgreso || Number(montoEgreso) <= 0) { setError("Indica el monto del egreso"); return; }
+    setRegistrandoEgreso(true);
+    try {
+      await registrarEgresoTurno(tenantId, turno.id, Number(montoEgreso), conceptoEgreso.trim() || undefined);
+      setMontoEgreso(""); setConceptoEgreso("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar el egreso");
+    } finally {
+      setRegistrandoEgreso(false);
+    }
+  };
+
+  const cerrar = async () => {
+    if (!turno) return;
+    setError(null);
+    if (montoDeclarado === "" || Number(montoDeclarado) < 0) { setError("Indica lo contado físicamente en caja"); return; }
+    if (!window.confirm("¿Cerrar el turno? Esto genera el Cierre Z y no se puede deshacer.")) return;
+    setCerrando(true);
+    try {
+      const cerrado = await cerrarTurno(tenantId, turno.id, Number(montoDeclarado));
+      setUltimoCierre(cerrado);
+      setMontoDeclarado("");
+      cargarTurno();
+      cargarHistorial();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cerrar el turno");
+    } finally {
+      setCerrando(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+        {MONEDAS.map((m) => (
+          <button key={m} onClick={() => setMoneda(m)} className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer ${moneda === m ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
+            {m}
+          </button>
+        ))}
+      </div>
+
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      {turno === undefined ? (
+        <p className="text-xs text-slate-400">Cargando…</p>
+      ) : turno === null ? (
+        <div className="apple-glass rounded-2xl p-5 space-y-3">
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Abrir turno de caja ({moneda})</h3>
+          <p className="text-slate-500 dark:text-white/40 text-xs">No hay ninguna caja abierta en {moneda} ahora mismo.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Campo label="Cajero / Responsable">
+              <input value={idCajero} onChange={(e) => setIdCajero(e.target.value)} placeholder="Nombre de quien abre" className="input-horeca" />
+            </Campo>
+            <Campo label={`Monto base de apertura (${moneda})`}>
+              <input value={montoBase} onChange={(e) => setMontoBase(e.target.value)} type="number" step="0.01" placeholder="0.00" className="input-horeca" />
+            </Campo>
+          </div>
+          <button onClick={abrir} disabled={abriendo} className="btn-cyber-neon text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer disabled:opacity-60">
+            {abriendo ? "Abriendo…" : "Abrir caja"}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <div className="apple-glass rounded-2xl p-5 space-y-1">
+            <div className="flex items-center justify-between">
+              <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Caja abierta ({moneda})</h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-300">ABIERTO</span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-white/40">Cajero: {turno.idCajero} · Desde {new Date(turno.fechaApertura).toLocaleString()}</p>
+            <p className="text-xs text-slate-500 dark:text-white/40">Monto base: {Number(turno.montoBase).toFixed(2)} {moneda}</p>
+          </div>
+
+          <div className="apple-glass rounded-2xl p-5 space-y-3">
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm">Registrar egreso</h4>
+            <p className="text-slate-500 dark:text-white/40 text-xs">Pago a proveedor, gasto menor u otra salida de dinero de esta caja.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-3">
+              <input value={montoEgreso} onChange={(e) => setMontoEgreso(e.target.value)} type="number" step="0.01" placeholder={`Monto ${moneda}`} className="input-horeca" />
+              <input value={conceptoEgreso} onChange={(e) => setConceptoEgreso(e.target.value)} placeholder="Concepto (ej. Pago a proveedor)" className="input-horeca" />
+            </div>
+            <button onClick={registrarEgreso} disabled={registrandoEgreso} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+              {registrandoEgreso ? "Registrando…" : "− Registrar egreso"}
+            </button>
+          </div>
+
+          <div className="apple-glass rounded-2xl p-5 space-y-3 border border-amber-500/30">
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm">Cierre de caja (Cierre Z)</h4>
+            <p className="text-slate-500 dark:text-white/40 text-xs">Contá físicamente el efectivo y escribí lo que hay — el sistema compara contra lo esperado (base + ventas − egresos) y muestra el descuadre.</p>
+            <input value={montoDeclarado} onChange={(e) => setMontoDeclarado(e.target.value)} type="number" step="0.01" placeholder={`Monto contado ${moneda}`} className="input-horeca" />
+            <button onClick={cerrar} disabled={cerrando} className="btn-cyber-neon text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer disabled:opacity-60">
+              {cerrando ? "Cerrando…" : "Cerrar turno (Cierre Z)"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {ultimoCierre && (
+        <Modal onClose={() => setUltimoCierre(null)} titulo="Cierre Z registrado">
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="text-slate-500 dark:text-white/40 text-xs">Esperado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{Number(ultimoCierre.montoEsperado).toFixed(2)} {ultimoCierre.moneda}</div></div>
+              <div><span className="text-slate-500 dark:text-white/40 text-xs">Declarado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{Number(ultimoCierre.montoDeclarado).toFixed(2)} {ultimoCierre.moneda}</div></div>
+            </div>
+            <div className={`rounded-xl p-3 text-center font-mono font-bold ${
+              Number(ultimoCierre.descuadre) === 0 ? "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+              : Number(ultimoCierre.descuadre) > 0 ? "bg-sky-500/15 text-sky-600 dark:text-sky-300"
+              : "bg-red-500/15 text-red-500"
+            }`}>
+              {Number(ultimoCierre.descuadre) === 0 ? "Caja cuadrada exacta"
+                : Number(ultimoCierre.descuadre) > 0 ? `Sobrante: +${Number(ultimoCierre.descuadre).toFixed(2)} ${ultimoCierre.moneda}`
+                : `Faltante: ${Number(ultimoCierre.descuadre).toFixed(2)} ${ultimoCierre.moneda}`}
+            </div>
+            <button onClick={() => setUltimoCierre(null)} className="w-full apple-glass-btn text-xs font-semibold py-3 rounded-xl cursor-pointer">Cerrar</button>
+          </div>
+        </Modal>
+      )}
+
+      {historial && historial.length > 0 && (
+        <div className="apple-glass rounded-2xl p-5">
+          <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-3">Historial de turnos</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-400 dark:text-white/40 uppercase text-[10px] tracking-wider border-b border-slate-300/50 dark:border-white/10">
+                  <th className="py-2 pr-2">Apertura</th>
+                  <th className="py-2 px-2">Cajero</th>
+                  <th className="py-2 px-2">Moneda</th>
+                  <th className="py-2 px-2 text-right">Base</th>
+                  <th className="py-2 px-2 text-right">Esperado</th>
+                  <th className="py-2 px-2 text-right">Declarado</th>
+                  <th className="py-2 pl-2 text-right">Descuadre</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historial.map((t) => (
+                  <tr key={t.id} className="border-b border-slate-200/50 dark:border-white/5">
+                    <td className="py-2 pr-2 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fechaApertura).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-slate-600 dark:text-white/60">{t.idCajero}</td>
+                    <td className="py-2 px-2 text-slate-600 dark:text-white/60">{t.moneda}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{Number(t.montoBase).toFixed(2)}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{t.montoEsperado != null ? Number(t.montoEsperado).toFixed(2) : "—"}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{t.montoDeclarado != null ? Number(t.montoDeclarado).toFixed(2) : "—"}</td>
+                    <td className={`py-2 pl-2 text-right font-mono font-bold ${
+                      t.descuadre == null ? "text-slate-400" : Number(t.descuadre) === 0 ? "text-teal-600 dark:text-teal-400" : "text-red-500"
+                    }`}>
+                      {t.descuadre != null ? Number(t.descuadre).toFixed(2) : (t.estado === "ABIERTO" ? "Abierto" : "—")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
