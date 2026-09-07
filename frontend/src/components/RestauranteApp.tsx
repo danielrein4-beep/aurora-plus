@@ -229,6 +229,11 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const [fastbar, setFastbar] = useState<FastBarTrago[] | null>(null);
   const [proveedores, setProveedores] = useState<ProveedorHoreca[] | null>(null);
   const [articulos, setArticulos] = useState<Articulo[] | null>(null);
+  // Edición rápida desde una tarjeta del catálogo del POS: refleja el
+  // artículo actualizado en memoria (el PUT ya lo devuelve completo) sin
+  // esperar un refetch completo de recargarTodo().
+  const actualizarArticuloEnEstado = (actualizado: Articulo) =>
+    setArticulos((prev) => (prev || []).map((a) => (a.id === actualizado.id ? actualizado : a)));
   const [lotesPorVencer, setLotesPorVencer] = useState<LoteArticulo[] | null>(null);
   const [kdsCounts, setKdsCounts] = useState<number>(0);
   const [tasaBcv, setTasaBcv] = useState<TasaCambio | null>(null);
@@ -379,7 +384,8 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
               tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
               ventasHoy={ventasHoy} nombreLocal={config.nombreLocal} tasaValida={tasaValida}
               onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
-              onRegistrarTasa={() => setBloqueoTasa("embebido")} />
+              onRegistrarTasa={() => setBloqueoTasa("embebido")}
+              onArticuloActualizado={actualizarArticuloEnEstado} />
           )}
           {pagina === "salon" && (esPremium("salon")
             ? <BloqueoPremium modulo="Salón & Mesas" />
@@ -411,7 +417,8 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
         <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
           ventasHoy={ventasHoy} nombreLocal={config.nombreLocal}
           onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
-          onCerrar={() => setVentaRapidaAbierta(false)} />
+          onCerrar={() => setVentaRapidaAbierta(false)}
+          onArticuloActualizado={actualizarArticuloEnEstado} />
       )}
 
       {bloqueoTasa && (
@@ -641,12 +648,13 @@ function KpiCard({ label, val, sub, color, onClick }: { label: string; val: stri
 // ══════════════════════════════════════════════════════════════════════════
 function VistaGeneral({
   totalVentasHoy, valorInventario, vencimientos, onNavegar,
-  tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, tasaValida, onVenta, onRegistrarTasa,
+  tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, tasaValida, onVenta, onRegistrarTasa, onArticuloActualizado,
 }: {
   totalVentasHoy: number; valorInventario: number; vencimientos: number; onNavegar: (p: Pagina) => void;
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
   tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
   tasaValida: boolean; onVenta: (monto: number, metodo: string) => void; onRegistrarTasa: () => void;
+  onArticuloActualizado: (articulo: Articulo) => void;
 }) {
   return (
     // h-[calc(100vh-250px)]: descuenta el header de la app + estos KPIs +
@@ -671,6 +679,7 @@ function VistaGeneral({
         embebido tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos}
         tasaBcv={tasaBcv} tasaCop={tasaCop} ventasHoy={ventasHoy} nombreLocal={nombreLocal}
         tasaValida={tasaValida} onRegistrarTasa={onRegistrarTasa} onVenta={onVenta}
+        onArticuloActualizado={onArticuloActualizado}
       />
     </div>
   );
@@ -2088,6 +2097,76 @@ function BadgeMargen({ margen }: { margen: number | null }) {
   return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${color}`}>Margen {margen.toFixed(1)}%</span>;
 }
 
+/**
+ * Modal de edición rápida de un artículo — componente compartido entre
+ * Inventario (TarjetaArticulo) y la cuadrícula de catálogo del POS, para
+ * que ajustar un precio no dependa de en qué pantalla esté el operador.
+ * `onGuardado` recibe el artículo ya actualizado (el PUT lo devuelve
+ * completo) para que quien lo use pueda reflejarlo al instante sin
+ * recargar ni volver a pedirlo al backend.
+ */
+function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
+  tenantId: number; articulo: Articulo; onClose: () => void; onGuardado: (actualizado: Articulo) => void;
+}) {
+  const [form, setForm] = useState({
+    nombre: articulo.nombre, categoria: articulo.categoria || "", unidadMedida: articulo.unidadMedida || "unidad",
+    costoUnitario: String(articulo.costoUnitario), precioVenta: String(articulo.precioVenta ?? 0),
+  });
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const margen = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
+
+  const guardar = async () => {
+    if (!form.nombre.trim()) { setError("El nombre no puede quedar vacío"); return; }
+    if (!form.categoria.trim()) { setError("La categoría no puede quedar vacía"); return; }
+    if (!form.costoUnitario || Number(form.costoUnitario) < 0) { setError("El costo unitario es obligatorio"); return; }
+    if (!form.precioVenta || Number(form.precioVenta) <= 0) { setError("El precio de venta es obligatorio"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      const actualizado = await editarArticulo(tenantId, articulo.id, {
+        nombre: form.nombre.trim(), categoria: form.categoria.trim(), unidadMedida: form.unidadMedida.trim(),
+        costoUnitario: Number(form.costoUnitario), precioVenta: Number(form.precioVenta),
+      });
+      onGuardado(actualizado);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} titulo="Editar artículo">
+      <div className="space-y-3">
+        <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="input-horeca text-sm font-bold" placeholder="Nombre" autoFocus />
+        <div className="grid grid-cols-2 gap-2">
+          <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} className="input-horeca text-xs" placeholder="Categoría" />
+          <select value={form.unidadMedida} onChange={(e) => setForm({ ...form, unidadMedida: e.target.value })} className="input-horeca text-xs">
+            {["kg", "g", "l", "ml", "unidad"].map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Costo unitario $" />
+          <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Precio de venta $" />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-slate-500 dark:text-white/40">Margen:</span>
+          <BadgeMargen margen={margen} />
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="flex gap-2 pt-1">
+          <button onClick={guardar} disabled={guardando} className="flex-1 g-aurora text-white text-sm font-bold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+            {guardando ? "Guardando…" : "Guardar cambios"}
+          </button>
+          <button onClick={onClose} className="flex-1 apple-glass-btn text-sm font-semibold py-2.5 rounded-xl cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number; articulos: Articulo[] | null; onCambio: () => void }) {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [mostrarImportar, setMostrarImportar] = useState(false);
@@ -2433,39 +2512,13 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
 
 function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; articulo: Articulo; onCambio: () => void }) {
   const [modo, setModo] = useState<"ver" | "editar" | "ajustar">("ver");
-  const [form, setForm] = useState({
-    nombre: articulo.nombre, categoria: articulo.categoria || "", unidadMedida: articulo.unidadMedida || "unidad",
-    costoUnitario: String(articulo.costoUnitario), precioVenta: String(articulo.precioVenta ?? 0),
-  });
   const [stockReal, setStockReal] = useState(String(Number(articulo.stockActual)));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const margenEdicion = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
   const margenActual = calcularMargen(Number(articulo.costoUnitario), Number(articulo.precioVenta ?? 0));
   const sinStock = Number(articulo.stockActual) <= 0;
   const stockBajo = !sinStock && articulo.stockMinimo != null && Number(articulo.stockActual) <= Number(articulo.stockMinimo);
-
-  const guardarEdicion = async () => {
-    if (!form.nombre.trim()) { setError("El nombre no puede quedar vacío"); return; }
-    if (!form.categoria.trim()) { setError("La categoría no puede quedar vacía"); return; }
-    if (!form.costoUnitario || Number(form.costoUnitario) < 0) { setError("El costo unitario es obligatorio"); return; }
-    if (!form.precioVenta || Number(form.precioVenta) <= 0) { setError("El precio de venta es obligatorio"); return; }
-    setGuardando(true);
-    setError(null);
-    try {
-      await editarArticulo(tenantId, articulo.id, {
-        nombre: form.nombre.trim(), categoria: form.categoria.trim(), unidadMedida: form.unidadMedida.trim(),
-        costoUnitario: Number(form.costoUnitario), precioVenta: Number(form.precioVenta),
-      });
-      setModo("ver");
-      onCambio();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
-    } finally {
-      setGuardando(false);
-    }
-  };
 
   const guardarAjuste = async () => {
     if (stockReal === "" || Number(stockReal) < 0) { setError("Indicá el stock real contado"); return; }
@@ -2494,35 +2547,6 @@ function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; a
       setGuardando(false);
     }
   };
-
-  if (modo === "editar") {
-    return (
-      <div className="apple-glass rounded-2xl p-5 space-y-2 border border-teal-500/30">
-        <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="input-horeca text-sm font-bold" placeholder="Nombre" />
-        <div className="grid grid-cols-2 gap-2">
-          <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} className="input-horeca text-xs" placeholder="Categoría" />
-          <select value={form.unidadMedida} onChange={(e) => setForm({ ...form, unidadMedida: e.target.value })} className="input-horeca text-xs">
-            {["kg", "g", "l", "ml", "unidad"].map((u) => <option key={u} value={u}>{u}</option>)}
-          </select>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Costo unitario $" />
-          <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Precio de venta $" />
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold text-slate-500 dark:text-white/40">Margen:</span>
-          <BadgeMargen margen={margenEdicion} />
-        </div>
-        {error && <p className="text-[10px] text-red-500">{error}</p>}
-        <div className="flex gap-2">
-          <button onClick={guardarEdicion} disabled={guardando} className="flex-1 g-aurora text-white text-xs font-semibold py-2 rounded-lg cursor-pointer disabled:opacity-60">
-            {guardando ? "Guardando…" : "Guardar"}
-          </button>
-          <button onClick={() => { setModo("ver"); setError(null); }} className="flex-1 apple-glass-btn text-xs font-semibold py-2 rounded-lg cursor-pointer">Cancelar</button>
-        </div>
-      </div>
-    );
-  }
 
   if (modo === "ajustar") {
     return (
@@ -2572,6 +2596,10 @@ function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; a
         <span className="text-slate-400 dark:text-white/40 font-mono">Costo ${Number(articulo.costoUnitario).toFixed(2)}</span>
       </div>
       {error && <p className="text-[10px] text-red-500">{error}</p>}
+
+      {modo === "editar" && (
+        <ModalEditarArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onGuardado={() => { setModo("ver"); onCambio(); }} />
+      )}
     </div>
   );
 }
@@ -2870,7 +2898,7 @@ function TasasDeCambio({ tenantId }: { tenantId: number }) {
 const CATEGORIA_RECETAS = "__RECETAS__";
 const CATEGORIA_FASTBAR = "__FASTBAR__";
 
-function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, onVenta, onCerrar, embebido, tasaValida, onRegistrarTasa }: {
+function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, onVenta, onCerrar, embebido, tasaValida, onRegistrarTasa, onArticuloActualizado }: {
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
   tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
   onVenta: (monto: number, metodo: string) => void; onCerrar?: () => void;
@@ -2878,6 +2906,10 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   // completa ni header propio, que duplicarían lo que el dashboard ya
   // muestra) en vez de como modal flotante independiente.
   embebido?: boolean; tasaValida?: boolean; onRegistrarTasa?: () => void;
+  // Edición rápida desde la tarjeta del catálogo: el padre actualiza su
+  // lista de artículos en memoria con lo que devuelve el PUT, sin volver a
+  // pedirla al backend.
+  onArticuloActualizado?: (articulo: Articulo) => void;
 }) {
   interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
   interface ReciboVenta { comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string }
@@ -2900,6 +2932,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   const [imprimiendoEscPos, setImprimiendoEscPos] = useState(false);
   const [moneda, setMoneda] = useState("USD");
   const [mostrarProductoLibre, setMostrarProductoLibre] = useState(false);
+  const [articuloEditando, setArticuloEditando] = useState<Articulo | null>(null);
   const [nombreLibre, setNombreLibre] = useState("");
   const [precioLibre, setPrecioLibre] = useState("");
   const [cantidadLibre, setCantidadLibre] = useState("1");
@@ -3168,11 +3201,14 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
           }`}>Comanda{carrito.length > 0 && ` · ${carrito.length} · $${total.toFixed(2)}`}</button>
       </div>
 
-      {/* CUERPO: catálogo (70%) + carrito (30%) en pantallas grandes; un panel a la vez debajo de "lg" */}
-      <div className="flex-1 flex min-h-0">
+      {/* CUERPO: grid de 12 columnas en pantallas grandes — catálogo (7) +
+          comanda/cobro (5), más ancho que antes para que los montos y el
+          cobro mixto respiren; debajo de "lg" sigue siendo un panel a la
+          vez (flex, sin grid) por el selector de pestañas móvil. */}
+      <div className="flex-1 flex min-h-0 lg:grid lg:grid-cols-12">
         {/* PANEL IZQUIERDO — CATÁLOGO */}
-        <div className={`${vistaMobile === "catalogo" ? "flex" : "hidden"} lg:flex flex-1 lg:flex-[7] min-w-0 flex-col p-4 gap-3 overflow-hidden`}>
-          <div className="relative flex-shrink-0">
+        <div className={`${vistaMobile === "catalogo" ? "flex" : "hidden"} lg:flex lg:col-span-7 flex-1 min-w-0 min-h-0 flex-col p-4 gap-3 overflow-hidden`}>
+          <div className="relative shrink-0">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={15} /></span>
             <input
               ref={busquedaRef}
@@ -3219,25 +3255,41 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 {catalogoFiltrado.map((item) => {
                   const sinStock = item.tipo === "articulo" && (item.stockActual ?? 0) <= 0;
                   return (
-                    <button key={item.key} type="button" disabled={sinStock} onClick={() => agregarDesdeTarjeta(item)}
-                      className={`apple-glass rounded-xl p-3.5 text-left transition-all border border-transparent ${
-                        sinStock ? "opacity-40 cursor-not-allowed" : "hover:border-teal-500/40 hover:scale-[1.02] cursor-pointer active:scale-[0.98]"
-                      }`}>
-                      <div className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full inline-block mb-1.5 ${
-                        item.tipo === "receta" ? "bg-purple-500/15 text-purple-600 dark:text-purple-300"
-                        : item.tipo === "fastbar" ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"
-                        : "bg-teal-500/15 text-teal-600 dark:text-teal-300"
-                      }`}>{item.tipo === "receta" ? "RECETA" : item.tipo === "fastbar" ? "FAST-BAR" : "INVENTARIO"}</div>
-                      <div className="text-xs font-semibold text-slate-900 dark:text-white leading-snug line-clamp-2 min-h-[2.2em]">{item.nombre}</div>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">${item.precio.toFixed(2)}</span>
-                        {item.tipo === "articulo" && (
-                          <span className={`text-[9px] font-mono ${sinStock ? "text-red-500" : "text-slate-400 dark:text-white/40"}`}>
-                            {sinStock ? "Sin stock" : `${item.stockActual} ${item.unidadMedida}`}
-                          </span>
-                        )}
-                      </div>
-                    </button>
+                    // relative: la tarjeta sigue siendo un solo <button> para
+                    // el agregado rápido; el ícono de edición va como
+                    // hermano posicionado encima, no anidado (un <button>
+                    // dentro de otro <button> es HTML inválido).
+                    <div key={item.key} className="relative">
+                      <button type="button" disabled={sinStock} onClick={() => agregarDesdeTarjeta(item)}
+                        className={`w-full apple-glass rounded-xl p-3.5 text-left transition-all border border-transparent ${
+                          sinStock ? "opacity-40 cursor-not-allowed" : "hover:border-teal-500/40 hover:scale-[1.02] cursor-pointer active:scale-[0.98]"
+                        }`}>
+                        <div className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full inline-block mb-1.5 ${
+                          item.tipo === "receta" ? "bg-purple-500/15 text-purple-600 dark:text-purple-300"
+                          : item.tipo === "fastbar" ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"
+                          : "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+                        }`}>{item.tipo === "receta" ? "RECETA" : item.tipo === "fastbar" ? "FAST-BAR" : "INVENTARIO"}</div>
+                        <div className="text-xs font-semibold text-slate-900 dark:text-white leading-snug line-clamp-2 min-h-[2.2em] pr-4">{item.nombre}</div>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">${item.precio.toFixed(2)}</span>
+                          {item.tipo === "articulo" && (
+                            <span className={`text-[9px] font-mono ${sinStock ? "text-red-500" : "text-slate-400 dark:text-white/40"}`}>
+                              {sinStock ? "Sin stock" : `${item.stockActual} ${item.unidadMedida}`}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                      {item.tipo === "articulo" && (
+                        <button type="button" title="Editar artículo" onClick={(e) => {
+                          e.stopPropagation();
+                          const completo = (articulos || []).find((a) => a.id === item.id);
+                          if (completo) setArticuloEditando(completo);
+                        }}
+                          className="absolute top-2 right-2 w-5 h-5 rounded-full bg-white/80 dark:bg-black/40 flex items-center justify-center text-slate-400 hover:text-teal-600 dark:hover:text-teal-300 opacity-70 hover:opacity-100 cursor-pointer transition-opacity">
+                          <IconCustomize size={11} />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -3250,7 +3302,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             flexbox) el hijo "flex-1 overflow-y-auto" de abajo no tiene un
             límite real de alto contra el cual hacer scroll — en vez de
             desplazarse, empuja/aplasta el pie de totales y cobro. */}
-        <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex flex-1 lg:flex-[3] lg:min-w-[300px] lg:max-w-[420px] flex-shrink-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col h-full min-h-0 bg-white/30 dark:bg-black/10`}>
+        <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex lg:col-span-5 flex-1 min-w-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col h-full min-h-0 bg-white/30 dark:bg-black/10`}>
           {/* Cabecera: cliente CRM */}
           <div className="p-4 border-b border-slate-300/50 dark:border-white/10 flex-shrink-0">
             <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1.5">Cliente (opcional)</p>
@@ -3343,6 +3395,15 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
           </div>
         </div>
       </div>
+
+      {articuloEditando && (
+        <ModalEditarArticulo
+          tenantId={tenantId}
+          articulo={articuloEditando}
+          onClose={() => setArticuloEditando(null)}
+          onGuardado={(actualizado) => { onArticuloActualizado?.(actualizado); setArticuloEditando(null); }}
+        />
+      )}
 
       {mostrarProductoLibre && (
         <Modal onClose={() => setMostrarProductoLibre(false)} titulo="Producto libre">
