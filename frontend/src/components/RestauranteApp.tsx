@@ -1260,40 +1260,40 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
           // no cabe método + moneda + monto en una sola línea sin comprimir el
           // texto — con min-w en cada control, lo que no cabe pasa a una
           // segunda línea en vez de recortarse.
-          <div key={f.id} className="flex flex-wrap items-center gap-1.5">
-            <select value={f.metodoPago} onChange={(e) => actualizarMetodo(f.id, e.target.value)} className="input-horeca flex-1 min-w-[130px] text-xs">
+          <div key={f.id} className="flex flex-wrap items-center gap-2">
+            <select value={f.metodoPago} onChange={(e) => actualizarMetodo(f.id, e.target.value)} className="input-horeca flex-1 min-w-[140px] text-sm py-2.5">
               <option value="EFECTIVO">Efectivo</option>
               <option value="TARJETA">Tarjeta</option>
               <option value="TRANSFERENCIA">Transferencia</option>
               <option value="BILLETERA_DIGITAL">Billetera digital</option>
             </select>
-            <select value={f.moneda} onChange={(e) => actualizarMoneda(f.id, e.target.value)} className="input-horeca w-20 flex-shrink-0 text-xs">
+            <select value={f.moneda} onChange={(e) => actualizarMoneda(f.id, e.target.value)} className="input-horeca w-24 flex-shrink-0 text-sm py-2.5">
               <option value={monedaBase}>{monedaBase}</option>
               {otrasMonedas.map((m) => <option key={m} value={m}>{MONEDAS_ALTERNAS[m]}</option>)}
             </select>
-            <div className="relative flex-1 min-w-[92px]">
+            <div className="relative flex-1 min-w-[100px]">
               <input
                 value={f.monto}
                 onChange={(e) => actualizarMonto(f.id, e.target.value)}
                 type="number" step="0.01" min="0" placeholder="0.00"
                 title={f.auto ? "Se calcula sola con lo que falta — escribe aquí para fijarla a mano" : undefined}
-                className={`input-horeca w-full text-xs ${f.auto ? "text-teal-600 dark:text-teal-300" : ""}`}
+                className={`input-horeca w-full text-sm py-2.5 ${f.auto ? "text-teal-600 dark:text-teal-300" : ""}`}
               />
               {f.auto && f.monto && (
                 <span className="absolute -top-1.5 -right-1.5 text-[8px] font-bold bg-teal-500 text-white rounded-full px-1 leading-tight">auto</span>
               )}
             </div>
-            <button type="button" onClick={() => completarConPendiente(f.id)} title="Rellenar con lo que falta" className="text-[10px] font-semibold text-teal-600 dark:text-teal-300 px-1.5 py-1 cursor-pointer whitespace-nowrap flex-shrink-0">todo</button>
+            <button type="button" onClick={() => completarConPendiente(f.id)} title="Rellenar con lo que falta" className="text-xs font-semibold text-teal-600 dark:text-teal-300 px-2 py-1 cursor-pointer whitespace-nowrap flex-shrink-0">todo</button>
             {filas.length > 1 && (
-              <button type="button" onClick={() => quitarFila(f.id)} className="text-slate-400 hover:text-red-500 cursor-pointer flex-shrink-0"><IconTrash size={13} /></button>
+              <button type="button" onClick={() => quitarFila(f.id)} className="text-slate-400 hover:text-red-500 cursor-pointer flex-shrink-0"><IconTrash size={15} /></button>
             )}
           </div>
         ))}
       </div>
 
-      <button type="button" onClick={agregarFila} className="text-xs text-teal-600 dark:text-teal-300 font-semibold cursor-pointer">+ Agregar otro método de pago</button>
+      <button type="button" onClick={agregarFila} className="text-sm text-teal-600 dark:text-teal-300 font-semibold cursor-pointer">+ Agregar otro método de pago</button>
 
-      <div className="apple-glass rounded-xl p-3 space-y-1 text-xs">
+      <div className="apple-glass rounded-xl p-3.5 space-y-1.5 text-sm">
         <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Total a cobrar</span><span className="font-mono font-bold text-slate-900 dark:text-white">{simbolo}{total.toFixed(2)}</span></div>
         <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Ingresado</span><span className="font-mono text-slate-700 dark:text-white/70">{simbolo}{totalIngresadoBase.toFixed(2)}</span></div>
         {!cubierto ? (
@@ -1322,7 +1322,7 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
       {error && <p className="text-xs text-red-500">{error}</p>}
 
       <button onClick={handleCobrar} disabled={procesando || !cubierto}
-        className="w-full btn-cyber-neon text-white text-sm font-bold py-3.5 rounded-xl cursor-pointer disabled:opacity-50">
+        className="w-full btn-cyber-neon text-white text-base font-bold py-4 rounded-xl cursor-pointer disabled:opacity-50">
         {procesando ? "Procesando…" : cubierto ? `Cobrar y Cerrar ${simbolo}${total.toFixed(2)}` : "Completa el pago para cobrar"}
       </button>
     </div>
@@ -2925,6 +2925,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   const [vistaMobile, setVistaMobile] = useState<"catalogo" | "carrito">("catalogo");
   const [busqueda, setBusqueda] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
+  const [paginaCatalogo, setPaginaCatalogo] = useState(1);
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recibo, setRecibo] = useState<ReciboVenta | null>(null);
@@ -2989,6 +2990,20 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
       return item.nombre.toLowerCase().includes(q) || (item.sku || "").toLowerCase().includes(q);
     }).sort((a, b) => Number(b.sku?.toLowerCase() === q) - Number(a.sku?.toLowerCase() === q));
   }, [catalogo, categoriaFiltro, busqueda]);
+
+  // Paginado del catálogo — antes todo el resultado se amontonaba en un
+  // solo scroll infinito sin ninguna referencia de cuánto faltaba; ahora
+  // se navega de a páginas con un indicador "Página X/Y" visible siempre.
+  const PRODUCTOS_POR_PAGINA = 12;
+  const totalPaginasCatalogo = Math.max(1, Math.ceil(catalogoFiltrado.length / PRODUCTOS_POR_PAGINA));
+  useEffect(() => { setPaginaCatalogo(1); }, [busqueda, categoriaFiltro]);
+  useEffect(() => {
+    if (paginaCatalogo > totalPaginasCatalogo) setPaginaCatalogo(totalPaginasCatalogo);
+  }, [paginaCatalogo, totalPaginasCatalogo]);
+  const catalogoPagina = useMemo(
+    () => catalogoFiltrado.slice((paginaCatalogo - 1) * PRODUCTOS_POR_PAGINA, paginaCatalogo * PRODUCTOS_POR_PAGINA),
+    [catalogoFiltrado, paginaCatalogo]
+  );
 
   useEffect(() => {
     if (clienteSel || !busquedaCliente.trim()) { setResultadosCliente([]); return; }
@@ -3207,7 +3222,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
           vez (flex, sin grid) por el selector de pestañas móvil. */}
       <div className="flex-1 flex min-h-0 lg:grid lg:grid-cols-12">
         {/* PANEL IZQUIERDO — CATÁLOGO */}
-        <div className={`${vistaMobile === "catalogo" ? "flex" : "hidden"} lg:flex lg:col-span-7 flex-1 min-w-0 min-h-0 flex-col p-4 gap-3 overflow-hidden`}>
+        <div className={`${vistaMobile === "catalogo" ? "flex" : "hidden"} lg:flex lg:col-span-6 flex-1 min-w-0 min-h-0 flex-col p-4 gap-3 overflow-hidden`}>
           <div className="relative shrink-0">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={15} /></span>
             <input
@@ -3252,7 +3267,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pb-4">
-                {catalogoFiltrado.map((item) => {
+                {catalogoPagina.map((item) => {
                   const sinStock = item.tipo === "articulo" && (item.stockActual ?? 0) <= 0;
                   return (
                     // relative: la tarjeta sigue siendo un solo <button> para
@@ -3295,6 +3310,23 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               </div>
             )}
           </div>
+
+          {/* Paginación del catálogo — fuera del área con scroll (shrink-0),
+              siempre visible con el indicador "Página X/Y" para saber
+              cuánto falta y poder navegar sin depender del scroll. */}
+          {catalogoFiltrado.length > PRODUCTOS_POR_PAGINA && (
+            <div className="flex items-center justify-between shrink-0 pt-2">
+              <button type="button" onClick={() => setPaginaCatalogo((p) => Math.max(1, p - 1))} disabled={paginaCatalogo <= 1}
+                className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-300/60 dark:hover:bg-white/15 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                ← Anterior
+              </button>
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-white/40">Página {paginaCatalogo}/{totalPaginasCatalogo}</span>
+              <button type="button" onClick={() => setPaginaCatalogo((p) => Math.min(totalPaginasCatalogo, p + 1))} disabled={paginaCatalogo >= totalPaginasCatalogo}
+                className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-300/60 dark:hover:bg-white/15 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                Siguiente →
+              </button>
+            </div>
+          )}
         </div>
 
         {/* PANEL DERECHO — COMANDA ACTIVA
@@ -3302,7 +3334,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             flexbox) el hijo "flex-1 overflow-y-auto" de abajo no tiene un
             límite real de alto contra el cual hacer scroll — en vez de
             desplazarse, empuja/aplasta el pie de totales y cobro. */}
-        <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex lg:col-span-5 flex-1 min-w-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col h-full min-h-0 bg-white/30 dark:bg-black/10`}>
+        <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex lg:col-span-6 flex-1 min-w-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col h-full min-h-0 bg-white/30 dark:bg-black/10`}>
           {/* Cabecera: cliente CRM */}
           <div className="p-4 border-b border-slate-300/50 dark:border-white/10 flex-shrink-0">
             <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1.5">Cliente (opcional)</p>
@@ -3341,28 +3373,29 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               espacio disponible, min-h-[150px] le pone un piso real para
               que nunca quede aplastado a casi nada aunque el pie de cobro
               (shrink-0, nunca se comprime) sea alto. */}
-          <div className="flex-1 overflow-y-auto min-h-[150px] p-4 space-y-2">
-            <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-1">Comanda activa</h3>
+          <div className="flex-1 overflow-y-auto min-h-[150px] p-4 space-y-2.5">
+            <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base mb-1.5">Comanda activa</h3>
             {carrito.length === 0 ? (
-              <p className="text-xs text-slate-400">Toca un producto del catálogo para agregarlo aquí.</p>
+              <p className="text-sm text-slate-400">Toca un producto del catálogo para agregarlo aquí.</p>
             ) : (
               carrito.map((l) => (
-                <div key={l.key} className="flex items-center justify-between gap-2 bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2">
+                <div key={l.key} className="flex items-center justify-between gap-3 bg-slate-100/60 dark:bg-white/5 rounded-xl px-4 py-3">
                   {/* Nombre: flex-1 truncate — un nombre largo ("COCA COLA
                       255ML") nunca empuja ni deforma los botones de cantidad. */}
                   <div className="flex-1 min-w-0 truncate">
-                    <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{l.nombre}</div>
-                    <div className="text-[10px] text-slate-500 dark:text-white/40 font-mono">${l.precio.toFixed(2)} c/u</div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">{l.nombre}</div>
+                    <div className="text-xs text-slate-500 dark:text-white/40 font-mono">${l.precio.toFixed(2)} c/u</div>
                   </div>
-                  {/* Botones de cantidad: shrink-0 — mantienen su tamaño fijo
-                      sin comprimirse ni deformarse verticalmente. */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button onClick={() => cambiarCantidad(l.key, -1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer shrink-0">−</button>
-                    <span className="text-xs font-bold w-5 text-center shrink-0">{l.cantidad}</span>
-                    <button onClick={() => cambiarCantidad(l.key, 1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer shrink-0">+</button>
+                  {/* Botones de cantidad: shrink-0, tamaño grande y cómodo de
+                      presionar — mantienen su tamaño fijo sin comprimirse
+                      ni deformarse verticalmente. */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => cambiarCantidad(l.key, -1)} className="w-8 h-8 rounded-full bg-slate-200/80 dark:bg-white/10 text-sm font-bold cursor-pointer shrink-0">−</button>
+                    <span className="text-sm font-bold w-6 text-center shrink-0">{l.cantidad}</span>
+                    <button onClick={() => cambiarCantidad(l.key, 1)} className="w-8 h-8 rounded-full bg-slate-200/80 dark:bg-white/10 text-sm font-bold cursor-pointer shrink-0">+</button>
                     <button onClick={() => quitarLinea(l.key)} title="Quitar de la venta"
-                      className="w-6 h-6 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer shrink-0 ml-0.5">
-                      <IconTrash size={13} />
+                      className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer shrink-0 ml-0.5">
+                      <IconTrash size={15} />
                     </button>
                   </div>
                 </div>
