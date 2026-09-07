@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   IconVet, IconClinic, IconHardware, IconMining,
-  IconRestaurant, IconFarm, IconEducation, IconRetail,
+  IconRestaurant, IconFarm, IconEducation, IconRetail, IconCheck,
 } from "../Icons";
 
 const INDUSTRIES = [
@@ -148,7 +148,7 @@ export default function Industrias() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {ind.modulos.map((m) => (
                       <div key={m} className="flex items-center gap-3 bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/70 dark:border-white/5 rounded-xl px-4 py-3">
-                        <span className="w-5 h-5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0">✓</span>
+                        <span className="w-5 h-5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0"><IconCheck size={10} /></span>
                         <span className="text-slate-700 dark:text-white/65 text-sm font-medium">{m}</span>
                       </div>
                     ))}

@@ -1,5 +1,5 @@
 import {
-  IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile,
+  IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile, IconCheck,
 } from "../Icons";
 
 const SOLUCIONES = [
@@ -98,7 +98,7 @@ export default function Soluciones() {
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {sol.puntos.map((p) => (
                   <li key={p} className="flex items-center gap-2.5 text-sm text-slate-700 dark:text-white/55 font-medium">
-                    <span className="w-4 h-4 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0">✓</span>
+                    <span className="w-4 h-4 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0"><IconCheck size={9} /></span>
                     {p}
                   </li>
                 ))}

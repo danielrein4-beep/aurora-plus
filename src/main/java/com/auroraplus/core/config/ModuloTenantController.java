@@ -38,6 +38,7 @@ public class ModuloTenantController {
 
     public static class MarcaResponse {
         public String nombreEmpresa;
+        public String moduloPrincipal;
         public String logoBase64;
         public String hierroBase64;
     }
@@ -49,6 +50,7 @@ public class ModuloTenantController {
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
         MarcaResponse r = new MarcaResponse();
         r.nombreEmpresa = licencia.getNombreEmpresa();
+        r.moduloPrincipal = licencia.getModuloPrincipal();
         r.logoBase64 = licencia.getLogoBase64();
         r.hierroBase64 = licencia.getHierroBase64();
         return r;

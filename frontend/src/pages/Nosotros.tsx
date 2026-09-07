@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { IconChat, IconMail, IconCheck } from "../Icons";
 
 const VALORES = [
   { title: "Simplicidad", desc: "La tecnología debe facilitar el trabajo, no complicarlo. Diseñamos cada pantalla pensando en el usuario final, no en el programador." },
@@ -24,9 +25,9 @@ const HITOS = [
 ];
 
 const CONTACTO_MEDIOS = [
-  { label: "WhatsApp", valor: "+1 (555) 000-0000", icon: "💬" },
-  { label: "Correo", valor: "hola@auroraplus.com", icon: "✉️" },
-  { label: "LinkedIn", valor: "Aurora Plus Software", icon: "in" },
+  { label: "WhatsApp", valor: "+1 (555) 000-0000", Icon: IconChat },
+  { label: "Correo", valor: "hola@auroraplus.com", Icon: IconMail },
+  { label: "LinkedIn", valor: "Aurora Plus Software", Icon: null, text: "in" },
 ];
 
 export default function Nosotros() {
@@ -161,8 +162,8 @@ export default function Nosotros() {
               <div className="space-y-4">
                 {CONTACTO_MEDIOS.map((m) => (
                   <div key={m.label} className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8 flex items-center justify-center text-sm flex-shrink-0">
-                      {m.icon}
+                    <div className="w-9 h-9 rounded-xl bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8 flex items-center justify-center text-sm flex-shrink-0 text-teal-600 dark:text-teal-300">
+                      {m.Icon ? <m.Icon size={16} /> : m.text}
                     </div>
                     <div>
                       <div className="text-slate-400 dark:text-white/30 text-[10px] uppercase tracking-widest font-semibold">{m.label}</div>
@@ -177,7 +178,7 @@ export default function Nosotros() {
             <div className="flex-1">
               {enviado ? (
                 <div className="h-full flex flex-col items-center justify-center text-center py-12">
-                  <div className="w-16 h-16 rounded-2xl g-aurora flex items-center justify-center text-2xl mb-4 text-white shadow-lg">✓</div>
+                  <div className="w-16 h-16 rounded-2xl g-aurora flex items-center justify-center mb-4 text-white shadow-lg"><IconCheck size={26} /></div>
                   <h3 className="font-['Outfit'] font-bold text-2xl text-slate-900 dark:text-white mb-2">Mensaje recibido</h3>
                   <p className="text-slate-500 dark:text-white/45 text-sm max-w-xs">
                     Te contactaremos en menos de 24 horas hábiles.

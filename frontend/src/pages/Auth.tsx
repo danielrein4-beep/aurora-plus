@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
-import { AuroraGradientDef } from "../Icons";
+import { AuroraGradientDef, IconLock } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 
 type Mode = "login" | "register";
@@ -10,13 +10,11 @@ export default function Auth() {
   const [mode, setMode] = useState<Mode>("login");
   const [form, setForm] = useState({ nombre: "", email: "", password: "", confirmar: "", remember: true, terms: true });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [enviando, setEnviando] = useState(false);
   const navigate = useNavigate();
-  const { login, register, isLoggedIn, user } = useAuth();
+  const { login, isLoggedIn, user } = useAuth();
 
   if (isLoggedIn) {
-    if (user?.hasCompletedOnboarding === false) {
-      return <Navigate to="/onboarding" replace />;
-    }
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -31,16 +29,25 @@ export default function Auth() {
     return e;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    if (mode === "register") {
-      register(form.email, form.nombre);
-      navigate("/onboarding");
-    } else {
-      login(form.email, form.nombre || form.email.split("@")[0]);
-      navigate("/dashboard");
+    setEnviando(true);
+    try {
+      if (mode === "register") {
+        // El registro real (crear el negocio en el backend) ocurre al final del
+        // onboarding, después de elegir módulo y método de pago — aquí solo se
+        // recogen los datos básicos y se pasan a la siguiente pantalla.
+        navigate("/onboarding", { state: { nombre: form.nombre, email: form.email, password: form.password } });
+      } else {
+        await login(form.email, form.password);
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      setErrors({ submit: err instanceof Error ? err.message : "No se pudo iniciar sesión" });
+    } finally {
+      setEnviando(false);
     }
   };
 
@@ -212,30 +219,17 @@ export default function Auth() {
                 )}
               </div>
 
+              {errors.submit && (
+                <p className="text-[#ff3b80] text-xs text-center -mb-1">{errors.submit}</p>
+              )}
+
               {/* Botón Principal Cyber Neon */}
               <button
                 type="submit"
-                className="w-full btn-cyber-neon text-white font-bold py-3.5 rounded-full text-sm mt-4 cursor-pointer">
-                {mode === "register" ? "Crear cuenta y comenzar →" : "Ingresar a la plataforma →"}
+                disabled={enviando}
+                className="w-full btn-cyber-neon text-white font-bold py-3.5 rounded-full text-sm mt-4 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                {enviando ? "Verificando…" : mode === "register" ? "Crear cuenta y comenzar →" : "Ingresar a la plataforma →"}
               </button>
-
-              {/* Proveedores de acceso rápido */}
-              <div className="pt-3">
-                <div className="flex items-center justify-center gap-2 text-xs text-white/40">
-                  <span>Acceso rápido:</span>
-                  <div className="flex items-center gap-1.5">
-                    {["Google", "Apple", "GitHub"].map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => login(`demo_${p.toLowerCase()}@auroraplus.com`, `Usuario ${p}`)}
-                        className="apple-glass-pill px-3 py-1 rounded-full text-[11px] text-white/70 hover:text-white hover:border-white/30 transition-all">
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
             </form>
           </div>
 
@@ -271,7 +265,7 @@ export default function Auth() {
             {/* Badge inferior derecho de seguridad */}
             <div className="flex justify-end">
               <div className="apple-glass-pill rounded-full px-4 py-2 flex items-center gap-2 text-xs text-white/70 shadow-lg">
-                <span className="text-teal-400">🔒</span>
+                <IconLock size={14} />
                 <span className="font-medium text-[11px] tracking-wide">Cifrado de Extremo a Extremo (AES-256)</span>
               </div>
             </div>

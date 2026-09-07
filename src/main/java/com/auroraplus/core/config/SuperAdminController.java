@@ -37,6 +37,9 @@ public class SuperAdminController {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private TenantProvisioningService tenantProvisioningService;
+
     @GetMapping
     public List<LicenciaTenant> listar() {
         return licenciaTenantRepository.findAll();
@@ -66,52 +69,18 @@ public class SuperAdminController {
 
     /** Da de alta un cliente nuevo: le asigna un tenantId propio y su licencia inicial. */
     @PostMapping
-    @Transactional
     public ResponseEntity<LicenciaTenant> crear(@RequestBody CrearTenantRequest request) {
-        if (request.nombreEmpresa == null || request.nombreEmpresa.isBlank()) {
-            throw new RuntimeException("El nombre de la empresa es obligatorio");
-        }
-        if (request.moduloPrincipal == null || request.moduloPrincipal.isBlank()) {
-            throw new RuntimeException("El módulo principal es obligatorio (ej: minero, repuestos, moda, horeca, tamanaco-comercial)");
-        }
-        if (request.tipoLicencia == null) {
-            throw new RuntimeException("El tipo de licencia es obligatorio");
-        }
-
-        Long nuevoTenantId = licenciaTenantRepository.buscarMaximoTenantId() + 1;
-        int meses = request.mesesVigencia != null ? request.mesesVigencia : 1;
-
-        LicenciaTenant licencia = new LicenciaTenant();
-        licencia.setTenantId(nuevoTenantId);
-        licencia.setNombreEmpresa(request.nombreEmpresa);
-        licencia.setModuloPrincipal(request.moduloPrincipal);
-        licencia.setTipoLicencia(request.tipoLicencia);
-        licencia.setActiva(true);
-        licencia.setFechaVencimientoPago(LocalDate.now().plusMonths(meses));
-        licencia.setEmailContacto(request.emailContacto);
-        licencia.setTelefonoContacto(request.telefonoContacto);
-        licencia.setFechaAlta(LocalDate.now());
-        if (request.monedaBase != null && !request.monedaBase.isBlank()) {
-            licencia.setMonedaBase(request.monedaBase);
-        }
-
-        LicenciaTenant guardada = licenciaTenantRepository.save(licencia);
-
-        // Al dar de alta el tenant, su módulo principal queda contratado y activo
-        // desde ya en modulos_tenant — sin este paso el LicenciaInterceptor
-        // bloquearía con 403 al tenant recién creado en su propio módulo.
-        ModuloTenant moduloInicial = new ModuloTenant();
-        moduloInicial.setTenantId(nuevoTenantId);
-        moduloInicial.setModuloNombre(request.moduloPrincipal);
-        moduloInicial.setActivo(true);
-        moduloTenantRepository.save(moduloInicial);
-
-        if (request.usuarioInicial != null && !request.usuarioInicial.isBlank()) {
-            authService.crearUsuario(nuevoTenantId, request.usuarioInicial, request.passwordInicial,
-                Usuario.Rol.DUENO_ADMIN, request.nombreEmpresa);
-        }
-
-        return ResponseEntity.ok(guardada);
+        TenantProvisioningService.AltaTenantRequest alta = new TenantProvisioningService.AltaTenantRequest();
+        alta.nombreEmpresa = request.nombreEmpresa;
+        alta.moduloPrincipal = request.moduloPrincipal;
+        alta.tipoLicencia = request.tipoLicencia;
+        alta.emailContacto = request.emailContacto;
+        alta.telefonoContacto = request.telefonoContacto;
+        alta.mesesVigencia = request.mesesVigencia;
+        alta.monedaBase = request.monedaBase;
+        alta.usuarioInicial = request.usuarioInicial;
+        alta.passwordInicial = request.passwordInicial;
+        return ResponseEntity.ok(tenantProvisioningService.crear(alta));
     }
 
     public static class ActualizarTenantRequest {

@@ -20,7 +20,7 @@ public class WebConfig implements WebMvcConfigurer {
     // por TenantInterceptor como cualquier otro endpoint, porque necesita
     // AuthContext/TenantContext resueltos para saber quién llama y de qué rol.
     private static final String[] RUTAS_LOGIN_PUBLICAS = {
-        "/api/auth/login", "/api/auth/login-super-admin"
+        "/api/auth/login", "/api/auth/login-super-admin", "/api/auth/login-directo", "/api/auth/registro-negocio"
     };
 
     @Override
@@ -33,6 +33,6 @@ public class WebConfig implements WebMvcConfigurer {
         // token SUPER_ADMIN, sin concepto de licencia) y las rutas de login.
         registry.addInterceptor(licenciaInterceptor)
             .addPathPatterns("/api/**")
-            .excludePathPatterns("/api/super-admin/**", RUTAS_LOGIN_PUBLICAS[0], RUTAS_LOGIN_PUBLICAS[1]);
+            .excludePathPatterns("/api/super-admin/**", RUTAS_LOGIN_PUBLICAS[0], RUTAS_LOGIN_PUBLICAS[1], RUTAS_LOGIN_PUBLICAS[2], RUTAS_LOGIN_PUBLICAS[3]);
     }
 }

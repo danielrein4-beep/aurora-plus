@@ -5,7 +5,8 @@ import {
   IconVet, IconClinic, IconHardware, IconMining,
   IconRestaurant, IconFarm, IconEducation, IconRetail,
   IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile,
-  IconLaptop, IconPhone, IconPlane,
+  IconLaptop, IconPhone, IconPlane, IconBoutique, IconFactory,
+  IconCard, IconBox, IconBolt, IconShield, IconStar, IconCheck,
 } from "../Icons";
 
 const INDUSTRIES = [
@@ -90,13 +91,13 @@ export default function Home() {
   const navigate = useNavigate();
 
   const HERO_VERTICALS = [
-    { title: "Salud & Clínicas", subtitle: "Historias clínicas, citas y triaje", badge: "NUEVO", stat: "100% Digital", img: "🏥" },
-    { title: "Minería & Faenas", subtitle: "Control de mineral, cuadrillas y romana", badge: "ACTIVO", stat: "Balanza Real", img: "⛏️" },
-    { title: "Horeca & Restaurantes", subtitle: "Comandas POS, cocina y escandallo", badge: "POPULAR", stat: "Offline POS", img: "🍽️" },
-    { title: "Ganadería & Fincas", subtitle: "Hato, potreros y control sanitario", badge: "PRO", stat: "Trazabilidad", img: "🐂" },
-    { title: "Ferreterías & Retail", subtitle: "Kardex multi-unidad y listas por volumen", badge: "PRO", stat: "Stock en Vivo", img: "🔧" },
-    { title: "Moda & Boutique", subtitle: "Variantes talla/color y fidelización", badge: "SMART", stat: "Puntos & Gift", img: "👗" },
-    { title: "Tamanaco Industrial", subtitle: "Operación integral, tesorería y OCR", badge: "ENTERPRISE", stat: "Multi-Empresa", img: "🏭" },
+    { title: "Salud & Clínicas", subtitle: "Historias clínicas, citas y triaje", badge: "NUEVO", stat: "100% Digital", Icon: IconClinic },
+    { title: "Minería & Faenas", subtitle: "Control de mineral, cuadrillas y romana", badge: "ACTIVO", stat: "Balanza Real", Icon: IconMining },
+    { title: "Horeca & Restaurantes", subtitle: "Comandas POS, cocina y escandallo", badge: "POPULAR", stat: "Offline POS", Icon: IconRestaurant },
+    { title: "Ganadería & Fincas", subtitle: "Hato, potreros y control sanitario", badge: "PRO", stat: "Trazabilidad", Icon: IconFarm },
+    { title: "Ferreterías & Retail", subtitle: "Kardex multi-unidad y listas por volumen", badge: "PRO", stat: "Stock en Vivo", Icon: IconHardware },
+    { title: "Moda & Boutique", subtitle: "Variantes talla/color y fidelización", badge: "SMART", stat: "Puntos & Gift", Icon: IconBoutique },
+    { title: "Tamanaco Industrial", subtitle: "Operación integral, tesorería y OCR", badge: "ENTERPRISE", stat: "Multi-Empresa", Icon: IconFactory },
   ];
 
   return (
@@ -281,13 +282,13 @@ export default function Home() {
             {/* Grid de Nodos de Automatización con Micro-interacciones */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-5">
               {[
-                { label: "Caja Central", val: "Sincronizada", icon: "💳", color: "text-teal-600 dark:text-teal-300" },
-                { label: "Kardex e Insumos", val: "Auto-Descuento", icon: "📦", color: "text-sky-600 dark:text-sky-300" },
-                { label: "Offline POS", val: "100% Idempotente", icon: "⚡", color: "text-purple-600 dark:text-purple-300" },
-                { label: "Roles & Privacidad", val: "RBAC Estricto", icon: "🛡️", color: "text-amber-600 dark:text-amber-300" },
+                { label: "Caja Central", val: "Sincronizada", Icon: IconCard, color: "text-teal-600 dark:text-teal-300" },
+                { label: "Kardex e Insumos", val: "Auto-Descuento", Icon: IconBox, color: "text-sky-600 dark:text-sky-300" },
+                { label: "Offline POS", val: "100% Idempotente", Icon: IconBolt, color: "text-purple-600 dark:text-purple-300" },
+                { label: "Roles & Privacidad", val: "RBAC Estricto", Icon: IconShield, color: "text-amber-600 dark:text-amber-300" },
               ].map((n) => (
                 <div key={n.label} className="bg-black/[0.02] dark:bg-white/[0.03] hover:bg-black/[0.05] dark:hover:bg-white/[0.07] rounded-2xl p-4 border border-black/5 dark:border-white/5 hover:border-teal-400/30 transition-all duration-300 hover:-translate-y-1 cursor-default">
-                  <div className="text-2xl mb-1.5">{n.icon}</div>
+                  <div className={`mb-1.5 ${n.color}`}><n.Icon size={22} /></div>
                   <div className="text-slate-900 dark:text-white font-semibold text-xs tracking-tight">{n.label}</div>
                   <div className={`text-[11px] font-mono mt-0.5 ${n.color}`}>{n.val}</div>
                 </div>
@@ -346,8 +347,8 @@ export default function Home() {
                 
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform duration-300">
-                      {HERO_VERTICALS[activeHeroIndex].img}
+                    <div className="w-12 h-12 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-center text-aurora shadow-inner group-hover:scale-110 transition-transform duration-300">
+                      {(() => { const HeroIcon = HERO_VERTICALS[activeHeroIndex].Icon; return <HeroIcon size={24} />; })()}
                     </div>
                     <div className="text-left">
                       <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base tracking-tight flex items-center gap-2">
@@ -403,7 +404,7 @@ export default function Home() {
         <div className="flex gap-6 whitespace-nowrap" style={{ animation: "ticker 22s linear infinite" }}>
           {[...MODULES, ...MODULES, ...MODULES].map((m, i) => (
             <span key={i} className="text-sm text-slate-500 dark:text-white/30 font-medium flex items-center gap-3 flex-shrink-0">
-              <span className="text-aurora opacity-80">✦</span> {m}
+              <span className="text-aurora opacity-80">·</span> {m}
             </span>
           ))}
         </div>
@@ -666,7 +667,7 @@ export default function Home() {
               <ul className="space-y-2.5 mb-6 flex-1">
                 {plan.features.map((feat) => (
                   <li key={feat} className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-white/55">
-                    <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] flex-shrink-0 font-bold ${plan.name === "Página Web" ? "bg-violet-500/15 text-violet-600 dark:text-violet-400" : "bg-teal-500/15 text-teal-600 dark:text-teal-400"}`}>✓</span>
+                    <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${plan.name === "Página Web" ? "bg-violet-500/15 text-violet-600 dark:text-violet-400" : "bg-teal-500/15 text-teal-600 dark:text-teal-400"}`}><IconCheck size={9} /></span>
                     {feat}
                   </li>
                 ))}
@@ -696,7 +697,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {TESTIMONIALS.map((t) => (
             <div key={t.name} className="apple-glass rounded-2xl p-6 card-shadow hover-card">
-              <div className="flex gap-1 mb-4">{[1,2,3,4,5].map((s) => <span key={s} className="text-amber-500 text-sm">★</span>)}</div>
+              <div className="flex gap-1 mb-4 text-amber-500">{[1,2,3,4,5].map((s) => <IconStar key={s} size={13} />)}</div>
               <p className="text-slate-600 dark:text-white/65 text-sm leading-relaxed mb-6 italic">"{t.text}"</p>
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${t.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-sm`}>{t.avatar}</div>

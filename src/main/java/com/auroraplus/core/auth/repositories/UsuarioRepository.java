@@ -18,4 +18,11 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> buscarPorTenantYUsername(@Param("tenantId") Long tenantId, @Param("username") String username);
 
     List<Usuario> findByTenantId(Long tenantId);
+
+    // El username solo es único por tenant (ver constraint en Usuario) — para el
+    // login por correo, sin que el cliente conozca su tenantId, se busca en todos
+    // los tenants; si hay más de una coincidencia se le pide al usuario que
+    // desambigüe (caso raro: mismo username elegido en dos negocios distintos).
+    @Query("SELECT u FROM UsuarioAuth u WHERE u.username = :username")
+    List<Usuario> buscarPorUsernameEnTodosLosTenants(@Param("username") String username);
 }

@@ -1,22 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
-import { AuroraGradientDef } from "../Icons";
+import {
+  AuroraGradientDef, IconClinic, IconVet, IconHardware, IconCard, IconUsers, IconCustomize,
+  IconStethoscope, IconCalendar, IconPrescription, IconRocket, IconDownload, IconKey,
+  IconHourglass, IconUser, IconClose, IconCheckCircle, IconBank, IconChat, IconFileText,
+} from "../Icons";
 import { useAuth } from "../context/AuthContext";
+import { listarPacientes, listarCitasDelDia, listarCobrosDelDia, type Paciente, type CitaMedica } from "../api";
+
+const VERTICAL_ICON: Record<string, (props: { size?: number }) => JSX.Element> = {
+  clinica: IconClinic,
+  veterinaria: IconVet,
+  ferreteria: IconHardware,
+};
+
+const ACTION_ICON: Record<string, (props: { size?: number }) => JSX.Element> = {
+  "Nueva Consulta": IconStethoscope,
+  "Agendar Cita": IconCalendar,
+  "Emitir Receta": IconPrescription,
+  "Cobrar Factura": IconCard,
+  "Ficha Mascota": IconVet,
+  "Plan Vacunación": IconPrescription,
+  "Venta PetShop": IconCard,
+  "Cirugías": IconClinic,
+  "Abrir Caja / POS": IconCard,
+  "Consultar Kardex": IconHardware,
+  "Nueva Cotización": IconFileText,
+  "Cierre de Turno": IconCard,
+};
 
 const VERTICAL_METADATA: Record<string, {
   name: string;
   badge: string;
-  icon: string;
   desc: string;
   stats: { label: string; val: string; change: string; color: string }[];
-  actions: { label: string; icon: string; desc: string }[];
+  actions: { label: string; desc: string }[];
   defaultPatients: { name: string; age: string; reason: string; status: string; time: string }[];
 }> = {
   clinica: {
     name: "Mediclinic Pro",
     badge: "EDICIÓN CLÍNICA & SALUD",
-    icon: "🏥",
     desc: "Historias clínicas digitales, agenda de especialistas, recetas y facturación.",
     stats: [
       { label: "Pacientes Hoy", val: "28", change: "+4 vs ayer", color: "text-teal-500 dark:text-teal-400" },
@@ -25,10 +49,10 @@ const VERTICAL_METADATA: Record<string, {
       { label: "Stock Farmacia", val: "94%", change: "2 alertas de reorden", color: "text-amber-500 dark:text-amber-400" },
     ],
     actions: [
-      { label: "Nueva Consulta", icon: "🩺", desc: "Abrir historia clínica y registrar diagnóstico" },
-      { label: "Agendar Cita", icon: "📅", desc: "Asignar horario y notificar por WhatsApp" },
-      { label: "Emitir Receta", icon: "📋", desc: "Generar récipe digital con firma" },
-      { label: "Cobrar Factura", icon: "💳", desc: "Punto de venta multi-moneda" },
+      { label: "Nueva Consulta", desc: "Abrir historia clínica y registrar diagnóstico" },
+      { label: "Agendar Cita", desc: "Asignar horario y notificar por WhatsApp" },
+      { label: "Emitir Receta", desc: "Generar récipe digital con firma" },
+      { label: "Cobrar Factura", desc: "Punto de venta multi-moneda" },
     ],
     defaultPatients: [
       { name: "Carlos Mendoza", age: "42 años", reason: "Control Cardiología", status: "En Espera", time: "09:30 AM" },
@@ -40,7 +64,6 @@ const VERTICAL_METADATA: Record<string, {
   veterinaria: {
     name: "Mediclinic Vet",
     badge: "EDICIÓN VETERINARIA",
-    icon: "🐾",
     desc: "Expedientes por mascota, plan de vacunas, cirugías e inventario veterinario.",
     stats: [
       { label: "Mascotas Atendidas", val: "19", change: "+3 vs ayer", color: "text-teal-500 dark:text-teal-400" },
@@ -49,10 +72,10 @@ const VERTICAL_METADATA: Record<string, {
       { label: "Hospitalizaciones", val: "2", change: "En recuperación", color: "text-amber-500 dark:text-amber-400" },
     ],
     actions: [
-      { label: "Ficha Mascota", icon: "🐕", desc: "Historial por paciente y tutor" },
-      { label: "Plan Vacunación", icon: "💉", desc: "Recordatorios automáticos" },
-      { label: "Venta PetShop", icon: "🛒", desc: "Cobro rápido por mostrador" },
-      { label: "Cirugías", icon: "🏥", desc: "Registro pre y post operatorio" },
+      { label: "Ficha Mascota", desc: "Historial por paciente y tutor" },
+      { label: "Plan Vacunación", desc: "Recordatorios automáticos" },
+      { label: "Venta PetShop", desc: "Cobro rápido por mostrador" },
+      { label: "Cirugías", desc: "Registro pre y post operatorio" },
     ],
     defaultPatients: [
       { name: "Max (Golden Retriever)", age: "3 años", reason: "Vacuna Séxtuple", status: "En Espera", time: "09:15 AM" },
@@ -63,7 +86,6 @@ const VERTICAL_METADATA: Record<string, {
   ferreteria: {
     name: "FerrePlus ERP",
     badge: "EDICIÓN FERRETERÍA & RETAIL",
-    icon: "🔧",
     desc: "Kardex multi-unidad, lista de precios por volumen, compras y POS mostrador.",
     stats: [
       { label: "Ventas de Hoy", val: "$3,420", change: "142 tickets", color: "text-teal-500 dark:text-teal-400" },
@@ -72,10 +94,10 @@ const VERTICAL_METADATA: Record<string, {
       { label: "Órdenes de Compra", val: "4", change: "En despacho", color: "text-amber-500 dark:text-amber-400" },
     ],
     actions: [
-      { label: "Abrir Caja / POS", icon: "⚡", desc: "Venta por mostrador y códigos de barra" },
-      { label: "Consultar Kardex", icon: "📦", desc: "Stock por bodega y listas de precio" },
-      { label: "Nueva Cotización", icon: "📝", desc: "Presupuesto con validez temporal" },
-      { label: "Cierre de Turno", icon: "💰", desc: "Arqueo de caja y corte Z" },
+      { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
+      { label: "Consultar Kardex", desc: "Stock por bodega y listas de precio" },
+      { label: "Nueva Cotización", desc: "Presupuesto con validez temporal" },
+      { label: "Cierre de Turno", desc: "Arqueo de caja y corte Z" },
     ],
     defaultPatients: [
       { name: "Constructora del Este", age: "Cliente VIP", reason: "50 Sacos Cemento + Cabillas", status: "Despachado", time: "08:30 AM" },
@@ -86,10 +108,15 @@ const VERTICAL_METADATA: Record<string, {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, logout, trialDaysLeft, reportPayment } = useAuth();
-  
+  const { user, logout, trialDaysLeft, reportPayment, marcarPrimerIngresoCompletado } = useAuth();
+
+  // El Hub (launcher + hero de bienvenida) solo se muestra la primera vez que
+  // este tenant entra a su módulo — en el uso diario sería un estorbo, así que
+  // de ahí en adelante se entra directo al espacio de trabajo clínico.
+  const mostrarHero = user?.primerIngreso !== false;
+
   const [activeTab, setActiveTab] = useState<"vertical" | "billing" | "team" | "settings">("vertical");
-  const [workspaceTab, setWorkspaceTab] = useState<"kpis" | "patients" | "agenda" | "pos">("kpis");
+  const [workspaceTab, setWorkspaceTab] = useState<"kpis" | "patients" | "agenda" | "pos">(mostrarHero ? "kpis" : "patients");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     metodo: "Pago Móvil (Bolívares - Tasa BCV)",
@@ -101,8 +128,27 @@ export default function Dashboard() {
 
   const userIndustry = user?.industry || "clinica";
   const vertical = VERTICAL_METADATA[userIndustry] || VERTICAL_METADATA["clinica"];
+  const VerticalIcon = VERTICAL_ICON[userIndustry] || VERTICAL_ICON["clinica"];
   const isTrial = user?.planStatus !== "active";
   const daysLeft = isTrial ? trialDaysLeft : 30;
+
+  // Datos reales de Mediclinic Pro — solo hay backend conectado para "clinica"
+  // por ahora; el resto de verticales del onboarding siguen en demo estática
+  // (ver Onboarding.tsx: solo esta está marcada "100% disponible").
+  const [pacientesReales, setPacientesReales] = useState<Paciente[] | null>(null);
+  const [citasReales, setCitasReales] = useState<CitaMedica[] | null>(null);
+  const [ingresosHoy, setIngresosHoy] = useState<number | null>(null);
+  const esClinicaReal = userIndustry === "clinica" && !!user?.tenantId;
+
+  useEffect(() => {
+    if (!esClinicaReal || !user?.tenantId) return;
+    const hoy = new Date().toISOString().slice(0, 10);
+    listarPacientes(user.tenantId).then(setPacientesReales).catch(() => setPacientesReales([]));
+    listarCitasDelDia(user.tenantId, hoy).then(setCitasReales).catch(() => setCitasReales([]));
+    listarCobrosDelDia(`${hoy}T00:00:00`, `${hoy}T23:59:59`)
+      .then((cobros) => setIngresosHoy(cobros.reduce((sum, c) => sum + Number(c.montoTotal), 0)))
+      .catch(() => setIngresosHoy(0));
+  }, [esClinicaReal, user?.tenantId]);
 
   const handleReportPaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,27 +199,27 @@ export default function Dashboard() {
               className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
                 activeTab === "vertical" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/70 hover:text-black dark:hover:text-white"
               }`}>
-              {vertical.icon} {vertical.name}
+              <span className="inline-flex items-center gap-1.5"><VerticalIcon size={14} /> {vertical.name}</span>
             </button>
             <button
               onClick={() => setActiveTab("billing")}
               className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
                 activeTab === "billing" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/70 hover:text-black dark:hover:text-white"
               }`}>
-              💳 Facturación & Pagos
+              <span className="inline-flex items-center gap-1.5"><IconCard size={14} /> Facturación & Pagos</span>
             </button>
             <button
               onClick={() => setActiveTab("team")}
               className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
                 activeTab === "team" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/70 hover:text-black dark:hover:text-white"
               }`}>
-              👥 Equipo & Roles
+              <span className="inline-flex items-center gap-1.5"><IconUsers size={14} /> Equipo & Roles</span>
             </button>
             <button
               onClick={() => navigate("/onboarding")}
               title="Cambiar o configurar rubro"
               className="px-2.5 py-1.5 rounded-full text-slate-500 dark:text-white/40 hover:text-teal-500 dark:hover:text-teal-300 font-medium transition-all text-[11px]">
-              ⚙️ Cambiar Rubro
+              <span className="inline-flex items-center gap-1.5"><IconCustomize size={13} /> Cambiar Rubro</span>
             </button>
           </div>
         </div>
@@ -212,8 +258,8 @@ export default function Dashboard() {
         {isTrial && (
           <div className="apple-glass border-l-4 border-l-teal-500 rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 shadow-md">
             <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-teal-500/15 text-teal-600 dark:text-teal-300 flex items-center justify-center text-xl">
-                ⏳
+              <div className="w-10 h-10 rounded-xl bg-teal-500/15 text-teal-600 dark:text-teal-300 flex items-center justify-center">
+                <IconHourglass size={20} />
               </div>
               <div>
                 <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
@@ -238,7 +284,8 @@ export default function Dashboard() {
         {activeTab === "vertical" && (
           <div className="space-y-8">
             
-            {/* HERO LAUNCHER CARD */}
+            {/* HERO LAUNCHER CARD — solo la primera vez (ver mostrarHero) */}
+            {mostrarHero && (
             <div className="relative apple-glass rounded-3xl p-6 sm:p-8 overflow-hidden shadow-xl border border-teal-500/20">
               <div className="line-aurora absolute top-0 left-0 right-0" />
               
@@ -258,9 +305,10 @@ export default function Dashboard() {
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">
                     <button
-                      onClick={() => setWorkspaceTab("patients")}
+                      onClick={() => { setWorkspaceTab("patients"); marcarPrimerIngresoCompletado(); }}
                       className="btn-electric-blue text-xs sm:text-sm font-bold px-6 py-3 rounded-full flex items-center gap-2 shadow-lg cursor-pointer">
-                      <span>🚀 Abrir {vertical.name} (Cloud Web)</span>
+                      <IconRocket size={15} />
+                      <span>Abrir {vertical.name} (Cloud Web)</span>
                       <span>→</span>
                     </button>
 
@@ -269,20 +317,31 @@ export default function Dashboard() {
                       target="_blank"
                       rel="noreferrer"
                       className="apple-glass-btn text-xs sm:text-sm font-semibold px-5 py-3 rounded-full flex items-center gap-2 text-slate-800 dark:text-white cursor-pointer">
-                      <span>💾 Descargar para Windows (.exe)</span>
+                      <IconDownload size={15} />
+                      <span>Descargar para Windows (.exe)</span>
                     </a>
 
                     <button
                       onClick={() => alert("Tu API Token de Licencia: AURORA-MED-PRO-9842-SECURE")}
-                      className="apple-glass-btn text-xs font-mono px-4 py-3 rounded-full text-slate-600 dark:text-white/60 cursor-pointer">
-                      🔑 Clave de Licencia
+                      className="apple-glass-btn text-xs font-mono px-4 py-3 rounded-full text-slate-600 dark:text-white/60 cursor-pointer flex items-center gap-2">
+                      <IconKey size={14} />
+                      <span>Clave de Licencia</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Métricas destacadas del día */}
+                {/* Métricas destacadas del día — reales para Mediclinic Pro cuando hay
+                    sesión de un tenant real; el resto de verticales aún es demo. */}
                 <div className="lg:col-span-4 grid grid-cols-2 gap-3">
-                  {vertical.stats.map((s) => (
+                  {(esClinicaReal
+                    ? [
+                        { label: "Pacientes Registrados", val: pacientesReales ? String(pacientesReales.length) : "…", change: "Total en el consultorio", color: "text-teal-500 dark:text-teal-400" },
+                        { label: "Citas de Hoy", val: citasReales ? String(citasReales.length) : "…", change: citasReales ? `${citasReales.filter(c => c.estado === "CONFIRMADA").length} confirmadas` : "", color: "text-sky-500 dark:text-sky-400" },
+                        { label: "Ingresos del Día", val: ingresosHoy !== null ? `$${ingresosHoy.toFixed(2)}` : "…", change: "Multi-moneda (USD/VES/COP)", color: "text-purple-500 dark:text-purple-400" },
+                        { label: "Módulo Farmacia", val: "—", change: "Próximamente", color: "text-amber-500 dark:text-amber-400" },
+                      ]
+                    : vertical.stats
+                  ).map((s) => (
                     <div key={s.label} className="apple-glass rounded-2xl p-4 text-left border border-white/10 shadow-sm">
                       <div className="text-slate-500 dark:text-white/40 text-[11px] font-medium leading-tight">{s.label}</div>
                       <div className={`font-['Outfit'] font-black text-2xl mt-1 ${s.color}`}>{s.val}</div>
@@ -292,13 +351,14 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+            )}
 
             {/* SIMULADOR EN VIVO / WORKSPACE INTEGRADO */}
             <div className="apple-glass rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-300/60 dark:border-white/10">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-300 flex items-center justify-center text-xl">
-                    🩺
+                  <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-300 flex items-center justify-center">
+                    <IconStethoscope size={20} />
                   </div>
                   <div className="text-left">
                     <h3 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white">
@@ -363,7 +423,33 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
-                        {vertical.defaultPatients.map((p) => (
+                        {esClinicaReal ? (
+                          citasReales === null ? (
+                            <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Cargando…</td></tr>
+                          ) : citasReales.length === 0 ? (
+                            <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">No hay citas registradas hoy.</td></tr>
+                          ) : citasReales.map((c) => (
+                            <tr key={c.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
+                              <td className="p-3.5 font-bold text-slate-900 dark:text-white">{c.paciente?.nombreCompleto || "—"}</td>
+                              <td className="p-3.5 text-slate-500 dark:text-white/60">{c.paciente?.edad ? `${c.paciente.edad} años` : "—"}</td>
+                              <td className="p-3.5 text-slate-700 dark:text-white/80">{c.motivo || c.especialidad || "—"}</td>
+                              <td className="p-3.5 text-slate-500 dark:text-white/50 font-mono">{c.horaInicio}</td>
+                              <td className="p-3.5">
+                                <span className="px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
+                                  {c.estado}
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-right">
+                                <button
+                                  onClick={() => alert(`Abriendo historia clínica de ${c.paciente?.nombreCompleto}`)}
+                                  className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                  Abrir Historia →
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          vertical.defaultPatients.map((p) => (
                           <tr key={p.name} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
                             <td className="p-3.5 font-bold text-slate-900 dark:text-white">{p.name}</td>
                             <td className="p-3.5 text-slate-500 dark:text-white/60">{p.age}</td>
@@ -382,37 +468,58 @@ export default function Dashboard() {
                               </button>
                             </td>
                           </tr>
-                        ))}
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </div>
               ) : workspaceTab === "agenda" ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {["09:00 AM - Dr. Carlos (Cardiología)", "10:30 AM - Dra. Soto (Pediatría)", "02:00 PM - Laboratorio / Tomas"].map((slot, i) => (
-                    <div key={i} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-teal-600 dark:text-teal-400 text-xs font-mono font-bold">Bloque Activo</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-300">Confirmado</span>
+                  {esClinicaReal ? (
+                    citasReales === null ? (
+                      <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-4">Cargando…</p>
+                    ) : citasReales.length === 0 ? (
+                      <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-4">No hay citas agendadas para hoy.</p>
+                    ) : citasReales.map((c) => (
+                      <div key={c.id} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-teal-600 dark:text-teal-400 text-xs font-mono font-bold">{c.horaInicio} — {c.horaFin}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-300">{c.estado}</span>
+                        </div>
+                        <div className="font-bold text-sm text-slate-900 dark:text-white">{c.paciente?.nombreCompleto} — {c.especialidad || c.motivo}</div>
+                        <p className="text-slate-500 dark:text-white/40 text-xs">{c.motivo}</p>
                       </div>
-                      <div className="font-bold text-sm text-slate-900 dark:text-white">{slot}</div>
-                      <p className="text-slate-500 dark:text-white/40 text-xs">Recordatorio enviado vía WhatsApp SMS</p>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    ["09:00 AM - Dr. Carlos (Cardiología)", "10:30 AM - Dra. Soto (Pediatría)", "02:00 PM - Laboratorio / Tomas"].map((slot, i) => (
+                      <div key={i} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-teal-600 dark:text-teal-400 text-xs font-mono font-bold">Bloque Activo</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-300">Confirmado</span>
+                        </div>
+                        <div className="font-bold text-sm text-slate-900 dark:text-white">{slot}</div>
+                        <p className="text-slate-500 dark:text-white/40 text-xs">Recordatorio enviado vía WhatsApp SMS</p>
+                      </div>
+                    ))
+                  )}
                 </div>
               ) : (
                 /* KPIS Y ACCIONES RÁPIDAS */
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {vertical.actions.map((act) => (
+                  {vertical.actions.map((act) => {
+                    const ActIcon = ACTION_ICON[act.label] || IconStethoscope;
+                    return (
                     <div
                       key={act.label}
                       onClick={() => alert(`Ejecutando acción: ${act.label}`)}
                       className="apple-glass rounded-2xl p-5 hover-card text-left cursor-pointer border border-white/10 shadow-sm space-y-2">
-                      <div className="text-2xl">{act.icon}</div>
+                      <div className="text-teal-600 dark:text-teal-300"><ActIcon size={22} /></div>
                       <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">{act.label}</h4>
                       <p className="text-slate-500 dark:text-white/40 text-xs leading-relaxed">{act.desc}</p>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -435,8 +542,9 @@ export default function Dashboard() {
                 </div>
                 <button
                   onClick={() => setShowPaymentModal(true)}
-                  className="btn-electric-blue text-xs font-bold px-6 py-3 rounded-full cursor-pointer shadow-md">
-                  💳 Reportar Nuevo Pago
+                  className="btn-electric-blue text-xs font-bold px-6 py-3 rounded-full cursor-pointer shadow-md flex items-center gap-2">
+                  <IconCard size={14} />
+                  <span>Reportar Nuevo Pago</span>
                 </button>
               </div>
 
@@ -507,8 +615,8 @@ export default function Dashboard() {
                             <td className="p-3.5 text-right">
                               <button
                                 onClick={() => alert(`Descargando factura en PDF del pago ${p.id}`)}
-                                className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
-                                📄 Descargar PDF
+                                className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer inline-flex items-center gap-1">
+                                <IconFileText size={12} /> Descargar PDF
                               </button>
                             </td>
                           </tr>
@@ -527,8 +635,8 @@ export default function Dashboard() {
                           <td className="p-3.5 text-right">
                             <button
                               onClick={() => alert("Descargando factura fiscal en PDF")}
-                              className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
-                              📄 Descargar PDF
+                              className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer inline-flex items-center gap-1">
+                              <IconFileText size={12} /> Descargar PDF
                             </button>
                           </td>
                         </tr>
@@ -562,12 +670,12 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
-                { name: user?.nombre || "Dr. Alejandro Ramos", role: "Director Médico / Admin", email: user?.email || "admin@clinica.com", icon: "👨‍⚕️" },
-                { name: "Dra. Valentina Soto", role: "Especialista en Pediatría", email: "pediatria@clinica.com", icon: "👩‍⚕️" },
-                { name: "Mariana Pérez", role: "Recepción & Caja", email: "recepcion@clinica.com", icon: "👩‍💼" },
+                { name: user?.nombre || "Dr. Alejandro Ramos", role: "Director Médico / Admin", email: user?.email || "admin@clinica.com" },
+                { name: "Dra. Valentina Soto", role: "Especialista en Pediatría", email: "pediatria@clinica.com" },
+                { name: "Mariana Pérez", role: "Recepción & Caja", email: "recepcion@clinica.com" },
               ].map((m) => (
                 <div key={m.email} className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
-                  <div className="text-3xl">{m.icon}</div>
+                  <div className="text-teal-600 dark:text-teal-300"><IconUser size={26} /></div>
                   <div className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">{m.name}</div>
                   <div className="text-xs font-semibold text-teal-600 dark:text-teal-400">{m.role}</div>
                   <div className="text-xs text-slate-500 dark:text-white/40 font-mono">{m.email}</div>
@@ -586,8 +694,8 @@ export default function Dashboard() {
             
             <div className="flex items-center justify-between pb-4 border-b border-slate-300/60 dark:border-white/10">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-300 flex items-center justify-center text-xl">
-                  💳
+                <div className="w-10 h-10 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-300 flex items-center justify-center">
+                  <IconCard size={20} />
                 </div>
                 <div>
                   <h3 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white">
@@ -600,23 +708,23 @@ export default function Dashboard() {
               </div>
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="w-8 h-8 rounded-full bg-black/10 dark:bg-white/10 text-slate-700 dark:text-white flex items-center justify-center font-bold cursor-pointer">
-                ✕
+                className="w-8 h-8 rounded-full bg-black/10 dark:bg-white/10 text-slate-700 dark:text-white flex items-center justify-center cursor-pointer">
+                <IconClose size={14} />
               </button>
             </div>
 
             {paymentSuccessMsg ? (
               <div className="p-6 text-center space-y-3">
-                <div className="text-4xl">🎉</div>
+                <div className="flex justify-center text-teal-500 dark:text-teal-400"><IconCheckCircle size={40} /></div>
                 <h4 className="font-['Outfit'] font-bold text-lg text-teal-600 dark:text-teal-400">{paymentSuccessMsg}</h4>
               </div>
             ) : (
               <form onSubmit={handleReportPaymentSubmit} className="space-y-4">
-                
+
                 {/* Datos bancarios oficiales para transferir */}
                 <div className="p-4 rounded-2xl bg-slate-200/60 dark:bg-white/5 border border-slate-300/80 dark:border-white/10 text-xs space-y-1.5 font-mono">
-                  <div className="font-bold text-teal-600 dark:text-teal-300 font-sans text-xs mb-1">
-                    📌 Cuentas Oficiales para Transferir:
+                  <div className="font-bold text-teal-600 dark:text-teal-300 font-sans text-xs mb-1.5 flex items-center gap-1.5">
+                    <IconBank size={13} /> Cuentas Oficiales para Transferir:
                   </div>
                   <div>• <strong>Pago Móvil:</strong> Banesco (0134) · CI: 28.123.456 · Tel: 0414-1234567</div>
                   <div>• <strong>Binance USDT (TRC-20):</strong> TQ3j8K9vP2sL... [Copiar]</div>
@@ -693,7 +801,7 @@ export default function Dashboard() {
         target="_blank"
         rel="noreferrer"
         className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 bg-[#25D366] text-white font-bold text-xs px-4 py-3 rounded-full shadow-[0_8px_25px_rgba(37,211,102,0.4)] hover:scale-105 transition-transform">
-        <span className="text-base">💬</span>
+        <IconChat size={16} />
         <span className="hidden sm:inline">Soporte WhatsApp</span>
       </a>
 

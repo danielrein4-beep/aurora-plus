@@ -1,10 +1,13 @@
 package com.auroraplus.core.inventario.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.inventario.entities.Articulo;
 import com.auroraplus.core.inventario.entities.Kardex;
 import com.auroraplus.core.inventario.repositories.ArticuloRepository;
 import com.auroraplus.core.inventario.repositories.KardexRepository;
 import com.auroraplus.core.inventario.services.InventarioService;
+import jakarta.persistence.EntityManager;
+import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,8 +29,18 @@ public class ArticuloController {
     @Autowired
     private InventarioService inventarioService;
 
+    @Autowired
+    private EntityManager entityManager;
+
     @GetMapping
     public List<Articulo> listar() {
+        // El filtro de Hibernate habilitado en TenantInterceptor no llega vivo
+        // hasta acá (ver hallazgo de seguridad — el enableFilter del
+        // interceptor no persiste a la sesión que ejecuta esta query), así
+        // que se re-habilita explícitamente aquí antes de consultar. Sin esto,
+        // findAll() devuelve artículos de TODOS los tenants sin distinción.
+        entityManager.unwrap(Session.class).enableFilter("tenantFilter")
+            .setParameter("tenantId", TenantContext.getCurrentTenant());
         return articuloRepository.findAll();
     }
 

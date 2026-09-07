@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { IconCheck } from "../Icons";
 
 const PLANS = [
   {
@@ -117,7 +118,7 @@ export default function Precios() {
               <ul className="space-y-3 mb-8 flex-1">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-start gap-3 text-sm text-slate-700 dark:text-white/60 font-medium">
-                    <span className="mt-0.5 w-4 h-4 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0">✓</span>
+                    <span className="mt-0.5 w-4 h-4 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0"><IconCheck size={9} /></span>
                     {f}
                   </li>
                 ))}
@@ -163,7 +164,7 @@ export default function Precios() {
                   "Panel auto-administrable",
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-2.5 text-sm text-slate-700 dark:text-white/60 font-medium">
-                    <span className="w-4 h-4 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0">✓</span>
+                    <span className="w-4 h-4 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0"><IconCheck size={9} /></span>
                     {item}
                   </li>
                 ))}

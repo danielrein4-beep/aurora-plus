@@ -1,13 +1,24 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
-import { AuroraGradientDef } from "../Icons";
+import {
+  AuroraGradientDef, IconClinic, IconVet, IconHardware, IconRestaurant, IconFarm, IconMining,
+  IconEducation, IconRetail, IconConstruction, IconCustomize, IconWarning, IconClose, IconCheck, IconLock,
+  IconCard, IconBank,
+} from "../Icons";
 import { useAuth } from "../context/AuthContext";
+
+const METODOS_PAGO = [
+  { id: "PAGO_MOVIL", label: "Pago Móvil (Bolívares, tasa BCV)" },
+  { id: "ZELLE", label: "Zelle" },
+  { id: "BINANCE", label: "Binance Pay / USDT" },
+  { id: "TRANSFERENCIA", label: "Transferencia Bancaria Nacional" },
+];
 
 interface IndustryItem {
   id: string;
   label: string;
-  icon: string;
+  Icon: (props: { size?: number }) => JSX.Element;
   desc: string;
   badge: string;
   isReady: boolean;
@@ -18,82 +29,82 @@ const INDUSTRIES: IndustryItem[] = [
   {
     id: "clinica",
     label: "Clínica & Salud",
-    icon: "🏥",
+    Icon: IconClinic,
     desc: "Historias clínicas, triaje, agenda médica y facturación",
-    badge: "⚡ 100% DISPONIBLE (Listo)",
+    badge: "100% DISPONIBLE (Listo)",
     isReady: true,
     tagline: "Vertical Insignia: Mediclinic Pro",
   },
   {
     id: "veterinaria",
     label: "Veterinaria & Mascotas",
-    icon: "🐾",
+    Icon: IconVet,
     desc: "Consultas, vacunas, hospitalización y control de peso",
-    badge: "🔒 Próximamente (Fase 2)",
+    badge: "Próximamente (Fase 2)",
     isReady: false,
   },
   {
     id: "ferreteria",
     label: "Ferretería & Materiales",
-    icon: "🔧",
+    Icon: IconHardware,
     desc: "Control de stock, POS mostrador, compras y créditos",
-    badge: "🔒 Próximamente (Fase 2)",
+    badge: "Próximamente (Fase 2)",
     isReady: false,
   },
   {
     id: "restaurante",
     label: "Restaurante & Gastronomía",
-    icon: "🍽️",
+    Icon: IconRestaurant,
     desc: "Comandas digitales, pantalla de cocina y mesas",
-    badge: "🔒 Próximamente (Fase 2)",
+    badge: "Próximamente (Fase 2)",
     isReady: false,
   },
   {
     id: "finca",
     label: "Control de Fincas & Ganado",
-    icon: "🌿",
+    Icon: IconFarm,
     desc: "Lotes de ganado, pesaje, potreros y vacunación",
-    badge: "🔒 Próximamente (Fase 2)",
+    badge: "Próximamente (Fase 2)",
     isReady: false,
   },
   {
     id: "mineria",
     label: "Minería & Maquinaria",
-    icon: "⛏️",
+    Icon: IconMining,
     desc: "Control de horas máquina, turnos y seguridad industrial",
-    badge: "🔒 Próximamente (Fase 2)",
+    badge: "Próximamente (Fase 2)",
     isReady: false,
   },
   {
     id: "educacion",
     label: "Educación & Colegios",
-    icon: "🎓",
+    Icon: IconEducation,
     desc: "Matrículas, calificaciones, boletines y pagos",
-    badge: "🔒 Próximamente (Fase 2)",
+    badge: "Próximamente (Fase 2)",
     isReady: false,
   },
   {
     id: "retail",
     label: "Retail & Comercio",
-    icon: "🛒",
+    Icon: IconRetail,
     desc: "Punto de venta multi-caja y fidelización",
-    badge: "🔒 Próximamente (Fase 2)",
+    badge: "Próximamente (Fase 2)",
     isReady: false,
   },
   {
     id: "construccion",
     label: "Construcción & Obras",
-    icon: "🏗️",
+    Icon: IconConstruction,
     desc: "Avance de obra, presupuestos y compras de insumos",
-    badge: "🔒 Próximamente (Fase 2)",
+    badge: "Próximamente (Fase 2)",
     isReady: false,
   },
   {
     id: "otro",
     label: "Otro Rubro Comercial",
-    icon: "✦",
+    Icon: IconCustomize,
     desc: "Arquitectura modular para industrias a medida",
-    badge: "🔒 Lista de Espera",
+    badge: "Lista de Espera",
     isReady: false,
   },
 ];
@@ -106,20 +117,35 @@ const CLINIC_MODULES = [
   { id: "reportes", label: "Generador de Informes Médicos PDF", desc: "Descarga de reportes clínicos con membrete y firma digital", defaultOn: true },
 ];
 
+// Mapa de "clinica"/"veterinaria"/etc. (id del onboarding) al moduloPrincipal
+// real que entiende el backend (ver TenantProvisioningService).
+const INDUSTRIA_A_MODULO: Record<string, string> = {
+  clinica: "salud",
+};
+
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { user, completeOnboarding } = useAuth();
+  const location = useLocation();
+  const { user, completeOnboarding, completarRegistro } = useAuth();
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  // Datos básicos recogidos en Auth.tsx (registro) — si no hay sesión activa
+  // ni datos pendientes de un registro recién iniciado, no hay nada que
+  // configurar aquí todavía.
+  const pendingSignup = location.state as { nombre: string; email: string; password: string } | undefined;
+
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [selectedIndustry, setSelectedIndustry] = useState<string>("clinica");
   const [empresaNombre, setEmpresaNombre] = useState<string>(user?.empresa || "Clínica & Consultorios Médicos");
   const [modules, setModules] = useState<string[]>(CLINIC_MODULES.map((m) => m.id));
   const [lockedNotice, setLockedNotice] = useState<string | null>(null);
+  const [metodoPago, setMetodoPago] = useState<string>(METODOS_PAGO[0].id);
+  const [activando, setActivando] = useState(false);
+  const [errorActivacion, setErrorActivacion] = useState<string | null>(null);
 
   const handleSelectIndustry = (ind: IndustryItem) => {
     if (!ind.isReady) {
       setLockedNotice(
-        `El rubro "${ind.label}" está en fase de desarrollo con candado 🔒. La vertical insignia actualmente lista y operativa es Mediclinic Pro (Clínica & Salud). Puedes probar Mediclinic Pro ahora mismo.`
+        `El rubro "${ind.label}" está en fase de desarrollo. La vertical insignia actualmente lista y operativa es Mediclinic Pro (Clínica & Salud). Puedes probar Mediclinic Pro ahora mismo.`
       );
       return;
     }
@@ -133,17 +159,41 @@ export default function Onboarding() {
     );
   };
 
-  const handleActivate = () => {
-    completeOnboarding({
-      industry: "clinica",
-      empresa: empresaNombre.trim() || "Clínica & Consultorios Médicos",
-      modules: modules.length > 0 ? modules : CLINIC_MODULES.map((m) => m.id),
-      plan: "Estándar",
-      planStatus: "trial",
-      hasCompletedOnboarding: true,
-    });
-    navigate("/dashboard");
+  const handleActivate = async () => {
+    setErrorActivacion(null);
+    setActivando(true);
+    try {
+      if (pendingSignup) {
+        // Registro real de un negocio nuevo — crea el tenant en el backend.
+        await completarRegistro({
+          nombreEmpresa: empresaNombre.trim() || "Clínica & Consultorios Médicos",
+          moduloPrincipal: INDUSTRIA_A_MODULO[selectedIndustry] || "salud",
+          emailContacto: pendingSignup.email,
+          username: pendingSignup.email,
+          password: pendingSignup.password,
+          modules: modules.length > 0 ? modules : CLINIC_MODULES.map((m) => m.id),
+          metodoPagoPreferido: METODOS_PAGO.find((m) => m.id === metodoPago)?.label,
+        });
+      } else {
+        // Usuario ya existente reconfigurando su rubro/módulos (ej. "Cambiar Rubro").
+        completeOnboarding({
+          industry: "clinica",
+          empresa: empresaNombre.trim() || "Clínica & Consultorios Médicos",
+          modules: modules.length > 0 ? modules : CLINIC_MODULES.map((m) => m.id),
+          hasCompletedOnboarding: true,
+        });
+      }
+      navigate("/dashboard");
+    } catch (err) {
+      setErrorActivacion(err instanceof Error ? err.message : "No se pudo activar tu cuenta");
+    } finally {
+      setActivando(false);
+    }
   };
+
+  if (!user && !pendingSignup) {
+    return <Navigate to="/auth" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden transition-colors duration-300">
@@ -167,16 +217,17 @@ export default function Onboarding() {
             Configuración del Ecosistema Aurora Plus
           </h1>
           <p className="text-white/40 text-xs mt-1 tracking-widest uppercase font-mono">
-            Paso {step} de 3 · Selección de Rubro & Arquitectura
+            Paso {step} de 4 · Selección de Rubro & Arquitectura
           </p>
         </div>
 
         {/* Barra de progreso de pasos */}
-        <div className="flex items-center justify-center gap-3 mb-6">
+        <div className="flex items-center justify-center gap-3 mb-6 flex-wrap">
           {[
             { num: 1, label: "1. Elegir Rubro" },
             { num: 2, label: "2. Módulos Activos" },
-            { num: 3, label: "3. Activación" },
+            { num: 3, label: "3. Método de Pago" },
+            { num: 4, label: "4. Activación" },
           ].map((s) => (
             <div
               key={s.num}
@@ -209,14 +260,14 @@ export default function Onboarding() {
                   ¿A qué rubro se dedica tu negocio?
                 </h2>
                 <p className="text-white/50 text-sm mt-1">
-                  Actualmente <strong className="text-teal-400">Mediclinic Pro</strong> está 100% habilitado y listo para operar. Las demás verticales se encuentran en proceso de despliegue con candado 🔒.
+                  Actualmente <strong className="text-teal-400">Mediclinic Pro</strong> está 100% habilitado y listo para operar. Las demás verticales se encuentran en proceso de despliegue.
                 </p>
               </div>
 
               {/* Banner de aviso si hizo clic en un rubro con candado */}
               {lockedNotice && (
                 <div className="apple-glass rounded-2xl p-4 border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs sm:text-sm flex items-start gap-3 animate-fade-in shadow-lg">
-                  <span className="text-xl">⚠️</span>
+                  <span className="text-amber-300"><IconWarning size={20} /></span>
                   <div className="flex-1">
                     <p className="font-semibold text-amber-300 mb-1">Módulo en Desarrollo</p>
                     <p className="text-white/80 leading-relaxed">{lockedNotice}</p>
@@ -228,14 +279,14 @@ export default function Onboarding() {
                       }}
                       className="mt-2.5 px-3 py-1.5 rounded-lg bg-teal-500 text-black font-bold text-xs hover:bg-teal-400 transition-all flex items-center gap-1.5"
                     >
-                      <span>🏥</span> Seleccionar Mediclinic Pro (Listo para usar)
+                      <IconClinic size={14} /> Seleccionar Mediclinic Pro (Listo para usar)
                     </button>
                   </div>
                   <button
                     onClick={() => setLockedNotice(null)}
                     className="text-white/40 hover:text-white text-xs"
                   >
-                    ✕
+                    <IconClose size={14} />
                   </button>
                 </div>
               )}
@@ -259,13 +310,13 @@ export default function Onboarding() {
                     >
                       {/* Icono */}
                       <div
-                        className={`w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 ${
+                        className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
                           ind.isReady
-                            ? "bg-teal-400/15 border border-teal-400/30 shadow-inner"
-                            : "bg-white/5 border border-white/10"
+                            ? "bg-teal-400/15 border border-teal-400/30 shadow-inner text-teal-300"
+                            : "bg-white/5 border border-white/10 text-white/50"
                         }`}
                       >
-                        {ind.icon}
+                        <ind.Icon size={22} />
                       </div>
 
                       {/* Info */}
@@ -288,8 +339,8 @@ export default function Onboarding() {
                           {ind.desc}
                         </p>
                         {ind.tagline && (
-                          <div className="text-[11px] font-semibold text-teal-300 mt-1.5 flex items-center gap-1">
-                            <span>✦</span> {ind.tagline}
+                          <div className="text-[11px] font-semibold text-teal-300 mt-1.5 flex items-center gap-1.5">
+                            <IconCheck size={11} /> {ind.tagline}
                           </div>
                         )}
                       </div>
@@ -300,15 +351,15 @@ export default function Onboarding() {
                           <div
                             className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
                               isSelected
-                                ? "bg-teal-400 text-black font-black text-xs shadow-[0_0_10px_#00f2fe]"
+                                ? "bg-teal-400 text-black shadow-[0_0_10px_#00f2fe]"
                                 : "border border-teal-400/40 text-transparent"
                             }`}
                           >
-                            ✓
+                            <IconCheck size={13} />
                           </div>
                         ) : (
-                          <div className="w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs text-white/40">
-                            🔒
+                          <div className="w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
+                            <IconLock size={12} />
                           </div>
                         )}
                       </div>
@@ -390,10 +441,10 @@ export default function Onboarding() {
                       >
                         <div
                           className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
-                            isChecked ? "bg-teal-400 text-black font-bold text-xs" : "border border-white/20"
+                            isChecked ? "bg-teal-400 text-black" : "border border-white/20"
                           }`}
                         >
-                          {isChecked && "✓"}
+                          {isChecked && <IconCheck size={11} />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-sm">{m.label}</div>
@@ -422,19 +473,79 @@ export default function Onboarding() {
                   disabled={modules.length === 0}
                   className="btn-cyber-neon text-white font-bold px-7 py-3 rounded-full text-sm flex items-center gap-2 cursor-pointer"
                 >
+                  Continuar a Método de Pago →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ════════════ PASO 3: MÉTODO DE PAGO PARA LA PRUEBA GRATUITA ════════════ */}
+          {step === 3 && (
+            <div className="space-y-6">
+              <div>
+                <div className="inline-block px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[11px] font-mono uppercase tracking-wider mb-2">
+                  Paso 3 · Método de Pago
+                </div>
+                <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white leading-tight">
+                  ¿Cómo prefieres pagar cuando termine tu prueba?
+                </h2>
+                <p className="text-white/50 text-sm mt-1">
+                  Tu prueba de <strong className="text-teal-400">30 días es 100% gratis</strong> — no se te cobra nada ahora. Esto solo queda guardado como tu método preferido para cuando decidas continuar.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {METODOS_PAGO.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setMetodoPago(m.id)}
+                    className={`flex items-center gap-3 p-4 rounded-2xl border text-left transition-all ${
+                      metodoPago === m.id
+                        ? "bg-teal-500/15 border-teal-400/60 text-white shadow-[0_0_15px_rgba(0,242,254,0.15)]"
+                        : "bg-white/[0.03] border-white/10 text-white/60 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${metodoPago === m.id ? "bg-teal-400/20 text-teal-300" : "bg-white/5 text-white/40"}`}>
+                      <IconCard size={16} />
+                    </div>
+                    <span className="font-semibold text-sm">{m.label}</span>
+                    {metodoPago === m.id && <IconCheck size={14} />}
+                  </button>
+                ))}
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex items-start gap-3 text-xs text-white/50">
+                <IconBank size={16} />
+                <p>Ningún cobro se procesa ahora. Cuando termine tu prueba, te avisamos y reportas tu pago por este método directamente desde el Hub.</p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-between border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="text-white/40 hover:text-white text-xs transition-colors"
+                >
+                  ← Volver a módulos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep(4)}
+                  className="btn-cyber-neon text-white font-bold px-7 py-3 rounded-full text-sm flex items-center gap-2 cursor-pointer"
+                >
                   Revisar y Activar Prueba →
                 </button>
               </div>
             </div>
           )}
 
-          {/* ════════════ PASO 3: RESUMEN Y ACTIVACIÓN ════════════ */}
-          {step === 3 && (
+          {/* ════════════ PASO 4: RESUMEN Y ACTIVACIÓN ════════════ */}
+          {step === 4 && (
             <div className="text-center space-y-6 py-2">
               <div className="flex justify-center">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#00f2fe] via-[#7928ca] to-[#ff007f] p-0.5 shadow-[0_0_30px_rgba(0,242,254,0.5)]">
-                  <div className="w-full h-full bg-[#0d131f] rounded-2xl flex items-center justify-center text-2xl">
-                    🏥
+                  <div className="w-full h-full bg-[#0d131f] rounded-2xl flex items-center justify-center text-teal-300">
+                    <IconClinic size={26} />
                   </div>
                 </div>
               </div>
@@ -457,8 +568,8 @@ export default function Onboarding() {
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-white/40 uppercase tracking-wider font-mono">Vertical:</span>
-                  <span className="text-teal-300 font-semibold flex items-center gap-1">
-                    <span>🏥</span> Mediclinic Pro (Clínica & Salud)
+                  <span className="text-teal-300 font-semibold flex items-center gap-1.5">
+                    <IconClinic size={13} /> Mediclinic Pro (Clínica & Salud)
                   </span>
                 </div>
                 <div className="flex items-start justify-between text-xs">
@@ -477,17 +588,26 @@ export default function Onboarding() {
                 <div className="h-px bg-white/10" />
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-white/40 uppercase tracking-wider font-mono">Prueba Gratuita:</span>
-                  <span className="text-emerald-400 font-bold">14 días de acceso completo</span>
+                  <span className="text-emerald-400 font-bold">30 días de acceso completo</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-white/40 uppercase tracking-wider font-mono">Método de Pago:</span>
+                  <span className="text-white font-semibold">{METODOS_PAGO.find((m) => m.id === metodoPago)?.label}</span>
                 </div>
               </div>
+
+              {errorActivacion && (
+                <p className="text-[#ff3b80] text-xs max-w-md mx-auto">{errorActivacion}</p>
+              )}
 
               <div className="space-y-3 max-w-md mx-auto">
                 <button
                   type="button"
                   onClick={handleActivate}
-                  className="w-full btn-cyber-neon text-white font-bold py-4 rounded-full text-base shadow-[0_0_30px_rgba(255,59,128,0.4)] cursor-pointer"
+                  disabled={activando}
+                  className="w-full btn-cyber-neon text-white font-bold py-4 rounded-full text-base shadow-[0_0_30px_rgba(255,59,128,0.4)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Entrar a Mediclinic Pro en Aurora Hub →
+                  {activando ? "Creando tu cuenta…" : "Entrar a Mediclinic Pro en Aurora Hub →"}
                 </button>
                 <p className="text-white/30 text-xs">
                   Sin cobros obligatorios. Podrás gestionar pagos, planes y roles desde el Hub.

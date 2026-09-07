@@ -5,6 +5,8 @@ import com.auroraplus.modules.salud.entities.BloqueoAgenda;
 import com.auroraplus.modules.salud.entities.CitaMedica;
 import com.auroraplus.modules.salud.services.AgendaMedicaService;
 import com.auroraplus.modules.salud.services.MedicoTenantResolver;
+import jakarta.persistence.EntityManager;
+import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,18 @@ public class AgendaMedicaController {
 
     @Autowired
     private MedicoTenantResolver medicoTenantResolver;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    // El filtro de Hibernate habilitado en TenantInterceptor no persiste hasta
+    // la sesión que ejecuta la query real (hallazgo de seguridad — un tenant
+    // podía ver la agenda de TODOS los demás tenants). Se re-habilita aquí
+    // explícitamente antes de cualquier lectura.
+    private void asegurarFiltroTenant() {
+        entityManager.unwrap(Session.class).enableFilter("tenantFilter")
+            .setParameter("tenantId", TenantContext.getCurrentTenant());
+    }
 
     /**
      * Cada tenant es la práctica de UN SOLO médico — recepción nunca necesita
@@ -50,6 +64,7 @@ public class AgendaMedicaController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
 
+        asegurarFiltroTenant();
         if (fechaInicio != null && fechaFin != null) {
             return agendaMedicaService.listarPorRango(fechaInicio, fechaFin);
         }
@@ -62,6 +77,7 @@ public class AgendaMedicaController {
 
     @GetMapping("/paciente/{pacienteId}")
     public List<CitaMedica> historialPorPaciente(@PathVariable Long pacienteId) {
+        asegurarFiltroTenant();
         return agendaMedicaService.historialPorPaciente(pacienteId);
     }
 
@@ -86,6 +102,7 @@ public class AgendaMedicaController {
 
     @GetMapping("/bloqueos/medico/{medicoId}")
     public List<BloqueoAgenda> listarBloqueosPorMedico(@PathVariable Long medicoId) {
+        asegurarFiltroTenant();
         return agendaMedicaService.listarBloqueosPorMedico(medicoId);
     }
 }

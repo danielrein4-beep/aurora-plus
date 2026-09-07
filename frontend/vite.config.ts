@@ -34,6 +34,15 @@ export default defineConfig(({ mode }) => {
       port: parseInt(process.env.PORT || '8443'),
       strictPort: true,
       watch: { ignored: ['**/.figma/**'] },
+      // Evita CORS entre el dev server (8443) y el backend Spring Boot (8080) —
+      // el navegador ve todo como mismo origen, igual que en producción detrás
+      // de un solo dominio.
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+        },
+      },
     },
     preview: {
       host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',

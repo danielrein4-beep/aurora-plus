@@ -28,10 +28,12 @@ public class AuthService {
         public final String token;
         public final String rol;
         public final String username;
-        public ResultadoLogin(String token, String rol, String username) {
+        public final Long tenantId;
+        public ResultadoLogin(String token, String rol, String username, Long tenantId) {
             this.token = token;
             this.rol = rol;
             this.username = username;
+            this.tenantId = tenantId;
         }
     }
 
@@ -45,7 +47,34 @@ public class AuthService {
         }
 
         String token = jwtService.generarTokenTenant(tenantId, usuario.getUsername(), usuario.getRol().name());
-        return new ResultadoLogin(token, usuario.getRol().name(), usuario.getUsername());
+        return new ResultadoLogin(token, usuario.getRol().name(), usuario.getUsername(), tenantId);
+    }
+
+    /**
+     * Login solo con username/password, sin que el cliente conozca su tenantId
+     * (pensado para el frontend público, donde el usuario solo tiene un correo
+     * y contraseña). Busca el username en todos los tenants; si aparece en más
+     * de uno, no se puede resolver de forma segura sin más información.
+     */
+    public ResultadoLogin loginPorUsername(String username, String password) {
+        List<Usuario> candidatos = usuarioRepository.buscarPorUsernameEnTodosLosTenants(username);
+        if (candidatos.isEmpty()) {
+            throw new RuntimeException("Usuario o contraseña incorrectos");
+        }
+        if (candidatos.size() > 1) {
+            throw new RuntimeException("Este usuario existe en más de un negocio — inicia sesión indicando el negocio");
+        }
+        Usuario usuario = candidatos.get(0);
+        if (!usuario.isActivo() || !passwordEncoder.matches(password, usuario.getPasswordHash())) {
+            throw new RuntimeException("Usuario o contraseña incorrectos");
+        }
+        String token = jwtService.generarTokenTenant(usuario.getTenantId(), usuario.getUsername(), usuario.getRol().name());
+        return new ResultadoLogin(token, usuario.getRol().name(), usuario.getUsername(), usuario.getTenantId());
+    }
+
+    /** Para el registro público: verificar que el correo elegido no esté ya en uso en ningún tenant. */
+    public boolean existeUsername(String username) {
+        return !usuarioRepository.buscarPorUsernameEnTodosLosTenants(username).isEmpty();
     }
 
     public String loginSuperAdmin(String username, String password) {
