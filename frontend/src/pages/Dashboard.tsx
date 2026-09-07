@@ -8,6 +8,7 @@ import {
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import { listarPacientes, listarCitasDelDia, listarCobrosDelDia, type Paciente, type CitaMedica } from "../api";
+import MediclinicApp from "../components/MediclinicApp";
 
 const VERTICAL_ICON: Record<string, (props: { size?: number }) => JSX.Element> = {
   clinica: IconClinic,
@@ -140,6 +141,11 @@ export default function Dashboard() {
   const [ingresosHoy, setIngresosHoy] = useState<number | null>(null);
   const esClinicaReal = userIndustry === "clinica" && !!user?.tenantId;
 
+  // En visitas siguientes (no primer ingreso) se salta el Hub por completo y
+  // entra directo a la app de Mediclinic — igual que pasa al hacer clic en
+  // "Abrir Mediclinic Pro" la primera vez.
+  const [abrirMediclinicApp, setAbrirMediclinicApp] = useState(!mostrarHero);
+
   useEffect(() => {
     if (!esClinicaReal || !user?.tenantId) return;
     const hoy = new Date().toISOString().slice(0, 10);
@@ -166,6 +172,10 @@ export default function Dashboard() {
       setPaymentSuccessMsg("");
     }, 2000);
   };
+
+  if (esClinicaReal && abrirMediclinicApp) {
+    return <MediclinicApp onSalir={() => setAbrirMediclinicApp(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 relative overflow-hidden flex flex-col">
@@ -305,7 +315,7 @@ export default function Dashboard() {
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">
                     <button
-                      onClick={() => { setWorkspaceTab("patients"); marcarPrimerIngresoCompletado(); }}
+                      onClick={() => { setAbrirMediclinicApp(true); marcarPrimerIngresoCompletado(); }}
                       className="btn-electric-blue text-xs sm:text-sm font-bold px-6 py-3 rounded-full flex items-center gap-2 shadow-lg cursor-pointer">
                       <IconRocket size={15} />
                       <span>Abrir {vertical.name} (Cloud Web)</span>

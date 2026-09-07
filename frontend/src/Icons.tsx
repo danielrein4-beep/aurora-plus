@@ -429,6 +429,52 @@ export function IconMail({ size = 24 }: IconProps) {
   );
 }
 
+export function IconSearch({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="11" cy="11" r="7" {...s} />
+      <path d="M20 20l-4.35-4.35" {...s} />
+    </svg>
+  );
+}
+
+export function IconTrash({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M4 7h16" {...s} />
+      <path d="M9 7V4h6v3" {...s} />
+      <path d="M6 7l1 13h10l1-13" {...s} />
+      <path d="M10 11v6M14 11v6" {...s} />
+    </svg>
+  );
+}
+
+export function IconRefresh({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M4 4v6h6" {...s} />
+      <path d="M20 20v-6h-6" {...s} />
+      <path d="M5.5 9a7 7 0 0112.4-2.5M18.5 15a7 7 0 01-12.4 2.5" {...s} />
+    </svg>
+  );
+}
+
+export function IconChevronLeft({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M15 5l-7 7 7 7" {...s} />
+    </svg>
+  );
+}
+
+export function IconChevronRight({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M9 5l7 7-7 7" {...s} />
+    </svg>
+  );
+}
+
 export function IconFileText({ size = 24 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">

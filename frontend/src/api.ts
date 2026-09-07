@@ -103,8 +103,33 @@ export interface Paciente {
   id: number;
   nombreCompleto: string;
   identificacion: string;
+  nombres?: string;
+  apellidos?: string;
   edad: number | null;
+  fechaNacimiento?: string | null;
   telefono: string | null;
+  email?: string | null;
+  direccion?: string | null;
+  genero?: string;
+}
+
+export function listarPacientes(tenantId: number): Promise<Paciente[]> {
+  return request(`/api/salud/pacientes?tenantId=${tenantId}`);
+}
+
+export interface NuevoPaciente {
+  identificacion: string;
+  nombres: string;
+  apellidos: string;
+  telefono?: string;
+  email?: string;
+  fechaNacimiento?: string;
+  direccion?: string;
+  genero?: string;
+}
+
+export function crearPaciente(tenantId: number, datos: NuevoPaciente): Promise<Paciente> {
+  return request(`/api/salud/pacientes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
 export interface CitaMedica {
@@ -118,12 +143,33 @@ export interface CitaMedica {
   estado: string;
 }
 
-export function listarPacientes(tenantId: number): Promise<Paciente[]> {
-  return request(`/api/salud/pacientes?tenantId=${tenantId}`);
-}
-
 export function listarCitasDelDia(tenantId: number, fecha: string): Promise<CitaMedica[]> {
   return request(`/api/salud/agenda?tenantId=${tenantId}&fecha=${fecha}`);
+}
+
+export interface NuevaCita {
+  pacienteId: number;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+  motivo?: string;
+  especialidad?: string;
+  estado?: string;
+}
+
+export function agendarCita(tenantId: number, datos: NuevaCita): Promise<CitaMedica> {
+  return request(`/api/salud/agenda/citas?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({
+      paciente: { id: datos.pacienteId },
+      fecha: datos.fecha,
+      horaInicio: datos.horaInicio,
+      horaFin: datos.horaFin,
+      motivo: datos.motivo,
+      especialidad: datos.especialidad,
+      estado: datos.estado || "PROGRAMADA",
+    }),
+  });
 }
 
 export interface CobroConsulta {
@@ -135,4 +181,63 @@ export interface CobroConsulta {
 
 export function listarCobrosDelDia(inicioIso: string, finIso: string): Promise<CobroConsulta[]> {
   return request(`/api/salud/cobros/reporte?inicio=${inicioIso}&fin=${finIso}`);
+}
+
+export interface SalaEsperaEntrada {
+  id: number;
+  paciente: Paciente;
+  consultorio: string | null;
+  estado: string;
+  horaLlegada: string;
+}
+
+export function listarSalaEspera(): Promise<SalaEsperaEntrada[]> {
+  return request(`/api/salud/sala-espera`);
+}
+
+export function registrarLlegadaSalaEspera(tenantId: number, pacienteId: number, consultorio?: string): Promise<SalaEsperaEntrada> {
+  return request(`/api/salud/sala-espera/check-in?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ paciente: { id: pacienteId }, consultorio }),
+  });
+}
+
+export function finalizarAtencionSalaEspera(id: number): Promise<SalaEsperaEntrada> {
+  return request(`/api/salud/sala-espera/${id}/finalizar`, { method: "POST" });
+}
+
+export interface ProcedimientoMedico {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  costo: number;
+  moneda: string;
+  duracionMinutos: number | null;
+}
+
+export function listarProcedimientos(): Promise<ProcedimientoMedico[]> {
+  return request(`/api/salud/procedimientos`);
+}
+
+export function crearProcedimiento(tenantId: number, datos: Omit<ProcedimientoMedico, "id">): Promise<ProcedimientoMedico> {
+  return request(`/api/salud/procedimientos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export interface ConsultaMedica {
+  id: number;
+  motivoConsulta: string;
+  descripcionDiagnostico?: string;
+  planTratamiento?: string;
+  fechaHora?: string;
+}
+
+export function historialConsultasPaciente(pacienteId: number): Promise<ConsultaMedica[]> {
+  return request(`/api/salud/consultas/paciente/${pacienteId}`);
+}
+
+export function registrarConsulta(tenantId: number, pacienteId: number, datos: Partial<ConsultaMedica>): Promise<ConsultaMedica> {
+  return request(`/api/salud/consultas?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ paciente: { id: pacienteId }, ...datos }),
+  });
 }

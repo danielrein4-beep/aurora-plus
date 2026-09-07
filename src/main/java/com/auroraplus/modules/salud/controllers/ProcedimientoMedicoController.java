@@ -3,6 +3,8 @@ package com.auroraplus.modules.salud.controllers;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.ProcedimientoMedico;
 import com.auroraplus.modules.salud.repositories.ProcedimientoMedicoRepository;
+import jakarta.persistence.EntityManager;
+import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,8 +18,19 @@ public class ProcedimientoMedicoController {
     @Autowired
     private ProcedimientoMedicoRepository procedimientoMedicoRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    // Ver hallazgo de seguridad en PacienteController — el filtro de tenant
+    // del interceptor no llega vivo hasta esta query, hay que re-habilitarlo.
+    private void asegurarFiltroTenant() {
+        entityManager.unwrap(Session.class).enableFilter("tenantFilter")
+            .setParameter("tenantId", TenantContext.getCurrentTenant());
+    }
+
     @GetMapping
     public List<ProcedimientoMedico> listar() {
+        asegurarFiltroTenant();
         return procedimientoMedicoRepository.findByActivoTrue();
     }
 

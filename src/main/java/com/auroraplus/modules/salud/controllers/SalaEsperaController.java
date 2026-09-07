@@ -4,6 +4,8 @@ import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.SalaEspera;
 import com.auroraplus.modules.salud.services.MedicoTenantResolver;
 import com.auroraplus.modules.salud.services.SalaEsperaService;
+import jakarta.persistence.EntityManager;
+import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,8 +22,19 @@ public class SalaEsperaController {
     @Autowired
     private MedicoTenantResolver medicoTenantResolver;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    // Ver hallazgo de seguridad en PacienteController — el filtro de tenant
+    // del interceptor no llega vivo hasta esta query, hay que re-habilitarlo.
+    private void asegurarFiltroTenant() {
+        entityManager.unwrap(Session.class).enableFilter("tenantFilter")
+            .setParameter("tenantId", TenantContext.getCurrentTenant());
+    }
+
     @GetMapping
     public List<SalaEspera> listarColaActiva() {
+        asegurarFiltroTenant();
         return salaEsperaService.listarColaActiva();
     }
 
