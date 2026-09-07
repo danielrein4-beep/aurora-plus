@@ -3237,8 +3237,12 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
           </div>
         </div>
 
-        {/* PANEL DERECHO — COMANDA ACTIVA */}
-        <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex flex-1 lg:flex-[3] lg:min-w-[300px] lg:max-w-[420px] flex-shrink-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col bg-white/30 dark:bg-black/10`}>
+        {/* PANEL DERECHO — COMANDA ACTIVA
+            flex flex-col h-full: sin h-full (y min-h-0, la vuelta clásica de
+            flexbox) el hijo "flex-1 overflow-y-auto" de abajo no tiene un
+            límite real de alto contra el cual hacer scroll — en vez de
+            desplazarse, empuja/aplasta el pie de totales y cobro. */}
+        <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex flex-1 lg:flex-[3] lg:min-w-[300px] lg:max-w-[420px] flex-shrink-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col h-full min-h-0 bg-white/30 dark:bg-black/10`}>
           {/* Cabecera: cliente CRM */}
           <div className="p-4 border-b border-slate-300/50 dark:border-white/10 flex-shrink-0">
             <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1.5">Cliente (opcional)</p>
