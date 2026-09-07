@@ -2160,18 +2160,30 @@ function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
   return (
     <Modal onClose={onClose} titulo="Editar artículo">
       <div className="space-y-3">
-        <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="input-horeca text-sm font-bold" placeholder="Nombre" autoFocus />
+        <Campo label="Nombre del artículo">
+          <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="input-horeca text-sm font-bold" placeholder="Nombre" autoFocus />
+        </Campo>
         <div className="grid grid-cols-2 gap-2">
-          <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} className="input-horeca text-xs" placeholder="Categoría" />
-          <select value={form.unidadMedida} onChange={(e) => setForm({ ...form, unidadMedida: e.target.value })} className="input-horeca text-xs">
-            {["kg", "g", "l", "ml", "unidad"].map((u) => <option key={u} value={u}>{u}</option>)}
-          </select>
+          <Campo label="Categoría">
+            <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} className="input-horeca text-xs" placeholder="Categoría" />
+          </Campo>
+          <Campo label="Unidad de medida">
+            <select value={form.unidadMedida} onChange={(e) => setForm({ ...form, unidadMedida: e.target.value })} className="input-horeca text-xs">
+              {["kg", "g", "l", "ml", "unidad"].map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </Campo>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Costo unitario $" />
-          <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Precio de venta $" />
+          <Campo label="Costo de adquisición $">
+            <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Costo unitario $" />
+          </Campo>
+          <Campo label="Precio de venta $">
+            <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Precio de venta $" />
+          </Campo>
         </div>
-        <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="input-horeca text-xs font-mono" placeholder="Código de barras / SKU" />
+        <Campo label="Código de barras / SKU">
+          <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="input-horeca text-xs font-mono" placeholder="Código de barras / SKU" />
+        </Campo>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold text-slate-500 dark:text-white/40">Margen:</span>
           <BadgeMargen margen={margen} />
