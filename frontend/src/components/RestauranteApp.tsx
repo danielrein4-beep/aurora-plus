@@ -5,13 +5,14 @@ import {
   IconBolt, IconBank, IconChart, IconDownload, IconLock,
 } from "../Icons";
 import * as XLSX from "xlsx";
+import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useAuth } from "../context/AuthContext";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
   dividirCuenta, cerrarComandaMixto, listarEscandallos, crearEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo,
   listarIngredientesEscandallo, listarFastBar, crearTragoFastBar, venderTragoRapido,
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
-  editarArticulo, ajustarStockArticulo, eliminarArticulo,
+  editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
   tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
   cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria, reporteTickets,
@@ -20,6 +21,7 @@ import {
   type EscandalloReceta, type DetalleReceta, type FastBarTrago, type ProveedorHoreca,
   type Articulo, type ItemCompraInsumo, type LoteArticulo, type TasaCambio, type MovimientoCaja,
   type ResumenPeriodoAbierto, type ArqueoCaja, type PagoParcial, type ResumenUtilidadProducto, type ReporteTicket, type Turno,
+  type ItemImportacionArticulo, type ResultadoImportacionArticulos,
 } from "../api";
 
 type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "inventario" | "administracion" | "reportes" | "configuracion";
@@ -1834,6 +1836,7 @@ function generarSku(nombre: string): string {
 
 function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number; articulos: Articulo[] | null; onCambio: () => void }) {
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [mostrarImportar, setMostrarImportar] = useState(false);
   const [form, setForm] = useState({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", cantidadInicial: "", fechaVencimiento: "" });
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -1877,11 +1880,16 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm text-slate-500 dark:text-white/40">{(articulos || []).length} artículos/insumos en Inventario</p>
-        <button onClick={() => setMostrarForm((v) => !v)} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
-          {mostrarForm ? "Cancelar" : "+ Nuevo artículo"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setMostrarImportar(true)} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5">
+            <IconDownload size={14} /> Importar Excel
+          </button>
+          <button onClick={() => setMostrarForm((v) => !v)} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
+            {mostrarForm ? "Cancelar" : "+ Nuevo artículo"}
+          </button>
+        </div>
       </div>
 
       {mostrarForm && (
@@ -1933,7 +1941,180 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
           <TarjetaArticulo key={a.id} tenantId={tenantId} articulo={a} onCambio={onCambio} />
         ))}
       </div>
+
+      {mostrarImportar && (
+        <ModalImportarInventario tenantId={tenantId} onClose={() => setMostrarImportar(false)} onImportado={onCambio} />
+      )}
     </div>
+  );
+}
+
+/** Carga masiva de inventario desde Excel/CSV (SheetJS parsea localmente en el navegador) — POST /api/inventario/articulos/importar-lote. */
+function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId: number; onClose: () => void; onImportado: () => void }) {
+  const ALIAS: Record<string, string[]> = {
+    sku: ["sku", "codigo"],
+    nombre: ["nombre", "producto", "descripcion"],
+    unidadMedida: ["unidad de medida", "unidad", "und", "um"],
+    categoria: ["categoria"],
+    costoUnitario: ["costo unitario", "costo", "precio costo"],
+    stockInicial: ["stock inicial", "stock", "cantidad", "existencia"],
+  };
+  const normalizar = (s: string) => s.toString().trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [arrastrando, setArrastrando] = useState(false);
+  const [filas, setFilas] = useState<ItemImportacionArticulo[] | null>(null);
+  const [procesando, setProcesando] = useState(false);
+  const [resultado, setResultado] = useState<ResultadoImportacionArticulos | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const procesarArchivo = async (file: File) => {
+    setError(null);
+    setResultado(null);
+    setFilas(null);
+    setArchivo(file);
+    try {
+      const buffer = await file.arrayBuffer();
+      const libro = XLSX.read(buffer, { type: "array" });
+      const hoja = libro.Sheets[libro.SheetNames[0]];
+      const filasCrudas: Record<string, unknown>[] = XLSX.utils.sheet_to_json(hoja, { defval: "" });
+      if (filasCrudas.length === 0) { setError("El archivo no tiene filas de datos"); return; }
+
+      const encabezados = Object.keys(filasCrudas[0]);
+      const columna: Record<string, string> = {};
+      for (const [campo, alias] of Object.entries(ALIAS)) {
+        const encontrada = encabezados.find((h) => alias.includes(normalizar(h)));
+        if (encontrada) columna[campo] = encontrada;
+      }
+      if (!columna.sku || !columna.nombre) {
+        setError('El archivo debe tener al menos columnas "SKU" y "Nombre" en la primera fila.');
+        return;
+      }
+
+      const procesadas: ItemImportacionArticulo[] = filasCrudas
+        .map((fila) => ({
+          sku: String(fila[columna.sku] ?? "").trim(),
+          nombre: String(fila[columna.nombre] ?? "").trim(),
+          unidadMedida: columna.unidadMedida ? String(fila[columna.unidadMedida] ?? "").trim() || undefined : undefined,
+          categoria: columna.categoria ? String(fila[columna.categoria] ?? "").trim() || undefined : undefined,
+          costoUnitario: columna.costoUnitario && fila[columna.costoUnitario] !== "" ? Number(fila[columna.costoUnitario]) : undefined,
+          stockInicial: columna.stockInicial && fila[columna.stockInicial] !== "" ? Number(fila[columna.stockInicial]) : undefined,
+        }))
+        .filter((f) => f.sku && f.nombre);
+
+      if (procesadas.length === 0) {
+        setError("Ninguna fila tiene SKU y Nombre completos — revisa el archivo.");
+        return;
+      }
+      setFilas(procesadas);
+    } catch {
+      setError("No se pudo leer el archivo — verifica que sea un .xlsx, .xls o .csv válido.");
+    }
+  };
+
+  const confirmarImportacion = async () => {
+    if (!filas || filas.length === 0) return;
+    setProcesando(true);
+    setError(null);
+    try {
+      const res = await importarArticulosLote(tenantId, filas);
+      setResultado(res);
+      onImportado();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo importar el archivo");
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} titulo="Importar inventario desde Excel/CSV" ancho="max-w-2xl">
+      <div className="space-y-4">
+        {!resultado && (
+          <>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setArrastrando(true); }}
+              onDragLeave={() => setArrastrando(false)}
+              onDrop={(e) => {
+                e.preventDefault(); setArrastrando(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) procesarArchivo(file);
+              }}
+              onClick={() => inputRef.current?.click()}
+              className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+                arrastrando ? "border-teal-500 bg-teal-500/10" : "border-slate-300/60 dark:border-white/15 hover:border-teal-500/50"
+              }`}
+            >
+              <div className="flex justify-center mb-2 text-slate-400"><IconDownload size={28} /></div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-white/70">
+                {archivo ? archivo.name : "Arrastra tu archivo aquí o haz click para elegirlo"}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-1">.xlsx, .xls o .csv — columnas: SKU, Nombre, Unidad, Costo, Stock Inicial (Categoría opcional)</p>
+              <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) procesarArchivo(f); }} />
+            </div>
+
+            {error && <p className="text-xs text-red-500">{error}</p>}
+
+            {filas && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-600 dark:text-white/60">{filas.length} fila{filas.length === 1 ? "" : "s"} detectada{filas.length === 1 ? "" : "s"} — vista previa:</p>
+                <div className="overflow-x-auto border border-slate-200/60 dark:border-white/10 rounded-xl max-h-48 overflow-y-auto">
+                  <table className="w-full text-[11px]">
+                    <thead className="bg-slate-100/60 dark:bg-white/5 sticky top-0">
+                      <tr className="text-left text-slate-400">
+                        <th className="py-1.5 px-2">SKU</th><th className="py-1.5 px-2">Nombre</th><th className="py-1.5 px-2">Unidad</th>
+                        <th className="py-1.5 px-2 text-right">Costo</th><th className="py-1.5 px-2 text-right">Stock inicial</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filas.slice(0, 8).map((f, i) => (
+                        <tr key={i} className="border-t border-slate-200/50 dark:border-white/5">
+                          <td className="py-1.5 px-2 font-mono">{f.sku}</td>
+                          <td className="py-1.5 px-2">{f.nombre}</td>
+                          <td className="py-1.5 px-2">{f.unidadMedida || "—"}</td>
+                          <td className="py-1.5 px-2 text-right">{f.costoUnitario ?? "—"}</td>
+                          <td className="py-1.5 px-2 text-right">{f.stockInicial ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {filas.length > 8 && <p className="text-[10px] text-slate-400">…y {filas.length - 8} filas más.</p>}
+                <button onClick={confirmarImportacion} disabled={procesando}
+                  className="w-full btn-cyber-neon text-white text-sm font-bold py-3 rounded-xl cursor-pointer disabled:opacity-60">
+                  {procesando ? "Importando…" : `Importar ${filas.length} artículo${filas.length === 1 ? "" : "s"}`}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {resultado && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0"><IconCheckCircle size={22} /></div>
+              <div>
+                <div className="font-['Outfit'] font-bold text-slate-900 dark:text-white">Importación completada</div>
+                <div className="text-xs text-slate-500 dark:text-white/40">
+                  {resultado.creados} creado{resultado.creados === 1 ? "" : "s"} · {resultado.actualizados} actualizado{resultado.actualizados === 1 ? "" : "s"}
+                  {resultado.errores.length > 0 ? ` · ${resultado.errores.length} con error` : ""}
+                </div>
+              </div>
+            </div>
+            {resultado.errores.length > 0 && (
+              <div className="max-h-32 overflow-y-auto bg-red-500/5 border border-red-500/20 rounded-xl p-3 space-y-1">
+                {resultado.errores.map((e, i) => (
+                  <p key={i} className="text-[11px] text-red-500">Fila {e.fila}: {e.motivo}</p>
+                ))}
+              </div>
+            )}
+            <button onClick={onClose} className="w-full g-aurora text-white text-sm font-bold py-3 rounded-xl cursor-pointer">Cerrar</button>
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -2856,15 +3037,132 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// RESUMEN FINANCIERO — dashboard gerencial. Todos los números son reales
+// (Reportes Operativos + Resumen Diario + Movimientos de caja ya
+// existentes), no hay datos simulados: no hacía falta, los endpoints ya
+// estaban construidos.
+// ══════════════════════════════════════════════════════════════════════════
+function ResumenFinanciero({ tenantId }: { tenantId: number }) {
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [ventasHoy, setVentasHoy] = useState(0);
+  const [ventasMes, setVentasMes] = useState(0);
+  const [egresosHoy, setEgresosHoy] = useState(0);
+  const [utilidadHoy, setUtilidadHoy] = useState(0);
+  const [ticketsHoy, setTicketsHoy] = useState(0);
+  const [topProductos, setTopProductos] = useState<ResumenUtilidadProducto[]>([]);
+  const [tendencia, setTendencia] = useState<{ fecha: string; ventas: number }[]>([]);
+
+  useEffect(() => {
+    let cancelado = false;
+    setCargando(true);
+    setError(null);
+
+    const hoy = new Date();
+    const hoyStr = hoy.toISOString().slice(0, 10);
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
+    const hace6dias = new Date(hoy); hace6dias.setDate(hace6dias.getDate() - 6);
+    const hace6diasStr = hace6dias.toISOString().slice(0, 10);
+
+    Promise.all([
+      reporteTickets(tenantId, { fechaInicio: hoyStr, fechaFin: hoyStr, estado: "PAGADA" }),
+      reporteTickets(tenantId, { fechaInicio: inicioMes, fechaFin: hoyStr, estado: "PAGADA" }),
+      reporteTickets(tenantId, { fechaInicio: hace6diasStr, fechaFin: hoyStr, estado: "PAGADA" }),
+      utilidadDiaria(tenantId, hoyStr),
+      listarMovimientos(tenantId, "EGRESO"),
+    ])
+      .then(([ticketsHoyLista, ticketsMesLista, tickets7dias, utilidadHoyLista, egresos]) => {
+        if (cancelado) return;
+        const sumaUsd = (arr: ReporteTicket[]) => arr.reduce((s, t) => s + Number(t.totalUsd), 0);
+
+        setVentasHoy(sumaUsd(ticketsHoyLista));
+        setVentasMes(sumaUsd(ticketsMesLista));
+        setTicketsHoy(ticketsHoyLista.length);
+        setUtilidadHoy(utilidadHoyLista.reduce((s, u) => s + Number(u.utilidad), 0));
+        setEgresosHoy(egresos.filter((m) => m.fechaRegistro.slice(0, 10) === hoyStr).reduce((s, m) => s + Number(m.monto), 0));
+        setTopProductos([...utilidadHoyLista].sort((a, b) => b.cantidadVendida - a.cantidadVendida).slice(0, 5));
+
+        // Serie de 7 días con huecos rellenados en 0 (para que el gráfico no salte días sin ventas)
+        const porDia: Record<string, number> = {};
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(hace6dias); d.setDate(d.getDate() + i);
+          porDia[d.toISOString().slice(0, 10)] = 0;
+        }
+        tickets7dias.forEach((t) => {
+          const dia = t.fecha.slice(0, 10);
+          if (dia in porDia) porDia[dia] += Number(t.totalUsd);
+        });
+        setTendencia(Object.entries(porDia).map(([fecha, ventas]) => ({
+          fecha: new Date(fecha + "T00:00:00").toLocaleDateString("es-VE", { day: "2-digit", month: "short" }),
+          ventas: Number(ventas.toFixed(2)),
+        })));
+      })
+      .catch((e) => { if (!cancelado) setError(e instanceof Error ? e.message : "No se pudieron cargar los indicadores"); })
+      .finally(() => { if (!cancelado) setCargando(false); });
+
+    return () => { cancelado = true; };
+  }, [tenantId]);
+
+  const ticketPromedio = ticketsHoy > 0 ? ventasHoy / ticketsHoy : 0;
+
+  if (cargando) return <p className="text-xs text-slate-400">Cargando indicadores…</p>;
+
+  return (
+    <div className="space-y-5">
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard label="Ventas Totales" val={`$${ventasHoy.toFixed(2)}`} sub={`Mes: $${ventasMes.toFixed(2)}`} color="#0ea5e9" />
+        <KpiCard label="Egresos Operativos" val={`$${egresosHoy.toFixed(2)}`} sub="Salidas de caja de hoy" color="#ef4444" />
+        <KpiCard label="Utilidad Bruta Estimada" val={`$${utilidadHoy.toFixed(2)}`} sub="Ventas de hoy con costo conocido" color="#22c55e" />
+        <KpiCard label="Ticket Promedio" val={`$${ticketPromedio.toFixed(2)}`} sub={`${ticketsHoy} ticket${ticketsHoy === 1 ? "" : "s"} hoy`} color="#a855f7" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="apple-glass rounded-2xl p-5">
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-4">Top 5 productos más vendidos (hoy)</h3>
+          {topProductos.length === 0 ? (
+            <p className="text-xs text-slate-400">Sin ventas con costo conocido hoy todavía.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={topProductos} layout="vertical" margin={{ left: 10, right: 16 }}>
+                <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                <YAxis type="category" dataKey="nombrePlato" width={100} tick={{ fontSize: 10 }} />
+                <Tooltip formatter={((v: any) => [`${v} unid.`, "Vendidos"]) as any} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                <Bar dataKey="cantidadVendida" fill="#14b8a6" radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="apple-glass rounded-2xl p-5">
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-4">Tendencia de ingresos — últimos 7 días</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={tendencia}>
+              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.1} />
+              <XAxis dataKey="fecha" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip formatter={((v: any) => [`$${Number(v).toFixed(2)}`, "Ventas"]) as any} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+              <Line type="monotone" dataKey="ventas" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // ADMINISTRACIÓN — ingresos/gastos + cuentas x cobrar/pagar + cierre de caja, unidos
 // ══════════════════════════════════════════════════════════════════════════
 function Administracion({ tenantId }: { tenantId: number }) {
-  const [tab, setTab] = useState<"turnos" | "finanzas" | "cuentas" | "cierre" | "resumen">("turnos");
+  const [tab, setTab] = useState<"financiero" | "turnos" | "finanzas" | "cuentas" | "cierre" | "resumen">("financiero");
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit flex-wrap">
         {[
+          { id: "financiero", label: "Resumen Financiero" },
           { id: "turnos", label: "Control de Caja (Turnos)" },
           { id: "finanzas", label: "Ingresos & Gastos" },
           { id: "cuentas", label: "Cuentas x Cobrar/Pagar" },
@@ -2878,6 +3176,7 @@ function Administracion({ tenantId }: { tenantId: number }) {
         ))}
       </div>
 
+      {tab === "financiero" && <ResumenFinanciero tenantId={tenantId} />}
       {tab === "turnos" && <TurnosCaja tenantId={tenantId} />}
       {tab === "finanzas" && <Finanzas tenantId={tenantId} />}
       {tab === "cuentas" && <CuentasPorCobrarPagar tenantId={tenantId} />}

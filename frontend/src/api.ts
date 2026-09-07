@@ -965,6 +965,28 @@ export function eliminarArticulo(tenantId: number, articuloId: number): Promise<
   return request(`/api/inventario/articulos/${articuloId}?tenantId=${tenantId}`, { method: "DELETE" });
 }
 
+export interface ItemImportacionArticulo {
+  sku: string;
+  nombre: string;
+  unidadMedida?: string;
+  categoria?: string;
+  costoUnitario?: number;
+  stockInicial?: number;
+}
+
+export interface FilaImportacionError { fila: number; motivo: string }
+
+export interface ResultadoImportacionArticulos {
+  creados: number;
+  actualizados: number;
+  errores: FilaImportacionError[];
+}
+
+/** Carga masiva de artículos (desde Excel/CSV parseado en el navegador con SheetJS) — crea o actualiza por SKU. */
+export function importarArticulosLote(tenantId: number, items: ItemImportacionArticulo[]): Promise<ResultadoImportacionArticulos> {
+  return request(`/api/inventario/articulos/importar-lote?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(items) });
+}
+
 export interface ItemCompraInsumo {
   articuloId: number;
   cantidad: number;
