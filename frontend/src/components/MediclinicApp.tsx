@@ -5418,10 +5418,12 @@ function AgendaMedica({
                   key={idx}
                   onClick={() => setFechaSeleccionada(celda.fechaIso)}
                   className={`min-h-[42px] sm:min-h-[48px] p-1 sm:p-1.5 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between select-none relative group ${
-                    esSeleccionada
-                      ? "border-2 border-sky-500 bg-sky-500/15 dark:bg-sky-500/25 shadow-md ring-1 ring-sky-500/30"
+                    estaBloq && esSeleccionada
+                      ? "border-2 border-rose-500 bg-rose-500/20 dark:bg-rose-950/50 shadow-md ring-2 ring-rose-500/30"
                       : estaBloq
-                      ? "bg-rose-50/60 dark:bg-rose-950/20 border-rose-200/70 dark:border-rose-500/20 hover:border-rose-400"
+                      ? "bg-rose-50/80 dark:bg-rose-950/30 border-rose-300 dark:border-rose-500/40 hover:border-rose-500"
+                      : esSeleccionada
+                      ? "border-2 border-sky-500 bg-sky-500/15 dark:bg-sky-500/25 shadow-md ring-1 ring-sky-500/30"
                       : celda.mesActual
                       ? "bg-white/70 dark:bg-white/[0.03] border-slate-200/80 dark:border-white/10 hover:border-sky-400 hover:bg-sky-50/30 dark:hover:bg-white/[0.08]"
                       : "bg-slate-50/40 dark:bg-black/20 border-slate-100 dark:border-white/5 opacity-40 hover:opacity-80"
@@ -5431,7 +5433,9 @@ function AgendaMedica({
                   <div className="flex items-center justify-between">
                     <span
                       className={`text-[11px] font-mono font-black ${
-                        esSeleccionada
+                        estaBloq
+                          ? "text-rose-600 dark:text-rose-400 text-xs font-black"
+                          : esSeleccionada
                           ? "text-sky-700 dark:text-sky-300 text-xs font-black"
                           : celda.esHoy
                           ? "text-teal-600 dark:text-teal-400 font-bold"
@@ -5448,16 +5452,15 @@ function AgendaMedica({
                     )}
                   </div>
 
-                  {/* Badges de Citas o Bloqueado */}
+                  {/* Badges de Citas o Bloqueado (solo candado sin texto) */}
                   <div className="space-y-0.5 mt-0.5">
                     {estaBloq && (
-                      <div className="text-[8px] font-bold px-1 py-0.2 rounded bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center justify-center gap-0.5 truncate">
+                      <div className="text-[10px] py-0.5 rounded-md bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center justify-center shadow-xs">
                         <span>🔒</span>
-                        <span className="hidden sm:inline">Bloq</span>
                       </div>
                     )}
 
-                    {citasEnDia.length > 0 && (
+                    {!estaBloq && citasEnDia.length > 0 && (
                       <div className="text-[8.5px] font-black px-1 py-0.5 rounded-md bg-sky-500 text-white dark:bg-sky-600 flex items-center justify-center gap-0.5 shadow-xs truncate">
                         <span>📅</span>
                         <span>{citasEnDia.length}</span>
