@@ -32,6 +32,12 @@ public class EscandalloReceta {
     @Column(name = "precio_venta", precision = 18, scale = 2)
     private BigDecimal precioVenta;
 
+    // Si ya se vendió alguna vez, la receta no se puede borrar (queda como
+    // historial de la venta) — esto deja ocultarla del catálogo de Venta
+    // Rápida/Fast-sale sin perder ese historial ni el costeo configurado.
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private Boolean activo = true;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -44,6 +50,8 @@ public class EscandalloReceta {
     public void setEstacionCocina(String estacionCocina) { this.estacionCocina = estacionCocina; }
     public BigDecimal getPrecioVenta() { return precioVenta; }
     public void setPrecioVenta(BigDecimal precioVenta) { this.precioVenta = precioVenta; }
+    public Boolean getActivo() { return activo; }
+    public void setActivo(Boolean activo) { this.activo = activo; }
 
     @Transient
     public BigDecimal getMargenContribucion() {

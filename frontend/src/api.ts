@@ -814,6 +814,7 @@ export interface EscandalloReceta {
   costoTotalProduccion: number;
   estacionCocina: string;
   precioVenta: number;
+  activo: boolean;
 }
 
 export interface DetalleReceta {
@@ -834,8 +835,15 @@ export function crearEscandallo(tenantId: number, datos: { nombrePlato: string; 
   return request(`/api/horeca/escandallos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function eliminarEscandallo(tenantId: number, escandalloId: number): Promise<void> {
+// Si la receta ya tiene ventas, el backend no la borra: la marca inactiva
+// (desaparece de Venta Rápida) y devuelve el escandallo actualizado en vez
+// de nada — por eso el tipo de retorno no es void.
+export function eliminarEscandallo(tenantId: number, escandalloId: number): Promise<EscandalloReceta | void> {
   return request(`/api/horeca/escandallos/${escandalloId}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
+export function cambiarActivoEscandallo(tenantId: number, escandalloId: number, activo: boolean): Promise<EscandalloReceta> {
+  return request(`/api/horeca/escandallos/${escandalloId}/activo?tenantId=${tenantId}&activo=${activo}`, { method: "PATCH" });
 }
 
 export function agregarIngredienteEscandallo(tenantId: number, escandalloId: number, datos: {
@@ -912,6 +920,19 @@ export function crearArticulo(tenantId: number, datos: { sku: string; nombre: st
 
 export function entradaArticulo(tenantId: number, articuloId: number, datos: { cantidad: number; costoUnitario?: number; motivo?: string; fechaVencimiento?: string }): Promise<unknown> {
   return request(`/api/inventario/articulos/${articuloId}/entrada?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function editarArticulo(tenantId: number, articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number }): Promise<Articulo> {
+  return request(`/api/inventario/articulos/${articuloId}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+/** Corrección de inventario: indicá el stock REAL contado y el sistema calcula/ audita la diferencia solo. */
+export function ajustarStockArticulo(tenantId: number, articuloId: number, datos: { stockReal: number; motivo?: string }): Promise<Articulo> {
+  return request(`/api/inventario/articulos/${articuloId}/ajustar-stock?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function eliminarArticulo(tenantId: number, articuloId: number): Promise<void> {
+  return request(`/api/inventario/articulos/${articuloId}?tenantId=${tenantId}`, { method: "DELETE" });
 }
 
 export interface ItemCompraInsumo {

@@ -11,6 +11,7 @@ import com.auroraplus.core.inventario.services.InventarioService;
 import jakarta.persistence.EntityManager;
 import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -81,6 +82,76 @@ public class ArticuloController {
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
         articulo.setStockMinimo(stockMinimo);
         return ResponseEntity.ok(articuloRepository.save(articulo));
+    }
+
+    public static class EditarArticuloRequest {
+        public String nombre;
+        public String categoria;
+        public String unidadMedida;
+        public BigDecimal costoUnitario;
+    }
+
+    /** Corrige datos del artículo (nombre, categoría, unidad, costo) — NO toca stockActual, que solo cambia vía Kardex (entrada/salida/ajuste) para no perder el rastro de auditoría. */
+    @PutMapping("/{id}")
+    public ResponseEntity<Articulo> editar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody EditarArticuloRequest request) {
+        Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
+        if (!articulo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
+        }
+        if (request.nombre != null && !request.nombre.isBlank()) articulo.setNombre(request.nombre.trim());
+        if (request.categoria != null) articulo.setCategoria(request.categoria.isBlank() ? "General" : request.categoria.trim());
+        if (request.unidadMedida != null && !request.unidadMedida.isBlank()) articulo.setUnidadMedida(request.unidadMedida.trim());
+        if (request.costoUnitario != null) articulo.setCostoUnitario(request.costoUnitario);
+        return ResponseEntity.ok(articuloRepository.save(articulo));
+    }
+
+    public static class AjustarStockRequest {
+        public BigDecimal stockReal; // cantidad real contada físicamente — el sistema calcula la diferencia sola
+        public String motivo;
+    }
+
+    /**
+     * Corrección de inventario: en vez de que el usuario calcule a mano cuánto
+     * hay que sumar o restar, indica cuánto tiene REALMENTE contado y el
+     * sistema registra la diferencia como entrada o merma en el Kardex — así
+     * queda auditado por qué cambió el stock, no solo el número nuevo.
+     */
+    @PostMapping("/{id}/ajustar-stock")
+    public ResponseEntity<Articulo> ajustarStock(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody AjustarStockRequest request) {
+        Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
+        if (!articulo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
+        }
+        if (request.stockReal == null || request.stockReal.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Indique el stock real contado (no puede ser negativo)");
+        }
+
+        BigDecimal diferencia = request.stockReal.subtract(articulo.getStockActual());
+        String motivo = request.motivo != null && !request.motivo.isBlank() ? request.motivo : "Corrección de inventario (conteo físico)";
+        if (diferencia.compareTo(BigDecimal.ZERO) > 0) {
+            inventarioService.registrarMovimientoKardex(id, tenantId, Kardex.TipoOperacion.ENTRADA, diferencia, articulo.getCostoUnitario(), motivo);
+        } else if (diferencia.compareTo(BigDecimal.ZERO) < 0) {
+            inventarioService.registrarMovimientoKardex(id, tenantId, Kardex.TipoOperacion.MERMA, diferencia.abs(), articulo.getCostoUnitario(), motivo);
+        }
+
+        return ResponseEntity.ok(articuloRepository.findById(id).orElseThrow());
+    }
+
+    /** Elimina un artículo (ej. duplicado creado por error). Si ya tiene movimientos, compras o se usa en una receta, la base lo rechaza — se traduce a un error claro. */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+        Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
+        if (!articulo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
+        }
+        try {
+            articuloRepository.delete(articulo);
+            articuloRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new RuntimeException("No se puede eliminar \"" + articulo.getNombre()
+                + "\": ya tiene movimientos de inventario, compras o se usa en una receta.");
+        }
+        return ResponseEntity.noContent().build();
     }
 
     /** Insumos por debajo de su umbral de reposición — para alertar antes de que se agote un ingrediente crítico. */

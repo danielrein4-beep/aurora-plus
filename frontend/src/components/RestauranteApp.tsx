@@ -7,9 +7,10 @@ import {
 import { useAuth } from "../context/AuthContext";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
-  dividirCuenta, cerrarComandaMixto, listarEscandallos, crearEscandallo, eliminarEscandallo, agregarIngredienteEscandallo,
+  dividirCuenta, cerrarComandaMixto, listarEscandallos, crearEscandallo, eliminarEscandallo, cambiarActivoEscandallo, agregarIngredienteEscandallo,
   listarIngredientesEscandallo, listarFastBar, crearTragoFastBar, venderTragoRapido,
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
+  editarArticulo, ajustarStockArticulo, eliminarArticulo,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda,
   tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
   cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria,
@@ -1149,7 +1150,7 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
           <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Agregar plato</p>
           <select value={escandalloSel} onChange={(e) => setEscandalloSel(e.target.value)} className="input-horeca">
             <option value="">— Plato libre (escribir nombre) —</option>
-            {(escandallos || []).map((e) => (
+            {(escandallos || []).filter((e) => e.activo !== false).map((e) => (
               <option key={e.id} value={e.id}>{e.nombrePlato} · ${Number(e.precioVenta).toFixed(2)}</option>
             ))}
           </select>
@@ -1266,14 +1267,31 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
 
   const eliminar = async (e: React.MouseEvent, escandallo: EscandalloReceta) => {
     e.stopPropagation();
-    if (!window.confirm(`¿Eliminar la receta "${escandallo.nombrePlato}"? Esto no se puede deshacer.`)) return;
+    if (!window.confirm(`¿Eliminar la receta "${escandallo.nombrePlato}"? Si ya tiene ventas, en vez de borrarla se ocultará de Venta Rápida.`)) return;
     setEliminandoId(escandallo.id);
     setError(null);
     try {
-      await eliminarEscandallo(tenantId, escandallo.id);
+      const resultado = await eliminarEscandallo(tenantId, escandallo.id);
+      if (resultado && resultado.activo === false) {
+        setError(`"${escandallo.nombrePlato}" ya tenía ventas registradas — se ocultó de Venta Rápida en vez de borrarse. Podés reactivarla desde su tarjeta.`);
+      }
       onCambio();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo eliminar la receta");
+    } finally {
+      setEliminandoId(null);
+    }
+  };
+
+  const alternarActivo = async (e: React.MouseEvent, escandallo: EscandalloReceta) => {
+    e.stopPropagation();
+    setEliminandoId(escandallo.id);
+    setError(null);
+    try {
+      await cambiarActivoEscandallo(tenantId, escandallo.id, !escandallo.activo);
+      onCambio();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar la receta");
     } finally {
       setEliminandoId(null);
     }
@@ -1313,22 +1331,30 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
             </select>
             <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" placeholder="Precio de venta $" className="input-horeca" />
           </div>
-          {error && <p className="text-xs text-red-500">{error}</p>}
           <button onClick={crear} disabled={guardando} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
             {guardando ? "Guardando…" : "Guardar receta"}
           </button>
         </div>
       )}
 
+      {error && <p className="text-xs text-amber-600 dark:text-amber-400 apple-glass rounded-xl p-3">{error}</p>}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {(escandallos || []).map((e) => {
           const margen = Number(e.precioVenta) - Number(e.costoTotalProduccion || 0);
+          const inactivo = e.activo === false;
           return (
-            <div key={e.id} onClick={() => setSeleccionado(e)} className="apple-glass rounded-2xl p-5 hover-card cursor-pointer space-y-2">
+            <div key={e.id} onClick={() => setSeleccionado(e)}
+              className={`apple-glass rounded-2xl p-5 hover-card cursor-pointer space-y-2 ${inactivo ? "opacity-50 border-dashed" : ""}`}>
               <div className="flex items-center justify-between gap-2">
-                <h4 className="font-bold text-slate-900 dark:text-white text-sm">{e.nombrePlato}</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white text-sm">{e.nombrePlato}{inactivo && <span className="ml-1.5 text-[9px] font-normal text-slate-400">(oculta)</span>}</h4>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-white/10 text-slate-500 dark:text-white/40">{e.estacionCocina}</span>
+                  <button onClick={(ev) => alternarActivo(ev, e)} disabled={eliminandoId === e.id}
+                    title={inactivo ? "Mostrar de nuevo en Venta Rápida" : "Ocultar de Venta Rápida (sin borrar)"}
+                    className="text-slate-400 hover:text-teal-500 cursor-pointer disabled:opacity-40">
+                    {inactivo ? <IconCheckCircle size={13} /> : <IconClose size={13} />}
+                  </button>
                   <button onClick={(ev) => eliminar(ev, e)} disabled={eliminandoId === e.id} title="Eliminar receta"
                     className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40">
                     <IconTrash size={13} />
@@ -1636,6 +1662,13 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
+  // Avisa ANTES de crear si ya existe un artículo con nombre parecido — la
+  // causa más común de duplicados es escribir el mismo insumo dos veces sin
+  // darse cuenta de que ya estaba cargado.
+  const posibleDuplicado = form.nombre.trim().length > 2
+    ? (articulos || []).find((a) => a.nombre.trim().toLowerCase() === form.nombre.trim().toLowerCase())
+    : null;
+
   const crear = async () => {
     if (!form.nombre.trim()) { setError("El nombre del artículo es obligatorio"); return; }
     setGuardando(true);
@@ -1706,6 +1739,12 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
               {diasParaVencerTexto(form.fechaVencimiento).texto} — te avisaremos en Vencimientos cuando se acerque.
             </p>
           )}
+          {posibleDuplicado && (
+            <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+              Ya existe "{posibleDuplicado.nombre}" con {Number(posibleDuplicado.stockActual)} {posibleDuplicado.unidadMedida} en stock — si es el mismo insumo,
+              cancelá y usá "Ajustar stock" en esa tarjeta en vez de crear uno nuevo (si no, seguí igual).
+            </p>
+          )}
           {error && <p className="text-xs text-red-500">{error}</p>}
           <button onClick={crear} disabled={guardando} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
             {guardando ? "Guardando…" : "Guardar artículo"}
@@ -1715,13 +1754,118 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {(articulos || []).map((a) => (
-          <div key={a.id} className="apple-glass rounded-2xl p-5 space-y-1.5">
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm">{a.nombre}</h4>
-            <div className="text-xs text-slate-500 dark:text-white/40">{a.categoria || "Sin categoría"} · {a.unidadMedida}</div>
-            <div className="text-xs text-slate-500 dark:text-white/40">Stock: {Number(a.stockActual).toFixed(2)} · Costo: ${Number(a.costoUnitario).toFixed(2)}</div>
-          </div>
+          <TarjetaArticulo key={a.id} tenantId={tenantId} articulo={a} onCambio={onCambio} />
         ))}
       </div>
+    </div>
+  );
+}
+
+function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; articulo: Articulo; onCambio: () => void }) {
+  const [modo, setModo] = useState<"ver" | "editar" | "ajustar">("ver");
+  const [form, setForm] = useState({ nombre: articulo.nombre, categoria: articulo.categoria || "", unidadMedida: articulo.unidadMedida || "unidad", costoUnitario: String(articulo.costoUnitario) });
+  const [stockReal, setStockReal] = useState(String(Number(articulo.stockActual)));
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const guardarEdicion = async () => {
+    if (!form.nombre.trim()) { setError("El nombre no puede quedar vacío"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      await editarArticulo(tenantId, articulo.id, {
+        nombre: form.nombre.trim(), categoria: form.categoria.trim(), unidadMedida: form.unidadMedida.trim(),
+        costoUnitario: form.costoUnitario ? Number(form.costoUnitario) : undefined,
+      });
+      setModo("ver");
+      onCambio();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const guardarAjuste = async () => {
+    if (stockReal === "" || Number(stockReal) < 0) { setError("Indicá el stock real contado"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      await ajustarStockArticulo(tenantId, articulo.id, { stockReal: Number(stockReal) });
+      setModo("ver");
+      onCambio();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo ajustar el stock");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const eliminar = async () => {
+    if (!window.confirm(`¿Eliminar "${articulo.nombre}"? Esto no se puede deshacer.`)) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      await eliminarArticulo(tenantId, articulo.id);
+      onCambio();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setGuardando(false);
+    }
+  };
+
+  if (modo === "editar") {
+    return (
+      <div className="apple-glass rounded-2xl p-5 space-y-2 border border-teal-500/30">
+        <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="input-horeca text-sm font-bold" placeholder="Nombre" />
+        <div className="grid grid-cols-2 gap-2">
+          <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} className="input-horeca text-xs" placeholder="Categoría" />
+          <select value={form.unidadMedida} onChange={(e) => setForm({ ...form, unidadMedida: e.target.value })} className="input-horeca text-xs">
+            {["kg", "g", "l", "ml", "unidad"].map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+        <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" className="input-horeca text-xs" placeholder="Costo unitario $" />
+        {error && <p className="text-[10px] text-red-500">{error}</p>}
+        <div className="flex gap-2">
+          <button onClick={guardarEdicion} disabled={guardando} className="flex-1 g-aurora text-white text-xs font-semibold py-2 rounded-lg cursor-pointer disabled:opacity-60">
+            {guardando ? "Guardando…" : "Guardar"}
+          </button>
+          <button onClick={() => { setModo("ver"); setError(null); }} className="flex-1 apple-glass-btn text-xs font-semibold py-2 rounded-lg cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (modo === "ajustar") {
+    return (
+      <div className="apple-glass rounded-2xl p-5 space-y-2 border border-teal-500/30">
+        <h4 className="font-bold text-slate-900 dark:text-white text-sm">{articulo.nombre}</h4>
+        <p className="text-[10px] text-slate-500 dark:text-white/40">Sistema dice: {Number(articulo.stockActual)} {articulo.unidadMedida}. Escribí lo que realmente hay contado — el sistema calcula y audita la diferencia solo.</p>
+        <input value={stockReal} onChange={(e) => setStockReal(e.target.value)} type="number" step="0.001" min="0" className="input-horeca text-sm font-bold" placeholder="Stock real" autoFocus />
+        {error && <p className="text-[10px] text-red-500">{error}</p>}
+        <div className="flex gap-2">
+          <button onClick={guardarAjuste} disabled={guardando} className="flex-1 g-aurora text-white text-xs font-semibold py-2 rounded-lg cursor-pointer disabled:opacity-60">
+            {guardando ? "Guardando…" : "Corregir stock"}
+          </button>
+          <button onClick={() => { setModo("ver"); setError(null); }} className="flex-1 apple-glass-btn text-xs font-semibold py-2 rounded-lg cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="apple-glass rounded-2xl p-5 space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">{articulo.nombre}</h4>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button onClick={() => setModo("ajustar")} title="Corregir stock (conteo físico)" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconRefresh size={13} /></button>
+          <button onClick={() => setModo("editar")} title="Editar nombre/categoría/costo" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconCustomize size={13} /></button>
+          <button onClick={eliminar} disabled={guardando} title="Eliminar artículo" className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40"><IconTrash size={13} /></button>
+        </div>
+      </div>
+      <div className="text-xs text-slate-500 dark:text-white/40">{articulo.categoria || "Sin categoría"} · {articulo.unidadMedida}</div>
+      <div className="text-xs text-slate-500 dark:text-white/40">Stock: {Number(articulo.stockActual).toFixed(2)} · Costo: ${Number(articulo.costoUnitario).toFixed(2)}</div>
+      {error && <p className="text-[10px] text-red-500">{error}</p>}
     </div>
   );
 }
@@ -2130,7 +2274,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
       <div className="space-y-4">
         <p className="text-xs text-slate-500 dark:text-white/40">Toca un producto para agregarlo — ideal para ventas de mostrador que no pasan por una mesa.</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {(escandallos || []).map((e) => (
+          {(escandallos || []).filter((e) => e.activo !== false).map((e) => (
             <button key={`plato-${e.id}`}
               onClick={() => agregarAlCarrito({ key: `plato-${e.id}`, nombre: e.nombrePlato, precio: Number(e.precioVenta), escandalloId: e.id, estacionCocina: e.estacionCocina })}
               className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">

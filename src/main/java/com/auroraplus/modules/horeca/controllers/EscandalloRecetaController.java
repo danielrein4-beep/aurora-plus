@@ -132,11 +132,13 @@ public class EscandalloRecetaController {
     /**
      * Elimina una receta y sus líneas de ingredientes (ej. datos de prueba).
      * Si ya se vendió alguna vez o se usa como sub-receta de otra, la base de
-     * datos rechaza el borrado por la referencia (FK) — se traduce a un error
-     * claro en vez de un 500 crudo.
+     * datos rechaza el borrado por la referencia (FK) — en ese caso no se
+     * revienta con un 500: se la marca inactiva automáticamente (desaparece
+     * del catálogo de Venta Rápida igual, sin perder el historial de ventas)
+     * y se avisa que quedó oculta en vez de borrada.
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<EscandalloReceta> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
         if (!escandallo.getTenantId().equals(tenantId)) {
@@ -148,11 +150,23 @@ public class EscandalloRecetaController {
         try {
             escandalloRecetaRepository.delete(escandallo);
             escandalloRecetaRepository.flush();
+            return ResponseEntity.noContent().build();
         } catch (DataIntegrityViolationException e) {
-            throw new RuntimeException("No se puede eliminar \"" + escandallo.getNombrePlato()
-                + "\": ya tiene ventas registradas o se usa como sub-receta de otro plato.");
+            escandallo.setActivo(false);
+            escandalloRecetaRepository.save(escandallo);
+            return ResponseEntity.ok(escandallo);
         }
+    }
 
-        return ResponseEntity.noContent().build();
+    /** Muestra/oculta la receta del catálogo de Venta Rápida sin borrarla (para recetas que ya tienen ventas y no se pueden eliminar). */
+    @PatchMapping("/{id}/activo")
+    public ResponseEntity<EscandalloReceta> cambiarActivo(@PathVariable Long id, @RequestParam Long tenantId, @RequestParam boolean activo) {
+        EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
+        if (!escandallo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Escandallo no pertenece a este tenant");
+        }
+        escandallo.setActivo(activo);
+        return ResponseEntity.ok(escandalloRecetaRepository.save(escandallo));
     }
 }
