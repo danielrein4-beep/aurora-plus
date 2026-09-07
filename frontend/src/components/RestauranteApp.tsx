@@ -1231,18 +1231,22 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
 
       <div className="space-y-2">
         {filas.map((f) => (
-          <div key={f.id} className="flex items-center gap-1.5">
-            <select value={f.metodoPago} onChange={(e) => actualizarMetodo(f.id, e.target.value)} className="input-horeca flex-[1.3] text-xs">
+          // flex-wrap: en un contenedor angosto (el carrito del POS, 300-420px)
+          // no cabe método + moneda + monto en una sola línea sin comprimir el
+          // texto — con min-w en cada control, lo que no cabe pasa a una
+          // segunda línea en vez de recortarse.
+          <div key={f.id} className="flex flex-wrap items-center gap-1.5">
+            <select value={f.metodoPago} onChange={(e) => actualizarMetodo(f.id, e.target.value)} className="input-horeca flex-1 min-w-[130px] text-xs">
               <option value="EFECTIVO">Efectivo</option>
               <option value="TARJETA">Tarjeta</option>
               <option value="TRANSFERENCIA">Transferencia</option>
               <option value="BILLETERA_DIGITAL">Billetera digital</option>
             </select>
-            <select value={f.moneda} onChange={(e) => actualizarMoneda(f.id, e.target.value)} className="input-horeca w-[4.5rem] text-xs">
+            <select value={f.moneda} onChange={(e) => actualizarMoneda(f.id, e.target.value)} className="input-horeca w-20 flex-shrink-0 text-xs">
               <option value={monedaBase}>{monedaBase}</option>
               {otrasMonedas.map((m) => <option key={m} value={m}>{MONEDAS_ALTERNAS[m]}</option>)}
             </select>
-            <div className="relative w-24 flex-shrink-0">
+            <div className="relative flex-1 min-w-[92px]">
               <input
                 value={f.monto}
                 onChange={(e) => actualizarMonto(f.id, e.target.value)}
@@ -1254,7 +1258,7 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
                 <span className="absolute -top-1.5 -right-1.5 text-[8px] font-bold bg-teal-500 text-white rounded-full px-1 leading-tight">auto</span>
               )}
             </div>
-            <button type="button" onClick={() => completarConPendiente(f.id)} title="Rellenar con lo que falta" className="text-[10px] font-semibold text-teal-600 dark:text-teal-300 px-1 cursor-pointer whitespace-nowrap">todo</button>
+            <button type="button" onClick={() => completarConPendiente(f.id)} title="Rellenar con lo que falta" className="text-[10px] font-semibold text-teal-600 dark:text-teal-300 px-1.5 py-1 cursor-pointer whitespace-nowrap flex-shrink-0">todo</button>
             {filas.length > 1 && (
               <button type="button" onClick={() => quitarFila(f.id)} className="text-slate-400 hover:text-red-500 cursor-pointer flex-shrink-0"><IconTrash size={13} /></button>
             )}
@@ -1268,14 +1272,14 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
         <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Total a cobrar</span><span className="font-mono font-bold text-slate-900 dark:text-white">{simbolo}{total.toFixed(2)}</span></div>
         <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Ingresado</span><span className="font-mono text-slate-700 dark:text-white/70">{simbolo}{totalIngresadoBase.toFixed(2)}</span></div>
         {!cubierto ? (
-          <div className="flex justify-between text-amber-600 dark:text-amber-400 font-semibold">
-            <span>Pendiente</span>
-            <span className="font-mono">{simbolo}{pendienteBase.toFixed(2)}{formatearEnOtras(pendienteBase) ? ` · ${formatearEnOtras(pendienteBase)}` : ""}</span>
+          <div className="flex flex-wrap justify-between gap-x-2 text-amber-600 dark:text-amber-400 font-semibold">
+            <span className="flex-shrink-0">Pendiente</span>
+            <span className="font-mono text-right">{simbolo}{pendienteBase.toFixed(2)}{formatearEnOtras(pendienteBase) ? ` · ${formatearEnOtras(pendienteBase)}` : ""}</span>
           </div>
         ) : (
-          <div className="flex justify-between text-teal-600 dark:text-teal-400 font-semibold">
-            <span>Vuelto</span>
-            <span className="font-mono">{simbolo}{vueltoBase.toFixed(2)}{formatearEnOtras(vueltoBase) ? ` · ${formatearEnOtras(vueltoBase)}` : ""}</span>
+          <div className="flex flex-wrap justify-between gap-x-2 text-teal-600 dark:text-teal-400 font-semibold">
+            <span className="flex-shrink-0">Vuelto</span>
+            <span className="font-mono text-right">{simbolo}{vueltoBase.toFixed(2)}{formatearEnOtras(vueltoBase) ? ` · ${formatearEnOtras(vueltoBase)}` : ""}</span>
           </div>
         )}
       </div>
@@ -3181,13 +3185,13 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 <div className="relative flex-1">
                   <input value={busquedaCliente} onChange={(e) => setBusquedaCliente(e.target.value)} placeholder="Buscar por nombre o RIF…" className="input-horeca w-full text-xs" />
                   {resultadosCliente.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-40 overflow-y-auto shadow-lg">
+                    <div className="absolute z-10 mt-1 min-w-[200px] w-max max-w-[280px] bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-40 overflow-y-auto shadow-lg">
                       {resultadosCliente.map((c) => (
                         <button key={c.id} type="button"
                           onClick={() => { setClienteSel(c); setBusquedaCliente(""); setResultadosCliente([]); }}
                           className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer">
-                          <div className="font-semibold text-slate-800 dark:text-white">{c.nombre}</div>
-                          {c.identificacionRif && <div className="text-[10px] text-slate-400">{c.identificacionRif}</div>}
+                          <div className="font-semibold text-slate-800 dark:text-white truncate">{c.nombre}</div>
+                          {c.identificacionRif && <div className="text-[10px] text-slate-400 truncate">{c.identificacionRif}</div>}
                         </button>
                       ))}
                     </div>
