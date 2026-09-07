@@ -2080,6 +2080,18 @@ function calcularMargen(costo: number, precio: number): number | null {
   return ((precio - costo) / precio) * 100;
 }
 
+/**
+ * Filtro defensivo para categorías de artículo: descarta vacíos y valores
+ * puramente numéricos ("1", "2.5") — basura que puede colarse desde una
+ * importación de Excel mal mapeada o un formulario con la categoría en
+ * blanco, y que de otro modo aparece como un chip de filtro fantasma
+ * (ej. "1") junto a las categorías reales.
+ */
+function esCategoriaValida(c: string | null | undefined): c is string {
+  const t = c?.trim();
+  return !!t && isNaN(Number(t));
+}
+
 function BadgeMargen({ margen }: { margen: number | null }) {
   if (margen === null) return <span className="text-[10px] text-slate-400">Sin precio de venta</span>;
   const color = margen < 0 ? "text-red-500 bg-red-500/10" : margen < 20 ? "text-amber-600 dark:text-amber-400 bg-amber-500/10" : "text-teal-600 dark:text-teal-400 bg-teal-500/10";
@@ -2208,7 +2220,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     }
   };
 
-  const categorias = useMemo(() => Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).sort(), [articulos]);
+  const categorias = useMemo(() => Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).filter(esCategoriaValida).sort(), [articulos]);
 
   const articulosFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -2966,7 +2978,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     const tabs: { key: string | null; label: string }[] = [{ key: null, label: "Todas" }];
     if ((escandallos || []).some((e) => e.activo !== false)) tabs.push({ key: CATEGORIA_RECETAS, label: "Recetas" });
     if ((fastbar || []).length > 0) tabs.push({ key: CATEGORIA_FASTBAR, label: "Fast-Bar" });
-    Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).sort()
+    Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).filter(esCategoriaValida).sort()
       .forEach((c) => tabs.push({ key: c, label: c }));
     return tabs;
   }, [escandallos, fastbar, articulos]);
