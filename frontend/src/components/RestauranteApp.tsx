@@ -4453,11 +4453,23 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Modal({ titulo, onClose, children, ancho }: { titulo: string; onClose: () => void; children: React.ReactNode; ancho?: string }) {
+  // Fondo SIEMPRE claro y sólido a propósito, sin variante dark: en la
+  // tarjeta ni en el título — nada de apple-glass (translúcido, "casi
+  // invisible" fue el reporte exacto) ni de bg-white/dark:bg-slate-800
+  // (probado en vivo: con Modo Clásico activo, que es como corre esta
+  // vertical en la práctica, .horeca-clasico fuerza TODO texto con clase
+  // text-slate-900 — y cualquier <h1-4>/<strong> sin importar su clase —
+  // a un navy oscuro fijo por CSS global; combinado con un fondo
+  // genuinamente oscuro real (dark:bg-slate-800, activo porque <html>
+  // trae la clase "dark"), el resultado medido fue texto oscuro sobre
+  // fondo oscuro, invisible). Fijar la tarjeta a blanco/texto oscuro sin
+  // depender de dark: evita la colisión en el modo en que de verdad se
+  // usa la app.
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className={`apple-glass rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-white/15`}>
+      <div onClick={(e) => e.stopPropagation()} className={`bg-white rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-200`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white">{titulo}</h3>
+          <div role="heading" aria-level={3} className="font-['Outfit'] font-bold text-lg text-slate-900">{titulo}</div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"><IconClose size={18} /></button>
         </div>
         {children}
