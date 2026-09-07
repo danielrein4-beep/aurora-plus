@@ -442,6 +442,15 @@ public class HorecaService {
             throw new RuntimeException("La cantidad debe ser mayor a cero");
         }
 
+        // Venta de mostrador (Venta Rápida: RECOGER_EN_TIENDA) — el cliente se
+        // lleva el producto en el momento, no hay mesero ni cocinero con
+        // tablet relevando el KDS paso a paso. Estos ítems no entran al
+        // tablero de cocina: quedan ENTREGADO de una vez, igual que ya
+        // pasaba con los artículos de inventario vendidos directo. Las
+        // mesas (SALON/QR_MESA) y delivery sí siguen el flujo normal de
+        // cocina, porque ahí el plato se prepara mientras el cliente espera.
+        boolean esVentaDeMostrador = "RECOGER_EN_TIENDA".equals(comanda.getCanal());
+
         ItemComanda item = new ItemComanda();
         item.setTenantId(tenantId);
         item.setComanda(comanda);
@@ -463,7 +472,7 @@ public class HorecaService {
             item.setEstacionCocina(escandallo.getEstacionCocina());
             item.setPrecioUnitario(escandallo.getPrecioVenta() != null ? escandallo.getPrecioVenta() : precioUnitario);
             item.setCostoUnitario(costoTotalConsumido.divide(cantidad, 4, RoundingMode.HALF_UP));
-            item.setEstadoItem(ItemComanda.EstadoItem.PENDIENTE);
+            item.setEstadoItem(esVentaDeMostrador ? ItemComanda.EstadoItem.ENTREGADO : ItemComanda.EstadoItem.PENDIENTE);
         } else if (articuloId != null) {
             Articulo articulo = articuloRepository.findById(articuloId)
                 .orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
@@ -492,7 +501,7 @@ public class HorecaService {
             item.setNombrePlato(nombrePlato);
             item.setEstacionCocina(estacionCocina);
             item.setPrecioUnitario(precioUnitario);
-            item.setEstadoItem(ItemComanda.EstadoItem.PENDIENTE);
+            item.setEstadoItem(esVentaDeMostrador ? ItemComanda.EstadoItem.ENTREGADO : ItemComanda.EstadoItem.PENDIENTE);
         }
 
         ItemComanda guardado = itemComandaRepository.save(item);
