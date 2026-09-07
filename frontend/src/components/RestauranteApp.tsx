@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import {
   IconRestaurant, IconCustomize, IconUsers, IconUser, IconHourglass, IconCard, IconFileText,
   IconCheck, IconTrash, IconRefresh, IconCheckCircle, IconWarning, IconSearch, IconClose,
-  IconBolt, IconBank, IconChart, IconDownload, IconLock,
+  IconBolt, IconBank, IconChart, IconDownload, IconLock, IconRocket,
 } from "../Icons";
 import * as XLSX from "xlsx";
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
@@ -25,7 +25,7 @@ import {
   type ItemImportacionArticulo, type ResultadoImportacionArticulos, type Cliente, type MetricasCliente,
 } from "../api";
 
-type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "inventario" | "clientes" | "administracion" | "reportes" | "configuracion";
+type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
 
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
@@ -53,6 +53,7 @@ const NAV_GRUPOS: NavGrupo[] = [
       { id: "clientes", label: "Clientes", Icon: IconUser },
       { id: "administracion", label: "Administración", Icon: IconBank },
       { id: "reportes", label: "Reportes Operativos", Icon: IconChart },
+      { id: "estadisticas", label: "Estadísticas", Icon: IconRocket },
       { id: "configuracion", label: "Configuración", Icon: IconCustomize },
     ],
   },
@@ -388,6 +389,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "inventario" && <Inventario tenantId={tenantId} articulos={articulos} onCambio={recargarTodo} />}
           {pagina === "clientes" && <Clientes tenantId={tenantId} />}
           {pagina === "administracion" && <Administracion tenantId={tenantId} />}
+          {pagina === "estadisticas" && <ResumenFinanciero tenantId={tenantId} />}
           {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
         </div>
@@ -3625,13 +3627,12 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
 // ADMINISTRACIÓN — ingresos/gastos + cuentas x cobrar/pagar + cierre de caja, unidos
 // ══════════════════════════════════════════════════════════════════════════
 function Administracion({ tenantId }: { tenantId: number }) {
-  const [tab, setTab] = useState<"financiero" | "turnos" | "finanzas" | "cuentas" | "cierre" | "resumen">("financiero");
+  const [tab, setTab] = useState<"turnos" | "finanzas" | "cuentas" | "cierre" | "resumen">("turnos");
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit flex-wrap">
         {[
-          { id: "financiero", label: "Resumen Financiero" },
           { id: "turnos", label: "Control de Caja (Turnos)" },
           { id: "finanzas", label: "Ingresos & Gastos" },
           { id: "cuentas", label: "Cuentas x Cobrar/Pagar" },
@@ -3645,7 +3646,6 @@ function Administracion({ tenantId }: { tenantId: number }) {
         ))}
       </div>
 
-      {tab === "financiero" && <ResumenFinanciero tenantId={tenantId} />}
       {tab === "turnos" && <TurnosCaja tenantId={tenantId} />}
       {tab === "finanzas" && <Finanzas tenantId={tenantId} />}
       {tab === "cuentas" && <CuentasPorCobrarPagar tenantId={tenantId} />}
