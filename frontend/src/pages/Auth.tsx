@@ -6,9 +6,17 @@ import { useAuth } from "../context/AuthContext";
 
 type Mode = "login" | "register";
 
+const REMEMBERED_EMAIL_KEY = "aurora_remembered_email";
+
 export default function Auth() {
   const [mode, setMode] = useState<Mode>("login");
-  const [form, setForm] = useState({ nombre: "", email: "", password: "", confirmar: "", remember: true, terms: true });
+  const [form, setForm] = useState(() => {
+    let email = "";
+    try {
+      email = localStorage.getItem(REMEMBERED_EMAIL_KEY) || "";
+    } catch {}
+    return { nombre: "", email, password: "", confirmar: "", remember: true, terms: true };
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [enviando, setEnviando] = useState(false);
   const navigate = useNavigate();
@@ -41,6 +49,11 @@ export default function Auth() {
         // recogen los datos básicos y se pasan a la siguiente pantalla.
         navigate("/onboarding", { state: { nombre: form.nombre, email: form.email, password: form.password } });
       } else {
+        if (form.remember) {
+          try { localStorage.setItem(REMEMBERED_EMAIL_KEY, form.email); } catch {}
+        } else {
+          try { localStorage.removeItem(REMEMBERED_EMAIL_KEY); } catch {}
+        }
         await login(form.email, form.password);
         navigate("/dashboard");
       }

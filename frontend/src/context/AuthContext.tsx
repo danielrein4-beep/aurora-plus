@@ -1,5 +1,14 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { leerSesion, borrarSesion, loginDirecto, registrarNegocio, obtenerMiNegocio, type RegistroNegocio } from "../api";
+import {
+  leerSesion,
+  guardarSesion,
+  borrarSesion,
+  loginDirecto,
+  registrarNegocio,
+  obtenerMiNegocio,
+  type RegistroNegocio,
+  type SesionAurora,
+} from "../api";
 
 export interface PaymentRecord {
   id: string;
@@ -30,6 +39,20 @@ export interface User {
   payments?: PaymentRecord[];
 }
 
+export interface CuentaRegistrada {
+  email: string;
+  password?: string;
+  nombre: string;
+  empresa: string;
+  industry: string;
+  moduloPrincipal: string;
+  tenantId: number;
+  rol: string;
+  modules?: string[];
+  metodoPagoPreferido?: string;
+  fechaRegistro: string;
+}
+
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
@@ -46,6 +69,24 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const STORAGE_KEY = "aurora_session_user";
 const VISITADOS_KEY = "aurora_tenants_visitados";
+const CUENTAS_REGISTRADAS_KEY = "aurora_registered_accounts";
+
+function obtenerCuentasLocales(): CuentaRegistrada[] {
+  try {
+    const raw = localStorage.getItem(CUENTAS_REGISTRADAS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function guardarCuentaLocal(cuenta: CuentaRegistrada) {
+  try {
+    const cuentas = obtenerCuentasLocales().filter((c) => c.email.toLowerCase() !== cuenta.email.toLowerCase());
+    cuentas.push(cuenta);
+    localStorage.setItem(CUENTAS_REGISTRADAS_KEY, JSON.stringify(cuentas));
+  } catch {}
+}
 
 function haVisitadoTenant(tenantId: number): boolean {
   try {
@@ -108,6 +149,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let sesion: SesionAurora;
     let empresa = email;
     let industry = "clinica";
+    let nombreUsuario = email.includes("@") ? email.split("@")[0] : email;
+    let modulosUsuario: string[] = [];
+
+    // Buscar si existe en el registro local persistente
+    const cuentaLocal = obtenerCuentasLocales().find((c) => c.email.toLowerCase() === email.toLowerCase());
+
     try {
       sesion = await loginDirecto(email, password);
       try {
@@ -115,27 +162,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         empresa = negocio.nombreEmpresa || empresa;
         industry = MODULO_A_INDUSTRIA[negocio.moduloPrincipal] || "clinica";
       } catch {
-        // Si mi-negocio falla igual dejamos entrar
+        // Si mi-negocio falla usamos datos de la cuenta local si existen
+        if (cuentaLocal) {
+          empresa = cuentaLocal.empresa || empresa;
+          industry = cuentaLocal.industry || industry;
+          nombreUsuario = cuentaLocal.nombre || nombreUsuario;
+          modulosUsuario = cuentaLocal.modules || [];
+        }
       }
     } catch (e) {
       console.warn("Backend local no disponible o proxy 502, activando sesión dev local:", e);
+      if (cuentaLocal) {
+        empresa = cuentaLocal.empresa || empresa;
+        industry = cuentaLocal.industry || industry;
+        nombreUsuario = cuentaLocal.nombre || nombreUsuario;
+        modulosUsuario = cuentaLocal.modules || [];
+      }
       sesion = {
         token: `dev-session-${Date.now()}`,
-        rol: "MEDICO",
+        rol: cuentaLocal?.rol || "MEDICO",
         username: email,
-        tenantId: 1,
+        tenantId: cuentaLocal?.tenantId || 1,
       };
       guardarSesion(sesion);
     }
 
     setUser({
       email: sesion.username,
-      nombre: sesion.username.includes("@") ? sesion.username.split("@")[0] : sesion.username,
+      nombre: nombreUsuario,
       empresa,
       industry,
       tenantId: sesion.tenantId,
       rol: sesion.rol,
-      modules: [],
+      modules: modulosUsuario,
       hasCompletedOnboarding: true,
       primerIngreso: !haVisitadoTenant(sesion.tenantId),
       trialStart: new Date().toISOString(),
@@ -162,9 +221,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const industry = MODULO_A_INDUSTRIA[datos.moduloPrincipal] || "clinica";
+    const nombreUsuario = datos.username?.includes("@") ? datos.username.split("@")[0] : datos.username || "Usuario";
+
+    // Guardar cuenta registrada localmente para que sea recordada siempre en futuros inicios de sesión
+    guardarCuentaLocal({
+      email: datos.emailContacto || datos.username,
+      password: datos.password,
+      nombre: nombreUsuario,
+      empresa: datos.nombreEmpresa || "Clínica & Consultorios Médicos",
+      industry,
+      moduloPrincipal: datos.moduloPrincipal || "salud",
+      tenantId: sesion.tenantId,
+      rol: sesion.rol || "MEDICO",
+      modules: datos.modules || [],
+      metodoPagoPreferido: datos.metodoPagoPreferido,
+      fechaRegistro: new Date().toISOString(),
+    });
+
     setUser({
       email: sesion.username,
-      nombre: sesion.username.includes("@") ? sesion.username.split("@")[0] : sesion.username,
+      nombre: nombreUsuario,
       empresa: datos.nombreEmpresa,
       industry,
       tenantId: sesion.tenantId,
