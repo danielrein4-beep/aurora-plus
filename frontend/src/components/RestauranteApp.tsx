@@ -2662,13 +2662,17 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
 }) {
   const [cantidad, setCantidad] = useState("");
   const [costoUnitario, setCostoUnitario] = useState(String(articulo.costoUnitario));
+  const [precioVenta, setPrecioVenta] = useState(String(articulo.precioVenta ?? 0));
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const margen = calcularMargen(Number(costoUnitario) || 0, Number(precioVenta) || 0);
+
   const guardar = async () => {
     if (!cantidad || Number(cantidad) <= 0) { setError("Indica la cantidad que llegó"); return; }
     if (!costoUnitario || Number(costoUnitario) < 0) { setError("El costo unitario es obligatorio"); return; }
+    if (!precioVenta || Number(precioVenta) <= 0) { setError("El precio de venta es obligatorio"); return; }
     setGuardando(true);
     setError(null);
     try {
@@ -2676,6 +2680,13 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
         cantidad: Number(cantidad), costoUnitario: Number(costoUnitario),
         motivo: "Reabastecimiento rápido", fechaVencimiento: fechaVencimiento || undefined,
       });
+      // El precio de venta no es parte del movimiento de stock — se actualiza
+      // aparte solo si cambió, así el reabastecimiento sirve también para
+      // corregir de una vez artículos que quedaron sin precio (ej. cargados
+      // por Excel sin esa columna).
+      if (Number(precioVenta) !== Number(articulo.precioVenta ?? 0)) {
+        await editarArticulo(tenantId, articulo.id, { precioVenta: Number(precioVenta) });
+      }
       onReabastecido();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo registrar la entrada");
@@ -2694,6 +2705,13 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
           <Campo label="Costo unitario $">
             <input value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
           </Campo>
+        </div>
+        <Campo label="Precio de venta $">
+          <input value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
+        </Campo>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-slate-500">Margen:</span>
+          <BadgeMargen margen={margen} />
         </div>
         <Campo label="Fecha de vencimiento (opcional)">
           <input value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} type="date" className="input-horeca" />
