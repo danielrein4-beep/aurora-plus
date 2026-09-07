@@ -1,8 +1,10 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Nav from "./Nav";
 import { AuroraGradientDef } from "./Icons";
 
 export default function Layout() {
+  const location = useLocation();
+
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 overflow-x-hidden">
       <AuroraGradientDef />
@@ -18,7 +20,9 @@ export default function Layout() {
       </div>
 
       <Nav />
-      <Outlet />
+      <div key={location.pathname} className="animate-page-enter">
+        <Outlet />
+      </div>
 
       {/* Footer */}
       <footer className="border-t border-slate-200/60 dark:border-white/5 py-12 px-4 sm:px-6 max-w-7xl mx-auto relative transition-colors duration-500">

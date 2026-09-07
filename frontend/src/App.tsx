@@ -14,6 +14,10 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 
+function AnimatedRoute({ children }: { children: React.ReactNode }) {
+  return <div className="animate-page-enter min-h-full w-full">{children}</div>;
+}
+
 function MediclinicPage() {
   const navigate = useNavigate();
   return <MediclinicApp onSalir={() => navigate("/dashboard")} />;
@@ -38,13 +42,13 @@ export default function App() {
               <Route path="/precios"    element={<Precios />} />
               <Route path="/nosotros"   element={<Nosotros />} />
             </Route>
-            {/* Auth + onboarding — full screen */}
-            <Route path="/auth"       element={<Auth />} />
-            <Route path="/onboarding" element={<Onboarding />} />
+            {/* Auth + onboarding — full screen con transiciones fluidas */}
+            <Route path="/auth"       element={<AnimatedRoute><Auth /></AnimatedRoute>} />
+            <Route path="/onboarding" element={<AnimatedRoute><Onboarding /></AnimatedRoute>} />
             {/* Protected — requiere sesión activa */}
-            <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/mediclinic" element={<ProtectedRoute><MediclinicPage /></ProtectedRoute>} />
-            <Route path="/restaurante" element={<ProtectedRoute><RestaurantePage /></ProtectedRoute>} />
+            <Route path="/dashboard"  element={<ProtectedRoute><AnimatedRoute><Dashboard /></AnimatedRoute></ProtectedRoute>} />
+            <Route path="/mediclinic" element={<ProtectedRoute><AnimatedRoute><MediclinicPage /></AnimatedRoute></ProtectedRoute>} />
+            <Route path="/restaurante" element={<ProtectedRoute><AnimatedRoute><RestaurantePage /></AnimatedRoute></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

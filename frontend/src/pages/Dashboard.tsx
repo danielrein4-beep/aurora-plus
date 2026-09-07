@@ -332,7 +332,7 @@ export default function Dashboard() {
 
         {/* ── PESTAÑA 1: LAUNCHER & ENTORNO DE LA VERTICAL (MEDICLINIC PRO) ── */}
         {activeTab === "vertical" && (
-          <div className="space-y-8">
+          <div key="vertical" className="animate-tab-enter space-y-8">
             
             {/* HERO LAUNCHER CARD — DISEÑO REDONDEADO Y ELEGANTE ESTILO APPLE LIQUID GLASS */}
             <div className="relative apple-glass rounded-[32px] p-6 sm:p-9 overflow-hidden shadow-2xl border border-teal-500/30 bg-gradient-to-br from-slate-900/95 via-[#0c1424]/95 to-slate-900/95 backdrop-blur-2xl">
@@ -581,7 +581,7 @@ export default function Dashboard() {
 
         {/* ── PESTAÑA 2: BILLING, FACTURACIÓN Y PAGOS ── */}
         {activeTab === "billing" && (
-          <div className="space-y-8">
+          <div key="billing" className="animate-tab-enter space-y-8">
             <div className="apple-glass rounded-3xl p-6 sm:p-8 space-y-6 text-left">
               <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-300/60 dark:border-white/10">
                 <div>
@@ -703,7 +703,7 @@ export default function Dashboard() {
 
         {/* ── PESTAÑA 3: EQUIPO Y ROLES ── */}
         {activeTab === "team" && (
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 space-y-6 text-left shadow-xl">
+          <div key="team" className="animate-tab-enter apple-glass rounded-3xl p-6 sm:p-8 space-y-6 text-left shadow-xl">
             <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-300/60 dark:border-white/10">
               <div>
                 <h3 className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">

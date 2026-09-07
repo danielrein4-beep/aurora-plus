@@ -372,38 +372,40 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           </div>
         </header>
 
-        <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-          {pagina === "general" && (
-            <VistaGeneral totalVentasHoy={totalVentasHoy} valorInventario={valorInventario} vencimientos={(lotesPorVencer || []).length}
-              onNavegar={irA}
-              tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
-              ventasHoy={ventasHoy} nombreLocal={config.nombreLocal} tasaValida={tasaValida}
-              onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
-              onRegistrarTasa={() => setBloqueoTasa("embebido")} />
-          )}
-          {pagina === "salon" && (esPremium("salon")
-            ? <BloqueoPremium modulo="Salón & Mesas" />
-            : tasaValida
-              ? <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
-                  escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
-              : (
-                <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
-                  <IconWarning size={28} />
-                  <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar el salón.</p>
-                </div>
-              )
-          )}
-          {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} />)}
-          {pagina === "recetas" && <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} onCambio={recargarTodo} />}
-          {pagina === "compras" && (
-            <ComprasProveedores tenantId={tenantId} proveedores={proveedores} articulos={articulos} onCambio={recargarTodo} />
-          )}
-          {pagina === "inventario" && <Inventario tenantId={tenantId} articulos={articulos} onCambio={recargarTodo} />}
-          {pagina === "clientes" && <Clientes tenantId={tenantId} />}
-          {pagina === "administracion" && <Administracion tenantId={tenantId} />}
-          {pagina === "estadisticas" && <ResumenFinanciero tenantId={tenantId} />}
-          {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
-          {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
+        <div className="flex-1 p-6 max-w-7xl w-full mx-auto">
+          <div key={pagina} className="animate-tab-enter space-y-6">
+            {pagina === "general" && (
+              <VistaGeneral totalVentasHoy={totalVentasHoy} valorInventario={valorInventario} vencimientos={(lotesPorVencer || []).length}
+                onNavegar={irA}
+                tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
+                ventasHoy={ventasHoy} nombreLocal={config.nombreLocal} tasaValida={tasaValida}
+                onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
+                onRegistrarTasa={() => setBloqueoTasa("embebido")} />
+            )}
+            {pagina === "salon" && (esPremium("salon")
+              ? <BloqueoPremium modulo="Salón & Mesas" />
+              : tasaValida
+                ? <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
+                    escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
+                : (
+                  <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
+                    <IconWarning size={28} />
+                    <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar el salón.</p>
+                  </div>
+                )
+            )}
+            {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} />)}
+            {pagina === "recetas" && <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} onCambio={recargarTodo} />}
+            {pagina === "compras" && (
+              <ComprasProveedores tenantId={tenantId} proveedores={proveedores} articulos={articulos} onCambio={recargarTodo} />
+            )}
+            {pagina === "inventario" && <Inventario tenantId={tenantId} articulos={articulos} onCambio={recargarTodo} />}
+            {pagina === "clientes" && <Clientes tenantId={tenantId} />}
+            {pagina === "administracion" && <Administracion tenantId={tenantId} />}
+            {pagina === "estadisticas" && <ResumenFinanciero tenantId={tenantId} />}
+            {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
+            {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
+          </div>
         </div>
       </main>
 
@@ -4348,8 +4350,8 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
 
 function Modal({ titulo, onClose, children, ancho }: { titulo: string; onClose: () => void; children: React.ReactNode; ancho?: string }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className={`apple-glass rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-white/15`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-smooth" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className={`apple-glass rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-white/15 animate-modal-enter`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white">{titulo}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"><IconClose size={18} /></button>

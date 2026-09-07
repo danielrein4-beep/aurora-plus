@@ -285,8 +285,8 @@ function ModalClaveDoctor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/75 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-md rounded-3xl p-6 sm:p-7 bg-white dark:bg-[#071a2e] border border-slate-200 dark:border-teal-500/30 text-slate-900 dark:text-white space-y-5 shadow-2xl transition-colors duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/75 backdrop-blur-md animate-fade-smooth">
+      <div className="relative w-full max-w-md rounded-3xl p-6 sm:p-7 bg-white dark:bg-[#071a2e] border border-slate-200 dark:border-teal-500/30 text-slate-900 dark:text-white space-y-5 shadow-2xl transition-colors duration-300 animate-modal-enter">
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-[#00FFC2] flex items-center justify-center border border-teal-500/20 dark:border-teal-500/30">
@@ -807,63 +807,65 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           />
         )}
 
-        <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-          {pagina === "general" && <VistaGeneral pacientes={pacientes} citasHoy={citasHoy} salaEspera={salaEspera} procedimientos={procedimientos} ingresosHoy={ingresosHoy} onNavegar={setPagina} />}
-          {pagina === "pacientes" && (
-            <GestionPacientes
-              tenantId={tenantId}
-              pacientes={pacientes}
-              onCambio={recargarTodo}
-              onNavegar={setPagina}
-              onSeleccionarPacienteParaConsulta={(id) => {
-                setPacienteSeleccionadoId(id);
-                setPagina("historias");
-              }}
-              onSeleccionarPacienteParaCotizacion={(id) => {
-                setPacienteSeleccionadoId(id);
-                setPagina("procedimientos");
-              }}
-            />
-          )}
-          {pagina === "historias" && (
-            <HistoriasClinicas
-              tenantId={tenantId}
-              pacientes={pacientes}
-              config={configPerfil}
-              rol={rolActivo}
-              pacienteInicialId={pacienteSeleccionadoId}
-            />
-          )}
-          {pagina === "procedimientos" && (
-            <Procedimientos
-              tenantId={tenantId}
-              procedimientos={procedimientos}
-              pacientes={pacientes}
-              config={configPerfil}
-              onCambio={recargarTodo}
-              pacienteInicialId={pacienteSeleccionadoId}
-            />
-          )}
-          {pagina === "sala-espera" && (
-            <SalaEspera
-              tenantId={tenantId}
-              pacientes={pacientes}
-              entradas={salaEspera}
-              cobrosLocales={cobrosLocales}
-              onAgregarCobro={agregarCobroLocal}
-              onAgregarCierre={agregarCierreAuditado}
-              onCambio={recargarTodo}
-              config={configPerfil}
-              onNavegar={setPagina}
-              onSeleccionarPacienteParaConsulta={(id) => {
-                setPacienteSeleccionadoId(id);
-                setPagina("historias");
-              }}
-            />
-          )}
-          {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} />}
-          {pagina === "financiero" && <ResumenesFinancieros ingresosHoy={ingresosHoy} citasHoy={citasHoy} cobrosLocales={cobrosLocales} historialCierres={historialCierres} config={configPerfil} />}
-          {pagina === "configuracion" && <Configuracion config={configPerfil} onGuardar={guardarConfigPerfil} user={user} />}
+        <div className="flex-1 p-6 max-w-7xl w-full mx-auto">
+          <div key={pagina} className="animate-tab-enter space-y-6">
+            {pagina === "general" && <VistaGeneral pacientes={pacientes} citasHoy={citasHoy} salaEspera={salaEspera} procedimientos={procedimientos} ingresosHoy={ingresosHoy} onNavegar={setPagina} />}
+            {pagina === "pacientes" && (
+              <GestionPacientes
+                tenantId={tenantId}
+                pacientes={pacientes}
+                onCambio={recargarTodo}
+                onNavegar={setPagina}
+                onSeleccionarPacienteParaConsulta={(id) => {
+                  setPacienteSeleccionadoId(id);
+                  setPagina("historias");
+                }}
+                onSeleccionarPacienteParaCotizacion={(id) => {
+                  setPacienteSeleccionadoId(id);
+                  setPagina("procedimientos");
+                }}
+              />
+            )}
+            {pagina === "historias" && (
+              <HistoriasClinicas
+                tenantId={tenantId}
+                pacientes={pacientes}
+                config={configPerfil}
+                rol={rolActivo}
+                pacienteInicialId={pacienteSeleccionadoId}
+              />
+            )}
+            {pagina === "procedimientos" && (
+              <Procedimientos
+                tenantId={tenantId}
+                procedimientos={procedimientos}
+                pacientes={pacientes}
+                config={configPerfil}
+                onCambio={recargarTodo}
+                pacienteInicialId={pacienteSeleccionadoId}
+              />
+            )}
+            {pagina === "sala-espera" && (
+              <SalaEspera
+                tenantId={tenantId}
+                pacientes={pacientes}
+                entradas={salaEspera}
+                cobrosLocales={cobrosLocales}
+                onAgregarCobro={agregarCobroLocal}
+                onAgregarCierre={agregarCierreAuditado}
+                onCambio={recargarTodo}
+                config={configPerfil}
+                onNavegar={setPagina}
+                onSeleccionarPacienteParaConsulta={(id) => {
+                  setPacienteSeleccionadoId(id);
+                  setPagina("historias");
+                }}
+              />
+            )}
+            {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} />}
+            {pagina === "financiero" && <ResumenesFinancieros ingresosHoy={ingresosHoy} citasHoy={citasHoy} cobrosLocales={cobrosLocales} historialCierres={historialCierres} config={configPerfil} />}
+            {pagina === "configuracion" && <Configuracion config={configPerfil} onGuardar={guardarConfigPerfil} user={user} />}
+          </div>
         </div>
       </main>
 
