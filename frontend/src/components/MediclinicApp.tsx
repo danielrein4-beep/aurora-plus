@@ -323,19 +323,23 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             <button
               type="button"
               onClick={abrirModalTasas}
-              className="text-xs text-right hidden sm:flex flex-col items-end px-3 py-1.5 rounded-xl border border-teal-500/30 dark:border-teal-400/30 hover:border-teal-500 bg-teal-500/10 dark:bg-teal-400/10 hover:bg-teal-500/20 transition-all cursor-pointer group shadow-xs"
-              title="Haz clic aquí para cambiar rápidamente las tasas de cambio (BCV / COP) de forma manual"
+              className="text-xs text-right hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-300/60 dark:border-white/10 hover:border-teal-500/50 hover:bg-teal-500/5 transition-all cursor-pointer group"
+              title="Cambiar tasas de cambio manualmente"
             >
-              <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <span>{configPerfil.doctorNombre}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/30 text-teal-700 dark:text-teal-200 group-hover:scale-105 transition-transform font-mono font-bold flex items-center gap-1">
-                  ✏️ Tasas
-                </span>
+              <div className="flex flex-col items-end">
+                <div className="font-bold text-slate-900 dark:text-white leading-tight">
+                  {configPerfil.doctorNombre}
+                </div>
+                <div className="text-[11px] text-teal-600 dark:text-teal-400 font-mono leading-tight mt-0.5">
+                  BCV: Bs. {Number(configPerfil.tasaBCV || 56.4).toFixed(2)} | COP: ${Number(configPerfil.tasaCOP || 4200).toLocaleString()}
+                </div>
               </div>
-              <div className="text-[11px] text-teal-700 dark:text-teal-300 font-mono flex items-center gap-1.5 mt-0.5 font-bold">
-                <span>BCV: <strong>Bs. {Number(configPerfil.tasaBCV || 56.4).toFixed(2)}</strong></span>
-                <span className="text-slate-400 dark:text-white/40">|</span>
-                <span>COP: <strong>${Number(configPerfil.tasaCOP || 4200).toLocaleString()}</strong></span>
+
+              {/* Lápiz minimalista sin texto */}
+              <div className="p-1.5 rounded-lg bg-slate-200/60 dark:bg-white/5 group-hover:bg-teal-500/20 text-slate-400 dark:text-white/40 group-hover:text-teal-600 dark:group-hover:text-teal-300 transition-all flex items-center justify-center">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                </svg>
               </div>
             </button>
 
