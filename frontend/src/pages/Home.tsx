@@ -153,17 +153,17 @@ export default function Home() {
               <svg className="w-[120%] h-[160%] max-w-none absolute pointer-events-none opacity-75 group-hover:opacity-100 transition-opacity duration-700" viewBox="0 0 900 300" fill="none">
                 <defs>
                   <linearGradient id="aurora-wave-grad-1" x1="0%" y1="50%" x2="100%" y2="50%">
-                    <stop offset="0%" stopColor="#00e5b8" stopOpacity="0.85" />
-                    <stop offset="35%" stopColor="#0ea5e9" stopOpacity="0.75" />
-                    <stop offset="70%" stopColor="#a855f7" stopOpacity="0.80" />
-                    <stop offset="100%" stopColor="#00f2fe" stopOpacity="0.90" />
+                    <stop offset="0%" stopColor="#00FFC2" stopOpacity="0.85" />
+                    <stop offset="40%" stopColor="#00C9A7" stopOpacity="0.80" />
+                    <stop offset="75%" stopColor="#008B8B" stopOpacity="0.85" />
+                    <stop offset="100%" stopColor="#0B3D91" stopOpacity="0.90" />
                   </linearGradient>
 
                   <linearGradient id="aurora-wave-grad-2" x1="100%" y1="50%" x2="0%" y2="50%">
-                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.8" />
-                    <stop offset="40%" stopColor="#6366f1" stopOpacity="0.7" />
-                    <stop offset="75%" stopColor="#00e5b8" stopOpacity="0.8" />
-                    <stop offset="100%" stopColor="#ff3b80" stopOpacity="0.6" />
+                    <stop offset="0%" stopColor="#0B3D91" stopOpacity="0.85" />
+                    <stop offset="35%" stopColor="#008B8B" stopOpacity="0.80" />
+                    <stop offset="70%" stopColor="#00C9A7" stopOpacity="0.85" />
+                    <stop offset="100%" stopColor="#00FFC2" stopOpacity="0.90" />
                   </linearGradient>
 
                   <filter id="aurora-blur-fluid" x="-20%" y="-20%" width="140%" height="140%">
@@ -418,7 +418,7 @@ export default function Home() {
                         onClick={() => setActiveHeroIndex(idx)}
                         aria-label={`Ver vertical ${idx + 1}`}
                         className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                          activeHeroIndex === idx ? "w-7 bg-teal-400 shadow-[0_0_12px_#00e5b8]" : "w-2 bg-slate-300 dark:bg-white/20 hover:bg-slate-400 dark:hover:bg-white/40"
+                          activeHeroIndex === idx ? "w-7 bg-[#00FFC2] shadow-[0_0_12px_#00FFC2]" : "w-2 bg-slate-300 dark:bg-white/20 hover:bg-slate-400 dark:hover:bg-white/40"
                         }`}
                       />
                     ))}
