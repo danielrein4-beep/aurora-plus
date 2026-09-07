@@ -4,6 +4,7 @@ import com.auroraplus.core.inventario.entities.Articulo;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "items_comanda")
@@ -59,6 +60,13 @@ public class ItemComanda {
     @Column(name = "costo_unitario", precision = 18, scale = 4)
     private BigDecimal costoUnitario;
 
+    // Para el temporizador visual del KDS (verde/amarillo/rojo según minutos
+    // esperando) — antes no existía ningún registro de cuándo entró el plato.
+    // columnDefinition con default: sin esto, el ALTER TABLE sobre una tabla
+    // con filas existentes revienta (NOT NULL sin valor para lo ya cargado).
+    @Column(name = "fecha_creacion", nullable = false, columnDefinition = "timestamp default now()")
+    private LocalDateTime fechaCreacion = LocalDateTime.now();
+
     public enum EstadoItem { PENDIENTE, PREPARANDO, LISTO, ENTREGADO }
 
     public Long getId() { return id; }
@@ -83,4 +91,6 @@ public class ItemComanda {
     public void setArticulo(Articulo articulo) { this.articulo = articulo; }
     public BigDecimal getCostoUnitario() { return costoUnitario; }
     public void setCostoUnitario(BigDecimal costoUnitario) { this.costoUnitario = costoUnitario; }
+    public LocalDateTime getFechaCreacion() { return fechaCreacion; }
+    public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
 }

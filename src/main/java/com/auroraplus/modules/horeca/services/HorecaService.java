@@ -472,7 +472,8 @@ public class HorecaService {
             item.setEstacionCocina(escandallo.getEstacionCocina());
             item.setPrecioUnitario(escandallo.getPrecioVenta() != null ? escandallo.getPrecioVenta() : precioUnitario);
             item.setCostoUnitario(costoTotalConsumido.divide(cantidad, 4, RoundingMode.HALF_UP));
-            item.setEstadoItem(esVentaDeMostrador ? ItemComanda.EstadoItem.ENTREGADO : ItemComanda.EstadoItem.PENDIENTE);
+            boolean saltaCocina = esVentaDeMostrador || !Boolean.TRUE.equals(escandallo.getRequiereCocina());
+            item.setEstadoItem(saltaCocina ? ItemComanda.EstadoItem.ENTREGADO : ItemComanda.EstadoItem.PENDIENTE);
         } else if (articuloId != null) {
             Articulo articulo = articuloRepository.findById(articuloId)
                 .orElseThrow(() -> new RuntimeException("Artículo no encontrado"));

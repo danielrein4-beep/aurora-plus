@@ -38,6 +38,13 @@ public class EscandalloReceta {
     @Column(nullable = false, columnDefinition = "boolean default true")
     private Boolean activo = true;
 
+    // false para lo que no necesita preparación de cocina (bebida embotellada,
+    // snack, combo armado sin cocción) — esos ítems no generan ticket en el
+    // KDS ni esperan por "Preparando/Listo": quedan ENTREGADO de una vez,
+    // igual que ya pasa con las ventas de mostrador.
+    @Column(name = "requiere_cocina", nullable = false, columnDefinition = "boolean default true")
+    private Boolean requiereCocina = true;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -52,6 +59,8 @@ public class EscandalloReceta {
     public void setPrecioVenta(BigDecimal precioVenta) { this.precioVenta = precioVenta; }
     public Boolean getActivo() { return activo; }
     public void setActivo(Boolean activo) { this.activo = activo; }
+    public Boolean getRequiereCocina() { return requiereCocina; }
+    public void setRequiereCocina(Boolean requiereCocina) { this.requiereCocina = requiereCocina; }
 
     @Transient
     public BigDecimal getMargenContribucion() {

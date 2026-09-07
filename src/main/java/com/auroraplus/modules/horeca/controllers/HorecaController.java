@@ -3,6 +3,7 @@ package com.auroraplus.modules.horeca.controllers;
 import com.auroraplus.modules.horeca.entities.Comanda;
 import com.auroraplus.modules.horeca.entities.ItemComanda;
 import com.auroraplus.modules.horeca.repositories.ItemComandaRepository;
+import com.auroraplus.modules.horeca.services.ComandaEscPosService;
 import com.auroraplus.modules.horeca.services.ComandaPdfService;
 import com.auroraplus.modules.horeca.services.HorecaService;
 import com.auroraplus.modules.horeca.services.ResultadoCobroMixto;
@@ -29,6 +30,9 @@ public class HorecaController {
 
     @Autowired
     private ComandaPdfService comandaPdfService;
+
+    @Autowired
+    private ComandaEscPosService comandaEscPosService;
 
     @PostMapping("/comandas/abrir")
     public ResponseEntity<Comanda> abrirComanda(
@@ -140,5 +144,23 @@ public class HorecaController {
             .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"ticket-" + identificador + ".pdf\"")
             .contentType(MediaType.APPLICATION_PDF)
             .body(pdf);
+    }
+
+    /**
+     * Mismo ticket, pero como comandos ESC/POS crudos en vez de PDF — para
+     * enviarlo directo a una impresora térmica por Web Serial/WebUSB desde el
+     * navegador, sin pasar por el diálogo de impresión del sistema operativo.
+     */
+    @GetMapping(value = "/comandas/{comandaId}/ticket-escpos", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public ResponseEntity<byte[]> ticketEscPos(@PathVariable Long comandaId, @RequestParam Long tenantId) throws Exception {
+        Comanda comanda = horecaService.obtenerComanda(comandaId);
+        if (!comanda.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Comanda no pertenece a este tenant");
+        }
+        List<ItemComanda> items = itemComandaRepository.findByComandaId(comandaId);
+        byte[] bytesEscPos = comandaEscPosService.generarTicket(comanda, items);
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .body(bytesEscPos);
     }
 }

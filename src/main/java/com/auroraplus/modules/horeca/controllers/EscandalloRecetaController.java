@@ -56,6 +56,7 @@ public class EscandalloRecetaController {
         public String nombrePlato;
         public String estacionCocina;
         public BigDecimal precioVenta;
+        public Boolean requiereCocina;
     }
 
     @PostMapping
@@ -66,6 +67,7 @@ public class EscandalloRecetaController {
         escandallo.setEstacionCocina(request.estacionCocina != null ? request.estacionCocina : "COCINA");
         escandallo.setPrecioVenta(request.precioVenta);
         escandallo.setCostoTotalProduccion(BigDecimal.ZERO);
+        escandallo.setRequiereCocina(request.requiereCocina == null || request.requiereCocina);
         return ResponseEntity.ok(escandalloRecetaRepository.save(escandallo));
     }
 
@@ -180,6 +182,18 @@ public class EscandalloRecetaController {
             throw new RuntimeException("Violación de seguridad: Escandallo no pertenece a este tenant");
         }
         escandallo.setActivo(activo);
+        return ResponseEntity.ok(escandalloRecetaRepository.save(escandallo));
+    }
+
+    /** Define si este producto pasa por el tablero de cocina (KDS) o se entrega de una vez (bebida embotellada, snack, combo sin cocción). */
+    @PatchMapping("/{id}/requiere-cocina")
+    public ResponseEntity<EscandalloReceta> cambiarRequiereCocina(@PathVariable Long id, @RequestParam Long tenantId, @RequestParam boolean requiereCocina) {
+        EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
+        if (!escandallo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Escandallo no pertenece a este tenant");
+        }
+        escandallo.setRequiereCocina(requiereCocina);
         return ResponseEntity.ok(escandalloRecetaRepository.save(escandallo));
     }
 }

@@ -7,11 +7,11 @@ import {
 import { useAuth } from "../context/AuthContext";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
-  dividirCuenta, cerrarComandaMixto, listarEscandallos, crearEscandallo, eliminarEscandallo, cambiarActivoEscandallo, agregarIngredienteEscandallo,
+  dividirCuenta, cerrarComandaMixto, listarEscandallos, crearEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo,
   listarIngredientesEscandallo, listarFastBar, crearTragoFastBar, venderTragoRapido,
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   editarArticulo, ajustarStockArticulo, eliminarArticulo,
-  registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda,
+  registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
   tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
   cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria,
   type Mesa, type MapaMesaEntrada, type Comanda, type ItemComanda, type EstadoItemComanda,
@@ -142,6 +142,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
   const [ventaRapidaAbierta, setVentaRapidaAbierta] = useState(false);
+  const [bloqueoTasa, setBloqueoTasa] = useState<"salon" | "ventarapida" | null>(null);
 
   const [config, setConfig] = useState(() => {
     try {
@@ -230,6 +231,14 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const mesasOcupadas = (mapa || []).filter((m) => m.estado === "OCUPADA").length;
   const comandasAbiertas = (mapa || []).filter((m) => m.comandaAbierta).length;
 
+  // Sin tasa BCV del día, un cobro mixto en Bs o el total bimoneda del
+  // carrito estarían calculando con una tasa vencida o en cero — bloquea
+  // Venta Rápida y Salón hasta que se registre, en vez de dejar operar con
+  // números que no cuadran.
+  const tasaValida = tasaBcv != null && Number(tasaBcv.tasa) > 0;
+  const irASalon = () => { if (!tasaValida) { setBloqueoTasa("salon"); return; } setPagina("salon"); };
+  const abrirVentaRapida = () => { if (!tasaValida) { setBloqueoTasa("ventarapida"); return; } setVentaRapidaAbierta(true); };
+
   return (
     <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "horeca-clasico" : ""}`}>
       {modoClasico && <EstiloClasico />}
@@ -254,7 +263,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                 return (
                   <button
                     key={n.id}
-                    onClick={() => (n.id === "ventarapida" ? setVentaRapidaAbierta(true) : setPagina(n.id))}
+                    onClick={() => (n.id === "ventarapida" ? abrirVentaRapida() : n.id === "salon" ? irASalon() : setPagina(n.id))}
                     className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                       pagina === n.id
                         ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 shadow-sm"
@@ -325,10 +334,11 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
         <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
           {pagina === "general" && (
             <VistaGeneral mesasOcupadas={mesasOcupadas} totalMesas={(mapa || []).length} comandasAbiertas={comandasAbiertas}
-              totalVentasHoy={totalVentasHoy} kdsCounts={kdsCounts} vencimientos={(lotesPorVencer || []).length} onNavegar={setPagina}
-              onVentaRapida={() => setVentaRapidaAbierta(true)} />
+              totalVentasHoy={totalVentasHoy} kdsCounts={kdsCounts} vencimientos={(lotesPorVencer || []).length}
+              onNavegar={(p) => (p === "salon" ? irASalon() : setPagina(p))}
+              onVentaRapida={abrirVentaRapida} />
           )}
-          {pagina === "salon" && (
+          {pagina === "salon" && tasaValida && (
             <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
               escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
           )}
@@ -341,16 +351,88 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "inventario" && <Inventario tenantId={tenantId} articulos={articulos} onCambio={recargarTodo} />}
           {pagina === "administracion" && <Administracion tenantId={tenantId} />}
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
+          {pagina === "salon" && !tasaValida && (
+            <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
+              <IconWarning size={28} />
+              <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar el salón.</p>
+              <button onClick={() => setBloqueoTasa("salon")} className="g-aurora text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer">
+                Registrar tasa ahora
+              </button>
+            </div>
+          )}
         </div>
       </main>
 
       {ventaRapidaAbierta && (
         <Modal onClose={() => setVentaRapidaAbierta(false)} titulo="Venta Rápida" ancho="max-w-4xl">
-          <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos}
+          <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv}
             onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }} />
         </Modal>
       )}
+
+      {bloqueoTasa && (
+        <ModalTasaRequerida
+          tenantId={tenantId}
+          destino={bloqueoTasa}
+          onCancelar={() => setBloqueoTasa(null)}
+          onRegistrada={() => {
+            const destino = bloqueoTasa;
+            setBloqueoTasa(null);
+            recargarTodo();
+            if (destino === "salon") setPagina("salon");
+            if (destino === "ventarapida") setVentaRapidaAbierta(true);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/** Bloquea Venta Rápida/Salón hasta que se registre la tasa BCV del día — sin tasa, un cobro en Bs o el total bimoneda calcularían con un número vencido o en cero. */
+function ModalTasaRequerida({ tenantId, destino, onCancelar, onRegistrada }: {
+  tenantId: number; destino: "salon" | "ventarapida"; onCancelar: () => void; onRegistrada: () => void;
+}) {
+  const [tasa, setTasa] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const guardar = async () => {
+    const valor = Number(tasa);
+    if (!valor || valor <= 0) { setError("Ingresa una tasa válida mayor a cero"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: valor, origen: "MANUAL" });
+      onRegistrada();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar la tasa");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onCancelar} titulo="Tasa BCV requerida">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-amber-500/15 text-amber-500 flex items-center justify-center flex-shrink-0"><IconWarning size={20} /></div>
+          <p className="text-sm text-slate-600 dark:text-white/70">
+            No hay tasa BCV registrada hoy (o es $0). {destino === "salon" ? "El salón" : "Venta Rápida"} necesita una tasa vigente para calcular
+            el total en bolívares y el vuelto en cualquier cobro mixto — regístrala para continuar.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500 dark:text-white/40 whitespace-nowrap">1 USD =</span>
+          <input value={tasa} onChange={(e) => setTasa(e.target.value)} type="number" step="0.01" min="0" placeholder="Ej. 56.40"
+            className="input-horeca flex-1" autoFocus onKeyDown={(e) => e.key === "Enter" && guardar()} />
+          <span className="text-xs font-semibold text-slate-500 dark:text-white/40">Bs</span>
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <button onClick={guardar} disabled={guardando} className="w-full btn-cyber-neon text-white text-sm font-bold py-3 rounded-xl cursor-pointer disabled:opacity-60">
+          {guardando ? "Guardando…" : "Registrar tasa y continuar"}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
@@ -1195,11 +1277,24 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
 function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void }) {
   const [estacion, setEstacion] = useState(ESTACIONES[0]);
   const [items, setItems] = useState<ItemComanda[] | null>(null);
+  const [ahora, setAhora] = useState(() => Date.now());
 
   const cargar = () => {
     obtenerTableroKds(tenantId, estacion).then(setItems).catch(() => setItems([]));
   };
   useEffect(() => { cargar(); }, [estacion, tenantId]);
+  // Repinta el temporizador de cada tarjeta sin tener que re-consultar el backend.
+  useEffect(() => {
+    const id = setInterval(() => setAhora(Date.now()), 15000);
+    return () => clearInterval(id);
+  }, []);
+
+  const minutosEnEspera = (item: ItemComanda) => Math.max(0, Math.floor((ahora - new Date(item.fechaCreacion).getTime()) / 60000));
+  const estiloPorTiempo = (min: number) =>
+    min >= 10 ? "bg-red-500/15 border border-red-500/40 hover:bg-red-500/25"
+    : min >= 5 ? "bg-amber-500/15 border border-amber-500/40 hover:bg-amber-500/25"
+    : "bg-slate-100/60 dark:bg-white/5 border border-transparent hover:bg-teal-500/10";
+  const colorTexto = (min: number) => (min >= 10 ? "text-red-600 dark:text-red-300" : min >= 5 ? "text-amber-600 dark:text-amber-300" : "text-slate-500 dark:text-white/40");
 
   const avanzar = async (item: ItemComanda) => {
     const siguiente: Record<EstadoItemComanda, EstadoItemComanda | null> = {
@@ -1240,12 +1335,18 @@ function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void
               <h4 className="font-bold text-sm text-slate-900 dark:text-white">{col.label}</h4>
               {items.filter((i) => i.estadoItem === col.estado).length === 0 ? (
                 <p className="text-xs text-slate-400">Sin platos</p>
-              ) : items.filter((i) => i.estadoItem === col.estado).map((i) => (
-                <button key={i.id} onClick={() => avanzar(i)} className="w-full text-left bg-slate-100/60 dark:bg-white/5 rounded-xl p-3 hover:bg-teal-500/10 cursor-pointer transition-all">
-                  <div className="font-semibold text-sm text-slate-900 dark:text-white">{i.cantidad}× {i.nombrePlato}</div>
-                  <div className="text-[10px] text-slate-500 dark:text-white/40 mt-1">Toca para avanzar →</div>
-                </button>
-              ))}
+              ) : items.filter((i) => i.estadoItem === col.estado).map((i) => {
+                const min = minutosEnEspera(i);
+                return (
+                  <button key={i.id} onClick={() => avanzar(i)} title="Toca para avanzar de estado"
+                    className={`w-full text-left rounded-xl p-3 cursor-pointer transition-all ${estiloPorTiempo(min)}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-semibold text-sm text-slate-900 dark:text-white">{i.cantidad}× {i.nombrePlato}</div>
+                      <div className={`text-[10px] font-mono font-bold whitespace-nowrap ${colorTexto(min)}`}>{min} min</div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -1259,7 +1360,7 @@ function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void
 // ══════════════════════════════════════════════════════════════════════════
 function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: number; escandallos: EscandalloReceta[] | null; articulos: Articulo[] | null; onCambio: () => void }) {
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ nombrePlato: "", estacionCocina: "COCINA", precioVenta: "" });
+  const [form, setForm] = useState({ nombrePlato: "", estacionCocina: "COCINA", precioVenta: "", requiereCocina: true });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seleccionado, setSeleccionado] = useState<EscandalloReceta | null>(null);
@@ -1302,14 +1403,28 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
     setGuardando(true);
     setError(null);
     try {
-      await crearEscandallo(tenantId, { nombrePlato: form.nombrePlato.trim(), estacionCocina: form.estacionCocina, precioVenta: Number(form.precioVenta) });
-      setForm({ nombrePlato: "", estacionCocina: "COCINA", precioVenta: "" });
+      await crearEscandallo(tenantId, { nombrePlato: form.nombrePlato.trim(), estacionCocina: form.estacionCocina, precioVenta: Number(form.precioVenta), requiereCocina: form.requiereCocina });
+      setForm({ nombrePlato: "", estacionCocina: "COCINA", precioVenta: "", requiereCocina: true });
       setMostrarForm(false);
       onCambio();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo crear la receta");
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const alternarRequiereCocina = async (e: React.MouseEvent, escandallo: EscandalloReceta) => {
+    e.stopPropagation();
+    setEliminandoId(escandallo.id);
+    setError(null);
+    try {
+      await cambiarRequiereCocinaEscandallo(tenantId, escandallo.id, !escandallo.requiereCocina);
+      onCambio();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar la receta");
+    } finally {
+      setEliminandoId(null);
     }
   };
 
@@ -1331,6 +1446,10 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
             </select>
             <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" placeholder="Precio de venta $" className="input-horeca" />
           </div>
+          <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-white/60 cursor-pointer w-fit">
+            <input type="checkbox" checked={form.requiereCocina} onChange={(e) => setForm({ ...form, requiereCocina: e.target.checked })} className="cursor-pointer" />
+            Necesita preparación de cocina (desmarcar para bebida embotellada, snack o combo sin cocción)
+          </label>
           <button onClick={crear} disabled={guardando} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
             {guardando ? "Guardando…" : "Guardar receta"}
           </button>
@@ -1368,6 +1487,13 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
               <div className={`text-xs font-semibold ${margen >= 0 ? "text-teal-600 dark:text-teal-400" : "text-red-500"}`}>
                 Margen: ${margen.toFixed(2)}
               </div>
+              <button onClick={(ev) => alternarRequiereCocina(ev, e)} disabled={eliminandoId === e.id}
+                title="Si se desmarca, esta venta no pasa por el tablero de cocina — queda entregada de una vez"
+                className={`text-[10px] font-bold px-2 py-1 rounded-full cursor-pointer disabled:opacity-40 ${
+                  e.requiereCocina !== false ? "bg-sky-500/15 text-sky-600 dark:text-sky-300" : "bg-slate-200/60 dark:bg-white/10 text-slate-500 dark:text-white/40"
+                }`}>
+                {e.requiereCocina !== false ? "🍳 Pasa por cocina" : "⚡ Entrega directa"}
+              </button>
             </div>
           );
         })}
@@ -2161,9 +2287,9 @@ function TasasDeCambio({ tenantId }: { tenantId: number }) {
 // ══════════════════════════════════════════════════════════════════════════
 // VENTA RÁPIDA — para lo que no pasa por una mesa (mostrador, para llevar)
 // ══════════════════════════════════════════════════════════════════════════
-function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
+function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVenta }: {
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
-  onVenta: (monto: number, metodo: string) => void;
+  tasaBcv: TasaCambio | null; onVenta: (monto: number, metodo: string) => void;
 }) {
   interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
   interface ReciboVenta { comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string }
@@ -2174,6 +2300,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
 
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
   const [busqueda, setBusqueda] = useState("");
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
   const [seleccion, setSeleccion] = useState<ResultadoBusqueda | null>(null);
   const [cantidadManual, setCantidadManual] = useState("1");
   const [precioManual, setPrecioManual] = useState("");
@@ -2181,29 +2308,51 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
   const [error, setError] = useState<string | null>(null);
   const [recibo, setRecibo] = useState<ReciboVenta | null>(null);
   const [abriendoTicket, setAbriendoTicket] = useState(false);
+  const [imprimiendoEscPos, setImprimiendoEscPos] = useState(false);
   const [moneda, setMoneda] = useState("USD");
+  const busquedaRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => { monedaBase(tenantId).then(setMoneda).catch(() => setMoneda("USD")); }, [tenantId]);
+  // Auto-focus para que un escáner de código de barras (que solo "teclea"
+  // rápido + Enter) pueda disparar sin que el cajero tenga que hacer clic.
+  useEffect(() => { busquedaRef.current?.focus(); }, []);
+
+  const categorias = useMemo(() => Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).sort(), [articulos]);
 
   // Un solo buscador para recetas, tragos de Fast-Bar y artículos de
   // inventario — antes las recetas aparecían como botones sueltos arriba,
-  // duplicando la forma de encontrar lo mismo.
+  // duplicando la forma de encontrar lo mismo. También matchea por SKU (lo
+  // que efectivamente lee un escáner de código de barras), priorizando el
+  // match exacto de SKU arriba del todo.
   const resultadosBusqueda = useMemo(() => {
-    if (seleccion || !busqueda.trim()) return [];
+    if (seleccion) return [];
     const q = busqueda.trim().toLowerCase();
-    const recetas: ResultadoBusqueda[] = (escandallos || [])
+    if (!q && !categoriaFiltro) return [];
+    const dentroCategoria = (a: Articulo) => !categoriaFiltro || (a.categoria || "General") === categoriaFiltro;
+    const recetas: ResultadoBusqueda[] = categoriaFiltro ? [] : (escandallos || [])
       .filter((e) => e.activo !== false && e.nombrePlato.toLowerCase().includes(q))
       .map((e) => ({ tipo: "receta", id: e.id, nombre: e.nombrePlato, precioVenta: Number(e.precioVenta), estacionCocina: e.estacionCocina }));
-    const tragos: ResultadoBusqueda[] = (fastbar || [])
+    const tragos: ResultadoBusqueda[] = categoriaFiltro ? [] : (fastbar || [])
       .filter((t) => t.nombreTrago.toLowerCase().includes(q))
       .map((t) => ({ tipo: "fastbar", id: t.id, nombre: t.nombreTrago, precioVenta: Number(t.precioVenta) }));
     const insumos: ResultadoBusqueda[] = (articulos || [])
-      .filter((a) => a.nombre.toLowerCase().includes(q))
+      .filter((a) => dentroCategoria(a) && (a.nombre.toLowerCase().includes(q) || a.sku.toLowerCase().includes(q)))
+      .sort((a, b) => Number(b.sku.toLowerCase() === q) - Number(a.sku.toLowerCase() === q))
       .map((a) => ({ tipo: "articulo", id: a.id, nombre: a.nombre, unidadMedida: a.unidadMedida || "unidad", stockActual: Number(a.stockActual), costoUnitario: Number(a.costoUnitario) }));
-    return [...recetas, ...tragos, ...insumos].slice(0, 8);
-  }, [busqueda, seleccion, escandallos, fastbar, articulos]);
+    return [...recetas, ...tragos, ...insumos].slice(0, categoriaFiltro ? 24 : 8);
+  }, [busqueda, seleccion, escandallos, fastbar, articulos, categoriaFiltro]);
 
-  const elegirResultado = (r: ResultadoBusqueda) => {
+  const elegirResultado = (r: ResultadoBusqueda, autoAgregar = false) => {
+    if (autoAgregar && r.tipo !== "articulo") {
+      // Flujo de escáner: un solo Enter agrega el trago/receta directo con cantidad 1, sin pasos extra.
+      agregarConCantidad({
+        key: `${r.tipo}-${r.id}`, nombre: r.nombre, precio: r.precioVenta,
+        escandalloId: r.tipo === "receta" ? r.id : undefined,
+        estacionCocina: r.tipo === "receta" ? r.estacionCocina : "BAR",
+      }, 1);
+      setBusqueda("");
+      return;
+    }
     setSeleccion(r);
     setBusqueda("");
     setPrecioManual(r.tipo === "articulo" ? "" : String(r.precioVenta));
@@ -2224,8 +2373,8 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
   const handleAgregarProducto = () => {
     setError(null);
     const nombre = seleccion ? seleccion.nombre : busqueda.trim();
-    if (!nombre) { setError("Busca una receta, un trago o un artículo — o escribe qué vas a vender"); return; }
-    if (!precioManual || Number(precioManual) <= 0) { setError("Indica el precio de venta"); return; }
+    if (!nombre) { setError("La descripción del producto es obligatoria — búscalo o escribe qué vas a vender"); return; }
+    if (!precioManual || Number(precioManual) <= 0) { setError("El precio es obligatorio"); return; }
     const cant = parseFloat(cantidadManual);
     if (!cant || cant <= 0) { setError("Indica una cantidad válida (acepta decimales: kg, L, etc.)"); return; }
     if (seleccion?.tipo === "articulo") {
@@ -2291,6 +2440,33 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
     }
   };
 
+  // Impresora térmica por Web Serial: escribe los bytes ESC/POS directo al
+  // puerto USB/serial, sin el diálogo de impresión del navegador. Requiere
+  // Chrome/Edge sobre HTTPS o localhost y un gesto del usuario (el propio
+  // click) para pedir permiso del puerto — no hay forma de saltarse eso.
+  const imprimirEscPos = async () => {
+    if (!recibo) return;
+    setImprimiendoEscPos(true);
+    setError(null);
+    try {
+      const nav = navigator as Navigator & { serial?: { requestPort: () => Promise<any> } };
+      if (!nav.serial) {
+        throw new Error("Este navegador no soporta impresión térmica directa (Web Serial) — usa Chrome o Edge, o imprime el PDF.");
+      }
+      const bytes = await descargarTicketEscPos(tenantId, recibo.comandaId);
+      const port = await nav.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      const writer = port.writable.getWriter();
+      await writer.write(bytes);
+      writer.releaseLock();
+      await port.close();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo imprimir en la térmica");
+    } finally {
+      setImprimiendoEscPos(false);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
       {/* Buscador único: recetas, Fast-Bar e inventario */}
@@ -2298,12 +2474,34 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
         <p className="text-xs text-slate-500 dark:text-white/40">Busca lo que vas a vender — receta, trago o artículo de inventario — ideal para ventas de mostrador que no pasan por una mesa.</p>
 
         <div className="apple-glass rounded-xl p-4 space-y-2.5">
-          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Buscar producto</p>
+          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Buscar producto (o escanea el código de barras)</p>
+
+          {categorias.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+              <button type="button" onClick={() => setCategoriaFiltro(null)}
+                className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap cursor-pointer flex-shrink-0 ${
+                  categoriaFiltro === null ? "bg-teal-600 text-white" : "bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60"
+                }`}>Todas</button>
+              {categorias.map((c) => (
+                <button key={c} type="button" onClick={() => { setCategoriaFiltro((prev) => (prev === c ? null : c)); setBusqueda(""); setSeleccion(null); }}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap cursor-pointer flex-shrink-0 ${
+                    categoriaFiltro === c ? "bg-teal-600 text-white" : "bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60"
+                  }`}>{c}</button>
+              ))}
+            </div>
+          )}
+
           <div className="relative">
             <input
+              ref={busquedaRef}
               value={seleccion ? seleccion.nombre : busqueda}
               onChange={(e) => { setBusqueda(e.target.value); setSeleccion(null); }}
-              placeholder="Escribe para buscar… ej. Torta de Queso, Doritos, Mojito"
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || seleccion) return;
+                e.preventDefault();
+                if (resultadosBusqueda.length >= 1) elegirResultado(resultadosBusqueda[0], true);
+              }}
+              placeholder="Escribe o escanea… ej. Torta de Queso, Doritos, Mojito"
               className="input-horeca w-full pr-8"
             />
             {seleccion && (
@@ -2312,7 +2510,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
                 <IconClose size={14} />
               </button>
             )}
-            {!seleccion && busqueda.trim() && resultadosBusqueda.length > 0 && (
+            {!seleccion && (busqueda.trim() || categoriaFiltro) && resultadosBusqueda.length > 0 && (
               <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-56 overflow-y-auto shadow-lg">
                 {resultadosBusqueda.map((r) => (
                   <button key={`${r.tipo}-${r.id}`} type="button" onClick={() => elegirResultado(r)}
@@ -2385,8 +2583,15 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
           </div>
         )}
 
-        <div className="flex items-center justify-between pt-2 border-t border-slate-300/50 dark:border-white/10 font-bold text-slate-900 dark:text-white">
-          <span>Total</span><span className="font-mono">${total.toFixed(2)}</span>
+        <div className="pt-2 border-t border-slate-300/50 dark:border-white/10">
+          <div className="flex items-center justify-between font-bold text-slate-900 dark:text-white">
+            <span>Total</span><span className="font-mono">${total.toFixed(2)}</span>
+          </div>
+          {tasaBcv && Number(tasaBcv.tasa) > 0 && (
+            <div className="flex items-center justify-between text-xs text-teal-600 dark:text-teal-400 font-mono mt-0.5">
+              <span>≈ Bs</span><span>{(total * Number(tasaBcv.tasa)).toFixed(2)}</span>
+            </div>
+          )}
         </div>
 
         {carrito.length > 0 && (
@@ -2414,15 +2619,28 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
               ))}
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-slate-300/50 dark:border-white/10 font-bold text-slate-900 dark:text-white">
-              <span>Total</span><span className="font-mono">${recibo.total.toFixed(2)}</span>
+            <div className="pt-2 border-t border-slate-300/50 dark:border-white/10">
+              <div className="flex items-center justify-between font-bold text-slate-900 dark:text-white">
+                <span>Total</span><span className="font-mono">${recibo.total.toFixed(2)}</span>
+              </div>
+              {tasaBcv && Number(tasaBcv.tasa) > 0 && (
+                <div className="flex items-center justify-between text-xs text-teal-600 dark:text-teal-400 font-mono mt-0.5">
+                  <span>≈ Bs</span><span>{(recibo.total * Number(tasaBcv.tasa)).toFixed(2)}</span>
+                </div>
+              )}
             </div>
-            <div className="text-xs text-slate-500 dark:text-white/40">Pagado con: {recibo.metodoPago.replace("_", " ")}</div>
+            <div className="text-xs text-slate-700 dark:text-white/80 font-medium">Pagado con: <span className="font-bold text-slate-900 dark:text-white">{recibo.metodoPago.replace("_", " ")}</span></div>
+
+            {error && <p className="text-xs text-red-500">{error}</p>}
 
             <div className="flex gap-2 pt-2">
               <button onClick={verTicket} disabled={abriendoTicket}
                 className="flex-1 g-aurora text-white text-xs font-semibold py-3 rounded-xl cursor-pointer disabled:opacity-60">
-                {abriendoTicket ? "Generando…" : "🧾 Ver / Imprimir recibo"}
+                {abriendoTicket ? "Generando…" : "🧾 PDF"}
+              </button>
+              <button onClick={imprimirEscPos} disabled={imprimiendoEscPos} title="Imprime directo a impresora térmica USB por Web Serial, sin diálogo del sistema"
+                className="flex-1 btn-cyber-neon text-white text-xs font-semibold py-3 rounded-xl cursor-pointer disabled:opacity-60">
+                {imprimiendoEscPos ? "Imprimiendo…" : "🖨️ Térmica"}
               </button>
               <button onClick={() => setRecibo(null)} className="flex-1 apple-glass-btn text-xs font-semibold py-3 rounded-xl cursor-pointer">
                 Nueva venta

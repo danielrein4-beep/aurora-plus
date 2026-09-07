@@ -681,6 +681,7 @@ export interface ItemComanda {
   estadoItem: EstadoItemComanda;
   cantidad: number;
   precioUnitario: number;
+  fechaCreacion: string;
 }
 
 export function listarMesas(): Promise<Mesa[]> {
@@ -815,6 +816,7 @@ export interface EscandalloReceta {
   estacionCocina: string;
   precioVenta: number;
   activo: boolean;
+  requiereCocina: boolean;
 }
 
 export interface DetalleReceta {
@@ -831,7 +833,7 @@ export function listarEscandallos(): Promise<EscandalloReceta[]> {
   return request(`/api/horeca/escandallos`);
 }
 
-export function crearEscandallo(tenantId: number, datos: { nombrePlato: string; estacionCocina?: string; precioVenta: number }): Promise<EscandalloReceta> {
+export function crearEscandallo(tenantId: number, datos: { nombrePlato: string; estacionCocina?: string; precioVenta: number; requiereCocina?: boolean }): Promise<EscandalloReceta> {
   return request(`/api/horeca/escandallos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
@@ -844,6 +846,10 @@ export function eliminarEscandallo(tenantId: number, escandalloId: number): Prom
 
 export function cambiarActivoEscandallo(tenantId: number, escandalloId: number, activo: boolean): Promise<EscandalloReceta> {
   return request(`/api/horeca/escandallos/${escandalloId}/activo?tenantId=${tenantId}&activo=${activo}`, { method: "PATCH" });
+}
+
+export function cambiarRequiereCocinaEscandallo(tenantId: number, escandalloId: number, requiereCocina: boolean): Promise<EscandalloReceta> {
+  return request(`/api/horeca/escandallos/${escandalloId}/requiere-cocina?tenantId=${tenantId}&requiereCocina=${requiereCocina}`, { method: "PATCH" });
 }
 
 export function agregarIngredienteEscandallo(tenantId: number, escandalloId: number, datos: {
@@ -1038,6 +1044,20 @@ export async function descargarTicketComanda(tenantId: number, comandaId: number
   }
   if (!res.ok) throw new ApiError(`Error ${res.status}`);
   return res.blob();
+}
+
+/** Mismo ticket, como bytes ESC/POS crudos — para escribirlos directo a una impresora térmica por Web Serial, sin diálogo de impresión. */
+export async function descargarTicketEscPos(tenantId: number, comandaId: number): Promise<Uint8Array> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const res = await fetch(`/api/horeca/mesas/comandas/${comandaId}/ticket-escpos?tenantId=${tenantId}`, { headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) throw new ApiError(`Error ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 export async function descargarCierrePdf(tenantId: number, arqueoId: number): Promise<Blob> {
