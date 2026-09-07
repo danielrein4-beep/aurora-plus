@@ -2371,12 +2371,15 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
                   <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{l.nombre}</div>
                   <div className="text-[10px] text-slate-500 dark:text-white/40 font-mono">${l.precio.toFixed(2)} c/u</div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => cambiarCantidad(l.key, -1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer">−</button>
-                  <span className="text-xs font-bold w-5 text-center">{l.cantidad}</span>
-                  <button onClick={() => cambiarCantidad(l.key, 1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer">+</button>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button onClick={() => cambiarCantidad(l.key, -1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer flex-shrink-0">−</button>
+                  <span className="text-xs font-bold w-5 text-center flex-shrink-0">{l.cantidad}</span>
+                  <button onClick={() => cambiarCantidad(l.key, 1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer flex-shrink-0">+</button>
+                  <button onClick={() => quitarLinea(l.key)} title="Quitar de la venta"
+                    className="w-6 h-6 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer flex-shrink-0 ml-0.5">
+                    <IconTrash size={13} />
+                  </button>
                 </div>
-                <button onClick={() => quitarLinea(l.key)} className="text-slate-400 hover:text-red-500 cursor-pointer"><IconTrash size={13} /></button>
               </div>
             ))}
           </div>
