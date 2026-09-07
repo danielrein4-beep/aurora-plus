@@ -1191,6 +1191,13 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
   // tocar nada, sea el restante en Bs, en COP o en la moneda base.
   const firmaManual = JSON.stringify(filas.filter((f) => !f.auto).map((f) => `${f.monto}|${f.moneda}`));
   const firmaTasas = JSON.stringify(tasas);
+  // Firma de las filas AUTO (id + su moneda) — sin esto, agregar una fila
+  // nueva (auto, recién creada con monto "") o cambiarle la moneda a una ya
+  // existente no cambiaba ninguna de las otras dependencias del efecto
+  // (firmaManual solo mira las filas manuales, firmaTasas el mapa de
+  // tasas), así que el recálculo nunca se disparaba: la fila quedaba en
+  // "" (mostrando el placeholder "0.00") en vez de convertir el restante.
+  const firmaAuto = JSON.stringify(filas.filter((f) => f.auto).map((f) => `${f.id}|${f.moneda}`));
   useEffect(() => {
     setFilas((prev) => {
       const sumaManualBase = prev.filter((f) => !f.auto).reduce((s, f) => s + aBase(Number(f.monto) || 0, f.moneda), 0);
@@ -1206,7 +1213,7 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
       return cambio ? siguiente : prev;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmaManual, total, firmaTasas, monedaBase]);
+  }, [firmaManual, firmaAuto, total, firmaTasas, monedaBase]);
 
   const totalIngresadoBase = filas.reduce((s, f) => s + aBase(Number(f.monto) || 0, f.moneda), 0);
   const pendienteBase = Math.max(0, total - totalIngresadoBase);

@@ -138,6 +138,7 @@ public class CompraInsumoHorecaService {
                 lote.setTenantId(tenantId);
                 lote.setArticulo(articulo);
                 lote.setCantidadIngresada(cantidadBase);
+                lote.setCantidadActual(cantidadBase);
                 lote.setCostoUnitario(costoUnitarioBase);
                 lote.setFechaVencimiento(item.fechaVencimiento);
                 lote.setReferenciaCompra(numeroFactura);

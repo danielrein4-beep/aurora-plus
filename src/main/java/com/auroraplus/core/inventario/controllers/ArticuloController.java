@@ -202,6 +202,7 @@ public class ArticuloController {
             lote.setTenantId(tenantId);
             lote.setArticulo(articulo);
             lote.setCantidadIngresada(request.cantidad);
+            lote.setCantidadActual(request.cantidad);
             lote.setCostoUnitario(costoAplicado);
             lote.setFechaVencimiento(request.fechaVencimiento);
             lote.setReferenciaCompra(request.motivo != null ? request.motivo : "Entrada de stock");
