@@ -545,8 +545,42 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     setCobrosLocales((prev) => [item, ...prev]);
   };
 
+  const eliminarCobroLocal = (index: number) => {
+    setCobrosLocales((prev) => {
+      const nuevas = prev.filter((_, i) => i !== index);
+      try { localStorage.setItem(`cobros_locales_${hoy()}`, JSON.stringify(nuevas)); } catch {}
+      return nuevas;
+    });
+    setToastTasa("✓ Cobro eliminado de la auditoría.");
+    setTimeout(() => setToastTasa(null), 3000);
+  };
+
+  const limpiarCobrosLocales = () => {
+    setCobrosLocales([]);
+    try { localStorage.removeItem(`cobros_locales_${hoy()}`); } catch {}
+    setToastTasa("✓ Caja de hoy reiniciada correctamente.");
+    setTimeout(() => setToastTasa(null), 3000);
+  };
+
   const agregarCierreAuditado = (cierre: CierreCajaData) => {
     setHistorialCierres((prev) => [cierre, ...prev]);
+  };
+
+  const eliminarCierreAuditado = (index: number) => {
+    setHistorialCierres((prev) => {
+      const nuevas = prev.filter((_, i) => i !== index);
+      try { localStorage.setItem(HISTORIAL_CIERRES_KEY, JSON.stringify(nuevas)); } catch {}
+      return nuevas;
+    });
+    setToastTasa("✓ Cierre auditado eliminado del historial.");
+    setTimeout(() => setToastTasa(null), 3000);
+  };
+
+  const limpiarHistorialCierres = () => {
+    setHistorialCierres([]);
+    try { localStorage.removeItem(HISTORIAL_CIERRES_KEY); } catch {}
+    setToastTasa("✓ Historial de auditorías vaciado.");
+    setTimeout(() => setToastTasa(null), 3000);
   };
 
   const recargarTodo = () => {
@@ -863,7 +897,20 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               />
             )}
             {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} />}
-            {pagina === "financiero" && <ResumenesFinancieros ingresosHoy={ingresosHoy} citasHoy={citasHoy} cobrosLocales={cobrosLocales} historialCierres={historialCierres} config={configPerfil} />}
+            {pagina === "financiero" && (
+              <ResumenesFinancieros
+                ingresosHoy={ingresosHoy}
+                citasHoy={citasHoy}
+                cobrosLocales={cobrosLocales}
+                historialCierres={historialCierres}
+                config={configPerfil}
+                rol={rolActivo}
+                onEliminarCobro={eliminarCobroLocal}
+                onLimpiarCobros={limpiarCobrosLocales}
+                onEliminarCierre={eliminarCierreAuditado}
+                onLimpiarCierres={limpiarHistorialCierres}
+              />
+            )}
             {pagina === "configuracion" && <Configuracion config={configPerfil} onGuardar={guardarConfigPerfil} user={user} />}
           </div>
         </div>
@@ -5831,8 +5878,28 @@ function AgendaMedica({
 // ══════════════════════════════════════════════════════════════════════════
 // RESÚMENES FINANCIEROS & HISTORIAL DE CIERRES AUDITADOS
 // ══════════════════════════════════════════════════════════════════════════
-function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, historialCierres, config }: {
-  ingresosHoy: number | null; citasHoy: CitaMedica[] | null; cobrosLocales: CobroItem[]; historialCierres: CierreCajaData[]; config: any;
+function ResumenesFinancieros({
+  ingresosHoy,
+  citasHoy,
+  cobrosLocales,
+  historialCierres,
+  config,
+  rol,
+  onEliminarCobro,
+  onLimpiarCobros,
+  onEliminarCierre,
+  onLimpiarCierres,
+}: {
+  ingresosHoy: number | null;
+  citasHoy: CitaMedica[] | null;
+  cobrosLocales: CobroItem[];
+  historialCierres: CierreCajaData[];
+  config: any;
+  rol?: RolVista;
+  onEliminarCobro?: (index: number) => void;
+  onLimpiarCobros?: () => void;
+  onEliminarCierre?: (index: number) => void;
+  onLimpiarCierres?: () => void;
 }) {
   const totalUSD = cobrosLocales
     .filter((c) => c.moneda === "USD" || (!c.moneda && (c.metodoPago?.toUpperCase().includes("USD") || (c.montoUSD !== undefined && c.montoUSD > 0 && !c.montoVES))))
@@ -5857,31 +5924,46 @@ function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, historialC
 
       {/* Cobros del día */}
       <div className="apple-glass rounded-2xl p-5 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h4 className="font-bold text-sm text-slate-900 dark:text-white">Auditoría de Cobros de Hoy</h4>
             <p className="text-[11px] text-slate-500 dark:text-white/50">Montos clasificados estrictamente por la moneda recibida</p>
           </div>
-          <button
-            onClick={() => {
-              generarPdfCierreCaja({
-                clinicaNombre: config.clinicaNombre,
-                doctorNombre: config.doctorNombre,
-                fecha: hoy(),
-                horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                tasaBCV: config.tasaBCV,
-                tasaCOP: config.tasaCOP || 4200,
-                cobros: cobrosLocales,
-                totalUSD,
-                totalVES,
-                totalCOP,
-                totalPacientes: cobrosLocales.length,
-              });
-            }}
-            className="px-3.5 py-1.5 rounded-full border border-teal-500/40 text-teal-600 dark:text-teal-400 font-bold text-xs hover:bg-teal-500/10 flex items-center gap-1.5 cursor-pointer"
-          >
-            <span>📥</span> Exportar PDF de Auditoría
-          </button>
+          <div className="flex items-center gap-2">
+            {onLimpiarCobros && cobrosLocales.length > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm("¿Estás seguro de que deseas vaciar todos los cobros registrados en la caja de hoy?")) {
+                    onLimpiarCobros();
+                  }
+                }}
+                className="px-3 py-1.5 rounded-full border border-rose-500/40 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-500/10 flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="Vaciar todos los cobros registrados de hoy"
+              >
+                <span>🗑️</span> Vaciar Cobros
+              </button>
+            )}
+            <button
+              onClick={() => {
+                generarPdfCierreCaja({
+                  clinicaNombre: config.clinicaNombre,
+                  doctorNombre: config.doctorNombre,
+                  fecha: hoy(),
+                  horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                  tasaBCV: config.tasaBCV,
+                  tasaCOP: config.tasaCOP || 4200,
+                  cobros: cobrosLocales,
+                  totalUSD,
+                  totalVES,
+                  totalCOP,
+                  totalPacientes: cobrosLocales.length,
+                });
+              }}
+              className="px-3.5 py-1.5 rounded-full border border-teal-500/40 text-teal-600 dark:text-teal-400 font-bold text-xs hover:bg-teal-500/10 flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <span>📥</span> Exportar PDF de Auditoría
+            </button>
+          </div>
         </div>
 
         {cobrosLocales.length === 0 ? (
@@ -5893,7 +5975,7 @@ function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, historialC
               const esCop = c.moneda === "COP" || (c.montoCOP !== undefined && c.montoCOP > 0);
 
               return (
-                <div key={i} className="py-3 flex items-center justify-between">
+                <div key={i} className="py-3 flex items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-white/[0.02] px-2 rounded-lg transition-colors">
                   <div>
                     <div className="font-bold text-slate-900 dark:text-white">
                       {c.pacienteNombre} <span className="text-slate-400 font-normal">({c.identificacion})</span>
@@ -5902,19 +5984,36 @@ function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, historialC
                       {c.metodoPago} {c.referencia && c.referencia !== "N/A" ? `· Ref: ${c.referencia}` : ""} · {c.hora}
                     </div>
                   </div>
-                  <div className="text-right">
-                    {esVes ? (
-                      <div className="font-bold text-sky-600 dark:text-sky-400 font-mono">
-                        Bs. {(c.montoVES || c.montoCobrado || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                      </div>
-                    ) : esCop ? (
-                      <div className="font-bold text-purple-600 dark:text-purple-400 font-mono">
-                        ${(c.montoCOP || c.montoCobrado || 0).toLocaleString("es-CO")} COP
-                      </div>
-                    ) : (
-                      <div className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
-                        ${(c.montoUSD || c.montoCobrado || 0).toFixed(2)} USD
-                      </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      {esVes ? (
+                        <div className="font-bold text-sky-600 dark:text-sky-400 font-mono">
+                          Bs. {(c.montoVES || c.montoCobrado || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                        </div>
+                      ) : esCop ? (
+                        <div className="font-bold text-purple-600 dark:text-purple-400 font-mono">
+                          ${(c.montoCOP || c.montoCobrado || 0).toLocaleString("es-CO")} COP
+                        </div>
+                      ) : (
+                        <div className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                          ${(c.montoUSD || c.montoCobrado || 0).toFixed(2)} USD
+                        </div>
+                      )}
+                    </div>
+                    {onEliminarCobro && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`¿Eliminar cobro de ${c.pacienteNombre}?`)) {
+                            onEliminarCobro(i);
+                          }
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 cursor-pointer transition-colors"
+                        title="Eliminar este cobro individual"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -5926,18 +6025,37 @@ function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, historialC
 
       {/* Historial de cierres de caja anteriores */}
       <div className="apple-glass rounded-2xl p-5 space-y-3">
-        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Historial de Cierres de Caja Guardados</h4>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h4 className="font-bold text-sm text-slate-900 dark:text-white">Historial de Cierres de Caja Guardados</h4>
+            <p className="text-[11px] text-slate-500 dark:text-white/50">Auditorías y cierres consolidados</p>
+          </div>
+          {onLimpiarCierres && historialCierres.length > 0 && (
+            <button
+              onClick={() => {
+                if (window.confirm("¿Estás seguro de que deseas borrar TODO el historial de auditorías y cierres guardados?")) {
+                  onLimpiarCierres();
+                }
+              }}
+              className="px-3 py-1.5 rounded-full border border-rose-500/40 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-500/10 flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Borrar todas las auditorías guardadas"
+            >
+              <span>🗑️</span> Borrar Todo el Historial
+            </button>
+          )}
+        </div>
+
         {historialCierres.length === 0 ? (
           <p className="text-xs text-slate-400">No hay cierres de caja históricos guardados.</p>
         ) : (
           <div className="divide-y divide-slate-200/60 dark:divide-white/5 text-xs">
             {historialCierres.map((cierre, i) => (
-              <div key={i} className="py-3 flex items-center justify-between">
+              <div key={i} className="py-3 flex items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-white/[0.02] px-2 rounded-lg transition-colors">
                 <div>
                   <div className="font-bold text-slate-900 dark:text-white">Cierre del {cierre.fecha} ({cierre.horaCierre})</div>
                   <div className="text-[11px] text-slate-500">{cierre.totalPacientes} pacientes · Responsable: {cierre.doctorNombre}</div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <div className="text-right text-xs">
                     {cierre.totalUSD > 0 && (
                       <div className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
@@ -5955,12 +6073,28 @@ function ResumenesFinancieros({ ingresosHoy, citasHoy, cobrosLocales, historialC
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => generarPdfCierreCaja(cierre)}
-                    className="px-3 py-1.5 rounded-lg border border-teal-500/40 text-teal-600 dark:text-teal-400 text-xs font-bold hover:bg-teal-500/10 flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>📥</span> PDF
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => generarPdfCierreCaja(cierre)}
+                      className="px-3 py-1.5 rounded-lg border border-teal-500/40 text-teal-600 dark:text-teal-400 text-xs font-bold hover:bg-teal-500/10 flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Descargar PDF de esta auditoría"
+                    >
+                      <span>📥</span> PDF
+                    </button>
+                    {onEliminarCierre && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`¿Eliminar la auditoría/cierre del ${cierre.fecha} (${cierre.horaCierre})?`)) {
+                            onEliminarCierre(i);
+                          }
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg border border-rose-500/40 text-rose-600 dark:text-rose-400 text-xs font-bold hover:bg-rose-500/10 flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Eliminar esta auditoría"
+                      >
+                        <span>🗑️</span> Borrar
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
