@@ -5,6 +5,7 @@ import {
   AuroraGradientDef, IconClinic, IconVet, IconHardware, IconCard, IconUsers, IconCustomize,
   IconStethoscope, IconCalendar, IconPrescription, IconRocket, IconDownload, IconKey,
   IconHourglass, IconUser, IconClose, IconCheckCircle, IconBank, IconChat, IconFileText,
+  IconRestaurant,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import { listarPacientes, listarCitasDelDia, listarCobrosDelDia, type Paciente, type CitaMedica } from "../api";
@@ -14,6 +15,7 @@ const VERTICAL_ICON: Record<string, (props: { size?: number }) => JSX.Element> =
   clinica: IconClinic,
   veterinaria: IconVet,
   ferreteria: IconHardware,
+  restaurante: IconRestaurant,
 };
 
 const ACTION_ICON: Record<string, (props: { size?: number }) => JSX.Element> = {
@@ -29,6 +31,10 @@ const ACTION_ICON: Record<string, (props: { size?: number }) => JSX.Element> = {
   "Consultar Kardex": IconHardware,
   "Nueva Cotización": IconFileText,
   "Cierre de Turno": IconCard,
+  "Abrir Mesa / Comanda": IconRestaurant,
+  "Ver Cocina (KDS)": IconHourglass,
+  "Escandallo de Recetas": IconFileText,
+  "Cerrar Cuenta": IconCard,
 };
 
 const VERTICAL_METADATA: Record<string, {
@@ -105,6 +111,24 @@ const VERTICAL_METADATA: Record<string, {
       { name: "Taller Mecánico Ramos", age: "Crédito 15d", reason: "Tornillería y Discos de Corte", status: "Facturado", time: "09:45 AM" },
     ],
   },
+  restaurante: {
+    name: "Aurora Horeca",
+    badge: "EDICIÓN RESTAURANTES & HORECA",
+    desc: "Mapa de mesas, comandas digitales, cocina en tiempo real (KDS) y escandallo de recetas.",
+    stats: [
+      { label: "Mesas Ocupadas", val: "—", change: "Mapa en vivo", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Comandas Abiertas", val: "—", change: "Salón + delivery", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Ventas del Día", val: "—", change: "Multi-moneda (USD/VES)", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Platos en Cocina", val: "—", change: "Pendientes + en preparación", color: "text-amber-500 dark:text-amber-400" },
+    ],
+    actions: [
+      { label: "Abrir Mesa / Comanda", desc: "Tomar pedido y enviar a cocina" },
+      { label: "Ver Cocina (KDS)", desc: "Tablero de platos pendientes y en preparación" },
+      { label: "Escandallo de Recetas", desc: "Registrar plato y costo de ingredientes" },
+      { label: "Cerrar Cuenta", desc: "Cobrar comanda y emitir ticket" },
+    ],
+    defaultPatients: [],
+  },
 };
 
 export default function Dashboard() {
@@ -135,6 +159,9 @@ export default function Dashboard() {
   const [citasReales, setCitasReales] = useState<CitaMedica[] | null>(null);
   const [ingresosHoy, setIngresosHoy] = useState<number | null>(null);
   const esClinicaReal = userIndustry === "clinica" && !!user?.tenantId;
+  const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
+  const rutaVertical = userIndustry === "restaurante" ? "/restaurante" : "/mediclinic";
+  const esVerticalReal = esClinicaReal || esRestauranteReal;
 
   useEffect(() => {
     if (!esClinicaReal || !user?.tenantId) return;
@@ -242,15 +269,15 @@ export default function Dashboard() {
 
         {/* Derecha: Botón Directo a Mediclinic + Estado + Salir */}
         <div className="flex items-center gap-2.5 whitespace-nowrap">
-          {/* Botón Destacado: Entrar a Mediclinic Pro */}
-          {esClinicaReal && (
+          {/* Botón Destacado: Entrar a la app de la vertical activa */}
+          {esVerticalReal && (
             <button
-              onClick={() => navigate("/mediclinic")}
+              onClick={() => navigate(rutaVertical)}
               className="btn-cyber-neon text-white text-xs font-extrabold px-4 py-2 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.5)] hover:scale-105 transition-all cursor-pointer"
-              title="Abrir el entorno clínico de Mediclinic Pro"
+              title={`Abrir ${vertical.name}`}
             >
               <span className="w-2 h-2 rounded-full bg-teal-300 animate-pulse" />
-              <span>Entrar a Mediclinic Pro →</span>
+              <span>Entrar a {vertical.name} →</span>
             </button>
           )}
 
@@ -324,15 +351,18 @@ export default function Dashboard() {
                   </h2>
 
                   <p className="text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
-                    {vertical.desc} Administra consultas médicas, historias clínicas, agenda de especialistas, sala de espera reactiva y cotizaciones multi-moneda en tiempo real.
+                    {vertical.desc}{" "}
+                    {userIndustry === "restaurante"
+                      ? "Gestiona mesas, comandas y cocina en tiempo real desde un solo lugar."
+                      : "Administra consultas médicas, historias clínicas, agenda de especialistas, sala de espera reactiva y cotizaciones multi-moneda en tiempo real."}
                   </p>
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">
                     <button
-                      onClick={() => navigate("/mediclinic")}
+                      onClick={() => navigate(rutaVertical)}
                       className="btn-cyber-neon text-white text-xs sm:text-sm font-extrabold px-7 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_0_30px_rgba(255,59,128,0.5)] cursor-pointer hover:scale-105 transition-all">
                       <IconRocket size={17} />
-                      <span>Entrar a Mediclinic Pro (Cloud Web)</span>
+                      <span>Entrar a {vertical.name} (Cloud Web)</span>
                       <span className="text-base">→</span>
                     </button>
 

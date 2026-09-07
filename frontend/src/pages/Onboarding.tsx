@@ -55,9 +55,10 @@ const INDUSTRIES: IndustryItem[] = [
     id: "restaurante",
     label: "Restaurante & Gastronomía",
     Icon: IconRestaurant,
-    desc: "Comandas digitales, pantalla de cocina y mesas",
-    badge: "Próximamente (Fase 2)",
-    isReady: false,
+    desc: "Mapa de mesas, comandas digitales, cocina en tiempo real y escandallo de recetas",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Aurora Horeca",
   },
   {
     id: "finca",
@@ -117,10 +118,34 @@ const CLINIC_MODULES = [
   { id: "reportes", label: "Generador de Informes Médicos PDF", desc: "Descarga de reportes clínicos con membrete y firma digital", defaultOn: true },
 ];
 
-// Mapa de "clinica"/"veterinaria"/etc. (id del onboarding) al moduloPrincipal
+const RESTAURANT_MODULES = [
+  { id: "salon", label: "Salón & Mapa de Mesas", desc: "Abrir comandas por mesa, delivery propio o recoger en tienda", defaultOn: true },
+  { id: "cocina", label: "Cocina en Tiempo Real (KDS)", desc: "Tablero por estación: pendiente, preparando, listo", defaultOn: true },
+  { id: "recetas", label: "Recetas & Escandallo de Costos", desc: "Costeo por ingrediente y margen real por plato", defaultOn: true },
+  { id: "fastbar", label: "Fast-Bar", desc: "Venta rápida de tragos por botella/mililitraje", defaultOn: true },
+  { id: "compras", label: "Compras, Proveedores & Vencimientos", desc: "Registro de facturas de insumos con alertas de caducidad", defaultOn: true },
+];
+
+// Mapa de "clinica"/"restaurante"/etc. (id del onboarding) al moduloPrincipal
 // real que entiende el backend (ver TenantProvisioningService).
 const INDUSTRIA_A_MODULO: Record<string, string> = {
   clinica: "salud",
+  restaurante: "horeca",
+};
+
+const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
+  clinica: CLINIC_MODULES,
+  restaurante: RESTAURANT_MODULES,
+};
+
+const NOMBRE_POR_DEFECTO: Record<string, string> = {
+  clinica: "Clínica & Consultorios Médicos",
+  restaurante: "Mi Restaurante",
+};
+
+const VERTICAL_LABEL: Record<string, string> = {
+  clinica: "Mediclinic Pro (Clínica & Salud)",
+  restaurante: "Aurora Horeca (Restaurante & Gastronomía)",
 };
 
 export default function Onboarding() {
@@ -135,22 +160,28 @@ export default function Onboarding() {
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [selectedIndustry, setSelectedIndustry] = useState<string>("clinica");
-  const [empresaNombre, setEmpresaNombre] = useState<string>(user?.empresa || "Clínica & Consultorios Médicos");
+  const [empresaNombre, setEmpresaNombre] = useState<string>(user?.empresa || NOMBRE_POR_DEFECTO.clinica);
   const [modules, setModules] = useState<string[]>(CLINIC_MODULES.map((m) => m.id));
   const [lockedNotice, setLockedNotice] = useState<string | null>(null);
   const [metodoPago, setMetodoPago] = useState<string>(METODOS_PAGO[0].id);
   const [activando, setActivando] = useState(false);
   const [errorActivacion, setErrorActivacion] = useState<string | null>(null);
 
+  const modulosDisponibles = MODULOS_POR_INDUSTRIA[selectedIndustry] || CLINIC_MODULES;
+
   const handleSelectIndustry = (ind: IndustryItem) => {
     if (!ind.isReady) {
       setLockedNotice(
-        `El rubro "${ind.label}" está en fase de desarrollo. La vertical insignia actualmente lista y operativa es Mediclinic Pro (Clínica & Salud). Puedes probar Mediclinic Pro ahora mismo.`
+        `El rubro "${ind.label}" está en fase de desarrollo. Las verticales listas y operativas hoy son Mediclinic Pro (Clínica & Salud) y Aurora Horeca (Restaurante & Gastronomía).`
       );
       return;
     }
     setLockedNotice(null);
     setSelectedIndustry(ind.id);
+    setModules((MODULOS_POR_INDUSTRIA[ind.id] || CLINIC_MODULES).map((m) => m.id));
+    if (!user?.empresa) {
+      setEmpresaNombre(NOMBRE_POR_DEFECTO[ind.id] || NOMBRE_POR_DEFECTO.clinica);
+    }
   };
 
   const toggleModule = (id: string) => {
@@ -162,24 +193,26 @@ export default function Onboarding() {
   const handleActivate = async () => {
     setErrorActivacion(null);
     setActivando(true);
+    const nombrePorDefecto = NOMBRE_POR_DEFECTO[selectedIndustry] || NOMBRE_POR_DEFECTO.clinica;
+    const modulosPorDefecto = modulosDisponibles.map((m) => m.id);
     try {
       if (pendingSignup) {
         // Registro real de un negocio nuevo — crea el tenant en el backend o activa sesión local
         await completarRegistro({
-          nombreEmpresa: empresaNombre.trim() || "Clínica & Consultorios Médicos",
+          nombreEmpresa: empresaNombre.trim() || nombrePorDefecto,
           moduloPrincipal: INDUSTRIA_A_MODULO[selectedIndustry] || "salud",
           emailContacto: pendingSignup.email,
           username: pendingSignup.email,
           password: pendingSignup.password,
-          modules: modules.length > 0 ? modules : CLINIC_MODULES.map((m) => m.id),
+          modules: modules.length > 0 ? modules : modulosPorDefecto,
           metodoPagoPreferido: METODOS_PAGO.find((m) => m.id === metodoPago)?.label,
         });
       } else {
         // Usuario ya existente reconfigurando su rubro/módulos (ej. "Cambiar Rubro")
         completeOnboarding({
-          industry: "clinica",
-          empresa: empresaNombre.trim() || "Clínica & Consultorios Médicos",
-          modules: modules.length > 0 ? modules : CLINIC_MODULES.map((m) => m.id),
+          industry: selectedIndustry,
+          empresa: empresaNombre.trim() || nombrePorDefecto,
+          modules: modules.length > 0 ? modules : modulosPorDefecto,
           hasCompletedOnboarding: true,
         });
       }
@@ -187,9 +220,9 @@ export default function Onboarding() {
     } catch (err) {
       console.warn("Fallo en registro backend (502), continuando en modo seguro local:", err);
       completeOnboarding({
-        industry: "clinica",
-        empresa: empresaNombre.trim() || "Clínica & Consultorios Médicos",
-        modules: modules.length > 0 ? modules : CLINIC_MODULES.map((m) => m.id),
+        industry: selectedIndustry,
+        empresa: empresaNombre.trim() || nombrePorDefecto,
+        modules: modules.length > 0 ? modules : modulosPorDefecto,
         hasCompletedOnboarding: true,
       });
       navigate("/dashboard");
@@ -268,7 +301,7 @@ export default function Onboarding() {
                   ¿A qué rubro se dedica tu negocio?
                 </h2>
                 <p className="text-white/50 text-sm mt-1">
-                  Actualmente <strong className="text-teal-400">Mediclinic Pro</strong> está 100% habilitado y listo para operar. Las demás verticales se encuentran en proceso de despliegue.
+                  Actualmente <strong className="text-teal-400">Mediclinic Pro</strong> y <strong className="text-teal-400">Aurora Horeca</strong> están 100% habilitadas y listas para operar. Las demás verticales se encuentran en proceso de despliegue.
                 </p>
               </div>
 
@@ -279,16 +312,22 @@ export default function Onboarding() {
                   <div className="flex-1">
                     <p className="font-semibold text-amber-300 mb-1">Módulo en Desarrollo</p>
                     <p className="text-white/80 leading-relaxed">{lockedNotice}</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedIndustry("clinica");
-                        setLockedNotice(null);
-                      }}
-                      className="mt-2.5 px-3 py-1.5 rounded-lg bg-teal-500 text-black font-bold text-xs hover:bg-teal-400 transition-all flex items-center gap-1.5"
-                    >
-                      <IconClinic size={14} /> Seleccionar Mediclinic Pro (Listo para usar)
-                    </button>
+                    <div className="flex flex-wrap gap-2 mt-2.5">
+                      <button
+                        type="button"
+                        onClick={() => { handleSelectIndustry(INDUSTRIES.find((i) => i.id === "clinica")!); }}
+                        className="px-3 py-1.5 rounded-lg bg-teal-500 text-black font-bold text-xs hover:bg-teal-400 transition-all flex items-center gap-1.5"
+                      >
+                        <IconClinic size={14} /> Seleccionar Mediclinic Pro
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { handleSelectIndustry(INDUSTRIES.find((i) => i.id === "restaurante")!); }}
+                        className="px-3 py-1.5 rounded-lg bg-teal-500 text-black font-bold text-xs hover:bg-teal-400 transition-all flex items-center gap-1.5"
+                      >
+                        <IconRestaurant size={14} /> Seleccionar Aurora Horeca
+                      </button>
+                    </div>
                   </div>
                   <button
                     onClick={() => setLockedNotice(null)}
@@ -388,9 +427,9 @@ export default function Onboarding() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  disabled={selectedIndustry !== "clinica"}
+                  disabled={!INDUSTRIES.find((i) => i.id === selectedIndustry)?.isReady}
                   className={`btn-cyber-neon text-white font-bold px-7 py-3 rounded-full text-sm flex items-center gap-2 cursor-pointer ${
-                    selectedIndustry === "clinica" ? "" : "opacity-40 cursor-not-allowed"
+                    INDUSTRIES.find((i) => i.id === selectedIndustry)?.isReady ? "" : "opacity-40 cursor-not-allowed"
                   }`}
                 >
                   Continuar a Selección de Módulos →
@@ -399,29 +438,31 @@ export default function Onboarding() {
             </div>
           )}
 
-          {/* ════════════ PASO 2: SELECCIONAR MÓDULOS DE MEDICLINIC PRO ════════════ */}
+          {/* ════════════ PASO 2: SELECCIONAR MÓDULOS DE LA VERTICAL ════════════ */}
           {step === 2 && (
             <div className="space-y-6">
               <div>
                 <div className="inline-block px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[11px] font-mono uppercase tracking-wider mb-2">
-                  Paso 2 · Arquitectura Médica
+                  Paso 2 · {selectedIndustry === "restaurante" ? "Arquitectura del Local" : "Arquitectura Médica"}
                 </div>
                 <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white leading-tight">
-                  Personaliza tu Clínica o Consultorio
+                  {selectedIndustry === "restaurante" ? "Personaliza tu Restaurante" : "Personaliza tu Clínica o Consultorio"}
                 </h2>
                 <p className="text-white/50 text-sm mt-1">
-                  Indica el nombre de tu centro de salud y activa los módulos que utilizará tu equipo médico.
+                  {selectedIndustry === "restaurante"
+                    ? "Indica el nombre de tu local y activa los módulos que utilizará tu equipo."
+                    : "Indica el nombre de tu centro de salud y activa los módulos que utilizará tu equipo médico."}
                 </p>
               </div>
 
-              {/* Nombre de la clínica */}
+              {/* Nombre del negocio */}
               <div>
                 <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1.5">
-                  Nombre de la Clínica / Consultorio / Doctor
+                  {selectedIndustry === "restaurante" ? "Nombre del Restaurante / Local" : "Nombre de la Clínica / Consultorio / Doctor"}
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Centro Médico Especializado San Cristóbal"
+                  placeholder={selectedIndustry === "restaurante" ? "Ej. Restaurante La Terraza" : "Ej. Centro Médico Especializado San Cristóbal"}
                   value={empresaNombre}
                   onChange={(e) => setEmpresaNombre(e.target.value)}
                   className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none transition-all shadow-inner"
@@ -431,10 +472,10 @@ export default function Onboarding() {
               {/* Lista de módulos */}
               <div className="space-y-2.5">
                 <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider">
-                  Módulos de Mediclinic Pro habilitados ({modules.length}/{CLINIC_MODULES.length})
+                  Módulos de {VERTICAL_LABEL[selectedIndustry]?.split(" (")[0] || "la vertical"} habilitados ({modules.length}/{modulosDisponibles.length})
                 </label>
                 <div className="grid grid-cols-1 gap-2.5">
-                  {CLINIC_MODULES.map((m) => {
+                  {modulosDisponibles.map((m) => {
                     const isChecked = modules.includes(m.id);
                     return (
                       <button
@@ -553,18 +594,18 @@ export default function Onboarding() {
               <div className="flex justify-center">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#00f2fe] via-[#7928ca] to-[#ff007f] p-0.5 shadow-[0_0_30px_rgba(0,242,254,0.5)]">
                   <div className="w-full h-full bg-[#0d131f] rounded-2xl flex items-center justify-center text-teal-300">
-                    <IconClinic size={26} />
+                    {selectedIndustry === "restaurante" ? <IconRestaurant size={26} /> : <IconClinic size={26} />}
                   </div>
                 </div>
               </div>
 
               <div>
                 <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white">
-                  ¡Todo Listo para tu Clínica!
+                  {selectedIndustry === "restaurante" ? "¡Todo Listo para tu Restaurante!" : "¡Todo Listo para tu Clínica!"}
                 </h2>
                 <p className="text-white/50 text-sm mt-1 max-w-md mx-auto">
                   Tu entorno privado en <strong>Aurora Hub</strong> ha sido preparado con la vertical{" "}
-                  <strong className="text-teal-300">Mediclinic Pro</strong>.
+                  <strong className="text-teal-300">{VERTICAL_LABEL[selectedIndustry]?.split(" (")[0] || "Mediclinic Pro"}</strong>.
                 </p>
               </div>
 
@@ -572,12 +613,12 @@ export default function Onboarding() {
               <div className="bg-white/[0.04] border border-white/10 rounded-2xl p-5 text-left space-y-3.5 max-w-md mx-auto shadow-inner">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-white/40 uppercase tracking-wider font-mono">Organización:</span>
-                  <span className="text-white font-bold">{empresaNombre || "Centro Médico Pro"}</span>
+                  <span className="text-white font-bold">{empresaNombre || NOMBRE_POR_DEFECTO[selectedIndustry] || "Centro Médico Pro"}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-white/40 uppercase tracking-wider font-mono">Vertical:</span>
                   <span className="text-teal-300 font-semibold flex items-center gap-1.5">
-                    <IconClinic size={13} /> Mediclinic Pro (Clínica & Salud)
+                    {selectedIndustry === "restaurante" ? <IconRestaurant size={13} /> : <IconClinic size={13} />} {VERTICAL_LABEL[selectedIndustry] || "Mediclinic Pro (Clínica & Salud)"}
                   </span>
                 </div>
                 <div className="flex items-start justify-between text-xs">
@@ -615,7 +656,7 @@ export default function Onboarding() {
                   disabled={activando}
                   className="w-full btn-cyber-neon text-white font-bold py-4 rounded-full text-base shadow-[0_0_30px_rgba(255,59,128,0.4)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {activando ? "Creando tu cuenta…" : "Entrar a Mediclinic Pro en Aurora Hub →"}
+                  {activando ? "Creando tu cuenta…" : `Entrar a ${VERTICAL_LABEL[selectedIndustry]?.split(" (")[0] || "Mediclinic Pro"} en Aurora Hub →`}
                 </button>
                 <p className="text-white/30 text-xs">
                   Sin cobros obligatorios. Podrás gestionar pagos, planes y roles desde el Hub.

@@ -241,3 +241,252 @@ export function registrarConsulta(tenantId: number, pacienteId: number, datos: P
     body: JSON.stringify({ paciente: { id: pacienteId }, ...datos }),
   });
 }
+
+// --- Horeca / Restaurantes ---
+
+export interface Mesa {
+  id: number;
+  tenantId: number;
+  numero: number;
+  capacidad: number | null;
+  zona: string | null;
+  posX: number | null;
+  posY: number | null;
+  ancho: number | null;
+  alto: number | null;
+  forma: string;
+}
+
+export type EstadoComanda = "ABIERTA" | "PAGADA" | "ANULADA";
+
+export interface Comanda {
+  id: number;
+  tenantId: number;
+  numeroMesa: number | null;
+  mesero: string;
+  canal: string;
+  nombreCliente: string | null;
+  telefonoCliente: string | null;
+  direccionEntrega: string | null;
+  mensajero: string | null;
+  estado: EstadoComanda;
+  totalConsumo: number;
+  fechaApertura: string;
+  metodoPago: string | null;
+  fechaCierre: string | null;
+}
+
+export interface MapaMesaEntrada {
+  mesa: Mesa;
+  estado: "LIBRE" | "OCUPADA";
+  comandaAbierta: Comanda | null;
+}
+
+export type EstadoItemComanda = "PENDIENTE" | "PREPARANDO" | "LISTO" | "ENTREGADO";
+
+export interface ItemComanda {
+  id: number;
+  tenantId: number;
+  nombrePlato: string;
+  estacionCocina: string;
+  estadoItem: EstadoItemComanda;
+  cantidad: number;
+  precioUnitario: number;
+}
+
+export function listarMesas(): Promise<Mesa[]> {
+  return request(`/api/horeca/mesas-fisicas`);
+}
+
+export function crearMesa(tenantId: number, datos: { numero: number; capacidad?: number; zona?: string }): Promise<Mesa> {
+  return request(`/api/horeca/mesas-fisicas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function mapaDeMesas(): Promise<MapaMesaEntrada[]> {
+  return request(`/api/horeca/mesas-fisicas/mapa`);
+}
+
+export function abrirComanda(tenantId: number, datos: {
+  numeroMesa?: number; mesero: string; canal?: string; nombreCliente?: string;
+  telefonoCliente?: string; direccionEntrega?: string; mensajero?: string;
+}): Promise<Comanda> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), mesero: datos.mesero });
+  if (datos.numeroMesa != null) params.set("numeroMesa", String(datos.numeroMesa));
+  if (datos.canal) params.set("canal", datos.canal);
+  if (datos.nombreCliente) params.set("nombreCliente", datos.nombreCliente);
+  if (datos.telefonoCliente) params.set("telefonoCliente", datos.telefonoCliente);
+  if (datos.direccionEntrega) params.set("direccionEntrega", datos.direccionEntrega);
+  if (datos.mensajero) params.set("mensajero", datos.mensajero);
+  return request(`/api/horeca/mesas/comandas/abrir?${params}`, { method: "POST" });
+}
+
+export function agregarItemComanda(tenantId: number, comandaId: number, datos: {
+  escandalloId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number;
+}): Promise<ItemComanda> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), cantidad: String(datos.cantidad) });
+  if (datos.escandalloId != null) params.set("escandalloId", String(datos.escandalloId));
+  if (datos.nombrePlato) params.set("nombrePlato", datos.nombrePlato);
+  if (datos.estacionCocina) params.set("estacionCocina", datos.estacionCocina);
+  if (datos.precioUnitario != null) params.set("precioUnitario", String(datos.precioUnitario));
+  return request(`/api/horeca/mesas/comandas/${comandaId}/items?${params}`, { method: "POST" });
+}
+
+export function actualizarEstadoItem(tenantId: number, itemId: number, nuevoEstado: EstadoItemComanda): Promise<ItemComanda> {
+  return request(`/api/horeca/mesas/items/${itemId}/estado?tenantId=${tenantId}&nuevoEstado=${nuevoEstado}`, { method: "PATCH" });
+}
+
+export function obtenerTableroKds(estacionCocina: string): Promise<ItemComanda[]> {
+  return request(`/api/horeca/mesas/kds/${encodeURIComponent(estacionCocina)}`);
+}
+
+export function dividirCuenta(tenantId: number, comandaId: number, numeroPersonas: number): Promise<number[]> {
+  return request(`/api/horeca/mesas/comandas/${comandaId}/dividir?tenantId=${tenantId}&numeroPersonas=${numeroPersonas}`, { method: "POST" });
+}
+
+export function cerrarComanda(tenantId: number, comandaId: number, datos: {
+  metodoPago: string; monedaPago?: string; montoRecibido?: number;
+}): Promise<Comanda> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), metodoPago: datos.metodoPago });
+  if (datos.monedaPago) params.set("monedaPago", datos.monedaPago);
+  if (datos.montoRecibido != null) params.set("montoRecibido", String(datos.montoRecibido));
+  return request(`/api/horeca/mesas/comandas/${comandaId}/cerrar?${params}`, { method: "POST" });
+}
+
+export interface EscandalloReceta {
+  id: number;
+  tenantId: number;
+  nombrePlato: string;
+  costoTotalProduccion: number;
+  estacionCocina: string;
+  precioVenta: number;
+}
+
+export interface DetalleReceta {
+  id: number;
+  tenantId: number;
+  ingredienteSku: string | null;
+  subReceta: EscandalloReceta | null;
+  cantidadRequerida: number;
+  pesoNeto: number | null;
+  porcentajeMerma: number | null;
+}
+
+export function listarEscandallos(): Promise<EscandalloReceta[]> {
+  return request(`/api/horeca/escandallos`);
+}
+
+export function crearEscandallo(tenantId: number, datos: { nombrePlato: string; estacionCocina?: string; precioVenta: number }): Promise<EscandalloReceta> {
+  return request(`/api/horeca/escandallos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function agregarIngredienteEscandallo(tenantId: number, escandalloId: number, datos: {
+  ingredienteSku?: string; subEscandalloId?: number; cantidadRequerida?: number; pesoNeto?: number; porcentajeMerma?: number;
+}): Promise<EscandalloReceta> {
+  return request(`/api/horeca/escandallos/${escandalloId}/ingredientes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function listarIngredientesEscandallo(escandalloId: number): Promise<DetalleReceta[]> {
+  return request(`/api/horeca/escandallos/${escandalloId}/ingredientes`);
+}
+
+export interface FastBarTrago {
+  id: number;
+  tenantId: number;
+  nombreTrago: string;
+  botellaSku: string | null;
+  mililitrosPorTrago: number | null;
+  precioVenta: number;
+}
+
+export function listarFastBar(tenantId: number): Promise<FastBarTrago[]> {
+  return request(`/api/horeca/fastbar?tenantId=${tenantId}`);
+}
+
+export function crearTragoFastBar(tenantId: number, datos: { nombreTrago: string; botellaSku?: string; mililitrosPorTrago?: number; precioVenta: number }): Promise<FastBarTrago> {
+  return request(`/api/horeca/fastbar?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function venderTragoRapido(tenantId: number, fastBarTragoId: number, cantidadTragos: number): Promise<number> {
+  return request(`/api/horeca/fastbar/vender?tenantId=${tenantId}&fastBarTragoId=${fastBarTragoId}&cantidadTragos=${cantidadTragos}`, { method: "POST" });
+}
+
+export interface ProveedorHoreca {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  rif: string | null;
+  telefono: string | null;
+  contacto: string | null;
+  direccion: string | null;
+  activo: boolean;
+}
+
+export function listarProveedoresHoreca(): Promise<ProveedorHoreca[]> {
+  return request(`/api/horeca/proveedores`);
+}
+
+export function crearProveedorHoreca(tenantId: number, datos: { nombre: string; rif?: string; telefono?: string; contacto?: string; direccion?: string }): Promise<ProveedorHoreca> {
+  return request(`/api/horeca/proveedores?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+// --- Inventario: artículos, compras y vencimientos ---
+
+export interface Articulo {
+  id: number;
+  tenantId: number;
+  sku: string;
+  nombre: string;
+  unidadMedida: string | null;
+  categoria: string | null;
+  stockActual: number;
+  costoUnitario: number;
+  stockMinimo: number | null;
+}
+
+export function listarArticulos(): Promise<Articulo[]> {
+  return request(`/api/inventario/articulos`);
+}
+
+export function crearArticulo(tenantId: number, datos: { sku: string; nombre: string; unidadMedida?: string; categoria?: string; costoUnitario?: number; stockMinimo?: number }): Promise<Articulo> {
+  return request(`/api/inventario/articulos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export interface ItemCompraInsumo {
+  articuloId: number;
+  cantidad: number;
+  costoUnitario: number;
+  presentacionId?: number;
+  fechaVencimiento?: string; // yyyy-MM-dd — si viene, crea un lote rastreable para alertas
+}
+
+export function registrarCompraInsumo(tenantId: number, datos: { proveedorId: number; numeroFactura: string; items: ItemCompraInsumo[] }): Promise<CompraInsumoHoreca> {
+  return request(`/api/horeca/compras-insumo?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export interface CompraInsumoHoreca {
+  id: number;
+  tenantId: number;
+  proveedor: ProveedorHoreca;
+  numeroFactura: string | null;
+  fechaCompra: string;
+  total: number;
+}
+
+export function listarComprasInsumo(): Promise<CompraInsumoHoreca[]> {
+  return request(`/api/horeca/compras-insumo`);
+}
+
+export interface LoteArticulo {
+  id: number;
+  tenantId: number;
+  articulo: Articulo;
+  cantidadIngresada: number;
+  costoUnitario: number;
+  fechaVencimiento: string; // yyyy-MM-dd
+  referenciaCompra: string | null;
+  fechaIngreso: string;
+}
+
+export function alertasVencimiento(tenantId: number, diasAnticipacion = 7): Promise<LoteArticulo[]> {
+  return request(`/api/inventario/lotes/alertas-vencimiento?tenantId=${tenantId}&diasAnticipacion=${diasAnticipacion}`);
+}

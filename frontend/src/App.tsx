@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import MediclinicApp from "./components/MediclinicApp";
+import RestauranteApp from "./components/RestauranteApp";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -16,6 +17,11 @@ import { ThemeProvider } from "./context/ThemeContext";
 function MediclinicPage() {
   const navigate = useNavigate();
   return <MediclinicApp onSalir={() => navigate("/dashboard")} />;
+}
+
+function RestaurantePage() {
+  const navigate = useNavigate();
+  return <RestauranteApp onSalir={() => navigate("/dashboard")} />;
 }
 
 export default function App() {
@@ -38,6 +44,7 @@ export default function App() {
             {/* Protected — requiere sesión activa */}
             <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/mediclinic" element={<ProtectedRoute><MediclinicPage /></ProtectedRoute>} />
+            <Route path="/restaurante" element={<ProtectedRoute><RestaurantePage /></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
