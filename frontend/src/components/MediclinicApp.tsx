@@ -847,7 +847,23 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               pacienteInicialId={pacienteSeleccionadoId}
             />
           )}
-          {pagina === "sala-espera" && <SalaEspera tenantId={tenantId} pacientes={pacientes} entradas={salaEspera} cobrosLocales={cobrosLocales} onAgregarCobro={agregarCobroLocal} onAgregarCierre={agregarCierreAuditado} onCambio={recargarTodo} config={configPerfil} />}
+          {pagina === "sala-espera" && (
+            <SalaEspera
+              tenantId={tenantId}
+              pacientes={pacientes}
+              entradas={salaEspera}
+              cobrosLocales={cobrosLocales}
+              onAgregarCobro={agregarCobroLocal}
+              onAgregarCierre={agregarCierreAuditado}
+              onCambio={recargarTodo}
+              config={configPerfil}
+              onNavegar={setPagina}
+              onSeleccionarPacienteParaConsulta={(id) => {
+                setPacienteSeleccionadoId(id);
+                setPagina("historias");
+              }}
+            />
+          )}
           {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} />}
           {pagina === "financiero" && <ResumenesFinancieros ingresosHoy={ingresosHoy} citasHoy={citasHoy} cobrosLocales={cobrosLocales} historialCierres={historialCierres} config={configPerfil} />}
           {pagina === "configuracion" && <Configuracion config={configPerfil} onGuardar={guardarConfigPerfil} user={user} />}
@@ -3639,66 +3655,315 @@ function Procedimientos({
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// SALA DE ESPERA & CIERRE DE CAJA DIARIA
+// SALA DE ESPERA & GESTIÓN DE TURNOS EN TIEMPO REAL
 // ══════════════════════════════════════════════════════════════════════════
-function SalaEspera({ tenantId, pacientes, entradas, cobrosLocales, onAgregarCobro, onAgregarCierre, onCambio, config }: {
-  tenantId: number; pacientes: Paciente[] | null; entradas: SalaEsperaEntrada[] | null; cobrosLocales: CobroItem[];
-  onAgregarCobro: (item: CobroItem) => void; onAgregarCierre: (cierre: CierreCajaData) => void; onCambio: () => void; config: any;
+
+export interface TurnoSalaEspera {
+  id: string;
+  turnoNumero: number;
+  codigoTurno: string;
+  pacienteId: number | null;
+  pacienteNombre: string;
+  pacienteCedula: string;
+  pacienteTelefono: string;
+  horaLlegada: string;
+  fecha: string;
+  motivo: string;
+  consultorio: string;
+  estado: "EN_ESPERA" | "EN_CONSULTA" | "ATENDIDO" | "CANCELADO";
+  estadoPago: "PAGADO" | "PENDIENTE" | "EXONERADO" | "PARCIAL";
+  metodoPago?: string;
+  montoUSD?: number;
+  montoVES?: number;
+  referenciaPago?: string;
+}
+
+const SALA_ESPERA_TURNOS_KEY = "aurora_mediclinic_sala_espera_turnos_v2";
+
+const MOTIVOS_CONSULTA_SUGERIDOS = [
+  "Consulta Médica General",
+  "Consulta Especializada",
+  "Control y Lectura de Exámenes",
+  "Cirugía Menor Ambulatoria",
+  "Curación / Retiro de Puntos",
+  "Evaluación Pre-Operatoria",
+  "Triaje y Emergencia",
+];
+
+function SalaEspera({
+  tenantId,
+  pacientes,
+  entradas,
+  cobrosLocales,
+  onAgregarCobro,
+  onAgregarCierre,
+  onCambio,
+  config,
+  onNavegar,
+  onSeleccionarPacienteParaConsulta,
+}: {
+  tenantId: number;
+  pacientes: Paciente[] | null;
+  entradas: SalaEsperaEntrada[] | null;
+  cobrosLocales: CobroItem[];
+  onAgregarCobro: (item: CobroItem) => void;
+  onAgregarCierre: (cierre: CierreCajaData) => void;
+  onCambio: () => void;
+  config: any;
+  onNavegar?: (pag: Pagina) => void;
+  onSeleccionarPacienteParaConsulta?: (pacienteId: number) => void;
 }) {
-  const [pacienteId, setPacienteId] = useState<number | "">("");
-  const [consultorio, setConsultorio] = useState("Consultorio 1");
-  const [metodoPago, setMetodoPago] = useState("Efectivo USD");
-  const [montoUSD, setMontoUSD] = useState("25");
-  const [referencia, setReferencia] = useState("");
-  const [enviando, setEnviando] = useState(false);
-  const [mostrarModalCierre, setMostrarModalCierre] = useState(false);
-
-  const checkIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pacienteId) return;
-    setEnviando(true);
+  // Lista de Turnos del Día
+  const [turnos, setTurnos] = useState<TurnoSalaEspera[]>(() => {
     try {
-      await registrarLlegadaSalaEspera(tenantId, Number(pacienteId), consultorio || undefined);
-      
-      const pac = (pacientes || []).find((p) => p.id === Number(pacienteId));
-      const montoNum = parseFloat(montoUSD) || 0;
-      const cobroItem: CobroItem = {
-        turno: (entradas || []).length + 1,
-        pacienteNombre: pac?.nombreCompleto || "Paciente",
-        identificacion: pac?.identificacion || "S/C",
-        concepto: "Consulta Médica",
-        metodoPago,
-        referencia: referencia.trim(),
-        montoUSD: montoNum,
-        montoVES: montoNum * config.tasaBCV,
-        hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-      onAgregarCobro(cobroItem);
+      const guardado = localStorage.getItem(SALA_ESPERA_TURNOS_KEY);
+      if (guardado) {
+        const parsed = JSON.parse(guardado);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
 
-      setPacienteId("");
-      setReferencia("");
-      onCambio();
-    } finally {
-      setEnviando(false);
+  // Guardar turnos en localStorage cuando cambie
+  useEffect(() => {
+    try {
+      localStorage.setItem(SALA_ESPERA_TURNOS_KEY, JSON.stringify(turnos));
+    } catch {}
+  }, [turnos]);
+
+  // Modales
+  const [modalAdmitir, setModalAdmitir] = useState(false);
+  const [modalPago, setModalPago] = useState<TurnoSalaEspera | null>(null);
+  const [mostrarModalCierre, setMostrarModalCierre] = useState(false);
+  const [toastExito, setToastExito] = useState<string | null>(null);
+
+  // Filtros de búsqueda
+  const [filtroTexto, setFiltroTexto] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<"TODOS" | "EN_ESPERA" | "EN_CONSULTA" | "ATENDIDO" | "CANCELADO">("TODOS");
+
+  // Formulario de Admisión
+  const [admitirPacienteId, setAdmitirPacienteId] = useState<number | "">("");
+  const [admitirNombreManual, setAdmitirNombreManual] = useState("");
+  const [admitirCedulaManual, setAdmitirCedulaManual] = useState("");
+  const [admitirTelefono, setAdmitirTelefono] = useState("");
+  const [admitirConsultorio, setAdmitirConsultorio] = useState("Consultorio 1 (Doctor)");
+  const [admitirMotivo, setAdmitirMotivo] = useState("Consulta Médica General");
+  const [admitirHora, setAdmitirHora] = useState(() =>
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  );
+  const [admitirEstadoPago, setAdmitirEstadoPago] = useState<"PAGADO" | "PENDIENTE" | "EXONERADO">("PAGADO");
+  const [admitirMetodoPago, setAdmitirMetodoPago] = useState("Efectivo USD");
+  const [admitirMontoUSD, setAdmitirMontoUSD] = useState("25");
+  const [admitirReferencia, setAdmitirReferencia] = useState("");
+  const [guardandoAdmision, setGuardandoAdmision] = useState(false);
+
+  // Formulario de Pago Rápido
+  const [pagoMetodo, setPagoMetodo] = useState("Efectivo USD");
+  const [pagoMontoUSD, setPagoMontoUSD] = useState("25");
+  const [pagoReferencia, setPagoReferencia] = useState("");
+
+  const tasaBCV = Number(config?.tasaBCV) || 950;
+
+  const dispararToast = (msg: string) => {
+    setToastExito(msg);
+    setTimeout(() => setToastExito(null), 3500);
+  };
+
+  // Contadores métricas superiores
+  const conteoEnEspera = turnos.filter((t) => t.estado === "EN_ESPERA").length;
+  const conteoEnConsulta = turnos.filter((t) => t.estado === "EN_CONSULTA").length;
+  const conteoAtendidos = turnos.filter((t) => t.estado === "ATENDIDO").length;
+
+  // Filtrado de la tabla de turnos
+  const turnosFiltrados = useMemo(() => {
+    return turnos.filter((t) => {
+      if (filtroEstado !== "TODOS" && t.estado !== filtroEstado) {
+        return false;
+      }
+      if (!filtroTexto.trim()) return true;
+      const q = filtroTexto.toLowerCase();
+      return (
+        t.codigoTurno.toLowerCase().includes(q) ||
+        t.pacienteNombre.toLowerCase().includes(q) ||
+        t.pacienteCedula.toLowerCase().includes(q) ||
+        t.pacienteTelefono.toLowerCase().includes(q) ||
+        t.motivo.toLowerCase().includes(q) ||
+        t.consultorio.toLowerCase().includes(q)
+      );
+    });
+  }, [turnos, filtroEstado, filtroTexto]);
+
+  // Al seleccionar paciente en formulario de admisión
+  const handleSeleccionarPacienteAdmision = (id: number | "") => {
+    setAdmitirPacienteId(id);
+    if (id && pacientes) {
+      const p = pacientes.find((item) => item.id === id);
+      if (p) {
+        setAdmitirNombreManual(p.nombreCompleto);
+        setAdmitirCedulaManual(p.identificacion);
+        setAdmitirTelefono(p.telefono || "");
+      }
     }
   };
 
-  const finalizar = async (id: number) => {
-    await finalizarAtencionSalaEspera(id);
+  // Ejecutar admisión de nuevo paciente a sala de espera
+  const handleGuardarAdmision = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const nombreFinal = admitirNombreManual.trim();
+    if (!nombreFinal) {
+      alert("Por favor ingresa o selecciona un paciente.");
+      return;
+    }
+
+    setGuardandoAdmision(true);
+    try {
+      const nuevoNumero = turnos.length + 1;
+      const codigoTurno = `T-${String(nuevoNumero).padStart(2, "0")}`;
+      const montoNum = parseFloat(admitirMontoUSD) || 0;
+      const montoVesNum = montoNum * tasaBCV;
+
+      const nuevoTurno: TurnoSalaEspera = {
+        id: `turno-${Date.now()}`,
+        turnoNumero: nuevoNumero,
+        codigoTurno,
+        pacienteId: admitirPacienteId ? Number(admitirPacienteId) : null,
+        pacienteNombre: nombreFinal,
+        pacienteCedula: admitirCedulaManual.trim() || "S/C",
+        pacienteTelefono: admitirTelefono.trim() || "S/T",
+        horaLlegada: admitirHora || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        fecha: hoy(),
+        motivo: admitirMotivo.trim() || "Consulta Médica General",
+        consultorio: admitirConsultorio,
+        estado: "EN_ESPERA",
+        estadoPago: admitirEstadoPago,
+        metodoPago: admitirEstadoPago === "PAGADO" ? admitirMetodoPago : undefined,
+        montoUSD: admitirEstadoPago === "PAGADO" ? montoNum : 0,
+        montoVES: admitirEstadoPago === "PAGADO" ? montoVesNum : 0,
+        referenciaPago: admitirEstadoPago === "PAGADO" ? admitirReferencia.trim() : undefined,
+      };
+
+      // Si se registró como PAGADO, agregarlo al flujo de cobros locales de caja
+      if (admitirEstadoPago === "PAGADO" && montoNum > 0) {
+        const cobroItem: CobroItem = {
+          turno: nuevoNumero,
+          pacienteNombre: nombreFinal,
+          identificacion: admitirCedulaManual.trim() || "S/C",
+          concepto: admitirMotivo.trim() || "Consulta Médica",
+          metodoPago: admitirMetodoPago,
+          referencia: admitirReferencia.trim() || "N/A",
+          montoUSD: montoNum,
+          montoVES: montoVesNum,
+          hora: nuevoTurno.horaLlegada,
+        };
+        onAgregarCobro(cobroItem);
+      }
+
+      // Backend sync
+      if (admitirPacienteId && tenantId) {
+        registrarLlegadaSalaEspera(tenantId, Number(admitirPacienteId), admitirConsultorio).catch(() => {});
+      }
+
+      setTurnos((prev) => [nuevoTurno, ...prev]);
+      dispararToast(`¡Paciente admitido con Turno ${codigoTurno}!`);
+
+      // Limpiar formulario y cerrar modal
+      setAdmitirPacienteId("");
+      setAdmitirNombreManual("");
+      setAdmitirCedulaManual("");
+      setAdmitirTelefono("");
+      setAdmitirReferencia("");
+      setModalAdmitir(false);
+      onCambio();
+    } finally {
+      setGuardandoAdmision(false);
+    }
+  };
+
+  // Cambiar estado de turno
+  const handleCambiarEstado = (id: string, nuevoEstado: TurnoSalaEspera["estado"]) => {
+    setTurnos((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, estado: nuevoEstado } : t))
+    );
+    dispararToast(`Turno actualizado a: ${nuevoEstado.replace("_", " ")}`);
     onCambio();
   };
 
-  const activos = (entradas || []).filter((e) => e.estado !== "FINALIZADO");
+  // Llamar a consulta directamente
+  const handleLlamarConsulta = (turno: TurnoSalaEspera) => {
+    handleCambiarEstado(turno.id, "EN_CONSULTA");
+    if (turno.pacienteId && onSeleccionarPacienteParaConsulta) {
+      onSeleccionarPacienteParaConsulta(turno.pacienteId);
+    } else if (onNavegar) {
+      onNavegar("historias");
+    }
+  };
+
+  // Registrar/Modificar pago de un turno
+  const handleGuardarPagoModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modalPago) return;
+
+    const montoNum = parseFloat(pagoMontoUSD) || 0;
+    const montoVesNum = montoNum * tasaBCV;
+
+    setTurnos((prev) =>
+      prev.map((t) =>
+        t.id === modalPago.id
+          ? {
+              ...t,
+              estadoPago: "PAGADO",
+              metodoPago: pagoMetodo,
+              montoUSD: montoNum,
+              montoVES: montoVesNum,
+              referenciaPago: pagoReferencia.trim(),
+            }
+          : t
+      )
+    );
+
+    if (montoNum > 0) {
+      const cobroItem: CobroItem = {
+        turno: modalPago.turnoNumero,
+        pacienteNombre: modalPago.pacienteNombre,
+        identificacion: modalPago.pacienteCedula,
+        concepto: modalPago.motivo || "Consulta Médica",
+        metodoPago: pagoMetodo,
+        referencia: pagoReferencia.trim() || "N/A",
+        montoUSD: montoNum,
+        montoVES: montoVesNum,
+        hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      onAgregarCobro(cobroItem);
+    }
+
+    dispararToast("Pago registrado exitosamente.");
+    setModalPago(null);
+    setPagoReferencia("");
+    onCambio();
+  };
+
+  // Eliminar turno
+  const handleEliminarTurno = (id: string) => {
+    if (confirm("¿Estás seguro de eliminar este turno de la sala de espera?")) {
+      setTurnos((prev) => prev.filter((t) => t.id !== id));
+      dispararToast("Turno eliminado.");
+      onCambio();
+    }
+  };
+
+  // Total de caja acumulada
   const totalCajaUSD = cobrosLocales.reduce((acc, c) => acc + c.montoUSD, 0);
   const totalCajaVES = cobrosLocales.reduce((acc, c) => acc + c.montoVES, 0);
 
+  // Cierre de caja
   const ejecutarCierreCaja = () => {
     const dataCierre: CierreCajaData = {
-      clinicaNombre: config.clinicaNombre,
-      doctorNombre: config.doctorNombre,
+      clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
+      doctorNombre: config?.doctorNombre || "Dr. Daniel Reina",
       fecha: hoy(),
       horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      tasaBCV: config.tasaBCV,
+      tasaBCV: config?.tasaBCV || tasaBCV,
       cobros: cobrosLocales,
       totalUSD: totalCajaUSD,
       totalVES: totalCajaVES,
@@ -3707,126 +3972,708 @@ function SalaEspera({ tenantId, pacientes, entradas, cobrosLocales, onAgregarCob
     generarPdfCierreCaja(dataCierre);
     onAgregarCierre(dataCierre);
     setMostrarModalCierre(false);
+    dispararToast("Cierre de caja generado y guardado.");
   };
 
   return (
-    <div className="space-y-5">
-      {/* Cabecera con botón de Cierre de Caja */}
-      <div className="flex items-center justify-between apple-glass rounded-2xl p-4 border border-teal-500/30">
-        <div>
-          <h4 className="font-bold text-sm text-slate-900 dark:text-white">Recepción, Triaje & Caja Diaria</h4>
-          <p className="text-xs text-slate-500">Recaudación acumulada hoy: <strong className="text-emerald-500">${totalCajaUSD.toFixed(2)} USD</strong> (Bs. {totalCajaVES.toFixed(2)})</p>
+    <div className="space-y-6 animate-fade-in text-slate-900 dark:text-white">
+      {/* Toast Notification */}
+      {toastExito && (
+        <div className="fixed bottom-6 right-6 z-50 bg-teal-600 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-teal-400/30 animate-bounce">
+          <IconCheckCircle size={20} />
+          <span className="text-xs sm:text-sm font-semibold">{toastExito}</span>
         </div>
-        <button
-          onClick={() => setMostrarModalCierre(true)}
-          className="px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
-        >
-          <span>🔒</span> Cerrar Caja y Jornada
-        </button>
+      )}
+
+      {/* ── HEADER SUPERIOR ── */}
+      <div className="apple-glass rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border border-slate-200/80 dark:border-white/10 shadow-sm">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center border border-teal-500/30 shadow-inner">
+            <IconHourglass size={24} />
+          </div>
+          <div>
+            <h2 className="font-['Outfit'] font-black text-lg sm:text-xl text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              Gestión de Sala de Espera & Turnos
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-white/60">
+              Control de admisión de pacientes y llamados a consulta médica en tiempo real
+            </p>
+          </div>
+        </div>
+
+        {/* 3 Pills de Estados */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* En Espera */}
+          <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-500/30 px-3.5 py-1.5 rounded-2xl text-xs font-bold shadow-xs">
+            <span className="text-sm">⏳</span>
+            <span>En Espera:</span>
+            <span className="font-black font-mono text-sm">{conteoEnEspera}</span>
+          </div>
+
+          {/* En Consulta */}
+          <div className="flex items-center gap-2 bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-300 border border-sky-300/80 dark:border-sky-500/30 px-3.5 py-1.5 rounded-2xl text-xs font-bold shadow-xs">
+            <span className="text-sm">🚪</span>
+            <span>En Consulta:</span>
+            <span className="font-black font-mono text-sm">{conteoEnConsulta}</span>
+          </div>
+
+          {/* Atendidos */}
+          <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-500/30 px-3.5 py-1.5 rounded-2xl text-xs font-bold shadow-xs">
+            <span className="text-sm">✓</span>
+            <span>Atendidos:</span>
+            <span className="font-black font-mono text-sm">{conteoAtendidos}</span>
+          </div>
+        </div>
       </div>
 
-      {/* Check-In con captura de pago */}
-      <form onSubmit={checkIn} className="apple-glass rounded-2xl p-5 space-y-3">
-        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Registrar Llegada & Captura de Pago</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div className="sm:col-span-5">
-            <label className="text-[10px] text-slate-400 uppercase font-mono">Paciente *</label>
-            <select required value={pacienteId} onChange={(e) => setPacienteId(e.target.value ? Number(e.target.value) : "")}
-              className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs">
-              <option value="">— Seleccionar paciente —</option>
-              {(pacientes || []).map((p) => <option key={p.id} value={p.id}>{p.nombreCompleto} ({p.identificacion})</option>)}
-            </select>
+      {/* ── CARD PRINCIPAL: TURNOS Y PACIENTES EN ESPERA (HOY) ── */}
+      <div className="apple-glass rounded-2xl p-5 sm:p-6 border border-slate-200/80 dark:border-white/10 shadow-sm space-y-4">
+        {/* Barra superior de herramientas */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/60 dark:border-white/10">
+          <div>
+            <h3 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">
+              Turnos y Pacientes en Espera (Hoy)
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-white/50">
+              Recaudación hoy: <strong className="text-emerald-600 dark:text-emerald-400 font-mono">${totalCajaUSD.toFixed(2)} USD</strong> (Bs. {totalCajaVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })})
+            </p>
           </div>
-          <div className="sm:col-span-3">
-            <label className="text-[10px] text-slate-400 uppercase font-mono">Método de Pago</label>
-            <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}
-              className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs">
-              <option value="Efectivo USD">Efectivo USD ($)</option>
-              <option value="Pago Móvil VES">Pago Móvil (VES)</option>
-              <option value="Zelle USD">Zelle (USD)</option>
-              <option value="Transferencia VES">Transferencia (VES)</option>
-              <option value="Punto de Venta">Punto de Venta / Tarjeta</option>
-            </select>
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-[10px] text-slate-400 uppercase font-mono">Monto ($)</label>
-            <input type="number" step="1" value={montoUSD} onChange={(e) => setMontoUSD(e.target.value)}
-              className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs font-bold" />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-[10px] text-slate-400 uppercase font-mono">Ref. / Recibo</label>
-            <input placeholder="Últimos 4 dígitos" value={referencia} onChange={(e) => setReferencia(e.target.value)}
-              className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs" />
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Buscador */}
+            <div className="w-full sm:w-56 relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <IconSearch size={14} />
+              </div>
+              <input
+                type="text"
+                placeholder="Buscar turno, paciente..."
+                value={filtroTexto}
+                onChange={(e) => setFiltroTexto(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+
+            {/* Botón Admitir Paciente */}
+            <button
+              type="button"
+              onClick={() => setModalAdmitir(true)}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-teal-600 to-sky-600 hover:from-teal-500 hover:to-sky-500 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <span className="text-sm font-black">+</span>
+              <span>Admitir Paciente</span>
+            </button>
+
+            {/* Botón Cierre de Caja */}
+            <button
+              type="button"
+              onClick={() => setMostrarModalCierre(true)}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Cerrar caja y generar reporte diario"
+            >
+              <IconLock size={13} />
+              <span>Cierre de Caja</span>
+            </button>
           </div>
         </div>
-        <button disabled={enviando} className="btn-electric-blue text-xs font-bold px-5 py-2 rounded-full disabled:opacity-50 mt-2 cursor-pointer">
-          {enviando ? "Registrando…" : "Ingresar a Sala & Registrar Cobro"}
-        </button>
-      </form>
 
-      {/* Turnos en sala */}
-      <div className="apple-glass rounded-2xl p-5 space-y-3">
-        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Sala de Espera (Turnos del Día)</h4>
-        {entradas === null ? (
-          <p className="text-xs text-slate-400">Cargando sala…</p>
-        ) : activos.length === 0 ? (
-          <p className="text-xs text-slate-400">No hay pacientes en sala de espera.</p>
-        ) : (
-          <div className="space-y-2.5">
-            {activos.map((e, idx) => (
-              <div key={e.id} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-100/60 dark:bg-white/5 border border-slate-200 dark:border-white/5">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-teal-500/20 text-teal-400 font-black text-sm flex items-center justify-center">
-                    #{idx + 1}
+        {/* Pestañas / Chips de Filtrado */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-slate-400 mr-1 font-medium">Filtrar:</span>
+          <button
+            type="button"
+            onClick={() => setFiltroEstado("TODOS")}
+            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              filtroEstado === "TODOS"
+                ? "bg-teal-600 text-white shadow-sm"
+                : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
+            }`}
+          >
+            Todos ({turnos.length})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFiltroEstado("EN_ESPERA")}
+            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              filtroEstado === "EN_ESPERA"
+                ? "bg-amber-600 text-white shadow-sm"
+                : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
+            }`}
+          >
+            ⏳ En Espera ({conteoEnEspera})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFiltroEstado("EN_CONSULTA")}
+            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              filtroEstado === "EN_CONSULTA"
+                ? "bg-sky-600 text-white shadow-sm"
+                : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
+            }`}
+          >
+            🚪 En Consulta ({conteoEnConsulta})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFiltroEstado("ATENDIDO")}
+            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              filtroEstado === "ATENDIDO"
+                ? "bg-emerald-600 text-white shadow-sm"
+                : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
+            }`}
+          >
+            ✓ Atendidos ({conteoAtendidos})
+          </button>
+        </div>
+
+        {/* TABLA DE TURNOS Y SALA DE ESPERA */}
+        <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-white/10">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-100/90 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/70 font-semibold">
+                <th className="py-2.5 px-3">Turno</th>
+                <th className="py-2.5 px-3">Paciente</th>
+                <th className="py-2.5 px-3">Teléfono</th>
+                <th className="py-2.5 px-3">Hora</th>
+                <th className="py-2.5 px-3">Motivo</th>
+                <th className="py-2.5 px-3 text-center">Estado</th>
+                <th className="py-2.5 px-3 text-center">Estado de Pago</th>
+                <th className="py-2.5 px-3 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+              {turnosFiltrados.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-16 text-center">
+                    <div className="space-y-3">
+                      <div className="text-slate-400 text-sm font-medium">
+                        Tabla sin contenido
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setModalAdmitir(true)}
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-teal-600 hover:bg-teal-500 shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5"
+                        >
+                          <span className="text-sm font-bold">+</span>
+                          <span>Admitir Paciente a Sala de Espera</span>
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                turnosFiltrados.map((t) => (
+                  <tr key={t.id} className="hover:bg-teal-500/5 transition-colors group">
+                    {/* Turno */}
+                    <td className="py-3 px-3">
+                      <div className="inline-flex items-center px-2.5 py-1 rounded-lg bg-teal-500/15 text-teal-700 dark:text-teal-300 font-mono font-black text-xs border border-teal-500/25">
+                        {t.codigoTurno}
+                      </div>
+                    </td>
+
+                    {/* Paciente */}
+                    <td className="py-3 px-3">
+                      <div className="font-bold text-slate-900 dark:text-white">
+                        {t.pacienteNombre}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        C.I: {t.pacienteCedula}
+                      </div>
+                    </td>
+
+                    {/* Teléfono */}
+                    <td className="py-3 px-3">
+                      <div className="text-slate-600 dark:text-white/80 font-mono text-[11px] flex items-center gap-1.5">
+                        <span>{t.pacienteTelefono}</span>
+                        {t.pacienteTelefono && t.pacienteTelefono !== "S/T" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const tel = t.pacienteTelefono.replace(/\D/g, "");
+                              window.open(`https://wa.me/${tel}?text=Hola%20${encodeURIComponent(t.pacienteNombre)},%20le%20escribimos%20de%20la%20cl%C3%ADnica%20para%20su%20turno%20m%C3%A9dico.`, "_blank");
+                            }}
+                            className="text-emerald-600 hover:text-emerald-500 text-xs cursor-pointer"
+                            title="Enviar mensaje por WhatsApp"
+                          >
+                            💬
+                          </button>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Hora */}
+                    <td className="py-3 px-3 font-mono text-slate-700 dark:text-white/80 font-medium">
+                      {t.horaLlegada}
+                      <div className="text-[10px] text-slate-400 font-normal">
+                        {t.consultorio}
+                      </div>
+                    </td>
+
+                    {/* Motivo */}
+                    <td className="py-3 px-3 max-w-[180px]">
+                      <div className="font-medium text-slate-800 dark:text-white/90 truncate" title={t.motivo}>
+                        {t.motivo}
+                      </div>
+                    </td>
+
+                    {/* Estado */}
+                    <td className="py-3 px-3 text-center">
+                      <select
+                        value={t.estado}
+                        onChange={(e: any) => handleCambiarEstado(t.id, e.target.value)}
+                        className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border focus:outline-none cursor-pointer ${
+                          t.estado === "EN_ESPERA"
+                            ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30"
+                            : t.estado === "EN_CONSULTA"
+                            ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-400/30"
+                            : t.estado === "ATENDIDO"
+                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30"
+                            : "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-400/30"
+                        }`}
+                      >
+                        <option value="EN_ESPERA">EN ESPERA</option>
+                        <option value="EN_CONSULTA">EN CONSULTA</option>
+                        <option value="ATENDIDO">ATENDIDO</option>
+                        <option value="CANCELADO">CANCELADO</option>
+                      </select>
+                    </td>
+
+                    {/* Estado de Pago */}
+                    <td className="py-3 px-3 text-center">
+                      {t.estadoPago === "PAGADO" ? (
+                        <div className="inline-flex flex-col items-center">
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-400/30 font-bold text-[10px]">
+                            PAGADO (${t.montoUSD || 0})
+                          </span>
+                          <span className="text-[9px] text-slate-400 font-mono mt-0.5">
+                            {t.metodoPago || "Efectivo"}
+                          </span>
+                        </div>
+                      ) : t.estadoPago === "PENDIENTE" ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalPago(t);
+                            setPagoMontoUSD("25");
+                          }}
+                          className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-400/30 font-bold text-[10px] hover:bg-amber-500/25 cursor-pointer"
+                          title="Haz clic para registrar cobro"
+                        >
+                          PENDIENTE 💳
+                        </button>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-md bg-slate-500/15 text-slate-600 dark:text-slate-300 border border-slate-400/30 font-bold text-[10px]">
+                          {t.estadoPago}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Acciones */}
+                    <td className="py-3 px-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        {/* Llamar a Consulta */}
+                        <button
+                          type="button"
+                          onClick={() => handleLlamarConsulta(t)}
+                          className="p-1.5 rounded-lg text-teal-600 hover:bg-teal-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                          title="Llamar a Consulta médica"
+                        >
+                          <IconStethoscope size={15} />
+                        </button>
+
+                        {/* Finalizar */}
+                        {t.estado !== "ATENDIDO" && (
+                          <button
+                            type="button"
+                            onClick={() => handleCambiarEstado(t.id, "ATENDIDO")}
+                            className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                            title="Marcar como Atendido"
+                          >
+                            <IconCheck size={15} />
+                          </button>
+                        )}
+
+                        {/* Eliminar */}
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarTurno(t.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                          title="Eliminar de sala de espera"
+                        >
+                          <IconTrash size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── MODAL DE ADMISIÓN DE PACIENTE (NUEVO TURNO) ── */}
+      {modalAdmitir && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-lg apple-glass rounded-3xl p-6 sm:p-7 shadow-2xl border border-white/20 bg-white/95 dark:bg-[#071a2e]/95 text-slate-900 dark:text-white space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-teal-500/20 text-teal-600 dark:text-teal-300">
+                  <IconHourglass size={20} />
+                </div>
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-base">Admitir Paciente a Sala de Espera</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-white/50">Asignar turno y registrar cobro inicial</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalAdmitir(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarAdmision} className="space-y-3.5 text-xs">
+              {/* Seleccionar Paciente Registrado */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-white/90">
+                  Seleccionar Paciente de Base de Datos
+                </label>
+                <select
+                  value={admitirPacienteId}
+                  onChange={(e) => handleSeleccionarPacienteAdmision(e.target.value ? Number(e.target.value) : "")}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 font-medium"
+                >
+                  <option value="">— Paciente Particular o Nuevo —</option>
+                  {(pacientes || []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombreCompleto} ({p.identificacion})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Nombre y Cédula (Auto o manual) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-white/90">
+                    Nombre del Paciente <span className="text-teal-500">*</span>
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="Ej. Valentina Duque"
+                    value={admitirNombreManual}
+                    onChange={(e) => setAdmitirNombreManual(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-white/90">
+                    Cédula / Identificación
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. V-28.450.123"
+                    value={admitirCedulaManual}
+                    onChange={(e) => setAdmitirCedulaManual(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30"
+                  />
+                </div>
+              </div>
+
+              {/* Teléfono y Consultorio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-white/90">Teléfono WhatsApp</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. +584121234567"
+                    value={admitirTelefono}
+                    onChange={(e) => setAdmitirTelefono(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-white/90">Consultorio Destino</label>
+                  <select
+                    value={admitirConsultorio}
+                    onChange={(e) => setAdmitirConsultorio(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30"
+                  >
+                    <option value="Consultorio 1 (Doctor)">Consultorio 1 (Doctor)</option>
+                    <option value="Consultorio 2">Consultorio 2</option>
+                    <option value="Sala de Procedimientos">Sala de Procedimientos</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Motivo de Consulta */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-white/90">Motivo de Visita</label>
+                <input
+                  type="text"
+                  placeholder="Ej. Consulta Médica General"
+                  value={admitirMotivo}
+                  onChange={(e) => setAdmitirMotivo(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30"
+                />
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {MOTIVOS_CONSULTA_SUGERIDOS.slice(0, 4).map((mot) => (
+                    <button
+                      key={mot}
+                      type="button"
+                      onClick={() => setAdmitirMotivo(mot)}
+                      className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-teal-500/20 text-slate-600 dark:text-white/70 transition-colors cursor-pointer"
+                    >
+                      {mot}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Estado de Pago */}
+              <div className="p-3 rounded-xl bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 dark:text-white">Estado de Cobro / Caja:</span>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="estadoPago"
+                        checked={admitirEstadoPago === "PAGADO"}
+                        onChange={() => setAdmitirEstadoPago("PAGADO")}
+                      />
+                      <span>Pagado</span>
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="estadoPago"
+                        checked={admitirEstadoPago === "PENDIENTE"}
+                        onChange={() => setAdmitirEstadoPago("PENDIENTE")}
+                      />
+                      <span>Pendiente</span>
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="estadoPago"
+                        checked={admitirEstadoPago === "EXONERADO"}
+                        onChange={() => setAdmitirEstadoPago("EXONERADO")}
+                      />
+                      <span>Exonerado</span>
+                    </label>
                   </div>
-                  <div>
-                    <div className="font-bold text-sm text-slate-900 dark:text-white">{e.paciente?.nombreCompleto}</div>
-                    <div className="text-[11px] text-slate-500">
-                      Llegada: {new Date(e.horaLlegada).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · Consultorio: {e.consultorio || "Principal"}
+                </div>
+
+                {admitirEstadoPago === "PAGADO" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                    <div>
+                      <label className="text-[10px] text-slate-400">Método de Pago</label>
+                      <select
+                        value={admitirMetodoPago}
+                        onChange={(e) => setAdmitirMetodoPago(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 text-xs font-medium"
+                      >
+                        <option value="Efectivo USD">Efectivo USD ($)</option>
+                        <option value="Pago Móvil VES">Pago Móvil (VES)</option>
+                        <option value="Zelle USD">Zelle (USD)</option>
+                        <option value="Transferencia VES">Transferencia (VES)</option>
+                        <option value="Punto de Venta">Punto de Venta / Tarjeta</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400">Monto USD ($)</label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={admitirMontoUSD}
+                        onChange={(e) => setAdmitirMontoUSD(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono"
+                      />
+                      <div className="text-[9px] text-slate-400 font-mono mt-0.5">
+                        Bs. {((parseFloat(admitirMontoUSD) || 0) * tasaBCV).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400">Ref. / Recibo</label>
+                      <input
+                        type="text"
+                        placeholder="Últimos 4 dígitos"
+                        value={admitirReferencia}
+                        onChange={(e) => setAdmitirReferencia(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 text-xs"
+                      />
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold text-[10px]">
-                    {e.estado}
-                  </span>
-                  <button onClick={() => finalizar(e.id)} className="px-3 py-1.5 rounded-full bg-teal-500/20 text-teal-600 dark:text-teal-300 font-bold text-xs hover:bg-teal-500/30 flex items-center gap-1 cursor-pointer">
-                    <IconCheck size={12} /> Finalizar
-                  </button>
+                )}
+              </div>
+
+              {/* Botones de acción del Modal */}
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalAdmitir(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-white/20 text-slate-600 dark:text-white/80 hover:bg-slate-100 dark:hover:bg-white/5 font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardandoAdmision}
+                  className="px-5 py-2 rounded-xl text-white bg-teal-600 hover:bg-teal-500 font-bold shadow-md transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {guardandoAdmision ? "Admitiendo..." : "Admitir y Asignar Turno"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL DE REGISTRO / MODIFICACIÓN DE PAGO ── */}
+      {modalPago && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-sm apple-glass rounded-3xl p-6 shadow-2xl border border-white/20 bg-white/95 dark:bg-[#071a2e]/95 text-slate-900 dark:text-white space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
+              <h3 className="font-['Outfit'] font-black text-base">Registrar Cobro de Consulta</h3>
+              <button
+                type="button"
+                onClick={() => setModalPago(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <div className="text-xs space-y-1">
+              <div className="font-bold text-slate-800 dark:text-white">{modalPago.pacienteNombre}</div>
+              <div className="text-slate-500 font-mono">Turno: {modalPago.codigoTurno} · C.I: {modalPago.pacienteCedula}</div>
+            </div>
+
+            <form onSubmit={handleGuardarPagoModal} className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-white/80">Método de Pago</label>
+                <select
+                  value={pagoMetodo}
+                  onChange={(e) => setPagoMetodo(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 font-medium"
+                >
+                  <option value="Efectivo USD">Efectivo USD ($)</option>
+                  <option value="Pago Móvil VES">Pago Móvil (VES)</option>
+                  <option value="Zelle USD">Zelle (USD)</option>
+                  <option value="Transferencia VES">Transferencia (VES)</option>
+                  <option value="Punto de Venta">Punto de Venta / Tarjeta</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-white/80">Monto en USD ($)</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={pagoMontoUSD}
+                  onChange={(e) => setPagoMontoUSD(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 font-black text-emerald-600 dark:text-emerald-400 text-sm font-mono"
+                />
+                <div className="text-[10px] text-slate-400 font-mono">
+                  Equivalente en VES: Bs. {((parseFloat(pagoMontoUSD) || 0) * tasaBCV).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Modal de Cierre de Caja */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-white/80">Nro. de Referencia / Comprobante</label>
+                <input
+                  type="text"
+                  placeholder="Ej. Ref #9843"
+                  value={pagoReferencia}
+                  onChange={(e) => setPagoReferencia(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalPago(null)}
+                  className="flex-1 py-2 rounded-xl border border-slate-300 dark:border-white/20 text-xs font-bold hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-md cursor-pointer"
+                >
+                  Confirmar Cobro
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL DE CIERRE DE CAJA DIARIO ── */}
       {mostrarModalCierre && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="apple-glass rounded-3xl p-6 max-w-lg w-full space-y-4 border border-white/20 shadow-2xl">
-            <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Cierre de Caja y Fin de Jornada</h3>
-            <p className="text-xs text-slate-500">Consolidación de auditoría para el día {hoy()}:</p>
-            
-            <div className="grid grid-cols-2 gap-3 p-4 rounded-xl bg-slate-100 dark:bg-white/5">
+          <div className="apple-glass rounded-3xl p-6 sm:p-7 max-w-lg w-full space-y-4 border border-white/20 shadow-2xl bg-white/95 dark:bg-[#071a2e]/95 text-slate-900 dark:text-white">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400">
+                  <IconLock size={20} />
+                </div>
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-lg">Cierre de Caja y Fin de Jornada</h3>
+                  <p className="text-xs text-slate-500 dark:text-white/50">Auditoría diaria para el día {hoy()}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarModalCierre(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
               <div>
-                <div className="text-[10px] text-slate-400 uppercase">Total Recaudado USD</div>
-                <div className="text-lg font-black text-emerald-500">${totalCajaUSD.toFixed(2)}</div>
+                <div className="text-[10px] text-slate-400 uppercase font-mono">Total Recaudado USD</div>
+                <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">${totalCajaUSD.toFixed(2)}</div>
               </div>
               <div>
-                <div className="text-[10px] text-slate-400 uppercase">Total Recaudado VES</div>
-                <div className="text-lg font-black text-sky-500">Bs. {totalCajaVES.toFixed(2)}</div>
+                <div className="text-[10px] text-slate-400 uppercase font-mono">Total Recaudado VES</div>
+                <div className="text-xl font-black text-sky-600 dark:text-sky-400 font-mono">Bs. {totalCajaVES.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</div>
               </div>
-              <div className="col-span-2 pt-2 border-t border-slate-200 dark:border-white/10 text-xs text-slate-600 dark:text-white/70">
-                Transacciones registradas: <strong>{cobrosLocales.length} pacientes</strong>
+              <div className="col-span-2 pt-2 border-t border-slate-200 dark:border-white/10 flex items-center justify-between text-xs text-slate-600 dark:text-white/70">
+                <span>Transacciones de cobro: <strong>{cobrosLocales.length}</strong></span>
+                <span>Pacientes atendidos hoy: <strong>{conteoAtendidos}</strong></span>
               </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">
-              <button onClick={() => setMostrarModalCierre(false)} className="px-4 py-2 rounded-full text-xs text-slate-400 hover:text-white cursor-pointer">
+              <button
+                type="button"
+                onClick={() => setMostrarModalCierre(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900 dark:text-white/60 dark:hover:text-white cursor-pointer"
+              >
                 Cancelar
               </button>
-              <button onClick={ejecutarCierreCaja} className="px-5 py-2.5 rounded-full bg-teal-500 text-black font-bold text-xs hover:bg-teal-400 flex items-center gap-2 cursor-pointer">
-                <span>📥</span> Descargar Reporte PDF & Guardar
+              <button
+                type="button"
+                onClick={ejecutarCierreCaja}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-sky-600 hover:from-teal-500 hover:to-sky-500 text-white font-bold text-xs flex items-center gap-2 shadow-md cursor-pointer"
+              >
+                <IconFileText size={15} />
+                <span>Descargar Reporte PDF & Guardar</span>
               </button>
             </div>
           </div>
