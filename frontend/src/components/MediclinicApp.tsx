@@ -1180,7 +1180,9 @@ function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingreso
   const totalProcedimientos = (procedimientos ? procedimientos.length : 0) + cotizacionesVivas.length;
 
   const turnosActivosLista = turnosVivos.length > 0
-    ? turnosVivos.filter((t) => t.estado === "EN_ESPERA" || t.estado === "EN_CONSULTA")
+    ? [...turnosVivos]
+        .sort((a, b) => (a.turnoNumero || 0) - (b.turnoNumero || 0))
+        .filter((t) => t.estado === "EN_ESPERA" || t.estado === "EN_CONSULTA")
     : (salaEspera || []).filter((e) => e.estado !== "FINALIZADO");
 
   const handleBuscar = (e: React.FormEvent) => {
@@ -3832,23 +3834,25 @@ function SalaEspera({
   const conteoEnConsulta = turnos.filter((t) => t.estado === "EN_CONSULTA").length;
   const conteoAtendidos = turnos.filter((t) => t.estado === "ATENDIDO").length;
 
-  // Filtrado de la tabla de turnos
+  // Filtrado de la tabla de turnos (orden cronológico ascendente: primer turno arriba, nuevos abajo)
   const turnosFiltrados = useMemo(() => {
-    return turnos.filter((t) => {
-      if (filtroEstado !== "TODOS" && t.estado !== filtroEstado) {
-        return false;
-      }
-      if (!filtroTexto.trim()) return true;
-      const q = filtroTexto.toLowerCase();
-      return (
-        t.codigoTurno.toLowerCase().includes(q) ||
-        t.pacienteNombre.toLowerCase().includes(q) ||
-        t.pacienteCedula.toLowerCase().includes(q) ||
-        t.pacienteTelefono.toLowerCase().includes(q) ||
-        t.motivo.toLowerCase().includes(q) ||
-        t.consultorio.toLowerCase().includes(q)
-      );
-    });
+    return [...turnos]
+      .sort((a, b) => (a.turnoNumero || 0) - (b.turnoNumero || 0))
+      .filter((t) => {
+        if (filtroEstado !== "TODOS" && t.estado !== filtroEstado) {
+          return false;
+        }
+        if (!filtroTexto.trim()) return true;
+        const q = filtroTexto.toLowerCase();
+        return (
+          t.codigoTurno.toLowerCase().includes(q) ||
+          t.pacienteNombre.toLowerCase().includes(q) ||
+          t.pacienteCedula.toLowerCase().includes(q) ||
+          t.pacienteTelefono.toLowerCase().includes(q) ||
+          t.motivo.toLowerCase().includes(q) ||
+          t.consultorio.toLowerCase().includes(q)
+        );
+      });
   }, [turnos, filtroEstado, filtroTexto]);
 
   // Al seleccionar paciente en formulario de admisión
@@ -3875,7 +3879,8 @@ function SalaEspera({
 
     setGuardandoAdmision(true);
     try {
-      const nuevoNumero = turnos.length + 1;
+      const maxNumero = turnos.reduce((max, t) => Math.max(max, t.turnoNumero || 0), 0);
+      const nuevoNumero = maxNumero + 1;
       const codigoTurno = `T-${String(nuevoNumero).padStart(2, "0")}`;
       const montoNum = parseFloat(admitirMontoUSD) || 0;
       const montoVesNum = montoNum * tasaBCV;
@@ -3921,7 +3926,8 @@ function SalaEspera({
         registrarLlegadaSalaEspera(tenantId, Number(admitirPacienteId), admitirConsultorio).catch(() => {});
       }
 
-      setTurnos((prev) => [nuevoTurno, ...prev]);
+      // Agregar al final (los nuevos van abajo, el primero queda arriba)
+      setTurnos((prev) => [...prev, nuevoTurno]);
       dispararToast(`¡Paciente admitido con Turno ${codigoTurno}!`);
 
       // Limpiar formulario y cerrar modal
