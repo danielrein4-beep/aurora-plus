@@ -2521,7 +2521,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
 }
 
 function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; articulo: Articulo; onCambio: () => void }) {
-  const [modo, setModo] = useState<"ver" | "editar" | "ajustar">("ver");
+  const [modo, setModo] = useState<"ver" | "editar" | "ajustar" | "reabastecer">("ver");
   const [stockReal, setStockReal] = useState(String(Number(articulo.stockActual)));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2582,6 +2582,7 @@ function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; a
       <div className="flex items-center justify-between gap-2">
         <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">{articulo.nombre}</h4>
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button onClick={() => setModo("reabastecer")} title="Reabastecer (entrada rápida de stock)" className="text-slate-400 hover:text-emerald-500 cursor-pointer"><IconDownload size={13} /></button>
           <button onClick={() => setModo("ajustar")} title="Corregir stock (conteo físico)" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconRefresh size={13} /></button>
           <button onClick={() => setModo("editar")} title="Editar artículo" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconCustomize size={13} /></button>
           <button onClick={eliminar} disabled={guardando} title="Eliminar artículo" className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40"><IconTrash size={13} /></button>
@@ -2610,12 +2611,139 @@ function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; a
       {modo === "editar" && (
         <ModalEditarArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onGuardado={() => { setModo("ver"); onCambio(); }} />
       )}
+      {modo === "reabastecer" && (
+        <ModalReabastecerArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onReabastecido={() => { setModo("ver"); onCambio(); }} />
+      )}
     </div>
+  );
+}
+
+/**
+ * Reabastecimiento express: a diferencia de "Ajustar stock" (que corrige a
+ * un total contado a mano), esto SUMA una cantidad recién llegada, con su
+ * propio costo y — si el insumo vence — su propio lote, en un solo paso
+ * desde la tarjeta del artículo, sin pasar por Compras & Proveedores.
+ */
+function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido }: {
+  tenantId: number; articulo: Articulo; onClose: () => void; onReabastecido: () => void;
+}) {
+  const [cantidad, setCantidad] = useState("");
+  const [costoUnitario, setCostoUnitario] = useState(String(articulo.costoUnitario));
+  const [fechaVencimiento, setFechaVencimiento] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const guardar = async () => {
+    if (!cantidad || Number(cantidad) <= 0) { setError("Indica la cantidad que llegó"); return; }
+    if (!costoUnitario || Number(costoUnitario) < 0) { setError("El costo unitario es obligatorio"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      await entradaArticulo(tenantId, articulo.id, {
+        cantidad: Number(cantidad), costoUnitario: Number(costoUnitario),
+        motivo: "Reabastecimiento rápido", fechaVencimiento: fechaVencimiento || undefined,
+      });
+      onReabastecido();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar la entrada");
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} titulo={`Reabastecer · ${articulo.nombre}`}>
+      <div className="space-y-3">
+        <p className="text-xs text-slate-500">Stock actual: {Number(articulo.stockActual).toFixed(2)} {articulo.unidadMedida}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label={`Cantidad a sumar (${articulo.unidadMedida})`}>
+            <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} type="number" step="0.001" min="0.001" placeholder="0" className="input-horeca" autoFocus />
+          </Campo>
+          <Campo label="Costo unitario $">
+            <input value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
+          </Campo>
+        </div>
+        <Campo label="Fecha de vencimiento (opcional)">
+          <input value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} type="date" className="input-horeca" />
+        </Campo>
+        {fechaVencimiento && (
+          <p className={`text-[11px] font-semibold ${diasParaVencerTexto(fechaVencimiento).color}`}>
+            {diasParaVencerTexto(fechaVencimiento).texto} — Aurora crea el lote y avisará en Vencimientos.
+          </p>
+        )}
+        {cantidad && costoUnitario && (
+          <p className="text-xs text-slate-500">
+            Nuevo stock: <strong className="text-slate-900">{(Number(articulo.stockActual) + Number(cantidad)).toFixed(2)} {articulo.unidadMedida}</strong>
+            {" · "}Costo de esta entrada: <strong className="text-slate-900">${(Number(cantidad) * Number(costoUnitario)).toFixed(2)}</strong>
+          </p>
+        )}
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="flex gap-2 pt-1">
+          <button onClick={guardar} disabled={guardando} className="flex-1 g-aurora text-white text-sm font-bold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+            {guardando ? "Registrando…" : "Reabastecer"}
+          </button>
+          <button onClick={onClose} className="flex-1 apple-glass-btn text-sm font-semibold py-2.5 rounded-xl cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
 interface FilaCompra { articuloId: string; cantidad: string; costoUnitario: string; fechaVencimiento: string }
 const filaVacia = (): FilaCompra => ({ articuloId: "", cantidad: "", costoUnitario: "", fechaVencimiento: "" });
+
+/** Buscador con dropdown para elegir un artículo por nombre o SKU — reemplaza el <select> plano de una lista larga de inventario en la factura de compra. */
+function BuscadorArticulo({ articulos, articuloId, onSeleccionar }: {
+  articulos: Articulo[] | null; articuloId: string; onSeleccionar: (id: string) => void;
+}) {
+  const [busqueda, setBusqueda] = useState("");
+  const [abierto, setAbierto] = useState(false);
+  const contenedorRef = useRef<HTMLDivElement | null>(null);
+
+  const seleccionado = (articulos || []).find((a) => String(a.id) === articuloId) || null;
+
+  useEffect(() => {
+    if (!abierto) return;
+    const handler = (e: MouseEvent) => {
+      if (contenedorRef.current && !contenedorRef.current.contains(e.target as Node)) setAbierto(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [abierto]);
+
+  const resultados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return (articulos || []).slice(0, 30);
+    return (articulos || []).filter((a) => a.nombre.toLowerCase().includes(q) || a.sku.toLowerCase().includes(q)).slice(0, 30);
+  }, [articulos, busqueda]);
+
+  return (
+    <div className="relative" ref={contenedorRef}>
+      <input
+        value={abierto ? busqueda : (seleccionado ? `${seleccionado.nombre} (${seleccionado.sku})` : "")}
+        onChange={(e) => { setBusqueda(e.target.value); if (!abierto) setAbierto(true); }}
+        onFocus={() => { setBusqueda(""); setAbierto(true); }}
+        placeholder="Buscar artículo por nombre o SKU…"
+        className="input-horeca w-full"
+      />
+      {abierto && (
+        <div className="absolute z-20 mt-1 w-full min-w-[220px] bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-52 overflow-y-auto shadow-lg">
+          {resultados.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-slate-400">Sin resultados.</p>
+          ) : (
+            resultados.map((a) => (
+              <button key={a.id} type="button"
+                onClick={() => { onSeleccionar(String(a.id)); setBusqueda(""); setAbierto(false); }}
+                className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer flex items-center justify-between gap-2">
+                <span className="font-semibold text-slate-800 dark:text-white truncate">{a.nombre}</span>
+                <span className="text-slate-400 font-mono flex-shrink-0">{a.sku}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
   tenantId: number; proveedores: ProveedorHoreca[] | null; articulos: Articulo[] | null; onCambio: () => void;
@@ -2683,10 +2811,7 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
         <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Artículos comprados</p>
         {filas.map((f, idx) => (
           <div key={idx} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1.2fr_auto] gap-2 items-center">
-            <select value={f.articuloId} onChange={(e) => actualizarFila(idx, "articuloId", e.target.value)} className="input-horeca">
-              <option value="">— Artículo —</option>
-              {(articulos || []).map((a) => <option key={a.id} value={a.id}>{a.nombre} ({a.sku})</option>)}
-            </select>
+            <BuscadorArticulo articulos={articulos} articuloId={f.articuloId} onSeleccionar={(id) => actualizarFila(idx, "articuloId", id)} />
             <input value={f.cantidad} onChange={(e) => actualizarFila(idx, "cantidad", e.target.value)} type="number" step="0.001" placeholder="Cantidad" className="input-horeca" />
             <input value={f.costoUnitario} onChange={(e) => actualizarFila(idx, "costoUnitario", e.target.value)} type="number" step="0.01" placeholder="Costo unit. $" className="input-horeca" />
             <div>
