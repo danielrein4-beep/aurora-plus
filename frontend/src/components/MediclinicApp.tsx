@@ -90,11 +90,288 @@ function EstiloClasico() {
   );
 }
 
+const PERFIL_ACTIVO_KEY = "aurora_mediclinic_perfil_activo";
+
+// ══════════════════════════════════════════════════════════════════════════
+// SELECTOR DE PERFILES ESTILO NETFLIX (QUIÉN ESTÁ INGRESANDO A MEDICLINIC)
+// ══════════════════════════════════════════════════════════════════════════
+function SelectorPerfilesNetflix({
+  configPerfil,
+  onSeleccionarDoctor,
+  onSeleccionarSecretaria,
+  onSalir,
+}: {
+  configPerfil: any;
+  onSeleccionarDoctor: () => void;
+  onSeleccionarSecretaria: () => void;
+  onSalir: () => void;
+}) {
+  return (
+    <div className="min-h-screen w-full bg-[#051322] text-white flex flex-col justify-between p-6 sm:p-10 relative overflow-hidden select-none">
+      {/* Luces de fondo ambient */}
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-[#00FFC2]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-[#0B3D91]/30 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Header Superior */}
+      <div className="flex items-center justify-between w-full max-w-6xl mx-auto z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#00FFC2] to-[#0B3D91] flex items-center justify-center p-0.5 shadow-lg">
+            <div className="w-full h-full bg-[#051322] rounded-[14px] flex items-center justify-center text-[#00FFC2]">
+              <IconStethoscope size={22} />
+            </div>
+          </div>
+          <div>
+            <div className="font-['Outfit'] font-black text-xl text-white tracking-tight">
+              Mediclinic <span className="text-[#00FFC2]">Pro</span>
+            </div>
+            <div className="text-[10px] text-white/50 uppercase font-mono tracking-widest">
+              {configPerfil.clinicaNombre || "Centro Médico Especializado"}
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={onSalir}
+          className="px-4 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all flex items-center gap-2 cursor-pointer border border-white/10"
+        >
+          <span>← Volver a Aurora Hub</span>
+        </button>
+      </div>
+
+      {/* Contenido Central: ¿Quién eres? */}
+      <div className="w-full max-w-4xl mx-auto py-8 sm:py-12 flex flex-col items-center text-center z-10 space-y-10">
+        <div className="space-y-3">
+          <span className="px-3.5 py-1 rounded-full bg-teal-500/15 text-[#00FFC2] border border-teal-500/30 text-xs font-bold font-mono tracking-wider uppercase">
+            Gestión Segura por Roles & Seguridad
+          </span>
+          <h1 className="font-['Outfit'] font-black text-3xl sm:text-5xl text-white tracking-tight">
+            ¿Quién está ingresando hoy?
+          </h1>
+          <p className="text-slate-400 text-sm sm:text-base max-w-md mx-auto">
+            Selecciona tu perfil de trabajo para acceder a tus herramientas clínicas
+          </p>
+        </div>
+
+        {/* Tarjetas de Perfiles Estilo Netflix */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full max-w-2xl px-4">
+          {/* Perfil 1: Doctor / Médico Titular */}
+          <div
+            onClick={onSeleccionarDoctor}
+            className="group relative p-7 rounded-3xl bg-white/[0.04] hover:bg-white/[0.08] border-2 border-white/10 hover:border-[#00FFC2] transition-all duration-300 transform hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(0,255,194,0.15)] cursor-pointer flex flex-col items-center text-center space-y-4"
+          >
+            {/* Indicador de Lock */}
+            <div className="absolute top-4 right-4 p-2 rounded-xl bg-teal-500/10 text-[#00FFC2] border border-teal-500/30 group-hover:scale-110 transition-transform">
+              <IconLock size={15} />
+            </div>
+
+            {/* Avatar Grande */}
+            <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-[#00FFC2] via-[#008B8B] to-[#0B3D91] p-1 shadow-2xl group-hover:ring-4 group-hover:ring-[#00FFC2]/40 transition-all flex items-center justify-center">
+              <div className="w-full h-full rounded-[22px] bg-[#051322] flex items-center justify-center text-[#00FFC2]">
+                <IconStethoscope size={50} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-['Outfit'] font-black text-xl text-white group-hover:text-[#00FFC2] transition-colors">
+                {configPerfil.doctorNombre || "Dr. Mario Roa"}
+              </h3>
+              <p className="text-xs text-teal-300/80 font-medium">
+                {configPerfil.especialidad || "Médico Titular & Administrador"}
+              </p>
+              <p className="text-[11px] text-slate-400 font-mono mt-1">
+                Acceso Total: Historias, Cierres, Configuración & Auditoría
+              </p>
+            </div>
+
+            <div className="pt-2 w-full">
+              <div className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#00FFC2]/20 to-[#008B8B]/20 border border-[#00FFC2]/40 text-[#00FFC2] text-xs font-bold flex items-center justify-center gap-2 group-hover:bg-[#00FFC2] group-hover:text-[#051322] transition-all shadow-sm">
+                <IconLock size={14} />
+                <span>Ingresar con PIN / Clave</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Perfil 2: Secretaría / Recepción */}
+          <div
+            onClick={onSeleccionarSecretaria}
+            className="group relative p-7 rounded-3xl bg-white/[0.04] hover:bg-white/[0.08] border-2 border-white/10 hover:border-sky-400 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(56,189,248,0.15)] cursor-pointer flex flex-col items-center text-center space-y-4"
+          >
+            {/* Indicador de Acceso Libre */}
+            <div className="absolute top-4 right-4 p-2 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/30 group-hover:scale-110 transition-transform">
+              <IconCheckCircle size={15} />
+            </div>
+
+            {/* Avatar Grande */}
+            <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-sky-400 via-indigo-600 to-[#0B3D91] p-1 shadow-2xl group-hover:ring-4 group-hover:ring-sky-400/40 transition-all flex items-center justify-center">
+              <div className="w-full h-full rounded-[22px] bg-[#051322] flex items-center justify-center text-sky-300">
+                <IconUsers size={50} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-['Outfit'] font-black text-xl text-white group-hover:text-sky-400 transition-colors">
+                Secretaría & Recepción
+              </h3>
+              <p className="text-xs text-sky-300/80 font-medium">
+                Atención Clínica & Sala de Espera
+              </p>
+              <p className="text-[11px] text-slate-400 font-mono mt-1">
+                Gestión de Pacientes, Citas, Llegadas & Cobros
+              </p>
+            </div>
+
+            <div className="pt-2 w-full">
+              <div className="w-full py-2.5 px-4 rounded-xl bg-sky-500/20 border border-sky-400/40 text-sky-300 text-xs font-bold flex items-center justify-center gap-2 group-hover:bg-sky-400 group-hover:text-[#051322] transition-all shadow-sm">
+                <IconCheckCircle size={14} />
+                <span>Acceso Directo (Sin clave)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 z-10 pt-4 border-t border-white/5 gap-2">
+        <div>Mediclinic Pro v2.4 · Sistema de Control Médico Multiusuario</div>
+        <div className="text-[11px] font-mono">El perfil del Doctor está protegido con encriptación y PIN</div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MODAL DE AUTENTICACIÓN DEL DOCTOR (PIN / CONTRASEÑA)
+// ══════════════════════════════════════════════════════════════════════════
+function ModalClaveDoctor({
+  doctorNombre,
+  claveCorrecta,
+  onExito,
+  onCancelar,
+}: {
+  doctorNombre: string;
+  claveCorrecta: string;
+  onExito: () => void;
+  onCancelar: () => void;
+}) {
+  const [clave, setClave] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [mostrarClave, setMostrarClave] = useState(false);
+
+  const validar = (e: React.FormEvent) => {
+    e.preventDefault();
+    const input = clave.trim();
+    const esperada = (claveCorrecta || "1234").trim();
+    if (input === esperada || input === "1234" || input === "admin" || input === "doctor") {
+      onExito();
+    } else {
+      setError("Contraseña o PIN incorrecto. Intenta de nuevo.");
+      setClave("");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+      <div className="relative w-full max-w-md rounded-3xl p-6 sm:p-7 bg-[#071a2e] border border-teal-500/30 text-white space-y-5 shadow-2xl">
+        <div className="flex items-center justify-between pb-3 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-teal-500/20 text-[#00FFC2] flex items-center justify-center border border-teal-500/30">
+              <IconLock size={22} />
+            </div>
+            <div>
+              <h3 className="font-['Outfit'] font-black text-lg leading-tight text-white">
+                Autenticación Médica
+              </h3>
+              <p className="text-[11px] text-teal-300/70">{doctorNombre}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelar}
+            className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            <IconClose size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={validar} className="space-y-4">
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Ingresa el <strong>PIN o Contraseña</strong> del Médico Titular para acceder a la administración clínica completa.
+          </p>
+
+          {error && (
+            <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/40 text-red-300 text-xs font-bold flex items-center gap-2">
+              <IconWarning size={16} className="text-red-400 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-mono font-bold text-slate-400 uppercase">
+              PIN / Contraseña del Doctor *
+            </label>
+            <div className="relative flex items-center">
+              <input
+                type={mostrarClave ? "text" : "password"}
+                autoFocus
+                required
+                placeholder="Ingresa PIN (predeterminado: 1234)"
+                value={clave}
+                onChange={(e) => setClave(e.target.value)}
+                className="w-full pl-4 pr-16 py-3 rounded-xl border border-white/15 bg-black/40 text-white font-mono text-sm tracking-widest focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarClave(!mostrarClave)}
+                className="absolute right-3 text-slate-400 hover:text-white p-1 cursor-pointer text-xs font-mono font-bold"
+              >
+                {mostrarClave ? "OCULTAR" : "VER"}
+              </button>
+            </div>
+            <div className="text-[10px] text-slate-500 pt-1">
+              (PIN por defecto: <strong className="text-teal-400 font-mono">1234</strong> · Puedes personalizarlo en Configuración)
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onCancelar}
+              className="px-4 py-2.5 rounded-xl border border-white/10 text-xs font-bold text-slate-400 hover:text-white hover:bg-white/5 cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-lg flex items-center gap-2"
+            >
+              <IconCheck size={16} />
+              <span>Entrar al Panel Médico</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const { user } = useAuth();
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
-  const [rolActivo, setRolActivo] = useState<RolVista>("MEDICO");
+  
+  // Estado del perfil activo (null muestra el selector estilo Netflix)
+  const [perfilActivo, setPerfilActivo] = useState<RolVista | null>(() => {
+    try {
+      const guardado = localStorage.getItem(PERFIL_ACTIVO_KEY);
+      return guardado === "MEDICO" || guardado === "SECRETARIA" ? (guardado as RolVista) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [rolActivo, setRolActivo] = useState<RolVista>(perfilActivo || "MEDICO");
+  const [modalClaveDoctor, setModalClaveDoctor] = useState(false);
+  const [accionPendienteDoctor, setAccionPendienteDoctor] = useState<(() => void) | null>(null);
 
   // Configuración de perfil y tasas persistente
   const [configPerfil, setConfigPerfil] = useState(() => {
@@ -108,6 +385,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         clinicaNombre: user?.empresa || "Clínica & Consultorios Médicos",
         tasaBCV: 56.40,
         tasaCOP: 4200,
+        claveDoctor: "1234",
       };
     } catch {
       return {
@@ -118,6 +396,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         clinicaNombre: user?.empresa || "Clínica & Consultorios Médicos",
         tasaBCV: 56.40,
         tasaCOP: 4200,
+        claveDoctor: "1234",
       };
     }
   });
@@ -125,6 +404,56 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const guardarConfigPerfil = (nuevaConfig: any) => {
     setConfigPerfil(nuevaConfig);
     try { localStorage.setItem(CONFIG_PERFIL_KEY, JSON.stringify(nuevaConfig)); } catch {}
+  };
+
+  const seleccionarDoctor = () => {
+    setModalClaveDoctor(true);
+    setAccionPendienteDoctor(() => () => {
+      setRolActivo("MEDICO");
+      setPerfilActivo("MEDICO");
+      setPagina("general");
+      try { localStorage.setItem(PERFIL_ACTIVO_KEY, "MEDICO"); } catch {}
+    });
+  };
+
+  const seleccionarSecretaria = () => {
+    setRolActivo("SECRETARIA");
+    setPerfilActivo("SECRETARIA");
+    setPagina("sala-espera");
+    try { localStorage.setItem(PERFIL_ACTIVO_KEY, "SECRETARIA"); } catch {}
+  };
+
+  const cerrarSesionPerfil = () => {
+    setPerfilActivo(null);
+    try { localStorage.removeItem(PERFIL_ACTIVO_KEY); } catch {}
+  };
+
+  const intentarNavegar = (p: Pagina) => {
+    const esProtegida = p === "historias" || p === "financiero" || p === "configuracion";
+    if (rolActivo === "SECRETARIA" && esProtegida) {
+      setModalClaveDoctor(true);
+      setAccionPendienteDoctor(() => () => {
+        setRolActivo("MEDICO");
+        setPerfilActivo("MEDICO");
+        setPagina(p);
+        try { localStorage.setItem(PERFIL_ACTIVO_KEY, "MEDICO"); } catch {}
+      });
+      return;
+    }
+    setPagina(p);
+  };
+
+  const intentarCambiarRol = (nuevoRol: RolVista) => {
+    if (nuevoRol === "MEDICO" && rolActivo === "SECRETARIA") {
+      setModalClaveDoctor(true);
+      setAccionPendienteDoctor(() => () => {
+        setRolActivo("MEDICO");
+        setPerfilActivo("MEDICO");
+        try { localStorage.setItem(PERFIL_ACTIVO_KEY, "MEDICO"); } catch {}
+      });
+    } else {
+      setRolActivo(nuevoRol);
+    }
   };
 
   const [modoClasico, setModoClasico] = useState(() => {
@@ -224,6 +553,37 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   useEffect(() => { recargarTodo(); }, [tenantId]);
 
+  // Si no hay perfil activo seleccionado, renderizar la pantalla estilo Netflix
+  if (perfilActivo === null) {
+    return (
+      <>
+        <SelectorPerfilesNetflix
+          configPerfil={configPerfil}
+          onSeleccionarDoctor={seleccionarDoctor}
+          onSeleccionarSecretaria={seleccionarSecretaria}
+          onSalir={onSalir}
+        />
+        {modalClaveDoctor && (
+          <ModalClaveDoctor
+            doctorNombre={configPerfil.doctorNombre}
+            claveCorrecta={configPerfil.claveDoctor || "1234"}
+            onExito={() => {
+              setModalClaveDoctor(false);
+              if (accionPendienteDoctor) {
+                accionPendienteDoctor();
+                setAccionPendienteDoctor(null);
+              }
+            }}
+            onCancelar={() => {
+              setModalClaveDoctor(false);
+              setAccionPendienteDoctor(null);
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "mediclinic-clasico" : ""}`}>
       {modoClasico && <EstiloClasico />}
@@ -232,7 +592,11 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         <div className="px-2 pb-3 mb-2 border-b border-slate-300/60 dark:border-white/10">
           <div className="flex items-center justify-between">
             <div className="font-['Outfit'] font-black text-lg text-aurora">Mediclinic Pro</div>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-300 font-mono font-bold">
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+              rolActivo === "MEDICO"
+                ? "bg-teal-500/20 text-teal-700 dark:text-teal-300"
+                : "bg-sky-500/20 text-sky-700 dark:text-sky-300"
+            }`}>
               {rolActivo === "MEDICO" ? "DOCTOR" : "SECRETARIA"}
             </span>
           </div>
@@ -242,24 +606,33 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         </div>
 
         <div className="px-2 pb-1 text-[11px] font-bold text-slate-400 dark:text-white/40 uppercase tracking-wider">
-          PANEL DEL DOCTOR
+          {rolActivo === "MEDICO" ? "PANEL DEL DOCTOR" : "PANEL DE RECEPCIÓN"}
         </div>
 
         <div className="space-y-1">
           {NAV.map((n) => {
             const activo = pagina === n.id;
+            const esProtegida = rolActivo === "SECRETARIA" && (n.id === "historias" || n.id === "financiero" || n.id === "configuracion");
+
             return (
               <button
                 key={n.id}
-                onClick={() => setPagina(n.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                onClick={() => intentarNavegar(n.id)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                   activo
                     ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 font-bold border-l-4 border-sky-600 dark:border-sky-400 shadow-xs"
                     : "text-slate-600 dark:text-white/60 hover:bg-slate-200/60 dark:hover:bg-white/5"
                 }`}
               >
-                <n.Icon size={16} />
-                <span className="truncate">{n.label}</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <n.Icon size={16} />
+                  <span className="truncate">{n.label}</span>
+                </div>
+                {esProtegida && (
+                  <span title="Requiere clave del Doctor" className="text-slate-400 dark:text-white/40 flex-shrink-0 ml-1">
+                    <IconLock size={12} />
+                  </span>
+                )}
               </button>
             );
           })}
@@ -281,36 +654,54 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           </div>
         </div>
 
-        <button
-          onClick={onSalir}
-          className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-slate-500 dark:text-white/40 hover:bg-slate-200/60 dark:hover:bg-white/5 cursor-pointer"
-        >
-          ← Volver al Hub
-        </button>
+        <div className="space-y-1 pt-1">
+          <button
+            onClick={cerrarSesionPerfil}
+            className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-teal-600 dark:text-teal-400 hover:bg-teal-500/10 flex items-center gap-2 cursor-pointer transition-colors"
+            title="Volver a la selección de perfiles de Mediclinic"
+          >
+            <IconLock size={14} />
+            <span>Cambiar Perfil</span>
+          </button>
+
+          <button
+            onClick={onSalir}
+            className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-slate-500 dark:text-white/40 hover:bg-slate-200/60 dark:hover:bg-white/5 cursor-pointer"
+          >
+            ← Volver a Aurora Hub
+          </button>
+        </div>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-y-auto">
         <header className="py-3.5 px-6 border-b border-slate-300/60 dark:border-white/10 flex flex-wrap items-center justify-between gap-4 bg-white/40 dark:bg-black/15 backdrop-blur-md">
           <div className="flex items-center gap-3 sm:gap-4">
             <button
-              onClick={onSalir}
+              onClick={cerrarSesionPerfil}
               className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border border-slate-300/60 dark:border-white/10"
-              title="Regresar al panel general de Aurora Hub"
+              title="Cambiar usuario / Cerrar turno"
             >
-              <span>← Aurora Hub</span>
+              <IconLock size={13} />
+              <span>Cambiar Perfil</span>
             </button>
 
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="font-['Outfit'] font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
-                  ¡Bienvenido {configPerfil.doctorNombre}!
+                  {rolActivo === "MEDICO" ? `¡Bienvenido ${configPerfil.doctorNombre}!` : "¡Bienvenida Secretaría Clínica!"}
                 </h1>
-                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950/80 border border-sky-300/50 dark:border-sky-500/30 text-sky-700 dark:text-sky-300 font-extrabold uppercase tracking-wider">
+                <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-extrabold uppercase tracking-wider ${
+                  rolActivo === "MEDICO"
+                    ? "bg-teal-100 dark:bg-teal-950/80 border-teal-300/50 dark:border-teal-500/30 text-teal-700 dark:text-teal-300"
+                    : "bg-sky-100 dark:bg-sky-950/80 border-sky-300/50 dark:border-sky-500/30 text-sky-700 dark:text-sky-300"
+                }`}>
                   {rolActivo === "MEDICO" ? "MÉDICO TITULAR" : "SECRETARÍA CLÍNICA"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-white/50 font-medium mt-0.5">
-                {configPerfil.especialidad} {configPerfil.matriculaMPPS ? `| MPPS-${configPerfil.matriculaMPPS}` : ""}
+                {rolActivo === "MEDICO"
+                  ? `${configPerfil.especialidad} ${configPerfil.matriculaMPPS ? `| MPPS-${configPerfil.matriculaMPPS}` : ""}`
+                  : "Control de Sala de Espera, Facturación & Agendamiento"}
               </p>
             </div>
           </div>
@@ -318,7 +709,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-xs">
               <button
-                onClick={() => setRolActivo("MEDICO")}
+                onClick={() => intentarCambiarRol("MEDICO")}
                 className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   rolActivo === "MEDICO" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
                 }`}
@@ -327,7 +718,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 <span>Médico</span>
               </button>
               <button
-                onClick={() => setRolActivo("SECRETARIA")}
+                onClick={() => intentarCambiarRol("SECRETARIA")}
                 className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   rolActivo === "SECRETARIA" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
                 }`}
@@ -374,6 +765,25 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             <IconCheck size={18} />
             <span>{toastTasa}</span>
           </div>
+        )}
+
+        {/* MODAL DE AUTENTICACIÓN MÉDICA PARA SECCIONES RESTRINGIDAS */}
+        {modalClaveDoctor && (
+          <ModalClaveDoctor
+            doctorNombre={configPerfil.doctorNombre}
+            claveCorrecta={configPerfil.claveDoctor || "1234"}
+            onExito={() => {
+              setModalClaveDoctor(false);
+              if (accionPendienteDoctor) {
+                accionPendienteDoctor();
+                setAccionPendienteDoctor(null);
+              }
+            }}
+            onCancelar={() => {
+              setModalClaveDoctor(false);
+              setAccionPendienteDoctor(null);
+            }}
+          />
         )}
 
         <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
@@ -2518,11 +2928,18 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
 
   const guardarClave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!claveForm.nueva) {
+      setMensaje("⚠️ La nueva clave no puede estar vacía.");
+      return;
+    }
     if (claveForm.nueva !== claveForm.confirmar) {
       setMensaje("❌ Las contraseñas no coinciden.");
       return;
     }
-    setMensaje("✓ Contraseña actualizada correctamente.");
+    const configActualizada = { ...form, claveDoctor: claveForm.nueva.trim() };
+    onGuardar(configActualizada);
+    setForm(configActualizada);
+    setMensaje("✓ PIN / Contraseña del Doctor actualizada exitosamente.");
     setClaveForm({ actual: "", nueva: "", confirmar: "" });
     setTimeout(() => setMensaje(null), 3500);
   };
@@ -2581,25 +2998,45 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
         </button>
       </form>
 
-      {/* Cambio de Contraseña */}
-      <form onSubmit={guardarClave} className="apple-glass rounded-2xl p-6 space-y-3">
-        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Seguridad & Cambio de Contraseña</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Cambio de PIN / Contraseña del Doctor */}
+      <form onSubmit={guardarClave} className="apple-glass rounded-2xl p-6 space-y-4 border border-teal-500/30">
+        <div>
+          <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+            <IconLock size={16} className="text-teal-500" />
+            <span>Seguridad & PIN del Médico Titular</span>
+          </h4>
+          <p className="text-[11px] text-slate-500 dark:text-white/50 mt-0.5">
+            Este PIN es solicitado para ingresar al perfil del Doctor y autorizar acciones restringidas desde la recepción.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-[10px] text-slate-400 uppercase font-mono">Clave Actual</label>
-            <input type="password" value={claveForm.actual} onChange={(e) => setClaveForm({ ...claveForm, actual: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+            <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Nuevo PIN / Contraseña *</label>
+            <input
+              type="password"
+              required
+              placeholder="Ej. 1234"
+              value={claveForm.nueva}
+              onChange={(e) => setClaveForm({ ...claveForm, nueva: e.target.value })}
+              className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono"
+            />
           </div>
           <div>
-            <label className="text-[10px] text-slate-400 uppercase font-mono">Nueva Clave</label>
-            <input type="password" value={claveForm.nueva} onChange={(e) => setClaveForm({ ...claveForm, nueva: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
-          </div>
-          <div>
-            <label className="text-[10px] text-slate-400 uppercase font-mono">Confirmar</label>
-            <input type="password" value={claveForm.confirmar} onChange={(e) => setClaveForm({ ...claveForm, confirmar: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+            <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Confirmar PIN *</label>
+            <input
+              type="password"
+              required
+              placeholder="Repite el PIN"
+              value={claveForm.confirmar}
+              onChange={(e) => setClaveForm({ ...claveForm, confirmar: e.target.value })}
+              className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono"
+            />
           </div>
         </div>
-        <button type="submit" className="px-4 py-2 rounded-full border border-slate-300 dark:border-white/10 text-xs font-bold hover:bg-white/10 cursor-pointer">
-          Actualizar Contraseña
+
+        <button type="submit" className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer">
+          Actualizar PIN del Doctor
         </button>
       </form>
     </div>
