@@ -229,6 +229,7 @@ public class ArticuloController {
         public String unidadMedida;
         public String categoria;
         public BigDecimal costoUnitario;
+        public BigDecimal precioVenta;
         public BigDecimal stockInicial; // opcional — si viene, registra una entrada de Kardex de una vez
     }
 
@@ -273,6 +274,7 @@ public class ArticuloController {
                 articulo.setUnidadMedida(item.unidadMedida != null && !item.unidadMedida.isBlank() ? item.unidadMedida.trim() : "unidad");
                 articulo.setCategoria(item.categoria != null && !item.categoria.isBlank() ? item.categoria.trim() : "General");
                 if (item.costoUnitario != null) articulo.setCostoUnitario(item.costoUnitario);
+                if (item.precioVenta != null) articulo.setPrecioVenta(item.precioVenta);
                 if (esNuevo) articulo.setPorcentajeImpuesto(BigDecimal.ZERO);
 
                 articulo = articuloRepository.save(articulo);

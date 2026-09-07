@@ -973,6 +973,7 @@ export interface ItemImportacionArticulo {
   unidadMedida?: string;
   categoria?: string;
   costoUnitario?: number;
+  precioVenta?: number;
   stockInicial?: number;
 }
 

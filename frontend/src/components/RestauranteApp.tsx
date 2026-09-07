@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
+  AuroraGradientDef,
   IconRestaurant, IconCustomize, IconUsers, IconUser, IconHourglass, IconCard, IconFileText,
   IconCheck, IconTrash, IconRefresh, IconCheckCircle, IconWarning, IconSearch, IconClose,
   IconBolt, IconBank, IconChart, IconDownload, IconLock, IconRocket, IconChevronLeft, IconChevronRight,
@@ -282,6 +283,12 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   // <main>, que mantiene su propio overflow-y-auto.
   return (
     <div className={`h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "horeca-clasico" : ""}`}>
+      {/* Sin esto, todo ícono con stroke="url(#aurora-icon-grad)" (editar,
+          ajustar stock, eliminar, reabastecer, etc.) queda con trazo
+          irresoluble — invisible, no solo "difícil de ver" — porque
+          RestauranteApp es la única vista de la app que nunca montaba el
+          <defs> compartido que declara ese gradiente. */}
+      <AuroraGradientDef />
       {modoClasico && <EstiloClasico />}
       {/* SIDEBAR */}
       <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1">
@@ -2363,6 +2370,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
     unidadMedida: ["unidad de medida", "unidad", "und", "um"],
     categoria: ["categoria"],
     costoUnitario: ["costo unitario", "costo", "precio costo"],
+    precioVenta: ["precio de venta", "precio venta", "precio", "pvp", "precio publico"],
     stockInicial: ["stock inicial", "stock", "cantidad", "existencia"],
   };
   const normalizar = (s: string) => s.toString().trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -2405,6 +2413,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
           unidadMedida: columna.unidadMedida ? String(fila[columna.unidadMedida] ?? "").trim() || undefined : undefined,
           categoria: columna.categoria ? String(fila[columna.categoria] ?? "").trim() || undefined : undefined,
           costoUnitario: columna.costoUnitario && fila[columna.costoUnitario] !== "" ? Number(fila[columna.costoUnitario]) : undefined,
+          precioVenta: columna.precioVenta && fila[columna.precioVenta] !== "" ? Number(fila[columna.precioVenta]) : undefined,
           stockInicial: columna.stockInicial && fila[columna.stockInicial] !== "" ? Number(fila[columna.stockInicial]) : undefined,
         }))
         .filter((f) => f.sku && f.nombre);
@@ -2456,7 +2465,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
               <p className="text-sm font-semibold text-slate-700 dark:text-white/70">
                 {archivo ? archivo.name : "Arrastra tu archivo aquí o haz click para elegirlo"}
               </p>
-              <p className="text-[11px] text-slate-400 mt-1">.xlsx, .xls o .csv — columnas: SKU, Nombre, Unidad, Costo, Stock Inicial (Categoría opcional)</p>
+              <p className="text-[11px] text-slate-400 mt-1">.xlsx, .xls o .csv — columnas: SKU, Nombre, Unidad, Costo, Precio de Venta, Stock Inicial (Categoría opcional)</p>
               <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) procesarArchivo(f); }} />
             </div>
@@ -2471,7 +2480,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
                     <thead className="bg-slate-100/60 dark:bg-white/5 sticky top-0">
                       <tr className="text-left text-slate-400">
                         <th className="py-1.5 px-2">SKU</th><th className="py-1.5 px-2">Nombre</th><th className="py-1.5 px-2">Unidad</th>
-                        <th className="py-1.5 px-2 text-right">Costo</th><th className="py-1.5 px-2 text-right">Stock inicial</th>
+                        <th className="py-1.5 px-2 text-right">Costo</th><th className="py-1.5 px-2 text-right">Precio venta</th><th className="py-1.5 px-2 text-right">Stock inicial</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2481,6 +2490,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
                           <td className="py-1.5 px-2">{f.nombre}</td>
                           <td className="py-1.5 px-2">{f.unidadMedida || "—"}</td>
                           <td className="py-1.5 px-2 text-right">{f.costoUnitario ?? "—"}</td>
+                          <td className="py-1.5 px-2 text-right">{f.precioVenta ?? "—"}</td>
                           <td className="py-1.5 px-2 text-right">{f.stockInicial ?? "—"}</td>
                         </tr>
                       ))}
