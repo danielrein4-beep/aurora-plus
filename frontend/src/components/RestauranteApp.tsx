@@ -10,7 +10,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
   dividirCuenta, cerrarComandaMixto, listarEscandallos, crearEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo,
-  listarIngredientesEscandallo, listarFastBar, crearTragoFastBar, venderTragoRapido,
+  listarIngredientesEscandallo, listarFastBar,
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
@@ -25,7 +25,7 @@ import {
   type ItemImportacionArticulo, type ResultadoImportacionArticulos, type Cliente, type MetricasCliente,
 } from "../api";
 
-type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
+type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
 
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
@@ -42,7 +42,6 @@ const NAV_GRUPOS: NavGrupo[] = [
       { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant, premium: true },
       { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass, premium: true },
       { id: "recetas", label: "Recetas & Escandallo", Icon: IconFileText },
-      { id: "fastbar", label: "Fast-Bar", Icon: IconCard },
     ],
   },
   {
@@ -393,7 +392,6 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           )}
           {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} />)}
           {pagina === "recetas" && <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} onCambio={recargarTodo} />}
-          {pagina === "fastbar" && <FastBar tenantId={tenantId} fastbar={fastbar} onVenta={registrarVenta} onCambio={recargarTodo} />}
           {pagina === "compras" && (
             <ComprasProveedores tenantId={tenantId} proveedores={proveedores} articulos={articulos} onCambio={recargarTodo} />
           )}
@@ -1766,85 +1764,6 @@ function IngredientesModal({ tenantId, escandallo, articulos, onClose, onCambio 
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// FAST-BAR
-// ══════════════════════════════════════════════════════════════════════════
-function FastBar({ tenantId, fastbar, onVenta, onCambio }: { tenantId: number; fastbar: FastBarTrago[] | null; onVenta: (monto: number, metodo: string) => void; onCambio: () => void }) {
-  const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ nombreTrago: "", botellaSku: "", mililitrosPorTrago: "", precioVenta: "" });
-  const [error, setError] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
-  const [vendiendoId, setVendiendoId] = useState<number | null>(null);
-
-  const crear = async () => {
-    if (!form.nombreTrago.trim() || !form.precioVenta) { setError("Nombre y precio son obligatorios"); return; }
-    setGuardando(true);
-    setError(null);
-    try {
-      await crearTragoFastBar(tenantId, {
-        nombreTrago: form.nombreTrago.trim(),
-        botellaSku: form.botellaSku || undefined,
-        mililitrosPorTrago: form.mililitrosPorTrago ? Number(form.mililitrosPorTrago) : undefined,
-        precioVenta: Number(form.precioVenta),
-      });
-      setForm({ nombreTrago: "", botellaSku: "", mililitrosPorTrago: "", precioVenta: "" });
-      setMostrarForm(false);
-      onCambio();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo crear el trago");
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  const vender = async (trago: FastBarTrago) => {
-    setVendiendoId(trago.id);
-    try {
-      const total = await venderTragoRapido(tenantId, trago.id, 1);
-      onVenta(Number(total), "EFECTIVO");
-    } catch {} finally {
-      setVendiendoId(null);
-    }
-  };
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500 dark:text-white/40">{(fastbar || []).length} tragos en catálogo</p>
-        <button onClick={() => setMostrarForm((v) => !v)} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
-          {mostrarForm ? "Cancelar" : "+ Nuevo trago"}
-        </button>
-      </div>
-
-      {mostrarForm && (
-        <div className="apple-glass rounded-2xl p-5 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <input value={form.nombreTrago} onChange={(e) => setForm({ ...form, nombreTrago: e.target.value })} placeholder="Nombre del trago" className="input-horeca" />
-            <input value={form.botellaSku} onChange={(e) => setForm({ ...form, botellaSku: e.target.value })} placeholder="SKU botella (opcional)" className="input-horeca" />
-            <input value={form.mililitrosPorTrago} onChange={(e) => setForm({ ...form, mililitrosPorTrago: e.target.value })} type="number" placeholder="ml por trago" className="input-horeca" />
-            <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" placeholder="Precio $" className="input-horeca" />
-          </div>
-          {error && <p className="text-xs text-red-500">{error}</p>}
-          <button onClick={crear} disabled={guardando} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
-            {guardando ? "Guardando…" : "Guardar trago"}
-          </button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {(fastbar || []).map((t) => (
-          <div key={t.id} className="apple-glass rounded-2xl p-5 space-y-3">
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm">{t.nombreTrago}</h4>
-            <div className="text-xs text-slate-500 dark:text-white/40">${Number(t.precioVenta).toFixed(2)} {t.mililitrosPorTrago ? `· ${t.mililitrosPorTrago}ml` : ""}</div>
-            <button onClick={() => vender(t)} disabled={vendiendoId === t.id} className="w-full g-aurora text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
-              {vendiendoId === t.id ? "Vendiendo…" : "Venta rápida ×1"}
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ══════════════════════════════════════════════════════════════════════════
 // COMPRAS & PROVEEDORES
