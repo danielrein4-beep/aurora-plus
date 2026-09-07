@@ -73,6 +73,17 @@ public class CompraInsumoHorecaService {
 
     @Transactional
     public CompraInsumoHoreca registrarCompra(Long tenantId, Long proveedorId, String numeroFactura, List<ItemCompraInsumo> items) {
+        return registrarCompra(tenantId, proveedorId, numeroFactura, items, null, null);
+    }
+
+    /**
+     * @param montoPagadoAhora cuánto se le pagó al proveedor de una vez, en `monedaPago` — null/0 = factura entera
+     *                         a crédito. Si es menor al total, la diferencia queda como cuenta por pagar (CXP)
+     *                         normal; si cubre el total, no se crea CXP alguna (factura saldada de una).
+     */
+    @Transactional
+    public CompraInsumoHoreca registrarCompra(Long tenantId, Long proveedorId, String numeroFactura, List<ItemCompraInsumo> items,
+                                               BigDecimal montoPagadoAhora, String monedaPago) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("La compra debe tener al menos un ítem");
         }
@@ -158,10 +169,31 @@ public class CompraInsumoHorecaService {
         }
 
         compra.setTotal(totalCompra);
+
+        // Si se pagó algo de una vez, sale de caja como EGRESO real (en la moneda
+        // en la que físicamente se entregó) y solo la diferencia (si queda) se
+        // registra como deuda — antes SIEMPRE se cargaba el total entero a la
+        // cuenta por pagar, aunque el empleado hubiera pagado todo en efectivo.
+        BigDecimal montoPagadoBase = BigDecimal.ZERO;
+        if (montoPagadoAhora != null && montoPagadoAhora.compareTo(BigDecimal.ZERO) > 0) {
+            String monedaEfectiva = (monedaPago != null && !monedaPago.isBlank()) ? monedaPago : motorFinancieroService.obtenerMonedaBase(tenantId);
+            montoPagadoBase = monedaEfectiva.equals(motorFinancieroService.obtenerMonedaBase(tenantId))
+                ? montoPagadoAhora
+                : motorFinancieroService.convertirAMonedaBase(tenantId, montoPagadoAhora, monedaEfectiva);
+            if (montoPagadoBase.compareTo(totalCompra) > 0) {
+                throw new RuntimeException("El monto pagado (" + montoPagadoBase + ") no puede ser mayor al total de la factura (" + totalCompra + ")");
+            }
+            motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
+                montoPagadoAhora, monedaEfectiva, "Pago a proveedor " + proveedor.getNombre() + " — Factura " + numeroFactura);
+            compra.setMontoPagado(montoPagadoBase.setScale(2, RoundingMode.HALF_UP));
+        }
         CompraInsumoHoreca guardada = compraInsumoHorecaRepository.save(compra);
 
-        motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.CXP,
-            totalCompra, null, null, "Compra de insumos factura " + numeroFactura + " — Proveedor: " + proveedor.getNombre());
+        BigDecimal saldoPendiente = totalCompra.subtract(montoPagadoBase).setScale(2, RoundingMode.HALF_UP);
+        if (saldoPendiente.compareTo(BigDecimal.ZERO) > 0) {
+            motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.CXP,
+                saldoPendiente, null, null, "Compra de insumos factura " + numeroFactura + " — Proveedor: " + proveedor.getNombre());
+        }
 
         return guardada;
     }

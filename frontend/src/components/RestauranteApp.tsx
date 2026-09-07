@@ -16,7 +16,7 @@ import {
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
-  tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
+  tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos, abonarMovimiento,
   cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria, reporteTickets,
   abrirTurno, turnoAbierto, historialTurnos, registrarEgresoTurno, cerrarTurno,
   listarClientes, crearCliente, editarCliente, eliminarCliente, metricasCliente, ticketsCliente,
@@ -1829,7 +1829,7 @@ function ComprasProveedores({ tenantId, proveedores, articulos, onCambio }: {
       {tab === "proveedores" && (
         <div className="space-y-5">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500 dark:text-white/40">{(proveedores || []).length} proveedores registrados</p>
+            <p className="text-sm text-slate-500 dark:text-white/40">{(proveedores || []).length} proveedor{(proveedores || []).length === 1 ? "" : "es"} registrado{(proveedores || []).length === 1 ? "" : "s"}</p>
             <button onClick={() => setMostrarFormProveedor((v) => !v)} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
               {mostrarFormProveedor ? "Cancelar" : "+ Nuevo proveedor"}
             </button>
@@ -2803,6 +2803,8 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
   const [proveedorId, setProveedorId] = useState("");
   const [numeroFactura, setNumeroFactura] = useState("");
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
+  const [montoPagadoAhora, setMontoPagadoAhora] = useState("");
+  const [monedaPago, setMonedaPago] = useState("USD");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [exito, setExito] = useState(false);
@@ -2832,9 +2834,14 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
     if (items.length === 0) { setError("Agrega al menos un artículo con cantidad y costo"); return; }
     setGuardando(true);
     try {
-      await registrarCompraInsumo(tenantId, { proveedorId: Number(proveedorId), numeroFactura: numeroFactura.trim(), items });
+      await registrarCompraInsumo(tenantId, {
+        proveedorId: Number(proveedorId), numeroFactura: numeroFactura.trim(), items,
+        montoPagadoAhora: montoPagadoAhora ? Number(montoPagadoAhora) : undefined,
+        monedaPago: montoPagadoAhora ? monedaPago : undefined,
+      });
       setFilas([filaVacia()]);
       setNumeroFactura("");
+      setMontoPagadoAhora("");
       setExito(true);
       onCambio();
       setTimeout(() => setExito(false), 2500);
@@ -2882,11 +2889,33 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
         <button onClick={agregarFila} className="text-teal-600 dark:text-teal-400 text-xs font-semibold cursor-pointer">+ Agregar otro artículo</button>
       </div>
 
-      <div className="flex items-center justify-between pt-2 border-t border-slate-300/50 dark:border-white/10">
+      <div className="pt-2 border-t border-slate-300/50 dark:border-white/10 space-y-3">
         <div className="text-xs text-slate-500 dark:text-white/40">
           Total: <strong className="text-slate-900 dark:text-white">${totalCompra.toFixed(2)}</strong>
           {conVencimiento > 0 && <span className="ml-2 text-amber-500">· {conVencimiento} con fecha de vencimiento</span>}
         </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 max-w-sm">
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1">¿Cuánto le pagás al proveedor ahora?</label>
+            <input value={montoPagadoAhora} onChange={(e) => setMontoPagadoAhora(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00 — déjalo vacío si es todo a crédito" className="input-horeca" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1">Moneda</label>
+            <select value={monedaPago} onChange={(e) => setMonedaPago(e.target.value)} className="input-horeca">
+              {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+        </div>
+        {montoPagadoAhora && Number(montoPagadoAhora) > 0 && (
+          Number(montoPagadoAhora) >= totalCompra && monedaPago === "USD" ? (
+            <p className="text-xs font-semibold text-teal-600 dark:text-teal-400">✓ Factura pagada de una vez — no queda cuenta por pagar.</p>
+          ) : (
+            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+              Queda pendiente por pagar al proveedor — se registra como Cuenta por Pagar (visible en Administración).
+            </p>
+          )
+        )}
       </div>
 
       {error && <p className="text-xs text-red-500">{error}</p>}
@@ -4717,64 +4746,150 @@ function CuentasPorCobrarPagar({ tenantId }: { tenantId: number }) {
   const [tab, setTab] = useState<"CXC" | "CXP">("CXP");
   const [cxc, setCxc] = useState<MovimientoCaja[] | null>(null);
   const [cxp, setCxp] = useState<MovimientoCaja[] | null>(null);
+  const [verPagadas, setVerPagadas] = useState(false);
+  const [abonando, setAbonando] = useState<MovimientoCaja | null>(null);
 
-  useEffect(() => {
+  const cargar = () => {
     listarMovimientos(tenantId, "CXC").then(setCxc).catch(() => setCxc([]));
     listarMovimientos(tenantId, "CXP").then(setCxp).catch(() => setCxp([]));
-  }, [tenantId]);
+  };
+  useEffect(cargar, [tenantId]);
 
-  const activos = tab === "CXC" ? cxc : cxp;
-  const totalesPorMoneda = (activos || []).reduce<Record<string, number>>((acc, m) => {
-    acc[m.moneda] = (acc[m.moneda] || 0) + Number(m.monto);
+  const todos = tab === "CXC" ? cxc : cxp;
+  // Datos viejos (de antes de este campo) no traen `estado` — se tratan como
+  // pendientes por defecto, no como ya pagadas, para no esconder deuda real.
+  const pendientes = (todos || []).filter((m) => m.estado !== "PAGADO");
+  const pagadas = (todos || []).filter((m) => m.estado === "PAGADO");
+  const activos = verPagadas ? pagadas : pendientes;
+
+  const totalesPorMoneda = pendientes.reduce<Record<string, number>>((acc, m) => {
+    const saldo = m.saldoPendiente != null ? Number(m.saldoPendiente) : Number(m.monto);
+    acc[m.moneda] = (acc[m.moneda] || 0) + saldo;
     return acc;
   }, {});
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
-        <button onClick={() => setTab("CXP")}
-          className={`px-5 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === "CXP" ? "bg-red-500 text-white" : "text-slate-600 dark:text-white/60"}`}>
-          Por Pagar ({(cxp || []).length})
-        </button>
-        <button onClick={() => setTab("CXC")}
-          className={`px-5 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === "CXC" ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
-          Por Cobrar ({(cxc || []).length})
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+          <button onClick={() => { setTab("CXP"); setVerPagadas(false); }}
+            className={`px-5 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === "CXP" ? "bg-red-500 text-white" : "text-slate-600 dark:text-white/60"}`}>
+            Por Pagar ({cxp ? cxp.filter((m) => m.estado !== "PAGADO").length : 0})
+          </button>
+          <button onClick={() => { setTab("CXC"); setVerPagadas(false); }}
+            className={`px-5 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === "CXC" ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
+            Por Cobrar ({cxc ? cxc.filter((m) => m.estado !== "PAGADO").length : 0})
+          </button>
+        </div>
+        <button onClick={() => setVerPagadas((v) => !v)} className="text-xs font-semibold text-slate-500 dark:text-white/40 hover:text-teal-600 dark:hover:text-teal-400 cursor-pointer">
+          {verPagadas ? "← Ver pendientes" : `Ver saldadas (${pagadas.length}) →`}
         </button>
       </div>
 
-      {Object.keys(totalesPorMoneda).length > 0 && (
+      {!verPagadas && Object.keys(totalesPorMoneda).length > 0 && (
         <div className="flex flex-wrap gap-3">
           {Object.entries(totalesPorMoneda).map(([moneda, total]) => (
             <div key={moneda} className="apple-glass rounded-xl px-5 py-3">
-              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Total en {moneda}</div>
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Pendiente en {moneda}</div>
               <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{total.toFixed(2)}</div>
             </div>
           ))}
         </div>
       )}
 
-      {activos === null ? (
+      {todos === null ? (
         <p className="text-xs text-slate-400">Cargando…</p>
       ) : activos.length === 0 ? (
         <div className="apple-glass rounded-2xl p-8 text-center">
           <p className="text-slate-500 dark:text-white/40 text-sm">
-            {tab === "CXP" ? "Sin cuentas por pagar pendientes." : "Sin cuentas por cobrar pendientes."}
+            {verPagadas ? "Todavía no hay cuentas saldadas." : tab === "CXP" ? "Sin cuentas por pagar pendientes." : "Sin cuentas por cobrar pendientes."}
           </p>
         </div>
       ) : (
         <div className="space-y-2">
-          {activos.map((m) => (
-            <div key={m.id} className={`flex items-center justify-between rounded-xl px-4 py-3.5 border-l-4 apple-glass ${tab === "CXP" ? "border-red-500/50" : "border-teal-500/50"}`}>
-              <div>
-                <div className="text-sm font-semibold text-slate-900 dark:text-white">{m.concepto}</div>
-                <div className="text-[10px] text-slate-400">{new Date(m.fechaRegistro).toLocaleString()}</div>
+          {activos.map((m) => {
+            const saldo = m.saldoPendiente != null ? Number(m.saldoPendiente) : Number(m.monto);
+            const pagadoParcial = saldo > 0 && saldo < Number(m.monto);
+            return (
+              <div key={m.id} className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3.5 border-l-4 apple-glass ${m.estado === "PAGADO" ? "border-slate-300/50 dark:border-white/10 opacity-60" : tab === "CXP" ? "border-red-500/50" : "border-teal-500/50"}`}>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">{m.concepto}</div>
+                  <div className="text-[10px] text-slate-400">
+                    {new Date(m.fechaRegistro).toLocaleString()}
+                    {m.estado === "PAGADO" && " · Saldada"}
+                    {pagadoParcial && ` · Abonado ${(Number(m.monto) - saldo).toFixed(2)} de ${Number(m.monto).toFixed(2)}`}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">
+                    {m.estado === "PAGADO" ? Number(m.monto).toFixed(2) : saldo.toFixed(2)} {m.moneda}
+                  </span>
+                  {m.estado !== "PAGADO" && (
+                    <button onClick={() => setAbonando(m)} className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-500 px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap">
+                      Registrar abono
+                    </button>
+                  )}
+                </div>
               </div>
-              <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">{Number(m.monto).toFixed(2)} {m.moneda}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      {abonando && (
+        <ModalAbonarCuenta tenantId={tenantId} cuenta={abonando} tipoLabel={tab === "CXP" ? "proveedor" : "cliente"}
+          onClose={() => setAbonando(null)} onAbonado={() => { setAbonando(null); cargar(); }} />
+      )}
     </div>
+  );
+}
+
+function ModalAbonarCuenta({ tenantId, cuenta, tipoLabel, onClose, onAbonado }: {
+  tenantId: number; cuenta: MovimientoCaja; tipoLabel: string; onClose: () => void; onAbonado: () => void;
+}) {
+  const saldo = cuenta.saldoPendiente != null ? Number(cuenta.saldoPendiente) : Number(cuenta.monto);
+  const [monto, setMonto] = useState(saldo.toFixed(2));
+  const [moneda, setMoneda] = useState(cuenta.moneda);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const guardar = async () => {
+    if (!monto || Number(monto) <= 0) { setError("Indica cuánto se abona"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      await abonarMovimiento(tenantId, cuenta.id, { monto: Number(monto), moneda });
+      onAbonado();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar el abono");
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} titulo="Registrar abono">
+      <div className="space-y-3">
+        <p className="text-xs text-slate-500">{cuenta.concepto}</p>
+        <p className="text-xs text-slate-500">Saldo pendiente: <strong className="text-slate-900">{saldo.toFixed(2)} {cuenta.moneda}</strong></p>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label={`Monto que le pagás al ${tipoLabel} ahora`}>
+            <input value={monto} onChange={(e) => setMonto(e.target.value)} type="number" step="0.01" min="0.01" className="input-horeca" autoFocus />
+          </Campo>
+          <Campo label="Moneda">
+            <select value={moneda} onChange={(e) => setMoneda(e.target.value)} className="input-horeca">
+              {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </Campo>
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="flex gap-2 pt-1">
+          <button onClick={guardar} disabled={guardando} className="flex-1 g-aurora text-white text-sm font-bold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+            {guardando ? "Registrando…" : "Registrar abono"}
+          </button>
+          <button onClick={onClose} className="flex-1 apple-glass-btn text-sm font-semibold py-2.5 rounded-xl cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

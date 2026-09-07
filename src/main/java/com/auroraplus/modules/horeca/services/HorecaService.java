@@ -67,6 +67,20 @@ public class HorecaService {
         "SALON", "QR_MESA", "DELIVERY_PROPIO", "RECOGER_EN_TIENDA"
     );
 
+    // Ventas de mostrador (RECOGER_EN_TIENDA, DELIVERY_PROPIO) no tienen mesa
+    // física — numeroMesa queda null. Concatenarlo directo producía literales
+    // como "Comanda mesa null" en el historial de caja, que un cajero leería
+    // como un dato roto en vez de "vino del mostrador".
+    private String descripcionComanda(Comanda comanda) {
+        if (comanda.getNumeroMesa() != null) return "Mesa " + comanda.getNumeroMesa();
+        return switch (comanda.getCanal()) {
+            case "RECOGER_EN_TIENDA" -> "Mostrador";
+            case "DELIVERY_PROPIO" -> "Delivery";
+            case "QR_MESA" -> "Pedido QR";
+            default -> comanda.getCanal();
+        };
+    }
+
     public Comanda aperturarComanda(Long tenantId, Integer numeroMesa, String mesero) {
         return aperturarComanda(tenantId, numeroMesa, mesero, "SALON", null, null, null, null, null);
     }
@@ -222,7 +236,7 @@ public class HorecaService {
         if (cerrada.getTotalConsumo().compareTo(BigDecimal.ZERO) > 0) {
             motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
                 cerrada.getTotalConsumo(), monedaPago, montoRecibido,
-                "Comanda mesa " + cerrada.getNumeroMesa() + " (" + metodoPago + ")");
+                "Comanda " + descripcionComanda(cerrada) + " (" + metodoPago + ")");
         }
 
         idempotenciaService.registrar(tenantId, claveIdempotencia, "cierre_comanda_horeca", cerrada.getId());
@@ -314,7 +328,7 @@ public class HorecaService {
             guardados.add(pagoVentaRepository.save(pago));
 
             motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
-                p.monto, p.moneda, "Comanda mesa " + comanda.getNumeroMesa() + " (" + p.metodoPago + ")");
+                p.monto, p.moneda, "Comanda " + descripcionComanda(comanda) + " (" + p.metodoPago + ")");
         }
 
         BigDecimal faltante = totalBase.subtract(totalRecibidoBase).setScale(2, RoundingMode.HALF_UP);
@@ -330,7 +344,7 @@ public class HorecaService {
         if (vueltoBase.compareTo(BigDecimal.ZERO) > 0) {
             vueltoEnMonedaVuelto = motorFinancieroService.convertirMoneda(tenantId, vueltoBase, monedaBase, monedaVueltoFinal);
             motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
-                vueltoEnMonedaVuelto, monedaVueltoFinal, "Vuelto entregado - Comanda mesa " + comanda.getNumeroMesa());
+                vueltoEnMonedaVuelto, monedaVueltoFinal, "Vuelto entregado - Comanda " + descripcionComanda(comanda));
 
             try {
                 vueltoVes = "VES".equals(monedaVueltoFinal)

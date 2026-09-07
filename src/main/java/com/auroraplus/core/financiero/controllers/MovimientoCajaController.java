@@ -62,4 +62,15 @@ public class MovimientoCajaController {
             ? movimientoCajaRepository.findByTenantIdAndTipoOrderByFechaRegistroDesc(tenantId, tipo)
             : movimientoCajaRepository.findByTenantIdOrderByFechaRegistroDesc(tenantId);
     }
+
+    public static class AbonarRequest {
+        public BigDecimal monto;
+        public String moneda;
+    }
+
+    /** Registra un pago (total o parcial) sobre una cuenta por pagar/cobrar existente. */
+    @PostMapping("/{id}/abonar")
+    public ResponseEntity<MovimientoCaja> abonar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody AbonarRequest request) {
+        return ResponseEntity.ok(motorFinancieroService.abonarMovimiento(tenantId, id, request.monto, request.moneda));
+    }
 }

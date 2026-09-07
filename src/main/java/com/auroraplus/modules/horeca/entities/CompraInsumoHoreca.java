@@ -33,6 +33,14 @@ public class CompraInsumoHoreca {
     @Column(nullable = false, precision = 18, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
+    // En moneda base del tenant, igual que `total`. Null/0 = no se pagó nada
+    // al momento de la compra (factura entera a crédito). Cuando
+    // montoPagado >= total, la factura está saldada; el saldo real siempre
+    // vive en la cuenta por pagar (MovimientoCaja) vinculada, esto es solo
+    // para mostrar de un vistazo "pagado X de Y" en la lista de compras.
+    @Column(name = "monto_pagado", precision = 18, scale = 2)
+    private BigDecimal montoPagado;
+
     @OneToMany(mappedBy = "compra", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference
     private List<DetalleCompraInsumoHoreca> items = new ArrayList<>();
@@ -54,6 +62,8 @@ public class CompraInsumoHoreca {
     public void setFechaCompra(LocalDateTime fechaCompra) { this.fechaCompra = fechaCompra; }
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }
+    public BigDecimal getMontoPagado() { return montoPagado; }
+    public void setMontoPagado(BigDecimal montoPagado) { this.montoPagado = montoPagado; }
     public List<DetalleCompraInsumoHoreca> getItems() { return items; }
     public void setItems(List<DetalleCompraInsumoHoreca> items) { this.items = items; }
 }

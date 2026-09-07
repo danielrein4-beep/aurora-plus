@@ -998,7 +998,7 @@ export interface ItemCompraInsumo {
   fechaVencimiento?: string; // yyyy-MM-dd — si viene, crea un lote rastreable para alertas
 }
 
-export function registrarCompraInsumo(tenantId: number, datos: { proveedorId: number; numeroFactura: string; items: ItemCompraInsumo[] }): Promise<CompraInsumoHoreca> {
+export function registrarCompraInsumo(tenantId: number, datos: { proveedorId: number; numeroFactura: string; items: ItemCompraInsumo[]; montoPagadoAhora?: number; monedaPago?: string }): Promise<CompraInsumoHoreca> {
   return request(`/api/horeca/compras-insumo?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
@@ -1009,6 +1009,7 @@ export interface CompraInsumoHoreca {
   numeroFactura: string | null;
   fechaCompra: string;
   total: number;
+  montoPagado: number | null;
 }
 
 export function listarComprasInsumo(): Promise<CompraInsumoHoreca[]> {
@@ -1197,10 +1198,17 @@ export interface MovimientoCaja {
   moneda: string;
   concepto: string;
   fechaRegistro: string;
+  saldoPendiente: number | null;
+  estado: "PENDIENTE" | "PAGADO" | null;
 }
 
 export function registrarMovimiento(tenantId: number, datos: { tipo: "INGRESO" | "EGRESO"; monto: number; moneda: string; concepto: string }): Promise<MovimientoCaja> {
   return request(`/api/financiero/movimientos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+/** Registra un pago (total o parcial) sobre una cuenta por pagar/cobrar existente. */
+export function abonarMovimiento(tenantId: number, movimientoId: number, datos: { monto: number; moneda: string }): Promise<MovimientoCaja> {
+  return request(`/api/financiero/movimientos/${movimientoId}/abonar?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
 export function listarMovimientos(tenantId: number, tipo?: TipoMovimientoCaja): Promise<MovimientoCaja[]> {

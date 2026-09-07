@@ -34,6 +34,8 @@ public class CompraInsumoHorecaController {
         public Long proveedorId;
         public String numeroFactura;
         public List<ItemCompraRequest> items;
+        public BigDecimal montoPagadoAhora; // opcional — null/0 = factura entera a crédito
+        public String monedaPago;
     }
 
     @GetMapping
@@ -53,6 +55,7 @@ public class CompraInsumoHorecaController {
             item.fechaVencimiento = itemReq.fechaVencimiento;
             items.add(item);
         }
-        return ResponseEntity.ok(compraInsumoHorecaService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, items));
+        return ResponseEntity.ok(compraInsumoHorecaService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, items,
+            request.montoPagadoAhora, request.monedaPago));
     }
 }
