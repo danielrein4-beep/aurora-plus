@@ -559,13 +559,16 @@ html.light .input-horeca:hover { background: #ffffff; }
 }
 
 /* =========================================================================
-   PAGE & TAB TRANSITION ENGINE (SMOOTH & SUBTLE TRANSITIONS)
+   PAGE & TAB TRANSITION ENGINE (SMOOTH & SUBTLE TRANSITIONS - CINEMATIC PACING)
    ========================================================================= */
 
 @keyframes pageEnter {
   0% {
     opacity: 0;
-    transform: translateY(10px) scale(0.996);
+    transform: translateY(18px) scale(0.988);
+  }
+  60% {
+    opacity: 0.9;
   }
   100% {
     opacity: 1;
@@ -576,7 +579,10 @@ html.light .input-horeca:hover { background: #ffffff; }
 @keyframes tabEnter {
   0% {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(14px);
+  }
+  65% {
+    opacity: 0.92;
   }
   100% {
     opacity: 1;
@@ -587,7 +593,7 @@ html.light .input-horeca:hover { background: #ffffff; }
 @keyframes modalEnter {
   0% {
     opacity: 0;
-    transform: scale(0.95) translateY(8px);
+    transform: scale(0.93) translateY(16px);
   }
   100% {
     opacity: 1;
@@ -605,21 +611,21 @@ html.light .input-horeca:hover { background: #ffffff; }
 }
 
 .animate-page-enter {
-  animation: pageEnter 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: pageEnter 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
 }
 
 .animate-tab-enter {
-  animation: tabEnter 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: tabEnter 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
 }
 
 .animate-modal-enter {
-  animation: modalEnter 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modalEnter 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
 }
 
 .animate-fade-smooth {
-  animation: fadeInSmooth 0.22s ease-out forwards;
+  animation: fadeInSmooth 0.5s ease-out forwards;
 }
 
