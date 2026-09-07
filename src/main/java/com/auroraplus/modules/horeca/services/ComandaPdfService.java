@@ -11,6 +11,7 @@ import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -23,7 +24,8 @@ public class ComandaPdfService {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     public byte[] generarTicket(Comanda comanda, List<ItemComanda> items) throws Exception {
-        float alturaEstimada = 140 + items.size() * 14;
+        boolean hayVuelto = comanda.getVueltoBase() != null && comanda.getVueltoBase().compareTo(BigDecimal.ZERO) > 0;
+        float alturaEstimada = 140 + items.size() * 14 + (hayVuelto ? 28 : 0);
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PDPage page = new PDPage(new PDRectangle(TICKET_WIDTH, alturaEstimada));
             document.addPage(page);
@@ -96,6 +98,28 @@ public class ComandaPdfService {
                 cs.newLineAtOffset(x, y);
                 cs.showText("Pago: " + (comanda.getMetodoPago() != null ? comanda.getMetodoPago() : "-"));
                 cs.endText();
+                y -= 11;
+
+                // Recibido/vuelto: dato de caja crítico para el cierre — sin
+                // esto el cajero no tiene comprobante de cuánto entregó de
+                // vuelto en cada venta.
+                if (comanda.getTotalRecibidoBase() != null) {
+                    cs.beginText();
+                    cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 8);
+                    cs.newLineAtOffset(x, y);
+                    cs.showText("Recibido: $" + comanda.getTotalRecibidoBase().setScale(2, RoundingMode.HALF_UP));
+                    cs.endText();
+                    y -= 11;
+                }
+                if (hayVuelto) {
+                    cs.beginText();
+                    cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 8);
+                    cs.newLineAtOffset(x, y);
+                    String monedaVuelto = comanda.getMonedaVuelto() != null ? comanda.getMonedaVuelto() : "";
+                    BigDecimal montoVuelto = comanda.getVueltoMonto() != null ? comanda.getVueltoMonto() : comanda.getVueltoBase();
+                    cs.showText("Vuelto: " + montoVuelto.setScale(2, RoundingMode.HALF_UP) + " " + monedaVuelto);
+                    cs.endText();
+                }
             }
 
             document.save(out);

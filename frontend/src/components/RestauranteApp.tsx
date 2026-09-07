@@ -3098,7 +3098,10 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   onArticuloActualizado?: (articulo: Articulo) => void;
 }) {
   interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
-  interface ReciboVenta { comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string }
+  interface ReciboVenta {
+    comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string;
+    totalRecibido?: number; vuelto?: number; monedaVuelto?: string;
+  }
   interface ItemCatalogo {
     key: string; tipo: "articulo" | "receta" | "fastbar"; id: number; nombre: string; precio: number; categoria: string;
     unidadMedida?: string; stockActual?: number; estacionCocina?: string; sku?: string;
@@ -3265,7 +3268,10 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
       const resultado = await cerrarComandaMixto(tenantId, comanda.id, pagos, monedaVuelto);
       const metodoResumen = resultado.comanda.metodoPago || "MIXTO";
       onVenta(total, metodoResumen);
-      setRecibo({ comandaId: comanda.id, lineas: carrito, total, metodoPago: metodoResumen, fecha: new Date().toLocaleString() });
+      setRecibo({
+        comandaId: comanda.id, lineas: carrito, total, metodoPago: metodoResumen, fecha: new Date().toLocaleString(),
+        totalRecibido: resultado.totalRecibidoBase, vuelto: resultado.vueltoEnMonedaVuelto, monedaVuelto: resultado.monedaVuelto,
+      });
       setCarrito([]);
       setClienteSel(null); setBusquedaCliente("");
     } catch (e) {
@@ -3689,6 +3695,18 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               )}
             </div>
             <div className="text-xs text-slate-700 dark:text-white/80 font-medium">Pagado con: <span className="font-bold text-slate-900 dark:text-white">{recibo.metodoPago.replace("_", " ")}</span></div>
+
+            {/* Recibido/vuelto: sin esto el recibo en pantalla no coincide con
+                lo que el cajero de verdad hizo — un hueco contable grave para
+                el arqueo de caja del día. */}
+            {recibo.totalRecibido != null && (
+              <div className="text-xs text-slate-700 dark:text-white/80 font-medium">Recibido: <span className="font-bold text-slate-900 dark:text-white font-mono">${recibo.totalRecibido.toFixed(2)}</span></div>
+            )}
+            {recibo.vuelto != null && recibo.vuelto > 0.004 && (
+              <div className="text-sm font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2">
+                Vuelto entregado: <span className="font-mono">{recibo.vuelto.toFixed(2)} {recibo.monedaVuelto}</span>
+              </div>
+            )}
 
             {error && <p className="text-xs text-red-500">{error}</p>}
 

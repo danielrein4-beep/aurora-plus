@@ -66,6 +66,20 @@ public class ComandaEscPosService {
 
             escribirLinea(out, "Pago: " + (comanda.getMetodoPago() != null ? comanda.getMetodoPago() : "-"));
 
+            // Recibido/vuelto: dato de caja critico para el cierre — sin esto
+            // el cajero no tiene comprobante de cuanto entrego de vuelto.
+            if (comanda.getTotalRecibidoBase() != null) {
+                escribirLinea(out, "Recibido: $" + comanda.getTotalRecibidoBase().setScale(2, RoundingMode.HALF_UP));
+            }
+            boolean hayVuelto = comanda.getVueltoBase() != null && comanda.getVueltoBase().compareTo(java.math.BigDecimal.ZERO) > 0;
+            if (hayVuelto) {
+                String monedaVuelto = comanda.getMonedaVuelto() != null ? comanda.getMonedaVuelto() : "";
+                java.math.BigDecimal montoVuelto = comanda.getVueltoMonto() != null ? comanda.getVueltoMonto() : comanda.getVueltoBase();
+                out.write(NEGRITA_ON);
+                escribirLinea(out, "Vuelto: " + montoVuelto.setScale(2, RoundingMode.HALF_UP) + " " + monedaVuelto);
+                out.write(NEGRITA_OFF);
+            }
+
             out.write('\n');
             out.write('\n');
             out.write('\n');

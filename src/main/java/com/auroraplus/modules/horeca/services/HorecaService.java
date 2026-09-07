@@ -261,6 +261,10 @@ public class HorecaService {
             resultado.pagos = pagoVentaRepository.findByComandaIdOrderByFechaPagoAsc(comandaExistente.getId());
             resultado.totalBase = comandaExistente.getTotalConsumo();
             resultado.monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
+            resultado.totalRecibidoBase = comandaExistente.getTotalRecibidoBase();
+            resultado.vueltoBase = comandaExistente.getVueltoBase();
+            resultado.monedaVuelto = comandaExistente.getMonedaVuelto();
+            resultado.vueltoEnMonedaVuelto = comandaExistente.getVueltoMonto();
             return resultado;
         }
 
@@ -340,6 +344,14 @@ public class HorecaService {
         comanda.setEstado(Comanda.EstadoComanda.PAGADA);
         comanda.setMetodoPago(pagos.size() == 1 ? pagos.get(0).metodoPago : "MIXTO");
         comanda.setFechaCierre(LocalDateTime.now());
+        // Se guarda el vuelto entregado junto con la comanda: sin esto, el
+        // ticket (PDF/térmica) impreso o reimpreso más tarde no tiene forma de
+        // reflejar cuánto se recibió y cuánto se devolvió, un hueco contable
+        // grave para el cierre de caja.
+        comanda.setTotalRecibidoBase(totalRecibidoBase.setScale(2, RoundingMode.HALF_UP));
+        comanda.setVueltoBase(vueltoBase);
+        comanda.setMonedaVuelto(monedaVueltoFinal);
+        comanda.setVueltoMonto(vueltoEnMonedaVuelto);
         Comanda cerrada = comandaRepository.save(comanda);
 
         idempotenciaService.registrar(tenantId, claveIdempotencia, "cierre_comanda_horeca_mixto", cerrada.getId());
