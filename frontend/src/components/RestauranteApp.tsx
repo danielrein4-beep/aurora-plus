@@ -1138,13 +1138,15 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
   tenantId: number; total: number; monedaBase: string; procesando: boolean; error: string | null;
   onCobrar: (pagos: PagoParcial[], monedaVuelto: string) => void;
 }) {
-  // La primera fila es manual (la escribe el cajero); cualquier fila agregada
-  // después nace "auto" — mientras nadie la toque a mano, se recalcula sola
+  // La primera fila nace "auto" y ya trae el total completo puesto — el caso
+  // más común (pago 100% en efectivo, en la moneda base) queda a un solo
+  // clic en "Cobrar", sin que el cajero tenga que escribir ni tocar "todo".
+  // Cualquier fila agregada después también nace "auto" y se recalcula sola
   // con lo que falta (convertido a su moneda con la tasa vigente) cada vez
   // que cambia cualquier otra fila. En cuanto el cajero escribe algo directo
-  // en ella, deja de seguir el pendiente y queda fija como manual.
+  // en una fila, deja de seguir el pendiente y queda fija como manual.
   const otrasMonedas = Object.keys(MONEDAS_ALTERNAS).filter((m) => m !== monedaBase);
-  const [filas, setFilas] = useState<FilaPago[]>(() => [nuevaFilaPago(monedaBase, false)]);
+  const [filas, setFilas] = useState<FilaPago[]>(() => [nuevaFilaPago(monedaBase, true)]);
   const [tasas, setTasas] = useState<Record<string, number | null>>({});
   const [monedaVuelto, setMonedaVuelto] = useState(monedaBase);
 
@@ -2990,8 +2992,11 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
       .map((e) => ({ key: `receta-${e.id}`, tipo: "receta", id: e.id, nombre: e.nombrePlato, precio: Number(e.precioVenta), categoria: CATEGORIA_RECETAS, estacionCocina: e.estacionCocina }));
     const tragos: ItemCatalogo[] = (fastbar || [])
       .map((t) => ({ key: `fastbar-${t.id}`, tipo: "fastbar", id: t.id, nombre: t.nombreTrago, precio: Number(t.precioVenta), categoria: CATEGORIA_FASTBAR }));
+    // Vende al precio de venta configurado en Inventario — solo cae al costo
+    // como respaldo en artículos viejos que todavía no tienen un precio de
+    // venta cargado, para no mostrar una tarjeta en $0.00.
     const insumos: ItemCatalogo[] = (articulos || [])
-      .map((a) => ({ key: `articulo-${a.id}`, tipo: "articulo", id: a.id, nombre: a.nombre, precio: Number(a.costoUnitario), categoria: a.categoria || "General", unidadMedida: a.unidadMedida || "unidad", stockActual: Number(a.stockActual), sku: a.sku }));
+      .map((a) => ({ key: `articulo-${a.id}`, tipo: "articulo", id: a.id, nombre: a.nombre, precio: Number(a.precioVenta) > 0 ? Number(a.precioVenta) : Number(a.costoUnitario), categoria: a.categoria || "General", unidadMedida: a.unidadMedida || "unidad", stockActual: Number(a.stockActual), sku: a.sku }));
     return [...recetas, ...tragos, ...insumos];
   }, [escandallos, fastbar, articulos]);
 
