@@ -1,5 +1,7 @@
 package com.auroraplus.modules.horeca.services;
 
+import com.auroraplus.core.crm.entities.Cliente;
+import com.auroraplus.core.crm.repositories.ClienteRepository;
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.services.MotorFinancieroService;
 import com.auroraplus.core.inventario.entities.Articulo;
@@ -54,6 +56,9 @@ public class HorecaService {
     @Autowired
     private InventarioService inventarioService;
 
+    @Autowired
+    private ClienteRepository clienteRepository;
+
     public Comanda obtenerComanda(Long comandaId) {
         return comandaRepository.findById(comandaId).orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
     }
@@ -83,6 +88,19 @@ public class HorecaService {
     public Comanda aperturarComanda(Long tenantId, Integer numeroMesa, String mesero, String canal,
                                      String nombreCliente, String telefonoCliente, String direccionEntrega, String mensajero,
                                      String claveIdempotencia) {
+        return aperturarComanda(tenantId, numeroMesa, mesero, canal, nombreCliente, telefonoCliente, direccionEntrega, mensajero, claveIdempotencia, null);
+    }
+
+    /**
+     * Variante que además admite clienteId (CRM, opcional): vincular un
+     * cliente registrado a la venta es un paso extra, no un requisito — sin
+     * clienteId la comanda se abre exactamente igual que siempre (anónima),
+     * sin ninguna consulta ni validación de más en el camino caliente del POS.
+     */
+    @Transactional
+    public Comanda aperturarComanda(Long tenantId, Integer numeroMesa, String mesero, String canal,
+                                     String nombreCliente, String telefonoCliente, String direccionEntrega, String mensajero,
+                                     String claveIdempotencia, Long clienteId) {
         java.util.Optional<Long> existente = idempotenciaService.obtenerSiYaProcesada(tenantId, claveIdempotencia);
         if (existente.isPresent()) {
             return comandaRepository.findById(existente.get())
@@ -112,6 +130,15 @@ public class HorecaService {
         comanda.setEstado(Comanda.EstadoComanda.ABIERTA);
         comanda.setTotalConsumo(BigDecimal.ZERO);
         comanda.setFechaApertura(LocalDateTime.now());
+
+        if (clienteId != null) {
+            Cliente cliente = clienteRepository.findById(clienteId)
+                .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+            if (!cliente.getTenantId().equals(tenantId)) {
+                throw new RuntimeException("Violación de seguridad: Cliente no pertenece a este tenant");
+            }
+            comanda.setCliente(cliente);
+        }
 
         Comanda guardada = comandaRepository.save(comanda);
         idempotenciaService.registrar(tenantId, claveIdempotencia, "abrir_comanda_horeca", guardada.getId());

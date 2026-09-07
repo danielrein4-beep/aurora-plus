@@ -1,5 +1,6 @@
 package com.auroraplus.modules.horeca.entities;
 
+import com.auroraplus.core.crm.entities.Cliente;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
@@ -35,6 +36,14 @@ public class Comanda {
     private String telefonoCliente;
     private String direccionEntrega;
     private String mensajero;
+
+    // Opcional a propósito (CRM Fase 3): una venta sigue pudiendo cerrarse
+    // anónima exactamente igual que antes — vincular un Cliente es un paso
+    // extra que el cajero puede saltarse sin fricción ni impacto en la
+    // velocidad del POS.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cliente_id")
+    private Cliente cliente;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -82,4 +91,6 @@ public class Comanda {
     public void setDireccionEntrega(String direccionEntrega) { this.direccionEntrega = direccionEntrega; }
     public String getMensajero() { return mensajero; }
     public void setMensajero(String mensajero) { this.mensajero = mensajero; }
+    public Cliente getCliente() { return cliente; }
+    public void setCliente(Cliente cliente) { this.cliente = cliente; }
 }

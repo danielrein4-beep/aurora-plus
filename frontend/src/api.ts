@@ -710,7 +710,7 @@ export function mapaDeMesas(): Promise<MapaMesaEntrada[]> {
 
 export function abrirComanda(tenantId: number, datos: {
   numeroMesa?: number; mesero: string; canal?: string; nombreCliente?: string;
-  telefonoCliente?: string; direccionEntrega?: string; mensajero?: string;
+  telefonoCliente?: string; direccionEntrega?: string; mensajero?: string; clienteId?: number;
 }): Promise<Comanda> {
   const params = new URLSearchParams({ tenantId: String(tenantId), mesero: datos.mesero });
   if (datos.numeroMesa != null) params.set("numeroMesa", String(datos.numeroMesa));
@@ -719,6 +719,7 @@ export function abrirComanda(tenantId: number, datos: {
   if (datos.telefonoCliente) params.set("telefonoCliente", datos.telefonoCliente);
   if (datos.direccionEntrega) params.set("direccionEntrega", datos.direccionEntrega);
   if (datos.mensajero) params.set("mensajero", datos.mensajero);
+  if (datos.clienteId != null) params.set("clienteId", String(datos.clienteId));
   return request(`/api/horeca/mesas/comandas/abrir?${params}`, { method: "POST" });
 }
 
@@ -1210,4 +1211,54 @@ export function listarMovimientos(tenantId: number, tipo?: TipoMovimientoCaja): 
 
 export function agregarModulo(moduloNombre: string): Promise<{ moduloNombre: string; activo: boolean }> {
   return request(`/api/config/mi-negocio/agregar-modulo`, { method: "POST", body: JSON.stringify({ moduloNombre }) });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CRM — CLIENTES Y FIDELIZACIÓN (Fase 3)
+// ═══════════════════════════════════════════════════════════════════════
+export interface Cliente {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  identificacionRif: string | null;
+  telefono: string | null;
+  correo: string | null;
+  fechaRegistro: string;
+}
+
+export interface MetricasCliente {
+  totalGastado: number;
+  cantidadVisitas: number;
+  fechaUltimaCompra: string | null;
+}
+
+/** Lista todos los clientes, o filtra por nombre/RIF si se pasa `q` (mismo endpoint que usa el buscador de Venta Rápida). */
+export function listarClientes(tenantId: number, q?: string): Promise<Cliente[]> {
+  const params = new URLSearchParams({ tenantId: String(tenantId) });
+  if (q) params.set("q", q);
+  return request(`/api/crm/clientes?${params}`);
+}
+
+export function obtenerCliente(tenantId: number, id: number): Promise<Cliente> {
+  return request(`/api/crm/clientes/${id}?tenantId=${tenantId}`);
+}
+
+export function crearCliente(tenantId: number, datos: { nombre: string; identificacionRif?: string; telefono?: string; correo?: string }): Promise<Cliente> {
+  return request(`/api/crm/clientes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function editarCliente(tenantId: number, id: number, datos: { nombre?: string; identificacionRif?: string; telefono?: string; correo?: string }): Promise<Cliente> {
+  return request(`/api/crm/clientes/${id}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function eliminarCliente(tenantId: number, id: number): Promise<void> {
+  return request(`/api/crm/clientes/${id}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
+export function metricasCliente(tenantId: number, id: number): Promise<MetricasCliente> {
+  return request(`/api/crm/clientes/${id}/metricas?tenantId=${tenantId}`);
+}
+
+export function ticketsCliente(tenantId: number, id: number): Promise<Comanda[]> {
+  return request(`/api/crm/clientes/${id}/tickets?tenantId=${tenantId}`);
 }

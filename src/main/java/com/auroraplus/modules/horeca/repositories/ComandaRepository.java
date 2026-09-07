@@ -20,4 +20,9 @@ public interface ComandaRepository extends JpaRepository<Comanda, Long>, JpaSpec
     List<Comanda> findByTenantIdAndEstadoOrderByFechaAperturaDesc(Long tenantId, Comanda.EstadoComanda estado);
 
     List<Comanda> findByTenantIdAndEstadoAndFechaCierreBetween(Long tenantId, Comanda.EstadoComanda estado, LocalDateTime desde, LocalDateTime hasta);
+
+    // Historial de tickets de un cliente puntual (CRM) — para las métricas
+    // agregadas (total gastado, visitas, última compra) y el listado de
+    // tickets en su panel de detalle.
+    List<Comanda> findByTenantIdAndClienteIdAndEstadoOrderByFechaCierreDesc(Long tenantId, Long clienteId, Comanda.EstadoComanda estado);
 }

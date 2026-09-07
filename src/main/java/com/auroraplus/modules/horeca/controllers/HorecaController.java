@@ -44,9 +44,10 @@ public class HorecaController {
             @RequestParam(required = false) String telefonoCliente,
             @RequestParam(required = false) String direccionEntrega,
             @RequestParam(required = false) String mensajero,
-            @RequestParam(required = false) String claveIdempotencia) {
+            @RequestParam(required = false) String claveIdempotencia,
+            @RequestParam(required = false) Long clienteId) {
         return ResponseEntity.ok(horecaService.aperturarComanda(
-            tenantId, numeroMesa, mesero, canal, nombreCliente, telefonoCliente, direccionEntrega, mensajero, claveIdempotencia));
+            tenantId, numeroMesa, mesero, canal, nombreCliente, telefonoCliente, direccionEntrega, mensajero, claveIdempotencia, clienteId));
     }
 
     @PostMapping("/comandas/{comandaId}/consumo")

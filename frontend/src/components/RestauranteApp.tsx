@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import {
-  IconRestaurant, IconCustomize, IconUsers, IconHourglass, IconCard, IconFileText,
+  IconRestaurant, IconCustomize, IconUsers, IconUser, IconHourglass, IconCard, IconFileText,
   IconCheck, IconTrash, IconRefresh, IconCheckCircle, IconWarning, IconSearch, IconClose,
   IconBolt, IconBank, IconChart, IconDownload, IconLock,
 } from "../Icons";
@@ -17,14 +17,15 @@ import {
   tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
   cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria, reporteTickets,
   abrirTurno, turnoAbierto, historialTurnos, registrarEgresoTurno, cerrarTurno,
+  listarClientes, crearCliente, editarCliente, eliminarCliente, metricasCliente, ticketsCliente,
   type Mesa, type MapaMesaEntrada, type Comanda, type ItemComanda, type EstadoItemComanda,
   type EscandalloReceta, type DetalleReceta, type FastBarTrago, type ProveedorHoreca,
   type Articulo, type ItemCompraInsumo, type LoteArticulo, type TasaCambio, type MovimientoCaja,
   type ResumenPeriodoAbierto, type ArqueoCaja, type PagoParcial, type ResumenUtilidadProducto, type ReporteTicket, type Turno,
-  type ItemImportacionArticulo, type ResultadoImportacionArticulos,
+  type ItemImportacionArticulo, type ResultadoImportacionArticulos, type Cliente, type MetricasCliente,
 } from "../api";
 
-type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "inventario" | "administracion" | "reportes" | "configuracion";
+type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "inventario" | "clientes" | "administracion" | "reportes" | "configuracion";
 
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
@@ -49,6 +50,7 @@ const NAV_GRUPOS: NavGrupo[] = [
     items: [
       { id: "compras", label: "Compras & Proveedores", Icon: IconUsers },
       { id: "inventario", label: "Inventario", Icon: IconWarning },
+      { id: "clientes", label: "Clientes", Icon: IconUser },
       { id: "administracion", label: "Administración", Icon: IconBank },
       { id: "reportes", label: "Reportes Operativos", Icon: IconChart },
       { id: "configuracion", label: "Configuración", Icon: IconCustomize },
@@ -382,6 +384,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             <ComprasProveedores tenantId={tenantId} proveedores={proveedores} articulos={articulos} onCambio={recargarTodo} />
           )}
           {pagina === "inventario" && <Inventario tenantId={tenantId} articulos={articulos} onCambio={recargarTodo} />}
+          {pagina === "clientes" && <Clientes tenantId={tenantId} />}
           {pagina === "administracion" && <Administracion tenantId={tenantId} />}
           {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
@@ -1827,6 +1830,189 @@ function Inventario({ tenantId, articulos, onCambio }: { tenantId: number; artic
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// CLIENTES (CRM) — Fase 3. Lista + buscador + panel de detalle con métricas
+// y el historial de tickets del cliente.
+// ══════════════════════════════════════════════════════════════════════════
+function Clientes({ tenantId }: { tenantId: number }) {
+  const [clientes, setClientes] = useState<Cliente[] | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [seleccionado, setSeleccionado] = useState<Cliente | null>(null);
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [form, setForm] = useState({ nombre: "", identificacionRif: "", telefono: "", correo: "" });
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const cargar = (q: string) => {
+    listarClientes(tenantId, q || undefined).then(setClientes).catch(() => setClientes([]));
+  };
+  useEffect(() => {
+    const id = setTimeout(() => cargar(busqueda), 250); // pequeño debounce para no golpear el backend en cada tecla
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId, busqueda]);
+
+  const crear = async () => {
+    if (!form.nombre.trim()) { setError("El nombre es obligatorio"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      await crearCliente(tenantId, {
+        nombre: form.nombre.trim(),
+        identificacionRif: form.identificacionRif.trim() || undefined,
+        telefono: form.telefono.trim() || undefined,
+        correo: form.correo.trim() || undefined,
+      });
+      setForm({ nombre: "", identificacionRif: "", telefono: "", correo: "" });
+      setMostrarForm(false);
+      cargar(busqueda);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo crear el cliente");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="relative w-full sm:w-80">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={14} /></span>
+          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o cédula/RIF…" className="input-horeca w-full pl-8" />
+        </div>
+        <button onClick={() => setMostrarForm((v) => !v)} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
+          {mostrarForm ? "Cancelar" : "+ Nuevo cliente"}
+        </button>
+      </div>
+
+      {mostrarForm && (
+        <div className="apple-glass rounded-2xl p-5 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Campo label="Nombre"><input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="input-horeca" placeholder="Nombre completo" /></Campo>
+            <Campo label="Cédula / RIF (opcional)"><input value={form.identificacionRif} onChange={(e) => setForm({ ...form, identificacionRif: e.target.value })} className="input-horeca" placeholder="V-12345678" /></Campo>
+            <Campo label="Teléfono (opcional)"><input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} className="input-horeca" /></Campo>
+            <Campo label="Correo (opcional)"><input value={form.correo} onChange={(e) => setForm({ ...form, correo: e.target.value })} className="input-horeca" /></Campo>
+          </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <button onClick={crear} disabled={guardando} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+            {guardando ? "Guardando…" : "Guardar cliente"}
+          </button>
+        </div>
+      )}
+
+      {clientes === null ? (
+        <p className="text-xs text-slate-400">Cargando…</p>
+      ) : clientes.length === 0 ? (
+        <p className="text-xs text-slate-400">Sin clientes {busqueda ? "que coincidan con la búsqueda" : "registrados todavía"}.</p>
+      ) : (
+        <div className="apple-glass rounded-2xl overflow-hidden overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-slate-400 dark:text-white/40 uppercase text-[10px] tracking-wider border-b border-slate-300/50 dark:border-white/10">
+                <th className="py-2.5 px-4">Nombre</th><th className="py-2.5 px-4">Cédula/RIF</th><th className="py-2.5 px-4">Teléfono</th><th className="py-2.5 px-4">Registrado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clientes.map((c) => (
+                <tr key={c.id} onClick={() => setSeleccionado(c)} className="border-b border-slate-200/50 dark:border-white/5 hover:bg-teal-500/5 cursor-pointer">
+                  <td className="py-2.5 px-4 font-semibold text-slate-800 dark:text-white">{c.nombre}</td>
+                  <td className="py-2.5 px-4 text-slate-500 dark:text-white/50">{c.identificacionRif || "—"}</td>
+                  <td className="py-2.5 px-4 text-slate-500 dark:text-white/50">{c.telefono || "—"}</td>
+                  <td className="py-2.5 px-4 text-slate-500 dark:text-white/50">{new Date(c.fechaRegistro).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {seleccionado && (
+        <ModalDetalleCliente tenantId={tenantId} cliente={seleccionado} onClose={() => setSeleccionado(null)} onCambio={() => cargar(busqueda)} />
+      )}
+    </div>
+  );
+}
+
+function ModalDetalleCliente({ tenantId, cliente, onClose, onCambio }: { tenantId: number; cliente: Cliente; onClose: () => void; onCambio: () => void }) {
+  const [metricas, setMetricas] = useState<MetricasCliente | null>(null);
+  const [tickets, setTickets] = useState<Comanda[] | null>(null);
+  const [eliminando, setEliminando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    metricasCliente(tenantId, cliente.id).then(setMetricas).catch(() => setMetricas(null));
+    ticketsCliente(tenantId, cliente.id).then(setTickets).catch(() => setTickets([]));
+  }, [tenantId, cliente.id]);
+
+  const eliminar = async () => {
+    if (!window.confirm(`¿Eliminar a "${cliente.nombre}"? Esto no se puede deshacer.`)) return;
+    setEliminando(true);
+    setError(null);
+    try {
+      await eliminarCliente(tenantId, cliente.id);
+      onCambio();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo eliminar — puede tener ventas asociadas");
+      setEliminando(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} titulo={cliente.nombre} ancho="max-w-2xl">
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+          {cliente.identificacionRif && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Cédula/RIF</span><span className="text-slate-800 dark:text-white font-semibold">{cliente.identificacionRif}</span></div>}
+          {cliente.telefono && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Teléfono</span><span className="text-slate-800 dark:text-white font-semibold">{cliente.telefono}</span></div>}
+          {cliente.correo && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Correo</span><span className="text-slate-800 dark:text-white font-semibold">{cliente.correo}</span></div>}
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="apple-glass rounded-xl p-3.5 text-center">
+            <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Total gastado</div>
+            <div className="font-['Outfit'] font-black text-lg text-teal-600 dark:text-teal-400">{metricas ? `$${Number(metricas.totalGastado).toFixed(2)}` : "…"}</div>
+          </div>
+          <div className="apple-glass rounded-xl p-3.5 text-center">
+            <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Órdenes totales</div>
+            <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{metricas?.cantidadVisitas ?? "…"}</div>
+          </div>
+          <div className="apple-glass rounded-xl p-3.5 text-center">
+            <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Última compra</div>
+            <div className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white">{metricas?.fechaUltimaCompra ? new Date(metricas.fechaUltimaCompra).toLocaleDateString() : "—"}</div>
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2">Historial de tickets</h4>
+          {tickets === null ? (
+            <p className="text-xs text-slate-400">Cargando…</p>
+          ) : tickets.length === 0 ? (
+            <p className="text-xs text-slate-400">Sin compras registradas todavía.</p>
+          ) : (
+            <div className="max-h-52 overflow-y-auto space-y-1.5">
+              {tickets.map((t) => (
+                <div key={t.id} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2 text-xs">
+                  <span className="text-slate-600 dark:text-white/60">{t.fechaCierre ? new Date(t.fechaCierre).toLocaleString() : "—"}</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white">${Number(t.totalConsumo).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {error && <p className="text-xs text-red-500">{error}</p>}
+
+        <div className="flex gap-2 pt-2">
+          <button onClick={eliminar} disabled={eliminando} className="flex-1 apple-glass-btn text-red-500 text-xs font-semibold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+            {eliminando ? "Eliminando…" : "Eliminar cliente"}
+          </button>
+          <button onClick={onClose} className="flex-1 g-aurora text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer">Cerrar</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function generarSku(nombre: string): string {
   const base = nombre.trim().toUpperCase()
     .normalize("NFD").replace(/[̀-ͯ]/g, "") // quita tildes
@@ -2543,12 +2729,29 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVen
   const [moneda, setMoneda] = useState("USD");
   const busquedaRef = useRef<HTMLInputElement | null>(null);
 
+  // CRM (opcional, Fase 3): vincular un cliente a la venta no es requisito —
+  // sin seleccionar nada, la venta queda anónima exactamente igual que
+  // siempre. Nada de esto toca el flujo hasta que el cajero abre el
+  // buscador de cliente a propósito.
+  const [clienteSel, setClienteSel] = useState<Cliente | null>(null);
+  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [resultadosCliente, setResultadosCliente] = useState<Cliente[]>([]);
+  const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
+
   useEffect(() => { monedaBase(tenantId).then(setMoneda).catch(() => setMoneda("USD")); }, [tenantId]);
   // Auto-focus para que un escáner de código de barras (que solo "teclea"
   // rápido + Enter) pueda disparar sin que el cajero tenga que hacer clic.
   useEffect(() => { busquedaRef.current?.focus(); }, []);
 
   const categorias = useMemo(() => Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).sort(), [articulos]);
+
+  useEffect(() => {
+    if (clienteSel || !busquedaCliente.trim()) { setResultadosCliente([]); return; }
+    const id = setTimeout(() => {
+      listarClientes(tenantId, busquedaCliente.trim()).then((r) => setResultadosCliente(r.slice(0, 6))).catch(() => setResultadosCliente([]));
+    }, 200);
+    return () => clearTimeout(id);
+  }, [tenantId, busquedaCliente, clienteSel]);
 
   // Un solo buscador para recetas, tragos de Fast-Bar y artículos de
   // inventario — antes las recetas aparecían como botones sueltos arriba,
@@ -2633,7 +2836,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVen
     setError(null);
     setProcesando(true);
     try {
-      const comanda = await abrirComanda(tenantId, { mesero: "Mostrador", canal: "RECOGER_EN_TIENDA" });
+      const comanda = await abrirComanda(tenantId, { mesero: "Mostrador", canal: "RECOGER_EN_TIENDA", clienteId: clienteSel?.id });
       for (const linea of carrito) {
         await agregarItemComanda(tenantId, comanda.id, {
           escandalloId: linea.escandalloId,
@@ -2649,6 +2852,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVen
       onVenta(total, metodoResumen);
       setRecibo({ comandaId: comanda.id, lineas: carrito, total, metodoPago: metodoResumen, fecha: new Date().toLocaleString() });
       setCarrito([]);
+      setClienteSel(null); setBusquedaCliente("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo procesar la venta");
     } finally {
@@ -2825,10 +3029,49 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVen
           )}
         </div>
 
+        {/* Cliente (opcional) — sin seleccionar nada, la venta queda anónima igual que siempre */}
+        <div>
+          <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1.5">Cliente (opcional)</p>
+          {clienteSel ? (
+            <div className="flex items-center justify-between gap-2 bg-teal-500/10 border border-teal-500/25 rounded-xl px-3 py-2">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{clienteSel.nombre}</div>
+                {clienteSel.identificacionRif && <div className="text-[10px] text-slate-500 dark:text-white/40">{clienteSel.identificacionRif}</div>}
+              </div>
+              <button onClick={() => setClienteSel(null)} className="text-slate-400 hover:text-red-500 cursor-pointer flex-shrink-0"><IconClose size={14} /></button>
+            </div>
+          ) : (
+            <div className="relative flex items-center gap-1.5">
+              <div className="relative flex-1">
+                <input value={busquedaCliente} onChange={(e) => setBusquedaCliente(e.target.value)} placeholder="Buscar por nombre o RIF…" className="input-horeca w-full text-xs" />
+                {resultadosCliente.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-40 overflow-y-auto shadow-lg">
+                    {resultadosCliente.map((c) => (
+                      <button key={c.id} type="button"
+                        onClick={() => { setClienteSel(c); setBusquedaCliente(""); setResultadosCliente([]); }}
+                        className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer">
+                        <div className="font-semibold text-slate-800 dark:text-white">{c.nombre}</div>
+                        {c.identificacionRif && <div className="text-[10px] text-slate-400">{c.identificacionRif}</div>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button onClick={() => setMostrarNuevoCliente(true)} title="Registrar cliente nuevo"
+                className="w-8 h-8 flex-shrink-0 rounded-xl bg-teal-500/15 text-teal-600 dark:text-teal-300 hover:bg-teal-500/25 cursor-pointer flex items-center justify-center font-bold">+</button>
+            </div>
+          )}
+        </div>
+
         {carrito.length > 0 && (
           <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
         )}
       </div>
+
+      {mostrarNuevoCliente && (
+        <ModalClienteRapido tenantId={tenantId} onClose={() => setMostrarNuevoCliente(false)}
+          onCreado={(c) => { setClienteSel(c); setMostrarNuevoCliente(false); }} />
+      )}
 
       {recibo && (
         <Modal onClose={() => setRecibo(null)} titulo="Venta registrada">
@@ -2881,6 +3124,43 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVen
         </Modal>
       )}
     </div>
+  );
+}
+
+/** Modal hiper-ligero (3 campos) para registrar un cliente sin salir de Venta Rápida. */
+function ModalClienteRapido({ tenantId, onClose, onCreado }: { tenantId: number; onClose: () => void; onCreado: (c: Cliente) => void }) {
+  const [nombre, setNombre] = useState("");
+  const [identificacionRif, setIdentificacionRif] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const guardar = async () => {
+    if (!nombre.trim()) { setError("El nombre es obligatorio"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      const cliente = await crearCliente(tenantId, { nombre: nombre.trim(), identificacionRif: identificacionRif.trim() || undefined, telefono: telefono.trim() || undefined });
+      onCreado(cliente);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar el cliente");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} titulo="Cliente nuevo">
+      <div className="space-y-3">
+        <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre" className="input-horeca" autoFocus onKeyDown={(e) => e.key === "Enter" && guardar()} />
+        <input value={identificacionRif} onChange={(e) => setIdentificacionRif(e.target.value)} placeholder="Cédula / RIF (opcional)" className="input-horeca" onKeyDown={(e) => e.key === "Enter" && guardar()} />
+        <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="Teléfono (opcional)" className="input-horeca" onKeyDown={(e) => e.key === "Enter" && guardar()} />
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <button onClick={guardar} disabled={guardando} className="w-full btn-cyber-neon text-white text-sm font-bold py-3 rounded-xl cursor-pointer disabled:opacity-60">
+          {guardando ? "Guardando…" : "Guardar y seleccionar"}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
