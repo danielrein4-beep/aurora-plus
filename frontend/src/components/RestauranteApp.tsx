@@ -7,16 +7,16 @@ import {
 import { useAuth } from "../context/AuthContext";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
-  dividirCuenta, cerrarComanda, listarEscandallos, crearEscandallo, agregarIngredienteEscandallo,
+  dividirCuenta, cerrarComandaMixto, listarEscandallos, crearEscandallo, agregarIngredienteEscandallo,
   listarIngredientesEscandallo, listarFastBar, crearTragoFastBar, venderTragoRapido,
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda,
   tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
-  cerrarCaja, historialCierres, descargarCierrePdf,
+  cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria,
   type Mesa, type MapaMesaEntrada, type Comanda, type ItemComanda, type EstadoItemComanda,
   type EscandalloReceta, type DetalleReceta, type FastBarTrago, type ProveedorHoreca,
   type Articulo, type ItemCompraInsumo, type LoteArticulo, type TasaCambio, type MovimientoCaja,
-  type ResumenPeriodoAbierto, type ArqueoCaja,
+  type ResumenPeriodoAbierto, type ArqueoCaja, type PagoParcial, type ResumenUtilidadProducto,
 } from "../api";
 
 type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "inventario" | "administracion" | "configuracion";
@@ -140,6 +140,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const { user } = useAuth();
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
+  const [ventaRapidaAbierta, setVentaRapidaAbierta] = useState(false);
 
   const [config, setConfig] = useState(() => {
     try {
@@ -193,8 +194,10 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   };
   const registrarVenta = (_monto: number, _metodo: string) => {
     // El cobro ya quedó registrado en tesorería por el propio backend
-    // (cerrarComanda / venderTragoRapido) — solo hace falta refrescar.
-    cargarVentasHoy();
+    // (cerrarComanda / venderTragoRapido) — solo hace falta refrescar. Se
+    // recarga todo (no solo ventas) porque la venta puede haber descontado
+    // inventario, tanto de recetas como de artículos vendidos directo.
+    recargarTodo();
   };
 
   const [mapa, setMapa] = useState<MapaMesaEntrada[] | null>(null);
@@ -250,7 +253,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                 return (
                   <button
                     key={n.id}
-                    onClick={() => setPagina(n.id)}
+                    onClick={() => (n.id === "ventarapida" ? setVentaRapidaAbierta(true) : setPagina(n.id))}
                     className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                       pagina === n.id
                         ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 shadow-sm"
@@ -321,10 +324,8 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
         <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
           {pagina === "general" && (
             <VistaGeneral mesasOcupadas={mesasOcupadas} totalMesas={(mapa || []).length} comandasAbiertas={comandasAbiertas}
-              totalVentasHoy={totalVentasHoy} kdsCounts={kdsCounts} vencimientos={(lotesPorVencer || []).length} onNavegar={setPagina} />
-          )}
-          {pagina === "ventarapida" && (
-            <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} onVenta={registrarVenta} />
+              totalVentasHoy={totalVentasHoy} kdsCounts={kdsCounts} vencimientos={(lotesPorVencer || []).length} onNavegar={setPagina}
+              onVentaRapida={() => setVentaRapidaAbierta(true)} />
           )}
           {pagina === "salon" && (
             <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
@@ -341,6 +342,13 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
         </div>
       </main>
+
+      {ventaRapidaAbierta && (
+        <Modal onClose={() => setVentaRapidaAbierta(false)} titulo="Venta Rápida" ancho="max-w-4xl">
+          <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos}
+            onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }} />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -359,9 +367,9 @@ function KpiCard({ label, val, sub, color, onClick }: { label: string; val: stri
 // ══════════════════════════════════════════════════════════════════════════
 // VISTA GENERAL
 // ══════════════════════════════════════════════════════════════════════════
-function VistaGeneral({ mesasOcupadas, totalMesas, comandasAbiertas, totalVentasHoy, kdsCounts, vencimientos, onNavegar }: {
+function VistaGeneral({ mesasOcupadas, totalMesas, comandasAbiertas, totalVentasHoy, kdsCounts, vencimientos, onNavegar, onVentaRapida }: {
   mesasOcupadas: number; totalMesas: number; comandasAbiertas: number; totalVentasHoy: number; kdsCounts: number; vencimientos: number;
-  onNavegar: (p: Pagina) => void;
+  onNavegar: (p: Pagina) => void; onVentaRapida: () => void;
 }) {
   return (
     <div className="space-y-6">
@@ -372,13 +380,12 @@ function VistaGeneral({ mesasOcupadas, totalMesas, comandasAbiertas, totalVentas
         <KpiCard label="Platos en Cocina" val={String(kdsCounts)} sub="Pendientes + en preparación" color="#f59e0b" onClick={() => onNavegar("cocina")} />
         <KpiCard label="Por Vencer" val={String(vencimientos)} sub="Lotes vencidos o próximos" color={vencimientos > 0 ? "#ef4444" : "#64748b"} onClick={() => onNavegar("inventario")} />
       </div>
-      <button onClick={() => onNavegar("ventarapida")}
+      <button onClick={onVentaRapida}
         className="w-full btn-cyber-neon text-white rounded-2xl p-5 flex items-center justify-between cursor-pointer shadow-lg hover:scale-[1.01] transition-all">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center"><IconBolt size={22} /></div>
           <div className="text-left">
             <div className="font-['Outfit'] font-black text-base">Venta Rápida</div>
-            <div className="text-xs opacity-80">Para lo que se vende sin mesa: un pepito, un refresco, un Doritos…</div>
           </div>
         </div>
         <span className="text-xl">→</span>
@@ -860,6 +867,186 @@ function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, o
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// COBRO MIXTO — filas dinámicas de pago (uno o varios métodos/monedas a la
+// vez: moneda base, Bs/VES o COP), con el pendiente/vuelto calculado en vivo
+// en la moneda base del negocio y su equivalente en cada otra moneda, a la
+// tasa vigente que el tenant tenga registrada en Configuración.
+// ══════════════════════════════════════════════════════════════════════════
+interface FilaPago { id: string; metodoPago: string; moneda: string; monto: string; auto: boolean }
+
+const MONEDAS_ALTERNAS: Record<string, string> = { VES: "Bs", COP: "COP" };
+
+function nuevaFilaPago(moneda: string, auto: boolean): FilaPago {
+  return { id: `${Date.now()}-${Math.random()}`, metodoPago: "EFECTIVO", moneda, monto: "", auto };
+}
+
+function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCobrar }: {
+  tenantId: number; total: number; monedaBase: string; procesando: boolean; error: string | null;
+  onCobrar: (pagos: PagoParcial[], monedaVuelto: string) => void;
+}) {
+  // La primera fila es manual (la escribe el cajero); cualquier fila agregada
+  // después nace "auto" — mientras nadie la toque a mano, se recalcula sola
+  // con lo que falta (convertido a su moneda con la tasa vigente) cada vez
+  // que cambia cualquier otra fila. En cuanto el cajero escribe algo directo
+  // en ella, deja de seguir el pendiente y queda fija como manual.
+  const otrasMonedas = Object.keys(MONEDAS_ALTERNAS).filter((m) => m !== monedaBase);
+  const [filas, setFilas] = useState<FilaPago[]>(() => [nuevaFilaPago(monedaBase, false)]);
+  const [tasas, setTasas] = useState<Record<string, number | null>>({});
+  const [monedaVuelto, setMonedaVuelto] = useState(monedaBase);
+
+  useEffect(() => {
+    otrasMonedas.forEach((moneda) => {
+      tasaVigente(tenantId, monedaBase, moneda)
+        .then((t) => setTasas((prev) => ({ ...prev, [moneda]: Number(t.tasa) })))
+        .catch(() => setTasas((prev) => ({ ...prev, [moneda]: null })));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId, monedaBase]);
+
+  const aBase = (monto: number, moneda: string) => {
+    if (!monto) return 0;
+    if (moneda === monedaBase) return monto;
+    const tasa = tasas[moneda];
+    return tasa ? monto / tasa : 0;
+  };
+  const deBase = (montoBase: number, moneda: string) => {
+    if (moneda === monedaBase) return montoBase;
+    const tasa = tasas[moneda];
+    return tasa ? montoBase * tasa : montoBase;
+  };
+
+  // Recalcula en vivo las filas "auto" con lo que falta, cada vez que cambia
+  // una fila manual, el total o alguna tasa — sin que el cajero tenga que
+  // tocar nada, sea el restante en Bs, en COP o en la moneda base.
+  const firmaManual = JSON.stringify(filas.filter((f) => !f.auto).map((f) => `${f.monto}|${f.moneda}`));
+  const firmaTasas = JSON.stringify(tasas);
+  useEffect(() => {
+    setFilas((prev) => {
+      const sumaManualBase = prev.filter((f) => !f.auto).reduce((s, f) => s + aBase(Number(f.monto) || 0, f.moneda), 0);
+      const faltaBase = total - sumaManualBase;
+      let cambio = false;
+      const siguiente = prev.map((f) => {
+        if (!f.auto) return f;
+        const valor = faltaBase > 0.004 ? deBase(faltaBase, f.moneda).toFixed(2) : "";
+        if (valor === f.monto) return f;
+        cambio = true;
+        return { ...f, monto: valor };
+      });
+      return cambio ? siguiente : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaManual, total, firmaTasas, monedaBase]);
+
+  const totalIngresadoBase = filas.reduce((s, f) => s + aBase(Number(f.monto) || 0, f.moneda), 0);
+  const pendienteBase = Math.max(0, total - totalIngresadoBase);
+  const vueltoBase = Math.max(0, totalIngresadoBase - total);
+  const cubierto = total > 0 && totalIngresadoBase >= total - 0.005;
+
+  const actualizarMonto = (id: string, monto: string) =>
+    setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, monto, auto: false } : f)));
+  const actualizarMetodo = (id: string, metodoPago: string) =>
+    setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, metodoPago } : f)));
+  const actualizarMoneda = (id: string, moneda: string) =>
+    setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, moneda } : f)));
+  const agregarFila = () => setFilas((prev) => {
+    // La fila nueva nace en la primera moneda alterna disponible que ninguna otra fila ya esté usando (típicamente Bs).
+    const enUso = new Set(prev.map((f) => f.moneda));
+    const monedaSugerida = otrasMonedas.find((m) => !enUso.has(m)) || otrasMonedas[0] || monedaBase;
+    return [...prev, nuevaFilaPago(monedaSugerida, true)];
+  });
+  const quitarFila = (id: string) => setFilas((prev) => (prev.length > 1 ? prev.filter((f) => f.id !== id) : prev));
+  const completarConPendiente = (id: string) => setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, auto: true } : { ...f, auto: false })));
+
+  const handleCobrar = () => {
+    const pagos: PagoParcial[] = filas
+      .filter((f) => Number(f.monto) > 0)
+      .map((f) => ({ metodoPago: f.metodoPago, moneda: f.moneda, monto: Number(f.monto) }));
+    onCobrar(pagos, monedaVuelto);
+  };
+
+  const simbolo = monedaBase === "USD" ? "$" : monedaBase + " ";
+  const formatearEnOtras = (montoBase: number) =>
+    otrasMonedas
+      .filter((m) => tasas[m] != null)
+      .map((m) => `${MONEDAS_ALTERNAS[m]} ${deBase(montoBase, m).toFixed(2)}`)
+      .join(" · ");
+
+  return (
+    <div className="space-y-3 pt-3 border-t border-slate-300/50 dark:border-white/10">
+      <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Cobro (uno o varios métodos)</p>
+
+      <div className="space-y-2">
+        {filas.map((f) => (
+          <div key={f.id} className="flex items-center gap-1.5">
+            <select value={f.metodoPago} onChange={(e) => actualizarMetodo(f.id, e.target.value)} className="input-horeca flex-[1.3] text-xs">
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="TARJETA">Tarjeta</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="BILLETERA_DIGITAL">Billetera digital</option>
+            </select>
+            <select value={f.moneda} onChange={(e) => actualizarMoneda(f.id, e.target.value)} className="input-horeca w-[4.5rem] text-xs">
+              <option value={monedaBase}>{monedaBase}</option>
+              {otrasMonedas.map((m) => <option key={m} value={m}>{MONEDAS_ALTERNAS[m]}</option>)}
+            </select>
+            <div className="relative w-24 flex-shrink-0">
+              <input
+                value={f.monto}
+                onChange={(e) => actualizarMonto(f.id, e.target.value)}
+                type="number" step="0.01" min="0" placeholder="0.00"
+                title={f.auto ? "Se calcula sola con lo que falta — escribe aquí para fijarla a mano" : undefined}
+                className={`input-horeca w-full text-xs ${f.auto ? "text-teal-600 dark:text-teal-300" : ""}`}
+              />
+              {f.auto && f.monto && (
+                <span className="absolute -top-1.5 -right-1.5 text-[8px] font-bold bg-teal-500 text-white rounded-full px-1 leading-tight">auto</span>
+              )}
+            </div>
+            <button type="button" onClick={() => completarConPendiente(f.id)} title="Rellenar con lo que falta" className="text-[10px] font-semibold text-teal-600 dark:text-teal-300 px-1 cursor-pointer whitespace-nowrap">todo</button>
+            {filas.length > 1 && (
+              <button type="button" onClick={() => quitarFila(f.id)} className="text-slate-400 hover:text-red-500 cursor-pointer flex-shrink-0"><IconTrash size={13} /></button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <button type="button" onClick={agregarFila} className="text-xs text-teal-600 dark:text-teal-300 font-semibold cursor-pointer">+ Agregar otro método de pago</button>
+
+      <div className="apple-glass rounded-xl p-3 space-y-1 text-xs">
+        <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Total a cobrar</span><span className="font-mono font-bold text-slate-900 dark:text-white">{simbolo}{total.toFixed(2)}</span></div>
+        <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Ingresado</span><span className="font-mono text-slate-700 dark:text-white/70">{simbolo}{totalIngresadoBase.toFixed(2)}</span></div>
+        {!cubierto ? (
+          <div className="flex justify-between text-amber-600 dark:text-amber-400 font-semibold">
+            <span>Pendiente</span>
+            <span className="font-mono">{simbolo}{pendienteBase.toFixed(2)}{formatearEnOtras(pendienteBase) ? ` · ${formatearEnOtras(pendienteBase)}` : ""}</span>
+          </div>
+        ) : (
+          <div className="flex justify-between text-teal-600 dark:text-teal-400 font-semibold">
+            <span>Vuelto</span>
+            <span className="font-mono">{simbolo}{vueltoBase.toFixed(2)}{formatearEnOtras(vueltoBase) ? ` · ${formatearEnOtras(vueltoBase)}` : ""}</span>
+          </div>
+        )}
+      </div>
+
+      {vueltoBase > 0.004 && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-slate-500 dark:text-white/40 whitespace-nowrap">Entregar vuelto en</span>
+          <select value={monedaVuelto} onChange={(e) => setMonedaVuelto(e.target.value)} className="input-horeca flex-1">
+            <option value={monedaBase}>{monedaBase}</option>
+            {otrasMonedas.map((m) => <option key={m} value={m}>{MONEDAS_ALTERNAS[m]} ({m})</option>)}
+          </select>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      <button onClick={handleCobrar} disabled={procesando || !cubierto}
+        className="w-full btn-cyber-neon text-white text-sm font-bold py-3.5 rounded-xl cursor-pointer disabled:opacity-50">
+        {procesando ? "Procesando…" : cubierto ? `Cobrar y Cerrar ${simbolo}${total.toFixed(2)}` : "Completa el pago para cobrar"}
+      </button>
+    </div>
+  );
+}
+
 function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, onCerrar, onClose }: {
   tenantId: number; comanda: Comanda; items: ItemLocal[]; escandallos: EscandalloReceta[] | null;
   onAgregarItem: (item: ItemLocal) => void; onCerrar: (monto: number, metodo: string) => void; onClose: () => void;
@@ -873,8 +1060,11 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
   const [error, setError] = useState<string | null>(null);
   const [numeroPersonas, setNumeroPersonas] = useState("2");
   const [division, setDivision] = useState<number[] | null>(null);
-  const [metodoPago, setMetodoPago] = useState("EFECTIVO");
   const [cerrando, setCerrando] = useState(false);
+  const [errorCierre, setErrorCierre] = useState<string | null>(null);
+  const [moneda, setMoneda] = useState("USD");
+
+  useEffect(() => { monedaBase(tenantId).then(setMoneda).catch(() => setMoneda("USD")); }, [tenantId]);
 
   const totalLocal = items.reduce((s, i) => s + Number(i.precioUnitario) * i.cantidad, 0);
 
@@ -910,11 +1100,11 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
     }
   };
 
-  const handleCerrar = async () => {
+  const handleCerrar = async (pagos: PagoParcial[], monedaVuelto: string) => {
     setCerrando(true);
-    setError(null);
+    setErrorCierre(null);
     try {
-      await cerrarComanda(tenantId, comanda.id, { metodoPago });
+      const resultado = await cerrarComandaMixto(tenantId, comanda.id, pagos, monedaVuelto);
       try {
         const blob = await descargarTicketComanda(tenantId, comanda.id);
         const url = URL.createObjectURL(blob);
@@ -923,9 +1113,9 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
       } catch {
         // El cobro ya se procesó — si el recibo falla al generarse no debe bloquear el cierre.
       }
-      onCerrar(totalLocal, metodoPago);
+      onCerrar(totalLocal, resultado.comanda.metodoPago || "MIXTO");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cerrar la comanda");
+      setErrorCierre(e instanceof Error ? e.message : "No se pudo cerrar la comanda");
     } finally {
       setCerrando(false);
     }
@@ -990,17 +1180,9 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
         </div>
 
         {/* Cerrar comanda */}
-        <div className="flex items-center gap-2 pt-3 border-t border-slate-300/50 dark:border-white/10">
-          <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} className="input-horeca flex-1">
-            <option value="EFECTIVO">Efectivo</option>
-            <option value="TARJETA">Tarjeta</option>
-            <option value="TRANSFERENCIA">Transferencia</option>
-            <option value="BILLETERA_DIGITAL">Billetera digital</option>
-          </select>
-          <button onClick={handleCerrar} disabled={cerrando || items.length === 0} className="btn-cyber-neon text-white text-xs font-bold px-5 py-3 rounded-xl cursor-pointer disabled:opacity-50">
-            {cerrando ? "Cerrando…" : `Cobrar y Cerrar $${totalLocal.toFixed(2)}`}
-          </button>
-        </div>
+        {items.length > 0 && (
+          <PanelCobroMixto tenantId={tenantId} total={totalLocal} monedaBase={moneda} procesando={cerrando} error={errorCierre} onCobrar={handleCerrar} />
+        )}
       </div>
     </Modal>
   );
@@ -1813,35 +1995,70 @@ function TasasDeCambio({ tenantId }: { tenantId: number }) {
 // ══════════════════════════════════════════════════════════════════════════
 // VENTA RÁPIDA — para lo que no pasa por una mesa (mostrador, para llevar)
 // ══════════════════════════════════════════════════════════════════════════
-function VentaRapida({ tenantId, escandallos, fastbar, onVenta }: {
-  tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; onVenta: (monto: number, metodo: string) => void;
+function VentaRapida({ tenantId, escandallos, fastbar, articulos, onVenta }: {
+  tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
+  onVenta: (monto: number, metodo: string) => void;
 }) {
-  interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; estacionCocina?: string }
+  interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
   interface ReciboVenta { comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string }
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
-  const [nombreManual, setNombreManual] = useState("");
+  const [busqueda, setBusqueda] = useState("");
+  const [articuloSel, setArticuloSel] = useState<Articulo | null>(null);
+  const [cantidadManual, setCantidadManual] = useState("1");
   const [precioManual, setPrecioManual] = useState("");
-  const [metodoPago, setMetodoPago] = useState("EFECTIVO");
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recibo, setRecibo] = useState<ReciboVenta | null>(null);
   const [abriendoTicket, setAbriendoTicket] = useState(false);
+  const [moneda, setMoneda] = useState("USD");
 
-  const agregarAlCarrito = (linea: Omit<LineaCarrito, "cantidad">) => {
+  useEffect(() => { monedaBase(tenantId).then(setMoneda).catch(() => setMoneda("USD")); }, [tenantId]);
+
+  const resultadosBusqueda = useMemo(() => {
+    if (articuloSel || !busqueda.trim()) return [];
+    const q = busqueda.trim().toLowerCase();
+    return (articulos || []).filter((a) => a.nombre.toLowerCase().includes(q)).slice(0, 6);
+  }, [busqueda, articuloSel, articulos]);
+
+  const agregarConCantidad = (linea: Omit<LineaCarrito, "cantidad">, cant: number) => {
     setCarrito((prev) => {
       const existente = prev.find((l) => l.key === linea.key);
-      if (existente) return prev.map((l) => (l.key === linea.key ? { ...l, cantidad: l.cantidad + 1 } : l));
-      return [...prev, { ...linea, cantidad: 1 }];
+      if (existente) return prev.map((l) => (l.key === linea.key ? { ...l, cantidad: l.cantidad + cant } : l));
+      return [...prev, { ...linea, cantidad: cant }];
     });
   };
+  const agregarAlCarrito = (linea: Omit<LineaCarrito, "cantidad">) => agregarConCantidad(linea, 1);
   const cambiarCantidad = (key: string, delta: number) => {
     setCarrito((prev) => prev.map((l) => (l.key === key ? { ...l, cantidad: Math.max(1, l.cantidad + delta) } : l)).filter((l) => l.cantidad > 0));
   };
   const quitarLinea = (key: string) => setCarrito((prev) => prev.filter((l) => l.key !== key));
 
+  const handleAgregarProducto = () => {
+    setError(null);
+    const nombre = articuloSel ? articuloSel.nombre : busqueda.trim();
+    if (!nombre) { setError("Busca en tu inventario o escribe qué vas a vender"); return; }
+    if (!precioManual || Number(precioManual) <= 0) { setError("Indica el precio de venta"); return; }
+    const cant = Math.max(1, parseInt(cantidadManual, 10) || 1);
+    if (articuloSel) {
+      const yaEnCarrito = carrito.find((l) => l.key === `articulo-${articuloSel.id}`)?.cantidad || 0;
+      if (yaEnCarrito + cant > Number(articuloSel.stockActual)) {
+        setError(`Solo hay ${articuloSel.stockActual} ${articuloSel.unidadMedida || "unidades"} disponibles de ${articuloSel.nombre} en inventario`);
+        return;
+      }
+    }
+    agregarConCantidad({
+      key: articuloSel ? `articulo-${articuloSel.id}` : `manual-${Date.now()}`,
+      nombre,
+      precio: Number(precioManual),
+      articuloId: articuloSel?.id,
+      estacionCocina: articuloSel ? undefined : "COCINA",
+    }, cant);
+    setArticuloSel(null); setBusqueda(""); setCantidadManual("1"); setPrecioManual("");
+  };
+
   const total = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0);
 
-  const cobrar = async () => {
+  const cobrar = async (pagos: PagoParcial[], monedaVuelto: string) => {
     if (carrito.length === 0) return;
     setError(null);
     setProcesando(true);
@@ -1850,15 +2067,17 @@ function VentaRapida({ tenantId, escandallos, fastbar, onVenta }: {
       for (const linea of carrito) {
         await agregarItemComanda(tenantId, comanda.id, {
           escandalloId: linea.escandalloId,
+          articuloId: linea.articuloId,
           nombrePlato: linea.nombre,
           estacionCocina: linea.estacionCocina,
           cantidad: linea.cantidad,
           precioUnitario: linea.precio,
         });
       }
-      await cerrarComanda(tenantId, comanda.id, { metodoPago });
-      onVenta(total, metodoPago);
-      setRecibo({ comandaId: comanda.id, lineas: carrito, total, metodoPago, fecha: new Date().toLocaleString() });
+      const resultado = await cerrarComandaMixto(tenantId, comanda.id, pagos, monedaVuelto);
+      const metodoResumen = resultado.comanda.metodoPago || "MIXTO";
+      onVenta(total, metodoResumen);
+      setRecibo({ comandaId: comanda.id, lineas: carrito, total, metodoPago: metodoResumen, fecha: new Date().toLocaleString() });
       setCarrito([]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo procesar la venta");
@@ -1907,17 +2126,44 @@ function VentaRapida({ tenantId, escandallos, fastbar, onVenta }: {
         </div>
 
         <div className="apple-glass rounded-xl p-4 space-y-2.5">
-          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Producto suelto (no registrado en Recetas/Fast-Bar)</p>
+          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Buscar producto en inventario</p>
+          <div className="relative">
+            <input
+              value={articuloSel ? articuloSel.nombre : busqueda}
+              onChange={(e) => { setBusqueda(e.target.value); setArticuloSel(null); }}
+              placeholder="Escribe para buscar… ej. Doritos, Refresco"
+              className="input-horeca w-full pr-8"
+            />
+            {articuloSel && (
+              <button type="button" onClick={() => { setArticuloSel(null); setBusqueda(""); }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 cursor-pointer">
+                <IconClose size={14} />
+              </button>
+            )}
+            {!articuloSel && busqueda.trim() && resultadosBusqueda.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-48 overflow-y-auto shadow-lg">
+                {resultadosBusqueda.map((a) => (
+                  <button key={a.id} type="button" onClick={() => { setArticuloSel(a); setBusqueda(""); }}
+                    className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer flex items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-800 dark:text-white truncate">{a.nombre}</span>
+                    <span className="text-slate-400 font-mono flex-shrink-0">{a.stockActual} {a.unidadMedida || "u."}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {!articuloSel && busqueda.trim() && resultadosBusqueda.length === 0 && (
+              <p className="text-[10px] text-slate-400 mt-1">Sin resultados en inventario — puedes venderlo igual así, pero no descontará stock.</p>
+            )}
+          </div>
+          {articuloSel && (
+            <div className="text-[10px] text-teal-600 dark:text-teal-300">
+              En inventario: {Number(articuloSel.stockActual)} {articuloSel.unidadMedida || "unidades"} · Costo ${Number(articuloSel.costoUnitario).toFixed(2)} c/u
+            </div>
+          )}
           <div className="flex items-center gap-2">
-            <input value={nombreManual} onChange={(e) => setNombreManual(e.target.value)} placeholder="Ej. Doritos, Refresco…" className="input-horeca flex-1" />
-            <input value={precioManual} onChange={(e) => setPrecioManual(e.target.value)} type="number" step="0.01" placeholder="Precio $" className="input-horeca w-28" />
-            <button
-              onClick={() => {
-                if (!nombreManual.trim() || !precioManual) return;
-                agregarAlCarrito({ key: `manual-${Date.now()}`, nombre: nombreManual.trim(), precio: Number(precioManual), estacionCocina: "COCINA" });
-                setNombreManual(""); setPrecioManual("");
-              }}
-              className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer whitespace-nowrap">
+            <input value={cantidadManual} onChange={(e) => setCantidadManual(e.target.value)} type="number" min="1" className="input-horeca w-16" title="Cantidad" />
+            <input value={precioManual} onChange={(e) => setPrecioManual(e.target.value)} type="number" step="0.01" placeholder="Precio de venta $" className="input-horeca flex-1" />
+            <button onClick={handleAgregarProducto} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer whitespace-nowrap">
               + Agregar
             </button>
           </div>
@@ -1952,18 +2198,9 @@ function VentaRapida({ tenantId, escandallos, fastbar, onVenta }: {
           <span>Total</span><span className="font-mono">${total.toFixed(2)}</span>
         </div>
 
-        <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} className="input-horeca">
-          <option value="EFECTIVO">Efectivo</option>
-          <option value="TARJETA">Tarjeta</option>
-          <option value="TRANSFERENCIA">Transferencia</option>
-          <option value="BILLETERA_DIGITAL">Billetera digital</option>
-        </select>
-
-        {error && <p className="text-xs text-red-500">{error}</p>}
-        <button onClick={cobrar} disabled={procesando || carrito.length === 0}
-          className="w-full btn-cyber-neon text-white text-sm font-bold py-3.5 rounded-xl cursor-pointer disabled:opacity-50">
-          {procesando ? "Procesando…" : `Cobrar $${total.toFixed(2)}`}
-        </button>
+        {carrito.length > 0 && (
+          <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
+        )}
       </div>
 
       {recibo && (
@@ -2011,7 +2248,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, onVenta }: {
 // ADMINISTRACIÓN — ingresos/gastos + cuentas x cobrar/pagar + cierre de caja, unidos
 // ══════════════════════════════════════════════════════════════════════════
 function Administracion({ tenantId }: { tenantId: number }) {
-  const [tab, setTab] = useState<"finanzas" | "cuentas" | "cierre">("finanzas");
+  const [tab, setTab] = useState<"finanzas" | "cuentas" | "cierre" | "resumen">("finanzas");
 
   return (
     <div className="space-y-5">
@@ -2020,6 +2257,7 @@ function Administracion({ tenantId }: { tenantId: number }) {
           { id: "finanzas", label: "Ingresos & Gastos" },
           { id: "cuentas", label: "Cuentas x Cobrar/Pagar" },
           { id: "cierre", label: "Cierre de Caja" },
+          { id: "resumen", label: "Resumen Diario" },
         ].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id as typeof tab)}
             className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === t.id ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"}`}>
@@ -2031,6 +2269,84 @@ function Administracion({ tenantId }: { tenantId: number }) {
       {tab === "finanzas" && <Finanzas tenantId={tenantId} />}
       {tab === "cuentas" && <CuentasPorCobrarPagar tenantId={tenantId} />}
       {tab === "cierre" && <CierreDeCaja tenantId={tenantId} />}
+      {tab === "resumen" && <ResumenDiario tenantId={tenantId} />}
+    </div>
+  );
+}
+
+// Utilidad por producto del día: cuánto entró vendiendo cada plato/artículo
+// contra cuánto costó (compra o receta) — solo lo que se vendió HOY.
+function ResumenDiario({ tenantId }: { tenantId: number }) {
+  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [filas, setFilas] = useState<ResumenUtilidadProducto[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFilas(null);
+    setError(null);
+    utilidadDiaria(tenantId, fecha)
+      .then(setFilas)
+      .catch((e) => setError(e instanceof Error ? e.message : "No se pudo cargar el resumen"));
+  }, [tenantId, fecha]);
+
+  const totales = (filas || []).reduce(
+    (acc, f) => ({ ingreso: acc.ingreso + Number(f.ingresoTotal), costo: acc.costo + Number(f.costoTotal), utilidad: acc.utilidad + Number(f.utilidad) }),
+    { ingreso: 0, costo: 0, utilidad: 0 }
+  );
+
+  return (
+    <div className="apple-glass rounded-2xl p-6 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Utilidad por producto</h3>
+          <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">Solo platos y artículos vendidos con costo conocido (receta o compra) — no incluye cargos manuales sin costo.</p>
+        </div>
+        <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="input-horeca w-40" />
+      </div>
+
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      {filas === null ? (
+        <p className="text-xs text-slate-400">Cargando…</p>
+      ) : filas.length === 0 ? (
+        <p className="text-xs text-slate-400">Sin ventas con costo conocido en esta fecha.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-slate-400 dark:text-white/40 uppercase text-[10px] tracking-wider border-b border-slate-300/50 dark:border-white/10">
+                <th className="py-2 pr-2">Producto</th>
+                <th className="py-2 px-2 text-right">Cant.</th>
+                <th className="py-2 px-2 text-right">Ingreso</th>
+                <th className="py-2 px-2 text-right">Costo</th>
+                <th className="py-2 pl-2 text-right">Utilidad</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filas.map((f) => (
+                <tr key={f.nombrePlato} className="border-b border-slate-200/50 dark:border-white/5">
+                  <td className="py-2 pr-2 font-semibold text-slate-800 dark:text-white">{f.nombrePlato}</td>
+                  <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{f.cantidadVendida}</td>
+                  <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">${Number(f.ingresoTotal).toFixed(2)}</td>
+                  <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">${Number(f.costoTotal).toFixed(2)}</td>
+                  <td className={`py-2 pl-2 text-right font-mono font-bold ${Number(f.utilidad) >= 0 ? "text-teal-600 dark:text-teal-400" : "text-red-500"}`}>
+                    ${Number(f.utilidad).toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="font-bold text-slate-900 dark:text-white border-t-2 border-slate-300/60 dark:border-white/10">
+                <td className="py-2 pr-2">Total</td>
+                <td className="py-2 px-2"></td>
+                <td className="py-2 px-2 text-right font-mono">${totales.ingreso.toFixed(2)}</td>
+                <td className="py-2 px-2 text-right font-mono">${totales.costo.toFixed(2)}</td>
+                <td className={`py-2 pl-2 text-right font-mono ${totales.utilidad >= 0 ? "text-teal-600 dark:text-teal-400" : "text-red-500"}`}>${totales.utilidad.toFixed(2)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

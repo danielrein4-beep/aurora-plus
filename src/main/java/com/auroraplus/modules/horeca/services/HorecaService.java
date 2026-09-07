@@ -2,13 +2,19 @@ package com.auroraplus.modules.horeca.services;
 
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.services.MotorFinancieroService;
+import com.auroraplus.core.inventario.entities.Articulo;
+import com.auroraplus.core.inventario.entities.Kardex;
+import com.auroraplus.core.inventario.repositories.ArticuloRepository;
+import com.auroraplus.core.inventario.services.InventarioService;
 import com.auroraplus.core.sync.IdempotenciaService;
 import com.auroraplus.modules.horeca.entities.Comanda;
 import com.auroraplus.modules.horeca.entities.EscandalloReceta;
 import com.auroraplus.modules.horeca.entities.ItemComanda;
+import com.auroraplus.modules.horeca.entities.PagoVenta;
 import com.auroraplus.modules.horeca.repositories.ComandaRepository;
 import com.auroraplus.modules.horeca.repositories.EscandalloRecetaRepository;
 import com.auroraplus.modules.horeca.repositories.ItemComandaRepository;
+import com.auroraplus.modules.horeca.repositories.PagoVentaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +44,15 @@ public class HorecaService {
 
     @Autowired
     private IdempotenciaService idempotenciaService;
+
+    @Autowired
+    private PagoVentaRepository pagoVentaRepository;
+
+    @Autowired
+    private ArticuloRepository articuloRepository;
+
+    @Autowired
+    private InventarioService inventarioService;
 
     public Comanda obtenerComanda(Long comandaId) {
         return comandaRepository.findById(comandaId).orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
@@ -188,6 +203,133 @@ public class HorecaService {
         return cerrada;
     }
 
+    public static class PagoParcialRequest {
+        public String metodoPago;
+        public String moneda; // moneda en la que el cliente entrega ESTA línea (ej. USD, VES)
+        public BigDecimal monto; // monto entregado en esa moneda
+    }
+
+    /**
+     * Cierra la comanda cobrándola con VARIOS métodos de pago a la vez (cobro
+     * mixto: ej. parte en USD efectivo, resto en Bs por Pago Móvil) — cada
+     * línea se registra por separado en tesorería, en SU propia moneda real
+     * (para que el arqueo de caja por moneda sea exacto), y se valida el total
+     * contra la tasa BCV vigente del tenant. Si lo recibido supera el total,
+     * se calcula el vuelto exacto y se registra como un egreso "Vuelto
+     * entregado" en la moneda solicitada (por defecto, la moneda base del
+     * negocio), más su equivalente en Bs como referencia para el cajero.
+     *
+     * claveIdempotencia: mismo propósito que en cerrarComanda — un reintento
+     * de red no debe cobrar dos veces ni duplicar las líneas de pago.
+     */
+    @Transactional
+    public ResultadoCobroMixto cerrarComandaMixto(Long comandaId, Long tenantId, List<PagoParcialRequest> pagos,
+                                                    String monedaVuelto, String claveIdempotencia) {
+        java.util.Optional<Long> existente = idempotenciaService.obtenerSiYaProcesada(tenantId, claveIdempotencia);
+        if (existente.isPresent()) {
+            Comanda comandaExistente = comandaRepository.findById(existente.get())
+                .orElseThrow(() -> new RuntimeException("Operación idempotente inconsistente: comanda " + existente.get() + " no encontrada"));
+            ResultadoCobroMixto resultado = new ResultadoCobroMixto();
+            resultado.comanda = comandaExistente;
+            resultado.pagos = pagoVentaRepository.findByComandaIdOrderByFechaPagoAsc(comandaExistente.getId());
+            resultado.totalBase = comandaExistente.getTotalConsumo();
+            resultado.monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
+            return resultado;
+        }
+
+        Comanda comanda = comandaRepository.findById(comandaId)
+            .orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
+        if (!comanda.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Comanda no pertenece a este tenant");
+        }
+        if (comanda.getEstado() != Comanda.EstadoComanda.ABIERTA) {
+            throw new RuntimeException("Solo se puede cerrar una comanda que está ABIERTA");
+        }
+        if (pagos == null || pagos.isEmpty()) {
+            throw new RuntimeException("Debe indicar al menos una línea de pago");
+        }
+        for (PagoParcialRequest p : pagos) {
+            if (p.metodoPago == null || !METODOS_PAGO_VALIDOS.contains(p.metodoPago)) {
+                throw new RuntimeException("Método de pago inválido. Use: " + METODOS_PAGO_VALIDOS);
+            }
+            if (p.moneda == null || p.moneda.isBlank()) {
+                throw new RuntimeException("Cada línea de pago debe indicar su moneda");
+            }
+            if (p.monto == null || p.monto.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new RuntimeException("Cada línea de pago debe tener un monto mayor a cero");
+            }
+        }
+
+        String monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
+        BigDecimal totalBase = comanda.getTotalConsumo();
+        BigDecimal totalRecibidoBase = BigDecimal.ZERO;
+        List<PagoVenta> guardados = new ArrayList<>();
+
+        for (PagoParcialRequest p : pagos) {
+            BigDecimal montoBaseLinea = motorFinancieroService.convertirAMonedaBase(tenantId, p.monto, p.moneda);
+            totalRecibidoBase = totalRecibidoBase.add(montoBaseLinea);
+
+            PagoVenta pago = new PagoVenta();
+            pago.setTenantId(tenantId);
+            pago.setComanda(comanda);
+            pago.setMetodoPago(p.metodoPago);
+            pago.setMoneda(p.moneda);
+            pago.setMonto(p.monto);
+            pago.setMontoEquivalenteBase(montoBaseLinea);
+            if (!p.moneda.equals(monedaBase)) {
+                pago.setTasaAplicada(montoBaseLinea.divide(p.monto, 6, RoundingMode.HALF_UP));
+            }
+            pago.setFechaPago(LocalDateTime.now());
+            guardados.add(pagoVentaRepository.save(pago));
+
+            motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
+                p.monto, p.moneda, "Comanda mesa " + comanda.getNumeroMesa() + " (" + p.metodoPago + ")");
+        }
+
+        BigDecimal faltante = totalBase.subtract(totalRecibidoBase).setScale(2, RoundingMode.HALF_UP);
+        if (faltante.compareTo(BigDecimal.ZERO) > 0) {
+            throw new RuntimeException("El pago no cubre el total de la comanda. Faltan " + faltante + " " + monedaBase);
+        }
+
+        BigDecimal vueltoBase = totalRecibidoBase.subtract(totalBase).setScale(2, RoundingMode.HALF_UP);
+        String monedaVueltoFinal = (monedaVuelto != null && !monedaVuelto.isBlank()) ? monedaVuelto : monedaBase;
+        BigDecimal vueltoEnMonedaVuelto = BigDecimal.ZERO;
+        BigDecimal vueltoVes = null;
+
+        if (vueltoBase.compareTo(BigDecimal.ZERO) > 0) {
+            vueltoEnMonedaVuelto = motorFinancieroService.convertirMoneda(tenantId, vueltoBase, monedaBase, monedaVueltoFinal);
+            motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
+                vueltoEnMonedaVuelto, monedaVueltoFinal, "Vuelto entregado - Comanda mesa " + comanda.getNumeroMesa());
+
+            try {
+                vueltoVes = "VES".equals(monedaVueltoFinal)
+                    ? vueltoEnMonedaVuelto
+                    : motorFinancieroService.convertirMoneda(tenantId, vueltoBase, monedaBase, "VES");
+            } catch (RuntimeException sinTasaVes) {
+                // Sin tasa BCV registrada: el vuelto en Bs queda como informativo ausente, no bloquea el cobro.
+            }
+        }
+
+        comanda.setEstado(Comanda.EstadoComanda.PAGADA);
+        comanda.setMetodoPago(pagos.size() == 1 ? pagos.get(0).metodoPago : "MIXTO");
+        comanda.setFechaCierre(LocalDateTime.now());
+        Comanda cerrada = comandaRepository.save(comanda);
+
+        idempotenciaService.registrar(tenantId, claveIdempotencia, "cierre_comanda_horeca_mixto", cerrada.getId());
+
+        ResultadoCobroMixto resultado = new ResultadoCobroMixto();
+        resultado.comanda = cerrada;
+        resultado.pagos = guardados;
+        resultado.totalBase = totalBase;
+        resultado.monedaBase = monedaBase;
+        resultado.totalRecibidoBase = totalRecibidoBase.setScale(2, RoundingMode.HALF_UP);
+        resultado.vueltoBase = vueltoBase;
+        resultado.monedaVuelto = monedaVueltoFinal;
+        resultado.vueltoEnMonedaVuelto = vueltoEnMonedaVuelto;
+        resultado.vueltoVes = vueltoVes;
+        return resultado;
+    }
+
     public Comanda asignarMesero(Long comandaId, Long tenantId, String nuevoMesero) {
         Comanda comanda = comandaRepository.findById(comandaId)
             .orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
@@ -247,7 +389,7 @@ public class HorecaService {
     @Transactional
     public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, String nombrePlato,
                                            String estacionCocina, Integer cantidad, BigDecimal precioUnitario) {
-        return agregarItemComanda(comandaId, tenantId, escandalloId, nombrePlato, estacionCocina, cantidad, precioUnitario, null);
+        return agregarItemComanda(comandaId, tenantId, escandalloId, null, nombrePlato, estacionCocina, cantidad, precioUnitario, null);
     }
 
     /**
@@ -258,6 +400,23 @@ public class HorecaService {
      */
     @Transactional
     public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, String nombrePlato,
+                                           String estacionCocina, Integer cantidad, BigDecimal precioUnitario,
+                                           String claveIdempotencia) {
+        return agregarItemComanda(comandaId, tenantId, escandalloId, null, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia);
+    }
+
+    /**
+     * Variante que además admite articuloId: venta DIRECTA de un artículo de
+     * inventario (ej. un Doritos, un refresco) sin pasar por una receta —
+     * descuenta 1:1 del stock (InventarioService, que ya rechaza la salida si
+     * no alcanza), congela el costo de compra vigente del artículo en el ítem
+     * (costoUnitario) para que el reporte de utilidad del día no cambie si el
+     * costo del artículo se actualiza después, y no pasa por cocina (queda
+     * ENTREGADO de una vez, como cualquier venta de mostrador).
+     * escandalloId y articuloId son mutuamente excluyentes.
+     */
+    @Transactional
+    public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, Long articuloId, String nombrePlato,
                                            String estacionCocina, Integer cantidad, BigDecimal precioUnitario,
                                            String claveIdempotencia) {
         java.util.Optional<Long> existente = idempotenciaService.obtenerSiYaProcesada(tenantId, claveIdempotencia);
@@ -276,6 +435,9 @@ public class HorecaService {
         if (comanda.getEstado() != Comanda.EstadoComanda.ABIERTA) {
             throw new RuntimeException("No se pueden agregar ítems a una comanda que no está ABIERTA");
         }
+        if (escandalloId != null && articuloId != null) {
+            throw new RuntimeException("Indique escandalloId o articuloId, no ambos");
+        }
 
         ItemComanda item = new ItemComanda();
         item.setTenantId(tenantId);
@@ -291,22 +453,44 @@ public class HorecaService {
 
             // Explota los ingredientes ANTES de aceptar el ítem: si falta stock, revienta
             // aquí y la transacción completa se revierte — el plato nunca llega a cocina.
-            escandalloService.registrarVentaPlato(escandalloId, tenantId, cantidad);
+            BigDecimal costoTotalConsumido = escandalloService.registrarVentaPlato(escandalloId, tenantId, cantidad);
 
             item.setEscandallo(escandallo);
             item.setNombrePlato(escandallo.getNombrePlato());
             item.setEstacionCocina(escandallo.getEstacionCocina());
             item.setPrecioUnitario(escandallo.getPrecioVenta() != null ? escandallo.getPrecioVenta() : precioUnitario);
+            item.setCostoUnitario(costoTotalConsumido.divide(BigDecimal.valueOf(cantidad), 4, RoundingMode.HALF_UP));
+            item.setEstadoItem(ItemComanda.EstadoItem.PENDIENTE);
+        } else if (articuloId != null) {
+            Articulo articulo = articuloRepository.findById(articuloId)
+                .orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
+            if (!articulo.getTenantId().equals(tenantId)) {
+                throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
+            }
+            if (precioUnitario == null) {
+                throw new RuntimeException("Debe indicar el precio de venta del artículo");
+            }
+
+            // Descuenta el stock ANTES de aceptar el ítem: si no alcanza, revienta aquí
+            // (InventarioService) y la transacción completa se revierte.
+            inventarioService.registrarMovimientoKardex(articulo.getId(), tenantId, Kardex.TipoOperacion.SALIDA,
+                BigDecimal.valueOf(cantidad), articulo.getCostoUnitario(), "Venta directa: " + articulo.getNombre());
+
+            item.setArticulo(articulo);
+            item.setNombrePlato(articulo.getNombre());
+            item.setEstacionCocina("MOSTRADOR");
+            item.setPrecioUnitario(precioUnitario);
+            item.setCostoUnitario(articulo.getCostoUnitario());
+            item.setEstadoItem(ItemComanda.EstadoItem.ENTREGADO);
         } else {
             if (nombrePlato == null || estacionCocina == null || precioUnitario == null) {
-                throw new RuntimeException("Sin escandalloId debe indicar nombrePlato, estacionCocina y precioUnitario");
+                throw new RuntimeException("Sin escandalloId ni articuloId debe indicar nombrePlato, estacionCocina y precioUnitario");
             }
             item.setNombrePlato(nombrePlato);
             item.setEstacionCocina(estacionCocina);
             item.setPrecioUnitario(precioUnitario);
+            item.setEstadoItem(ItemComanda.EstadoItem.PENDIENTE);
         }
-
-        item.setEstadoItem(ItemComanda.EstadoItem.PENDIENTE);
 
         ItemComanda guardado = itemComandaRepository.save(item);
 
@@ -339,5 +523,42 @@ public class HorecaService {
      */
     public List<ItemComanda> obtenerTableroKds(String estacionCocina) {
         return itemComandaRepository.findByEstacionCocinaAndEstadoItemNot(estacionCocina, ItemComanda.EstadoItem.ENTREGADO);
+    }
+
+    /**
+     * Utilidad por producto del día: recorre las comandas PAGADAS cerradas
+     * ese día y agrupa sus ítems por nombre, sumando cuánto entró (precio de
+     * venta) contra cuánto costó (costoUnitario congelado al vender — del
+     * escandallo o del artículo de inventario). Los ítems sin costo conocido
+     * (cargos manuales sin receta ni artículo, ej. "Cover") se excluyen del
+     * reporte porque no hay con qué calcular su utilidad.
+     */
+    public List<ResumenUtilidadProducto> obtenerUtilidadDiaria(Long tenantId, java.time.LocalDate fecha) {
+        java.time.LocalDate dia = fecha != null ? fecha : java.time.LocalDate.now();
+        LocalDateTime desde = dia.atStartOfDay();
+        LocalDateTime hasta = dia.atTime(23, 59, 59);
+
+        List<Comanda> comandas = comandaRepository.findByTenantIdAndEstadoAndFechaCierreBetween(tenantId, Comanda.EstadoComanda.PAGADA, desde, hasta);
+
+        java.util.Map<String, ResumenUtilidadProducto> acumulado = new java.util.LinkedHashMap<>();
+        for (Comanda comanda : comandas) {
+            for (ItemComanda item : itemComandaRepository.findByComandaId(comanda.getId())) {
+                if (item.getCostoUnitario() == null) continue;
+                ResumenUtilidadProducto r = acumulado.computeIfAbsent(item.getNombrePlato(), ResumenUtilidadProducto::new);
+                BigDecimal cant = BigDecimal.valueOf(item.getCantidad());
+                r.cantidadVendida += item.getCantidad();
+                r.ingresoTotal = r.ingresoTotal.add(item.getPrecioUnitario().multiply(cant));
+                r.costoTotal = r.costoTotal.add(item.getCostoUnitario().multiply(cant));
+            }
+        }
+
+        List<ResumenUtilidadProducto> resultado = new ArrayList<>(acumulado.values());
+        for (ResumenUtilidadProducto r : resultado) {
+            r.utilidad = r.ingresoTotal.subtract(r.costoTotal).setScale(2, RoundingMode.HALF_UP);
+            r.ingresoTotal = r.ingresoTotal.setScale(2, RoundingMode.HALF_UP);
+            r.costoTotal = r.costoTotal.setScale(2, RoundingMode.HALF_UP);
+        }
+        resultado.sort((a, b) -> b.ingresoTotal.compareTo(a.ingresoTotal));
+        return resultado;
     }
 }

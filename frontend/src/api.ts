@@ -722,10 +722,11 @@ export function abrirComanda(tenantId: number, datos: {
 }
 
 export function agregarItemComanda(tenantId: number, comandaId: number, datos: {
-  escandalloId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number;
+  escandalloId?: number; articuloId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number;
 }): Promise<ItemComanda> {
   const params = new URLSearchParams({ tenantId: String(tenantId), cantidad: String(datos.cantidad) });
   if (datos.escandalloId != null) params.set("escandalloId", String(datos.escandalloId));
+  if (datos.articuloId != null) params.set("articuloId", String(datos.articuloId));
   if (datos.nombrePlato) params.set("nombrePlato", datos.nombrePlato);
   if (datos.estacionCocina) params.set("estacionCocina", datos.estacionCocina);
   if (datos.precioUnitario != null) params.set("precioUnitario", String(datos.precioUnitario));
@@ -740,6 +741,21 @@ export function obtenerTableroKds(estacionCocina: string): Promise<ItemComanda[]
   return request(`/api/horeca/mesas/kds/${encodeURIComponent(estacionCocina)}`);
 }
 
+export interface ResumenUtilidadProducto {
+  nombrePlato: string;
+  cantidadVendida: number;
+  ingresoTotal: number;
+  costoTotal: number;
+  utilidad: number;
+}
+
+/** Utilidad por producto del día (o de la fecha indicada, formato YYYY-MM-DD) — para el resumen diario de Administración. */
+export function utilidadDiaria(tenantId: number, fecha?: string): Promise<ResumenUtilidadProducto[]> {
+  const params = new URLSearchParams({ tenantId: String(tenantId) });
+  if (fecha) params.set("fecha", fecha);
+  return request(`/api/horeca/mesas/reportes/utilidad-diaria?${params}`);
+}
+
 export function dividirCuenta(tenantId: number, comandaId: number, numeroPersonas: number): Promise<number[]> {
   return request(`/api/horeca/mesas/comandas/${comandaId}/dividir?tenantId=${tenantId}&numeroPersonas=${numeroPersonas}`, { method: "POST" });
 }
@@ -751,6 +767,44 @@ export function cerrarComanda(tenantId: number, comandaId: number, datos: {
   if (datos.monedaPago) params.set("monedaPago", datos.monedaPago);
   if (datos.montoRecibido != null) params.set("montoRecibido", String(datos.montoRecibido));
   return request(`/api/horeca/mesas/comandas/${comandaId}/cerrar?${params}`, { method: "POST" });
+}
+
+export interface PagoParcial {
+  metodoPago: string; // EFECTIVO, TARJETA, TRANSFERENCIA, BILLETERA_DIGITAL
+  moneda: string; // moneda en la que el cliente entrega ESTA línea, ej. USD, VES
+  monto: number; // monto entregado en esa moneda
+}
+
+export interface PagoVenta {
+  id: number;
+  metodoPago: string;
+  moneda: string;
+  monto: number;
+  montoEquivalenteBase: number;
+  tasaAplicada: number | null;
+  fechaPago: string;
+}
+
+export interface ResultadoCobroMixto {
+  comanda: Comanda;
+  pagos: PagoVenta[];
+  totalBase: number;
+  monedaBase: string;
+  totalRecibidoBase: number;
+  vueltoBase: number;
+  monedaVuelto: string;
+  vueltoEnMonedaVuelto: number;
+  vueltoVes: number | null;
+}
+
+/** Cobro mixto: cierra la comanda con varias líneas de pago simultáneas (ej. parte USD efectivo + resto Bs Pago Móvil). */
+export function cerrarComandaMixto(tenantId: number, comandaId: number, pagos: PagoParcial[], monedaVuelto?: string): Promise<ResultadoCobroMixto> {
+  const params = new URLSearchParams({ tenantId: String(tenantId) });
+  if (monedaVuelto) params.set("monedaVuelto", monedaVuelto);
+  return request(`/api/horeca/mesas/comandas/${comandaId}/cerrar-mixto?${params}`, {
+    method: "POST",
+    body: JSON.stringify(pagos),
+  });
 }
 
 export interface EscandalloReceta {

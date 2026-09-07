@@ -5,12 +5,16 @@ import com.auroraplus.modules.horeca.entities.ItemComanda;
 import com.auroraplus.modules.horeca.repositories.ItemComandaRepository;
 import com.auroraplus.modules.horeca.services.ComandaPdfService;
 import com.auroraplus.modules.horeca.services.HorecaService;
+import com.auroraplus.modules.horeca.services.ResultadoCobroMixto;
+import com.auroraplus.modules.horeca.services.ResumenUtilidadProducto;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -76,18 +80,30 @@ public class HorecaController {
         return ResponseEntity.ok(horecaService.cerrarComanda(comandaId, tenantId, metodoPago, monedaPago, montoRecibido, claveIdempotencia));
     }
 
+    /** Cobro mixto: la comanda se cierra con varias líneas de pago a la vez (ej. parte USD efectivo + resto Bs Pago Móvil). */
+    @PostMapping("/comandas/{comandaId}/cerrar-mixto")
+    public ResponseEntity<ResultadoCobroMixto> cerrarComandaMixto(
+            @PathVariable Long comandaId,
+            @RequestParam Long tenantId,
+            @RequestParam(required = false) String monedaVuelto,
+            @RequestParam(required = false) String claveIdempotencia,
+            @RequestBody List<HorecaService.PagoParcialRequest> pagos) {
+        return ResponseEntity.ok(horecaService.cerrarComandaMixto(comandaId, tenantId, pagos, monedaVuelto, claveIdempotencia));
+    }
+
     @PostMapping("/comandas/{comandaId}/items")
     public ResponseEntity<ItemComanda> agregarItem(
             @PathVariable Long comandaId,
             @RequestParam Long tenantId,
             @RequestParam(required = false) Long escandalloId,
+            @RequestParam(required = false) Long articuloId,
             @RequestParam(required = false) String nombrePlato,
             @RequestParam(required = false) String estacionCocina,
             @RequestParam Integer cantidad,
             @RequestParam(required = false) BigDecimal precioUnitario,
             @RequestParam(required = false) String claveIdempotencia) {
         return ResponseEntity.ok(horecaService.agregarItemComanda(
-            comandaId, tenantId, escandalloId, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia));
+            comandaId, tenantId, escandalloId, articuloId, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia));
     }
 
     @PatchMapping("/items/{itemId}/estado")
@@ -101,6 +117,14 @@ public class HorecaController {
     @GetMapping("/kds/{estacionCocina}")
     public ResponseEntity<List<ItemComanda>> obtenerTableroKds(@PathVariable String estacionCocina) {
         return ResponseEntity.ok(horecaService.obtenerTableroKds(estacionCocina));
+    }
+
+    /** Utilidad por producto del día (o de la fecha indicada) — para el resumen diario de Administración. */
+    @GetMapping("/reportes/utilidad-diaria")
+    public ResponseEntity<List<ResumenUtilidadProducto>> utilidadDiaria(
+            @RequestParam Long tenantId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+        return ResponseEntity.ok(horecaService.obtenerUtilidadDiaria(tenantId, fecha));
     }
 
     @GetMapping(value = "/comandas/{comandaId}/ticket", produces = MediaType.APPLICATION_PDF_VALUE)
