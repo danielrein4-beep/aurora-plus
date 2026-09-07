@@ -392,10 +392,10 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
       </main>
 
       {ventaRapidaAbierta && (
-        <Modal onClose={() => setVentaRapidaAbierta(false)} titulo="Venta Rápida" ancho="max-w-4xl">
-          <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv}
-            onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }} />
-        </Modal>
+        <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv}
+          ventasHoy={ventasHoy} nombreLocal={config.nombreLocal}
+          onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
+          onCerrar={() => setVentaRapidaAbierta(false)} />
       )}
 
       {bloqueoTasa && (
@@ -2704,29 +2704,35 @@ function TasasDeCambio({ tenantId }: { tenantId: number }) {
 // ══════════════════════════════════════════════════════════════════════════
 // VENTA RÁPIDA — para lo que no pasa por una mesa (mostrador, para llevar)
 // ══════════════════════════════════════════════════════════════════════════
-function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVenta }: {
+const CATEGORIA_RECETAS = "__RECETAS__";
+const CATEGORIA_FASTBAR = "__FASTBAR__";
+
+function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, ventasHoy, nombreLocal, onVenta, onCerrar }: {
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
-  tasaBcv: TasaCambio | null; onVenta: (monto: number, metodo: string) => void;
+  tasaBcv: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
+  onVenta: (monto: number, metodo: string) => void; onCerrar: () => void;
 }) {
   interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
   interface ReciboVenta { comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string }
-  type ResultadoBusqueda =
-    | { tipo: "articulo"; id: number; nombre: string; unidadMedida: string; stockActual: number; costoUnitario: number }
-    | { tipo: "receta"; id: number; nombre: string; precioVenta: number; estacionCocina: string }
-    | { tipo: "fastbar"; id: number; nombre: string; precioVenta: number };
+  interface ItemCatalogo {
+    key: string; tipo: "articulo" | "receta" | "fastbar"; id: number; nombre: string; precio: number; categoria: string;
+    unidadMedida?: string; stockActual?: number; estacionCocina?: string; sku?: string;
+  }
 
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
-  const [seleccion, setSeleccion] = useState<ResultadoBusqueda | null>(null);
-  const [cantidadManual, setCantidadManual] = useState("1");
-  const [precioManual, setPrecioManual] = useState("");
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recibo, setRecibo] = useState<ReciboVenta | null>(null);
   const [abriendoTicket, setAbriendoTicket] = useState(false);
   const [imprimiendoEscPos, setImprimiendoEscPos] = useState(false);
   const [moneda, setMoneda] = useState("USD");
+  const [mostrarProductoLibre, setMostrarProductoLibre] = useState(false);
+  const [nombreLibre, setNombreLibre] = useState("");
+  const [precioLibre, setPrecioLibre] = useState("");
+  const [cantidadLibre, setCantidadLibre] = useState("1");
+  const [turno, setTurno] = useState<Turno | null | undefined>(undefined);
   const busquedaRef = useRef<HTMLInputElement | null>(null);
 
   // CRM (opcional, Fase 3): vincular un cliente a la venta no es requisito —
@@ -2739,11 +2745,43 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVen
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
 
   useEffect(() => { monedaBase(tenantId).then(setMoneda).catch(() => setMoneda("USD")); }, [tenantId]);
+  // Estado del turno de caja para el header operativo — solo lectura acá,
+  // la apertura/cierre real sigue viviendo en Administración > Control de Caja.
+  useEffect(() => { turnoAbierto(tenantId, moneda).then(setTurno).catch(() => setTurno(null)); }, [tenantId, moneda]);
   // Auto-focus para que un escáner de código de barras (que solo "teclea"
   // rápido + Enter) pueda disparar sin que el cajero tenga que hacer clic.
   useEffect(() => { busquedaRef.current?.focus(); }, []);
 
-  const categorias = useMemo(() => Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).sort(), [articulos]);
+  // Catálogo unificado (recetas + Fast-Bar + inventario) para la cuadrícula
+  // del panel izquierdo — cada tarjeta agrega al carrito con un solo clic.
+  const catalogo = useMemo<ItemCatalogo[]>(() => {
+    const recetas: ItemCatalogo[] = (escandallos || [])
+      .filter((e) => e.activo !== false)
+      .map((e) => ({ key: `receta-${e.id}`, tipo: "receta", id: e.id, nombre: e.nombrePlato, precio: Number(e.precioVenta), categoria: CATEGORIA_RECETAS, estacionCocina: e.estacionCocina }));
+    const tragos: ItemCatalogo[] = (fastbar || [])
+      .map((t) => ({ key: `fastbar-${t.id}`, tipo: "fastbar", id: t.id, nombre: t.nombreTrago, precio: Number(t.precioVenta), categoria: CATEGORIA_FASTBAR }));
+    const insumos: ItemCatalogo[] = (articulos || [])
+      .map((a) => ({ key: `articulo-${a.id}`, tipo: "articulo", id: a.id, nombre: a.nombre, precio: Number(a.costoUnitario), categoria: a.categoria || "General", unidadMedida: a.unidadMedida || "unidad", stockActual: Number(a.stockActual), sku: a.sku }));
+    return [...recetas, ...tragos, ...insumos];
+  }, [escandallos, fastbar, articulos]);
+
+  const categoriasTabs = useMemo(() => {
+    const tabs: { key: string | null; label: string }[] = [{ key: null, label: "Todas" }];
+    if ((escandallos || []).some((e) => e.activo !== false)) tabs.push({ key: CATEGORIA_RECETAS, label: "Recetas" });
+    if ((fastbar || []).length > 0) tabs.push({ key: CATEGORIA_FASTBAR, label: "Fast-Bar" });
+    Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).sort()
+      .forEach((c) => tabs.push({ key: c, label: c }));
+    return tabs;
+  }, [escandallos, fastbar, articulos]);
+
+  const catalogoFiltrado = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    return catalogo.filter((item) => {
+      if (categoriaFiltro && item.categoria !== categoriaFiltro) return false;
+      if (!q) return true;
+      return item.nombre.toLowerCase().includes(q) || (item.sku || "").toLowerCase().includes(q);
+    }).sort((a, b) => Number(b.sku?.toLowerCase() === q) - Number(a.sku?.toLowerCase() === q));
+  }, [catalogo, categoriaFiltro, busqueda]);
 
   useEffect(() => {
     if (clienteSel || !busquedaCliente.trim()) { setResultadosCliente([]); return; }
@@ -2752,45 +2790,6 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVen
     }, 200);
     return () => clearTimeout(id);
   }, [tenantId, busquedaCliente, clienteSel]);
-
-  // Un solo buscador para recetas, tragos de Fast-Bar y artículos de
-  // inventario — antes las recetas aparecían como botones sueltos arriba,
-  // duplicando la forma de encontrar lo mismo. También matchea por SKU (lo
-  // que efectivamente lee un escáner de código de barras), priorizando el
-  // match exacto de SKU arriba del todo.
-  const resultadosBusqueda = useMemo(() => {
-    if (seleccion) return [];
-    const q = busqueda.trim().toLowerCase();
-    if (!q && !categoriaFiltro) return [];
-    const dentroCategoria = (a: Articulo) => !categoriaFiltro || (a.categoria || "General") === categoriaFiltro;
-    const recetas: ResultadoBusqueda[] = categoriaFiltro ? [] : (escandallos || [])
-      .filter((e) => e.activo !== false && e.nombrePlato.toLowerCase().includes(q))
-      .map((e) => ({ tipo: "receta", id: e.id, nombre: e.nombrePlato, precioVenta: Number(e.precioVenta), estacionCocina: e.estacionCocina }));
-    const tragos: ResultadoBusqueda[] = categoriaFiltro ? [] : (fastbar || [])
-      .filter((t) => t.nombreTrago.toLowerCase().includes(q))
-      .map((t) => ({ tipo: "fastbar", id: t.id, nombre: t.nombreTrago, precioVenta: Number(t.precioVenta) }));
-    const insumos: ResultadoBusqueda[] = (articulos || [])
-      .filter((a) => dentroCategoria(a) && (a.nombre.toLowerCase().includes(q) || a.sku.toLowerCase().includes(q)))
-      .sort((a, b) => Number(b.sku.toLowerCase() === q) - Number(a.sku.toLowerCase() === q))
-      .map((a) => ({ tipo: "articulo", id: a.id, nombre: a.nombre, unidadMedida: a.unidadMedida || "unidad", stockActual: Number(a.stockActual), costoUnitario: Number(a.costoUnitario) }));
-    return [...recetas, ...tragos, ...insumos].slice(0, categoriaFiltro ? 24 : 8);
-  }, [busqueda, seleccion, escandallos, fastbar, articulos, categoriaFiltro]);
-
-  const elegirResultado = (r: ResultadoBusqueda, autoAgregar = false) => {
-    if (autoAgregar && r.tipo !== "articulo") {
-      // Flujo de escáner: un solo Enter agrega el trago/receta directo con cantidad 1, sin pasos extra.
-      agregarConCantidad({
-        key: `${r.tipo}-${r.id}`, nombre: r.nombre, precio: r.precioVenta,
-        escandalloId: r.tipo === "receta" ? r.id : undefined,
-        estacionCocina: r.tipo === "receta" ? r.estacionCocina : "BAR",
-      }, 1);
-      setBusqueda("");
-      return;
-    }
-    setSeleccion(r);
-    setBusqueda("");
-    setPrecioManual(r.tipo === "articulo" ? "" : String(r.precioVenta));
-  };
 
   const agregarConCantidad = (linea: Omit<LineaCarrito, "cantidad">, cant: number) => {
     setCarrito((prev) => {
@@ -2804,29 +2803,37 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVen
   };
   const quitarLinea = (key: string) => setCarrito((prev) => prev.filter((l) => l.key !== key));
 
-  const handleAgregarProducto = () => {
+  // Click en la tarjeta del catálogo = agregado instantáneo al carrito
+  // (cantidad 1) — mismo camino que usaría un escáner de código de barras.
+  const agregarDesdeTarjeta = (item: ItemCatalogo) => {
     setError(null);
-    const nombre = seleccion ? seleccion.nombre : busqueda.trim();
-    if (!nombre) { setError("La descripción del producto es obligatoria — búscalo o escribe qué vas a vender"); return; }
-    if (!precioManual || Number(precioManual) <= 0) { setError("El precio es obligatorio"); return; }
-    const cant = parseFloat(cantidadManual);
-    if (!cant || cant <= 0) { setError("Indica una cantidad válida (acepta decimales: kg, L, etc.)"); return; }
-    if (seleccion?.tipo === "articulo") {
-      const yaEnCarrito = carrito.find((l) => l.key === `articulo-${seleccion.id}`)?.cantidad || 0;
-      if (yaEnCarrito + cant > seleccion.stockActual) {
-        setError(`Solo hay ${seleccion.stockActual} ${seleccion.unidadMedida} disponibles de ${seleccion.nombre} en inventario`);
+    if (item.tipo === "articulo") {
+      const yaEnCarrito = carrito.find((l) => l.key === item.key)?.cantidad || 0;
+      if (yaEnCarrito + 1 > (item.stockActual ?? 0)) {
+        setError(`Solo hay ${item.stockActual} ${item.unidadMedida} disponibles de ${item.nombre} en inventario`);
         return;
       }
     }
     agregarConCantidad({
-      key: seleccion ? `${seleccion.tipo}-${seleccion.id}` : `manual-${Date.now()}`,
-      nombre,
-      precio: Number(precioManual),
-      articuloId: seleccion?.tipo === "articulo" ? seleccion.id : undefined,
-      escandalloId: seleccion?.tipo === "receta" ? seleccion.id : undefined,
-      estacionCocina: seleccion?.tipo === "receta" ? seleccion.estacionCocina : seleccion?.tipo === "fastbar" ? "BAR" : seleccion?.tipo === "articulo" ? undefined : "COCINA",
-    }, cant);
-    setSeleccion(null); setBusqueda(""); setCantidadManual("1"); setPrecioManual("");
+      key: item.key, nombre: item.nombre, precio: item.precio,
+      articuloId: item.tipo === "articulo" ? item.id : undefined,
+      escandalloId: item.tipo === "receta" ? item.id : undefined,
+      estacionCocina: item.tipo === "receta" ? item.estacionCocina : item.tipo === "fastbar" ? "BAR" : undefined,
+    }, 1);
+    setBusqueda("");
+  };
+
+  // Producto libre: para lo que no está en el catálogo (o necesita un precio
+  // distinto al de inventario) — descripción y precio siguen siendo obligatorios.
+  const agregarProductoLibre = () => {
+    setError(null);
+    const nombre = nombreLibre.trim();
+    if (!nombre) { setError("La descripción del producto es obligatoria"); return; }
+    if (!precioLibre || Number(precioLibre) <= 0) { setError("El precio es obligatorio"); return; }
+    const cant = parseFloat(cantidadLibre);
+    if (!cant || cant <= 0) { setError("Indica una cantidad válida (acepta decimales: kg, L, etc.)"); return; }
+    agregarConCantidad({ key: `manual-${Date.now()}`, nombre, precio: Number(precioLibre), estacionCocina: "COCINA" }, cant);
+    setNombreLibre(""); setPrecioLibre(""); setCantidadLibre("1"); setMostrarProductoLibre(false);
   };
 
   const total = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0);
@@ -2903,170 +2910,223 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, onVen
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
-      {/* Buscador único: recetas, Fast-Bar e inventario */}
-      <div className="space-y-4">
-        <p className="text-xs text-slate-500 dark:text-white/40">Busca lo que vas a vender — receta, trago o artículo de inventario — ideal para ventas de mostrador que no pasan por una mesa.</p>
-
-        <div className="apple-glass rounded-xl p-4 space-y-2.5">
-          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Buscar producto (o escanea el código de barras)</p>
-
-          {categorias.length > 1 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-              <button type="button" onClick={() => setCategoriaFiltro(null)}
-                className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap cursor-pointer flex-shrink-0 ${
-                  categoriaFiltro === null ? "bg-teal-600 text-white" : "bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60"
-                }`}>Todas</button>
-              {categorias.map((c) => (
-                <button key={c} type="button" onClick={() => { setCategoriaFiltro((prev) => (prev === c ? null : c)); setBusqueda(""); setSeleccion(null); }}
-                  className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap cursor-pointer flex-shrink-0 ${
-                    categoriaFiltro === c ? "bg-teal-600 text-white" : "bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60"
-                  }`}>{c}</button>
-              ))}
+    <div className="fixed inset-0 z-40 bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col">
+      {/* HEADER OPERATIVO */}
+      <header className="h-14 flex-shrink-0 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between px-5 bg-white/50 dark:bg-black/20 backdrop-blur-md">
+        <div className="flex items-center gap-4 min-w-0">
+          <button onClick={onCerrar} title="Salir de Venta Rápida"
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer border border-slate-300/60 dark:border-white/10 flex-shrink-0">
+            <IconClose size={14} /> Salir
+          </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <IconBolt size={16} className="text-teal-500 flex-shrink-0" />
+            <span className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white truncate">Venta Rápida</span>
+            <span className="text-[11px] text-slate-400 dark:text-white/30 truncate hidden sm:inline">{nombreLocal}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
+          <div className="text-right hidden md:block">
+            <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Turno de caja</div>
+            {turno === undefined ? (
+              <div className="text-[11px] text-slate-400">Cargando…</div>
+            ) : turno ? (
+              <div className="text-[11px] font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1 justify-end">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0" /> Abierto · {turno.idCajero}
+              </div>
+            ) : (
+              <div className="text-[11px] font-bold text-amber-500 flex items-center gap-1 justify-end">
+                <IconWarning size={11} /> Sin turno abierto
+              </div>
+            )}
+          </div>
+          <div className="text-right hidden sm:block">
+            <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Tasa BCV</div>
+            <div className="text-[11px] font-bold font-mono text-emerald-500">
+              {tasaBcv && Number(tasaBcv.tasa) > 0 ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa"}
             </div>
-          )}
+          </div>
+          <div className="text-right">
+            <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Ventas del día</div>
+            <div className="text-[11px] font-bold font-mono text-slate-900 dark:text-white">
+              ${(ventasHoy?.total ?? 0).toFixed(2)}
+            </div>
+          </div>
+        </div>
+      </header>
 
-          <div className="relative">
+      {/* CUERPO: catálogo (70%) + carrito (30%) */}
+      <div className="flex-1 flex min-h-0">
+        {/* PANEL IZQUIERDO — CATÁLOGO */}
+        <div className="flex-[7] min-w-0 flex flex-col p-4 gap-3 overflow-hidden">
+          <div className="relative flex-shrink-0">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={15} /></span>
             <input
               ref={busquedaRef}
-              value={seleccion ? seleccion.nombre : busqueda}
-              onChange={(e) => { setBusqueda(e.target.value); setSeleccion(null); }}
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key !== "Enter" || seleccion) return;
+                if (e.key !== "Enter") return;
                 e.preventDefault();
-                if (resultadosBusqueda.length >= 1) elegirResultado(resultadosBusqueda[0], true);
+                if (catalogoFiltrado.length >= 1) agregarDesdeTarjeta(catalogoFiltrado[0]);
               }}
-              placeholder="Escribe o escanea… ej. Torta de Queso, Doritos, Mojito"
-              className="input-horeca w-full pr-8"
+              placeholder="Buscar o escanear código de barras… ej. Torta de Queso, Doritos, Mojito"
+              className="input-horeca w-full pl-9 pr-8"
             />
-            {seleccion && (
-              <button type="button" onClick={() => { setSeleccion(null); setBusqueda(""); setPrecioManual(""); }}
+            {busqueda && (
+              <button type="button" onClick={() => setBusqueda("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 cursor-pointer">
                 <IconClose size={14} />
               </button>
             )}
-            {!seleccion && (busqueda.trim() || categoriaFiltro) && resultadosBusqueda.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-56 overflow-y-auto shadow-lg">
-                {resultadosBusqueda.map((r) => (
-                  <button key={`${r.tipo}-${r.id}`} type="button" onClick={() => elegirResultado(r)}
-                    className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 min-w-0">
-                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                        r.tipo === "receta" ? "bg-purple-500/15 text-purple-600 dark:text-purple-300"
-                        : r.tipo === "fastbar" ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"
-                        : "bg-teal-500/15 text-teal-600 dark:text-teal-300"
-                      }`}>{r.tipo === "receta" ? "RECETA" : r.tipo === "fastbar" ? "FAST-BAR" : "INVENTARIO"}</span>
-                      <span className="font-semibold text-slate-800 dark:text-white truncate">{r.nombre}</span>
-                    </span>
-                    <span className="text-slate-400 font-mono flex-shrink-0">
-                      {r.tipo === "articulo" ? `${r.stockActual} ${r.unidadMedida}` : `$${r.precioVenta.toFixed(2)}`}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {!seleccion && busqueda.trim() && resultadosBusqueda.length === 0 && (
-              <p className="text-[10px] text-slate-400 mt-1">Sin resultados — puedes venderlo igual así, pero no descontará stock ni recetas.</p>
-            )}
           </div>
-          {seleccion?.tipo === "articulo" && (
-            <div className="text-[10px] text-teal-600 dark:text-teal-300">
-              En inventario: {seleccion.stockActual} {seleccion.unidadMedida} · Costo ${seleccion.costoUnitario.toFixed(2)} c/u
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <div className="relative w-24 flex-shrink-0">
-              <input value={cantidadManual} onChange={(e) => setCantidadManual(e.target.value)} type="number" min="0.001" step="0.001"
-                placeholder="Cant." className="input-horeca w-full"
-                title={`Cantidad${seleccion?.tipo === "articulo" ? ` (${seleccion.unidadMedida})` : ""} — acepta decimales para kg/L`} />
-              {seleccion?.tipo === "articulo" && (
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 pointer-events-none">{seleccion.unidadMedida}</span>
-              )}
-            </div>
-            <input value={precioManual} onChange={(e) => setPrecioManual(e.target.value)} type="number" step="0.01" placeholder="Precio de venta $" className="input-horeca flex-1" />
-            <button onClick={handleAgregarProducto} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer whitespace-nowrap">
-              + Agregar
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 flex-shrink-0">
+            {categoriasTabs.map((tab) => (
+              <button key={tab.key ?? "todas"} type="button" onClick={() => setCategoriaFiltro(tab.key)}
+                className={`text-[10px] font-bold px-3 py-1.5 rounded-full whitespace-nowrap cursor-pointer flex-shrink-0 transition-colors ${
+                  categoriaFiltro === tab.key ? "bg-teal-600 text-white" : "bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-300/60 dark:hover:bg-white/15"
+                }`}>{tab.label}</button>
+            ))}
+            <button type="button" onClick={() => setMostrarProductoLibre(true)}
+              className="text-[10px] font-bold px-3 py-1.5 rounded-full whitespace-nowrap cursor-pointer flex-shrink-0 bg-amber-500/15 text-amber-600 dark:text-amber-300 hover:bg-amber-500/25 ml-auto">
+              + Producto libre
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* Carrito / cobro */}
-      <div className="apple-glass rounded-2xl p-5 space-y-4 h-fit sticky top-4">
-        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Venta actual</h3>
-        {carrito.length === 0 ? (
-          <p className="text-xs text-slate-400">Agrega productos del catálogo o uno suelto.</p>
-        ) : (
-          <div className="space-y-2">
-            {carrito.map((l) => (
-              <div key={l.key} className="flex items-center justify-between gap-2 bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2">
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{l.nombre}</div>
-                  <div className="text-[10px] text-slate-500 dark:text-white/40 font-mono">${l.precio.toFixed(2)} c/u</div>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <button onClick={() => cambiarCantidad(l.key, -1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer flex-shrink-0">−</button>
-                  <span className="text-xs font-bold w-5 text-center flex-shrink-0">{l.cantidad}</span>
-                  <button onClick={() => cambiarCantidad(l.key, 1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer flex-shrink-0">+</button>
-                  <button onClick={() => quitarLinea(l.key)} title="Quitar de la venta"
-                    className="w-6 h-6 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer flex-shrink-0 ml-0.5">
-                    <IconTrash size={13} />
-                  </button>
-                </div>
+          {error && <p className="text-xs text-red-500 flex-shrink-0">{error}</p>}
+
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {catalogoFiltrado.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-center px-6">
+                <p className="text-xs text-slate-400">Sin resultados en el catálogo — usa "+ Producto libre" para venderlo igual.</p>
               </div>
-            ))}
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pb-4">
+                {catalogoFiltrado.map((item) => {
+                  const sinStock = item.tipo === "articulo" && (item.stockActual ?? 0) <= 0;
+                  return (
+                    <button key={item.key} type="button" disabled={sinStock} onClick={() => agregarDesdeTarjeta(item)}
+                      className={`apple-glass rounded-xl p-3.5 text-left transition-all border border-transparent ${
+                        sinStock ? "opacity-40 cursor-not-allowed" : "hover:border-teal-500/40 hover:scale-[1.02] cursor-pointer active:scale-[0.98]"
+                      }`}>
+                      <div className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full inline-block mb-1.5 ${
+                        item.tipo === "receta" ? "bg-purple-500/15 text-purple-600 dark:text-purple-300"
+                        : item.tipo === "fastbar" ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"
+                        : "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+                      }`}>{item.tipo === "receta" ? "RECETA" : item.tipo === "fastbar" ? "FAST-BAR" : "INVENTARIO"}</div>
+                      <div className="text-xs font-semibold text-slate-900 dark:text-white leading-snug line-clamp-2 min-h-[2.2em]">{item.nombre}</div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">${item.precio.toFixed(2)}</span>
+                        {item.tipo === "articulo" && (
+                          <span className={`text-[9px] font-mono ${sinStock ? "text-red-500" : "text-slate-400 dark:text-white/40"}`}>
+                            {sinStock ? "Sin stock" : `${item.stockActual} ${item.unidadMedida}`}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
-
-        <div className="pt-2 border-t border-slate-300/50 dark:border-white/10">
-          <div className="flex items-center justify-between font-bold text-slate-900 dark:text-white">
-            <span>Total</span><span className="font-mono">${total.toFixed(2)}</span>
-          </div>
-          {tasaBcv && Number(tasaBcv.tasa) > 0 && (
-            <div className="flex items-center justify-between text-xs text-teal-600 dark:text-teal-400 font-mono mt-0.5">
-              <span>≈ Bs</span><span>{(total * Number(tasaBcv.tasa)).toFixed(2)}</span>
-            </div>
-          )}
         </div>
 
-        {/* Cliente (opcional) — sin seleccionar nada, la venta queda anónima igual que siempre */}
-        <div>
-          <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1.5">Cliente (opcional)</p>
-          {clienteSel ? (
-            <div className="flex items-center justify-between gap-2 bg-teal-500/10 border border-teal-500/25 rounded-xl px-3 py-2">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{clienteSel.nombre}</div>
-                {clienteSel.identificacionRif && <div className="text-[10px] text-slate-500 dark:text-white/40">{clienteSel.identificacionRif}</div>}
+        {/* PANEL DERECHO — COMANDA ACTIVA */}
+        <div className="flex-[3] min-w-[300px] max-w-[420px] flex-shrink-0 border-l border-slate-300/60 dark:border-white/10 flex flex-col bg-white/30 dark:bg-black/10">
+          {/* Cabecera: cliente CRM */}
+          <div className="p-4 border-b border-slate-300/50 dark:border-white/10 flex-shrink-0">
+            <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1.5">Cliente (opcional)</p>
+            {clienteSel ? (
+              <div className="flex items-center justify-between gap-2 bg-teal-500/10 border border-teal-500/25 rounded-xl px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{clienteSel.nombre}</div>
+                  {clienteSel.identificacionRif && <div className="text-[10px] text-slate-500 dark:text-white/40">{clienteSel.identificacionRif}</div>}
+                </div>
+                <button onClick={() => setClienteSel(null)} className="text-slate-400 hover:text-red-500 cursor-pointer flex-shrink-0"><IconClose size={14} /></button>
               </div>
-              <button onClick={() => setClienteSel(null)} className="text-slate-400 hover:text-red-500 cursor-pointer flex-shrink-0"><IconClose size={14} /></button>
-            </div>
-          ) : (
-            <div className="relative flex items-center gap-1.5">
-              <div className="relative flex-1">
-                <input value={busquedaCliente} onChange={(e) => setBusquedaCliente(e.target.value)} placeholder="Buscar por nombre o RIF…" className="input-horeca w-full text-xs" />
-                {resultadosCliente.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-40 overflow-y-auto shadow-lg">
-                    {resultadosCliente.map((c) => (
-                      <button key={c.id} type="button"
-                        onClick={() => { setClienteSel(c); setBusquedaCliente(""); setResultadosCliente([]); }}
-                        className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer">
-                        <div className="font-semibold text-slate-800 dark:text-white">{c.nombre}</div>
-                        {c.identificacionRif && <div className="text-[10px] text-slate-400">{c.identificacionRif}</div>}
-                      </button>
-                    ))}
+            ) : (
+              <div className="relative flex items-center gap-1.5">
+                <div className="relative flex-1">
+                  <input value={busquedaCliente} onChange={(e) => setBusquedaCliente(e.target.value)} placeholder="Buscar por nombre o RIF…" className="input-horeca w-full text-xs" />
+                  {resultadosCliente.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-40 overflow-y-auto shadow-lg">
+                      {resultadosCliente.map((c) => (
+                        <button key={c.id} type="button"
+                          onClick={() => { setClienteSel(c); setBusquedaCliente(""); setResultadosCliente([]); }}
+                          className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer">
+                          <div className="font-semibold text-slate-800 dark:text-white">{c.nombre}</div>
+                          {c.identificacionRif && <div className="text-[10px] text-slate-400">{c.identificacionRif}</div>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => setMostrarNuevoCliente(true)} title="Registrar cliente nuevo"
+                  className="w-8 h-8 flex-shrink-0 rounded-xl bg-teal-500/15 text-teal-600 dark:text-teal-300 hover:bg-teal-500/25 cursor-pointer flex items-center justify-center font-bold">+</button>
+              </div>
+            )}
+          </div>
+
+          {/* Cuerpo: líneas del carrito */}
+          <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-2">
+            <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-1">Comanda activa</h3>
+            {carrito.length === 0 ? (
+              <p className="text-xs text-slate-400">Toca un producto del catálogo para agregarlo aquí.</p>
+            ) : (
+              carrito.map((l) => (
+                <div key={l.key} className="flex items-center justify-between gap-2 bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{l.nombre}</div>
+                    <div className="text-[10px] text-slate-500 dark:text-white/40 font-mono">${l.precio.toFixed(2)} c/u</div>
                   </div>
-                )}
-              </div>
-              <button onClick={() => setMostrarNuevoCliente(true)} title="Registrar cliente nuevo"
-                className="w-8 h-8 flex-shrink-0 rounded-xl bg-teal-500/15 text-teal-600 dark:text-teal-300 hover:bg-teal-500/25 cursor-pointer flex items-center justify-center font-bold">+</button>
-            </div>
-          )}
-        </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button onClick={() => cambiarCantidad(l.key, -1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer flex-shrink-0">−</button>
+                    <span className="text-xs font-bold w-5 text-center flex-shrink-0">{l.cantidad}</span>
+                    <button onClick={() => cambiarCantidad(l.key, 1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer flex-shrink-0">+</button>
+                    <button onClick={() => quitarLinea(l.key)} title="Quitar de la venta"
+                      className="w-6 h-6 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer flex-shrink-0 ml-0.5">
+                      <IconTrash size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
 
-        {carrito.length > 0 && (
-          <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
-        )}
+          {/* Pie: totales + cobrar */}
+          <div className="flex-shrink-0 p-4 border-t border-slate-300/50 dark:border-white/10 space-y-3">
+            <div>
+              <div className="flex items-center justify-between font-black text-2xl text-slate-900 dark:text-white">
+                <span className="text-sm font-bold text-slate-500 dark:text-white/40">Total</span><span className="font-mono">${total.toFixed(2)}</span>
+              </div>
+              {tasaBcv && Number(tasaBcv.tasa) > 0 && (
+                <div className="flex items-center justify-between text-sm text-teal-600 dark:text-teal-400 font-mono font-bold mt-0.5">
+                  <span className="text-[11px] font-semibold text-slate-400">≈ Bs</span><span>{(total * Number(tasaBcv.tasa)).toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+            {carrito.length > 0 && (
+              <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
+            )}
+          </div>
+        </div>
       </div>
+
+      {mostrarProductoLibre && (
+        <Modal onClose={() => setMostrarProductoLibre(false)} titulo="Producto libre">
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500 dark:text-white/40">Para algo que no está en el catálogo — la descripción y el precio son obligatorios.</p>
+            <input value={nombreLibre} onChange={(e) => setNombreLibre(e.target.value)} placeholder="Descripción del producto" className="input-horeca w-full" autoFocus />
+            <div className="flex items-center gap-2">
+              <input value={cantidadLibre} onChange={(e) => setCantidadLibre(e.target.value)} type="number" min="0.001" step="0.001" placeholder="Cant." className="input-horeca w-24 flex-shrink-0" />
+              <input value={precioLibre} onChange={(e) => setPrecioLibre(e.target.value)} type="number" step="0.01" placeholder="Precio de venta $" className="input-horeca flex-1"
+                onKeyDown={(e) => e.key === "Enter" && agregarProductoLibre()} />
+            </div>
+            {error && <p className="text-xs text-red-500">{error}</p>}
+            <button onClick={agregarProductoLibre} className="w-full g-aurora text-white text-sm font-bold py-3 rounded-xl cursor-pointer">+ Agregar a la comanda</button>
+          </div>
+        </Modal>
+      )}
 
       {mostrarNuevoCliente && (
         <ModalClienteRapido tenantId={tenantId} onClose={() => setMostrarNuevoCliente(false)}
