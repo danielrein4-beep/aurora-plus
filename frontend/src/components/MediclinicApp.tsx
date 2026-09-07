@@ -18,6 +18,7 @@ import {
   generarPdfCotizacion,
   type CobroItem, type CierreCajaData, type ConsultaReportData, type CotizacionData, type CotizacionItem
 } from "../utils/pdfReports";
+import DocumentoPreviewModal, { type DocumentoVisorPayload } from "./DocumentoPreviewModal";
 
 type Pagina = "general" | "pacientes" | "historias" | "procedimientos" | "sala-espera" | "agenda" | "financiero" | "configuracion";
 type RolVista = "MEDICO" | "SECRETARIA";
@@ -490,6 +491,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [pacienteSeleccionadoId, setPacienteSeleccionadoId] = useState<number | null>(null);
   const [citasHoy, setCitasHoy] = useState<CitaMedica[] | null>(null);
   const [salaEspera, setSalaEspera] = useState<SalaEsperaEntrada[] | null>(null);
+  const [visorDocumento, setVisorDocumento] = useState<DocumentoVisorPayload | null>(null);
   const [procedimientos, setProcedimientos] = useState<ProcedimientoMedico[] | null>(null);
   const [ingresosHoy, setIngresosHoy] = useState<number | null>(null);
 
@@ -867,6 +869,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 config={configPerfil}
                 rol={rolActivo}
                 pacienteInicialId={pacienteSeleccionadoId}
+                onVerDocumento={setVisorDocumento}
               />
             )}
             {pagina === "procedimientos" && (
@@ -877,6 +880,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 config={configPerfil}
                 onCambio={recargarTodo}
                 pacienteInicialId={pacienteSeleccionadoId}
+                onVerDocumento={setVisorDocumento}
               />
             )}
             {pagina === "sala-espera" && (
@@ -909,6 +913,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onLimpiarCobros={limpiarCobrosLocales}
                 onEliminarCierre={eliminarCierreAuditado}
                 onLimpiarCierres={limpiarHistorialCierres}
+                onVerDocumento={setVisorDocumento}
               />
             )}
             {pagina === "configuracion" && <Configuracion config={configPerfil} onGuardar={guardarConfigPerfil} user={user} />}
@@ -1041,6 +1046,14 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* ── MODAL VISOR & EDITOR DE DOCUMENTO OFICIAL ── */}
+      {visorDocumento && (
+        <DocumentoPreviewModal
+          payload={visorDocumento}
+          onClose={() => setVisorDocumento(null)}
+        />
       )}
     </div>
   );
@@ -2072,12 +2085,14 @@ function HistoriasClinicas({
   config,
   rol,
   pacienteInicialId,
+  onVerDocumento,
 }: {
   tenantId: number;
   pacientes: Paciente[] | null;
   config: any;
   rol: RolVista;
   pacienteInicialId?: number | null;
+  onVerDocumento?: (payload: DocumentoVisorPayload) => void;
 }) {
   const [pacienteId, setPacienteId] = useState<number | "">(() => {
     if (pacienteInicialId) return pacienteInicialId;
@@ -2253,7 +2268,11 @@ function HistoriasClinicas({
   const handleGuardarYGenerarPdf = async () => {
     const data = await ejecutarGuardado();
     if (data) {
-      generarPdfInformeConsulta(data);
+      if (onVerDocumento) {
+        onVerDocumento({ tipo: "INFORME_MEDICO", data });
+      } else {
+        generarPdfInformeConsulta(data);
+      }
     }
   };
 
@@ -2297,7 +2316,11 @@ function HistoriasClinicas({
       planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
       proximaCita: undefined,
     };
-    generarPdfInformeConsulta(data);
+    if (onVerDocumento) {
+      onVerDocumento({ tipo: "INFORME_MEDICO", data });
+    } else {
+      generarPdfInformeConsulta(data);
+    }
   };
 
   const handleEnviarWhatsAppConsulta = (c: ConsultaMedica) => {
@@ -2340,10 +2363,13 @@ function HistoriasClinicas({
       planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
       proximaCita: undefined,
     };
-    const texto = generarTextoWhatsAppConsulta(data);
-    const tel = (pacienteSeleccionado.telefono || "").replace(/\D/g, "");
-    const url = tel ? `https://wa.me/${tel}?text=${texto}` : `https://wa.me/?text=${texto}`;
-    window.open(url, "_blank");
+    if (onVerDocumento) {
+      onVerDocumento({ tipo: "INFORME_MEDICO", data });
+    } else {
+      const texto = encodeURIComponent(generarTextoWhatsAppConsulta(data));
+      const tel = (data.paciente.telefono || "").replace(/\D/g, "");
+      window.open(tel ? `https://wa.me/${tel}?text=${texto}` : `https://wa.me/?text=${texto}`, "_blank");
+    }
   };
 
   return (
@@ -2869,6 +2895,7 @@ function Procedimientos({
   config,
   onCambio,
   pacienteInicialId,
+  onVerDocumento,
 }: {
   tenantId: number;
   procedimientos: ProcedimientoMedico[] | null;
@@ -2876,6 +2903,7 @@ function Procedimientos({
   config: any;
   onCambio: () => void;
   pacienteInicialId?: number | null;
+  onVerDocumento?: (payload: DocumentoVisorPayload) => void;
 }) {
   // Lista de Cotizaciones Guardadas
   const [cotizaciones, setCotizaciones] = useState<CotizacionGuardada[]>(() => {
@@ -3059,7 +3087,9 @@ function Procedimientos({
       doctorNombre: config?.doctorNombre || "Dr. Daniel Reina",
       pacienteNombre: cot.pacienteNombre,
       pacienteCedula: cot.pacienteCedula,
+      pacienteTelefono: cot.pacienteTelefono,
       fecha: cot.fecha,
+      fechaPlanificada: cot.fechaPlanificada,
       items: [
         {
           nombre: cot.procedimientoNombre + (cot.descripcion ? ` - ${cot.descripcion}` : ""),
@@ -3073,40 +3103,47 @@ function Procedimientos({
       totalUSD: cot.costoUSD,
       totalVES: cot.costoVES,
       totalCOP: cot.costoCOP,
+      observaciones: cot.descripcion,
     };
-    generarPdfCotizacion(dataCot);
+    if (onVerDocumento) {
+      onVerDocumento({ tipo: "COTIZACION", data: dataCot });
+    } else {
+      generarPdfCotizacion(dataCot);
+    }
   };
 
   // Enviar WhatsApp para una cotización
   const ejecutarWhatsAppCotizacion = (cot: CotizacionGuardada) => {
-    const lineas = [
-      `🏥 *${config?.clinicaNombre || "Centro Médico Especializado"}*`,
-      `👨‍⚕️ *${config?.doctorNombre || "Dr. Daniel Reina"}*`,
-      `━━━━━━━━━━━━━━━━━━`,
-      `📄 *PRESUPUESTO MÉDICO OFICIAL*`,
-      `👤 *Paciente:* ${cot.pacienteNombre}`,
-      `🪪 *Identificación:* ${cot.pacienteCedula}`,
-      `📅 *Fecha de Emisión:* ${cot.fecha}`,
-      cot.fechaPlanificada ? `🗓️ *Fecha Planificada:* ${cot.fechaPlanificada}` : ``,
-      `━━━━━━━━━━━━━━━━━━`,
-      `🔬 *Procedimiento / Cirugía:*`,
-      `*${cot.procedimientoNombre}*`,
-      cot.descripcion ? `📝 _${cot.descripcion}_` : ``,
-      `━━━━━━━━━━━━━━━━━━`,
-      `💵 *Total Dólares:* $${cot.costoUSD.toFixed(2)} USD`,
-      `🇻🇪 *Total Bolívares (VES):* Bs. ${cot.costoVES.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      `🇨🇴 *Total Pesos COP:* $${cot.costoCOP.toLocaleString("es-CO")} COP`,
-      `━━━━━━━━━━━━━━━━━━`,
-      `📌 *Tasas Aplicadas:*`,
-      `• 1 USD = Bs. ${(cot.tasaBCV || tasaBCV).toFixed(2)} (BCV)`,
-      `• 1 USD = $${(cot.tasaCOP || tasaCOP).toLocaleString("es-CO")} COP`,
-      `━━━━━━━━━━━━━━━━━━`,
-      `_Presupuesto válido por 15 días continuos._`,
-    ].filter(Boolean);
-
-    const texto = encodeURIComponent(lineas.join("\n"));
-    const telLimpio = (cot.pacienteTelefono || "").replace(/\D/g, "");
-    window.open(telLimpio ? `https://wa.me/${telLimpio}?text=${texto}` : `https://wa.me/?text=${texto}`, "_blank");
+    const dataCot: CotizacionData = {
+      clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
+      doctorNombre: config?.doctorNombre || "Dr. Daniel Reina",
+      pacienteNombre: cot.pacienteNombre,
+      pacienteCedula: cot.pacienteCedula,
+      pacienteTelefono: cot.pacienteTelefono,
+      fecha: cot.fecha,
+      fechaPlanificada: cot.fechaPlanificada,
+      items: [
+        {
+          nombre: cot.procedimientoNombre + (cot.descripcion ? ` - ${cot.descripcion}` : ""),
+          costoUSD: cot.costoUSD,
+          costoVES: cot.costoVES,
+          costoCOP: cot.costoCOP,
+        },
+      ],
+      tasaBCV: cot.tasaBCV || tasaBCV,
+      tasaCOP: cot.tasaCOP || tasaCOP,
+      totalUSD: cot.costoUSD,
+      totalVES: cot.costoVES,
+      totalCOP: cot.costoCOP,
+      observaciones: cot.descripcion,
+    };
+    if (onVerDocumento) {
+      onVerDocumento({ tipo: "COTIZACION", data: dataCot });
+    } else {
+      const texto = encodeURIComponent(generarTextoWhatsAppCotizacion(dataCot));
+      const telLimpio = (cot.pacienteTelefono || "").replace(/\D/g, "");
+      window.open(telLimpio ? `https://wa.me/${telLimpio}?text=${texto}` : `https://wa.me/?text=${texto}`, "_blank");
+    }
   };
 
   // Cambiar estado de una cotización en el historial
@@ -5889,6 +5926,7 @@ function ResumenesFinancieros({
   onLimpiarCobros,
   onEliminarCierre,
   onLimpiarCierres,
+  onVerDocumento,
 }: {
   ingresosHoy: number | null;
   citasHoy: CitaMedica[] | null;
@@ -5900,6 +5938,7 @@ function ResumenesFinancieros({
   onLimpiarCobros?: () => void;
   onEliminarCierre?: (index: number) => void;
   onLimpiarCierres?: () => void;
+  onVerDocumento?: (payload: DocumentoVisorPayload) => void;
 }) {
   const totalUSD = cobrosLocales
     .filter((c) => c.moneda === "USD" || (!c.moneda && (c.metodoPago?.toUpperCase().includes("USD") || (c.montoUSD !== undefined && c.montoUSD > 0 && !c.montoVES))))
@@ -5948,19 +5987,24 @@ function ResumenesFinancieros({
             )}
             <button
               onClick={() => {
-                generarPdfCierreCaja({
-                  clinicaNombre: config.clinicaNombre,
-                  doctorNombre: config.doctorNombre,
+                const dataHoy: CierreCajaData = {
+                  clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
+                  doctorNombre: config?.doctorNombre || "Dr. Médico",
                   fecha: hoy(),
                   horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                  tasaBCV: config.tasaBCV,
-                  tasaCOP: config.tasaCOP || 4200,
+                  tasaBCV: config?.tasaBCV || 56.4,
+                  tasaCOP: config?.tasaCOP || 4200,
                   cobros: cobrosLocales,
                   totalUSD,
                   totalVES,
                   totalCOP,
                   totalPacientes: cobrosLocales.length,
-                });
+                };
+                if (onVerDocumento) {
+                  onVerDocumento({ tipo: "CIERRE_CAJA", data: dataHoy });
+                } else {
+                  generarPdfCierreCaja(dataHoy);
+                }
               }}
               className="px-3 py-1 rounded-lg border border-teal-500/30 text-teal-600 dark:text-teal-400 hover:bg-teal-500/10 text-[11px] font-medium flex items-center gap-1.5 cursor-pointer transition-all"
             >
@@ -6084,9 +6128,15 @@ function ResumenesFinancieros({
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => generarPdfCierreCaja(cierre)}
+                      onClick={() => {
+                        if (onVerDocumento) {
+                          onVerDocumento({ tipo: "CIERRE_CAJA", data: cierre });
+                        } else {
+                          generarPdfCierreCaja(cierre);
+                        }
+                      }}
                       className="px-2 py-1 rounded-md border border-teal-500/30 text-teal-600 dark:text-teal-400 text-[11px] font-medium hover:bg-teal-500/10 flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Descargar PDF de esta auditoría"
+                      title="Abrir visor & exportar PDF de esta auditoría"
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
