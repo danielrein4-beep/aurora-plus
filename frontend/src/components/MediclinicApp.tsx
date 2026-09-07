@@ -37,16 +37,50 @@ const MODO_CLASICO_KEY = "aurora_mediclinic_modo_clasico";
 function EstiloClasico() {
   return (
     <style>{`
-      .mediclinic-clasico { --mc-primary: #0ea5e9; --mc-secondary: #0d9488; }
+      /* Reskin completo — fondo claro, tarjetas blancas y acento azul/teal,
+         calcado de main.css del MediClinic original (no solo los botones). */
+      .mediclinic-clasico {
+        background: #f8fafc !important;
+        color: #0f172a !important;
+      }
+      .mediclinic-clasico aside {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+      }
+      .mediclinic-clasico header {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+      }
+      .mediclinic-clasico .apple-glass,
+      .mediclinic-clasico .apple-glass-btn {
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+        backdrop-filter: none !important;
+      }
+      .mediclinic-clasico input, .mediclinic-clasico select, .mediclinic-clasico textarea {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+        color: #0f172a !important;
+      }
+      .mediclinic-clasico .bg-slate-100\\/60, .mediclinic-clasico .bg-slate-200\\/60 {
+        background-color: #f1f5f9 !important;
+      }
+      .mediclinic-clasico h1, .mediclinic-clasico h2, .mediclinic-clasico h3,
+      .mediclinic-clasico h4, .mediclinic-clasico strong,
+      .mediclinic-clasico .text-slate-900 { color: #0f172a !important; }
+      .mediclinic-clasico .text-slate-500, .mediclinic-clasico .text-slate-600 { color: #64748b !important; }
       .mediclinic-clasico .btn-electric-blue {
         background: linear-gradient(135deg, #0ea5e9, #0d9488) !important;
         box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
+        color: #fff !important;
       }
       .mediclinic-clasico .text-teal-600, .mediclinic-clasico .text-teal-500,
-      .mediclinic-clasico .text-aurora { color: #0d9488 !important; }
-      .mediclinic-clasico :is(.dark) .text-teal-300, .mediclinic-clasico :is(.dark) .text-teal-400 { color: #38bdf8 !important; }
+      .mediclinic-clasico .text-teal-300, .mediclinic-clasico .text-teal-400,
+      .mediclinic-clasico .text-aurora { color: #0d9488 !important; -webkit-text-fill-color: #0d9488 !important; }
       .mediclinic-clasico .bg-teal-500\\/15 { background-color: rgba(14,165,233,0.12) !important; }
-      .mediclinic-clasico .border-teal-500\\/30 { border-color: rgba(13,148,136,0.4) !important; }
+      .mediclinic-clasico .border-teal-500\\/30, .mediclinic-clasico .border-teal-400\\/60 { border-color: rgba(13,148,136,0.4) !important; }
+      .mediclinic-clasico [style*="border-left-color"] { filter: saturate(1.4); }
     `}</style>
   );
 }
@@ -89,18 +123,9 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       {modoClasico && <EstiloClasico />}
       {/* SIDEBAR */}
       <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1">
-        <div className="px-2 pb-4 mb-2 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between gap-2">
-          <div>
-            <div className="font-['Outfit'] font-black text-lg text-aurora">Mediclinic Pro</div>
-            <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mt-0.5">Panel del Médico</div>
-          </div>
-          <button
-            onClick={alternarModo}
-            title="Alternar entre la identidad Aurora y el look clásico de MediClinic"
-            className="text-[9px] font-bold px-2 py-1 rounded-full border border-slate-300 dark:border-white/15 text-slate-500 dark:text-white/50 hover:text-teal-600 dark:hover:text-teal-300 flex-shrink-0"
-          >
-            {modoClasico ? "Clásico" : "Aurora"}
-          </button>
+        <div className="px-2 pb-4 mb-2 border-b border-slate-300/60 dark:border-white/10">
+          <div className="font-['Outfit'] font-black text-lg text-aurora">Mediclinic Pro</div>
+          <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mt-0.5">Panel del Médico</div>
         </div>
         {NAV.map((n) => (
           <button
@@ -134,11 +159,20 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             </div>
             <div className="text-[11px] text-slate-500 dark:text-white/40">{user?.empresa}</div>
           </div>
-          <button
-            onClick={recargarTodo}
-            className="apple-glass-btn text-xs font-semibold px-3 py-2 rounded-full flex items-center gap-1.5 text-slate-700 dark:text-white/80">
-            <IconRefresh size={13} /> Actualizar
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={alternarModo}
+              className={`text-xs font-bold px-3 py-2 rounded-full flex items-center gap-1.5 border ${
+                modoClasico ? "bg-teal-500/15 border-teal-500/40 text-teal-700 dark:text-teal-300" : "apple-glass-btn text-slate-700 dark:text-white/80"
+              }`}>
+              {modoClasico ? "Vista: Clásico MediClinic (clic para volver a Aurora)" : "Vista: Aurora (clic para probar look clásico)"}
+            </button>
+            <button
+              onClick={recargarTodo}
+              className="apple-glass-btn text-xs font-semibold px-3 py-2 rounded-full flex items-center gap-1.5 text-slate-700 dark:text-white/80">
+              <IconRefresh size={13} /> Actualizar
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
