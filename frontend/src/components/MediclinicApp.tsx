@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   IconStethoscope, IconUsers, IconFileText, IconPrescription, IconHourglass, IconCalendar,
   IconCard, IconCustomize, IconSearch, IconUser, IconCheck, IconTrash, IconRefresh,
-  IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconWarning
+  IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconWarning, IconClose, IconBank
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -164,6 +164,33 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     } catch { return []; }
   });
 
+  // Modal de cambio rápido manual de tasas (esquina superior derecha)
+  const [modalTasasRapidas, setModalTasasRapidas] = useState(false);
+  const [tasaBCVInput, setTasaBCVInput] = useState<string>("");
+  const [tasaCOPInput, setTasaCOPInput] = useState<string>("");
+  const [toastTasa, setToastTasa] = useState<string | null>(null);
+
+  const abrirModalTasas = () => {
+    setTasaBCVInput(String(configPerfil.tasaBCV || 56.40));
+    setTasaCOPInput(String(configPerfil.tasaCOP || 4200));
+    setModalTasasRapidas(true);
+  };
+
+  const guardarTasasRapidas = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const bcv = parseFloat(tasaBCVInput) || configPerfil.tasaBCV || 56.40;
+    const cop = parseFloat(tasaCOPInput) || configPerfil.tasaCOP || 4200;
+    const nuevaConfig = {
+      ...configPerfil,
+      tasaBCV: bcv,
+      tasaCOP: cop,
+    };
+    guardarConfigPerfil(nuevaConfig);
+    setModalTasasRapidas(false);
+    setToastTasa(`Tasas actualizadas: BCV Bs. ${bcv.toFixed(2)} | COP $${cop.toLocaleString()}`);
+    setTimeout(() => setToastTasa(null), 3500);
+  };
+
   useEffect(() => {
     try { localStorage.setItem(`cobros_locales_${hoy()}`, JSON.stringify(cobrosLocales)); } catch {}
   }, [cobrosLocales]);
@@ -292,18 +319,39 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               </button>
             </div>
 
-            <div className="text-xs text-right hidden sm:block">
-              <div className="font-bold text-slate-900 dark:text-white">{configPerfil.doctorNombre}</div>
-              <div className="text-[11px] text-teal-600 dark:text-teal-400 font-mono">
-                BCV: Bs. {configPerfil.tasaBCV.toFixed(2)} | COP: ${configPerfil.tasaCOP}
+            {/* Widget / Botón Interactivo de Cambio Rápido de Tasas */}
+            <button
+              type="button"
+              onClick={abrirModalTasas}
+              className="text-xs text-right hidden sm:flex flex-col items-end px-3 py-1.5 rounded-xl border border-teal-500/30 dark:border-teal-400/30 hover:border-teal-500 bg-teal-500/10 dark:bg-teal-400/10 hover:bg-teal-500/20 transition-all cursor-pointer group shadow-xs"
+              title="Haz clic aquí para cambiar rápidamente las tasas de cambio (BCV / COP) de forma manual"
+            >
+              <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <span>{configPerfil.doctorNombre}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/30 text-teal-700 dark:text-teal-200 group-hover:scale-105 transition-transform font-mono font-bold flex items-center gap-1">
+                  ✏️ Tasas
+                </span>
               </div>
-            </div>
+              <div className="text-[11px] text-teal-700 dark:text-teal-300 font-mono flex items-center gap-1.5 mt-0.5 font-bold">
+                <span>BCV: <strong>Bs. {Number(configPerfil.tasaBCV || 56.4).toFixed(2)}</strong></span>
+                <span className="text-slate-400 dark:text-white/40">|</span>
+                <span>COP: <strong>${Number(configPerfil.tasaCOP || 4200).toLocaleString()}</strong></span>
+              </div>
+            </button>
 
             <button onClick={recargarTodo} className="p-2 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
               <IconRefresh size={16} />
             </button>
           </div>
         </header>
+
+        {/* TOAST DE NOTIFICACIÓN RÁPIDA DE TASAS */}
+        {toastTasa && (
+          <div className="fixed top-20 right-6 z-50 p-3.5 rounded-2xl bg-teal-600 text-white font-bold text-xs shadow-2xl flex items-center gap-2 animate-bounce">
+            <IconCheck size={18} />
+            <span>{toastTasa}</span>
+          </div>
+        )}
 
         <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
           {pagina === "general" && <VistaGeneral pacientes={pacientes} citasHoy={citasHoy} salaEspera={salaEspera} ingresosHoy={ingresosHoy} onNavegar={setPagina} />}
@@ -316,6 +364,133 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "configuracion" && <Configuracion config={configPerfil} onGuardar={guardarConfigPerfil} user={user} />}
         </div>
       </main>
+
+      {/* ── MODAL DE CAMBIO RÁPIDO MANUAL DE TASAS DE CAMBIO ── */}
+      {modalTasasRapidas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-md apple-glass rounded-3xl p-6 sm:p-7 shadow-2xl border border-white/20 bg-white/95 dark:bg-[#071a2e]/95 text-slate-900 dark:text-white space-y-5">
+            {/* Header del modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-teal-500/20 text-teal-600 dark:text-teal-300">
+                  <IconBank size={22} />
+                </div>
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-lg leading-tight">Tasas de Cambio Oficiales</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-white/50">Ajuste manual e instantáneo para cobros y caja</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalTasasRapidas(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <IconClose size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={guardarTasasRapidas} className="space-y-4">
+              {/* Tasa BCV */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-white/80 flex items-center justify-between">
+                  <span>🇻🇪 Tasa BCV (Bs. / USD)</span>
+                  <span className="text-[10px] font-mono text-teal-600 dark:text-teal-400">Bolívares por Dólar</span>
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-xs font-mono font-bold text-slate-400">Bs.</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    autoFocus
+                    value={tasaBCVInput}
+                    onChange={(e) => setTasaBCVInput(e.target.value)}
+                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-slate-50 dark:bg-black/20 text-slate-900 dark:text-white font-mono font-bold text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                    placeholder="Ej. 56.40"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                  <span className="text-[10px] text-slate-400">Ajuste rápido:</span>
+                  {[56.40, 57.50, 58.00, 60.00].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setTasaBCVInput(String(val))}
+                      className="text-[10px] px-2 py-0.5 rounded bg-slate-200/70 dark:bg-white/10 hover:bg-teal-500 hover:text-white transition-colors font-mono cursor-pointer font-bold"
+                    >
+                      Bs. {val.toFixed(2)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tasa COP */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-white/80 flex items-center justify-between">
+                  <span>🇨🇴 Tasa TRM (Pesos COP / USD)</span>
+                  <span className="text-[10px] font-mono text-teal-600 dark:text-teal-400">Pesos por Dólar</span>
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-xs font-mono font-bold text-slate-400">$</span>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    required
+                    value={tasaCOPInput}
+                    onChange={(e) => setTasaCOPInput(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-slate-50 dark:bg-black/20 text-slate-900 dark:text-white font-mono font-bold text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                    placeholder="Ej. 4200"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                  <span className="text-[10px] text-slate-400">Ajuste rápido:</span>
+                  {[4000, 4100, 4200, 4300].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setTasaCOPInput(String(val))}
+                      className="text-[10px] px-2 py-0.5 rounded bg-slate-200/70 dark:bg-white/10 hover:bg-teal-500 hover:text-white transition-colors font-mono cursor-pointer font-bold"
+                    >
+                      ${val} COP
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Vista previa en vivo */}
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs space-y-1 font-mono">
+                <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider font-sans font-bold">
+                  💡 Simulación de Conversión ($10.00 USD):
+                </div>
+                <div className="flex items-center justify-between text-teal-700 dark:text-teal-300 font-bold">
+                  <span>Bs. {((parseFloat(tasaBCVInput) || 0) * 10).toFixed(2)} VES</span>
+                  <span>${((parseFloat(tasaCOPInput) || 0) * 10).toLocaleString()} COP</span>
+                </div>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalTasasRapidas(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-md hover:shadow-teal-500/20 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <IconCheck size={16} />
+                  <span>Guardar Tasas</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
