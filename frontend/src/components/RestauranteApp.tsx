@@ -2720,6 +2720,10 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, venta
   }
 
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
+  // Por debajo de "lg" no hay espacio para catálogo + comanda lado a lado
+  // (el panel derecho necesita 300-420px mínimo) — se muestra un panel a la
+  // vez con una pestaña para cambiar, en vez de aplastar el grid.
+  const [vistaMobile, setVistaMobile] = useState<"catalogo" | "carrito">("catalogo");
   const [busqueda, setBusqueda] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
@@ -2954,10 +2958,22 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, venta
         </div>
       </header>
 
-      {/* CUERPO: catálogo (70%) + carrito (30%) */}
+      {/* Selector de panel en móvil/tablet angosto — abajo de "lg" no cabe catálogo + comanda lado a lado */}
+      <div className="lg:hidden flex-shrink-0 flex border-b border-slate-300/60 dark:border-white/10">
+        <button type="button" onClick={() => setVistaMobile("catalogo")}
+          className={`flex-1 py-2.5 text-xs font-bold cursor-pointer transition-colors ${
+            vistaMobile === "catalogo" ? "text-teal-600 dark:text-teal-400 border-b-2 border-teal-600" : "text-slate-400 dark:text-white/40 border-b-2 border-transparent"
+          }`}>Catálogo</button>
+        <button type="button" onClick={() => setVistaMobile("carrito")}
+          className={`flex-1 py-2.5 text-xs font-bold cursor-pointer transition-colors ${
+            vistaMobile === "carrito" ? "text-teal-600 dark:text-teal-400 border-b-2 border-teal-600" : "text-slate-400 dark:text-white/40 border-b-2 border-transparent"
+          }`}>Comanda{carrito.length > 0 && ` · ${carrito.length} · $${total.toFixed(2)}`}</button>
+      </div>
+
+      {/* CUERPO: catálogo (70%) + carrito (30%) en pantallas grandes; un panel a la vez debajo de "lg" */}
       <div className="flex-1 flex min-h-0">
         {/* PANEL IZQUIERDO — CATÁLOGO */}
-        <div className="flex-[7] min-w-0 flex flex-col p-4 gap-3 overflow-hidden">
+        <div className={`${vistaMobile === "catalogo" ? "flex" : "hidden"} lg:flex flex-1 lg:flex-[7] min-w-0 flex-col p-4 gap-3 overflow-hidden`}>
           <div className="relative flex-shrink-0">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={15} /></span>
             <input
@@ -3032,7 +3048,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, venta
         </div>
 
         {/* PANEL DERECHO — COMANDA ACTIVA */}
-        <div className="flex-[3] min-w-[300px] max-w-[420px] flex-shrink-0 border-l border-slate-300/60 dark:border-white/10 flex flex-col bg-white/30 dark:bg-black/10">
+        <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex flex-1 lg:flex-[3] lg:min-w-[300px] lg:max-w-[420px] flex-shrink-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col bg-white/30 dark:bg-black/10`}>
           {/* Cabecera: cliente CRM */}
           <div className="p-4 border-b border-slate-300/50 dark:border-white/10 flex-shrink-0">
             <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1.5">Cliente (opcional)</p>
