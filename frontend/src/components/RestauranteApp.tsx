@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import {
   IconRestaurant, IconCustomize, IconUsers, IconUser, IconHourglass, IconCard, IconFileText,
   IconCheck, IconTrash, IconRefresh, IconCheckCircle, IconWarning, IconSearch, IconClose,
-  IconBolt, IconBank, IconChart, IconDownload, IconLock, IconRocket,
+  IconBolt, IconBank, IconChart, IconDownload, IconLock, IconRocket, IconChevronLeft, IconChevronRight,
 } from "../Icons";
 import * as XLSX from "xlsx";
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
@@ -25,7 +25,7 @@ import {
   type ItemImportacionArticulo, type ResultadoImportacionArticulos, type Cliente, type MetricasCliente,
 } from "../api";
 
-type Pagina = "general" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
+type Pagina = "general" | "resumen" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
 
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
@@ -38,6 +38,7 @@ const NAV_GRUPOS: NavGrupo[] = [
     titulo: "Operación",
     items: [
       { id: "general", label: "Vista General", Icon: IconCustomize },
+      { id: "resumen", label: "Resumen General", Icon: IconChart },
       { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant, premium: true },
       { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass, premium: true },
       { id: "recetas", label: "Recetas & Escandallo", Icon: IconFileText },
@@ -257,9 +258,6 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
 
   useEffect(() => { recargarTodo(); }, [tenantId]);
 
-  const totalVentasHoy = ventasHoy?.total ?? 0;
-  const valorInventario = (articulos || []).reduce((s, a) => s + Number(a.costoUnitario) * Number(a.stockActual), 0);
-
   // Sin tasa BCV del día, un cobro mixto en Bs o el total bimoneda del
   // carrito estarían calculando con una tasa vencida o en cero — bloquea
   // Venta Rápida hasta que se registre, en vez de dejar operar con números
@@ -277,8 +275,12 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     setPagina(p);
   };
 
+  // h-screen + overflow-hidden en la raíz: la terminal de caja (Vista
+  // General) nunca debe scrollear la página completa — solo sus paneles
+  // internos. El resto de las páginas sigue scrolleando normal dentro de
+  // <main>, que mantiene su propio overflow-y-auto.
   return (
-    <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "horeca-clasico" : ""}`}>
+    <div className={`h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "horeca-clasico" : ""}`}>
       {modoClasico && <EstiloClasico />}
       {/* SIDEBAR */}
       <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1">
@@ -352,7 +354,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
       </aside>
 
       {/* ÁREA PRINCIPAL */}
-      <main className="flex-1 flex flex-col overflow-y-auto">
+      <main className={`flex-1 flex flex-col min-h-0 ${pagina === "general" ? "overflow-hidden" : "overflow-y-auto"}`}>
         {/* relative + z-30: el header usa backdrop-blur, que crea su propio contexto de
             apilamiento — sin un z-index explícito acá, el popover de la tasa (aunque
             tenga su propio z-index alto) queda atrapado dentro de ese contexto y las
@@ -380,16 +382,24 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           </div>
         </header>
 
-        <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-          {pagina === "general" && (
-            <VistaGeneral totalVentasHoy={totalVentasHoy} valorInventario={valorInventario} vencimientos={(lotesPorVencer || []).length}
-              onNavegar={irA}
+        {/* Vista General (POS puro) es la única página que gestiona su propio
+            alto y scroll interno de punta a punta — el wrapper acá no le
+            mete padding/max-width/space-y que le robarían pantalla al
+            catálogo y la comanda. El resto de las páginas (Inventario,
+            Reportes, Resumen General, etc.) sigue con el contenedor
+            gerencial de siempre, con scroll de página normal. */}
+        {pagina === "general" ? (
+          <div className="flex-1 min-h-0 flex flex-col p-4">
+            <VistaGeneral
               tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
               ventasHoy={ventasHoy} nombreLocal={config.nombreLocal} tasaValida={tasaValida}
               onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
               onRegistrarTasa={() => setBloqueoTasa(true)}
               onArticuloActualizado={actualizarArticuloEnEstado} />
-          )}
+          </div>
+        ) : (
+        <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6 overflow-y-auto min-h-0">
+          {pagina === "resumen" && <ResumenGeneral tenantId={tenantId} />}
           {pagina === "salon" && (esPremium("salon")
             ? <BloqueoPremium modulo="Salón & Mesas" />
             : tasaValida
@@ -414,6 +424,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
         </div>
+        )}
       </main>
 
       {bloqueoTasa && (
@@ -638,35 +649,23 @@ function KpiCard({ label, val, sub, color, onClick }: { label: string; val: stri
 // ══════════════════════════════════════════════════════════════════════════
 // VISTA GENERAL
 // ══════════════════════════════════════════════════════════════════════════
+/**
+ * Vista General = terminal de caja pura, sin nada gerencial encima. Cero
+ * KPIs, cero tarjetas de resumen — esa analítica vive en "Resumen General"
+ * (ver ResumenGeneral más abajo). El espacio entero, de punta a punta,
+ * es catálogo + comanda + cobro para que el cajero cobre lo más rápido
+ * posible sin que nada le compita por la pantalla.
+ */
 function VistaGeneral({
-  totalVentasHoy, valorInventario, vencimientos, onNavegar,
   tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, tasaValida, onVenta, onRegistrarTasa, onArticuloActualizado,
 }: {
-  totalVentasHoy: number; valorInventario: number; vencimientos: number; onNavegar: (p: Pagina) => void;
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
   tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
   tasaValida: boolean; onVenta: (monto: number, metodo: string) => void; onRegistrarTasa: () => void;
   onArticuloActualizado: (articulo: Articulo) => void;
 }) {
   return (
-    // h-[calc(100vh-250px)]: descuenta el header de la app + estos KPIs +
-    // paddings de arriba, para que el POS embebido de abajo tenga un techo
-    // real contra el cual repartir su alto (flex-1 min-h-0) en vez de
-    // apoyarse en un h-[Npx] fijo que colapsa en pantallas más chicas.
-    <div className="flex flex-col h-[calc(100vh-250px)] gap-6">
-      {/* Mesas, comandas y cocina quedan fuera de estos KPIs — están detrás
-          del paywall Pro, así que el protagonismo va para lo que sí está
-          activo en el plan base: ventas e inventario. */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-shrink-0">
-        <KpiCard label="Ventas del Día" val={`$${totalVentasHoy.toFixed(2)}`} sub="Comandas y Fast-Bar cerrados" color="#10b981" />
-        <KpiCard label="Valor del Inventario" val={`$${valorInventario.toFixed(2)}`} sub="Costo total en bodega" color="#0ea5e9" onClick={() => onNavegar("inventario")} />
-        <KpiCard label="Por Vencer" val={String(vencimientos)} sub="Lotes vencidos o próximos" color={vencimientos > 0 ? "#ef4444" : "#64748b"} onClick={() => onNavegar("inventario")} />
-      </div>
-
-      {/* El POS vive acá directo — sin banner ni "Accesos rápidos" que solo
-          llevaban a la misma pantalla con un clic extra. Buscar un producto
-          y cobrar pasa a ser la mitad inferior del dashboard, no una vista
-          aparte. */}
+    <div className="h-full flex flex-col overflow-hidden">
       <VentaRapida
         embebido tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos}
         tasaBcv={tasaBcv} tasaCop={tasaCop} ventasHoy={ventasHoy} nombreLocal={nombreLocal}
@@ -3721,6 +3720,143 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
             </table>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+const DIAS_SEMANA_CORTOS = ["L", "M", "X", "J", "V", "S", "D"];
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const fmtFechaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// ══════════════════════════════════════════════════════════════════════════
+// RESUMEN GENERAL — el dashboard gerencial vive acá, separado por completo
+// de la Vista General (que ahora es una terminal de caja pura). KPIs de
+// ventas de hoy/semana en tiempo real + un calendario para auditar
+// cualquier día anterior sin mezclar analítica con el flujo de cobro.
+// ══════════════════════════════════════════════════════════════════════════
+function ResumenGeneral({ tenantId }: { tenantId: number }) {
+  const [ventasHoy, setVentasHoy] = useState<number | null>(null);
+  const [ticketsHoy, setTicketsHoy] = useState(0);
+  const [ventasSemana, setVentasSemana] = useState<number | null>(null);
+
+  const hoy = useMemo(() => new Date(), []);
+  const hoyStr = fmtFechaLocal(hoy);
+  const [vista, setVista] = useState(() => ({ anio: hoy.getFullYear(), mes: hoy.getMonth() }));
+  const [fechaSel, setFechaSel] = useState(hoyStr);
+  const [ticketsDia, setTicketsDia] = useState<ReporteTicket[] | null>(null);
+
+  useEffect(() => {
+    const diaSemana = hoy.getDay(); // 0 = domingo
+    const lunes = new Date(hoy);
+    lunes.setDate(hoy.getDate() - ((diaSemana + 6) % 7));
+    const lunesStr = fmtFechaLocal(lunes);
+
+    reporteTickets(tenantId, { fechaInicio: hoyStr, fechaFin: hoyStr, estado: "PAGADA" })
+      .then((lista) => { setVentasHoy(lista.reduce((s, t) => s + Number(t.totalUsd), 0)); setTicketsHoy(lista.length); })
+      .catch(() => { setVentasHoy(0); setTicketsHoy(0); });
+
+    reporteTickets(tenantId, { fechaInicio: lunesStr, fechaFin: hoyStr, estado: "PAGADA" })
+      .then((lista) => setVentasSemana(lista.reduce((s, t) => s + Number(t.totalUsd), 0)))
+      .catch(() => setVentasSemana(0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
+
+  useEffect(() => {
+    setTicketsDia(null);
+    reporteTickets(tenantId, { fechaInicio: fechaSel, fechaFin: fechaSel, estado: "PAGADA" })
+      .then(setTicketsDia)
+      .catch(() => setTicketsDia([]));
+  }, [tenantId, fechaSel]);
+
+  const totalDiaSel = (ticketsDia || []).reduce((s, t) => s + Number(t.totalUsd), 0);
+
+  const primerDiaMes = new Date(vista.anio, vista.mes, 1);
+  const diasEnMes = new Date(vista.anio, vista.mes + 1, 0).getDate();
+  const offsetInicio = (primerDiaMes.getDay() + 6) % 7; // semana empieza en lunes
+  const celdas: (number | null)[] = [...Array(offsetInicio).fill(null), ...Array.from({ length: diasEnMes }, (_, i) => i + 1)];
+  const fechaCelda = (dia: number) => `${vista.anio}-${String(vista.mes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+
+  const cambiarMes = (delta: number) => setVista(({ anio, mes }) => {
+    const d = new Date(anio, mes + delta, 1);
+    return { anio: d.getFullYear(), mes: d.getMonth() };
+  });
+
+  const fechaSelObj = new Date(fechaSel + "T00:00:00");
+  const fechaSelLegible = fechaSelObj.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <KpiCard label="Ventas del Día" val={ventasHoy === null ? "…" : `$${ventasHoy.toFixed(2)}`} sub={`${ticketsHoy} ticket${ticketsHoy === 1 ? "" : "s"} hoy`} color="#10b981" />
+        <KpiCard label="Ventas de la Semana" val={ventasSemana === null ? "…" : `$${ventasSemana.toFixed(2)}`} sub="Lunes a hoy" color="#0ea5e9" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start">
+        {/* Calendario histórico */}
+        <div className="apple-glass rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <button onClick={() => cambiarMes(-1)} className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 cursor-pointer text-slate-500 dark:text-white/60"><IconChevronLeft size={16} /></button>
+            <span className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">{MESES[vista.mes]} {vista.anio}</span>
+            <button onClick={() => cambiarMes(1)} className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 cursor-pointer text-slate-500 dark:text-white/60"><IconChevronRight size={16} /></button>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-[10px] font-semibold text-center text-slate-400 dark:text-white/30 mb-1.5">
+            {DIAS_SEMANA_CORTOS.map((d) => <div key={d}>{d}</div>)}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {celdas.map((dia, i) => {
+              if (dia === null) return <div key={i} />;
+              const fecha = fechaCelda(dia);
+              const esHoy = fecha === hoyStr;
+              const esSel = fecha === fechaSel;
+              const esFuturo = fecha > hoyStr;
+              return (
+                <button key={i} type="button" disabled={esFuturo} onClick={() => setFechaSel(fecha)}
+                  className={`aspect-square rounded-lg text-xs font-semibold transition-colors ${
+                    esFuturo ? "text-slate-300 dark:text-white/15 cursor-not-allowed"
+                    : esSel ? "bg-teal-600 text-white cursor-pointer"
+                    : esHoy ? "border border-teal-500 text-teal-600 dark:text-teal-400 cursor-pointer"
+                    : "text-slate-600 dark:text-white/60 hover:bg-slate-200/60 dark:hover:bg-white/10 cursor-pointer"
+                  }`}>
+                  {dia}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Detalle del día seleccionado */}
+        <div className="apple-glass rounded-2xl p-5">
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base capitalize mb-4">{fechaSelLegible}</h3>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="apple-glass rounded-xl p-3.5">
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Total del día</div>
+              <div className="font-['Outfit'] font-black text-xl text-teal-600 dark:text-teal-400">${totalDiaSel.toFixed(2)}</div>
+            </div>
+            <div className="apple-glass rounded-xl p-3.5">
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Transacciones</div>
+              <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{(ticketsDia || []).length}</div>
+            </div>
+          </div>
+
+          {ticketsDia === null ? (
+            <p className="text-xs text-slate-400">Cargando…</p>
+          ) : ticketsDia.length === 0 ? (
+            <p className="text-xs text-slate-400">Sin ventas registradas este día.</p>
+          ) : (
+            <div className="space-y-1.5 max-h-80 overflow-y-auto">
+              {ticketsDia.map((t) => (
+                <div key={t.comandaId} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2 text-xs">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-slate-800 dark:text-white truncate">{t.numeroTicket}</div>
+                    <div className="text-[10px] text-slate-400">{new Date(t.fecha).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })} · {(t.metodoPago || "—").replace("_", " ")}</div>
+                  </div>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white flex-shrink-0">${Number(t.totalUsd).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
