@@ -136,4 +136,14 @@ public class LicenciaService {
             .map(ModuloTenant::getModuloNombre)
             .toList();
     }
+
+    /** Nivel mínimo de licencia que exige un módulo — usado también al contratar una vertical adicional (ver ModuloTenantController.agregarModulo). */
+    public LicenciaTenant.TipoLicencia nivelRequeridoPara(String modulo) {
+        return NIVEL_REQUERIDO_POR_MODULO.getOrDefault(modulo, LicenciaTenant.TipoLicencia.BASICA);
+    }
+
+    /** Si el nombre corresponde a una vertical de industria real (y no a un módulo núcleo o inexistente). */
+    public boolean esVerticalControlada(String modulo) {
+        return VERTICALES_CONTROLADAS.contains(modulo);
+    }
 }

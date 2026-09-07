@@ -40,3 +40,6 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Herramientas locales (JDK/Maven portables descargados para esta sesión) ###
+.tools/

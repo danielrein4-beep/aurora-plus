@@ -1,8 +1,12 @@
 package com.auroraplus.core.config;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.entities.LicenciaTenant;
+import com.auroraplus.core.config.entities.ModuloTenant;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
+import com.auroraplus.core.config.repositories.ModuloTenantRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,10 +29,68 @@ public class ModuloTenantController {
     @Autowired
     private LicenciaTenantRepository licenciaTenantRepository;
 
+    @Autowired
+    private ModuloTenantRepository moduloTenantRepository;
+
     @GetMapping("/mis-modulos")
     public List<String> misModulos() {
         Long tenantId = TenantContext.getCurrentTenant();
         return licenciaService.obtenerModulosActivos(tenantId);
+    }
+
+    public static class AgregarModuloRequest {
+        public String moduloNombre; // ej: "horeca", "salud" — mismo valor que en la URL /api/{modulo}/...
+    }
+
+    /**
+     * Contrata una vertical adicional para el negocio YA existente, sin crear
+     * un tenant nuevo — a diferencia del registro de autoservicio (que solo
+     * asigna un módulo al nacer el tenant), esto permite que un cliente de
+     * Mediclinic (salud) sume Aurora Horeca sobre la misma cuenta, o
+     * viceversa. Requiere que la licencia del negocio ya alcance el nivel que
+     * exige ese módulo (ver LicenciaService.NIVEL_REQUERIDO_POR_MODULO) — no
+     * se sube de nivel de licencia automáticamente aquí, solo se valida.
+     */
+    @PostMapping("/mi-negocio/agregar-modulo")
+    public ResponseEntity<ModuloTenant> agregarModulo(@RequestBody AgregarModuloRequest request) {
+        String rol = AuthContext.getRol();
+        if (!"DUENO_ADMIN".equals(rol) && !"MEDICO".equals(rol)) {
+            throw new RuntimeException("Solo el Dueño/Administrador puede contratar módulos adicionales para este negocio");
+        }
+        if (request.moduloNombre == null || request.moduloNombre.isBlank()) {
+            throw new RuntimeException("Debe indicar el módulo a agregar");
+        }
+        if (!licenciaService.esVerticalControlada(request.moduloNombre)) {
+            throw new RuntimeException("Módulo desconocido o no disponible para contratación: " + request.moduloNombre);
+        }
+
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        if (!licencia.isActiva()) {
+            throw new RuntimeException("La licencia de este negocio está desactivada. Regularice el pago antes de contratar módulos nuevos.");
+        }
+
+        LicenciaTenant.TipoLicencia nivelRequerido = licenciaService.nivelRequeridoPara(request.moduloNombre);
+        if (licencia.getTipoLicencia().ordinal() < nivelRequerido.ordinal()) {
+            throw new RuntimeException("Su licencia actual (" + licencia.getTipoLicencia() + ") no alcanza para el módulo '"
+                + request.moduloNombre + "'. Se requiere " + nivelRequerido + " o superior — contacte a ventas para actualizar su plan.");
+        }
+
+        ModuloTenant existente = moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, request.moduloNombre).orElse(null);
+        if (existente != null) {
+            if (existente.isActivo()) {
+                throw new RuntimeException("Este negocio ya tiene contratado el módulo '" + request.moduloNombre + "'");
+            }
+            existente.setActivo(true);
+            return ResponseEntity.ok(moduloTenantRepository.save(existente));
+        }
+
+        ModuloTenant nuevo = new ModuloTenant();
+        nuevo.setTenantId(tenantId);
+        nuevo.setModuloNombre(request.moduloNombre);
+        nuevo.setActivo(true);
+        return ResponseEntity.ok(moduloTenantRepository.save(nuevo));
     }
 
     // --- Marca del negocio: logo (cualquier vertical) y hierro (marca de propiedad del

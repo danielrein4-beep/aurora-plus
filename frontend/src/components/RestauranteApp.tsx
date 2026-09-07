@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   IconRestaurant, IconCustomize, IconUsers, IconHourglass, IconCard, IconFileText,
   IconCheck, IconTrash, IconRefresh, IconCheckCircle, IconWarning, IconSearch, IconClose,
+  IconBolt, IconBank,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -9,33 +10,130 @@ import {
   dividirCuenta, cerrarComanda, listarEscandallos, crearEscandallo, agregarIngredienteEscandallo,
   listarIngredientesEscandallo, listarFastBar, crearTragoFastBar, venderTragoRapido,
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo,
-  registrarCompraInsumo, alertasVencimiento,
+  registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase,
+  tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
   type MapaMesaEntrada, type Comanda, type ItemComanda, type EstadoItemComanda,
   type EscandalloReceta, type DetalleReceta, type FastBarTrago, type ProveedorHoreca,
-  type Articulo, type ItemCompraInsumo, type LoteArticulo,
+  type Articulo, type ItemCompraInsumo, type LoteArticulo, type TasaCambio, type MovimientoCaja,
 } from "../api";
 
-type Pagina = "general" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "vencimientos" | "configuracion";
+type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "fastbar" | "compras" | "vencimientos" | "finanzas" | "cuentas" | "configuracion";
 
-const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element }[] = [
-  { id: "general", label: "Vista General", Icon: IconCustomize },
-  { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant },
-  { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass },
-  { id: "recetas", label: "Recetas & Escandallo", Icon: IconFileText },
-  { id: "fastbar", label: "Fast-Bar", Icon: IconCard },
-  { id: "compras", label: "Compras & Proveedores", Icon: IconUsers },
-  { id: "vencimientos", label: "Vencimientos", Icon: IconWarning },
-  { id: "configuracion", label: "Configuración", Icon: IconCustomize },
+interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => JSX.Element }
+interface NavGrupo { titulo: string; items: NavItem[] }
+
+const NAV_GRUPOS: NavGrupo[] = [
+  {
+    titulo: "Operación",
+    items: [
+      { id: "general", label: "Vista General", Icon: IconCustomize },
+      { id: "ventarapida", label: "Venta Rápida", Icon: IconBolt },
+      { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant },
+      { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass },
+      { id: "recetas", label: "Recetas & Escandallo", Icon: IconFileText },
+      { id: "fastbar", label: "Fast-Bar", Icon: IconCard },
+    ],
+  },
+  {
+    titulo: "Administración",
+    items: [
+      { id: "compras", label: "Compras & Proveedores", Icon: IconUsers },
+      { id: "vencimientos", label: "Vencimientos", Icon: IconWarning },
+      { id: "finanzas", label: "Ingresos & Gastos", Icon: IconCheckCircle },
+      { id: "cuentas", label: "Cuentas x Cobrar/Pagar", Icon: IconBank },
+      { id: "configuracion", label: "Configuración", Icon: IconCustomize },
+    ],
+  },
 ];
+
+// Lista plana — usada donde no importa el agrupamiento (ej. título del header por página activa)
+const NAV: NavItem[] = NAV_GRUPOS.flatMap((g) => g.items);
 
 const ESTACIONES = ["COCINA", "PARRILLA", "BAR", "COCINA_FRIA"];
 const hoy = () => new Date().toISOString().slice(0, 10);
 
+function diasParaVencer(fechaVencimiento: string): number {
+  const hoy0 = new Date(); hoy0.setHours(0, 0, 0, 0);
+  const venc = new Date(fechaVencimiento + "T00:00:00");
+  return Math.round((venc.getTime() - hoy0.getTime()) / 86400000);
+}
+
+function diasParaVencerTexto(fechaVencimiento: string): { texto: string; color: string } {
+  const d = diasParaVencer(fechaVencimiento);
+  if (d < 0) return { texto: `Vencido hace ${Math.abs(d)} día${Math.abs(d) === 1 ? "" : "s"}`, color: "text-red-500" };
+  if (d === 0) return { texto: "Vence hoy", color: "text-red-500" };
+  if (d <= 3) return { texto: `Vence en ${d} día${d === 1 ? "" : "s"}`, color: "text-amber-500" };
+  return { texto: `Vence en ${d} días`, color: "text-teal-600 dark:text-teal-400" };
+}
+
 const CONFIG_KEY = "aurora_horeca_config_perfil";
 const ITEMS_LOCALES_KEY = "aurora_horeca_items_por_comanda";
 const VENTAS_HOY_KEY = `aurora_horeca_ventas_${hoy()}`;
+const MODO_CLASICO_KEY = "aurora_horeca_modo_clasico";
 
 interface ItemLocal extends ItemComanda {}
+
+// Modo claro por defecto — mismo look "Clásico" blanco de Mediclinic Pro,
+// para que todas las verticales abran con la misma identidad visual.
+function EstiloClasico() {
+  return (
+    <style>{`
+      .horeca-clasico {
+        background: #f8fafc !important;
+        color: #0f172a !important;
+      }
+      .horeca-clasico aside {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+      }
+      .horeca-clasico header {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+      }
+      .horeca-clasico .apple-glass,
+      .horeca-clasico .apple-glass-btn {
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+        backdrop-filter: none !important;
+      }
+      .horeca-clasico input, .horeca-clasico select, .horeca-clasico textarea {
+        background: #ffffff !important;
+        border-color: #cbd5e1 !important;
+        color: #0f172a !important;
+      }
+      .horeca-clasico .bg-slate-100\\/60, .horeca-clasico .bg-slate-200\\/60 {
+        background-color: #f1f5f9 !important;
+      }
+      .horeca-clasico h1, .horeca-clasico h2, .horeca-clasico h3,
+      .horeca-clasico h4, .horeca-clasico strong,
+      .horeca-clasico .text-slate-900 { color: #0f172a !important; }
+      .horeca-clasico .text-slate-500, .horeca-clasico .text-slate-600 { color: #64748b !important; }
+      /* El sitio sigue en tema oscuro por debajo (solo estos overrides simulan
+         "claro") — sin esto, las clases dark:text-white/N ganan por
+         especificidad sobre las claras y quedan invisibles en fondo blanco. */
+      .horeca-clasico .dark\\:text-white\\/80 { color: #1e293b !important; -webkit-text-fill-color: #1e293b !important; }
+      .horeca-clasico .dark\\:text-white\\/70 { color: #334155 !important; -webkit-text-fill-color: #334155 !important; }
+      .horeca-clasico .dark\\:text-white\\/60 { color: #475569 !important; -webkit-text-fill-color: #475569 !important; }
+      .horeca-clasico .dark\\:text-white\\/50 { color: #64748b !important; -webkit-text-fill-color: #64748b !important; }
+      .horeca-clasico .dark\\:text-white\\/40 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
+      .horeca-clasico .btn-cyber-neon {
+        background: linear-gradient(135deg, #0ea5e9, #0d9488 65%, #8b5cf6) !important;
+        box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
+        color: #fff !important;
+      }
+      .horeca-clasico .text-teal-600, .horeca-clasico .text-teal-500,
+      .horeca-clasico .text-teal-300, .horeca-clasico .text-teal-400 { color: #0d9488 !important; -webkit-text-fill-color: #0d9488 !important; }
+      .horeca-clasico .text-aurora {
+        background: linear-gradient(90deg, #0ea5e9, #0d9488 70%, #8b5cf6) !important;
+        -webkit-background-clip: text !important; background-clip: text !important;
+        color: transparent !important; -webkit-text-fill-color: transparent !important;
+      }
+      .horeca-clasico .bg-teal-500\\/15 { background-color: rgba(14,165,233,0.12) !important; }
+      .horeca-clasico .border-teal-500\\/30, .horeca-clasico .border-teal-400\\/60 { border-color: rgba(13,148,136,0.4) !important; }
+    `}</style>
+  );
+}
 
 export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const { user } = useAuth();
@@ -45,14 +143,28 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const [config, setConfig] = useState(() => {
     try {
       const raw = localStorage.getItem(CONFIG_KEY);
-      return raw ? JSON.parse(raw) : { nombreLocal: user?.empresa || "Mi Restaurante", tasaBCV: 56.4, tasaCOP: 4200 };
+      return raw ? JSON.parse(raw) : { nombreLocal: user?.empresa || "Mi Restaurante" };
     } catch {
-      return { nombreLocal: user?.empresa || "Mi Restaurante", tasaBCV: 56.4, tasaCOP: 4200 };
+      return { nombreLocal: user?.empresa || "Mi Restaurante" };
     }
   });
   const guardarConfig = (c: any) => {
     setConfig(c);
     try { localStorage.setItem(CONFIG_KEY, JSON.stringify(c)); } catch {}
+  };
+
+  const [modoClasico, setModoClasico] = useState(() => {
+    try {
+      const guardado = localStorage.getItem(MODO_CLASICO_KEY);
+      return guardado === null ? true : guardado === "1";
+    } catch { return true; }
+  });
+  const alternarModo = () => {
+    setModoClasico((v) => {
+      const nuevo = !v;
+      try { localStorage.setItem(MODO_CLASICO_KEY, nuevo ? "1" : "0"); } catch {}
+      return nuevo;
+    });
   };
 
   // Los ítems de una comanda abierta no tienen endpoint de "listar" en el backend
@@ -68,17 +180,20 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     try { localStorage.setItem(ITEMS_LOCALES_KEY, JSON.stringify(itemsPorComanda)); } catch {}
   }, [itemsPorComanda]);
 
-  const [ventasHoy, setVentasHoy] = useState<{ id: number; monto: number; metodo: string; hora: string }[]>(() => {
-    try {
-      const raw = localStorage.getItem(VENTAS_HOY_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(VENTAS_HOY_KEY, JSON.stringify(ventasHoy)); } catch {}
-  }, [ventasHoy]);
-  const registrarVenta = (monto: number, metodo: string) => {
-    setVentasHoy((prev) => [{ id: Date.now(), monto, metodo, hora: new Date().toLocaleTimeString() }, ...prev]);
+  // Ventas del día = ingresos reales de tesorería desde el último cierre de
+  // caja (mismo endpoint que usa cualquier vertical) — antes se llevaba un
+  // conteo aparte en localStorage que no reflejaba lo que de verdad quedó
+  // registrado en caja.
+  const [ventasHoy, setVentasHoy] = useState<{ total: number; moneda: string } | null>(null);
+  const cargarVentasHoy = () => {
+    monedaBase(tenantId)
+      .then((moneda) => resumenPeriodoAbierto(tenantId, moneda).then((r) => setVentasHoy({ total: Number(r.totalIngresos), moneda })))
+      .catch(() => setVentasHoy(null));
+  };
+  const registrarVenta = (_monto: number, _metodo: string) => {
+    // El cobro ya quedó registrado en tesorería por el propio backend
+    // (cerrarComanda / venderTragoRapido) — solo hace falta refrescar.
+    cargarVentasHoy();
   };
 
   const [mapa, setMapa] = useState<MapaMesaEntrada[] | null>(null);
@@ -88,6 +203,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const [articulos, setArticulos] = useState<Articulo[] | null>(null);
   const [lotesPorVencer, setLotesPorVencer] = useState<LoteArticulo[] | null>(null);
   const [kdsCounts, setKdsCounts] = useState<number>(0);
+  const [tasaBcv, setTasaBcv] = useState<TasaCambio | null>(null);
 
   const recargarTodo = () => {
     mapaDeMesas().then(setMapa).catch(() => setMapa([]));
@@ -96,6 +212,8 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     listarProveedoresHoreca().then(setProveedores).catch(() => setProveedores([]));
     listarArticulos().then(setArticulos).catch(() => setArticulos([]));
     alertasVencimiento(tenantId, 7).then(setLotesPorVencer).catch(() => setLotesPorVencer([]));
+    tasaVigente(tenantId, "USD", "VES").then(setTasaBcv).catch(() => setTasaBcv(null));
+    cargarVentasHoy();
     Promise.all(ESTACIONES.map((e) => obtenerTableroKds(e).catch(() => [])))
       .then((listas) => setKdsCounts(listas.reduce((sum, l) => sum + l.filter((i) => i.estadoItem !== "ENTREGADO").length, 0)))
       .catch(() => setKdsCounts(0));
@@ -103,12 +221,13 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
 
   useEffect(() => { recargarTodo(); }, [tenantId]);
 
-  const totalVentasHoy = ventasHoy.reduce((s, v) => s + v.monto, 0);
+  const totalVentasHoy = ventasHoy?.total ?? 0;
   const mesasOcupadas = (mapa || []).filter((m) => m.estado === "OCUPADA").length;
   const comandasAbiertas = (mapa || []).filter((m) => m.comandaAbierta).length;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex">
+    <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "horeca-clasico" : ""}`}>
+      {modoClasico && <EstiloClasico />}
       {/* SIDEBAR */}
       <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1">
         <div className="px-2 pb-4 mb-2 border-b border-slate-300/60 dark:border-white/10">
@@ -121,29 +240,47 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mt-0.5">{config.nombreLocal}</div>
         </div>
 
-        {NAV.map((n) => {
-          const alertaVencimiento = n.id === "vencimientos" && (lotesPorVencer || []).length > 0;
-          return (
-            <button
-              key={n.id}
-              onClick={() => setPagina(n.id)}
-              className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
-                pagina === n.id
-                  ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 shadow-sm"
-                  : alertaVencimiento
-                  ? "text-red-600 dark:text-red-300 hover:bg-red-500/10"
-                  : "text-slate-600 dark:text-white/60 hover:bg-slate-200/60 dark:hover:bg-white/5"
-              }`}
-            >
-              <span className="flex items-center gap-2.5"><n.Icon size={16} /><span>{n.label}</span></span>
-              {alertaVencimiento && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 font-bold">{(lotesPorVencer || []).length}</span>
-              )}
-            </button>
-          );
-        })}
+        <div className="flex-1 overflow-y-auto space-y-4 pr-0.5">
+          {NAV_GRUPOS.map((grupo) => (
+            <div key={grupo.titulo} className="space-y-1">
+              <div className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/25">{grupo.titulo}</div>
+              {grupo.items.map((n) => {
+                const alertaVencimiento = n.id === "vencimientos" && (lotesPorVencer || []).length > 0;
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => setPagina(n.id)}
+                    className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                      pagina === n.id
+                        ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 shadow-sm"
+                        : alertaVencimiento
+                        ? "text-red-600 dark:text-red-300 hover:bg-red-500/10"
+                        : "text-slate-600 dark:text-white/60 hover:bg-slate-200/60 dark:hover:bg-white/5"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2.5"><n.Icon size={16} /><span>{n.label}</span></span>
+                    {alertaVencimiento && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 font-bold">{(lotesPorVencer || []).length}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
 
-        <div className="flex-1" />
+        {/* Switch Modo Clásico / Aurora */}
+        <div className="p-2.5 rounded-xl bg-slate-100/60 dark:bg-white/5 border border-slate-300/60 dark:border-white/10 text-xs mb-2">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-600 dark:text-white/70 text-[11px] font-medium">Modo Clásico</span>
+            <button
+              onClick={alternarModo}
+              className={`w-9 h-5 rounded-full transition-colors relative p-0.5 cursor-pointer ${modoClasico ? "bg-teal-600" : "bg-slate-400/40"}`}
+            >
+              <div className={`w-4 h-4 rounded-full bg-white transition-transform ${modoClasico ? "translate-x-4" : "translate-x-0"}`} />
+            </button>
+          </div>
+        </div>
 
         <button
           onClick={onSalir}
@@ -170,7 +307,9 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           <div className="flex items-center gap-4">
             <div className="text-xs text-right hidden sm:block">
               <div className="font-bold text-slate-900 dark:text-white">{config.nombreLocal}</div>
-              <div className="text-[11px] text-teal-600 dark:text-teal-400 font-mono">BCV: Bs. {Number(config.tasaBCV).toFixed(2)}</div>
+              <div className="text-[11px] text-teal-600 dark:text-teal-400 font-mono">
+                {tasaBcv ? `BCV: Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "BCV: sin tasa registrada"}
+              </div>
             </div>
             <button onClick={recargarTodo} className="p-2 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
               <IconRefresh size={16} />
@@ -183,6 +322,9 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             <VistaGeneral mesasOcupadas={mesasOcupadas} totalMesas={(mapa || []).length} comandasAbiertas={comandasAbiertas}
               totalVentasHoy={totalVentasHoy} kdsCounts={kdsCounts} vencimientos={(lotesPorVencer || []).length} onNavegar={setPagina} />
           )}
+          {pagina === "ventarapida" && (
+            <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} onVenta={registrarVenta} />
+          )}
           {pagina === "salon" && (
             <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
               escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
@@ -194,7 +336,9 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             <ComprasProveedores tenantId={tenantId} proveedores={proveedores} articulos={articulos} onCambio={recargarTodo} />
           )}
           {pagina === "vencimientos" && <Vencimientos tenantId={tenantId} onCambio={recargarTodo} />}
-          {pagina === "configuracion" && <Configuracion config={config} onGuardar={guardarConfig} />}
+          {pagina === "finanzas" && <Finanzas tenantId={tenantId} />}
+          {pagina === "cuentas" && <CuentasPorCobrarPagar tenantId={tenantId} />}
+          {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
         </div>
       </main>
     </div>
@@ -228,6 +372,18 @@ function VistaGeneral({ mesasOcupadas, totalMesas, comandasAbiertas, totalVentas
         <KpiCard label="Platos en Cocina" val={String(kdsCounts)} sub="Pendientes + en preparación" color="#f59e0b" onClick={() => onNavegar("cocina")} />
         <KpiCard label="Por Vencer" val={String(vencimientos)} sub="Lotes vencidos o próximos" color={vencimientos > 0 ? "#ef4444" : "#64748b"} onClick={() => onNavegar("vencimientos")} />
       </div>
+      <button onClick={() => onNavegar("ventarapida")}
+        className="w-full btn-cyber-neon text-white rounded-2xl p-5 flex items-center justify-between cursor-pointer shadow-lg hover:scale-[1.01] transition-all">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center"><IconBolt size={22} /></div>
+          <div className="text-left">
+            <div className="font-['Outfit'] font-black text-base">Venta Rápida</div>
+            <div className="text-xs opacity-80">Para lo que se vende sin mesa: un pepito, un refresco, un Doritos…</div>
+          </div>
+        </div>
+        <span className="text-xl">→</span>
+      </button>
+
       <div className="apple-glass rounded-2xl p-6">
         <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-3">Accesos rápidos</h4>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -427,6 +583,7 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
   const [escandalloSel, setEscandalloSel] = useState<string>("");
   const [nombrePlato, setNombrePlato] = useState("");
   const [precioManual, setPrecioManual] = useState("");
+  const [estacionManual, setEstacionManual] = useState(ESTACIONES[0]);
   const [cantidad, setCantidad] = useState("1");
   const [agregando, setAgregando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -447,7 +604,7 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
       const item = await agregarItemComanda(tenantId, comanda.id, {
         escandalloId: escandallo?.id,
         nombrePlato: escandallo ? escandallo.nombrePlato : nombrePlato.trim(),
-        estacionCocina: escandallo?.estacionCocina,
+        estacionCocina: escandallo ? escandallo.estacionCocina : estacionManual,
         cantidad: cant,
         precioUnitario: escandallo ? escandallo.precioVenta : Number(precioManual) || 0,
       });
@@ -515,9 +672,12 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
             ))}
           </select>
           {!escandalloSel && (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <input value={nombrePlato} onChange={(e) => setNombrePlato(e.target.value)} placeholder="Nombre del plato" className="input-horeca" />
               <input value={precioManual} onChange={(e) => setPrecioManual(e.target.value)} placeholder="Precio $" type="number" step="0.01" className="input-horeca" />
+              <select value={estacionManual} onChange={(e) => setEstacionManual(e.target.value)} className="input-horeca" title="A qué estación de cocina va este plato">
+                {ESTACIONES.map((e) => <option key={e} value={e}>{e.replace("_", " ")}</option>)}
+              </select>
             </div>
           )}
           <div className="flex items-center gap-2">
@@ -895,14 +1055,23 @@ function ComprasProveedores({ tenantId, proveedores, articulos, onCambio }: {
           </div>
 
           {mostrarFormProveedor && (
-            <div className="apple-glass rounded-2xl p-5 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <input value={formProveedor.nombre} onChange={(e) => setFormProveedor({ ...formProveedor, nombre: e.target.value })} placeholder="Nombre del proveedor" className="input-horeca" />
-                <input value={formProveedor.rif} onChange={(e) => setFormProveedor({ ...formProveedor, rif: e.target.value })} placeholder="RIF" className="input-horeca" />
-                <input value={formProveedor.telefono} onChange={(e) => setFormProveedor({ ...formProveedor, telefono: e.target.value })} placeholder="Teléfono" className="input-horeca" />
-                <input value={formProveedor.contacto} onChange={(e) => setFormProveedor({ ...formProveedor, contacto: e.target.value })} placeholder="Persona de contacto" className="input-horeca" />
+            <div className="apple-glass rounded-2xl p-5 space-y-4">
+              <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Nuevo proveedor</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <Campo label="Nombre / Razón social">
+                  <input value={formProveedor.nombre} onChange={(e) => setFormProveedor({ ...formProveedor, nombre: e.target.value })} placeholder="Ej. Distribuidora Polar" className="input-horeca" />
+                </Campo>
+                <Campo label="RIF">
+                  <input value={formProveedor.rif} onChange={(e) => setFormProveedor({ ...formProveedor, rif: e.target.value })} placeholder="J-12345678-9" className="input-horeca" />
+                </Campo>
+                <Campo label="Teléfono">
+                  <input value={formProveedor.telefono} onChange={(e) => setFormProveedor({ ...formProveedor, telefono: e.target.value })} placeholder="0412-1234567" className="input-horeca" />
+                </Campo>
+                <Campo label="Persona de contacto">
+                  <input value={formProveedor.contacto} onChange={(e) => setFormProveedor({ ...formProveedor, contacto: e.target.value })} placeholder="Ej. Luis Pérez" className="input-horeca" />
+                </Campo>
               </div>
-              {error && <p className="text-xs text-red-500">{error}</p>}
+              {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
               <button onClick={crearProveedor} disabled={guardando} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
                 {guardando ? "Guardando…" : "Guardar proveedor"}
               </button>
@@ -1063,6 +1232,11 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
             <input value={f.costoUnitario} onChange={(e) => actualizarFila(idx, "costoUnitario", e.target.value)} type="number" step="0.01" placeholder="Costo unit. $" className="input-horeca" />
             <div>
               <input value={f.fechaVencimiento} onChange={(e) => actualizarFila(idx, "fechaVencimiento", e.target.value)} type="date" className="input-horeca w-full" title="Fecha de vencimiento (opcional)" />
+              {f.fechaVencimiento && (
+                <p className={`text-[10px] mt-1 font-semibold ${diasParaVencerTexto(f.fechaVencimiento).color}`}>
+                  {diasParaVencerTexto(f.fechaVencimiento).texto}
+                </p>
+              )}
             </div>
             <button onClick={() => quitarFila(idx)} disabled={filas.length === 1} className="p-2 text-slate-400 hover:text-red-500 disabled:opacity-30 cursor-pointer" title="Quitar fila">
               <IconTrash size={15} />
@@ -1165,7 +1339,7 @@ function Vencimientos({ tenantId, onCambio }: { tenantId: number; onCambio: () =
 // ══════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN
 // ══════════════════════════════════════════════════════════════════════════
-function Configuracion({ config, onGuardar }: { config: any; onGuardar: (c: any) => void }) {
+function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; config: any; onGuardar: (c: any) => void }) {
   const [form, setForm] = useState(config);
   const [guardado, setGuardado] = useState(false);
 
@@ -1176,21 +1350,393 @@ function Configuracion({ config, onGuardar }: { config: any; onGuardar: (c: any)
   };
 
   return (
-    <div className="apple-glass rounded-2xl p-6 max-w-lg space-y-4">
-      <Campo label="Nombre del local">
-        <input value={form.nombreLocal} onChange={(e) => setForm({ ...form, nombreLocal: e.target.value })} className="input-horeca" />
-      </Campo>
-      <div className="grid grid-cols-2 gap-3">
-        <Campo label="Tasa BCV (Bs.)">
-          <input value={form.tasaBCV} onChange={(e) => setForm({ ...form, tasaBCV: e.target.value })} type="number" step="0.01" className="input-horeca" />
+    <div className="space-y-5 max-w-lg">
+      <div className="apple-glass rounded-2xl p-6 space-y-4">
+        <Campo label="Nombre del local">
+          <input value={form.nombreLocal} onChange={(e) => setForm({ ...form, nombreLocal: e.target.value })} className="input-horeca" />
         </Campo>
-        <Campo label="Tasa COP">
-          <input value={form.tasaCOP} onChange={(e) => setForm({ ...form, tasaCOP: e.target.value })} type="number" className="input-horeca" />
-        </Campo>
+        <button onClick={guardar} className="g-aurora text-white text-sm font-semibold px-6 py-3 rounded-xl cursor-pointer">
+          {guardado ? "✓ Guardado" : "Guardar configuración"}
+        </button>
       </div>
-      <button onClick={guardar} className="g-aurora text-white text-sm font-semibold px-6 py-3 rounded-xl cursor-pointer">
-        {guardado ? "✓ Guardado" : "Guardar configuración"}
-      </button>
+
+      <TasasDeCambio tenantId={tenantId} />
+    </div>
+  );
+}
+
+function TasasDeCambio({ tenantId }: { tenantId: number }) {
+  const PARES = [
+    { origen: "USD", destino: "VES", label: "Dólar → Bolívar (BCV)" },
+    { origen: "USD", destino: "COP", label: "Dólar → Peso colombiano" },
+  ];
+
+  const [vigentes, setVigentes] = useState<Record<string, TasaCambio | null>>({});
+  const [nuevaTasa, setNuevaTasa] = useState<Record<string, string>>({});
+  const [guardando, setGuardando] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const clave = (o: string, d: string) => `${o}_${d}`;
+
+  const cargar = () => {
+    PARES.forEach((p) => {
+      tasaVigente(tenantId, p.origen, p.destino)
+        .then((t) => setVigentes((prev) => ({ ...prev, [clave(p.origen, p.destino)]: t })))
+        .catch(() => setVigentes((prev) => ({ ...prev, [clave(p.origen, p.destino)]: null })));
+    });
+  };
+  useEffect(() => { cargar(); }, [tenantId]);
+
+  const actualizar = async (par: typeof PARES[number]) => {
+    const k = clave(par.origen, par.destino);
+    const valor = Number(nuevaTasa[k]);
+    if (!valor || valor <= 0) { setError("Ingresa una tasa válida mayor a cero"); return; }
+    setError(null);
+    setGuardando(k);
+    try {
+      await actualizarTasa(tenantId, { monedaOrigen: par.origen, monedaDestino: par.destino, tasa: valor, origen: "MANUAL" });
+      setNuevaTasa((prev) => ({ ...prev, [k]: "" }));
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo actualizar la tasa");
+    } finally {
+      setGuardando(null);
+    }
+  };
+
+  return (
+    <div className="apple-glass rounded-2xl p-6 space-y-4">
+      <div>
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Tasas de cambio del día</h3>
+        <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">Se guarda un historial — nunca se sobreescribe la tasa anterior, siempre se usa la más reciente.</p>
+      </div>
+
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      <div className="space-y-3">
+        {PARES.map((p) => {
+          const k = clave(p.origen, p.destino);
+          const vigente = vigentes[k];
+          return (
+            <div key={k} className="flex items-center gap-3 flex-wrap bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
+              <div className="flex-1 min-w-[140px]">
+                <div className="text-xs font-semibold text-slate-700 dark:text-white/70">{p.label}</div>
+                <div className="text-[11px] text-slate-500 dark:text-white/40 font-mono mt-0.5">
+                  {vigente ? `Vigente: ${Number(vigente.tasa).toFixed(2)}` : "Sin tasa registrada"}
+                </div>
+              </div>
+              <input
+                value={nuevaTasa[k] || ""}
+                onChange={(e) => setNuevaTasa((prev) => ({ ...prev, [k]: e.target.value }))}
+                type="number" step="0.01" placeholder="Nueva tasa"
+                className="input-horeca w-32"
+              />
+              <button onClick={() => actualizar(p)} disabled={guardando === k}
+                className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+                {guardando === k ? "Guardando…" : "Actualizar"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// VENTA RÁPIDA — para lo que no pasa por una mesa (mostrador, para llevar)
+// ══════════════════════════════════════════════════════════════════════════
+function VentaRapida({ tenantId, escandallos, fastbar, onVenta }: {
+  tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; onVenta: (monto: number, metodo: string) => void;
+}) {
+  interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; estacionCocina?: string }
+  const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
+  const [nombreManual, setNombreManual] = useState("");
+  const [precioManual, setPrecioManual] = useState("");
+  const [metodoPago, setMetodoPago] = useState("EFECTIVO");
+  const [procesando, setProcesando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [exito, setExito] = useState(false);
+
+  const agregarAlCarrito = (linea: Omit<LineaCarrito, "cantidad">) => {
+    setCarrito((prev) => {
+      const existente = prev.find((l) => l.key === linea.key);
+      if (existente) return prev.map((l) => (l.key === linea.key ? { ...l, cantidad: l.cantidad + 1 } : l));
+      return [...prev, { ...linea, cantidad: 1 }];
+    });
+  };
+  const cambiarCantidad = (key: string, delta: number) => {
+    setCarrito((prev) => prev.map((l) => (l.key === key ? { ...l, cantidad: Math.max(1, l.cantidad + delta) } : l)).filter((l) => l.cantidad > 0));
+  };
+  const quitarLinea = (key: string) => setCarrito((prev) => prev.filter((l) => l.key !== key));
+
+  const total = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0);
+
+  const cobrar = async () => {
+    if (carrito.length === 0) return;
+    setError(null);
+    setProcesando(true);
+    try {
+      const comanda = await abrirComanda(tenantId, { mesero: "Mostrador", canal: "RECOGER_EN_TIENDA" });
+      for (const linea of carrito) {
+        await agregarItemComanda(tenantId, comanda.id, {
+          escandalloId: linea.escandalloId,
+          nombrePlato: linea.nombre,
+          estacionCocina: linea.estacionCocina,
+          cantidad: linea.cantidad,
+          precioUnitario: linea.precio,
+        });
+      }
+      await cerrarComanda(tenantId, comanda.id, { metodoPago });
+      onVenta(total, metodoPago);
+      setCarrito([]);
+      setExito(true);
+      setTimeout(() => setExito(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo procesar la venta");
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+      {/* Catálogo rápido */}
+      <div className="space-y-4">
+        <p className="text-xs text-slate-500 dark:text-white/40">Toca un producto para agregarlo — ideal para ventas de mostrador que no pasan por una mesa.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {(escandallos || []).map((e) => (
+            <button key={`plato-${e.id}`}
+              onClick={() => agregarAlCarrito({ key: `plato-${e.id}`, nombre: e.nombrePlato, precio: Number(e.precioVenta), escandalloId: e.id, estacionCocina: e.estacionCocina })}
+              className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
+              <div className="font-bold text-sm text-slate-900 dark:text-white">{e.nombrePlato}</div>
+              <div className="text-xs text-teal-600 dark:text-teal-400 font-mono mt-1">${Number(e.precioVenta).toFixed(2)}</div>
+            </button>
+          ))}
+          {(fastbar || []).map((t) => (
+            <button key={`trago-${t.id}`}
+              onClick={() => agregarAlCarrito({ key: `trago-${t.id}`, nombre: t.nombreTrago, precio: Number(t.precioVenta), estacionCocina: "BAR" })}
+              className="apple-glass rounded-xl p-4 text-left hover-card cursor-pointer">
+              <div className="font-bold text-sm text-slate-900 dark:text-white">{t.nombreTrago}</div>
+              <div className="text-xs text-teal-600 dark:text-teal-400 font-mono mt-1">${Number(t.precioVenta).toFixed(2)}</div>
+            </button>
+          ))}
+        </div>
+
+        <div className="apple-glass rounded-xl p-4 space-y-2.5">
+          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Producto suelto (no registrado en Recetas/Fast-Bar)</p>
+          <div className="flex items-center gap-2">
+            <input value={nombreManual} onChange={(e) => setNombreManual(e.target.value)} placeholder="Ej. Doritos, Refresco…" className="input-horeca flex-1" />
+            <input value={precioManual} onChange={(e) => setPrecioManual(e.target.value)} type="number" step="0.01" placeholder="Precio $" className="input-horeca w-28" />
+            <button
+              onClick={() => {
+                if (!nombreManual.trim() || !precioManual) return;
+                agregarAlCarrito({ key: `manual-${Date.now()}`, nombre: nombreManual.trim(), precio: Number(precioManual), estacionCocina: "COCINA" });
+                setNombreManual(""); setPrecioManual("");
+              }}
+              className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer whitespace-nowrap">
+              + Agregar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Carrito / cobro */}
+      <div className="apple-glass rounded-2xl p-5 space-y-4 h-fit sticky top-4">
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Venta actual</h3>
+        {carrito.length === 0 ? (
+          <p className="text-xs text-slate-400">Agrega productos del catálogo o uno suelto.</p>
+        ) : (
+          <div className="space-y-2">
+            {carrito.map((l) => (
+              <div key={l.key} className="flex items-center justify-between gap-2 bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{l.nombre}</div>
+                  <div className="text-[10px] text-slate-500 dark:text-white/40 font-mono">${l.precio.toFixed(2)} c/u</div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => cambiarCantidad(l.key, -1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer">−</button>
+                  <span className="text-xs font-bold w-5 text-center">{l.cantidad}</span>
+                  <button onClick={() => cambiarCantidad(l.key, 1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer">+</button>
+                </div>
+                <button onClick={() => quitarLinea(l.key)} className="text-slate-400 hover:text-red-500 cursor-pointer"><IconTrash size={13} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-2 border-t border-slate-300/50 dark:border-white/10 font-bold text-slate-900 dark:text-white">
+          <span>Total</span><span className="font-mono">${total.toFixed(2)}</span>
+        </div>
+
+        <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} className="input-horeca">
+          <option value="EFECTIVO">Efectivo</option>
+          <option value="TARJETA">Tarjeta</option>
+          <option value="TRANSFERENCIA">Transferencia</option>
+          <option value="BILLETERA_DIGITAL">Billetera digital</option>
+        </select>
+
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <button onClick={cobrar} disabled={procesando || carrito.length === 0}
+          className="w-full btn-cyber-neon text-white text-sm font-bold py-3.5 rounded-xl cursor-pointer disabled:opacity-50">
+          {procesando ? "Procesando…" : exito ? "✓ Venta registrada" : `Cobrar $${total.toFixed(2)}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// INGRESOS & GASTOS
+// ══════════════════════════════════════════════════════════════════════════
+function Finanzas({ tenantId }: { tenantId: number }) {
+  const [movimientos, setMovimientos] = useState<MovimientoCaja[] | null>(null);
+  const [form, setForm] = useState({ tipo: "EGRESO" as "INGRESO" | "EGRESO", monto: "", moneda: "USD", concepto: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  const cargar = () => {
+    listarMovimientos(tenantId).then((lista) => setMovimientos(lista.filter((m) => m.tipo === "INGRESO" || m.tipo === "EGRESO"))).catch(() => setMovimientos([]));
+  };
+  useEffect(() => { cargar(); }, [tenantId]);
+
+  const registrar = async () => {
+    setError(null);
+    if (!form.monto || Number(form.monto) <= 0) { setError("Ingresa un monto válido"); return; }
+    if (!form.concepto.trim()) { setError("Describe el concepto del movimiento"); return; }
+    setGuardando(true);
+    try {
+      await registrarMovimiento(tenantId, { tipo: form.tipo, monto: Number(form.monto), moneda: form.moneda, concepto: form.concepto.trim() });
+      setForm({ tipo: form.tipo, monto: "", moneda: form.moneda, concepto: "" });
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar el movimiento");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const totalIngresos = (movimientos || []).filter((m) => m.tipo === "INGRESO").reduce((s, m) => s + Number(m.monto), 0);
+  const totalEgresos = (movimientos || []).filter((m) => m.tipo === "EGRESO").reduce((s, m) => s + Number(m.monto), 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <KpiCard label="Total Ingresos" val={`$${totalIngresos.toFixed(2)}`} sub="Histórico registrado" color="#10b981" />
+        <KpiCard label="Total Gastos" val={`$${totalEgresos.toFixed(2)}`} sub="Histórico registrado" color="#ef4444" />
+      </div>
+
+      <div className="apple-glass rounded-2xl p-5 space-y-3">
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Registrar movimiento</h3>
+        <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+          {(["EGRESO", "INGRESO"] as const).map((t) => (
+            <button key={t} onClick={() => setForm({ ...form, tipo: t })}
+              className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer ${form.tipo === t ? (t === "EGRESO" ? "bg-red-500 text-white" : "bg-teal-600 text-white") : "text-slate-600 dark:text-white/60"}`}>
+              {t === "EGRESO" ? "Gasto" : "Ingreso"}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <input value={form.monto} onChange={(e) => setForm({ ...form, monto: e.target.value })} type="number" step="0.01" placeholder="Monto" className="input-horeca" />
+          <select value={form.moneda} onChange={(e) => setForm({ ...form, moneda: e.target.value })} className="input-horeca">
+            {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <input value={form.concepto} onChange={(e) => setForm({ ...form, concepto: e.target.value })} placeholder="Concepto (ej. Pago de electricidad)" className="input-horeca sm:col-span-2" />
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <button onClick={registrar} disabled={guardando} className="g-aurora text-white text-xs font-semibold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+          {guardando ? "Guardando…" : "Registrar"}
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Historial</h3>
+        {movimientos === null ? (
+          <p className="text-xs text-slate-400">Cargando…</p>
+        ) : movimientos.length === 0 ? (
+          <p className="text-xs text-slate-400">Sin movimientos registrados todavía.</p>
+        ) : (
+          movimientos.map((m) => (
+            <div key={m.id} className="flex items-center justify-between apple-glass rounded-xl px-4 py-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-white">{m.concepto}</div>
+                <div className="text-[10px] text-slate-400">{new Date(m.fechaRegistro).toLocaleString()}</div>
+              </div>
+              <span className={`font-mono text-sm font-bold ${m.tipo === "INGRESO" ? "text-teal-600 dark:text-teal-400" : "text-red-500"}`}>
+                {m.tipo === "INGRESO" ? "+" : "−"}{Number(m.monto).toFixed(2)} {m.moneda}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// CUENTAS POR COBRAR / PAGAR
+// ══════════════════════════════════════════════════════════════════════════
+function CuentasPorCobrarPagar({ tenantId }: { tenantId: number }) {
+  const [tab, setTab] = useState<"CXC" | "CXP">("CXP");
+  const [cxc, setCxc] = useState<MovimientoCaja[] | null>(null);
+  const [cxp, setCxp] = useState<MovimientoCaja[] | null>(null);
+
+  useEffect(() => {
+    listarMovimientos(tenantId, "CXC").then(setCxc).catch(() => setCxc([]));
+    listarMovimientos(tenantId, "CXP").then(setCxp).catch(() => setCxp([]));
+  }, [tenantId]);
+
+  const activos = tab === "CXC" ? cxc : cxp;
+  const totalesPorMoneda = (activos || []).reduce<Record<string, number>>((acc, m) => {
+    acc[m.moneda] = (acc[m.moneda] || 0) + Number(m.monto);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+        <button onClick={() => setTab("CXP")}
+          className={`px-5 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === "CXP" ? "bg-red-500 text-white" : "text-slate-600 dark:text-white/60"}`}>
+          Por Pagar ({(cxp || []).length})
+        </button>
+        <button onClick={() => setTab("CXC")}
+          className={`px-5 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === "CXC" ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
+          Por Cobrar ({(cxc || []).length})
+        </button>
+      </div>
+
+      {Object.keys(totalesPorMoneda).length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {Object.entries(totalesPorMoneda).map(([moneda, total]) => (
+            <div key={moneda} className="apple-glass rounded-xl px-5 py-3">
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Total en {moneda}</div>
+              <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{total.toFixed(2)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activos === null ? (
+        <p className="text-xs text-slate-400">Cargando…</p>
+      ) : activos.length === 0 ? (
+        <div className="apple-glass rounded-2xl p-8 text-center">
+          <p className="text-slate-500 dark:text-white/40 text-sm">
+            {tab === "CXP" ? "Sin cuentas por pagar pendientes." : "Sin cuentas por cobrar pendientes."}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {activos.map((m) => (
+            <div key={m.id} className={`flex items-center justify-between rounded-xl px-4 py-3.5 border-l-4 apple-glass ${tab === "CXP" ? "border-red-500/50" : "border-teal-500/50"}`}>
+              <div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-white">{m.concepto}</div>
+                <div className="text-[10px] text-slate-400">{new Date(m.fechaRegistro).toLocaleString()}</div>
+              </div>
+              <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">{Number(m.monto).toFixed(2)} {m.moneda}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

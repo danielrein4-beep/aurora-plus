@@ -55,6 +55,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+// Para endpoints que devuelven texto plano (ej. GET .../moneda-base responde
+// "USD" sin comillas, Content-Type text/plain) — request() con .json() falla
+// a parsear eso y el error queda silenciado por el try/catch del llamador.
+async function requestText(path: string, options: RequestInit = {}): Promise<string> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = { ...(options.headers as Record<string, string> | undefined) };
+  if (sesion?.token) {
+    headers["Authorization"] = `Bearer ${sesion.token}`;
+  }
+  const res = await fetch(path, { ...options, headers });
+  if (!res.ok) throw new ApiError(`Error ${res.status}`);
+  return res.text();
+}
+
 // --- Autenticación ---
 
 export interface RegistroNegocio {
@@ -489,4 +503,85 @@ export interface LoteArticulo {
 
 export function alertasVencimiento(tenantId: number, diasAnticipacion = 7): Promise<LoteArticulo[]> {
   return request(`/api/inventario/lotes/alertas-vencimiento?tenantId=${tenantId}&diasAnticipacion=${diasAnticipacion}`);
+}
+
+// --- Comandas: historial e ítems (antes solo se podía crear/modificar, no consultar) ---
+
+export function listarComandas(tenantId: number, estado?: EstadoComanda): Promise<Comanda[]> {
+  const params = new URLSearchParams({ tenantId: String(tenantId) });
+  if (estado) params.set("estado", estado);
+  return request(`/api/horeca/comandas?${params}`);
+}
+
+export function obtenerComanda(tenantId: number, comandaId: number): Promise<Comanda> {
+  return request(`/api/horeca/comandas/${comandaId}?tenantId=${tenantId}`);
+}
+
+export function obtenerItemsComanda(tenantId: number, comandaId: number): Promise<ItemComanda[]> {
+  return request(`/api/horeca/comandas/${comandaId}/items?tenantId=${tenantId}`);
+}
+
+// --- Tesorería (genérico, cualquier vertical) ---
+
+export interface ResumenPeriodoAbierto {
+  desde: string;
+  hasta: string;
+  totalIngresos: number;
+  totalEgresos: number;
+  montoEsperadoEnCaja: number;
+  cantidadMovimientos: number;
+}
+
+export function resumenPeriodoAbierto(tenantId: number, moneda: string): Promise<ResumenPeriodoAbierto> {
+  return request(`/api/financiero/tesoreria/resumen-periodo-abierto?tenantId=${tenantId}&moneda=${moneda}`);
+}
+
+export function monedaBase(tenantId: number): Promise<string> {
+  return requestText(`/api/financiero/tasas/moneda-base?tenantId=${tenantId}`);
+}
+
+export interface TasaCambio {
+  id: number;
+  tenantId: number;
+  monedaOrigen: string;
+  monedaDestino: string;
+  tasa: number;
+  origen: string;
+  fechaActualizacion: string;
+}
+
+export function tasaVigente(tenantId: number, monedaOrigen: string, monedaDestino: string): Promise<TasaCambio> {
+  return request(`/api/financiero/tasas/vigente?tenantId=${tenantId}&monedaOrigen=${monedaOrigen}&monedaDestino=${monedaDestino}`);
+}
+
+export function actualizarTasa(tenantId: number, datos: { monedaOrigen: string; monedaDestino: string; tasa: number; origen?: string }): Promise<TasaCambio> {
+  return request(`/api/financiero/tasas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export type TipoMovimientoCaja = "INGRESO" | "EGRESO" | "CXC" | "CXP";
+
+export interface MovimientoCaja {
+  id: number;
+  tenantId: number;
+  tipo: TipoMovimientoCaja;
+  monto: number;
+  moneda: string;
+  concepto: string;
+  fechaRegistro: string;
+}
+
+export function registrarMovimiento(tenantId: number, datos: { tipo: "INGRESO" | "EGRESO"; monto: number; moneda: string; concepto: string }): Promise<MovimientoCaja> {
+  return request(`/api/financiero/movimientos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function listarMovimientos(tenantId: number, tipo?: TipoMovimientoCaja): Promise<MovimientoCaja[]> {
+  const params = new URLSearchParams({ tenantId: String(tenantId) });
+  if (tipo) params.set("tipo", tipo);
+  return request(`/api/financiero/movimientos?${params}`);
+}
+
+// --- Licenciamiento: contratar una vertical adicional sobre el mismo tenant ---
+
+export function agregarModulo(moduloNombre: string): Promise<{ moduloNombre: string; activo: boolean }> {
+  return request(`/api/config/mi-negocio/agregar-modulo`, { method: "POST", body: JSON.stringify({ moduloNombre }) });
 }

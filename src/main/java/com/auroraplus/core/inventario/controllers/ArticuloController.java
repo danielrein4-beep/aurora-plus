@@ -58,6 +58,15 @@ public class ArticuloController {
     @PostMapping
     public ResponseEntity<Articulo> crear(@RequestParam Long tenantId, @RequestBody Articulo articulo) {
         articulo.setTenantId(tenantId);
+        // porcentajeImpuesto y categoria son NOT NULL en la base — sin un valor
+        // por defecto acá, cualquier alta que no los mande (ej. el formulario
+        // rápido de artículos en Horeca) revienta con 500 en vez de un error claro.
+        if (articulo.getPorcentajeImpuesto() == null) {
+            articulo.setPorcentajeImpuesto(BigDecimal.ZERO);
+        }
+        if (articulo.getCategoria() == null || articulo.getCategoria().isBlank()) {
+            articulo.setCategoria("General");
+        }
         return ResponseEntity.ok(articuloRepository.save(articulo));
     }
 

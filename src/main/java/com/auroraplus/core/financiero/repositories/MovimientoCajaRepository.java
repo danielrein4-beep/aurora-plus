@@ -23,4 +23,8 @@ public interface MovimientoCajaRepository extends JpaRepository<MovimientoCaja, 
 
     List<MovimientoCaja> findByTenantIdAndMonedaAndFechaRegistroBetweenOrderByFechaRegistroAsc(
         Long tenantId, String moneda, LocalDateTime desde, LocalDateTime hasta);
+
+    List<MovimientoCaja> findByTenantIdOrderByFechaRegistroDesc(Long tenantId);
+
+    List<MovimientoCaja> findByTenantIdAndTipoOrderByFechaRegistroDesc(Long tenantId, MovimientoCaja.TipoMovimiento tipo);
 }
