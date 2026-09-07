@@ -442,7 +442,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   const intentarNavegar = (p: Pagina) => {
     const esProtegida = p === "historias" || p === "financiero" || p === "configuracion";
-    if (rolActivo === "SECRETARIA" && esProtegida) {
+    // Si el usuario autenticado es el Doctor, tiene acceso total sin pedir PIN
+    if (perfilActivo !== "MEDICO" && rolActivo === "SECRETARIA" && esProtegida) {
       setModalClaveDoctor(true);
       setAccionPendienteDoctor(() => () => {
         setRolActivo("MEDICO");
@@ -456,6 +457,11 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   };
 
   const intentarCambiarRol = (nuevoRol: RolVista) => {
+    // Si el Doctor está en su perfil autenticado, cambia de vista libremente sin pedir PIN
+    if (perfilActivo === "MEDICO") {
+      setRolActivo(nuevoRol);
+      return;
+    }
     if (nuevoRol === "MEDICO" && rolActivo === "SECRETARIA") {
       setModalClaveDoctor(true);
       setAccionPendienteDoctor(() => () => {
@@ -626,7 +632,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         <div className="space-y-1">
           {NAV.map((n) => {
             const activo = pagina === n.id;
-            const esProtegida = rolActivo === "SECRETARIA" && (n.id === "historias" || n.id === "financiero" || n.id === "configuracion");
+            const esProtegida = perfilActivo !== "MEDICO" && rolActivo === "SECRETARIA" && (n.id === "historias" || n.id === "financiero" || n.id === "configuracion");
 
             return (
               <button
