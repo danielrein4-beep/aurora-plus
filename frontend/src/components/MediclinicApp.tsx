@@ -721,26 +721,30 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-xs">
-              <button
-                onClick={() => intentarCambiarRol("MEDICO")}
-                className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  rolActivo === "MEDICO" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
-                }`}
-              >
-                <IconStethoscope size={13} />
-                <span>Médico</span>
-              </button>
-              <button
-                onClick={() => intentarCambiarRol("SECRETARIA")}
-                className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  rolActivo === "SECRETARIA" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
-                }`}
-              >
-                <IconFileText size={13} />
-                <span>Secretaria</span>
-              </button>
-            </div>
+            {perfilActivo === "MEDICO" && (
+              <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-xs">
+                <button
+                  onClick={() => intentarCambiarRol("MEDICO")}
+                  className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    rolActivo === "MEDICO" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
+                  }`}
+                  title="Cambiar a vista de Médico Titular"
+                >
+                  <IconStethoscope size={13} />
+                  <span>Médico</span>
+                </button>
+                <button
+                  onClick={() => intentarCambiarRol("SECRETARIA")}
+                  className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    rolActivo === "SECRETARIA" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
+                  }`}
+                  title="Supervisar vista de Secretaría y Sala de Espera"
+                >
+                  <IconFileText size={13} />
+                  <span>Secretaria</span>
+                </button>
+              </div>
+            )}
 
             <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/70 dark:bg-white/5 border border-slate-300/60 dark:border-white/15 shadow-sm text-xs">
               <span className="font-bold text-slate-700 dark:text-white/80 flex items-center gap-1.5">
