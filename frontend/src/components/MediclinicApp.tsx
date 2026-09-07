@@ -5294,8 +5294,8 @@ function AgendaMedica({
       celdas.push({ dia: i, fechaIso, mesActual: true, esHoy: fechaIso === hoyStr });
     }
 
-    // Días mes siguiente para completar la cuadrícula de 35 o 42 celdas
-    const totalCeldas = celdas.length <= 35 ? 35 : 42;
+    // Días mes siguiente para completar la cuadrícula estándar fija de 42 celdas (6 semanas)
+    const totalCeldas = 42;
     const restantes = totalCeldas - celdas.length;
     for (let i = 1; i <= restantes; i++) {
       const mesSig = mesActual === 11 ? 0 : mesActual + 1;
@@ -5350,22 +5350,22 @@ function AgendaMedica({
           </div>
         </div>
 
-        {/* Controles de Navegación del Calendario */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10">
+        {/* Controles de Navegación del Calendario con Ancho Fijo para Estabilidad Total */}
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shrink-0">
             <button
               type="button"
               onClick={mesAnterior}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-white/80 hover:bg-white dark:hover:bg-white/10 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-white/80 hover:bg-white dark:hover:bg-white/10 transition-all flex items-center gap-1 cursor-pointer shadow-xs shrink-0 select-none"
               title="Mes Anterior"
             >
-              <span>◀</span>
+              <IconChevronLeft size={13} />
               <span>Anterior</span>
             </button>
             <button
               type="button"
               onClick={irAHoy}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-white/15 text-teal-600 dark:text-teal-300 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-white/15 text-teal-600 dark:text-teal-300 transition-all flex items-center gap-1 cursor-pointer shadow-xs shrink-0 select-none"
               title="Ir a la fecha de hoy"
             >
               <IconCalendar size={13} />
@@ -5374,15 +5374,15 @@ function AgendaMedica({
             <button
               type="button"
               onClick={mesSiguiente}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-white/80 hover:bg-white dark:hover:bg-white/10 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-white/80 hover:bg-white dark:hover:bg-white/10 transition-all flex items-center gap-1 cursor-pointer shadow-xs shrink-0 select-none"
               title="Mes Siguiente"
             >
               <span>Siguiente</span>
-              <span>▶</span>
+              <IconChevronRight size={13} />
             </button>
           </div>
 
-          <div className="font-['Outfit'] font-black text-lg sm:text-xl text-sky-600 dark:text-sky-400 pl-2">
+          <div className="w-48 text-right font-['Outfit'] font-black text-lg sm:text-xl text-sky-600 dark:text-sky-400 shrink-0 select-none truncate">
             {MESES_NOMBRES[mesActual]} {añoActual}
           </div>
         </div>
