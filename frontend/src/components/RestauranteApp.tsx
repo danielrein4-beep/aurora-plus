@@ -219,7 +219,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     alertasVencimiento(tenantId, 7).then(setLotesPorVencer).catch(() => setLotesPorVencer([]));
     tasaVigente(tenantId, "USD", "VES").then(setTasaBcv).catch(() => setTasaBcv(null));
     cargarVentasHoy();
-    Promise.all(ESTACIONES.map((e) => obtenerTableroKds(e).catch(() => [])))
+    Promise.all(ESTACIONES.map((e) => obtenerTableroKds(tenantId, e).catch(() => [])))
       .then((listas) => setKdsCounts(listas.reduce((sum, l) => sum + l.filter((i) => i.estadoItem !== "ENTREGADO").length, 0)))
       .catch(() => setKdsCounts(0));
   };
@@ -332,7 +332,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
               escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
           )}
-          {pagina === "cocina" && <Cocina onCambio={recargarTodo} />}
+          {pagina === "cocina" && <Cocina tenantId={tenantId} onCambio={recargarTodo} />}
           {pagina === "recetas" && <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} onCambio={recargarTodo} />}
           {pagina === "fastbar" && <FastBar tenantId={tenantId} fastbar={fastbar} onVenta={registrarVenta} onCambio={recargarTodo} />}
           {pagina === "compras" && (
@@ -1192,14 +1192,14 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
 // ══════════════════════════════════════════════════════════════════════════
 // COCINA (KDS)
 // ══════════════════════════════════════════════════════════════════════════
-function Cocina({ onCambio }: { onCambio: () => void }) {
+function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void }) {
   const [estacion, setEstacion] = useState(ESTACIONES[0]);
   const [items, setItems] = useState<ItemComanda[] | null>(null);
 
   const cargar = () => {
-    obtenerTableroKds(estacion).then(setItems).catch(() => setItems([]));
+    obtenerTableroKds(tenantId, estacion).then(setItems).catch(() => setItems([]));
   };
-  useEffect(() => { cargar(); }, [estacion]);
+  useEffect(() => { cargar(); }, [estacion, tenantId]);
 
   const avanzar = async (item: ItemComanda) => {
     const siguiente: Record<EstadoItemComanda, EstadoItemComanda | null> = {
@@ -1388,7 +1388,7 @@ function IngredientesModal({ tenantId, escandallo, articulos, onClose, onCambio 
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
-  const cargar = () => listarIngredientesEscandallo(escandallo.id).then(setIngredientes).catch(() => setIngredientes([]));
+  const cargar = () => listarIngredientesEscandallo(tenantId, escandallo.id).then(setIngredientes).catch(() => setIngredientes([]));
   useEffect(() => { cargar(); }, [escandallo.id]);
 
   const agregar = async () => {

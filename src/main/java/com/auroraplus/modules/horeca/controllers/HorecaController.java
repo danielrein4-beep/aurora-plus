@@ -115,8 +115,8 @@ public class HorecaController {
     }
 
     @GetMapping("/kds/{estacionCocina}")
-    public ResponseEntity<List<ItemComanda>> obtenerTableroKds(@PathVariable String estacionCocina) {
-        return ResponseEntity.ok(horecaService.obtenerTableroKds(estacionCocina));
+    public ResponseEntity<List<ItemComanda>> obtenerTableroKds(@PathVariable String estacionCocina, @RequestParam Long tenantId) {
+        return ResponseEntity.ok(horecaService.obtenerTableroKds(tenantId, estacionCocina));
     }
 
     /** Utilidad por producto del día (o de la fecha indicada) — para el resumen diario de Administración. */

@@ -52,8 +52,12 @@ public class ArticuloController {
     }
 
     @GetMapping("/{id}")
-    public Articulo obtener(@PathVariable Long id) {
-        return articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
+    public Articulo obtener(@PathVariable Long id, @RequestParam Long tenantId) {
+        Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
+        if (!articulo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
+        }
+        return articulo;
     }
 
     @GetMapping("/sku/{sku}")
@@ -201,7 +205,11 @@ public class ArticuloController {
     }
 
     @GetMapping("/{id}/kardex")
-    public List<Kardex> kardex(@PathVariable Long id) {
+    public List<Kardex> kardex(@PathVariable Long id, @RequestParam Long tenantId) {
+        Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
+        if (!articulo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
+        }
         return kardexRepository.findByArticuloIdOrderByIdDesc(id);
     }
 }

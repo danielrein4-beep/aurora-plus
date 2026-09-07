@@ -737,8 +737,8 @@ export function actualizarEstadoItem(tenantId: number, itemId: number, nuevoEsta
   return request(`/api/horeca/mesas/items/${itemId}/estado?tenantId=${tenantId}&nuevoEstado=${nuevoEstado}`, { method: "PATCH" });
 }
 
-export function obtenerTableroKds(estacionCocina: string): Promise<ItemComanda[]> {
-  return request(`/api/horeca/mesas/kds/${encodeURIComponent(estacionCocina)}`);
+export function obtenerTableroKds(tenantId: number, estacionCocina: string): Promise<ItemComanda[]> {
+  return request(`/api/horeca/mesas/kds/${encodeURIComponent(estacionCocina)}?tenantId=${tenantId}`);
 }
 
 export interface ResumenUtilidadProducto {
@@ -852,8 +852,8 @@ export function agregarIngredienteEscandallo(tenantId: number, escandalloId: num
   return request(`/api/horeca/escandallos/${escandalloId}/ingredientes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function listarIngredientesEscandallo(escandalloId: number): Promise<DetalleReceta[]> {
-  return request(`/api/horeca/escandallos/${escandalloId}/ingredientes`);
+export function listarIngredientesEscandallo(tenantId: number, escandalloId: number): Promise<DetalleReceta[]> {
+  return request(`/api/horeca/escandallos/${escandalloId}/ingredientes?tenantId=${tenantId}`);
 }
 
 export interface FastBarTrago {

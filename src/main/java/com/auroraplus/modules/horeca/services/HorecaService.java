@@ -524,8 +524,8 @@ public class HorecaService {
     /**
      * Tablero KDS: lista los ítems pendientes de despacho (no ENTREGADO) para una estación de cocina.
      */
-    public List<ItemComanda> obtenerTableroKds(String estacionCocina) {
-        return itemComandaRepository.findByEstacionCocinaAndEstadoItemNot(estacionCocina, ItemComanda.EstadoItem.ENTREGADO);
+    public List<ItemComanda> obtenerTableroKds(Long tenantId, String estacionCocina) {
+        return itemComandaRepository.findByTenantIdAndEstacionCocinaAndEstadoItemNot(tenantId, estacionCocina, ItemComanda.EstadoItem.ENTREGADO);
     }
 
     /**

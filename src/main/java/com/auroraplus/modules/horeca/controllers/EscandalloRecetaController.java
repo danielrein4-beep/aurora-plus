@@ -43,8 +43,13 @@ public class EscandalloRecetaController {
     }
 
     @GetMapping("/{id}")
-    public EscandalloReceta obtener(@PathVariable Long id) {
-        return escandalloRecetaRepository.findById(id).orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
+    public EscandalloReceta obtener(@PathVariable Long id, @RequestParam Long tenantId) {
+        EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
+        if (!escandallo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Escandallo no pertenece a este tenant");
+        }
+        return escandallo;
     }
 
     public static class CrearEscandalloRequest {
@@ -119,8 +124,16 @@ public class EscandalloRecetaController {
         return ResponseEntity.ok(escandalloService.recalcularCosto(id, tenantId));
     }
 
+    // CRÍTICO (fuga entre tenants, hallada en producción): faltaba tenantId y
+    // la validación de que la receta sea de este tenant — cualquier cuenta
+    // podía leer el escandallo/costeo de CUALQUIER otro tenant adivinando el id.
     @GetMapping("/{id}/ingredientes")
-    public List<DetalleReceta> listarIngredientes(@PathVariable Long id) {
+    public List<DetalleReceta> listarIngredientes(@PathVariable Long id, @RequestParam Long tenantId) {
+        EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
+        if (!escandallo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Escandallo no pertenece a este tenant");
+        }
         return detalleRecetaRepository.findByEscandalloId(id);
     }
 
