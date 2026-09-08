@@ -2825,16 +2825,24 @@ function HistoriasClinicas({
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-white/10">
               <button
                 type="button"
-                onClick={() => handleDescargarPdfConsulta(consultaDetalle)}
-                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                onClick={() => {
+                  const c = consultaDetalle;
+                  setConsultaDetalle(null);
+                  handleDescargarPdfConsulta(c);
+                }}
+                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
               >
                 <IconFileText size={14} />
-                <span>Descargar PDF</span>
+                <span>Ver Informe / Imprimir</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleEnviarWhatsAppConsulta(consultaDetalle)}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                onClick={() => {
+                  const c = consultaDetalle;
+                  setConsultaDetalle(null);
+                  handleEnviarWhatsAppConsulta(c);
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
               >
                 <IconBank size={14} />
                 <span>WhatsApp</span>
