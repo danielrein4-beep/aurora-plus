@@ -18,6 +18,7 @@ export interface CobroItem {
 export interface CierreCajaData {
   clinicaNombre: string;
   doctorNombre: string;
+  responsableNombre?: string;
   fecha: string;
   horaCierre: string;
   tasaBCV: number;
@@ -547,20 +548,24 @@ export function generarPdfCotizacion(data: CotizacionData) {
 // 4. GENERADORES DE TEXTO PARA WHATSAPP & CORREO
 // ══════════════════════════════════════════════════════════════════════════
 export function generarTextoWhatsAppConsulta(data: ConsultaReportData): string {
+  let docNombre = (data.doctorNombre || "").trim() || "Médico Titular";
+  if (!docNombre.toLowerCase().startsWith("dr")) {
+    docNombre = `Dr(a). ${docNombre}`;
+  }
+
   const lineas = [
-    `🏥 *${data.clinicaNombre || "Centro Médico Especializado"}*`,
-    `📋 *Informe de Consulta Médica*`,
+    `*Informe de Consulta Médica*`,
     `━━━━━━━━━━━━━━━━━━`,
-    `👤 *Paciente:* ${data.paciente.nombreCompleto}`,
-    `🆔 *Cédula:* ${data.paciente.identificacion} | *Edad:* ${data.paciente.edad} años`,
-    `📅 *Fecha:* ${data.paciente.fechaConsulta}`,
-    `🩺 *Médico:* Dr(a). ${data.doctorNombre} (${data.especialidad})`,
+    `*Paciente:* ${data.paciente.nombreCompleto}`,
+    `*Cédula:* ${data.paciente.identificacion} | *Edad:* ${data.paciente.edad} años`,
+    `*Fecha:* ${data.paciente.fechaConsulta}`,
+    `*Médico:* ${docNombre}${data.especialidad ? ` (${data.especialidad})` : ""}`,
     ``,
-    `🔍 *Diagnóstico:* ${data.diagnosticoCIE10 || "Evaluación Médica"}`,
+    `*Diagnóstico:* ${data.diagnosticoCIE10 || "Evaluación Médica"}`,
     ``,
-    `💊 *Indicaciones y Tratamiento (Rx):*`,
+    `*Indicaciones y Tratamiento (Rx):*`,
     `${data.planTratamiento || "Seguir recomendaciones dadas en consulta."}`,
-    data.proximaCita ? `\n🗓️ *Próximo Control:* ${data.proximaCita}` : "",
+    data.proximaCita ? `\n*Próximo Control:* ${data.proximaCita}` : "",
     `━━━━━━━━━━━━━━━━━━`,
     `_Conserve este mensaje para su control médico._`,
   ];
@@ -580,19 +585,23 @@ export function generarTextoEmailConsulta(data: ConsultaReportData): { subject: 
 }
 
 export function generarTextoWhatsAppCierre(data: CierreCajaData): string {
+  const nombreRaw = (data.responsableNombre || data.doctorNombre || "Recepción y Caja").trim();
+  const responsable = nombreRaw
+    .replace(/^Dr\(a\)\.?\s*/i, "")
+    .replace(/^Dra?\.?\s*/i, "");
+
   const lineas = [
-    `🏥 *${data.clinicaNombre || "Centro Médico"}*`,
-    `📊 *Auditoría y Cierre de Caja Diario*`,
+    `*Auditoría y Cierre de Caja Diario*`,
     `━━━━━━━━━━━━━━━━━━`,
-    `📅 *Fecha:* ${data.fecha} | ⏰ *Hora:* ${data.horaCierre}`,
-    `👨‍⚕️ *Responsable:* ${data.doctorNombre}`,
-    `👥 *Total Pacientes:* ${data.totalPacientes}`,
+    `*Fecha:* ${data.fecha} | *Hora:* ${data.horaCierre}`,
+    `*Responsable:* ${responsable}`,
+    `*Total Pacientes:* ${data.totalPacientes}`,
     `━━━━━━━━━━━━━━━━━━`,
-    `💵 *Dólares en Caja:* $${(data.totalUSD || 0).toFixed(2)} USD`,
-    `🇻🇪 *Bolívares en Caja:* Bs. ${(data.totalVES || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
-    (data.totalCOP || 0) > 0 ? `🇨🇴 *Pesos COP en Caja:* $${(data.totalCOP || 0).toLocaleString("es-CO")} COP` : "",
-    `📌 *Tasa BCV Aplicada:* Bs. ${(data.tasaBCV || 0).toFixed(2)}`,
-    data.observaciones ? `\n📝 *Observaciones:* ${data.observaciones}` : "",
+    `*Dólares en Caja:* $${(data.totalUSD || 0).toFixed(2)} USD`,
+    `*Bolívares en Caja:* Bs. ${(data.totalVES || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
+    (data.totalCOP || 0) > 0 ? `*Pesos COP en Caja:* $${(data.totalCOP || 0).toLocaleString("es-CO")} COP` : "",
+    `*Tasa BCV Aplicada:* Bs. ${(data.tasaBCV || 0).toFixed(2)}`,
+    data.observaciones ? `\n*Observaciones:* ${data.observaciones}` : "",
     `━━━━━━━━━━━━━━━━━━`,
     `_Cierre de caja generado automáticamente._`,
   ];
@@ -616,27 +625,22 @@ export function generarTextoEmailCierre(data: CierreCajaData): { subject: string
 
 export function generarTextoWhatsAppCotizacion(data: CotizacionData): string {
   const itemsTexto = (data.items || [])
-    .map((it) => `• *${it.nombre}*: $${(it.costoUSD || 0).toFixed(2)} USD / Bs. ${(it.costoVES || 0).toFixed(2)}`)
+    .map((it) => `• *${it.nombre}*: $${(it.costoUSD || 0).toFixed(2)} USD`)
     .join("\n");
 
   const lineas = [
-    `🏥 *${data.clinicaNombre || "Centro Médico"}*`,
-    `📄 *Presupuesto de Procedimientos Médicos*`,
+    `*Presupuesto de Procedimientos Médicos*`,
     `━━━━━━━━━━━━━━━━━━`,
-    `👤 *Paciente:* ${data.pacienteNombre} (C.I: ${data.pacienteCedula})`,
-    `📅 *Fecha de Emisión:* ${data.fecha}`,
-    data.fechaPlanificada ? `🗓️ *Fecha Planificada:* ${data.fechaPlanificada}` : "",
+    `*Paciente:* ${data.pacienteNombre} (C.I: ${data.pacienteCedula})`,
+    `*Fecha de Emisión:* ${data.fecha}`,
+    data.fechaPlanificada ? `*Fecha Planificada:* ${data.fechaPlanificada}` : "",
     `━━━━━━━━━━━━━━━━━━`,
-    `🔬 *Procedimientos:*`,
+    `*Procedimientos:*`,
     itemsTexto,
     `━━━━━━━━━━━━━━━━━━`,
-    `💵 *Total Estimado (USD):* $${(data.totalUSD || 0).toFixed(2)} USD`,
-    `🇻🇪 *Total Estimado (VES):* Bs. ${(data.totalVES || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
-    (data.totalCOP || 0) > 0 ? `🇨🇴 *Total Estimado (COP):* $${(data.totalCOP || 0).toLocaleString("es-CO")} COP` : "",
-    `📌 *Tasa BCV:* Bs. ${(data.tasaBCV || 0).toFixed(2)}`,
-    data.observaciones ? `\n📝 *Observaciones:* ${data.observaciones}` : "",
+    `*Total Estimado (USD):* $${(data.totalUSD || 0).toFixed(2)} USD`,
+    data.observaciones ? `\n*Observaciones:* ${data.observaciones}` : "",
     `━━━━━━━━━━━━━━━━━━`,
-    `_Validez del presupuesto: 15 días continuos._`,
   ];
   return lineas.filter(Boolean).join("\n");
 }

@@ -385,6 +385,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       const raw = localStorage.getItem(CONFIG_PERFIL_KEY);
       return raw ? JSON.parse(raw) : {
         doctorNombre: user?.nombre || "Dr. Mario Roa",
+        secretariaNombre: "Recepción / Asistente",
         especialidad: "Medicina General / Especialista",
         matriculaMPPS: "109842",
         colegioMedicos: "5421",
@@ -396,6 +397,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     } catch {
       return {
         doctorNombre: user?.nombre || "Dr. Mario Roa",
+        secretariaNombre: "Recepción / Asistente",
         especialidad: "Medicina General / Especialista",
         matriculaMPPS: "109842",
         colegioMedicos: "5421",
@@ -5997,7 +5999,8 @@ function ResumenesFinancieros({
               onClick={() => {
                 const dataHoy: CierreCajaData = {
                   clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
-                  doctorNombre: config?.doctorNombre || "Dr. Médico",
+                  doctorNombre: config?.doctorNombre || "Dr. Mario Roa",
+                  responsableNombre: config?.secretariaNombre || (rol === "SECRETARIA" ? "Recepción / Asistente" : config?.doctorNombre) || "Recepción y Caja",
                   fecha: hoy(),
                   horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                   tasaBCV: config?.tasaBCV || 56.4,
@@ -6138,7 +6141,13 @@ function ResumenesFinancieros({
                     <button
                       onClick={() => {
                         if (onVerDocumento) {
-                          onVerDocumento({ tipo: "CIERRE_CAJA", data: cierre });
+                          onVerDocumento({
+                            tipo: "CIERRE_CAJA",
+                            data: {
+                              ...cierre,
+                              responsableNombre: config?.secretariaNombre || cierre.responsableNombre || cierre.doctorNombre,
+                            },
+                          });
                         } else {
                           generarPdfCierreCaja(cierre);
                         }
@@ -6238,6 +6247,10 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
           <div>
             <label className="text-[10px] text-slate-400 uppercase font-mono">Matrícula MPPS *</label>
             <input value={form.matriculaMPPS} onChange={(e) => setForm({ ...form, matriculaMPPS: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-400 uppercase font-mono">Nombre de la Secretaria / Recepción</label>
+            <input value={form.secretariaNombre || ""} onChange={(e) => setForm({ ...form, secretariaNombre: e.target.value })} placeholder="Ej. Ana Pérez" className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
           </div>
           <div className="sm:col-span-2">
             <label className="text-[10px] text-slate-400 uppercase font-mono">Colegio de Médicos</label>
