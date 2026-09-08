@@ -14,6 +14,9 @@ import {
   generarTextoWhatsAppCotizacion,
   generarTextoEmailCotizacion,
   abrirWhatsAppDirecto,
+  abrirWhatsAppWebDirecto,
+  abrirWhatsAppAppDirecto,
+  formatearTelefonoParaWhatsApp,
 } from "../utils/pdfReports";
 
 export type TipoDocumento = "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION";
@@ -619,19 +622,48 @@ export default function DocumentoPreviewModal({
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400 max-h-32 overflow-y-auto whitespace-pre-wrap font-mono">
               {obtenerTextoResumen()}
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-800">
               <button
-                onClick={() => setModalCompartir(null)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+                type="button"
+                onClick={handleCopiarTexto}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors"
+                title="Copiar texto del documento"
               >
-                Cancelar
+                Copiar Texto
               </button>
-              <button
-                onClick={handleEnviarWhatsApp}
-                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition-colors shadow-md flex items-center gap-1.5"
-              >
-                <span>Abrir en WhatsApp</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalCompartir(null)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const texto = obtenerTextoResumen();
+                    abrirWhatsAppAppDirecto(telefonoWhatsApp, texto);
+                    setModalCompartir(null);
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/50 cursor-pointer transition-colors"
+                  title="Abrir a través de WhatsApp Desktop App"
+                >
+                  App Escritorio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const texto = obtenerTextoResumen();
+                    abrirWhatsAppWebDirecto(telefonoWhatsApp, texto);
+                    setModalCompartir(null);
+                  }}
+                  className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition-colors shadow-md flex items-center gap-1.5"
+                  title="Abrir chat directo en WhatsApp Web (Navegador)"
+                >
+                  <span>WhatsApp Web</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

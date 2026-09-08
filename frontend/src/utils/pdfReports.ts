@@ -818,11 +818,30 @@ export function formatearTelefonoParaWhatsApp(telRaw: string, codigoPaisManual?:
   return digits;
 }
 
-export function abrirWhatsAppDirecto(telefono: string, texto: string, codigoPaisManual?: string) {
+export function abrirWhatsAppWebDirecto(telefono: string, texto: string, codigoPaisManual?: string) {
   const telFormateado = formatearTelefonoParaWhatsApp(telefono, codigoPaisManual);
   const textoCodificado = encodeURIComponent(texto);
   const url = telFormateado
-    ? `https://wa.me/${telFormateado}?text=${textoCodificado}`
-    : `https://wa.me/?text=${textoCodificado}`;
-  window.open(url, "_blank");
+    ? `https://web.whatsapp.com/send?phone=${telFormateado}&text=${textoCodificado}`
+    : `https://web.whatsapp.com/send?text=${textoCodificado}`;
+  try {
+    navigator.clipboard.writeText(texto);
+  } catch {}
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+export function abrirWhatsAppAppDirecto(telefono: string, texto: string, codigoPaisManual?: string) {
+  const telFormateado = formatearTelefonoParaWhatsApp(telefono, codigoPaisManual);
+  const textoCodificado = encodeURIComponent(texto);
+  const url = telFormateado
+    ? `https://api.whatsapp.com/send/?phone=${telFormateado}&text=${textoCodificado}`
+    : `https://api.whatsapp.com/send/?text=${textoCodificado}`;
+  try {
+    navigator.clipboard.writeText(texto);
+  } catch {}
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+export function abrirWhatsAppDirecto(telefono: string, texto: string, codigoPaisManual?: string) {
+  abrirWhatsAppWebDirecto(telefono, texto, codigoPaisManual);
 }
