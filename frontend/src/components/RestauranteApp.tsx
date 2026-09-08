@@ -452,8 +452,6 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
         </div>
         )}
-        </div>
-        )}
       </main>
 
       {bloqueoTasa && (
