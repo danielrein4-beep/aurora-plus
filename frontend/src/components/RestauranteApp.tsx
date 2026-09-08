@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { createPortal } from "react-dom";
 import {
   AuroraGradientDef,
@@ -7,11 +7,12 @@ import {
   IconBolt, IconBank, IconChart, IconDownload, IconLock, IconRocket, IconChevronLeft, IconChevronRight,
 } from "../Icons";
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useAuth } from "../context/AuthContext";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
-  dividirCuenta, cerrarComandaMixto, listarEscandallos, crearEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo,
+  dividirCuenta, cerrarComandaMixto, anularComanda, listarEscandallos, crearEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo,
   listarIngredientesEscandallo, listarFastBar,
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
@@ -137,11 +138,14 @@ function EstiloClasico() {
       /* El sitio sigue en tema oscuro por debajo (solo estos overrides simulan
          "claro") — sin esto, las clases dark:text-white/N ganan por
          especificidad sobre las claras y quedan invisibles en fondo blanco. */
+      .horeca-clasico .dark\\:text-white\\/90 { color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; }
       .horeca-clasico .dark\\:text-white\\/80 { color: #1e293b !important; -webkit-text-fill-color: #1e293b !important; }
       .horeca-clasico .dark\\:text-white\\/70 { color: #334155 !important; -webkit-text-fill-color: #334155 !important; }
       .horeca-clasico .dark\\:text-white\\/60 { color: #475569 !important; -webkit-text-fill-color: #475569 !important; }
       .horeca-clasico .dark\\:text-white\\/50 { color: #64748b !important; -webkit-text-fill-color: #64748b !important; }
       .horeca-clasico .dark\\:text-white\\/40 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
+      .horeca-clasico .dark\\:text-white\\/30 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
+      .horeca-clasico .dark\\:text-white { color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; }
       .horeca-clasico .btn-cyber-neon {
         background: linear-gradient(135deg, #0ea5e9, #0d9488 65%, #8b5cf6) !important;
         box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
@@ -196,6 +200,19 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
       return nuevo;
     });
   };
+  // Todos los <Modal> de este módulo se renderizan con un portal directo a
+  // document.body (para escapar de cualquier ancestro con backdrop-filter,
+  // ver ModalTasaRequerida/ComandaDetalle) — eso también los saca del
+  // subárbol de este <div className="horeca-clasico">, así que ninguno de
+  // los overrides de EstiloClasico (que dependen de un ancestro con esa
+  // clase) les llegaba: quedaban con texto blanco sobre fondo blanco. Se
+  // replica la clase en <body> mientras este módulo esté montado en Modo
+  // Clásico, y se retira siempre al salir para no afectar al Hub u otras
+  // verticales que comparten el mismo <body>.
+  useEffect(() => {
+    document.body.classList.toggle("horeca-clasico", modoClasico);
+    return () => { document.body.classList.remove("horeca-clasico"); };
+  }, [modoClasico]);
 
   // Los ítems de una comanda abierta no tienen endpoint de "listar" en el backend
   // (solo el tablero de cocina por estación) — se acumulan aquí al agregarlos,
@@ -401,6 +418,8 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             <VistaGeneral
               tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
               ventasHoy={ventasHoy} nombreLocal={config.nombreLocal} tasaValida={tasaValida}
+              cargosPorDefecto={{ ...CARGOS_POR_DEFECTO, ...(config.cargosPorDefecto || {}) }}
+              impuestosPorDefecto={{ ...IMPUESTOS_POR_DEFECTO, ...(config.impuestosPorDefecto || {}) }}
               onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
               onRegistrarTasa={() => setBloqueoTasa(true)}
               onArticuloActualizado={actualizarArticuloEnEstado} />
@@ -665,11 +684,13 @@ function KpiCard({ label, val, sub, color, onClick }: { label: string; val: stri
  * posible sin que nada le compita por la pantalla.
  */
 function VistaGeneral({
-  tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, tasaValida, onVenta, onRegistrarTasa, onArticuloActualizado,
+  tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, tasaValida,
+  cargosPorDefecto, impuestosPorDefecto, onVenta, onRegistrarTasa, onArticuloActualizado,
 }: {
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
   tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
-  tasaValida: boolean; onVenta: (monto: number, metodo: string) => void; onRegistrarTasa: () => void;
+  tasaValida: boolean; cargosPorDefecto: typeof CARGOS_POR_DEFECTO; impuestosPorDefecto: typeof IMPUESTOS_POR_DEFECTO;
+  onVenta: (monto: number, metodo: string) => void; onRegistrarTasa: () => void;
   onArticuloActualizado: (articulo: Articulo) => void;
 }) {
   return (
@@ -677,7 +698,8 @@ function VistaGeneral({
       <VentaRapida
         embebido tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos}
         tasaBcv={tasaBcv} tasaCop={tasaCop} ventasHoy={ventasHoy} nombreLocal={nombreLocal}
-        tasaValida={tasaValida} onRegistrarTasa={onRegistrarTasa} onVenta={onVenta}
+        tasaValida={tasaValida} cargosPorDefecto={cargosPorDefecto} impuestosPorDefecto={impuestosPorDefecto}
+        onRegistrarTasa={onRegistrarTasa} onVenta={onVenta}
         onArticuloActualizado={onArticuloActualizado}
       />
     </div>
@@ -3036,8 +3058,18 @@ function Vencimientos({ tenantId, onCambio }: { tenantId: number; onCambio: () =
 // ══════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN
 // ══════════════════════════════════════════════════════════════════════════
+// Valores de fábrica de cargos e impuestos — el negocio los ajusta una vez
+// acá y desde ese momento aparecen como chips listos para aplicar (o no) en
+// cada venta, sin tener que escribir el monto/porcentaje cada vez.
+const CARGOS_POR_DEFECTO = { propinaPct: 10, deliveryMonto: 2, empaqueMonto: 0.5, comisionPct: 3 };
+const IMPUESTOS_POR_DEFECTO = { ivaPct: 16, igtfPct: 3 };
+
 function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; config: any; onGuardar: (c: any) => void }) {
-  const [form, setForm] = useState(config);
+  const [form, setForm] = useState({
+    ...config,
+    cargosPorDefecto: { ...CARGOS_POR_DEFECTO, ...(config.cargosPorDefecto || {}) },
+    impuestosPorDefecto: { ...IMPUESTOS_POR_DEFECTO, ...(config.impuestosPorDefecto || {}) },
+  });
   const [guardado, setGuardado] = useState(false);
 
   const guardar = () => {
@@ -3055,6 +3087,49 @@ function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; conf
         <button onClick={guardar} className="g-aurora text-white text-sm font-semibold px-6 py-3 rounded-xl cursor-pointer">
           {guardado ? "✓ Guardado" : "Guardar configuración"}
         </button>
+      </div>
+
+      <div className="apple-glass rounded-2xl p-6 space-y-4">
+        <div>
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Cargos por defecto</h3>
+          <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">Valores listos para agregar con un clic al cerrar una venta — el cajero puede ajustarlos ahí si un caso puntual lo requiere.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label="Propina sugerida (%)">
+            <input type="number" step="0.5" min="0" value={form.cargosPorDefecto.propinaPct}
+              onChange={(e) => setForm({ ...form, cargosPorDefecto: { ...form.cargosPorDefecto, propinaPct: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+          <Campo label="Comisión de pago (%)">
+            <input type="number" step="0.5" min="0" value={form.cargosPorDefecto.comisionPct}
+              onChange={(e) => setForm({ ...form, cargosPorDefecto: { ...form.cargosPorDefecto, comisionPct: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+          <Campo label="Delivery ($)">
+            <input type="number" step="0.25" min="0" value={form.cargosPorDefecto.deliveryMonto}
+              onChange={(e) => setForm({ ...form, cargosPorDefecto: { ...form.cargosPorDefecto, deliveryMonto: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+          <Campo label="Empaque ($)">
+            <input type="number" step="0.10" min="0" value={form.cargosPorDefecto.empaqueMonto}
+              onChange={(e) => setForm({ ...form, cargosPorDefecto: { ...form.cargosPorDefecto, empaqueMonto: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+        </div>
+      </div>
+
+      <div className="apple-glass rounded-2xl p-6 space-y-4">
+        <div>
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Impuestos</h3>
+          <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">El cajero decide en cada venta si aplica IVA y/o IGTF — acá solo se define el porcentaje que se usa cuando los active.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label="IVA (%)">
+            <input type="number" step="0.5" min="0" value={form.impuestosPorDefecto.ivaPct}
+              onChange={(e) => setForm({ ...form, impuestosPorDefecto: { ...form.impuestosPorDefecto, ivaPct: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+          <Campo label="IGTF (%)">
+            <input type="number" step="0.5" min="0" value={form.impuestosPorDefecto.igtfPct}
+              onChange={(e) => setForm({ ...form, impuestosPorDefecto: { ...form.impuestosPorDefecto, igtfPct: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+        </div>
+        <p className="text-[10px] text-slate-400">IGTF aplica típicamente a pagos en divisas (efectivo USD, tarjeta internacional) — actívalo según el método de pago de cada venta, no todas lo requieren.</p>
       </div>
 
       <TasasDeCambio tenantId={tenantId} />
@@ -3146,7 +3221,7 @@ function TasasDeCambio({ tenantId }: { tenantId: number }) {
 const CATEGORIA_RECETAS = "__RECETAS__";
 const CATEGORIA_FASTBAR = "__FASTBAR__";
 
-function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, onVenta, onCerrar, embebido, tasaValida, onRegistrarTasa, onArticuloActualizado }: {
+function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, cargosPorDefecto, impuestosPorDefecto, onVenta, onCerrar, embebido, tasaValida, onRegistrarTasa, onArticuloActualizado }: {
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
   tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
   onVenta: (monto: number, metodo: string) => void; onCerrar?: () => void;
@@ -3158,6 +3233,9 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   // lista de artículos en memoria con lo que devuelve el PUT, sin volver a
   // pedirla al backend.
   onArticuloActualizado?: (articulo: Articulo) => void;
+  // Valores de fábrica configurados en Configuración — el cajero solo
+  // decide si los activa en esta venta puntual, no los vuelve a escribir.
+  cargosPorDefecto?: typeof CARGOS_POR_DEFECTO; impuestosPorDefecto?: typeof IMPUESTOS_POR_DEFECTO;
 }) {
   interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
   interface ReciboVenta {
@@ -3170,6 +3248,16 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   }
 
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
+  // Cargos e impuestos: se guardan como interruptores, no como líneas fijas
+  // del carrito — así el monto (% sobre el subtotal de productos) siempre
+  // queda correcto aunque el cajero siga agregando o quitando platos
+  // después de activarlos.
+  const cargosCfg = cargosPorDefecto ?? CARGOS_POR_DEFECTO;
+  const impuestosCfg = impuestosPorDefecto ?? IMPUESTOS_POR_DEFECTO;
+  const [cargosActivos, setCargosActivos] = useState<Record<"propina" | "delivery" | "empaque" | "comision", boolean>>({
+    propina: false, delivery: false, empaque: false, comision: false,
+  });
+  const [impuestosActivos, setImpuestosActivos] = useState<Record<"iva" | "igtf", boolean>>({ iva: false, igtf: false });
   // Por debajo de "lg" no hay espacio para catálogo + comanda lado a lado
   // (el panel derecho necesita 300-420px mínimo) — se muestra un panel a la
   // vez con una pestaña para cambiar, en vez de aplastar el grid.
@@ -3309,7 +3397,28 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     setNombreLibre(""); setPrecioLibre(""); setCantidadLibre("1"); setMostrarProductoLibre(false);
   };
 
-  const total = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0);
+  const subtotalProductos = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0);
+
+  // Cargos: delivery/empaque son montos fijos por venta; propina/comisión
+  // son porcentaje sobre el subtotal de productos (nunca sobre otro cargo).
+  // Se marcan con estacionCocina "CARGOS" — un valor que no existe en
+  // ESTACIONES — para que nunca aparezcan como plato fantasma en el KDS.
+  const cargosLineas: LineaCarrito[] = [];
+  if (cargosActivos.propina) cargosLineas.push({ key: "cargo-propina", nombre: `Propina (${cargosCfg.propinaPct}%)`, precio: subtotalProductos * (cargosCfg.propinaPct / 100), cantidad: 1, estacionCocina: "CARGOS" });
+  if (cargosActivos.comision) cargosLineas.push({ key: "cargo-comision", nombre: `Comisión de pago (${cargosCfg.comisionPct}%)`, precio: subtotalProductos * (cargosCfg.comisionPct / 100), cantidad: 1, estacionCocina: "CARGOS" });
+  if (cargosActivos.delivery) cargosLineas.push({ key: "cargo-delivery", nombre: "Delivery", precio: cargosCfg.deliveryMonto, cantidad: 1, estacionCocina: "CARGOS" });
+  if (cargosActivos.empaque) cargosLineas.push({ key: "cargo-empaque", nombre: "Empaque", precio: cargosCfg.empaqueMonto, cantidad: 1, estacionCocina: "CARGOS" });
+  const subtotalConCargos = subtotalProductos + cargosLineas.reduce((s, l) => s + l.precio, 0);
+
+  // Impuestos: el cajero decide en cada venta si esta transacción los lleva
+  // (ej. IGTF solo aplica a ciertos pagos en divisas) — el % es el que se
+  // configuró una vez en Configuración, no se reescribe cada vez.
+  const impuestosLineas: LineaCarrito[] = [];
+  if (impuestosActivos.iva) impuestosLineas.push({ key: "impuesto-iva", nombre: `IVA (${impuestosCfg.ivaPct}%)`, precio: subtotalConCargos * (impuestosCfg.ivaPct / 100), cantidad: 1, estacionCocina: "CARGOS" });
+  if (impuestosActivos.igtf) impuestosLineas.push({ key: "impuesto-igtf", nombre: `IGTF (${impuestosCfg.igtfPct}%)`, precio: subtotalConCargos * (impuestosCfg.igtfPct / 100), cantidad: 1, estacionCocina: "CARGOS" });
+
+  const lineasParaCobrar = [...carrito, ...cargosLineas, ...impuestosLineas];
+  const total = subtotalConCargos + impuestosLineas.reduce((s, l) => s + l.precio, 0);
 
   const cobrar = async (pagos: PagoParcial[], monedaVuelto: string) => {
     if (carrito.length === 0) return;
@@ -3317,7 +3426,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     setProcesando(true);
     try {
       const comanda = await abrirComanda(tenantId, { mesero: "Mostrador", canal: "RECOGER_EN_TIENDA", clienteId: clienteSel?.id });
-      for (const linea of carrito) {
+      for (const linea of lineasParaCobrar) {
         await agregarItemComanda(tenantId, comanda.id, {
           escandalloId: linea.escandalloId,
           articuloId: linea.articuloId,
@@ -3331,16 +3440,62 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
       const metodoResumen = resultado.comanda.metodoPago || "MIXTO";
       onVenta(total, metodoResumen);
       setRecibo({
-        comandaId: comanda.id, lineas: carrito, total, metodoPago: metodoResumen, fecha: new Date().toLocaleString(),
+        comandaId: comanda.id, lineas: lineasParaCobrar, total, metodoPago: metodoResumen, fecha: new Date().toLocaleString(),
         totalRecibido: resultado.totalRecibidoBase, vuelto: resultado.vueltoEnMonedaVuelto, monedaVuelto: resultado.monedaVuelto,
       });
       setCarrito([]);
+      setCargosActivos({ propina: false, delivery: false, empaque: false, comision: false });
+      setImpuestosActivos({ iva: false, igtf: false });
       setClienteSel(null); setBusquedaCliente("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo procesar la venta");
     } finally {
       setProcesando(false);
     }
+  };
+
+  // Cotización/presupuesto: un PDF con el mismo carrito, pero sin abrir
+  // comanda ni tocar inventario o caja — el cliente todavía no compró nada,
+  // solo se lleva un precio por escrito. Válida un número de días fijo
+  // porque los precios en el negocio cambian con el tipo de cambio.
+  const generarCotizacion = () => {
+    if (lineasParaCobrar.length === 0) return;
+    const doc = new jsPDF();
+    const hoyFmt = new Date().toLocaleDateString("es-VE");
+    const vencimiento = new Date(); vencimiento.setDate(vencimiento.getDate() + 7);
+
+    doc.setFontSize(16); doc.setFont("helvetica", "bold");
+    doc.text(nombreLocal, 14, 18);
+    doc.setFontSize(11); doc.setFont("helvetica", "normal");
+    doc.text("Cotización de venta", 14, 26);
+    doc.setFontSize(9); doc.setTextColor(100);
+    doc.text(`Fecha: ${hoyFmt}    Válida hasta: ${vencimiento.toLocaleDateString("es-VE")}`, 14, 32);
+    if (clienteSel) doc.text(`Cliente: ${clienteSel.nombre}${clienteSel.identificacionRif ? " · " + clienteSel.identificacionRif : ""}`, 14, 37);
+    doc.setTextColor(0);
+
+    let y = clienteSel ? 46 : 42;
+    doc.setFontSize(9); doc.setFont("helvetica", "bold");
+    doc.text("Cant.", 14, y); doc.text("Descripción", 32, y); doc.text("P. Unit.", 150, y, { align: "right" }); doc.text("Subtotal", 196, y, { align: "right" });
+    y += 2; doc.setDrawColor(200); doc.line(14, y, 196, y); y += 6;
+    doc.setFont("helvetica", "normal");
+    lineasParaCobrar.forEach((l) => {
+      doc.text(String(l.cantidad), 14, y);
+      doc.text(l.nombre, 32, y, { maxWidth: 110 });
+      doc.text(`$${l.precio.toFixed(2)}`, 150, y, { align: "right" });
+      doc.text(`$${(l.precio * l.cantidad).toFixed(2)}`, 196, y, { align: "right" });
+      y += 7;
+    });
+    y += 2; doc.line(140, y, 196, y); y += 7;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+    doc.text("Total:", 150, y, { align: "right" }); doc.text(`$${total.toFixed(2)}`, 196, y, { align: "right" });
+    if (tasaBcv && Number(tasaBcv.tasa) > 0) {
+      y += 6; doc.setFontSize(9); doc.setFont("helvetica", "normal");
+      doc.text(`≈ Bs. ${(total * Number(tasaBcv.tasa)).toFixed(2)} (tasa BCV ${Number(tasaBcv.tasa).toFixed(2)})`, 196, y, { align: "right" });
+    }
+    doc.setFontSize(8); doc.setTextColor(120);
+    doc.text("Esta cotización no constituye una venta ni afecta inventario o caja — los precios pueden variar según el tipo de cambio vigente al momento de la compra.", 14, 285, { maxWidth: 182 });
+
+    doc.save(`cotizacion_${nombreLocal.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   const verTicket = async () => {
@@ -3669,7 +3824,53 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               comprime, así el carrito largo scrollea por dentro en vez de
               aplastar este bloque contra el borde. */}
           <div className="shrink-0 p-4 border-t border-slate-300/50 dark:border-white/10 space-y-3">
+            {/* Cargos e impuestos: chips de un clic — el monto ya sale
+                calculado con los valores de Configuración, el cajero solo
+                decide si esta venta puntual los lleva. */}
+            {carrito.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  ["propina", `Propina ${cargosCfg.propinaPct}%`],
+                  ["comision", `Comisión ${cargosCfg.comisionPct}%`],
+                  ["delivery", `Delivery $${cargosCfg.deliveryMonto.toFixed(2)}`],
+                  ["empaque", `Empaque $${cargosCfg.empaqueMonto.toFixed(2)}`],
+                ] as const).map(([clave, label]) => (
+                  <button key={clave}
+                    onClick={() => setCargosActivos((prev) => ({ ...prev, [clave]: !prev[clave] }))}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border cursor-pointer transition-colors ${
+                      cargosActivos[clave] ? "bg-teal-600 border-teal-600 text-white" : "border-slate-300/60 dark:border-white/15 text-slate-500 dark:text-white/50"
+                    }`}>
+                    {cargosActivos[clave] ? "✓ " : "+ "}{label}
+                  </button>
+                ))}
+                {([
+                  ["iva", `IVA ${impuestosCfg.ivaPct}%`],
+                  ["igtf", `IGTF ${impuestosCfg.igtfPct}%`],
+                ] as const).map(([clave, label]) => (
+                  <button key={clave}
+                    onClick={() => setImpuestosActivos((prev) => ({ ...prev, [clave]: !prev[clave] }))}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border cursor-pointer transition-colors ${
+                      impuestosActivos[clave] ? "bg-amber-600 border-amber-600 text-white" : "border-slate-300/60 dark:border-white/15 text-slate-500 dark:text-white/50"
+                    }`}>
+                    {impuestosActivos[clave] ? "✓ " : "+ "}{label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div>
+              {(cargosLineas.length > 0 || impuestosLineas.length > 0) && (
+                <div className="space-y-0.5 mb-1.5">
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-white/40">
+                    <span>Subtotal</span><span className="font-mono">${subtotalProductos.toFixed(2)}</span>
+                  </div>
+                  {[...cargosLineas, ...impuestosLineas].map((l) => (
+                    <div key={l.key} className="flex items-center justify-between text-xs text-slate-500 dark:text-white/40">
+                      <span>{l.nombre}</span><span className="font-mono">${l.precio.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex items-center justify-between font-black text-2xl text-slate-900 dark:text-white">
                 <span className="text-sm font-bold text-slate-500 dark:text-white/40">Total</span><span className="font-mono">${total.toFixed(2)}</span>
               </div>
@@ -3685,7 +3886,13 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               )}
             </div>
             {carrito.length > 0 && (
-              <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
+              <>
+                <button onClick={generarCotizacion}
+                  className="w-full text-[11px] font-bold text-slate-500 dark:text-white/50 hover:text-teal-600 dark:hover:text-teal-300 cursor-pointer py-1">
+                  📄 Generar cotización (PDF) — no cobra ni descuenta inventario
+                </button>
+                <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
+              </>
             )}
           </div>
         </div>
@@ -3730,6 +3937,14 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 <div className="font-['Outfit'] font-bold text-slate-900 dark:text-white">Cobro exitoso</div>
                 <div className="text-xs text-slate-500 dark:text-white/40">{recibo.fecha}</div>
               </div>
+            </div>
+
+            {/* Identificador único de la venta — mismo folio ("COM-<id>")
+                que usa el reporte de tickets y que se necesita para anular,
+                reclamar o auditar esta venta puntual más adelante. */}
+            <div className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-lg px-3 py-2">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 dark:text-white/30">Nro. de venta</span>
+              <span className="font-mono font-bold text-sm text-slate-800 dark:text-white/90">COM-{recibo.comandaId}</span>
             </div>
 
             <div className="space-y-1.5">
@@ -3836,6 +4051,7 @@ function ModalClienteRapido({ tenantId, onClose, onCreado }: { tenantId: number;
 // genera el .xlsx, solo entrega el JSON ya filtrado.
 // ══════════════════════════════════════════════════════════════════════════
 function ReportesOperativos({ tenantId }: { tenantId: number }) {
+  const { user } = useAuth();
   const [fechaInicio, setFechaInicio] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10);
   });
@@ -3845,6 +4061,27 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
   const [tickets, setTickets] = useState<ReporteTicket[] | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Anulación: comandaId cuya fila tiene abierto el campo de motivo — nunca
+  // se anula con un solo clic, siempre hay que escribir por qué.
+  const [anulandoId, setAnulandoId] = useState<number | null>(null);
+  const [motivoAnular, setMotivoAnular] = useState("");
+  const [procesandoAnulacion, setProcesandoAnulacion] = useState(false);
+
+  const confirmarAnulacion = async (comandaId: number) => {
+    if (!motivoAnular.trim()) { setError("Indica el motivo de la anulación"); return; }
+    setProcesandoAnulacion(true);
+    setError(null);
+    try {
+      await anularComanda(tenantId, comandaId, { motivo: motivoAnular.trim(), usuario: user?.nombre });
+      setAnulandoId(null);
+      setMotivoAnular("");
+      buscar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo anular la venta");
+    } finally {
+      setProcesandoAnulacion(false);
+    }
+  };
 
   const buscar = () => {
     setCargando(true);
@@ -3944,25 +4181,56 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                   <th className="py-2 px-3 text-right">Total USD</th>
                   <th className="py-2 px-3 text-right">Total Bs</th>
                   <th className="py-2 px-3">Método de Pago</th>
-                  <th className="py-2 pl-3">Estado</th>
+                  <th className="py-2 px-3">Estado</th>
+                  <th className="py-2 pl-3 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {tickets.map((t) => (
-                  <tr key={t.comandaId} className="border-b border-slate-200/50 dark:border-white/5">
-                    <td className="py-2 pr-3 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fecha).toLocaleString()}</td>
-                    <td className="py-2 px-3 font-mono font-semibold text-slate-800 dark:text-white/80">{t.numeroTicket}</td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white/80">${Number(t.totalUsd).toFixed(2)}</td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.totalBs != null ? `Bs ${Number(t.totalBs).toFixed(2)}` : "—"}</td>
-                    <td className="py-2 px-3 text-slate-600 dark:text-white/60">{(t.metodoPago || "-").replace("_", " ")}</td>
-                    <td className="py-2 pl-3">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        t.estado === "PAGADA" ? "bg-teal-500/15 text-teal-600 dark:text-teal-300"
-                        : t.estado === "ANULADA" ? "bg-red-500/15 text-red-500"
-                        : "bg-amber-500/15 text-amber-600 dark:text-amber-300"
-                      }`}>{t.estado}</span>
-                    </td>
-                  </tr>
+                  <Fragment key={t.comandaId}>
+                    <tr className="border-b border-slate-200/50 dark:border-white/5">
+                      <td className="py-2 pr-3 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fecha).toLocaleString()}</td>
+                      <td className="py-2 px-3 font-mono font-semibold text-slate-800 dark:text-white/80">{t.numeroTicket}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white/80">${Number(t.totalUsd).toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.totalBs != null ? `Bs ${Number(t.totalBs).toFixed(2)}` : "—"}</td>
+                      <td className="py-2 px-3 text-slate-600 dark:text-white/60">{(t.metodoPago || "-").replace("_", " ")}</td>
+                      <td className="py-2 px-3">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          t.estado === "PAGADA" ? "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+                          : t.estado === "ANULADA" ? "bg-red-500/15 text-red-500"
+                          : "bg-amber-500/15 text-amber-600 dark:text-amber-300"
+                        }`}>{t.estado}</span>
+                      </td>
+                      <td className="py-2 pl-3 text-right">
+                        {t.estado !== "ANULADA" && (
+                          <button
+                            onClick={() => { setAnulandoId(anulandoId === t.comandaId ? null : t.comandaId); setMotivoAnular(""); setError(null); }}
+                            className="text-[11px] font-semibold text-red-500 hover:text-red-600 cursor-pointer"
+                          >
+                            Anular
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                    {anulandoId === t.comandaId && (
+                      <tr className="border-b border-slate-200/50 dark:border-white/5 bg-red-500/5">
+                        <td colSpan={7} className="px-3 py-2.5">
+                          <div className="flex items-center gap-2 max-w-lg ml-auto">
+                            <input
+                              value={motivoAnular} onChange={(e) => setMotivoAnular(e.target.value)} autoFocus
+                              placeholder={`Motivo de la anulación de ${t.numeroTicket} (obligatorio)`}
+                              className="input-horeca text-xs flex-1"
+                            />
+                            <button onClick={() => confirmarAnulacion(t.comandaId)} disabled={procesandoAnulacion}
+                              className="text-xs font-bold px-3 py-2 rounded-lg bg-red-500 text-white cursor-pointer disabled:opacity-60 flex-shrink-0">
+                              {procesandoAnulacion ? "Anulando…" : "Confirmar anulación"}
+                            </button>
+                            <button onClick={() => { setAnulandoId(null); setMotivoAnular(""); }} className="text-xs font-semibold text-slate-500 cursor-pointer flex-shrink-0">Cancelar</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
               <tfoot>
@@ -3970,7 +4238,7 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                   <td className="py-2 pr-3" colSpan={2}>Total</td>
                   <td className="py-2 px-3 text-right font-mono">${totales.usd.toFixed(2)}</td>
                   <td className="py-2 px-3 text-right font-mono">Bs {totales.bs.toFixed(2)}</td>
-                  <td colSpan={2}></td>
+                  <td colSpan={3}></td>
                 </tr>
               </tfoot>
             </table>

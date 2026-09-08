@@ -663,6 +663,9 @@ export interface Comanda {
   fechaApertura: string;
   metodoPago: string | null;
   fechaCierre: string | null;
+  motivoAnulacion: string | null;
+  fechaAnulacion: string | null;
+  anuladoPor: string | null;
 }
 
 export interface MapaMesaEntrada {
@@ -831,6 +834,13 @@ export function cerrarComandaMixto(tenantId: number, comandaId: number, pagos: P
     method: "POST",
     body: JSON.stringify(pagos),
   });
+}
+
+/** Anula una comanda ABIERTA o PAGADA: revierte inventario/recetas y, si ya estaba cobrada, también la caja. Nunca borra nada. */
+export function anularComanda(tenantId: number, comandaId: number, datos: { motivo: string; usuario?: string }): Promise<Comanda> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), motivo: datos.motivo });
+  if (datos.usuario) params.set("usuario", datos.usuario);
+  return request(`/api/horeca/mesas/comandas/${comandaId}/anular?${params}`, { method: "POST" });
 }
 
 export interface EscandalloReceta {
