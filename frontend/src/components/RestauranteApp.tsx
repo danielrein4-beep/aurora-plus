@@ -1986,7 +1986,7 @@ function Clientes({ tenantId }: { tenantId: number }) {
             <tbody>
               {clientes.map((c) => (
                 <tr key={c.id} onClick={() => setSeleccionado(c)} className="border-b border-slate-200/50 dark:border-white/5 hover:bg-teal-500/5 cursor-pointer">
-                  <td className="py-2.5 px-4 font-semibold text-slate-800 dark:text-white">{c.nombre}</td>
+                  <td className="py-2.5 px-4 font-semibold text-slate-800 dark:text-white/80">{c.nombre}</td>
                   <td className="py-2.5 px-4 text-slate-500 dark:text-white/50">{c.identificacionRif || "—"}</td>
                   <td className="py-2.5 px-4 text-slate-500 dark:text-white/50">{c.telefono || "—"}</td>
                   <td className="py-2.5 px-4 text-slate-500 dark:text-white/50">{new Date(c.fechaRegistro).toLocaleDateString()}</td>
@@ -2033,9 +2033,9 @@ function ModalDetalleCliente({ tenantId, cliente, onClose, onCambio }: { tenantI
     <Modal onClose={onClose} titulo={cliente.nombre} ancho="max-w-2xl">
       <div className="space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-          {cliente.identificacionRif && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Cédula/RIF</span><span className="text-slate-800 dark:text-white font-semibold">{cliente.identificacionRif}</span></div>}
-          {cliente.telefono && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Teléfono</span><span className="text-slate-800 dark:text-white font-semibold">{cliente.telefono}</span></div>}
-          {cliente.correo && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Correo</span><span className="text-slate-800 dark:text-white font-semibold">{cliente.correo}</span></div>}
+          {cliente.identificacionRif && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Cédula/RIF</span><span className="text-slate-800 dark:text-white/80 font-semibold">{cliente.identificacionRif}</span></div>}
+          {cliente.telefono && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Teléfono</span><span className="text-slate-800 dark:text-white/80 font-semibold">{cliente.telefono}</span></div>}
+          {cliente.correo && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Correo</span><span className="text-slate-800 dark:text-white/80 font-semibold">{cliente.correo}</span></div>}
         </div>
 
         <div className="grid grid-cols-3 gap-3">
@@ -2786,7 +2786,7 @@ function BuscadorArticulo({ articulos, articuloId, onSeleccionar }: {
               <button key={a.id} type="button"
                 onClick={() => { onSeleccionar(String(a.id)); setBusqueda(""); setAbierto(false); }}
                 className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer flex items-center justify-between gap-2">
-                <span className="font-semibold text-slate-800 dark:text-white truncate">{a.nombre}</span>
+                <span className="font-semibold text-slate-800 dark:text-white/80 truncate">{a.nombre}</span>
                 <span className="text-slate-400 font-mono flex-shrink-0">{a.sku}</span>
               </button>
             ))
@@ -3586,7 +3586,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                         <button key={c.id} type="button"
                           onClick={() => { setClienteSel(c); setBusquedaCliente(""); setResultadosCliente([]); }}
                           className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer">
-                          <div className="font-semibold text-slate-800 dark:text-white truncate">{c.nombre}</div>
+                          <div className="font-semibold text-slate-800 dark:text-white/80 truncate">{c.nombre}</div>
                           {c.identificacionRif && <div className="text-[10px] text-slate-400 truncate">{c.identificacionRif}</div>}
                         </button>
                       ))}
@@ -3919,8 +3919,8 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                 {tickets.map((t) => (
                   <tr key={t.comandaId} className="border-b border-slate-200/50 dark:border-white/5">
                     <td className="py-2 pr-3 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fecha).toLocaleString()}</td>
-                    <td className="py-2 px-3 font-mono font-semibold text-slate-800 dark:text-white">{t.numeroTicket}</td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white">${Number(t.totalUsd).toFixed(2)}</td>
+                    <td className="py-2 px-3 font-mono font-semibold text-slate-800 dark:text-white/80">{t.numeroTicket}</td>
+                    <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white/80">${Number(t.totalUsd).toFixed(2)}</td>
                     <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.totalBs != null ? `Bs ${Number(t.totalBs).toFixed(2)}` : "—"}</td>
                     <td className="py-2 px-3 text-slate-600 dark:text-white/60">{(t.metodoPago || "-").replace("_", " ")}</td>
                     <td className="py-2 pl-3">
@@ -4072,7 +4072,7 @@ function ResumenGeneral({ tenantId }: { tenantId: number }) {
               {ticketsDia.map((t) => (
                 <div key={t.comandaId} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2 text-xs">
                   <div className="min-w-0">
-                    <div className="font-semibold text-slate-800 dark:text-white truncate">{t.numeroTicket}</div>
+                    <div className="font-semibold text-slate-800 dark:text-white/80 truncate">{t.numeroTicket}</div>
                     <div className="text-[10px] text-slate-400">{new Date(t.fecha).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })} · {(t.metodoPago || "—").replace("_", " ")}</div>
                   </div>
                   <span className="font-mono font-semibold text-slate-900 dark:text-white flex-shrink-0">${Number(t.totalUsd).toFixed(2)}</span>
@@ -4493,7 +4493,7 @@ function ResumenDiario({ tenantId }: { tenantId: number }) {
             <tbody>
               {filas.map((f) => (
                 <tr key={f.nombrePlato} className="border-b border-slate-200/50 dark:border-white/5">
-                  <td className="py-2 pr-2 font-semibold text-slate-800 dark:text-white">{f.nombrePlato}</td>
+                  <td className="py-2 pr-2 font-semibold text-slate-800 dark:text-white/80">{f.nombrePlato}</td>
                   <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{f.cantidadVendida}</td>
                   <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">${Number(f.ingresoTotal).toFixed(2)}</td>
                   <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">${Number(f.costoTotal).toFixed(2)}</td>
