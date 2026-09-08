@@ -140,6 +140,11 @@ public class MotorFinancieroService {
             movimiento.setTasaAplicada(montoEnMonedaCobro.divide(montoBase, 6, RoundingMode.HALF_UP));
         }
 
+        if (tipo == MovimientoCaja.TipoMovimiento.CXC || tipo == MovimientoCaja.TipoMovimiento.CXP) {
+            movimiento.setSaldoPendiente(movimiento.getMonto());
+            movimiento.setEstado("PENDIENTE");
+        }
+
         return movimientoCajaRepository.save(movimiento);
     }
 
@@ -178,6 +183,62 @@ public class MotorFinancieroService {
             }
         }
 
+        if (tipo == MovimientoCaja.TipoMovimiento.CXC || tipo == MovimientoCaja.TipoMovimiento.CXP) {
+            movimiento.setSaldoPendiente(movimiento.getMonto());
+            movimiento.setEstado("PENDIENTE");
+        }
+
         return movimientoCajaRepository.save(movimiento);
+    }
+
+    /**
+     * Registra un abono (pago parcial o total) sobre una cuenta por pagar o
+     * por cobrar existente: sin esto, una CXP/CXC nacía y se quedaba en la
+     * lista para siempre — no había forma de anotar que ya se le pagó al
+     * proveedor, o que el cliente ya saldó su deuda. El abono además genera
+     * su propio movimiento real de caja (EGRESO si es CXP — plata que sale a
+     * pagarle al proveedor; INGRESO si es CXC — plata que entra del cliente),
+     * en la moneda en que efectivamente se entregó/recibió, para que el
+     * arqueo de caja del día lo vea igual que cualquier otro movimiento.
+     */
+    @Transactional
+    public MovimientoCaja abonarMovimiento(Long tenantId, Long movimientoId, BigDecimal montoAbono, String monedaAbono) {
+        MovimientoCaja cuenta = movimientoCajaRepository.findById(movimientoId)
+            .orElseThrow(() -> new RuntimeException("Movimiento no encontrado"));
+        if (!cuenta.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: movimiento no pertenece a este tenant");
+        }
+        if (cuenta.getTipo() != MovimientoCaja.TipoMovimiento.CXC && cuenta.getTipo() != MovimientoCaja.TipoMovimiento.CXP) {
+            throw new RuntimeException("Solo se puede abonar a una cuenta por cobrar o por pagar");
+        }
+        if ("PAGADO".equals(cuenta.getEstado())) {
+            throw new RuntimeException("Esta cuenta ya está saldada");
+        }
+        if (montoAbono == null || montoAbono.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("El monto del abono debe ser mayor a cero");
+        }
+
+        BigDecimal saldoActual = cuenta.getSaldoPendiente() != null ? cuenta.getSaldoPendiente() : cuenta.getMonto();
+        String monedaCuenta = cuenta.getMoneda();
+        String monedaEfectiva = (monedaAbono != null && !monedaAbono.isBlank()) ? monedaAbono : monedaCuenta;
+        BigDecimal montoAbonoEnMonedaCuenta = monedaEfectiva.equals(monedaCuenta)
+            ? montoAbono
+            : convertirMoneda(tenantId, montoAbono, monedaEfectiva, monedaCuenta);
+
+        BigDecimal nuevoSaldo = saldoActual.subtract(montoAbonoEnMonedaCuenta).setScale(2, RoundingMode.HALF_UP);
+        if (nuevoSaldo.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("El abono (" + montoAbonoEnMonedaCuenta + " " + monedaCuenta
+                + ") es mayor al saldo pendiente (" + saldoActual + " " + monedaCuenta + ")");
+        }
+        cuenta.setSaldoPendiente(nuevoSaldo);
+        if (nuevoSaldo.compareTo(new BigDecimal("0.01")) < 0) {
+            cuenta.setEstado("PAGADO");
+        }
+        movimientoCajaRepository.save(cuenta);
+
+        MovimientoCaja.TipoMovimiento tipoAbono = cuenta.getTipo() == MovimientoCaja.TipoMovimiento.CXP
+            ? MovimientoCaja.TipoMovimiento.EGRESO : MovimientoCaja.TipoMovimiento.INGRESO;
+        return registrarMovimientoEnMoneda(tenantId, tipoAbono, montoAbono, monedaEfectiva,
+            "Abono a: " + cuenta.getConcepto());
     }
 }

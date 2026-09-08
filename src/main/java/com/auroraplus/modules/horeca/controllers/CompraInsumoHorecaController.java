@@ -34,11 +34,15 @@ public class CompraInsumoHorecaController {
         public Long proveedorId;
         public String numeroFactura;
         public List<ItemCompraRequest> items;
+        public BigDecimal montoPagadoAhora; // opcional — null/0 = factura entera a crédito
+        public String monedaPago;
     }
 
+    // Sin tenantId acá, findAll() devolvía las compras de TODOS los tenants
+    // mezcladas — mismo hallazgo que en el historial de cierres de caja.
     @GetMapping
-    public List<CompraInsumoHoreca> listar() {
-        return compraInsumoHorecaRepository.findAllByOrderByFechaCompraDesc();
+    public List<CompraInsumoHoreca> listar(@RequestParam Long tenantId) {
+        return compraInsumoHorecaRepository.findByTenantIdOrderByFechaCompraDesc(tenantId);
     }
 
     @PostMapping
@@ -53,6 +57,7 @@ public class CompraInsumoHorecaController {
             item.fechaVencimiento = itemReq.fechaVencimiento;
             items.add(item);
         }
-        return ResponseEntity.ok(compraInsumoHorecaService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, items));
+        return ResponseEntity.ok(compraInsumoHorecaService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, items,
+            request.montoPagadoAhora, request.monedaPago));
     }
 }

@@ -28,7 +28,6 @@ public class LoteArticuloController {
     public List<LoteArticulo> alertasVencimiento(@RequestParam Long tenantId,
                                                   @RequestParam(required = false, defaultValue = "7") Integer diasAnticipacion) {
         LocalDate fechaLimite = LocalDate.now().plusDays(diasAnticipacion);
-        return loteArticuloRepository
-            .findByTenantIdAndFechaVencimientoIsNotNullAndFechaVencimientoLessThanEqualOrderByFechaVencimientoAsc(tenantId, fechaLimite);
+        return loteArticuloRepository.alertasVencimientoConStock(tenantId, fechaLimite);
     }
 }

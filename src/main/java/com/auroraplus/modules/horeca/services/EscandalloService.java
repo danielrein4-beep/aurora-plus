@@ -116,7 +116,7 @@ public class EscandalloService {
         }
 
         BigDecimal costoTotalConsumido = explotarIngredientes(escandallo, cantidadVendida, tenantId,
-            "Consumo por venta de plato: " + escandallo.getNombrePlato(), new HashSet<>());
+            "Consumo por venta de plato: " + escandallo.getNombrePlato(), Kardex.TipoOperacion.SALIDA, new HashSet<>());
 
         recalcularCosto(escandalloId, tenantId);
 
@@ -124,14 +124,39 @@ public class EscandalloService {
     }
 
     /**
-     * Descuenta del inventario cada línea de un escandallo multiplicada por
-     * `factor` (cuántas veces se está preparando esa receta). Si una línea es
-     * una sub-receta, se llama recursivamente con factor = factor *
-     * cantidadRequerida-de-esa-línea, propagando la explosión hasta llegar a
-     * artículos reales. `visitados` detecta ciclos (una sub-receta que se
-     * referencia a sí misma directa o indirectamente).
+     * Reverso exacto de {@link #registrarVentaPlato} — misma explosión
+     * recursiva de ingredientes, pero devolviendo cada uno al inventario
+     * (ENTRADA) en vez de consumirlo. Se usa al anular una venta ya cerrada:
+     * el plato nunca se comió, así que sus ingredientes vuelven a existir.
      */
-    private BigDecimal explotarIngredientes(EscandalloReceta escandallo, BigDecimal factor, Long tenantId, String motivo, Set<Long> visitados) {
+    @Transactional
+    public void revertirVentaPlato(Long escandalloId, Long tenantId, BigDecimal cantidadVendida) {
+        if (cantidadVendida == null || cantidadVendida.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("La cantidad a revertir debe ser mayor a cero");
+        }
+
+        EscandalloReceta escandallo = escandalloRecetaRepository.findById(escandalloId)
+            .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
+        if (!escandallo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Escandallo no pertenece a este tenant");
+        }
+
+        explotarIngredientes(escandallo, cantidadVendida, tenantId,
+            "Anulación de venta: " + escandallo.getNombrePlato(), Kardex.TipoOperacion.ENTRADA, new HashSet<>());
+
+        recalcularCosto(escandalloId, tenantId);
+    }
+
+    /**
+     * Descuenta o devuelve del inventario (según `tipoOperacion`) cada línea
+     * de un escandallo multiplicada por `factor` (cuántas veces se está
+     * preparando/deshaciendo esa receta). Si una línea es una sub-receta, se
+     * llama recursivamente con factor = factor * cantidadRequerida-de-esa-
+     * línea, propagando la explosión hasta llegar a artículos reales.
+     * `visitados` detecta ciclos (una sub-receta que se referencia a sí misma
+     * directa o indirectamente).
+     */
+    private BigDecimal explotarIngredientes(EscandalloReceta escandallo, BigDecimal factor, Long tenantId, String motivo, Kardex.TipoOperacion tipoOperacion, Set<Long> visitados) {
         if (!visitados.add(escandallo.getId())) {
             throw new RuntimeException("Referencia circular de sub-recetas detectada en el escandallo " + escandallo.getId());
         }
@@ -150,7 +175,7 @@ public class EscandalloService {
 
                 if (detalle.getSubReceta() != null) {
                     costoTotal = costoTotal.add(
-                        explotarIngredientes(detalle.getSubReceta(), cantidadEfectiva, tenantId, motivo, visitados));
+                        explotarIngredientes(detalle.getSubReceta(), cantidadEfectiva, tenantId, motivo, tipoOperacion, visitados));
                 } else {
                     Articulo articulo = articuloRepository.findBySkuAndTenantId(detalle.getIngredienteSku(), tenantId)
                         .orElseThrow(() -> new RuntimeException("Ingrediente no encontrado en inventario: " + detalle.getIngredienteSku()));
@@ -159,7 +184,7 @@ public class EscandalloService {
                     costoTotal = costoTotal.add(costoConsumido);
 
                     inventarioService.registrarMovimientoKardex(
-                        articulo.getId(), tenantId, Kardex.TipoOperacion.SALIDA,
+                        articulo.getId(), tenantId, tipoOperacion,
                         cantidadEfectiva, articulo.getCostoUnitario(), motivo);
                 }
             }

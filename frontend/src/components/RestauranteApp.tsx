@@ -1,20 +1,23 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
+import { createPortal } from "react-dom";
 import {
+  AuroraGradientDef,
   IconRestaurant, IconCustomize, IconUsers, IconUser, IconHourglass, IconCard, IconFileText,
   IconCheck, IconTrash, IconRefresh, IconCheckCircle, IconWarning, IconSearch, IconClose,
-  IconBolt, IconBank, IconChart, IconDownload, IconLock, IconRocket,
+  IconBolt, IconBank, IconChart, IconDownload, IconLock, IconRocket, IconChevronLeft, IconChevronRight,
 } from "../Icons";
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useAuth } from "../context/AuthContext";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
-  dividirCuenta, cerrarComandaMixto, listarEscandallos, crearEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo,
+  dividirCuenta, cerrarComandaMixto, anularComanda, listarEscandallos, crearEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo,
   listarIngredientesEscandallo, listarFastBar,
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
-  tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos,
+  tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos, abonarMovimiento,
   cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria, reporteTickets,
   abrirTurno, turnoAbierto, historialTurnos, registrarEgresoTurno, cerrarTurno,
   listarClientes, crearCliente, editarCliente, eliminarCliente, metricasCliente, ticketsCliente,
@@ -25,7 +28,7 @@ import {
   type ItemImportacionArticulo, type ResultadoImportacionArticulos, type Cliente, type MetricasCliente,
 } from "../api";
 
-type Pagina = "general" | "ventarapida" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
+type Pagina = "general" | "resumen" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
 
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
@@ -38,7 +41,7 @@ const NAV_GRUPOS: NavGrupo[] = [
     titulo: "Operación",
     items: [
       { id: "general", label: "Vista General", Icon: IconCustomize },
-      { id: "ventarapida", label: "Venta Rápida", Icon: IconBolt },
+      { id: "resumen", label: "Resumen General", Icon: IconChart },
       { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant, premium: true },
       { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass, premium: true },
       { id: "recetas", label: "Recetas & Escandallo", Icon: IconFileText },
@@ -135,11 +138,14 @@ function EstiloClasico() {
       /* El sitio sigue en tema oscuro por debajo (solo estos overrides simulan
          "claro") — sin esto, las clases dark:text-white/N ganan por
          especificidad sobre las claras y quedan invisibles en fondo blanco. */
+      .horeca-clasico .dark\\:text-white\\/90 { color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; }
       .horeca-clasico .dark\\:text-white\\/80 { color: #1e293b !important; -webkit-text-fill-color: #1e293b !important; }
       .horeca-clasico .dark\\:text-white\\/70 { color: #334155 !important; -webkit-text-fill-color: #334155 !important; }
       .horeca-clasico .dark\\:text-white\\/60 { color: #475569 !important; -webkit-text-fill-color: #475569 !important; }
       .horeca-clasico .dark\\:text-white\\/50 { color: #64748b !important; -webkit-text-fill-color: #64748b !important; }
       .horeca-clasico .dark\\:text-white\\/40 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
+      .horeca-clasico .dark\\:text-white\\/30 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
+      .horeca-clasico .dark\\:text-white { color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; }
       .horeca-clasico .btn-cyber-neon {
         background: linear-gradient(135deg, #0ea5e9, #0d9488 65%, #8b5cf6) !important;
         box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
@@ -162,8 +168,10 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const { user } = useAuth();
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
-  const [ventaRapidaAbierta, setVentaRapidaAbierta] = useState(false);
-  const [bloqueoTasa, setBloqueoTasa] = useState<"ventarapida" | "embebido" | null>(null);
+  // Venta Rápida ya no es una pantalla aparte con su propio overlay — vive
+  // fusionada directo en la Vista General (ver VistaGeneral). Este candado
+  // solo se dispara desde ahí cuando falta registrar la tasa BCV del día.
+  const [bloqueoTasa, setBloqueoTasa] = useState(false);
   const [moduloPremiumClic, setModuloPremiumClic] = useState<Pagina | null>(null);
 
   const [config, setConfig] = useState(() => {
@@ -192,6 +200,19 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
       return nuevo;
     });
   };
+  // Todos los <Modal> de este módulo se renderizan con un portal directo a
+  // document.body (para escapar de cualquier ancestro con backdrop-filter,
+  // ver ModalTasaRequerida/ComandaDetalle) — eso también los saca del
+  // subárbol de este <div className="horeca-clasico">, así que ninguno de
+  // los overrides de EstiloClasico (que dependen de un ancestro con esa
+  // clase) les llegaba: quedaban con texto blanco sobre fondo blanco. Se
+  // replica la clase en <body> mientras este módulo esté montado en Modo
+  // Clásico, y se retira siempre al salir para no afectar al Hub u otras
+  // verticales que comparten el mismo <body>.
+  useEffect(() => {
+    document.body.classList.toggle("horeca-clasico", modoClasico);
+    return () => { document.body.classList.remove("horeca-clasico"); };
+  }, [modoClasico]);
 
   // Los ítems de una comanda abierta no tienen endpoint de "listar" en el backend
   // (solo el tablero de cocina por estación) — se acumulan aquí al agregarlos,
@@ -229,6 +250,11 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const [fastbar, setFastbar] = useState<FastBarTrago[] | null>(null);
   const [proveedores, setProveedores] = useState<ProveedorHoreca[] | null>(null);
   const [articulos, setArticulos] = useState<Articulo[] | null>(null);
+  // Edición rápida desde una tarjeta del catálogo del POS: refleja el
+  // artículo actualizado en memoria (el PUT ya lo devuelve completo) sin
+  // esperar un refetch completo de recargarTodo().
+  const actualizarArticuloEnEstado = (actualizado: Articulo) =>
+    setArticulos((prev) => (prev || []).map((a) => (a.id === actualizado.id ? actualizado : a)));
   const [lotesPorVencer, setLotesPorVencer] = useState<LoteArticulo[] | null>(null);
   const [kdsCounts, setKdsCounts] = useState<number>(0);
   const [tasaBcv, setTasaBcv] = useState<TasaCambio | null>(null);
@@ -251,15 +277,11 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
 
   useEffect(() => { recargarTodo(); }, [tenantId]);
 
-  const totalVentasHoy = ventasHoy?.total ?? 0;
-  const valorInventario = (articulos || []).reduce((s, a) => s + Number(a.costoUnitario) * Number(a.stockActual), 0);
-
   // Sin tasa BCV del día, un cobro mixto en Bs o el total bimoneda del
   // carrito estarían calculando con una tasa vencida o en cero — bloquea
   // Venta Rápida hasta que se registre, en vez de dejar operar con números
   // que no cuadran.
   const tasaValida = tasaBcv != null && Number(tasaBcv.tasa) > 0;
-  const abrirVentaRapida = () => { if (!tasaValida) { setBloqueoTasa("ventarapida"); return; } setVentaRapidaAbierta(true); };
 
   // Paywall: Salón & Mesas y Cocina (KDS) quedan marcados premium en
   // NAV_GRUPOS — esta es la ÚNICA puerta de entrada para cambiar de página,
@@ -272,15 +294,28 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     setPagina(p);
   };
 
+  // h-screen + overflow-hidden en la raíz: la terminal de caja (Vista
+  // General) nunca debe scrollear la página completa — solo sus paneles
+  // internos. El resto de las páginas sigue scrolleando normal dentro de
+  // <main>, que mantiene su propio overflow-y-auto.
   return (
-    <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "horeca-clasico" : ""}`}>
+    <div className={`h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "horeca-clasico" : ""}`}>
+      {/* Sin esto, todo ícono con stroke="url(#aurora-icon-grad)" (editar,
+          ajustar stock, eliminar, reabastecer, etc.) queda con trazo
+          irresoluble — invisible, no solo "difícil de ver" — porque
+          RestauranteApp es la única vista de la app que nunca montaba el
+          <defs> compartido que declara ese gradiente. */}
+      <AuroraGradientDef />
       {modoClasico && <EstiloClasico />}
       {/* SIDEBAR */}
       <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1">
         <div className="px-2 pb-4 mb-2 border-b border-slate-300/60 dark:border-white/10">
           <div className="flex items-center justify-between">
             <div className="font-['Outfit'] font-black text-lg text-aurora">Aurora Horeca</div>
-            {kdsCounts > 0 && (
+            {/* El badge "N en cocina" depende del módulo KDS, que está
+                detrás del paywall Pro — en Plan Base no debe existir en
+                el DOM, ni siquiera oculto por CSS. */}
+            {PLAN_ACTUAL === ("PRO" as PlanLicencia) && kdsCounts > 0 && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 font-mono font-bold">{kdsCounts} en cocina</span>
             )}
           </div>
@@ -296,7 +331,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                 return (
                   <button
                     key={n.id}
-                    onClick={() => (n.id === "ventarapida" ? abrirVentaRapida() : irA(n.id))}
+                    onClick={() => irA(n.id)}
                     className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                       n.premium
                         ? "text-slate-400 dark:text-white/30 hover:bg-slate-200/40 dark:hover:bg-white/5"
@@ -344,7 +379,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
       </aside>
 
       {/* ÁREA PRINCIPAL */}
-      <main className="flex-1 flex flex-col overflow-y-auto">
+      <main className={`flex-1 flex flex-col min-h-0 ${pagina === "general" ? "overflow-hidden" : "overflow-y-auto"}`}>
         {/* relative + z-30: el header usa backdrop-blur, que crea su propio contexto de
             apilamiento — sin un z-index explícito acá, el popover de la tasa (aunque
             tenga su propio z-index alto) queda atrapado dentro de ese contexto y las
@@ -372,63 +407,65 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           </div>
         </header>
 
-        <div className="flex-1 p-6 max-w-7xl w-full mx-auto">
-          <div key={pagina} className="animate-tab-enter space-y-6">
-            {pagina === "general" && (
-              <VistaGeneral totalVentasHoy={totalVentasHoy} valorInventario={valorInventario} vencimientos={(lotesPorVencer || []).length}
-                onNavegar={irA}
-                tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
-                ventasHoy={ventasHoy} nombreLocal={config.nombreLocal} tasaValida={tasaValida}
-                onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
-                onRegistrarTasa={() => setBloqueoTasa("embebido")} />
-            )}
-            {pagina === "salon" && (esPremium("salon")
-              ? <BloqueoPremium modulo="Salón & Mesas" />
-              : tasaValida
-                ? <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
-                    escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
-                : (
-                  <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
-                    <IconWarning size={28} />
-                    <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar el salón.</p>
-                  </div>
-                )
-            )}
-            {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} />)}
-            {pagina === "recetas" && <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} onCambio={recargarTodo} />}
-            {pagina === "compras" && (
-              <ComprasProveedores tenantId={tenantId} proveedores={proveedores} articulos={articulos} onCambio={recargarTodo} />
-            )}
-            {pagina === "inventario" && <Inventario tenantId={tenantId} articulos={articulos} onCambio={recargarTodo} />}
-            {pagina === "clientes" && <Clientes tenantId={tenantId} />}
-            {pagina === "administracion" && <Administracion tenantId={tenantId} />}
-            {pagina === "estadisticas" && <ResumenFinanciero tenantId={tenantId} />}
-            {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
-            {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
+        {/* Vista General (POS puro) es la única página que gestiona su propio
+            alto y scroll interno de punta a punta — el wrapper acá no le
+            mete padding/max-width/space-y que le robarían pantalla al
+            catálogo y la comanda. El resto de las páginas (Inventario,
+            Reportes, Resumen General, etc.) sigue con el contenedor
+            gerencial de siempre, con scroll de página normal. */}
+        {pagina === "general" ? (
+          <div className="flex-1 min-h-0 flex flex-col p-4">
+            <VistaGeneral
+              tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
+              ventasHoy={ventasHoy} nombreLocal={config.nombreLocal} tasaValida={tasaValida}
+              cargosPorDefecto={{ ...CARGOS_POR_DEFECTO, ...(config.cargosPorDefecto || {}) }}
+              impuestosPorDefecto={{ ...IMPUESTOS_POR_DEFECTO, ...(config.impuestosPorDefecto || {}) }}
+              onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
+              onRegistrarTasa={() => setBloqueoTasa(true)}
+              onArticuloActualizado={actualizarArticuloEnEstado} />
           </div>
+        ) : (
+        <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6 overflow-y-auto min-h-0">
+          {pagina === "resumen" && <ResumenGeneral tenantId={tenantId} />}
+          {pagina === "salon" && (esPremium("salon")
+            ? <BloqueoPremium modulo="Salón & Mesas" />
+            : tasaValida
+              ? <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
+                  escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
+              : (
+                <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
+                  <IconWarning size={28} />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar el salón.</p>
+                </div>
+              )
+          )}
+          {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} />)}
+          {pagina === "recetas" && <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} onCambio={recargarTodo} />}
+          {pagina === "compras" && (
+            <ComprasProveedores tenantId={tenantId} proveedores={proveedores} articulos={articulos} onCambio={recargarTodo} />
+          )}
+          {pagina === "inventario" && <Inventario tenantId={tenantId} articulos={articulos} onCambio={recargarTodo} />}
+          {pagina === "clientes" && <Clientes tenantId={tenantId} />}
+          {pagina === "administracion" && <Administracion tenantId={tenantId} />}
+          {pagina === "estadisticas" && <ResumenFinanciero tenantId={tenantId} />}
+          {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
+          {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
         </div>
+        )}
+        </div>
+        )}
       </main>
-
-      {ventaRapidaAbierta && (
-        <VentaRapida tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos} tasaBcv={tasaBcv} tasaCop={tasaCop}
-          ventasHoy={ventasHoy} nombreLocal={config.nombreLocal}
-          onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
-          onCerrar={() => setVentaRapidaAbierta(false)} />
-      )}
 
       {bloqueoTasa && (
         <ModalTasaRequerida
           tenantId={tenantId}
-          onCancelar={() => setBloqueoTasa(null)}
+          onCancelar={() => setBloqueoTasa(false)}
           onRegistrada={() => {
-            // Solo el overlay de pantalla completa (sidebar → abrirVentaRapida)
-            // se auto-abre al registrar la tasa; el panel embebido en la
-            // Vista General ya está ahí mismo y se desbloquea solo al
-            // refrescar tasaBcv, sin duplicar la experiencia con el overlay.
-            const veniaDelOverlay = bloqueoTasa === "ventarapida";
-            setBloqueoTasa(null);
+            // El panel de Venta Rápida vive embebido en la Vista General —
+            // al registrar la tasa alcanza con refrescar tasaBcv para que
+            // se desbloquee solo ahí mismo, sin overlay aparte.
+            setBloqueoTasa(false);
             recargarTodo();
-            if (veniaDelOverlay) setVentaRapidaAbierta(true);
           }}
         />
       )}
@@ -641,38 +678,31 @@ function KpiCard({ label, val, sub, color, onClick }: { label: string; val: stri
 // ══════════════════════════════════════════════════════════════════════════
 // VISTA GENERAL
 // ══════════════════════════════════════════════════════════════════════════
+/**
+ * Vista General = terminal de caja pura, sin nada gerencial encima. Cero
+ * KPIs, cero tarjetas de resumen — esa analítica vive en "Resumen General"
+ * (ver ResumenGeneral más abajo). El espacio entero, de punta a punta,
+ * es catálogo + comanda + cobro para que el cajero cobre lo más rápido
+ * posible sin que nada le compita por la pantalla.
+ */
 function VistaGeneral({
-  totalVentasHoy, valorInventario, vencimientos, onNavegar,
-  tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, tasaValida, onVenta, onRegistrarTasa,
+  tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, tasaValida,
+  cargosPorDefecto, impuestosPorDefecto, onVenta, onRegistrarTasa, onArticuloActualizado,
 }: {
-  totalVentasHoy: number; valorInventario: number; vencimientos: number; onNavegar: (p: Pagina) => void;
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
   tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
-  tasaValida: boolean; onVenta: (monto: number, metodo: string) => void; onRegistrarTasa: () => void;
+  tasaValida: boolean; cargosPorDefecto: typeof CARGOS_POR_DEFECTO; impuestosPorDefecto: typeof IMPUESTOS_POR_DEFECTO;
+  onVenta: (monto: number, metodo: string) => void; onRegistrarTasa: () => void;
+  onArticuloActualizado: (articulo: Articulo) => void;
 }) {
   return (
-    // h-[calc(100vh-250px)]: descuenta el header de la app + estos KPIs +
-    // paddings de arriba, para que el POS embebido de abajo tenga un techo
-    // real contra el cual repartir su alto (flex-1 min-h-0) en vez de
-    // apoyarse en un h-[Npx] fijo que colapsa en pantallas más chicas.
-    <div className="flex flex-col h-[calc(100vh-250px)] gap-6">
-      {/* Mesas, comandas y cocina quedan fuera de estos KPIs — están detrás
-          del paywall Pro, así que el protagonismo va para lo que sí está
-          activo en el plan base: ventas e inventario. */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-shrink-0">
-        <KpiCard label="Ventas del Día" val={`$${totalVentasHoy.toFixed(2)}`} sub="Comandas y Fast-Bar cerrados" color="#10b981" />
-        <KpiCard label="Valor del Inventario" val={`$${valorInventario.toFixed(2)}`} sub="Costo total en bodega" color="#0ea5e9" onClick={() => onNavegar("inventario")} />
-        <KpiCard label="Por Vencer" val={String(vencimientos)} sub="Lotes vencidos o próximos" color={vencimientos > 0 ? "#ef4444" : "#64748b"} onClick={() => onNavegar("inventario")} />
-      </div>
-
-      {/* El POS vive acá directo — sin banner ni "Accesos rápidos" que solo
-          llevaban a la misma pantalla con un clic extra. Buscar un producto
-          y cobrar pasa a ser la mitad inferior del dashboard, no una vista
-          aparte. */}
+    <div className="h-full flex flex-col overflow-hidden">
       <VentaRapida
         embebido tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos}
         tasaBcv={tasaBcv} tasaCop={tasaCop} ventasHoy={ventasHoy} nombreLocal={nombreLocal}
-        tasaValida={tasaValida} onRegistrarTasa={onRegistrarTasa} onVenta={onVenta}
+        tasaValida={tasaValida} cargosPorDefecto={cargosPorDefecto} impuestosPorDefecto={impuestosPorDefecto}
+        onRegistrarTasa={onRegistrarTasa} onVenta={onVenta}
+        onArticuloActualizado={onArticuloActualizado}
       />
     </div>
   );
@@ -1192,6 +1222,13 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
   // tocar nada, sea el restante en Bs, en COP o en la moneda base.
   const firmaManual = JSON.stringify(filas.filter((f) => !f.auto).map((f) => `${f.monto}|${f.moneda}`));
   const firmaTasas = JSON.stringify(tasas);
+  // Firma de las filas AUTO (id + su moneda) — sin esto, agregar una fila
+  // nueva (auto, recién creada con monto "") o cambiarle la moneda a una ya
+  // existente no cambiaba ninguna de las otras dependencias del efecto
+  // (firmaManual solo mira las filas manuales, firmaTasas el mapa de
+  // tasas), así que el recálculo nunca se disparaba: la fila quedaba en
+  // "" (mostrando el placeholder "0.00") en vez de convertir el restante.
+  const firmaAuto = JSON.stringify(filas.filter((f) => f.auto).map((f) => `${f.id}|${f.moneda}`));
   useEffect(() => {
     setFilas((prev) => {
       const sumaManualBase = prev.filter((f) => !f.auto).reduce((s, f) => s + aBase(Number(f.monto) || 0, f.moneda), 0);
@@ -1207,7 +1244,7 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
       return cambio ? siguiente : prev;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmaManual, total, firmaTasas, monedaBase]);
+  }, [firmaManual, firmaAuto, total, firmaTasas, monedaBase]);
 
   const totalIngresadoBase = filas.reduce((s, f) => s + aBase(Number(f.monto) || 0, f.moneda), 0);
   const pendienteBase = Math.max(0, total - totalIngresadoBase);
@@ -1253,40 +1290,40 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
           // no cabe método + moneda + monto en una sola línea sin comprimir el
           // texto — con min-w en cada control, lo que no cabe pasa a una
           // segunda línea en vez de recortarse.
-          <div key={f.id} className="flex flex-wrap items-center gap-1.5">
-            <select value={f.metodoPago} onChange={(e) => actualizarMetodo(f.id, e.target.value)} className="input-horeca flex-1 min-w-[130px] text-xs">
+          <div key={f.id} className="flex flex-wrap items-center gap-2">
+            <select value={f.metodoPago} onChange={(e) => actualizarMetodo(f.id, e.target.value)} className="input-horeca flex-1 min-w-[140px] text-sm py-2.5">
               <option value="EFECTIVO">Efectivo</option>
               <option value="TARJETA">Tarjeta</option>
               <option value="TRANSFERENCIA">Transferencia</option>
               <option value="BILLETERA_DIGITAL">Billetera digital</option>
             </select>
-            <select value={f.moneda} onChange={(e) => actualizarMoneda(f.id, e.target.value)} className="input-horeca w-20 flex-shrink-0 text-xs">
+            <select value={f.moneda} onChange={(e) => actualizarMoneda(f.id, e.target.value)} className="input-horeca w-24 flex-shrink-0 text-sm py-2.5">
               <option value={monedaBase}>{monedaBase}</option>
               {otrasMonedas.map((m) => <option key={m} value={m}>{MONEDAS_ALTERNAS[m]}</option>)}
             </select>
-            <div className="relative flex-1 min-w-[92px]">
+            <div className="relative flex-1 min-w-[100px]">
               <input
                 value={f.monto}
                 onChange={(e) => actualizarMonto(f.id, e.target.value)}
                 type="number" step="0.01" min="0" placeholder="0.00"
                 title={f.auto ? "Se calcula sola con lo que falta — escribe aquí para fijarla a mano" : undefined}
-                className={`input-horeca w-full text-xs ${f.auto ? "text-teal-600 dark:text-teal-300" : ""}`}
+                className={`input-horeca w-full text-sm py-2.5 ${f.auto ? "text-teal-600 dark:text-teal-300" : ""}`}
               />
               {f.auto && f.monto && (
                 <span className="absolute -top-1.5 -right-1.5 text-[8px] font-bold bg-teal-500 text-white rounded-full px-1 leading-tight">auto</span>
               )}
             </div>
-            <button type="button" onClick={() => completarConPendiente(f.id)} title="Rellenar con lo que falta" className="text-[10px] font-semibold text-teal-600 dark:text-teal-300 px-1.5 py-1 cursor-pointer whitespace-nowrap flex-shrink-0">todo</button>
+            <button type="button" onClick={() => completarConPendiente(f.id)} title="Rellenar con lo que falta" className="text-xs font-semibold text-teal-600 dark:text-teal-300 px-2 py-1 cursor-pointer whitespace-nowrap flex-shrink-0">todo</button>
             {filas.length > 1 && (
-              <button type="button" onClick={() => quitarFila(f.id)} className="text-slate-400 hover:text-red-500 cursor-pointer flex-shrink-0"><IconTrash size={13} /></button>
+              <button type="button" onClick={() => quitarFila(f.id)} className="text-slate-400 hover:text-red-500 cursor-pointer flex-shrink-0"><IconTrash size={15} /></button>
             )}
           </div>
         ))}
       </div>
 
-      <button type="button" onClick={agregarFila} className="text-xs text-teal-600 dark:text-teal-300 font-semibold cursor-pointer">+ Agregar otro método de pago</button>
+      <button type="button" onClick={agregarFila} className="text-sm text-teal-600 dark:text-teal-300 font-semibold cursor-pointer">+ Agregar otro método de pago</button>
 
-      <div className="apple-glass rounded-xl p-3 space-y-1 text-xs">
+      <div className="apple-glass rounded-xl p-3.5 space-y-1.5 text-sm">
         <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Total a cobrar</span><span className="font-mono font-bold text-slate-900 dark:text-white">{simbolo}{total.toFixed(2)}</span></div>
         <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Ingresado</span><span className="font-mono text-slate-700 dark:text-white/70">{simbolo}{totalIngresadoBase.toFixed(2)}</span></div>
         {!cubierto ? (
@@ -1315,7 +1352,7 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
       {error && <p className="text-xs text-red-500">{error}</p>}
 
       <button onClick={handleCobrar} disabled={procesando || !cubierto}
-        className="w-full btn-cyber-neon text-white text-sm font-bold py-3.5 rounded-xl cursor-pointer disabled:opacity-50">
+        className="w-full btn-cyber-neon text-white text-base font-bold py-4 rounded-xl cursor-pointer disabled:opacity-50">
         {procesando ? "Procesando…" : cubierto ? `Cobrar y Cerrar ${simbolo}${total.toFixed(2)}` : "Completa el pago para cobrar"}
       </button>
     </div>
@@ -1816,7 +1853,7 @@ function ComprasProveedores({ tenantId, proveedores, articulos, onCambio }: {
       {tab === "proveedores" && (
         <div className="space-y-5">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500 dark:text-white/40">{(proveedores || []).length} proveedores registrados</p>
+            <p className="text-sm text-slate-500 dark:text-white/40">{(proveedores || []).length} proveedor{(proveedores || []).length === 1 ? "" : "es"} registrado{(proveedores || []).length === 1 ? "" : "s"}</p>
             <button onClick={() => setMostrarFormProveedor((v) => !v)} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
               {mostrarFormProveedor ? "Cancelar" : "+ Nuevo proveedor"}
             </button>
@@ -1973,7 +2010,7 @@ function Clientes({ tenantId }: { tenantId: number }) {
             <tbody>
               {clientes.map((c) => (
                 <tr key={c.id} onClick={() => setSeleccionado(c)} className="border-b border-slate-200/50 dark:border-white/5 hover:bg-teal-500/5 cursor-pointer">
-                  <td className="py-2.5 px-4 font-semibold text-slate-800 dark:text-white">{c.nombre}</td>
+                  <td className="py-2.5 px-4 font-semibold text-slate-800 dark:text-white/80">{c.nombre}</td>
                   <td className="py-2.5 px-4 text-slate-500 dark:text-white/50">{c.identificacionRif || "—"}</td>
                   <td className="py-2.5 px-4 text-slate-500 dark:text-white/50">{c.telefono || "—"}</td>
                   <td className="py-2.5 px-4 text-slate-500 dark:text-white/50">{new Date(c.fechaRegistro).toLocaleDateString()}</td>
@@ -2020,9 +2057,9 @@ function ModalDetalleCliente({ tenantId, cliente, onClose, onCambio }: { tenantI
     <Modal onClose={onClose} titulo={cliente.nombre} ancho="max-w-2xl">
       <div className="space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-          {cliente.identificacionRif && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Cédula/RIF</span><span className="text-slate-800 dark:text-white font-semibold">{cliente.identificacionRif}</span></div>}
-          {cliente.telefono && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Teléfono</span><span className="text-slate-800 dark:text-white font-semibold">{cliente.telefono}</span></div>}
-          {cliente.correo && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Correo</span><span className="text-slate-800 dark:text-white font-semibold">{cliente.correo}</span></div>}
+          {cliente.identificacionRif && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Cédula/RIF</span><span className="text-slate-800 dark:text-white/80 font-semibold">{cliente.identificacionRif}</span></div>}
+          {cliente.telefono && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Teléfono</span><span className="text-slate-800 dark:text-white/80 font-semibold">{cliente.telefono}</span></div>}
+          {cliente.correo && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Correo</span><span className="text-slate-800 dark:text-white/80 font-semibold">{cliente.correo}</span></div>}
         </div>
 
         <div className="grid grid-cols-3 gap-3">
@@ -2084,10 +2121,107 @@ function calcularMargen(costo: number, precio: number): number | null {
   return ((precio - costo) / precio) * 100;
 }
 
+/**
+ * Filtro defensivo para categorías de artículo: descarta vacíos y valores
+ * puramente numéricos ("1", "2.5") — basura que puede colarse desde una
+ * importación de Excel mal mapeada o un formulario con la categoría en
+ * blanco, y que de otro modo aparece como un chip de filtro fantasma
+ * (ej. "1") junto a las categorías reales.
+ */
+function esCategoriaValida(c: string | null | undefined): c is string {
+  const t = c?.trim();
+  return !!t && isNaN(Number(t));
+}
+
 function BadgeMargen({ margen }: { margen: number | null }) {
   if (margen === null) return <span className="text-[10px] text-slate-400">Sin precio de venta</span>;
   const color = margen < 0 ? "text-red-500 bg-red-500/10" : margen < 20 ? "text-amber-600 dark:text-amber-400 bg-amber-500/10" : "text-teal-600 dark:text-teal-400 bg-teal-500/10";
   return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${color}`}>Margen {margen.toFixed(1)}%</span>;
+}
+
+/**
+ * Modal de edición rápida de un artículo — componente compartido entre
+ * Inventario (FilaArticuloCompacta) y la cuadrícula de catálogo del POS, para
+ * que ajustar un precio no dependa de en qué pantalla esté el operador.
+ * `onGuardado` recibe el artículo ya actualizado (el PUT lo devuelve
+ * completo) para que quien lo use pueda reflejarlo al instante sin
+ * recargar ni volver a pedirlo al backend.
+ */
+function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
+  tenantId: number; articulo: Articulo; onClose: () => void; onGuardado: (actualizado: Articulo) => void;
+}) {
+  const [form, setForm] = useState({
+    nombre: articulo.nombre, categoria: articulo.categoria || "", unidadMedida: articulo.unidadMedida || "unidad",
+    costoUnitario: String(articulo.costoUnitario), precioVenta: String(articulo.precioVenta ?? 0),
+    sku: articulo.sku || "",
+  });
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const margen = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
+
+  const guardar = async () => {
+    if (!form.nombre.trim()) { setError("El nombre no puede quedar vacío"); return; }
+    if (!form.categoria.trim()) { setError("La categoría no puede quedar vacía"); return; }
+    if (!form.costoUnitario || Number(form.costoUnitario) < 0) { setError("El costo unitario es obligatorio"); return; }
+    if (!form.precioVenta || Number(form.precioVenta) <= 0) { setError("El precio de venta es obligatorio"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      const actualizado = await editarArticulo(tenantId, articulo.id, {
+        nombre: form.nombre.trim(), categoria: form.categoria.trim(), unidadMedida: form.unidadMedida.trim(),
+        costoUnitario: Number(form.costoUnitario), precioVenta: Number(form.precioVenta),
+        sku: form.sku.trim() || undefined,
+      });
+      onGuardado(actualizado);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} titulo="Editar artículo">
+      <div className="space-y-3">
+        <Campo label="Nombre del artículo">
+          <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="input-horeca text-sm font-bold" placeholder="Nombre" autoFocus />
+        </Campo>
+        <div className="grid grid-cols-2 gap-2">
+          <Campo label="Categoría">
+            <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} className="input-horeca text-xs" placeholder="Categoría" />
+          </Campo>
+          <Campo label="Unidad de medida">
+            <select value={form.unidadMedida} onChange={(e) => setForm({ ...form, unidadMedida: e.target.value })} className="input-horeca text-xs">
+              {["kg", "g", "l", "ml", "unidad"].map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </Campo>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Campo label="Costo de adquisición $">
+            <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Costo unitario $" />
+          </Campo>
+          <Campo label="Precio de venta $">
+            <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Precio de venta $" />
+          </Campo>
+        </div>
+        <Campo label="Código de barras / SKU">
+          <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="input-horeca text-xs font-mono" placeholder="Código de barras / SKU" />
+        </Campo>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-slate-500 dark:text-white/40">Margen:</span>
+          <BadgeMargen margen={margen} />
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="flex gap-2 pt-1">
+          <button onClick={guardar} disabled={guardando} className="flex-1 g-aurora text-white text-sm font-bold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+            {guardando ? "Guardando…" : "Guardar cambios"}
+          </button>
+          <button onClick={onClose} className="flex-1 apple-glass-btn text-sm font-semibold py-2.5 rounded-xl cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    </Modal>
+  );
 }
 
 function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number; articulos: Articulo[] | null; onCambio: () => void }) {
@@ -2142,7 +2276,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     }
   };
 
-  const categorias = useMemo(() => Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).sort(), [articulos]);
+  const categorias = useMemo(() => Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).filter(esCategoriaValida).sort(), [articulos]);
 
   const articulosFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -2216,8 +2350,9 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
             <Campo label="Precio de venta $">
               <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
-            <Campo label="Stock inicial">
+            <Campo label={`Cantidad a ingresar ahora (${form.unidadMedida})`}>
               <input value={form.cantidadInicial} onChange={(e) => setForm({ ...form, cantidadInicial: e.target.value })} type="number" step="0.001" min="0" placeholder="0" className="input-horeca" />
+              <p className="text-[10px] text-slate-400 mt-1">Cuánto tenés físicamente de este producto ahora mismo. Podés dejarlo en 0 y cargar stock después con "Reabastecer".</p>
             </Campo>
           </div>
           {(form.costoUnitario || form.precioVenta) && (
@@ -2250,10 +2385,27 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
       {articulosFiltrados.length === 0 ? (
         <p className="text-xs text-slate-400">Sin artículos {busqueda || categoriaFiltro ? "que coincidan con el filtro" : "cargados todavía"}.</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {articulosFiltrados.map((a) => (
-            <TarjetaArticulo key={a.id} tenantId={tenantId} articulo={a} onCambio={onCambio} />
-          ))}
+        <div className="apple-glass rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-400 dark:text-white/40 uppercase text-[10px] tracking-wider border-b border-slate-300/50 dark:border-white/10">
+                  <th className="py-2 pl-3 pr-2 font-semibold">Producto</th>
+                  <th className="py-2 px-2 font-semibold">SKU</th>
+                  <th className="py-2 px-2 font-semibold text-right">Cantidad</th>
+                  <th className="py-2 px-2 font-semibold text-right">Costo</th>
+                  <th className="py-2 px-2 font-semibold text-right">Precio</th>
+                  <th className="py-2 px-2 font-semibold text-right">Valor en inventario</th>
+                  <th className="py-2 pl-2 pr-3 font-semibold text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {articulosFiltrados.map((a) => (
+                  <FilaArticuloCompacta key={a.id} tenantId={tenantId} articulo={a} onCambio={onCambio} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -2272,6 +2424,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
     unidadMedida: ["unidad de medida", "unidad", "und", "um"],
     categoria: ["categoria"],
     costoUnitario: ["costo unitario", "costo", "precio costo"],
+    precioVenta: ["precio de venta", "precio venta", "precio", "pvp", "precio publico"],
     stockInicial: ["stock inicial", "stock", "cantidad", "existencia"],
   };
   const normalizar = (s: string) => s.toString().trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -2314,6 +2467,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
           unidadMedida: columna.unidadMedida ? String(fila[columna.unidadMedida] ?? "").trim() || undefined : undefined,
           categoria: columna.categoria ? String(fila[columna.categoria] ?? "").trim() || undefined : undefined,
           costoUnitario: columna.costoUnitario && fila[columna.costoUnitario] !== "" ? Number(fila[columna.costoUnitario]) : undefined,
+          precioVenta: columna.precioVenta && fila[columna.precioVenta] !== "" ? Number(fila[columna.precioVenta]) : undefined,
           stockInicial: columna.stockInicial && fila[columna.stockInicial] !== "" ? Number(fila[columna.stockInicial]) : undefined,
         }))
         .filter((f) => f.sku && f.nombre);
@@ -2365,7 +2519,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
               <p className="text-sm font-semibold text-slate-700 dark:text-white/70">
                 {archivo ? archivo.name : "Arrastra tu archivo aquí o haz click para elegirlo"}
               </p>
-              <p className="text-[11px] text-slate-400 mt-1">.xlsx, .xls o .csv — columnas: SKU, Nombre, Unidad, Costo, Stock Inicial (Categoría opcional)</p>
+              <p className="text-[11px] text-slate-400 mt-1">.xlsx, .xls o .csv — columnas: SKU, Nombre, Unidad, Costo, Precio de Venta, Stock Inicial (Categoría opcional)</p>
               <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) procesarArchivo(f); }} />
             </div>
@@ -2380,7 +2534,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
                     <thead className="bg-slate-100/60 dark:bg-white/5 sticky top-0">
                       <tr className="text-left text-slate-400">
                         <th className="py-1.5 px-2">SKU</th><th className="py-1.5 px-2">Nombre</th><th className="py-1.5 px-2">Unidad</th>
-                        <th className="py-1.5 px-2 text-right">Costo</th><th className="py-1.5 px-2 text-right">Stock inicial</th>
+                        <th className="py-1.5 px-2 text-right">Costo</th><th className="py-1.5 px-2 text-right">Precio venta</th><th className="py-1.5 px-2 text-right">Stock inicial</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2390,6 +2544,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
                           <td className="py-1.5 px-2">{f.nombre}</td>
                           <td className="py-1.5 px-2">{f.unidadMedida || "—"}</td>
                           <td className="py-1.5 px-2 text-right">{f.costoUnitario ?? "—"}</td>
+                          <td className="py-1.5 px-2 text-right">{f.precioVenta ?? "—"}</td>
                           <td className="py-1.5 px-2 text-right">{f.stockInicial ?? "—"}</td>
                         </tr>
                       ))}
@@ -2433,41 +2588,17 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
   );
 }
 
-function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; articulo: Articulo; onCambio: () => void }) {
-  const [modo, setModo] = useState<"ver" | "editar" | "ajustar">("ver");
-  const [form, setForm] = useState({
-    nombre: articulo.nombre, categoria: articulo.categoria || "", unidadMedida: articulo.unidadMedida || "unidad",
-    costoUnitario: String(articulo.costoUnitario), precioVenta: String(articulo.precioVenta ?? 0),
-  });
+/** Fila de la tabla compacta de Inventario — una línea por artículo, máxima densidad. */
+function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: number; articulo: Articulo; onCambio: () => void }) {
+  const [modo, setModo] = useState<"ver" | "editar" | "ajustar" | "reabastecer">("ver");
   const [stockReal, setStockReal] = useState(String(Number(articulo.stockActual)));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const margenEdicion = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
   const margenActual = calcularMargen(Number(articulo.costoUnitario), Number(articulo.precioVenta ?? 0));
   const sinStock = Number(articulo.stockActual) <= 0;
   const stockBajo = !sinStock && articulo.stockMinimo != null && Number(articulo.stockActual) <= Number(articulo.stockMinimo);
-
-  const guardarEdicion = async () => {
-    if (!form.nombre.trim()) { setError("El nombre no puede quedar vacío"); return; }
-    if (!form.categoria.trim()) { setError("La categoría no puede quedar vacía"); return; }
-    if (!form.costoUnitario || Number(form.costoUnitario) < 0) { setError("El costo unitario es obligatorio"); return; }
-    if (!form.precioVenta || Number(form.precioVenta) <= 0) { setError("El precio de venta es obligatorio"); return; }
-    setGuardando(true);
-    setError(null);
-    try {
-      await editarArticulo(tenantId, articulo.id, {
-        nombre: form.nombre.trim(), categoria: form.categoria.trim(), unidadMedida: form.unidadMedida.trim(),
-        costoUnitario: Number(form.costoUnitario), precioVenta: Number(form.precioVenta),
-      });
-      setModo("ver");
-      onCambio();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
-    } finally {
-      setGuardando(false);
-    }
-  };
+  const valorInventario = Number(articulo.costoUnitario) * Number(articulo.stockActual);
 
   const guardarAjuste = async () => {
     if (stockReal === "" || Number(stockReal) < 0) { setError("Indicá el stock real contado"); return; }
@@ -2497,89 +2628,230 @@ function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; a
     }
   };
 
-  if (modo === "editar") {
-    return (
-      <div className="apple-glass rounded-2xl p-5 space-y-2 border border-teal-500/30">
-        <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="input-horeca text-sm font-bold" placeholder="Nombre" />
-        <div className="grid grid-cols-2 gap-2">
-          <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} className="input-horeca text-xs" placeholder="Categoría" />
-          <select value={form.unidadMedida} onChange={(e) => setForm({ ...form, unidadMedida: e.target.value })} className="input-horeca text-xs">
-            {["kg", "g", "l", "ml", "unidad"].map((u) => <option key={u} value={u}>{u}</option>)}
-          </select>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Costo unitario $" />
-          <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Precio de venta $" />
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold text-slate-500 dark:text-white/40">Margen:</span>
-          <BadgeMargen margen={margenEdicion} />
-        </div>
-        {error && <p className="text-[10px] text-red-500">{error}</p>}
-        <div className="flex gap-2">
-          <button onClick={guardarEdicion} disabled={guardando} className="flex-1 g-aurora text-white text-xs font-semibold py-2 rounded-lg cursor-pointer disabled:opacity-60">
-            {guardando ? "Guardando…" : "Guardar"}
-          </button>
-          <button onClick={() => { setModo("ver"); setError(null); }} className="flex-1 apple-glass-btn text-xs font-semibold py-2 rounded-lg cursor-pointer">Cancelar</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (modo === "ajustar") {
-    return (
-      <div className="apple-glass rounded-2xl p-5 space-y-2 border border-teal-500/30">
-        <h4 className="font-bold text-slate-900 dark:text-white text-sm">{articulo.nombre}</h4>
-        <p className="text-[10px] text-slate-500 dark:text-white/40">Sistema dice: {Number(articulo.stockActual)} {articulo.unidadMedida}. Escribí lo que realmente hay contado — el sistema calcula y audita la diferencia solo.</p>
-        <input value={stockReal} onChange={(e) => setStockReal(e.target.value)} type="number" step="0.001" min="0" className="input-horeca text-sm font-bold" placeholder="Stock real" autoFocus />
-        {error && <p className="text-[10px] text-red-500">{error}</p>}
-        <div className="flex gap-2">
-          <button onClick={guardarAjuste} disabled={guardando} className="flex-1 g-aurora text-white text-xs font-semibold py-2 rounded-lg cursor-pointer disabled:opacity-60">
-            {guardando ? "Guardando…" : "Corregir stock"}
-          </button>
-          <button onClick={() => { setModo("ver"); setError(null); }} className="flex-1 apple-glass-btn text-xs font-semibold py-2 rounded-lg cursor-pointer">Cancelar</button>
-        </div>
-      </div>
-    );
-  }
+  // Avatar de 2 letras a partir del nombre — un color fijo y siempre legible
+  // (no depende de dark:, mismo criterio que ya se aplicó al resto del
+  // módulo tras encontrar varios casos de texto invisible en Modo Clásico).
+  const iniciales = articulo.nombre.trim().slice(0, 2).toUpperCase();
 
   return (
-    <div className={`apple-glass rounded-2xl p-5 space-y-2 border transition-colors ${
-      sinStock ? "border-red-500/40" : stockBajo ? "border-amber-500/40" : "border-transparent"
-    }`}>
-      <div className="flex items-center justify-between gap-2">
-        <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">{articulo.nombre}</h4>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button onClick={() => setModo("ajustar")} title="Corregir stock (conteo físico)" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconRefresh size={13} /></button>
-          <button onClick={() => setModo("editar")} title="Editar artículo" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconCustomize size={13} /></button>
-          <button onClick={eliminar} disabled={guardando} title="Eliminar artículo" className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40"><IconTrash size={13} /></button>
+    <>
+      <tr className={`border-b border-slate-200/50 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${sinStock ? "bg-red-500/5" : stockBajo ? "bg-amber-500/5" : ""}`}>
+        <td className="py-2 pl-3 pr-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 flex-shrink-0 bg-[#E8ECE9] text-[#2B4C3F] font-bold flex items-center justify-center rounded-md text-[11px]">
+              {iniciales}
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-slate-800 dark:text-white/80 truncate max-w-[180px]">{articulo.nombre}</div>
+              <div className="text-[10px] text-slate-400 dark:text-white/30">{articulo.categoria || "Sin categoría"}</div>
+            </div>
+          </div>
+        </td>
+        <td className="py-2 px-2 font-mono text-slate-500 dark:text-white/40 whitespace-nowrap">{articulo.sku || "—"}</td>
+        <td className={`py-2 px-2 text-right font-semibold whitespace-nowrap ${sinStock ? "text-red-500" : stockBajo ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-white/70"}`}>
+          {Number(articulo.stockActual).toFixed(2)} {articulo.unidadMedida}
+        </td>
+        <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60 whitespace-nowrap">${Number(articulo.costoUnitario).toFixed(2)}</td>
+        <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60 whitespace-nowrap">${Number(articulo.precioVenta ?? 0).toFixed(2)}</td>
+        <td className="py-2 px-2 text-right font-mono font-semibold text-slate-800 dark:text-white/80 whitespace-nowrap">${valorInventario.toFixed(2)}</td>
+        <td className="py-2 pl-2 pr-3">
+          <div className="flex items-center justify-end gap-1">
+            <button onClick={() => setModo("reabastecer")} title="Añadir inventario" className="text-emerald-600 dark:text-emerald-300 hover:text-emerald-700 cursor-pointer p-1"><IconDownload size={14} /></button>
+            <button onClick={() => setModo("ajustar")} title="Corregir stock (conteo físico)" className="text-slate-400 hover:text-teal-500 cursor-pointer p-1"><IconRefresh size={14} /></button>
+            <button onClick={() => setModo("editar")} title="Editar artículo" className="text-slate-400 hover:text-teal-500 cursor-pointer p-1"><IconCustomize size={14} /></button>
+            <button onClick={eliminar} disabled={guardando} title="Eliminar artículo" className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40 p-1"><IconTrash size={14} /></button>
+          </div>
+        </td>
+      </tr>
+      {modo === "ajustar" && (
+        <tr className="border-b border-slate-200/50 dark:border-white/5 bg-slate-50 dark:bg-white/5">
+          <td colSpan={7} className="px-3 py-2">
+            <p className="text-[10px] text-slate-500 dark:text-white/40 mb-1.5">Sistema dice: {Number(articulo.stockActual)} {articulo.unidadMedida}. Escribí lo que realmente hay contado.</p>
+            <div className="flex gap-2 max-w-md">
+              <input value={stockReal} onChange={(e) => setStockReal(e.target.value)} type="number" step="0.001" min="0" className="input-horeca text-sm font-bold flex-1" placeholder="Stock real" autoFocus />
+              <button onClick={guardarAjuste} disabled={guardando} className="g-aurora text-white text-xs font-semibold px-4 rounded-lg cursor-pointer disabled:opacity-60">
+                {guardando ? "Guardando…" : "Corregir"}
+              </button>
+              <button onClick={() => { setModo("ver"); setError(null); }} className="apple-glass-btn text-xs font-semibold px-4 rounded-lg cursor-pointer">Cancelar</button>
+            </div>
+            {error && <p className="text-[10px] text-red-500 mt-1.5">{error}</p>}
+          </td>
+        </tr>
+      )}
+
+      {modo === "editar" && (
+        <ModalEditarArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onGuardado={() => { setModo("ver"); onCambio(); }} />
+      )}
+      {modo === "reabastecer" && (
+        <ModalReabastecerArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onReabastecido={() => { setModo("ver"); onCambio(); }} />
+      )}
+    </>
+  );
+}
+
+/**
+ * Reabastecimiento express: a diferencia de "Ajustar stock" (que corrige a
+ * un total contado a mano), esto SUMA una cantidad recién llegada, con su
+ * propio costo y — si el insumo vence — su propio lote, en un solo paso
+ * desde la tarjeta del artículo, sin pasar por Compras & Proveedores.
+ */
+function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido }: {
+  tenantId: number; articulo: Articulo; onClose: () => void; onReabastecido: () => void;
+}) {
+  const [cantidad, setCantidad] = useState("");
+  const [costoUnitario, setCostoUnitario] = useState(String(articulo.costoUnitario));
+  const [precioVenta, setPrecioVenta] = useState(String(articulo.precioVenta ?? 0));
+  const [metodoPago, setMetodoPago] = useState("EFECTIVO");
+  const [moneda, setMoneda] = useState("USD");
+  const [fechaVencimiento, setFechaVencimiento] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const margen = calcularMargen(Number(costoUnitario) || 0, Number(precioVenta) || 0);
+
+  const guardar = async () => {
+    if (!cantidad || Number(cantidad) <= 0) { setError("Indica la cantidad que llegó"); return; }
+    if (!costoUnitario || Number(costoUnitario) <= 0) { setError("El costo unitario es obligatorio: no se puede reabastecer sin registrar cuánto costó"); return; }
+    if (!precioVenta || Number(precioVenta) <= 0) { setError("El precio de venta es obligatorio"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      await entradaArticulo(tenantId, articulo.id, {
+        cantidad: Number(cantidad), costoUnitario: Number(costoUnitario),
+        motivo: "Reabastecimiento rápido", fechaVencimiento: fechaVencimiento || undefined,
+        metodoPago, moneda,
+      });
+      // El precio de venta no es parte del movimiento de stock — se actualiza
+      // aparte solo si cambió, así el reabastecimiento sirve también para
+      // corregir de una vez artículos que quedaron sin precio (ej. cargados
+      // por Excel sin esa columna).
+      if (Number(precioVenta) !== Number(articulo.precioVenta ?? 0)) {
+        await editarArticulo(tenantId, articulo.id, { precioVenta: Number(precioVenta) });
+      }
+      onReabastecido();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar la entrada");
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} titulo={`Reabastecer · ${articulo.nombre}`}>
+      <div className="space-y-3">
+        <p className="text-xs text-slate-500">Stock actual: {Number(articulo.stockActual).toFixed(2)} {articulo.unidadMedida}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label={`Cantidad a sumar (${articulo.unidadMedida})`}>
+            <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} type="number" step="0.001" min="0.001" placeholder="0" className="input-horeca" autoFocus />
+          </Campo>
+          <Campo label="Costo unitario $">
+            <input value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
+          </Campo>
+        </div>
+        <Campo label="Precio de venta $">
+          <input value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
+        </Campo>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-slate-500">Margen:</span>
+          <BadgeMargen margen={margen} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label="¿Cómo pagaste esta compra?">
+            <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} className="input-horeca">
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="TARJETA">Tarjeta</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="BILLETERA_DIGITAL">Billetera digital</option>
+            </select>
+          </Campo>
+          <Campo label="Moneda">
+            <select value={moneda} onChange={(e) => setMoneda(e.target.value)} className="input-horeca">
+              {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </Campo>
+        </div>
+        <p className="text-[10px] text-slate-400">Esto registra el gasto real en caja (Ingresos & Gastos), igual que cualquier otra salida de dinero.</p>
+        <Campo label="Fecha de vencimiento (opcional)">
+          <input value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} type="date" className="input-horeca" />
+        </Campo>
+        {fechaVencimiento && (
+          <p className={`text-[11px] font-semibold ${diasParaVencerTexto(fechaVencimiento).color}`}>
+            {diasParaVencerTexto(fechaVencimiento).texto} — Aurora crea el lote y avisará en Vencimientos.
+          </p>
+        )}
+        {cantidad && costoUnitario && (
+          <p className="text-xs text-slate-500">
+            Nuevo stock: <strong className="text-slate-900">{(Number(articulo.stockActual) + Number(cantidad)).toFixed(2)} {articulo.unidadMedida}</strong>
+            {" · "}Costo de esta entrada: <strong className="text-slate-900">${(Number(cantidad) * Number(costoUnitario)).toFixed(2)}</strong>
+          </p>
+        )}
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="flex gap-2 pt-1">
+          <button onClick={guardar} disabled={guardando} className="flex-1 g-aurora text-white text-sm font-bold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+            {guardando ? "Registrando…" : "Reabastecer"}
+          </button>
+          <button onClick={onClose} className="flex-1 apple-glass-btn text-sm font-semibold py-2.5 rounded-xl cursor-pointer">Cancelar</button>
         </div>
       </div>
-
-      <div className="text-[11px] text-slate-500 dark:text-white/40 font-semibold uppercase tracking-wider">{articulo.categoria || "Sin categoría"} · {articulo.unidadMedida}</div>
-
-      <div className="flex items-end justify-between gap-2 pt-1">
-        <div>
-          <div className="text-[10px] text-slate-400 dark:text-white/30 uppercase tracking-wider">Precio de venta</div>
-          <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">${Number(articulo.precioVenta ?? 0).toFixed(2)}</div>
-        </div>
-        <BadgeMargen margen={margenActual} />
-      </div>
-
-      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-300/40 dark:border-white/10">
-        <span className={`font-semibold ${sinStock ? "text-red-500" : stockBajo ? "text-amber-600 dark:text-amber-400" : "text-slate-600 dark:text-white/60"}`}>
-          Stock: {Number(articulo.stockActual).toFixed(2)} {articulo.unidadMedida}
-          {sinStock ? " · Agotado" : stockBajo ? " · Bajo mínimo" : ""}
-        </span>
-        <span className="text-slate-400 dark:text-white/40 font-mono">Costo ${Number(articulo.costoUnitario).toFixed(2)}</span>
-      </div>
-      {error && <p className="text-[10px] text-red-500">{error}</p>}
-    </div>
+    </Modal>
   );
 }
 
 interface FilaCompra { articuloId: string; cantidad: string; costoUnitario: string; fechaVencimiento: string }
 const filaVacia = (): FilaCompra => ({ articuloId: "", cantidad: "", costoUnitario: "", fechaVencimiento: "" });
+
+/** Buscador con dropdown para elegir un artículo por nombre o SKU — reemplaza el <select> plano de una lista larga de inventario en la factura de compra. */
+function BuscadorArticulo({ articulos, articuloId, onSeleccionar }: {
+  articulos: Articulo[] | null; articuloId: string; onSeleccionar: (id: string) => void;
+}) {
+  const [busqueda, setBusqueda] = useState("");
+  const [abierto, setAbierto] = useState(false);
+  const contenedorRef = useRef<HTMLDivElement | null>(null);
+
+  const seleccionado = (articulos || []).find((a) => String(a.id) === articuloId) || null;
+
+  useEffect(() => {
+    if (!abierto) return;
+    const handler = (e: MouseEvent) => {
+      if (contenedorRef.current && !contenedorRef.current.contains(e.target as Node)) setAbierto(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [abierto]);
+
+  const resultados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return (articulos || []).slice(0, 30);
+    return (articulos || []).filter((a) => a.nombre.toLowerCase().includes(q) || a.sku.toLowerCase().includes(q)).slice(0, 30);
+  }, [articulos, busqueda]);
+
+  return (
+    <div className="relative" ref={contenedorRef}>
+      <input
+        value={abierto ? busqueda : (seleccionado ? `${seleccionado.nombre} (${seleccionado.sku})` : "")}
+        onChange={(e) => { setBusqueda(e.target.value); if (!abierto) setAbierto(true); }}
+        onFocus={() => { setBusqueda(""); setAbierto(true); }}
+        placeholder="Buscar artículo por nombre o SKU…"
+        className="input-horeca w-full"
+      />
+      {abierto && (
+        <div className="absolute z-20 mt-1 w-full min-w-[220px] bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-52 overflow-y-auto shadow-lg">
+          {resultados.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-slate-400">Sin resultados.</p>
+          ) : (
+            resultados.map((a) => (
+              <button key={a.id} type="button"
+                onClick={() => { onSeleccionar(String(a.id)); setBusqueda(""); setAbierto(false); }}
+                className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer flex items-center justify-between gap-2">
+                <span className="font-semibold text-slate-800 dark:text-white/80 truncate">{a.nombre}</span>
+                <span className="text-slate-400 font-mono flex-shrink-0">{a.sku}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
   tenantId: number; proveedores: ProveedorHoreca[] | null; articulos: Articulo[] | null; onCambio: () => void;
@@ -2587,6 +2859,8 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
   const [proveedorId, setProveedorId] = useState("");
   const [numeroFactura, setNumeroFactura] = useState("");
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
+  const [montoPagadoAhora, setMontoPagadoAhora] = useState("");
+  const [monedaPago, setMonedaPago] = useState("USD");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [exito, setExito] = useState(false);
@@ -2616,9 +2890,14 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
     if (items.length === 0) { setError("Agrega al menos un artículo con cantidad y costo"); return; }
     setGuardando(true);
     try {
-      await registrarCompraInsumo(tenantId, { proveedorId: Number(proveedorId), numeroFactura: numeroFactura.trim(), items });
+      await registrarCompraInsumo(tenantId, {
+        proveedorId: Number(proveedorId), numeroFactura: numeroFactura.trim(), items,
+        montoPagadoAhora: montoPagadoAhora ? Number(montoPagadoAhora) : undefined,
+        monedaPago: montoPagadoAhora ? monedaPago : undefined,
+      });
       setFilas([filaVacia()]);
       setNumeroFactura("");
+      setMontoPagadoAhora("");
       setExito(true);
       onCambio();
       setTimeout(() => setExito(false), 2500);
@@ -2647,10 +2926,7 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
         <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Artículos comprados</p>
         {filas.map((f, idx) => (
           <div key={idx} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1.2fr_auto] gap-2 items-center">
-            <select value={f.articuloId} onChange={(e) => actualizarFila(idx, "articuloId", e.target.value)} className="input-horeca">
-              <option value="">— Artículo —</option>
-              {(articulos || []).map((a) => <option key={a.id} value={a.id}>{a.nombre} ({a.sku})</option>)}
-            </select>
+            <BuscadorArticulo articulos={articulos} articuloId={f.articuloId} onSeleccionar={(id) => actualizarFila(idx, "articuloId", id)} />
             <input value={f.cantidad} onChange={(e) => actualizarFila(idx, "cantidad", e.target.value)} type="number" step="0.001" placeholder="Cantidad" className="input-horeca" />
             <input value={f.costoUnitario} onChange={(e) => actualizarFila(idx, "costoUnitario", e.target.value)} type="number" step="0.01" placeholder="Costo unit. $" className="input-horeca" />
             <div>
@@ -2669,11 +2945,33 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
         <button onClick={agregarFila} className="text-teal-600 dark:text-teal-400 text-xs font-semibold cursor-pointer">+ Agregar otro artículo</button>
       </div>
 
-      <div className="flex items-center justify-between pt-2 border-t border-slate-300/50 dark:border-white/10">
+      <div className="pt-2 border-t border-slate-300/50 dark:border-white/10 space-y-3">
         <div className="text-xs text-slate-500 dark:text-white/40">
           Total: <strong className="text-slate-900 dark:text-white">${totalCompra.toFixed(2)}</strong>
           {conVencimiento > 0 && <span className="ml-2 text-amber-500">· {conVencimiento} con fecha de vencimiento</span>}
         </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 max-w-sm">
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1">¿Cuánto le pagás al proveedor ahora?</label>
+            <input value={montoPagadoAhora} onChange={(e) => setMontoPagadoAhora(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00 — déjalo vacío si es todo a crédito" className="input-horeca" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1">Moneda</label>
+            <select value={monedaPago} onChange={(e) => setMonedaPago(e.target.value)} className="input-horeca">
+              {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+        </div>
+        {montoPagadoAhora && Number(montoPagadoAhora) > 0 && (
+          Number(montoPagadoAhora) >= totalCompra && monedaPago === "USD" ? (
+            <p className="text-xs font-semibold text-teal-600 dark:text-teal-400">✓ Factura pagada de una vez — no queda cuenta por pagar.</p>
+          ) : (
+            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+              Queda pendiente por pagar al proveedor — se registra como Cuenta por Pagar (visible en Administración).
+            </p>
+          )
+        )}
       </div>
 
       {error && <p className="text-xs text-red-500">{error}</p>}
@@ -2762,8 +3060,18 @@ function Vencimientos({ tenantId, onCambio }: { tenantId: number; onCambio: () =
 // ══════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN
 // ══════════════════════════════════════════════════════════════════════════
+// Valores de fábrica de cargos e impuestos — el negocio los ajusta una vez
+// acá y desde ese momento aparecen como chips listos para aplicar (o no) en
+// cada venta, sin tener que escribir el monto/porcentaje cada vez.
+const CARGOS_POR_DEFECTO = { propinaPct: 10, deliveryMonto: 2, empaqueMonto: 0.5, comisionPct: 3 };
+const IMPUESTOS_POR_DEFECTO = { ivaPct: 16, igtfPct: 3 };
+
 function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; config: any; onGuardar: (c: any) => void }) {
-  const [form, setForm] = useState(config);
+  const [form, setForm] = useState({
+    ...config,
+    cargosPorDefecto: { ...CARGOS_POR_DEFECTO, ...(config.cargosPorDefecto || {}) },
+    impuestosPorDefecto: { ...IMPUESTOS_POR_DEFECTO, ...(config.impuestosPorDefecto || {}) },
+  });
   const [guardado, setGuardado] = useState(false);
 
   const guardar = () => {
@@ -2781,6 +3089,49 @@ function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; conf
         <button onClick={guardar} className="g-aurora text-white text-sm font-semibold px-6 py-3 rounded-xl cursor-pointer">
           {guardado ? "✓ Guardado" : "Guardar configuración"}
         </button>
+      </div>
+
+      <div className="apple-glass rounded-2xl p-6 space-y-4">
+        <div>
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Cargos por defecto</h3>
+          <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">Valores listos para agregar con un clic al cerrar una venta — el cajero puede ajustarlos ahí si un caso puntual lo requiere.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label="Propina sugerida (%)">
+            <input type="number" step="0.5" min="0" value={form.cargosPorDefecto.propinaPct}
+              onChange={(e) => setForm({ ...form, cargosPorDefecto: { ...form.cargosPorDefecto, propinaPct: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+          <Campo label="Comisión de pago (%)">
+            <input type="number" step="0.5" min="0" value={form.cargosPorDefecto.comisionPct}
+              onChange={(e) => setForm({ ...form, cargosPorDefecto: { ...form.cargosPorDefecto, comisionPct: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+          <Campo label="Delivery ($)">
+            <input type="number" step="0.25" min="0" value={form.cargosPorDefecto.deliveryMonto}
+              onChange={(e) => setForm({ ...form, cargosPorDefecto: { ...form.cargosPorDefecto, deliveryMonto: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+          <Campo label="Empaque ($)">
+            <input type="number" step="0.10" min="0" value={form.cargosPorDefecto.empaqueMonto}
+              onChange={(e) => setForm({ ...form, cargosPorDefecto: { ...form.cargosPorDefecto, empaqueMonto: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+        </div>
+      </div>
+
+      <div className="apple-glass rounded-2xl p-6 space-y-4">
+        <div>
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Impuestos</h3>
+          <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">El cajero decide en cada venta si aplica IVA y/o IGTF — acá solo se define el porcentaje que se usa cuando los active.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label="IVA (%)">
+            <input type="number" step="0.5" min="0" value={form.impuestosPorDefecto.ivaPct}
+              onChange={(e) => setForm({ ...form, impuestosPorDefecto: { ...form.impuestosPorDefecto, ivaPct: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+          <Campo label="IGTF (%)">
+            <input type="number" step="0.5" min="0" value={form.impuestosPorDefecto.igtfPct}
+              onChange={(e) => setForm({ ...form, impuestosPorDefecto: { ...form.impuestosPorDefecto, igtfPct: Number(e.target.value) } })} className="input-horeca" />
+          </Campo>
+        </div>
+        <p className="text-[10px] text-slate-400">IGTF aplica típicamente a pagos en divisas (efectivo USD, tarjeta internacional) — actívalo según el método de pago de cada venta, no todas lo requieren.</p>
       </div>
 
       <TasasDeCambio tenantId={tenantId} />
@@ -2872,7 +3223,7 @@ function TasasDeCambio({ tenantId }: { tenantId: number }) {
 const CATEGORIA_RECETAS = "__RECETAS__";
 const CATEGORIA_FASTBAR = "__FASTBAR__";
 
-function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, onVenta, onCerrar, embebido, tasaValida, onRegistrarTasa }: {
+function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, cargosPorDefecto, impuestosPorDefecto, onVenta, onCerrar, embebido, tasaValida, onRegistrarTasa, onArticuloActualizado }: {
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
   tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
   onVenta: (monto: number, metodo: string) => void; onCerrar?: () => void;
@@ -2880,21 +3231,42 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   // completa ni header propio, que duplicarían lo que el dashboard ya
   // muestra) en vez de como modal flotante independiente.
   embebido?: boolean; tasaValida?: boolean; onRegistrarTasa?: () => void;
+  // Edición rápida desde la tarjeta del catálogo: el padre actualiza su
+  // lista de artículos en memoria con lo que devuelve el PUT, sin volver a
+  // pedirla al backend.
+  onArticuloActualizado?: (articulo: Articulo) => void;
+  // Valores de fábrica configurados en Configuración — el cajero solo
+  // decide si los activa en esta venta puntual, no los vuelve a escribir.
+  cargosPorDefecto?: typeof CARGOS_POR_DEFECTO; impuestosPorDefecto?: typeof IMPUESTOS_POR_DEFECTO;
 }) {
   interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
-  interface ReciboVenta { comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string }
+  interface ReciboVenta {
+    comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string;
+    totalRecibido?: number; vuelto?: number; monedaVuelto?: string;
+  }
   interface ItemCatalogo {
     key: string; tipo: "articulo" | "receta" | "fastbar"; id: number; nombre: string; precio: number; categoria: string;
     unidadMedida?: string; stockActual?: number; estacionCocina?: string; sku?: string;
   }
 
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
+  // Cargos e impuestos: se guardan como interruptores, no como líneas fijas
+  // del carrito — así el monto (% sobre el subtotal de productos) siempre
+  // queda correcto aunque el cajero siga agregando o quitando platos
+  // después de activarlos.
+  const cargosCfg = cargosPorDefecto ?? CARGOS_POR_DEFECTO;
+  const impuestosCfg = impuestosPorDefecto ?? IMPUESTOS_POR_DEFECTO;
+  const [cargosActivos, setCargosActivos] = useState<Record<"propina" | "delivery" | "empaque" | "comision", boolean>>({
+    propina: false, delivery: false, empaque: false, comision: false,
+  });
+  const [impuestosActivos, setImpuestosActivos] = useState<Record<"iva" | "igtf", boolean>>({ iva: false, igtf: false });
   // Por debajo de "lg" no hay espacio para catálogo + comanda lado a lado
   // (el panel derecho necesita 300-420px mínimo) — se muestra un panel a la
   // vez con una pestaña para cambiar, en vez de aplastar el grid.
   const [vistaMobile, setVistaMobile] = useState<"catalogo" | "carrito">("catalogo");
   const [busqueda, setBusqueda] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
+  const [paginaCatalogo, setPaginaCatalogo] = useState(1);
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recibo, setRecibo] = useState<ReciboVenta | null>(null);
@@ -2902,6 +3274,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   const [imprimiendoEscPos, setImprimiendoEscPos] = useState(false);
   const [moneda, setMoneda] = useState("USD");
   const [mostrarProductoLibre, setMostrarProductoLibre] = useState(false);
+  const [articuloEditando, setArticuloEditando] = useState<Articulo | null>(null);
   const [nombreLibre, setNombreLibre] = useState("");
   const [precioLibre, setPrecioLibre] = useState("");
   const [cantidadLibre, setCantidadLibre] = useState("1");
@@ -2945,7 +3318,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     const tabs: { key: string | null; label: string }[] = [{ key: null, label: "Todas" }];
     if ((escandallos || []).some((e) => e.activo !== false)) tabs.push({ key: CATEGORIA_RECETAS, label: "Recetas" });
     if ((fastbar || []).length > 0) tabs.push({ key: CATEGORIA_FASTBAR, label: "Fast-Bar" });
-    Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).sort()
+    Array.from(new Set((articulos || []).map((a) => a.categoria || "General"))).filter(esCategoriaValida).sort()
       .forEach((c) => tabs.push({ key: c, label: c }));
     return tabs;
   }, [escandallos, fastbar, articulos]);
@@ -2958,6 +3331,20 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
       return item.nombre.toLowerCase().includes(q) || (item.sku || "").toLowerCase().includes(q);
     }).sort((a, b) => Number(b.sku?.toLowerCase() === q) - Number(a.sku?.toLowerCase() === q));
   }, [catalogo, categoriaFiltro, busqueda]);
+
+  // Paginado del catálogo — antes todo el resultado se amontonaba en un
+  // solo scroll infinito sin ninguna referencia de cuánto faltaba; ahora
+  // se navega de a páginas con un indicador "Página X/Y" visible siempre.
+  const PRODUCTOS_POR_PAGINA = 12;
+  const totalPaginasCatalogo = Math.max(1, Math.ceil(catalogoFiltrado.length / PRODUCTOS_POR_PAGINA));
+  useEffect(() => { setPaginaCatalogo(1); }, [busqueda, categoriaFiltro]);
+  useEffect(() => {
+    if (paginaCatalogo > totalPaginasCatalogo) setPaginaCatalogo(totalPaginasCatalogo);
+  }, [paginaCatalogo, totalPaginasCatalogo]);
+  const catalogoPagina = useMemo(
+    () => catalogoFiltrado.slice((paginaCatalogo - 1) * PRODUCTOS_POR_PAGINA, paginaCatalogo * PRODUCTOS_POR_PAGINA),
+    [catalogoFiltrado, paginaCatalogo]
+  );
 
   useEffect(() => {
     if (clienteSel || !busquedaCliente.trim()) { setResultadosCliente([]); return; }
@@ -3012,7 +3399,28 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     setNombreLibre(""); setPrecioLibre(""); setCantidadLibre("1"); setMostrarProductoLibre(false);
   };
 
-  const total = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0);
+  const subtotalProductos = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0);
+
+  // Cargos: delivery/empaque son montos fijos por venta; propina/comisión
+  // son porcentaje sobre el subtotal de productos (nunca sobre otro cargo).
+  // Se marcan con estacionCocina "CARGOS" — un valor que no existe en
+  // ESTACIONES — para que nunca aparezcan como plato fantasma en el KDS.
+  const cargosLineas: LineaCarrito[] = [];
+  if (cargosActivos.propina) cargosLineas.push({ key: "cargo-propina", nombre: `Propina (${cargosCfg.propinaPct}%)`, precio: subtotalProductos * (cargosCfg.propinaPct / 100), cantidad: 1, estacionCocina: "CARGOS" });
+  if (cargosActivos.comision) cargosLineas.push({ key: "cargo-comision", nombre: `Comisión de pago (${cargosCfg.comisionPct}%)`, precio: subtotalProductos * (cargosCfg.comisionPct / 100), cantidad: 1, estacionCocina: "CARGOS" });
+  if (cargosActivos.delivery) cargosLineas.push({ key: "cargo-delivery", nombre: "Delivery", precio: cargosCfg.deliveryMonto, cantidad: 1, estacionCocina: "CARGOS" });
+  if (cargosActivos.empaque) cargosLineas.push({ key: "cargo-empaque", nombre: "Empaque", precio: cargosCfg.empaqueMonto, cantidad: 1, estacionCocina: "CARGOS" });
+  const subtotalConCargos = subtotalProductos + cargosLineas.reduce((s, l) => s + l.precio, 0);
+
+  // Impuestos: el cajero decide en cada venta si esta transacción los lleva
+  // (ej. IGTF solo aplica a ciertos pagos en divisas) — el % es el que se
+  // configuró una vez en Configuración, no se reescribe cada vez.
+  const impuestosLineas: LineaCarrito[] = [];
+  if (impuestosActivos.iva) impuestosLineas.push({ key: "impuesto-iva", nombre: `IVA (${impuestosCfg.ivaPct}%)`, precio: subtotalConCargos * (impuestosCfg.ivaPct / 100), cantidad: 1, estacionCocina: "CARGOS" });
+  if (impuestosActivos.igtf) impuestosLineas.push({ key: "impuesto-igtf", nombre: `IGTF (${impuestosCfg.igtfPct}%)`, precio: subtotalConCargos * (impuestosCfg.igtfPct / 100), cantidad: 1, estacionCocina: "CARGOS" });
+
+  const lineasParaCobrar = [...carrito, ...cargosLineas, ...impuestosLineas];
+  const total = subtotalConCargos + impuestosLineas.reduce((s, l) => s + l.precio, 0);
 
   const cobrar = async (pagos: PagoParcial[], monedaVuelto: string) => {
     if (carrito.length === 0) return;
@@ -3020,7 +3428,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     setProcesando(true);
     try {
       const comanda = await abrirComanda(tenantId, { mesero: "Mostrador", canal: "RECOGER_EN_TIENDA", clienteId: clienteSel?.id });
-      for (const linea of carrito) {
+      for (const linea of lineasParaCobrar) {
         await agregarItemComanda(tenantId, comanda.id, {
           escandalloId: linea.escandalloId,
           articuloId: linea.articuloId,
@@ -3033,14 +3441,63 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
       const resultado = await cerrarComandaMixto(tenantId, comanda.id, pagos, monedaVuelto);
       const metodoResumen = resultado.comanda.metodoPago || "MIXTO";
       onVenta(total, metodoResumen);
-      setRecibo({ comandaId: comanda.id, lineas: carrito, total, metodoPago: metodoResumen, fecha: new Date().toLocaleString() });
+      setRecibo({
+        comandaId: comanda.id, lineas: lineasParaCobrar, total, metodoPago: metodoResumen, fecha: new Date().toLocaleString(),
+        totalRecibido: resultado.totalRecibidoBase, vuelto: resultado.vueltoEnMonedaVuelto, monedaVuelto: resultado.monedaVuelto,
+      });
       setCarrito([]);
+      setCargosActivos({ propina: false, delivery: false, empaque: false, comision: false });
+      setImpuestosActivos({ iva: false, igtf: false });
       setClienteSel(null); setBusquedaCliente("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo procesar la venta");
     } finally {
       setProcesando(false);
     }
+  };
+
+  // Cotización/presupuesto: un PDF con el mismo carrito, pero sin abrir
+  // comanda ni tocar inventario o caja — el cliente todavía no compró nada,
+  // solo se lleva un precio por escrito. Válida un número de días fijo
+  // porque los precios en el negocio cambian con el tipo de cambio.
+  const generarCotizacion = () => {
+    if (lineasParaCobrar.length === 0) return;
+    const doc = new jsPDF();
+    const hoyFmt = new Date().toLocaleDateString("es-VE");
+    const vencimiento = new Date(); vencimiento.setDate(vencimiento.getDate() + 7);
+
+    doc.setFontSize(16); doc.setFont("helvetica", "bold");
+    doc.text(nombreLocal, 14, 18);
+    doc.setFontSize(11); doc.setFont("helvetica", "normal");
+    doc.text("Cotización de venta", 14, 26);
+    doc.setFontSize(9); doc.setTextColor(100);
+    doc.text(`Fecha: ${hoyFmt}    Válida hasta: ${vencimiento.toLocaleDateString("es-VE")}`, 14, 32);
+    if (clienteSel) doc.text(`Cliente: ${clienteSel.nombre}${clienteSel.identificacionRif ? " · " + clienteSel.identificacionRif : ""}`, 14, 37);
+    doc.setTextColor(0);
+
+    let y = clienteSel ? 46 : 42;
+    doc.setFontSize(9); doc.setFont("helvetica", "bold");
+    doc.text("Cant.", 14, y); doc.text("Descripción", 32, y); doc.text("P. Unit.", 150, y, { align: "right" }); doc.text("Subtotal", 196, y, { align: "right" });
+    y += 2; doc.setDrawColor(200); doc.line(14, y, 196, y); y += 6;
+    doc.setFont("helvetica", "normal");
+    lineasParaCobrar.forEach((l) => {
+      doc.text(String(l.cantidad), 14, y);
+      doc.text(l.nombre, 32, y, { maxWidth: 110 });
+      doc.text(`$${l.precio.toFixed(2)}`, 150, y, { align: "right" });
+      doc.text(`$${(l.precio * l.cantidad).toFixed(2)}`, 196, y, { align: "right" });
+      y += 7;
+    });
+    y += 2; doc.line(140, y, 196, y); y += 7;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+    doc.text("Total:", 150, y, { align: "right" }); doc.text(`$${total.toFixed(2)}`, 196, y, { align: "right" });
+    if (tasaBcv && Number(tasaBcv.tasa) > 0) {
+      y += 6; doc.setFontSize(9); doc.setFont("helvetica", "normal");
+      doc.text(`≈ Bs. ${(total * Number(tasaBcv.tasa)).toFixed(2)} (tasa BCV ${Number(tasaBcv.tasa).toFixed(2)})`, 196, y, { align: "right" });
+    }
+    doc.setFontSize(8); doc.setTextColor(120);
+    doc.text("Esta cotización no constituye una venta ni afecta inventario o caja — los precios pueden variar según el tipo de cambio vigente al momento de la compra.", 14, 285, { maxWidth: 182 });
+
+    doc.save(`cotizacion_${nombreLocal.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   const verTicket = async () => {
@@ -3170,11 +3627,14 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
           }`}>Comanda{carrito.length > 0 && ` · ${carrito.length} · $${total.toFixed(2)}`}</button>
       </div>
 
-      {/* CUERPO: catálogo (70%) + carrito (30%) en pantallas grandes; un panel a la vez debajo de "lg" */}
-      <div className="flex-1 flex min-h-0">
+      {/* CUERPO: grid de 12 columnas en pantallas grandes — catálogo (7) +
+          comanda/cobro (5), más ancho que antes para que los montos y el
+          cobro mixto respiren; debajo de "lg" sigue siendo un panel a la
+          vez (flex, sin grid) por el selector de pestañas móvil. */}
+      <div className="flex-1 flex min-h-0 lg:grid lg:grid-cols-12">
         {/* PANEL IZQUIERDO — CATÁLOGO */}
-        <div className={`${vistaMobile === "catalogo" ? "flex" : "hidden"} lg:flex flex-1 lg:flex-[7] min-w-0 flex-col p-4 gap-3 overflow-hidden`}>
-          <div className="relative flex-shrink-0">
+        <div className={`${vistaMobile === "catalogo" ? "flex" : "hidden"} lg:flex lg:col-span-6 flex-1 min-w-0 min-h-0 flex-col p-4 gap-3 overflow-hidden`}>
+          <div className="relative shrink-0">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={15} /></span>
             <input
               ref={busquedaRef}
@@ -3218,33 +3678,66 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pb-4">
-                {catalogoFiltrado.map((item) => {
+                {catalogoPagina.map((item) => {
                   const sinStock = item.tipo === "articulo" && (item.stockActual ?? 0) <= 0;
                   return (
-                    <button key={item.key} type="button" disabled={sinStock} onClick={() => agregarDesdeTarjeta(item)}
-                      className={`apple-glass rounded-xl p-3.5 text-left transition-all border border-transparent ${
-                        sinStock ? "opacity-40 cursor-not-allowed" : "hover:border-teal-500/40 hover:scale-[1.02] cursor-pointer active:scale-[0.98]"
-                      }`}>
-                      <div className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full inline-block mb-1.5 ${
-                        item.tipo === "receta" ? "bg-purple-500/15 text-purple-600 dark:text-purple-300"
-                        : item.tipo === "fastbar" ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"
-                        : "bg-teal-500/15 text-teal-600 dark:text-teal-300"
-                      }`}>{item.tipo === "receta" ? "RECETA" : item.tipo === "fastbar" ? "FAST-BAR" : "INVENTARIO"}</div>
-                      <div className="text-xs font-semibold text-slate-900 dark:text-white leading-snug line-clamp-2 min-h-[2.2em]">{item.nombre}</div>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">${item.precio.toFixed(2)}</span>
-                        {item.tipo === "articulo" && (
-                          <span className={`text-[9px] font-mono ${sinStock ? "text-red-500" : "text-slate-400 dark:text-white/40"}`}>
-                            {sinStock ? "Sin stock" : `${item.stockActual} ${item.unidadMedida}`}
-                          </span>
-                        )}
-                      </div>
-                    </button>
+                    // relative: la tarjeta sigue siendo un solo <button> para
+                    // el agregado rápido; el ícono de edición va como
+                    // hermano posicionado encima, no anidado (un <button>
+                    // dentro de otro <button> es HTML inválido).
+                    <div key={item.key} className="relative">
+                      <button type="button" disabled={sinStock} onClick={() => agregarDesdeTarjeta(item)}
+                        className={`w-full apple-glass rounded-xl p-3.5 text-left transition-all border border-transparent ${
+                          sinStock ? "opacity-40 cursor-not-allowed" : "hover:border-teal-500/40 hover:scale-[1.02] cursor-pointer active:scale-[0.98]"
+                        }`}>
+                        <div className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full inline-block mb-1.5 ${
+                          item.tipo === "receta" ? "bg-purple-500/15 text-purple-600 dark:text-purple-300"
+                          : item.tipo === "fastbar" ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"
+                          : "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+                        }`}>{item.tipo === "receta" ? "RECETA" : item.tipo === "fastbar" ? "FAST-BAR" : "INVENTARIO"}</div>
+                        <div className="text-xs font-semibold text-slate-900 dark:text-white leading-snug line-clamp-2 min-h-[2.2em] pr-4">{item.nombre}</div>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">${item.precio.toFixed(2)}</span>
+                          {item.tipo === "articulo" && (
+                            <span className={`text-[9px] font-mono ${sinStock ? "text-red-500" : "text-slate-400 dark:text-white/40"}`}>
+                              {sinStock ? "Sin stock" : `${item.stockActual} ${item.unidadMedida}`}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                      {item.tipo === "articulo" && (
+                        <button type="button" title="Editar artículo" onClick={(e) => {
+                          e.stopPropagation();
+                          const completo = (articulos || []).find((a) => a.id === item.id);
+                          if (completo) setArticuloEditando(completo);
+                        }}
+                          className="absolute top-2 right-2 w-5 h-5 rounded-full bg-white/80 dark:bg-black/40 flex items-center justify-center text-slate-400 hover:text-teal-600 dark:hover:text-teal-300 opacity-70 hover:opacity-100 cursor-pointer transition-opacity">
+                          <IconCustomize size={11} />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
             )}
           </div>
+
+          {/* Paginación del catálogo — fuera del área con scroll (shrink-0),
+              siempre visible con el indicador "Página X/Y" para saber
+              cuánto falta y poder navegar sin depender del scroll. */}
+          {catalogoFiltrado.length > PRODUCTOS_POR_PAGINA && (
+            <div className="flex items-center justify-between shrink-0 pt-2">
+              <button type="button" onClick={() => setPaginaCatalogo((p) => Math.max(1, p - 1))} disabled={paginaCatalogo <= 1}
+                className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-300/60 dark:hover:bg-white/15 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                ← Anterior
+              </button>
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-white/40">Página {paginaCatalogo}/{totalPaginasCatalogo}</span>
+              <button type="button" onClick={() => setPaginaCatalogo((p) => Math.min(totalPaginasCatalogo, p + 1))} disabled={paginaCatalogo >= totalPaginasCatalogo}
+                className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-300/60 dark:hover:bg-white/15 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                Siguiente →
+              </button>
+            </div>
+          )}
         </div>
 
         {/* PANEL DERECHO — COMANDA ACTIVA
@@ -3252,7 +3745,15 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             flexbox) el hijo "flex-1 overflow-y-auto" de abajo no tiene un
             límite real de alto contra el cual hacer scroll — en vez de
             desplazarse, empuja/aplasta el pie de totales y cobro. */}
-        <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex flex-1 lg:flex-[3] lg:min-w-[300px] lg:max-w-[420px] flex-shrink-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col h-full min-h-0 bg-white/30 dark:bg-black/10`}>
+        {/* overflow-y-auto de respaldo en el panel entero: en un viewport
+            bajo, cabecera (cliente) + piso de la lista (150px) + pie de
+            cobro (shrink-0, nunca se comprime) pueden sumar más alto que
+            el panel disponible. Sin esto, lo que no entra queda cortado
+            por el overflow-hidden del contenedor raíz del POS — el botón
+            "Cobrar y Cerrar" desaparece de la vista aunque siga en el DOM.
+            Con esto, en vez de desaparecer, el panel completo se puede
+            desplazar hasta él. */}
+        <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex lg:col-span-6 flex-1 min-w-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col h-full min-h-0 overflow-y-auto bg-white/30 dark:bg-black/10`}>
           {/* Cabecera: cliente CRM */}
           <div className="p-4 border-b border-slate-300/50 dark:border-white/10 flex-shrink-0">
             <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1.5">Cliente (opcional)</p>
@@ -3274,7 +3775,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                         <button key={c.id} type="button"
                           onClick={() => { setClienteSel(c); setBusquedaCliente(""); setResultadosCliente([]); }}
                           className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer">
-                          <div className="font-semibold text-slate-800 dark:text-white truncate">{c.nombre}</div>
+                          <div className="font-semibold text-slate-800 dark:text-white/80 truncate">{c.nombre}</div>
                           {c.identificacionRif && <div className="text-[10px] text-slate-400 truncate">{c.identificacionRif}</div>}
                         </button>
                       ))}
@@ -3291,28 +3792,29 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               espacio disponible, min-h-[150px] le pone un piso real para
               que nunca quede aplastado a casi nada aunque el pie de cobro
               (shrink-0, nunca se comprime) sea alto. */}
-          <div className="flex-1 overflow-y-auto min-h-[150px] p-4 space-y-2">
-            <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-1">Comanda activa</h3>
+          <div className="flex-1 overflow-y-auto min-h-[150px] p-4 space-y-2.5">
+            <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base mb-1.5">Comanda activa</h3>
             {carrito.length === 0 ? (
-              <p className="text-xs text-slate-400">Toca un producto del catálogo para agregarlo aquí.</p>
+              <p className="text-sm text-slate-400">Toca un producto del catálogo para agregarlo aquí.</p>
             ) : (
               carrito.map((l) => (
-                <div key={l.key} className="flex items-center justify-between gap-2 bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2">
+                <div key={l.key} className="flex items-center justify-between gap-3 bg-slate-100/60 dark:bg-white/5 rounded-xl px-4 py-3">
                   {/* Nombre: flex-1 truncate — un nombre largo ("COCA COLA
                       255ML") nunca empuja ni deforma los botones de cantidad. */}
                   <div className="flex-1 min-w-0 truncate">
-                    <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{l.nombre}</div>
-                    <div className="text-[10px] text-slate-500 dark:text-white/40 font-mono">${l.precio.toFixed(2)} c/u</div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">{l.nombre}</div>
+                    <div className="text-xs text-slate-500 dark:text-white/40 font-mono">${l.precio.toFixed(2)} c/u</div>
                   </div>
-                  {/* Botones de cantidad: shrink-0 — mantienen su tamaño fijo
-                      sin comprimirse ni deformarse verticalmente. */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button onClick={() => cambiarCantidad(l.key, -1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer shrink-0">−</button>
-                    <span className="text-xs font-bold w-5 text-center shrink-0">{l.cantidad}</span>
-                    <button onClick={() => cambiarCantidad(l.key, 1)} className="w-6 h-6 rounded-full bg-slate-200/80 dark:bg-white/10 text-xs cursor-pointer shrink-0">+</button>
+                  {/* Botones de cantidad: shrink-0, tamaño grande y cómodo de
+                      presionar — mantienen su tamaño fijo sin comprimirse
+                      ni deformarse verticalmente. */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => cambiarCantidad(l.key, -1)} className="w-8 h-8 rounded-full bg-slate-200/80 dark:bg-white/10 text-sm font-bold cursor-pointer shrink-0">−</button>
+                    <span className="text-sm font-bold w-6 text-center shrink-0">{l.cantidad}</span>
+                    <button onClick={() => cambiarCantidad(l.key, 1)} className="w-8 h-8 rounded-full bg-slate-200/80 dark:bg-white/10 text-sm font-bold cursor-pointer shrink-0">+</button>
                     <button onClick={() => quitarLinea(l.key)} title="Quitar de la venta"
-                      className="w-6 h-6 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer shrink-0 ml-0.5">
-                      <IconTrash size={13} />
+                      className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer shrink-0 ml-0.5">
+                      <IconTrash size={15} />
                     </button>
                   </div>
                 </div>
@@ -3324,7 +3826,53 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               comprime, así el carrito largo scrollea por dentro en vez de
               aplastar este bloque contra el borde. */}
           <div className="shrink-0 p-4 border-t border-slate-300/50 dark:border-white/10 space-y-3">
+            {/* Cargos e impuestos: chips de un clic — el monto ya sale
+                calculado con los valores de Configuración, el cajero solo
+                decide si esta venta puntual los lleva. */}
+            {carrito.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  ["propina", `Propina ${cargosCfg.propinaPct}%`],
+                  ["comision", `Comisión ${cargosCfg.comisionPct}%`],
+                  ["delivery", `Delivery $${cargosCfg.deliveryMonto.toFixed(2)}`],
+                  ["empaque", `Empaque $${cargosCfg.empaqueMonto.toFixed(2)}`],
+                ] as const).map(([clave, label]) => (
+                  <button key={clave}
+                    onClick={() => setCargosActivos((prev) => ({ ...prev, [clave]: !prev[clave] }))}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border cursor-pointer transition-colors ${
+                      cargosActivos[clave] ? "bg-teal-600 border-teal-600 text-white" : "border-slate-300/60 dark:border-white/15 text-slate-500 dark:text-white/50"
+                    }`}>
+                    {cargosActivos[clave] ? "✓ " : "+ "}{label}
+                  </button>
+                ))}
+                {([
+                  ["iva", `IVA ${impuestosCfg.ivaPct}%`],
+                  ["igtf", `IGTF ${impuestosCfg.igtfPct}%`],
+                ] as const).map(([clave, label]) => (
+                  <button key={clave}
+                    onClick={() => setImpuestosActivos((prev) => ({ ...prev, [clave]: !prev[clave] }))}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border cursor-pointer transition-colors ${
+                      impuestosActivos[clave] ? "bg-amber-600 border-amber-600 text-white" : "border-slate-300/60 dark:border-white/15 text-slate-500 dark:text-white/50"
+                    }`}>
+                    {impuestosActivos[clave] ? "✓ " : "+ "}{label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div>
+              {(cargosLineas.length > 0 || impuestosLineas.length > 0) && (
+                <div className="space-y-0.5 mb-1.5">
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-white/40">
+                    <span>Subtotal</span><span className="font-mono">${subtotalProductos.toFixed(2)}</span>
+                  </div>
+                  {[...cargosLineas, ...impuestosLineas].map((l) => (
+                    <div key={l.key} className="flex items-center justify-between text-xs text-slate-500 dark:text-white/40">
+                      <span>{l.nombre}</span><span className="font-mono">${l.precio.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex items-center justify-between font-black text-2xl text-slate-900 dark:text-white">
                 <span className="text-sm font-bold text-slate-500 dark:text-white/40">Total</span><span className="font-mono">${total.toFixed(2)}</span>
               </div>
@@ -3340,11 +3888,26 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               )}
             </div>
             {carrito.length > 0 && (
-              <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
+              <>
+                <button onClick={generarCotizacion}
+                  className="w-full text-[11px] font-bold text-slate-500 dark:text-white/50 hover:text-teal-600 dark:hover:text-teal-300 cursor-pointer py-1">
+                  📄 Generar cotización (PDF) — no cobra ni descuenta inventario
+                </button>
+                <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
+              </>
             )}
           </div>
         </div>
       </div>
+
+      {articuloEditando && (
+        <ModalEditarArticulo
+          tenantId={tenantId}
+          articulo={articuloEditando}
+          onClose={() => setArticuloEditando(null)}
+          onGuardado={(actualizado) => { onArticuloActualizado?.(actualizado); setArticuloEditando(null); }}
+        />
+      )}
 
       {mostrarProductoLibre && (
         <Modal onClose={() => setMostrarProductoLibre(false)} titulo="Producto libre">
@@ -3378,6 +3941,14 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               </div>
             </div>
 
+            {/* Identificador único de la venta — mismo folio ("COM-<id>")
+                que usa el reporte de tickets y que se necesita para anular,
+                reclamar o auditar esta venta puntual más adelante. */}
+            <div className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-lg px-3 py-2">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 dark:text-white/30">Nro. de venta</span>
+              <span className="font-mono font-bold text-sm text-slate-800 dark:text-white/90">COM-{recibo.comandaId}</span>
+            </div>
+
             <div className="space-y-1.5">
               {recibo.lineas.map((l) => (
                 <div key={l.key} className="flex items-center justify-between text-sm">
@@ -3403,6 +3974,18 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               )}
             </div>
             <div className="text-xs text-slate-700 dark:text-white/80 font-medium">Pagado con: <span className="font-bold text-slate-900 dark:text-white">{recibo.metodoPago.replace("_", " ")}</span></div>
+
+            {/* Recibido/vuelto: sin esto el recibo en pantalla no coincide con
+                lo que el cajero de verdad hizo — un hueco contable grave para
+                el arqueo de caja del día. */}
+            {recibo.totalRecibido != null && (
+              <div className="text-xs text-slate-700 dark:text-white/80 font-medium">Recibido: <span className="font-bold text-slate-900 dark:text-white font-mono">${recibo.totalRecibido.toFixed(2)}</span></div>
+            )}
+            {recibo.vuelto != null && recibo.vuelto > 0.004 && (
+              <div className="text-sm font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2">
+                Vuelto entregado: <span className="font-mono">{recibo.vuelto.toFixed(2)} {recibo.monedaVuelto}</span>
+              </div>
+            )}
 
             {error && <p className="text-xs text-red-500">{error}</p>}
 
@@ -3470,6 +4053,7 @@ function ModalClienteRapido({ tenantId, onClose, onCreado }: { tenantId: number;
 // genera el .xlsx, solo entrega el JSON ya filtrado.
 // ══════════════════════════════════════════════════════════════════════════
 function ReportesOperativos({ tenantId }: { tenantId: number }) {
+  const { user } = useAuth();
   const [fechaInicio, setFechaInicio] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10);
   });
@@ -3479,6 +4063,27 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
   const [tickets, setTickets] = useState<ReporteTicket[] | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Anulación: comandaId cuya fila tiene abierto el campo de motivo — nunca
+  // se anula con un solo clic, siempre hay que escribir por qué.
+  const [anulandoId, setAnulandoId] = useState<number | null>(null);
+  const [motivoAnular, setMotivoAnular] = useState("");
+  const [procesandoAnulacion, setProcesandoAnulacion] = useState(false);
+
+  const confirmarAnulacion = async (comandaId: number) => {
+    if (!motivoAnular.trim()) { setError("Indica el motivo de la anulación"); return; }
+    setProcesandoAnulacion(true);
+    setError(null);
+    try {
+      await anularComanda(tenantId, comandaId, { motivo: motivoAnular.trim(), usuario: user?.nombre });
+      setAnulandoId(null);
+      setMotivoAnular("");
+      buscar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo anular la venta");
+    } finally {
+      setProcesandoAnulacion(false);
+    }
+  };
 
   const buscar = () => {
     setCargando(true);
@@ -3578,25 +4183,56 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                   <th className="py-2 px-3 text-right">Total USD</th>
                   <th className="py-2 px-3 text-right">Total Bs</th>
                   <th className="py-2 px-3">Método de Pago</th>
-                  <th className="py-2 pl-3">Estado</th>
+                  <th className="py-2 px-3">Estado</th>
+                  <th className="py-2 pl-3 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {tickets.map((t) => (
-                  <tr key={t.comandaId} className="border-b border-slate-200/50 dark:border-white/5">
-                    <td className="py-2 pr-3 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fecha).toLocaleString()}</td>
-                    <td className="py-2 px-3 font-mono font-semibold text-slate-800 dark:text-white">{t.numeroTicket}</td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white">${Number(t.totalUsd).toFixed(2)}</td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.totalBs != null ? `Bs ${Number(t.totalBs).toFixed(2)}` : "—"}</td>
-                    <td className="py-2 px-3 text-slate-600 dark:text-white/60">{(t.metodoPago || "-").replace("_", " ")}</td>
-                    <td className="py-2 pl-3">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        t.estado === "PAGADA" ? "bg-teal-500/15 text-teal-600 dark:text-teal-300"
-                        : t.estado === "ANULADA" ? "bg-red-500/15 text-red-500"
-                        : "bg-amber-500/15 text-amber-600 dark:text-amber-300"
-                      }`}>{t.estado}</span>
-                    </td>
-                  </tr>
+                  <Fragment key={t.comandaId}>
+                    <tr className="border-b border-slate-200/50 dark:border-white/5">
+                      <td className="py-2 pr-3 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fecha).toLocaleString()}</td>
+                      <td className="py-2 px-3 font-mono font-semibold text-slate-800 dark:text-white/80">{t.numeroTicket}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white/80">${Number(t.totalUsd).toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.totalBs != null ? `Bs ${Number(t.totalBs).toFixed(2)}` : "—"}</td>
+                      <td className="py-2 px-3 text-slate-600 dark:text-white/60">{(t.metodoPago || "-").replace("_", " ")}</td>
+                      <td className="py-2 px-3">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          t.estado === "PAGADA" ? "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+                          : t.estado === "ANULADA" ? "bg-red-500/15 text-red-500"
+                          : "bg-amber-500/15 text-amber-600 dark:text-amber-300"
+                        }`}>{t.estado}</span>
+                      </td>
+                      <td className="py-2 pl-3 text-right">
+                        {t.estado !== "ANULADA" && (
+                          <button
+                            onClick={() => { setAnulandoId(anulandoId === t.comandaId ? null : t.comandaId); setMotivoAnular(""); setError(null); }}
+                            className="text-[11px] font-semibold text-red-500 hover:text-red-600 cursor-pointer"
+                          >
+                            Anular
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                    {anulandoId === t.comandaId && (
+                      <tr className="border-b border-slate-200/50 dark:border-white/5 bg-red-500/5">
+                        <td colSpan={7} className="px-3 py-2.5">
+                          <div className="flex items-center gap-2 max-w-lg ml-auto">
+                            <input
+                              value={motivoAnular} onChange={(e) => setMotivoAnular(e.target.value)} autoFocus
+                              placeholder={`Motivo de la anulación de ${t.numeroTicket} (obligatorio)`}
+                              className="input-horeca text-xs flex-1"
+                            />
+                            <button onClick={() => confirmarAnulacion(t.comandaId)} disabled={procesandoAnulacion}
+                              className="text-xs font-bold px-3 py-2 rounded-lg bg-red-500 text-white cursor-pointer disabled:opacity-60 flex-shrink-0">
+                              {procesandoAnulacion ? "Anulando…" : "Confirmar anulación"}
+                            </button>
+                            <button onClick={() => { setAnulandoId(null); setMotivoAnular(""); }} className="text-xs font-semibold text-slate-500 cursor-pointer flex-shrink-0">Cancelar</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
               <tfoot>
@@ -3604,12 +4240,149 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                   <td className="py-2 pr-3" colSpan={2}>Total</td>
                   <td className="py-2 px-3 text-right font-mono">${totales.usd.toFixed(2)}</td>
                   <td className="py-2 px-3 text-right font-mono">Bs {totales.bs.toFixed(2)}</td>
-                  <td colSpan={2}></td>
+                  <td colSpan={3}></td>
                 </tr>
               </tfoot>
             </table>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+const DIAS_SEMANA_CORTOS = ["L", "M", "X", "J", "V", "S", "D"];
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const fmtFechaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// ══════════════════════════════════════════════════════════════════════════
+// RESUMEN GENERAL — el dashboard gerencial vive acá, separado por completo
+// de la Vista General (que ahora es una terminal de caja pura). KPIs de
+// ventas de hoy/semana en tiempo real + un calendario para auditar
+// cualquier día anterior sin mezclar analítica con el flujo de cobro.
+// ══════════════════════════════════════════════════════════════════════════
+function ResumenGeneral({ tenantId }: { tenantId: number }) {
+  const [ventasHoy, setVentasHoy] = useState<number | null>(null);
+  const [ticketsHoy, setTicketsHoy] = useState(0);
+  const [ventasSemana, setVentasSemana] = useState<number | null>(null);
+
+  const hoy = useMemo(() => new Date(), []);
+  const hoyStr = fmtFechaLocal(hoy);
+  const [vista, setVista] = useState(() => ({ anio: hoy.getFullYear(), mes: hoy.getMonth() }));
+  const [fechaSel, setFechaSel] = useState(hoyStr);
+  const [ticketsDia, setTicketsDia] = useState<ReporteTicket[] | null>(null);
+
+  useEffect(() => {
+    const diaSemana = hoy.getDay(); // 0 = domingo
+    const lunes = new Date(hoy);
+    lunes.setDate(hoy.getDate() - ((diaSemana + 6) % 7));
+    const lunesStr = fmtFechaLocal(lunes);
+
+    reporteTickets(tenantId, { fechaInicio: hoyStr, fechaFin: hoyStr, estado: "PAGADA" })
+      .then((lista) => { setVentasHoy(lista.reduce((s, t) => s + Number(t.totalUsd), 0)); setTicketsHoy(lista.length); })
+      .catch(() => { setVentasHoy(0); setTicketsHoy(0); });
+
+    reporteTickets(tenantId, { fechaInicio: lunesStr, fechaFin: hoyStr, estado: "PAGADA" })
+      .then((lista) => setVentasSemana(lista.reduce((s, t) => s + Number(t.totalUsd), 0)))
+      .catch(() => setVentasSemana(0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
+
+  useEffect(() => {
+    setTicketsDia(null);
+    reporteTickets(tenantId, { fechaInicio: fechaSel, fechaFin: fechaSel, estado: "PAGADA" })
+      .then(setTicketsDia)
+      .catch(() => setTicketsDia([]));
+  }, [tenantId, fechaSel]);
+
+  const totalDiaSel = (ticketsDia || []).reduce((s, t) => s + Number(t.totalUsd), 0);
+
+  const primerDiaMes = new Date(vista.anio, vista.mes, 1);
+  const diasEnMes = new Date(vista.anio, vista.mes + 1, 0).getDate();
+  const offsetInicio = (primerDiaMes.getDay() + 6) % 7; // semana empieza en lunes
+  const celdas: (number | null)[] = [...Array(offsetInicio).fill(null), ...Array.from({ length: diasEnMes }, (_, i) => i + 1)];
+  const fechaCelda = (dia: number) => `${vista.anio}-${String(vista.mes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+
+  const cambiarMes = (delta: number) => setVista(({ anio, mes }) => {
+    const d = new Date(anio, mes + delta, 1);
+    return { anio: d.getFullYear(), mes: d.getMonth() };
+  });
+
+  const fechaSelObj = new Date(fechaSel + "T00:00:00");
+  const fechaSelLegible = fechaSelObj.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <KpiCard label="Ventas del Día" val={ventasHoy === null ? "…" : `$${ventasHoy.toFixed(2)}`} sub={`${ticketsHoy} ticket${ticketsHoy === 1 ? "" : "s"} hoy`} color="#10b981" />
+        <KpiCard label="Ventas de la Semana" val={ventasSemana === null ? "…" : `$${ventasSemana.toFixed(2)}`} sub="Lunes a hoy" color="#0ea5e9" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start">
+        {/* Calendario histórico */}
+        <div className="apple-glass rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <button onClick={() => cambiarMes(-1)} className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 cursor-pointer text-slate-500 dark:text-white/60"><IconChevronLeft size={16} /></button>
+            <span className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">{MESES[vista.mes]} {vista.anio}</span>
+            <button onClick={() => cambiarMes(1)} className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 cursor-pointer text-slate-500 dark:text-white/60"><IconChevronRight size={16} /></button>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-[10px] font-semibold text-center text-slate-400 dark:text-white/30 mb-1.5">
+            {DIAS_SEMANA_CORTOS.map((d) => <div key={d}>{d}</div>)}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {celdas.map((dia, i) => {
+              if (dia === null) return <div key={i} />;
+              const fecha = fechaCelda(dia);
+              const esHoy = fecha === hoyStr;
+              const esSel = fecha === fechaSel;
+              const esFuturo = fecha > hoyStr;
+              return (
+                <button key={i} type="button" disabled={esFuturo} onClick={() => setFechaSel(fecha)}
+                  className={`aspect-square rounded-lg text-xs font-semibold transition-colors ${
+                    esFuturo ? "text-slate-300 dark:text-white/15 cursor-not-allowed"
+                    : esSel ? "bg-teal-600 text-white cursor-pointer"
+                    : esHoy ? "border border-teal-500 text-teal-600 dark:text-teal-400 cursor-pointer"
+                    : "text-slate-600 dark:text-white/60 hover:bg-slate-200/60 dark:hover:bg-white/10 cursor-pointer"
+                  }`}>
+                  {dia}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Detalle del día seleccionado */}
+        <div className="apple-glass rounded-2xl p-5">
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base capitalize mb-4">{fechaSelLegible}</h3>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="apple-glass rounded-xl p-3.5">
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Total del día</div>
+              <div className="font-['Outfit'] font-black text-xl text-teal-600 dark:text-teal-400">${totalDiaSel.toFixed(2)}</div>
+            </div>
+            <div className="apple-glass rounded-xl p-3.5">
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Transacciones</div>
+              <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{(ticketsDia || []).length}</div>
+            </div>
+          </div>
+
+          {ticketsDia === null ? (
+            <p className="text-xs text-slate-400">Cargando…</p>
+          ) : ticketsDia.length === 0 ? (
+            <p className="text-xs text-slate-400">Sin ventas registradas este día.</p>
+          ) : (
+            <div className="space-y-1.5 max-h-80 overflow-y-auto">
+              {ticketsDia.map((t) => (
+                <div key={t.comandaId} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2 text-xs">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-slate-800 dark:text-white/80 truncate">{t.numeroTicket}</div>
+                    <div className="text-[10px] text-slate-400">{new Date(t.fecha).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })} · {(t.metodoPago || "—").replace("_", " ")}</div>
+                  </div>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white flex-shrink-0">${Number(t.totalUsd).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -4022,7 +4795,7 @@ function ResumenDiario({ tenantId }: { tenantId: number }) {
             <tbody>
               {filas.map((f) => (
                 <tr key={f.nombrePlato} className="border-b border-slate-200/50 dark:border-white/5">
-                  <td className="py-2 pr-2 font-semibold text-slate-800 dark:text-white">{f.nombrePlato}</td>
+                  <td className="py-2 pr-2 font-semibold text-slate-800 dark:text-white/80">{f.nombrePlato}</td>
                   <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{f.cantidadVendida}</td>
                   <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">${Number(f.ingresoTotal).toFixed(2)}</td>
                   <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">${Number(f.costoTotal).toFixed(2)}</td>
@@ -4063,7 +4836,7 @@ function CierreDeCaja({ tenantId }: { tenantId: number }) {
     resumenPeriodoAbierto(tenantId, moneda).then(setResumen).catch(() => setResumen(null));
   };
   const cargarHistorial = () => {
-    historialCierres().then(setHistorial).catch(() => setHistorial([]));
+    historialCierres(tenantId).then(setHistorial).catch(() => setHistorial([]));
   };
   useEffect(() => { cargarResumen(); }, [tenantId, moneda]);
   useEffect(() => { cargarHistorial(); }, [tenantId]);
@@ -4164,9 +4937,9 @@ function CierreDeCaja({ tenantId }: { tenantId: number }) {
                 <div className="text-sm font-semibold text-slate-900 dark:text-white">
                   {a.idCajero} · {new Date(a.fechaArqueo).toLocaleString()}
                 </div>
-                <div className={`text-[11px] mt-0.5 ${Number(a.diferencia) === 0 ? "text-teal-600 dark:text-teal-400" : "text-amber-500"}`}>
-                  Declarado: {Number(a.montoDeclarado).toFixed(2)} {a.moneda} · Esperado: {Number(a.montoEsperado).toFixed(2)} {a.moneda}
-                  {Number(a.diferencia) !== 0 && ` · Diferencia: ${Number(a.diferencia).toFixed(2)}`}
+                <div className={`text-[11px] mt-0.5 ${a.diferencia == null || Number(a.diferencia) === 0 ? "text-teal-600 dark:text-teal-400" : "text-amber-500"}`}>
+                  Declarado: {Number(a.montoDeclarado).toFixed(2)} {a.moneda} · Esperado: {a.montoEsperado != null ? Number(a.montoEsperado).toFixed(2) : "—"} {a.moneda}
+                  {a.diferencia != null && Number(a.diferencia) !== 0 && ` · Diferencia: ${Number(a.diferencia).toFixed(2)}`}
                 </div>
               </div>
               <button onClick={() => descargarPdf(a.id)} disabled={descargandoId === a.id}
@@ -4275,64 +5048,150 @@ function CuentasPorCobrarPagar({ tenantId }: { tenantId: number }) {
   const [tab, setTab] = useState<"CXC" | "CXP">("CXP");
   const [cxc, setCxc] = useState<MovimientoCaja[] | null>(null);
   const [cxp, setCxp] = useState<MovimientoCaja[] | null>(null);
+  const [verPagadas, setVerPagadas] = useState(false);
+  const [abonando, setAbonando] = useState<MovimientoCaja | null>(null);
 
-  useEffect(() => {
+  const cargar = () => {
     listarMovimientos(tenantId, "CXC").then(setCxc).catch(() => setCxc([]));
     listarMovimientos(tenantId, "CXP").then(setCxp).catch(() => setCxp([]));
-  }, [tenantId]);
+  };
+  useEffect(cargar, [tenantId]);
 
-  const activos = tab === "CXC" ? cxc : cxp;
-  const totalesPorMoneda = (activos || []).reduce<Record<string, number>>((acc, m) => {
-    acc[m.moneda] = (acc[m.moneda] || 0) + Number(m.monto);
+  const todos = tab === "CXC" ? cxc : cxp;
+  // Datos viejos (de antes de este campo) no traen `estado` — se tratan como
+  // pendientes por defecto, no como ya pagadas, para no esconder deuda real.
+  const pendientes = (todos || []).filter((m) => m.estado !== "PAGADO");
+  const pagadas = (todos || []).filter((m) => m.estado === "PAGADO");
+  const activos = verPagadas ? pagadas : pendientes;
+
+  const totalesPorMoneda = pendientes.reduce<Record<string, number>>((acc, m) => {
+    const saldo = m.saldoPendiente != null ? Number(m.saldoPendiente) : Number(m.monto);
+    acc[m.moneda] = (acc[m.moneda] || 0) + saldo;
     return acc;
   }, {});
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
-        <button onClick={() => setTab("CXP")}
-          className={`px-5 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === "CXP" ? "bg-red-500 text-white" : "text-slate-600 dark:text-white/60"}`}>
-          Por Pagar ({(cxp || []).length})
-        </button>
-        <button onClick={() => setTab("CXC")}
-          className={`px-5 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === "CXC" ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
-          Por Cobrar ({(cxc || []).length})
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+          <button onClick={() => { setTab("CXP"); setVerPagadas(false); }}
+            className={`px-5 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === "CXP" ? "bg-red-500 text-white" : "text-slate-600 dark:text-white/60"}`}>
+            Por Pagar ({cxp ? cxp.filter((m) => m.estado !== "PAGADO").length : 0})
+          </button>
+          <button onClick={() => { setTab("CXC"); setVerPagadas(false); }}
+            className={`px-5 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === "CXC" ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
+            Por Cobrar ({cxc ? cxc.filter((m) => m.estado !== "PAGADO").length : 0})
+          </button>
+        </div>
+        <button onClick={() => setVerPagadas((v) => !v)} className="text-xs font-semibold text-slate-500 dark:text-white/40 hover:text-teal-600 dark:hover:text-teal-400 cursor-pointer">
+          {verPagadas ? "← Ver pendientes" : `Ver saldadas (${pagadas.length}) →`}
         </button>
       </div>
 
-      {Object.keys(totalesPorMoneda).length > 0 && (
+      {!verPagadas && Object.keys(totalesPorMoneda).length > 0 && (
         <div className="flex flex-wrap gap-3">
           {Object.entries(totalesPorMoneda).map(([moneda, total]) => (
             <div key={moneda} className="apple-glass rounded-xl px-5 py-3">
-              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Total en {moneda}</div>
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Pendiente en {moneda}</div>
               <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{total.toFixed(2)}</div>
             </div>
           ))}
         </div>
       )}
 
-      {activos === null ? (
+      {todos === null ? (
         <p className="text-xs text-slate-400">Cargando…</p>
       ) : activos.length === 0 ? (
         <div className="apple-glass rounded-2xl p-8 text-center">
           <p className="text-slate-500 dark:text-white/40 text-sm">
-            {tab === "CXP" ? "Sin cuentas por pagar pendientes." : "Sin cuentas por cobrar pendientes."}
+            {verPagadas ? "Todavía no hay cuentas saldadas." : tab === "CXP" ? "Sin cuentas por pagar pendientes." : "Sin cuentas por cobrar pendientes."}
           </p>
         </div>
       ) : (
         <div className="space-y-2">
-          {activos.map((m) => (
-            <div key={m.id} className={`flex items-center justify-between rounded-xl px-4 py-3.5 border-l-4 apple-glass ${tab === "CXP" ? "border-red-500/50" : "border-teal-500/50"}`}>
-              <div>
-                <div className="text-sm font-semibold text-slate-900 dark:text-white">{m.concepto}</div>
-                <div className="text-[10px] text-slate-400">{new Date(m.fechaRegistro).toLocaleString()}</div>
+          {activos.map((m) => {
+            const saldo = m.saldoPendiente != null ? Number(m.saldoPendiente) : Number(m.monto);
+            const pagadoParcial = saldo > 0 && saldo < Number(m.monto);
+            return (
+              <div key={m.id} className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3.5 border-l-4 apple-glass ${m.estado === "PAGADO" ? "border-slate-300/50 dark:border-white/10 opacity-60" : tab === "CXP" ? "border-red-500/50" : "border-teal-500/50"}`}>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">{m.concepto}</div>
+                  <div className="text-[10px] text-slate-400">
+                    {new Date(m.fechaRegistro).toLocaleString()}
+                    {m.estado === "PAGADO" && " · Saldada"}
+                    {pagadoParcial && ` · Abonado ${(Number(m.monto) - saldo).toFixed(2)} de ${Number(m.monto).toFixed(2)}`}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">
+                    {m.estado === "PAGADO" ? Number(m.monto).toFixed(2) : saldo.toFixed(2)} {m.moneda}
+                  </span>
+                  {m.estado !== "PAGADO" && (
+                    <button onClick={() => setAbonando(m)} className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-500 px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap">
+                      Registrar abono
+                    </button>
+                  )}
+                </div>
               </div>
-              <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">{Number(m.monto).toFixed(2)} {m.moneda}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      {abonando && (
+        <ModalAbonarCuenta tenantId={tenantId} cuenta={abonando} tipoLabel={tab === "CXP" ? "proveedor" : "cliente"}
+          onClose={() => setAbonando(null)} onAbonado={() => { setAbonando(null); cargar(); }} />
+      )}
     </div>
+  );
+}
+
+function ModalAbonarCuenta({ tenantId, cuenta, tipoLabel, onClose, onAbonado }: {
+  tenantId: number; cuenta: MovimientoCaja; tipoLabel: string; onClose: () => void; onAbonado: () => void;
+}) {
+  const saldo = cuenta.saldoPendiente != null ? Number(cuenta.saldoPendiente) : Number(cuenta.monto);
+  const [monto, setMonto] = useState(saldo.toFixed(2));
+  const [moneda, setMoneda] = useState(cuenta.moneda);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const guardar = async () => {
+    if (!monto || Number(monto) <= 0) { setError("Indica cuánto se abona"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      await abonarMovimiento(tenantId, cuenta.id, { monto: Number(monto), moneda });
+      onAbonado();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar el abono");
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} titulo="Registrar abono">
+      <div className="space-y-3">
+        <p className="text-xs text-slate-500">{cuenta.concepto}</p>
+        <p className="text-xs text-slate-500">Saldo pendiente: <strong className="text-slate-900">{saldo.toFixed(2)} {cuenta.moneda}</strong></p>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label={`Monto que le pagás al ${tipoLabel} ahora`}>
+            <input value={monto} onChange={(e) => setMonto(e.target.value)} type="number" step="0.01" min="0.01" className="input-horeca" autoFocus />
+          </Campo>
+          <Campo label="Moneda">
+            <select value={moneda} onChange={(e) => setMoneda(e.target.value)} className="input-horeca">
+              {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </Campo>
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="flex gap-2 pt-1">
+          <button onClick={guardar} disabled={guardando} className="flex-1 g-aurora text-white text-sm font-bold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+            {guardando ? "Registrando…" : "Registrar abono"}
+          </button>
+          <button onClick={onClose} className="flex-1 apple-glass-btn text-sm font-semibold py-2.5 rounded-xl cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -4340,24 +5199,46 @@ function CuentasPorCobrarPagar({ tenantId }: { tenantId: number }) {
 // COMPONENTES COMPARTIDOS
 // ══════════════════════════════════════════════════════════════════════════
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
+  // Sin variante dark: a propósito — Campo se usa exclusivamente dentro de
+  // Modal, que es siempre de fondo claro sólido (ver comentario en Modal).
+  // text-white/40 sobre esa tarjeta blanca queda casi invisible.
   return (
     <div>
-      <label className="block text-slate-500 dark:text-white/40 text-[11px] font-medium uppercase tracking-wider mb-1">{label}</label>
+      <label className="block text-slate-500 text-[11px] font-medium uppercase tracking-wider mb-1">{label}</label>
       {children}
     </div>
   );
 }
 
 function Modal({ titulo, onClose, children, ancho }: { titulo: string; onClose: () => void; children: React.ReactNode; ancho?: string }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-smooth" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className={`apple-glass rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-white/15 animate-modal-enter`}>
+  // Fondo SIEMPRE claro y sólido a propósito, sin variante dark: en la
+  // tarjeta ni en el título — nada de apple-glass (translúcido, "casi
+  // invisible" fue el reporte exacto) ni de bg-white/dark:bg-slate-800
+  // (probado en vivo: con Modo Clásico activo, que es como corre esta
+  // vertical en la práctica, .horeca-clasico fuerza TODO texto con clase
+  // text-slate-900 — y cualquier <h1-4>/<strong> sin importar su clase —
+  // a un navy oscuro fijo por CSS global; combinado con un fondo
+  // genuinamente oscuro real (dark:bg-slate-800, activo porque <html>
+  // trae la clase "dark"), el resultado medido fue texto oscuro sobre
+  // fondo oscuro, invisible). Fijar la tarjeta a blanco/texto oscuro sin
+  // depender de dark: evita la colisión en el modo en que de verdad se
+  // usa la app.
+  // Portal a document.body: cualquier ancestro con backdrop-filter/filter/
+  // transform (ej. .apple-glass, que trae backdrop-filter: blur(...)) crea
+  // un containing block nuevo para position: fixed y "atrapa" al modal
+  // dentro de esa caja, cortándolo o descentrándolo. Renderizar el modal
+  // fuera de ese árbol, directo bajo <body>, lo vuelve un overlay de viewport real sin
+  // importar qué ancestro lo dispare.
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className={`bg-white text-slate-900 rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-200`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white">{titulo}</h3>
+          <div role="heading" aria-level={3} className="font-['Outfit'] font-bold text-lg text-slate-900">{titulo}</div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"><IconClose size={18} /></button>
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

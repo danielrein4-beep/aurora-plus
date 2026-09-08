@@ -67,6 +67,20 @@ public class HorecaService {
         "SALON", "QR_MESA", "DELIVERY_PROPIO", "RECOGER_EN_TIENDA"
     );
 
+    // Ventas de mostrador (RECOGER_EN_TIENDA, DELIVERY_PROPIO) no tienen mesa
+    // física — numeroMesa queda null. Concatenarlo directo producía literales
+    // como "Comanda mesa null" en el historial de caja, que un cajero leería
+    // como un dato roto en vez de "vino del mostrador".
+    private String descripcionComanda(Comanda comanda) {
+        if (comanda.getNumeroMesa() != null) return "Mesa " + comanda.getNumeroMesa();
+        return switch (comanda.getCanal()) {
+            case "RECOGER_EN_TIENDA" -> "Mostrador";
+            case "DELIVERY_PROPIO" -> "Delivery";
+            case "QR_MESA" -> "Pedido QR";
+            default -> comanda.getCanal();
+        };
+    }
+
     public Comanda aperturarComanda(Long tenantId, Integer numeroMesa, String mesero) {
         return aperturarComanda(tenantId, numeroMesa, mesero, "SALON", null, null, null, null, null);
     }
@@ -222,7 +236,7 @@ public class HorecaService {
         if (cerrada.getTotalConsumo().compareTo(BigDecimal.ZERO) > 0) {
             motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
                 cerrada.getTotalConsumo(), monedaPago, montoRecibido,
-                "Comanda mesa " + cerrada.getNumeroMesa() + " (" + metodoPago + ")");
+                "Comanda " + descripcionComanda(cerrada) + " (" + metodoPago + ")");
         }
 
         idempotenciaService.registrar(tenantId, claveIdempotencia, "cierre_comanda_horeca", cerrada.getId());
@@ -261,6 +275,10 @@ public class HorecaService {
             resultado.pagos = pagoVentaRepository.findByComandaIdOrderByFechaPagoAsc(comandaExistente.getId());
             resultado.totalBase = comandaExistente.getTotalConsumo();
             resultado.monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
+            resultado.totalRecibidoBase = comandaExistente.getTotalRecibidoBase();
+            resultado.vueltoBase = comandaExistente.getVueltoBase();
+            resultado.monedaVuelto = comandaExistente.getMonedaVuelto();
+            resultado.vueltoEnMonedaVuelto = comandaExistente.getVueltoMonto();
             return resultado;
         }
 
@@ -310,7 +328,7 @@ public class HorecaService {
             guardados.add(pagoVentaRepository.save(pago));
 
             motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
-                p.monto, p.moneda, "Comanda mesa " + comanda.getNumeroMesa() + " (" + p.metodoPago + ")");
+                p.monto, p.moneda, "Comanda " + descripcionComanda(comanda) + " (" + p.metodoPago + ")");
         }
 
         BigDecimal faltante = totalBase.subtract(totalRecibidoBase).setScale(2, RoundingMode.HALF_UP);
@@ -326,7 +344,7 @@ public class HorecaService {
         if (vueltoBase.compareTo(BigDecimal.ZERO) > 0) {
             vueltoEnMonedaVuelto = motorFinancieroService.convertirMoneda(tenantId, vueltoBase, monedaBase, monedaVueltoFinal);
             motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
-                vueltoEnMonedaVuelto, monedaVueltoFinal, "Vuelto entregado - Comanda mesa " + comanda.getNumeroMesa());
+                vueltoEnMonedaVuelto, monedaVueltoFinal, "Vuelto entregado - Comanda " + descripcionComanda(comanda));
 
             try {
                 vueltoVes = "VES".equals(monedaVueltoFinal)
@@ -340,6 +358,14 @@ public class HorecaService {
         comanda.setEstado(Comanda.EstadoComanda.PAGADA);
         comanda.setMetodoPago(pagos.size() == 1 ? pagos.get(0).metodoPago : "MIXTO");
         comanda.setFechaCierre(LocalDateTime.now());
+        // Se guarda el vuelto entregado junto con la comanda: sin esto, el
+        // ticket (PDF/térmica) impreso o reimpreso más tarde no tiene forma de
+        // reflejar cuánto se recibió y cuánto se devolvió, un hueco contable
+        // grave para el cierre de caja.
+        comanda.setTotalRecibidoBase(totalRecibidoBase.setScale(2, RoundingMode.HALF_UP));
+        comanda.setVueltoBase(vueltoBase);
+        comanda.setMonedaVuelto(monedaVueltoFinal);
+        comanda.setVueltoMonto(vueltoEnMonedaVuelto);
         Comanda cerrada = comandaRepository.save(comanda);
 
         idempotenciaService.registrar(tenantId, claveIdempotencia, "cierre_comanda_horeca_mixto", cerrada.getId());
@@ -355,6 +381,76 @@ public class HorecaService {
         resultado.vueltoEnMonedaVuelto = vueltoEnMonedaVuelto;
         resultado.vueltoVes = vueltoVes;
         return resultado;
+    }
+
+    /**
+     * Anula una comanda ya emitida (ABIERTA o PAGADA) — nunca se borra nada:
+     * cada ítem devuelve su inventario/ingredientes de receta, cada pago
+     * recibido y cada vuelto entregado quedan revertidos con un movimiento de
+     * caja compensatorio (nunca eliminando el original), y la comanda queda
+     * marcada ANULADA con motivo, fecha y usuario — el mismo principio de una
+     * nota de crédito: se corrige con un movimiento inverso, no con un DELETE.
+     */
+    @Transactional
+    public Comanda anularComanda(Long comandaId, Long tenantId, String motivo, String usuario, String claveIdempotencia) {
+        java.util.Optional<Long> existente = idempotenciaService.obtenerSiYaProcesada(tenantId, claveIdempotencia);
+        if (existente.isPresent()) {
+            return comandaRepository.findById(existente.get())
+                .orElseThrow(() -> new RuntimeException("Operación idempotente inconsistente: comanda " + existente.get() + " no encontrada"));
+        }
+
+        Comanda comanda = comandaRepository.findById(comandaId)
+            .orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
+        if (!comanda.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Comanda no pertenece a este tenant");
+        }
+        if (comanda.getEstado() == Comanda.EstadoComanda.ANULADA) {
+            throw new RuntimeException("Esta comanda ya está anulada");
+        }
+        if (motivo == null || motivo.isBlank()) {
+            throw new RuntimeException("Debe indicar el motivo de la anulación");
+        }
+
+        boolean estabaPagada = comanda.getEstado() == Comanda.EstadoComanda.PAGADA;
+
+        // 1) Devolver cada ítem al inventario — recetas explotan sus
+        // ingredientes de vuelta, artículos de venta directa regresan su
+        // cantidad. Se hace siempre, esté PAGADA o ABIERTA: el descuento de
+        // stock ocurre al agregar el ítem, no al cerrar la comanda.
+        List<ItemComanda> items = itemComandaRepository.findByComandaId(comandaId);
+        for (ItemComanda item : items) {
+            if (item.getEscandallo() != null) {
+                escandalloService.revertirVentaPlato(item.getEscandallo().getId(), tenantId, item.getCantidad());
+            } else if (item.getArticulo() != null) {
+                inventarioService.registrarMovimientoKardex(item.getArticulo().getId(), tenantId, Kardex.TipoOperacion.ENTRADA,
+                    item.getCantidad(), item.getCostoUnitario(), "Anulación de venta: " + item.getNombrePlato());
+            }
+        }
+
+        // 2) Revertir caja — solo si de verdad se cobró. Cada línea de pago
+        // recibida se compensa con un EGRESO en su misma moneda; el vuelto
+        // entregado (que salió como EGRESO al cerrar) se compensa con un
+        // INGRESO. Ninguno de los movimientos originales se toca ni se borra.
+        if (estabaPagada) {
+            List<PagoVenta> pagos = pagoVentaRepository.findByComandaIdOrderByFechaPagoAsc(comandaId);
+            for (PagoVenta pago : pagos) {
+                motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
+                    pago.getMonto(), pago.getMoneda(), "Anulación de venta " + descripcionComanda(comanda) + " (reverso de " + pago.getMetodoPago() + ")");
+            }
+            if (comanda.getVueltoMonto() != null && comanda.getVueltoMonto().compareTo(BigDecimal.ZERO) > 0) {
+                motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
+                    comanda.getVueltoMonto(), comanda.getMonedaVuelto(), "Anulación de venta " + descripcionComanda(comanda) + " (reverso de vuelto entregado)");
+            }
+        }
+
+        comanda.setEstado(Comanda.EstadoComanda.ANULADA);
+        comanda.setMotivoAnulacion(motivo);
+        comanda.setFechaAnulacion(LocalDateTime.now());
+        comanda.setAnuladoPor(usuario);
+        Comanda anulada = comandaRepository.save(comanda);
+
+        idempotenciaService.registrar(tenantId, claveIdempotencia, "anular_comanda_horeca", anulada.getId());
+        return anulada;
     }
 
     public Comanda asignarMesero(Long comandaId, Long tenantId, String nuevoMesero) {

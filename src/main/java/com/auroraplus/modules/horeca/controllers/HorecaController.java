@@ -96,6 +96,17 @@ public class HorecaController {
         return ResponseEntity.ok(horecaService.cerrarComandaMixto(comandaId, tenantId, pagos, monedaVuelto, claveIdempotencia));
     }
 
+    /** Anula una comanda ABIERTA o PAGADA: revierte inventario/recetas y, si ya estaba cobrada, también la caja. Nunca borra nada. */
+    @PostMapping("/comandas/{comandaId}/anular")
+    public ResponseEntity<Comanda> anularComanda(
+            @PathVariable Long comandaId,
+            @RequestParam Long tenantId,
+            @RequestParam String motivo,
+            @RequestParam(required = false) String usuario,
+            @RequestParam(required = false) String claveIdempotencia) {
+        return ResponseEntity.ok(horecaService.anularComanda(comandaId, tenantId, motivo, usuario, claveIdempotencia));
+    }
+
     @PostMapping("/comandas/{comandaId}/items")
     public ResponseEntity<ItemComanda> agregarItem(
             @PathVariable Long comandaId,

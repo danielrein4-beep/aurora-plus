@@ -663,6 +663,9 @@ export interface Comanda {
   fechaApertura: string;
   metodoPago: string | null;
   fechaCierre: string | null;
+  motivoAnulacion: string | null;
+  fechaAnulacion: string | null;
+  anuladoPor: string | null;
 }
 
 export interface MapaMesaEntrada {
@@ -833,6 +836,13 @@ export function cerrarComandaMixto(tenantId: number, comandaId: number, pagos: P
   });
 }
 
+/** Anula una comanda ABIERTA o PAGADA: revierte inventario/recetas y, si ya estaba cobrada, también la caja. Nunca borra nada. */
+export function anularComanda(tenantId: number, comandaId: number, datos: { motivo: string; usuario?: string }): Promise<Comanda> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), motivo: datos.motivo });
+  if (datos.usuario) params.set("usuario", datos.usuario);
+  return request(`/api/horeca/mesas/comandas/${comandaId}/anular?${params}`, { method: "POST" });
+}
+
 export interface EscandalloReceta {
   id: number;
   tenantId: number;
@@ -950,11 +960,11 @@ export function crearArticulo(tenantId: number, datos: { sku: string; nombre: st
   return request(`/api/inventario/articulos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function entradaArticulo(tenantId: number, articuloId: number, datos: { cantidad: number; costoUnitario?: number; motivo?: string; fechaVencimiento?: string }): Promise<unknown> {
+export function entradaArticulo(tenantId: number, articuloId: number, datos: { cantidad: number; costoUnitario?: number; motivo?: string; fechaVencimiento?: string; metodoPago?: string; moneda?: string }): Promise<unknown> {
   return request(`/api/inventario/articulos/${articuloId}/entrada?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function editarArticulo(tenantId: number, articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number }): Promise<Articulo> {
+export function editarArticulo(tenantId: number, articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; sku?: string }): Promise<Articulo> {
   return request(`/api/inventario/articulos/${articuloId}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
 }
 
@@ -973,6 +983,7 @@ export interface ItemImportacionArticulo {
   unidadMedida?: string;
   categoria?: string;
   costoUnitario?: number;
+  precioVenta?: number;
   stockInicial?: number;
 }
 
@@ -997,7 +1008,7 @@ export interface ItemCompraInsumo {
   fechaVencimiento?: string; // yyyy-MM-dd — si viene, crea un lote rastreable para alertas
 }
 
-export function registrarCompraInsumo(tenantId: number, datos: { proveedorId: number; numeroFactura: string; items: ItemCompraInsumo[] }): Promise<CompraInsumoHoreca> {
+export function registrarCompraInsumo(tenantId: number, datos: { proveedorId: number; numeroFactura: string; items: ItemCompraInsumo[]; montoPagadoAhora?: number; monedaPago?: string }): Promise<CompraInsumoHoreca> {
   return request(`/api/horeca/compras-insumo?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
@@ -1008,10 +1019,11 @@ export interface CompraInsumoHoreca {
   numeroFactura: string | null;
   fechaCompra: string;
   total: number;
+  montoPagado: number | null;
 }
 
-export function listarComprasInsumo(): Promise<CompraInsumoHoreca[]> {
-  return request(`/api/horeca/compras-insumo`);
+export function listarComprasInsumo(tenantId: number): Promise<CompraInsumoHoreca[]> {
+  return request(`/api/horeca/compras-insumo?tenantId=${tenantId}`);
 }
 
 export interface LoteArticulo {
@@ -1066,8 +1078,8 @@ export interface ArqueoCaja {
   idCajero: string;
   moneda: string;
   montoDeclarado: number;
-  montoEsperado: number;
-  diferencia: number;
+  montoEsperado: number | null;
+  diferencia: number | null;
   fechaArqueo: string;
 }
 
@@ -1076,8 +1088,8 @@ export function cerrarCaja(tenantId: number, datos: { idCajero: string; montoDec
   return request(`/api/financiero/tesoreria/cerrar-caja?${params}`, { method: "POST" });
 }
 
-export function historialCierres(): Promise<ArqueoCaja[]> {
-  return request(`/api/financiero/tesoreria/historial-cierres`);
+export function historialCierres(tenantId: number): Promise<ArqueoCaja[]> {
+  return request(`/api/financiero/tesoreria/historial-cierres?tenantId=${tenantId}`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1196,10 +1208,17 @@ export interface MovimientoCaja {
   moneda: string;
   concepto: string;
   fechaRegistro: string;
+  saldoPendiente: number | null;
+  estado: "PENDIENTE" | "PAGADO" | null;
 }
 
 export function registrarMovimiento(tenantId: number, datos: { tipo: "INGRESO" | "EGRESO"; monto: number; moneda: string; concepto: string }): Promise<MovimientoCaja> {
   return request(`/api/financiero/movimientos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+/** Registra un pago (total o parcial) sobre una cuenta por pagar/cobrar existente. */
+export function abonarMovimiento(tenantId: number, movimientoId: number, datos: { monto: number; moneda: string }): Promise<MovimientoCaja> {
+  return request(`/api/financiero/movimientos/${movimientoId}/abonar?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
 export function listarMovimientos(tenantId: number, tipo?: TipoMovimientoCaja): Promise<MovimientoCaja[]> {

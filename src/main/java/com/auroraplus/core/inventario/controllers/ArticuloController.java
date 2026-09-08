@@ -8,6 +8,7 @@ import com.auroraplus.core.inventario.repositories.ArticuloRepository;
 import com.auroraplus.core.inventario.repositories.KardexRepository;
 import com.auroraplus.core.inventario.repositories.LoteArticuloRepository;
 import com.auroraplus.core.inventario.services.InventarioService;
+import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import jakarta.persistence.EntityManager;
 import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,9 @@ public class ArticuloController {
 
     @Autowired
     private LoteArticuloRepository loteArticuloRepository;
+
+    @Autowired
+    private com.auroraplus.core.financiero.services.MotorFinancieroService motorFinancieroService;
 
     @GetMapping
     public List<Articulo> listar() {
@@ -98,6 +102,7 @@ public class ArticuloController {
         public BigDecimal costoUnitario;
         public BigDecimal precioVenta;
         public BigDecimal stockMinimo;
+        public String sku;
     }
 
     /** Corrige datos del artículo (nombre, categoría, unidad, costo, precio de venta, stock mínimo) — NO toca stockActual, que solo cambia vía Kardex (entrada/salida/ajuste) para no perder el rastro de auditoría. */
@@ -113,6 +118,7 @@ public class ArticuloController {
         if (request.costoUnitario != null) articulo.setCostoUnitario(request.costoUnitario);
         if (request.precioVenta != null) articulo.setPrecioVenta(request.precioVenta);
         if (request.stockMinimo != null) articulo.setStockMinimo(request.stockMinimo);
+        if (request.sku != null && !request.sku.isBlank()) articulo.setSku(request.sku.trim());
         return ResponseEntity.ok(articuloRepository.save(articulo));
     }
 
@@ -180,6 +186,13 @@ public class ArticuloController {
         // una compra con factura, pero sin necesitar un proveedor para el alta
         // rápida de un artículo nuevo desde Inventario.
         public LocalDate fechaVencimiento;
+        // Opcionales: si vienen, además de sumar el stock se registra el gasto
+        // real (EGRESO) de cantidad*costoUnitario en esta moneda/método — para
+        // el reabastecimiento rápido desde Inventario, que no pasa por una
+        // factura formal de Compras & Proveedores y por eso antes no dejaba
+        // ningún rastro de cuánta plata salió de caja.
+        public String metodoPago;
+        public String moneda;
     }
 
     /** Entrada de stock (compra/reposición) — actualiza también el costo unitario vigente del artículo. */
@@ -197,11 +210,21 @@ public class ArticuloController {
         Kardex movimiento = inventarioService.registrarMovimientoKardex(id, tenantId, Kardex.TipoOperacion.ENTRADA,
             request.cantidad, costoAplicado, request.motivo != null ? request.motivo : "Entrada de stock");
 
+        if (request.metodoPago != null && !request.metodoPago.isBlank() && costoAplicado != null) {
+            BigDecimal montoGasto = costoAplicado.multiply(request.cantidad);
+            if (montoGasto.compareTo(BigDecimal.ZERO) > 0) {
+                String monedaGasto = (request.moneda != null && !request.moneda.isBlank()) ? request.moneda : motorFinancieroService.obtenerMonedaBase(tenantId);
+                motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
+                    montoGasto, monedaGasto, "Reabastecimiento: " + articulo.getNombre() + " (" + request.metodoPago + ")");
+            }
+        }
+
         if (request.fechaVencimiento != null) {
             LoteArticulo lote = new LoteArticulo();
             lote.setTenantId(tenantId);
             lote.setArticulo(articulo);
             lote.setCantidadIngresada(request.cantidad);
+            lote.setCantidadActual(request.cantidad);
             lote.setCostoUnitario(costoAplicado);
             lote.setFechaVencimiento(request.fechaVencimiento);
             lote.setReferenciaCompra(request.motivo != null ? request.motivo : "Entrada de stock");
@@ -226,6 +249,7 @@ public class ArticuloController {
         public String unidadMedida;
         public String categoria;
         public BigDecimal costoUnitario;
+        public BigDecimal precioVenta;
         public BigDecimal stockInicial; // opcional — si viene, registra una entrada de Kardex de una vez
     }
 
@@ -270,6 +294,7 @@ public class ArticuloController {
                 articulo.setUnidadMedida(item.unidadMedida != null && !item.unidadMedida.isBlank() ? item.unidadMedida.trim() : "unidad");
                 articulo.setCategoria(item.categoria != null && !item.categoria.isBlank() ? item.categoria.trim() : "General");
                 if (item.costoUnitario != null) articulo.setCostoUnitario(item.costoUnitario);
+                if (item.precioVenta != null) articulo.setPrecioVenta(item.precioVenta);
                 if (esNuevo) articulo.setPorcentajeImpuesto(BigDecimal.ZERO);
 
                 articulo = articuloRepository.save(articulo);

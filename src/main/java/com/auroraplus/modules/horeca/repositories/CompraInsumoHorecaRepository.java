@@ -7,5 +7,5 @@ import java.util.List;
 
 @Repository
 public interface CompraInsumoHorecaRepository extends JpaRepository<CompraInsumoHoreca, Long> {
-    List<CompraInsumoHoreca> findAllByOrderByFechaCompraDesc();
+    List<CompraInsumoHoreca> findByTenantIdOrderByFechaCompraDesc(Long tenantId);
 }

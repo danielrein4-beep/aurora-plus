@@ -49,6 +49,17 @@ public class MovimientoCaja {
     @Column(name = "tasa_aplicada", precision = 18, scale = 6)
     private BigDecimal tasaAplicada;
 
+    // Solo aplican a CXC/CXP: una deuda que nace y nunca se puede saldar es
+    // inútil para un negocio real — sin esto no había forma de registrar un
+    // abono ni de saber si una cuenta por pagar/cobrar ya se resolvió.
+    // Quedan NULL en INGRESO/EGRESO (no tiene sentido "saldo pendiente" de un
+    // movimiento que ya ocurrió por completo).
+    @Column(name = "saldo_pendiente", precision = 18, scale = 2)
+    private BigDecimal saldoPendiente;
+
+    @Column(length = 20)
+    private String estado; // PENDIENTE | PAGADO — solo para CXC/CXP
+
     public enum TipoMovimiento { INGRESO, EGRESO, CXC, CXP }
 
     // Getters y Setters
@@ -72,4 +83,8 @@ public class MovimientoCaja {
     public void setMonedaBaseEquivalente(String monedaBaseEquivalente) { this.monedaBaseEquivalente = monedaBaseEquivalente; }
     public BigDecimal getTasaAplicada() { return tasaAplicada; }
     public void setTasaAplicada(BigDecimal tasaAplicada) { this.tasaAplicada = tasaAplicada; }
+    public BigDecimal getSaldoPendiente() { return saldoPendiente; }
+    public void setSaldoPendiente(BigDecimal saldoPendiente) { this.saldoPendiente = saldoPendiente; }
+    public String getEstado() { return estado; }
+    public void setEstado(String estado) { this.estado = estado; }
 }

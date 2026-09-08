@@ -8,14 +8,14 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
 /**
- * Lote de un artículo con fecha de caducidad — capa ADICIONAL de trazabilidad
- * sobre el Kárdex, no lo reemplaza: Articulo.stockActual sigue siendo la
- * fuente única de "cuánto hay" (las ventas y mermas se siguen descontando ahí
- * igual que siempre). Esto es solo para poder avisar cuándo un lote
- * específico está por vencer — ej. compraste 50kg de harina el lunes con
- * vencimiento en 30 días, y otros 50kg el jueves con vencimiento distinto.
- * No hace descuento automático por FEFO (primero en vencer, primero en
- * salir) — eso queda pendiente si algún día hace falta.
+ * Lote de un artículo con fecha de caducidad — capa de trazabilidad sobre el
+ * Kárdex: Articulo.stockActual sigue siendo la fuente única de "cuánto hay"
+ * en total, pero cada lote lleva su propio saldo (cantidadActual) que las
+ * ventas van consumiendo FEFO (First-Expired-First-Out: primero se descuenta
+ * el lote con la fecha de vencimiento más próxima) — ver
+ * InventarioService.registrarMovimientoKardex. Un lote que llega a 0 deja de
+ * aparecer en las alertas de vencimiento (ya no queda nada de ese lote que
+ * pueda vencerse en la bodega).
  */
 @Entity
 @Table(name = "lotes_articulo")
@@ -35,6 +35,21 @@ public class LoteArticulo {
 
     @Column(name = "cantidad_ingresada", nullable = false, precision = 18, scale = 4)
     private BigDecimal cantidadIngresada;
+
+    // Saldo restante de ESTE lote — cantidadIngresada queda fija como
+    // registro histórico de lo que entró; cantidadActual es lo que
+    // efectivamente le queda después de que las ventas la van consumiendo
+    // FEFO. Columna NULLABLE a propósito (no NOT NULL con default 0): la
+    // tabla ya tiene filas viejas, y un default en 0 las haría desaparecer
+    // de golpe de las alertas de vencimiento aunque todavía tengan stock.
+    // @PostLoad las rellena con cantidadIngresada la primera vez que se leen.
+    @Column(name = "cantidad_actual", precision = 18, scale = 4)
+    private BigDecimal cantidadActual;
+
+    @PostLoad
+    private void inicializarCantidadActual() {
+        if (cantidadActual == null) cantidadActual = cantidadIngresada;
+    }
 
     // Referencial nada más — no se descuenta automáticamente al vender (ver nota de clase);
     // el negocio puede ajustarlo a mano si quiere llevar el lote exacto restante.
@@ -59,6 +74,8 @@ public class LoteArticulo {
     public void setArticulo(Articulo articulo) { this.articulo = articulo; }
     public BigDecimal getCantidadIngresada() { return cantidadIngresada; }
     public void setCantidadIngresada(BigDecimal cantidadIngresada) { this.cantidadIngresada = cantidadIngresada; }
+    public BigDecimal getCantidadActual() { return cantidadActual; }
+    public void setCantidadActual(BigDecimal cantidadActual) { this.cantidadActual = cantidadActual; }
     public BigDecimal getCostoUnitario() { return costoUnitario; }
     public void setCostoUnitario(BigDecimal costoUnitario) { this.costoUnitario = costoUnitario; }
     public LocalDate getFechaVencimiento() { return fechaVencimiento; }

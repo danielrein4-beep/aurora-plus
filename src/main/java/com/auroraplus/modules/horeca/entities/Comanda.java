@@ -61,6 +61,35 @@ public class Comanda {
     @Column(name = "fecha_cierre")
     private LocalDateTime fechaCierre;
 
+    // Registro contable del cobro — sin esto, el ticket (PDF/térmica) generado
+    // más tarde no tiene forma de saber cuánto se recibió ni cuánto vuelto se
+    // entregó, aunque el cajero lo haya visto en pantalla al cerrar la venta.
+    // Nullable a propósito: comandas cerradas antes de este campo, o pagadas
+    // exacto sin vuelto, simplemente no tienen (o tienen 0) esta info.
+    @Column(name = "total_recibido_base", precision = 18, scale = 2)
+    private BigDecimal totalRecibidoBase;
+
+    @Column(name = "vuelto_base", precision = 18, scale = 2)
+    private BigDecimal vueltoBase;
+
+    @Column(name = "moneda_vuelto", length = 10)
+    private String monedaVuelto;
+
+    @Column(name = "vuelto_monto", precision = 18, scale = 2)
+    private BigDecimal vueltoMonto; // vuelto ya convertido a monedaVuelto — lo que físicamente se entrega
+
+    // Auditoría de anulación — nunca se borra una comanda ni sus movimientos:
+    // se revierte inventario/caja y queda registrado quién, cuándo y por qué,
+    // igual que exige una nota de crédito en vez de un simple DELETE.
+    @Column(name = "motivo_anulacion", length = 255)
+    private String motivoAnulacion;
+
+    @Column(name = "fecha_anulacion")
+    private LocalDateTime fechaAnulacion;
+
+    @Column(name = "anulado_por", length = 120)
+    private String anuladoPor;
+
     public enum EstadoComanda { ABIERTA, PAGADA, ANULADA }
 
     public Long getId() { return id; }
@@ -93,4 +122,18 @@ public class Comanda {
     public void setMensajero(String mensajero) { this.mensajero = mensajero; }
     public Cliente getCliente() { return cliente; }
     public void setCliente(Cliente cliente) { this.cliente = cliente; }
+    public BigDecimal getTotalRecibidoBase() { return totalRecibidoBase; }
+    public void setTotalRecibidoBase(BigDecimal totalRecibidoBase) { this.totalRecibidoBase = totalRecibidoBase; }
+    public BigDecimal getVueltoBase() { return vueltoBase; }
+    public void setVueltoBase(BigDecimal vueltoBase) { this.vueltoBase = vueltoBase; }
+    public String getMonedaVuelto() { return monedaVuelto; }
+    public void setMonedaVuelto(String monedaVuelto) { this.monedaVuelto = monedaVuelto; }
+    public BigDecimal getVueltoMonto() { return vueltoMonto; }
+    public void setVueltoMonto(BigDecimal vueltoMonto) { this.vueltoMonto = vueltoMonto; }
+    public String getMotivoAnulacion() { return motivoAnulacion; }
+    public void setMotivoAnulacion(String motivoAnulacion) { this.motivoAnulacion = motivoAnulacion; }
+    public LocalDateTime getFechaAnulacion() { return fechaAnulacion; }
+    public void setFechaAnulacion(LocalDateTime fechaAnulacion) { this.fechaAnulacion = fechaAnulacion; }
+    public String getAnuladoPor() { return anuladoPor; }
+    public void setAnuladoPor(String anuladoPor) { this.anuladoPor = anuladoPor; }
 }

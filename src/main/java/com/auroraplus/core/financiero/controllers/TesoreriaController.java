@@ -68,9 +68,10 @@ public class TesoreriaController {
         return ResponseEntity.ok(tesoreriaService.procesarArqueoCiego(tenantId, idCajero, montoDeclarado, moneda));
     }
 
+    /** Historial de cierres del tenant, más recientes primero — antes devolvía TODOS los tenants sin filtrar. */
     @GetMapping("/historial-cierres")
-    public List<ArqueoCaja> historialCierres() {
-        return arqueoCajaRepository.findAll();
+    public List<ArqueoCaja> historialCierres(@RequestParam Long tenantId) {
+        return arqueoCajaRepository.findByTenantIdOrderByFechaArqueoDesc(tenantId);
     }
 
     /** PDF del comprobante de un cierre de caja ya registrado, con el desglose completo de sus movimientos. */
