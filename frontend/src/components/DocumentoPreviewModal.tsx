@@ -553,18 +553,64 @@ export default function DocumentoPreviewModal({
               <span>Enviar por WhatsApp</span>
             </h4>
             <p className="text-xs text-slate-400">
-              Ingresa o verifica el número del paciente (incluyendo código de país, ej. 584121234567).
+              Compatible con cualquier país. Puedes seleccionar el prefijo rápido o escribir el número con su código internacional (+58, +57, +34, +1, +54, etc.).
             </p>
+
+            {/* Selector Rápido de País */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] text-slate-400 uppercase font-mono font-bold">Prefijos Frecuentes:</span>
+              <div className="flex flex-wrap gap-1.5 text-[11px]">
+                {[
+                  { label: "Venezuela (+58)", code: "58" },
+                  { label: "Colombia (+57)", code: "57" },
+                  { label: "España (+34)", code: "34" },
+                  { label: "EE.UU. (+1)", code: "1" },
+                  { label: "Argentina (+54)", code: "54" },
+                  { label: "México (+52)", code: "52" },
+                  { label: "Chile (+56)", code: "56" },
+                  { label: "Perú (+51)", code: "51" },
+                ].map((pais) => (
+                  <button
+                    key={pais.code}
+                    type="button"
+                    onClick={() => {
+                      const digitos = telefonoWhatsApp.replace(/\D/g, "");
+                      // Quitar prefijo previo si existe
+                      let base = digitos;
+                      if (base.startsWith("58") || base.startsWith("57") || base.startsWith("34") || base.startsWith("54") || base.startsWith("52") || base.startsWith("56") || base.startsWith("51")) {
+                        base = base.slice(2);
+                      } else if (base.startsWith("549")) {
+                        base = base.slice(3);
+                      } else if (base.startsWith("1") && base.length === 11) {
+                        base = base.slice(1);
+                      }
+                      if (base.startsWith("0")) base = base.slice(1);
+                      setTelefonoWhatsApp(`+${pais.code} ${base}`);
+                    }}
+                    className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[10px] font-medium transition-colors cursor-pointer"
+                  >
+                    {pais.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="block text-[11px] text-slate-400 uppercase font-bold mb-1">Número de Teléfono</label>
               <input
                 type="text"
                 value={telefonoWhatsApp}
                 onChange={(e) => setTelefonoWhatsApp(e.target.value)}
-                placeholder="Ej. +58 424 1234567"
+                placeholder="Ej. +58 424 7640913 o +34 612 345 678"
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
               />
+              {telefonoWhatsApp && (
+                <p className="text-[10px] text-emerald-400 font-mono mt-1">
+                  ✓ Formato internacional destino: +{formatearTelefonoParaWhatsApp(telefonoWhatsApp)}
+                </p>
+              )}
             </div>
+
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400 max-h-32 overflow-y-auto whitespace-pre-wrap font-mono">
               {obtenerTextoResumen()}
             </div>
@@ -577,9 +623,9 @@ export default function DocumentoPreviewModal({
               </button>
               <button
                 onClick={handleEnviarWhatsApp}
-                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition-colors shadow-md"
+                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition-colors shadow-md flex items-center gap-1.5"
               >
-                Abrir en WhatsApp
+                <span>Abrir en WhatsApp</span>
               </button>
             </div>
           </div>

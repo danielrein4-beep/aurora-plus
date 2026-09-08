@@ -660,48 +660,143 @@ export function generarTextoEmailCotizacion(data: CotizacionData): { subject: st
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// 5. HELPER UNIVERSAL DE WHATSAPP (CORRIGE PREFIJOS INTERNACIONALES +58/+57)
+// 5. HELPER UNIVERSAL DE WHATSAPP MULTI-PAÍS (VE, CO, ES, US, AR, MX, CL, PE, ETC.)
 // ══════════════════════════════════════════════════════════════════════════
-export function formatearTelefonoParaWhatsApp(telRaw: string): string {
+export function formatearTelefonoParaWhatsApp(telRaw: string, codigoPaisManual?: string): string {
   if (!telRaw) return "";
   let digits = telRaw.replace(/\D/g, "");
   if (!digits) return "";
 
-  // Si comienza con 00 (ej. 0058...), quitar 00
+  // Si se seleccionó o especificó un código de país explícito
+  if (codigoPaisManual) {
+    const cp = codigoPaisManual.replace(/\D/g, "");
+    if (digits.startsWith(cp)) {
+      if (cp === "54" && !digits.startsWith("549") && digits.length === 12) {
+        return `549${digits.slice(2)}`;
+      }
+      return digits;
+    }
+    if (digits.startsWith("0")) digits = digits.slice(1);
+    if (cp === "54") {
+      if (digits.startsWith("15")) digits = digits.slice(2);
+      if (digits.startsWith("9")) digits = digits.slice(1);
+      return `549${digits}`;
+    }
+    return `${cp}${digits}`;
+  }
+
+  // Si comienza con 00 internacional (ej. 0058, 0034), quitar 00
   if (digits.startsWith("00")) {
     digits = digits.slice(2);
   }
 
-  // Si ya tiene código de país internacional:
-  // Venezuela (+58): 584XXXXXXXXX (12 dígitos)
-  // Colombia (+57): 573XXXXXXXXX (12 dígitos)
-  // USA (+1): 1XXXXXXXXXX (11 dígitos)
-  if (digits.startsWith("58") && digits.length >= 12) {
+  // 1. Si el usuario ingresó explícitamente '+' en el texto
+  if (telRaw.trim().startsWith("+")) {
+    // Para Argentina, WhatsApp exige prefijo '9' entre el 54 y el número móvil (13 dígitos)
+    if (digits.startsWith("54") && !digits.startsWith("549") && digits.length === 12) {
+      return `549${digits.slice(2)}`;
+    }
     return digits;
   }
-  if (digits.startsWith("57") && digits.length >= 12) {
+
+  // 2. Si ya incluye código internacional estándar por longitud y prefijo:
+  // España (+34): 34 seguido de 9 dígitos (11 dígitos)
+  if (digits.startsWith("34") && digits.length === 11) {
     return digits;
   }
+
+  // Estados Unidos / Canadá (+1): 1 seguido de 10 dígitos (11 dígitos)
   if (digits.startsWith("1") && digits.length === 11) {
     return digits;
   }
 
-  // Si es un número venezolano típico con cero inicial (ej. 04247640913, 0412..., 0414..., 0416..., 0426... -> 11 dígitos)
+  // Argentina (+54): 549 seguido de 10 dígitos (13 dígitos) o 54 seguido de 10 dígitos (12 dígitos)
+  if (digits.startsWith("549") && digits.length === 13) {
+    return digits;
+  }
+  if (digits.startsWith("54") && digits.length === 12) {
+    return `549${digits.slice(2)}`;
+  }
+
+  // México (+52): 52 seguido de 10 dígitos (12 dígitos)
+  if (digits.startsWith("52") && digits.length === 12) {
+    return digits;
+  }
+
+  // Chile (+56): 56 seguido de 9 dígitos (11 dígitos)
+  if (digits.startsWith("56") && digits.length === 11) {
+    return digits;
+  }
+
+  // Perú (+51): 51 seguido de 9 dígitos (11 dígitos)
+  if (digits.startsWith("51") && digits.length === 11) {
+    return digits;
+  }
+
+  // Colombia (+57): 57 seguido de 10 dígitos (12 dígitos)
+  if (digits.startsWith("57") && digits.length === 12) {
+    return digits;
+  }
+
+  // Venezuela (+58): 58 seguido de 10 dígitos (12 dígitos)
+  if (digits.startsWith("58") && digits.length === 12) {
+    return digits;
+  }
+
+  // 3. Detección inteligente por formato local:
+
+  // España: 9 dígitos comenzando en 6 o 7 (ej. 612345678, 712345678)
+  if ((digits.startsWith("6") || digits.startsWith("7")) && digits.length === 9) {
+    return `34${digits}`;
+  }
+
+  // Venezuela:
+  // 11 dígitos comenzando en 04 (ej. 04247640913, 0412..., 0414..., 0416..., 0426...)
   if (digits.startsWith("04") && digits.length === 11) {
-    return `58${digits.slice(1)}`; // Convertir a 584247640913
+    return `58${digits.slice(1)}`;
   }
-
-  // Si es 10 dígitos empezando en 4 (ej. 4247640913)
+  // 10 dígitos comenzando en 4 (ej. 4247640913, 412..., 414...)
   if (digits.startsWith("4") && digits.length === 10) {
-    return `58${digits}`; // Convertir a 584247640913
+    return `58${digits}`;
+  }
+  // 11 dígitos comenzando en 02 (fijo venezolano)
+  if (digits.startsWith("02") && digits.length === 11) {
+    return `58${digits.slice(1)}`;
   }
 
-  // Si es 10 dígitos colombiano empezando en 3 (ej. 3124567890)
+  // Colombia:
+  // 10 dígitos comenzando en 3 (ej. 3123456789, 300..., 310..., 320...)
   if (digits.startsWith("3") && digits.length === 10) {
     return `57${digits}`;
   }
+  // 11 dígitos comenzando en 03
+  if (digits.startsWith("03") && digits.length === 11) {
+    return `57${digits.slice(1)}`;
+  }
 
-  // Si tiene 10 dígitos con 0 inicial
+  // Argentina:
+  // 11 dígitos comenzando en 011 o 0
+  if (digits.startsWith("011") && digits.length === 11) {
+    return `54911${digits.slice(3)}`;
+  }
+  if (digits.startsWith("0") && digits.length === 11) {
+    return `549${digits.slice(1)}`;
+  }
+
+  // Chile: 9 dígitos comenzando en 9
+  if (digits.startsWith("9") && digits.length === 9) {
+    return `56${digits}`;
+  }
+
+  // México / EE.UU. (10 dígitos):
+  if (digits.length === 10) {
+    if (digits.startsWith("55") || digits.startsWith("81") || digits.startsWith("33")) {
+      return `52${digits}`;
+    }
+    return `1${digits}`;
+  }
+
+  // Fallback con 0 inicial
   if (digits.startsWith("0") && digits.length === 10) {
     return `58${digits.slice(1)}`;
   }
@@ -709,8 +804,8 @@ export function formatearTelefonoParaWhatsApp(telRaw: string): string {
   return digits;
 }
 
-export function abrirWhatsAppDirecto(telefono: string, texto: string) {
-  const telFormateado = formatearTelefonoParaWhatsApp(telefono);
+export function abrirWhatsAppDirecto(telefono: string, texto: string, codigoPaisManual?: string) {
+  const telFormateado = formatearTelefonoParaWhatsApp(telefono, codigoPaisManual);
   const textoCodificado = encodeURIComponent(texto);
   const url = telFormateado
     ? `https://api.whatsapp.com/send/?phone=${telFormateado}&text=${textoCodificado}`
