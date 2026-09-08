@@ -72,12 +72,17 @@ export default function DocumentoPreviewModal({
 
   // ── GENERAR TEXTO COMPLETO PARA COPIAR ──
   const obtenerTextoResumen = (): string => {
-    if (payload.tipo === "INFORME_MEDICO") {
-      return generarTextoWhatsAppConsulta(docData as ConsultaReportData);
-    } else if (payload.tipo === "CIERRE_CAJA") {
-      return generarTextoWhatsAppCierre(docData as CierreCajaData);
-    } else {
-      return generarTextoWhatsAppCotizacion(docData as CotizacionData);
+    try {
+      if (payload.tipo === "INFORME_MEDICO") {
+        return generarTextoWhatsAppConsulta(docData);
+      } else if (payload.tipo === "CIERRE_CAJA") {
+        return generarTextoWhatsAppCierre(docData);
+      } else {
+        return generarTextoWhatsAppCotizacion(docData);
+      }
+    } catch (err) {
+      console.error("Error al generar resumen:", err);
+      return "Informe médico generado por Mediclinic Pro.";
     }
   };
 

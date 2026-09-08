@@ -547,21 +547,28 @@ export function generarPdfCotizacion(data: CotizacionData) {
 // ══════════════════════════════════════════════════════════════════════════
 // 4. GENERADORES DE TEXTO PARA WHATSAPP & CORREO
 // ══════════════════════════════════════════════════════════════════════════
-export function generarTextoWhatsAppConsulta(data: ConsultaReportData): string {
+export function generarTextoWhatsAppConsulta(data: any): string {
+  if (!data) return "";
   let docNombre = (data.doctorNombre || "").trim() || "Médico Titular";
   if (!docNombre.toLowerCase().startsWith("dr")) {
     docNombre = `Dr(a). ${docNombre}`;
   }
 
+  const p = data.paciente || {};
+  const nombre = p.nombreCompleto || data.pacienteNombre || "Paciente";
+  const cedula = p.identificacion || data.pacienteCedula || data.cedula || "—";
+  const edad = p.edad || data.edad || "—";
+  const fecha = p.fechaConsulta || data.fecha || data.fechaConsulta || "";
+
   const lineas = [
     `*Informe de Consulta Médica*`,
     `━━━━━━━━━━━━━━━━━━`,
-    `*Paciente:* ${data.paciente.nombreCompleto}`,
-    `*Cédula:* ${data.paciente.identificacion} | *Edad:* ${data.paciente.edad} años`,
-    `*Fecha:* ${data.paciente.fechaConsulta}`,
+    `*Paciente:* ${nombre}`,
+    `*Cédula:* ${cedula}${edad && edad !== "—" ? ` | *Edad:* ${edad} años` : ""}`,
+    fecha ? `*Fecha:* ${fecha}` : "",
     `*Médico:* ${docNombre}${data.especialidad ? ` (${data.especialidad})` : ""}`,
     ``,
-    `*Diagnóstico:* ${data.diagnosticoCIE10 || "Evaluación Médica"}`,
+    `*Diagnóstico:* ${data.diagnosticoCIE10 || data.descripcionDiagnostico || "Evaluación Médica"}`,
     ``,
     `*Indicaciones y Tratamiento (Rx):*`,
     `${data.planTratamiento || "Seguir recomendaciones dadas en consulta."}`,
@@ -572,19 +579,24 @@ export function generarTextoWhatsAppConsulta(data: ConsultaReportData): string {
   return lineas.filter(Boolean).join("\n");
 }
 
-export function generarTextoEmailConsulta(data: ConsultaReportData): { subject: string; body: string } {
-  const subject = `Informe Médico - ${data.paciente.nombreCompleto} (${data.paciente.expediente})`;
-  const body = `Estimado(a) ${data.paciente.nombreCompleto},\n\nAdjuntamos el resumen de su informe de consulta médica realizada en ${data.clinicaNombre}:\n\n` +
-    `• Fecha: ${data.paciente.fechaConsulta}\n` +
-    `• Especialista: Dr(a). ${data.doctorNombre} (${data.especialidad})\n` +
-    `• Diagnóstico: ${data.diagnosticoCIE10 || "Evaluación Médica"}\n` +
+export function generarTextoEmailConsulta(data: any): { subject: string; body: string } {
+  if (!data) return { subject: "Informe Médico", body: "" };
+  const p = data.paciente || {};
+  const nombre = p.nombreCompleto || data.pacienteNombre || "Paciente";
+  const exp = p.expediente || data.expediente || "HC";
+  const subject = `Informe Médico - ${nombre} (${exp})`;
+  const body = `Estimado(a) ${nombre},\n\nAdjuntamos el resumen de su informe de consulta médica realizada en ${data.clinicaNombre || "Centro Médico"}:\n\n` +
+    `• Fecha: ${p.fechaConsulta || data.fecha || ""}\n` +
+    `• Especialista: Dr(a). ${data.doctorNombre || "Médico"} (${data.especialidad || ""})\n` +
+    `• Diagnóstico: ${data.diagnosticoCIE10 || data.descripcionDiagnostico || "Evaluación Médica"}\n` +
     `• Indicaciones / Tratamiento: ${data.planTratamiento || "Según prescripción médica"}\n` +
     (data.proximaCita ? `• Próxima Cita / Control: ${data.proximaCita}\n` : "") +
-    `\nSaludos cordiales,\n${data.clinicaNombre}`;
+    `\nSaludos cordiales,\n${data.clinicaNombre || "Centro Médico"}`;
   return { subject, body };
 }
 
-export function generarTextoWhatsAppCierre(data: CierreCajaData): string {
+export function generarTextoWhatsAppCierre(data: any): string {
+  if (!data) return "";
   const nombreRaw = (data.responsableNombre || data.doctorNombre || "Recepción y Caja").trim();
   const responsable = nombreRaw
     .replace(/^Dr\(a\)\.?\s*/i, "")
@@ -593,9 +605,9 @@ export function generarTextoWhatsAppCierre(data: CierreCajaData): string {
   const lineas = [
     `*Auditoría y Cierre de Caja Diario*`,
     `━━━━━━━━━━━━━━━━━━`,
-    `*Fecha:* ${data.fecha} | *Hora:* ${data.horaCierre}`,
+    `*Fecha:* ${data.fecha || ""} | *Hora:* ${data.horaCierre || ""}`,
     `*Responsable:* ${responsable}`,
-    `*Total Pacientes:* ${data.totalPacientes}`,
+    `*Total Pacientes:* ${data.totalPacientes || (data.cobros ? data.cobros.length : 0)}`,
     `━━━━━━━━━━━━━━━━━━`,
     `*Dólares en Caja:* $${(data.totalUSD || 0).toFixed(2)} USD`,
     `*Bolívares en Caja:* Bs. ${(data.totalVES || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
@@ -608,35 +620,37 @@ export function generarTextoWhatsAppCierre(data: CierreCajaData): string {
   return lineas.filter(Boolean).join("\n");
 }
 
-export function generarTextoEmailCierre(data: CierreCajaData): { subject: string; body: string } {
-  const subject = `Auditoría y Cierre de Caja - ${data.fecha} (${data.horaCierre})`;
-  const body = `Resumen de Cierre de Caja Diario - ${data.clinicaNombre}\n\n` +
-    `• Fecha: ${data.fecha} (${data.horaCierre})\n` +
-    `• Responsable: ${data.doctorNombre}\n` +
-    `• Total Pacientes Atendidos: ${data.totalPacientes}\n` +
+export function generarTextoEmailCierre(data: any): { subject: string; body: string } {
+  if (!data) return { subject: "Cierre de Caja", body: "" };
+  const subject = `Auditoría y Cierre de Caja - ${data.fecha || ""} (${data.horaCierre || ""})`;
+  const body = `Resumen de Cierre de Caja Diario - ${data.clinicaNombre || "Centro Médico"}\n\n` +
+    `• Fecha: ${data.fecha || ""} (${data.horaCierre || ""})\n` +
+    `• Responsable: ${data.doctorNombre || ""}\n` +
+    `• Total Pacientes Atendidos: ${data.totalPacientes || 0}\n` +
     `• Total USD: $${(data.totalUSD || 0).toFixed(2)} USD\n` +
     `• Total VES: Bs. ${(data.totalVES || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}\n` +
     ((data.totalCOP || 0) > 0 ? `• Total COP: $${(data.totalCOP || 0).toLocaleString("es-CO")} COP\n` : "") +
     `• Tasa Oficial BCV: Bs. ${(data.tasaBCV || 0).toFixed(2)}\n\n` +
     (data.observaciones ? `Observaciones: ${data.observaciones}\n\n` : "") +
-    `Administración - ${data.clinicaNombre}`;
+    `Administración - ${data.clinicaNombre || "Centro Médico"}`;
   return { subject, body };
 }
 
-export function generarTextoWhatsAppCotizacion(data: CotizacionData): string {
+export function generarTextoWhatsAppCotizacion(data: any): string {
+  if (!data) return "";
   const itemsTexto = (data.items || [])
-    .map((it) => `• *${it.nombre}*: $${(it.costoUSD || 0).toFixed(2)} USD`)
+    .map((it: any) => `• *${it.nombre}*: $${(it.costoUSD || 0).toFixed(2)} USD`)
     .join("\n");
 
   const lineas = [
     `*Presupuesto de Procedimientos Médicos*`,
     `━━━━━━━━━━━━━━━━━━`,
-    `*Paciente:* ${data.pacienteNombre} (C.I: ${data.pacienteCedula})`,
-    `*Fecha de Emisión:* ${data.fecha}`,
+    `*Paciente:* ${data.pacienteNombre || "Paciente"} (C.I: ${data.pacienteCedula || "—"})`,
+    `*Fecha de Emisión:* ${data.fecha || ""}`,
     data.fechaPlanificada ? `*Fecha Planificada:* ${data.fechaPlanificada}` : "",
     `━━━━━━━━━━━━━━━━━━`,
     `*Procedimientos:*`,
-    itemsTexto,
+    itemsTexto || "• Procedimiento evaluado en consulta",
     `━━━━━━━━━━━━━━━━━━`,
     `*Total Estimado (USD):* $${(data.totalUSD || 0).toFixed(2)} USD`,
     data.observaciones ? `\n*Observaciones:* ${data.observaciones}` : "",
@@ -808,7 +822,7 @@ export function abrirWhatsAppDirecto(telefono: string, texto: string, codigoPais
   const telFormateado = formatearTelefonoParaWhatsApp(telefono, codigoPaisManual);
   const textoCodificado = encodeURIComponent(texto);
   const url = telFormateado
-    ? `https://api.whatsapp.com/send/?phone=${telFormateado}&text=${textoCodificado}`
-    : `https://api.whatsapp.com/send/?text=${textoCodificado}`;
+    ? `https://wa.me/${telFormateado}?text=${textoCodificado}`
+    : `https://wa.me/?text=${textoCodificado}`;
   window.open(url, "_blank");
 }
