@@ -38,9 +38,11 @@ public class CompraInsumoHorecaController {
         public String monedaPago;
     }
 
+    // Sin tenantId acá, findAll() devolvía las compras de TODOS los tenants
+    // mezcladas — mismo hallazgo que en el historial de cierres de caja.
     @GetMapping
-    public List<CompraInsumoHoreca> listar() {
-        return compraInsumoHorecaRepository.findAllByOrderByFechaCompraDesc();
+    public List<CompraInsumoHoreca> listar(@RequestParam Long tenantId) {
+        return compraInsumoHorecaRepository.findByTenantIdOrderByFechaCompraDesc(tenantId);
     }
 
     @PostMapping

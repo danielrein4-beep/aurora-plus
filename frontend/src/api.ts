@@ -1012,8 +1012,8 @@ export interface CompraInsumoHoreca {
   montoPagado: number | null;
 }
 
-export function listarComprasInsumo(): Promise<CompraInsumoHoreca[]> {
-  return request(`/api/horeca/compras-insumo`);
+export function listarComprasInsumo(tenantId: number): Promise<CompraInsumoHoreca[]> {
+  return request(`/api/horeca/compras-insumo?tenantId=${tenantId}`);
 }
 
 export interface LoteArticulo {
