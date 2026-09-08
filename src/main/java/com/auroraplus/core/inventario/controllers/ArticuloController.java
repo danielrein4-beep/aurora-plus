@@ -8,6 +8,7 @@ import com.auroraplus.core.inventario.repositories.ArticuloRepository;
 import com.auroraplus.core.inventario.repositories.KardexRepository;
 import com.auroraplus.core.inventario.repositories.LoteArticuloRepository;
 import com.auroraplus.core.inventario.services.InventarioService;
+import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import jakarta.persistence.EntityManager;
 import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,9 @@ public class ArticuloController {
 
     @Autowired
     private LoteArticuloRepository loteArticuloRepository;
+
+    @Autowired
+    private com.auroraplus.core.financiero.services.MotorFinancieroService motorFinancieroService;
 
     @GetMapping
     public List<Articulo> listar() {
@@ -182,6 +186,13 @@ public class ArticuloController {
         // una compra con factura, pero sin necesitar un proveedor para el alta
         // rápida de un artículo nuevo desde Inventario.
         public LocalDate fechaVencimiento;
+        // Opcionales: si vienen, además de sumar el stock se registra el gasto
+        // real (EGRESO) de cantidad*costoUnitario en esta moneda/método — para
+        // el reabastecimiento rápido desde Inventario, que no pasa por una
+        // factura formal de Compras & Proveedores y por eso antes no dejaba
+        // ningún rastro de cuánta plata salió de caja.
+        public String metodoPago;
+        public String moneda;
     }
 
     /** Entrada de stock (compra/reposición) — actualiza también el costo unitario vigente del artículo. */
@@ -198,6 +209,15 @@ public class ArticuloController {
         BigDecimal costoAplicado = request.costoUnitario != null ? request.costoUnitario : articulo.getCostoUnitario();
         Kardex movimiento = inventarioService.registrarMovimientoKardex(id, tenantId, Kardex.TipoOperacion.ENTRADA,
             request.cantidad, costoAplicado, request.motivo != null ? request.motivo : "Entrada de stock");
+
+        if (request.metodoPago != null && !request.metodoPago.isBlank() && costoAplicado != null) {
+            BigDecimal montoGasto = costoAplicado.multiply(request.cantidad);
+            if (montoGasto.compareTo(BigDecimal.ZERO) > 0) {
+                String monedaGasto = (request.moneda != null && !request.moneda.isBlank()) ? request.moneda : motorFinancieroService.obtenerMonedaBase(tenantId);
+                motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
+                    montoGasto, monedaGasto, "Reabastecimiento: " + articulo.getNombre() + " (" + request.metodoPago + ")");
+            }
+        }
 
         if (request.fechaVencimiento != null) {
             LoteArticulo lote = new LoteArticulo();

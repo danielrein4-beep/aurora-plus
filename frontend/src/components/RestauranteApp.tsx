@@ -2117,7 +2117,7 @@ function BadgeMargen({ margen }: { margen: number | null }) {
 
 /**
  * Modal de edición rápida de un artículo — componente compartido entre
- * Inventario (TarjetaArticulo) y la cuadrícula de catálogo del POS, para
+ * Inventario (FilaArticuloCompacta) y la cuadrícula de catálogo del POS, para
  * que ajustar un precio no dependa de en qué pantalla esté el operador.
  * `onGuardado` recibe el artículo ya actualizado (el PUT lo devuelve
  * completo) para que quien lo use pueda reflejarlo al instante sin
@@ -2205,13 +2205,6 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
   const [mostrarImportar, setMostrarImportar] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"cards" | "compact">(
-    () => (localStorage.getItem("inventory_view") as "cards" | "compact") || "cards"
-  );
-  const cambiarViewMode = (modo: "cards" | "compact") => {
-    setViewMode(modo);
-    localStorage.setItem("inventory_view", modo);
-  };
   const [form, setForm] = useState({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "" });
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -2287,22 +2280,6 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
           <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o SKU…" className="input-horeca w-full pl-8" />
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-white/5 p-1 rounded-lg flex-shrink-0">
-            <button
-              onClick={() => cambiarViewMode("cards")}
-              title="Vista de tarjetas"
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${viewMode === "cards" ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-white/40"}`}
-            >
-              Tarjetas
-            </button>
-            <button
-              onClick={() => cambiarViewMode("compact")}
-              title="Vista de lista compacta"
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${viewMode === "compact" ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-white/40"}`}
-            >
-              Lista compacta
-            </button>
-          </div>
           <button onClick={() => setMostrarImportar(true)} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5">
             <IconDownload size={14} /> Importar Excel
           </button>
@@ -2383,17 +2360,28 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
 
       {articulosFiltrados.length === 0 ? (
         <p className="text-xs text-slate-400">Sin artículos {busqueda || categoriaFiltro ? "que coincidan con el filtro" : "cargados todavía"}.</p>
-      ) : viewMode === "compact" ? (
-        <div className="space-y-2">
-          {articulosFiltrados.map((a) => (
-            <FilaArticuloCompacta key={a.id} tenantId={tenantId} articulo={a} onCambio={onCambio} />
-          ))}
-        </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {articulosFiltrados.map((a) => (
-            <TarjetaArticulo key={a.id} tenantId={tenantId} articulo={a} onCambio={onCambio} />
-          ))}
+        <div className="apple-glass rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-400 dark:text-white/40 uppercase text-[10px] tracking-wider border-b border-slate-300/50 dark:border-white/10">
+                  <th className="py-2 pl-3 pr-2 font-semibold">Producto</th>
+                  <th className="py-2 px-2 font-semibold">SKU</th>
+                  <th className="py-2 px-2 font-semibold text-right">Cantidad</th>
+                  <th className="py-2 px-2 font-semibold text-right">Costo</th>
+                  <th className="py-2 px-2 font-semibold text-right">Precio</th>
+                  <th className="py-2 px-2 font-semibold text-right">Valor en inventario</th>
+                  <th className="py-2 pl-2 pr-3 font-semibold text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {articulosFiltrados.map((a) => (
+                  <FilaArticuloCompacta key={a.id} tenantId={tenantId} articulo={a} onCambio={onCambio} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -2576,112 +2564,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
   );
 }
 
-function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; articulo: Articulo; onCambio: () => void }) {
-  const [modo, setModo] = useState<"ver" | "editar" | "ajustar" | "reabastecer">("ver");
-  const [stockReal, setStockReal] = useState(String(Number(articulo.stockActual)));
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const margenActual = calcularMargen(Number(articulo.costoUnitario), Number(articulo.precioVenta ?? 0));
-  const sinStock = Number(articulo.stockActual) <= 0;
-  const stockBajo = !sinStock && articulo.stockMinimo != null && Number(articulo.stockActual) <= Number(articulo.stockMinimo);
-
-  const guardarAjuste = async () => {
-    if (stockReal === "" || Number(stockReal) < 0) { setError("Indicá el stock real contado"); return; }
-    setGuardando(true);
-    setError(null);
-    try {
-      await ajustarStockArticulo(tenantId, articulo.id, { stockReal: Number(stockReal) });
-      setModo("ver");
-      onCambio();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo ajustar el stock");
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  const eliminar = async () => {
-    if (!window.confirm(`¿Eliminar "${articulo.nombre}"? Esto no se puede deshacer.`)) return;
-    setGuardando(true);
-    setError(null);
-    try {
-      await eliminarArticulo(tenantId, articulo.id);
-      onCambio();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar");
-      setGuardando(false);
-    }
-  };
-
-  if (modo === "ajustar") {
-    return (
-      <div className="apple-glass rounded-2xl p-5 space-y-2 border border-teal-500/30">
-        <h4 className="font-bold text-slate-900 dark:text-white text-sm">{articulo.nombre}</h4>
-        <p className="text-[10px] text-slate-500 dark:text-white/40">Sistema dice: {Number(articulo.stockActual)} {articulo.unidadMedida}. Escribí lo que realmente hay contado — el sistema calcula y audita la diferencia solo.</p>
-        <input value={stockReal} onChange={(e) => setStockReal(e.target.value)} type="number" step="0.001" min="0" className="input-horeca text-sm font-bold" placeholder="Stock real" autoFocus />
-        {error && <p className="text-[10px] text-red-500">{error}</p>}
-        <div className="flex gap-2">
-          <button onClick={guardarAjuste} disabled={guardando} className="flex-1 g-aurora text-white text-xs font-semibold py-2 rounded-lg cursor-pointer disabled:opacity-60">
-            {guardando ? "Guardando…" : "Corregir stock"}
-          </button>
-          <button onClick={() => { setModo("ver"); setError(null); }} className="flex-1 apple-glass-btn text-xs font-semibold py-2 rounded-lg cursor-pointer">Cancelar</button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`apple-glass rounded-2xl p-5 space-y-2 border transition-colors ${
-      sinStock ? "border-red-500/40" : stockBajo ? "border-amber-500/40" : "border-transparent"
-    }`}>
-      <div className="flex items-center justify-between gap-2">
-        <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">{articulo.nombre}</h4>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button onClick={() => setModo("ajustar")} title="Corregir stock (conteo físico)" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconRefresh size={13} /></button>
-          <button onClick={() => setModo("editar")} title="Editar artículo" className="text-slate-400 hover:text-teal-500 cursor-pointer"><IconCustomize size={13} /></button>
-          <button onClick={eliminar} disabled={guardando} title="Eliminar artículo" className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40"><IconTrash size={13} /></button>
-        </div>
-      </div>
-
-      <div className="text-[11px] text-slate-500 dark:text-white/40 font-semibold uppercase tracking-wider">{articulo.categoria || "Sin categoría"} · {articulo.unidadMedida}</div>
-
-      <div className="flex items-end justify-between gap-2 pt-1">
-        <div>
-          <div className="text-[10px] text-slate-400 dark:text-white/30 uppercase tracking-wider">Precio de venta</div>
-          <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">${Number(articulo.precioVenta ?? 0).toFixed(2)}</div>
-        </div>
-        <BadgeMargen margen={margenActual} />
-      </div>
-
-      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-300/40 dark:border-white/10">
-        <span className={`font-semibold ${sinStock ? "text-red-500" : stockBajo ? "text-amber-600 dark:text-amber-400" : "text-slate-600 dark:text-white/60"}`}>
-          Stock: {Number(articulo.stockActual).toFixed(2)} {articulo.unidadMedida}
-          {sinStock ? " · Agotado" : stockBajo ? " · Bajo mínimo" : ""}
-        </span>
-        <span className="text-slate-400 dark:text-white/40 font-mono">Costo ${Number(articulo.costoUnitario).toFixed(2)}</span>
-      </div>
-
-      {/* Botón grande y con texto a propósito — el ícono chiquito de antes
-          era demasiado sutil, un cajero reportó que no encontraba ninguna
-          forma de recargar stock desde la tarjeta. */}
-      <button onClick={() => setModo("reabastecer")}
-        className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 py-2 rounded-xl cursor-pointer transition-colors">
-        <IconDownload size={13} /> Reabastecer stock
-      </button>
-      {error && <p className="text-[10px] text-red-500">{error}</p>}
-
-      {modo === "editar" && (
-        <ModalEditarArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onGuardado={() => { setModo("ver"); onCambio(); }} />
-      )}
-      {modo === "reabastecer" && (
-        <ModalReabastecerArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onReabastecido={() => { setModo("ver"); onCambio(); }} />
-      )}
-    </div>
-  );
-}
-
-/** Vista de lista compacta de Inventario — misma lógica y modales que TarjetaArticulo, densidad más alta para catálogos grandes. */
+/** Fila de la tabla compacta de Inventario — una línea por artículo, máxima densidad. */
 function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: number; articulo: Articulo; onCambio: () => void }) {
   const [modo, setModo] = useState<"ver" | "editar" | "ajustar" | "reabastecer">("ver");
   const [stockReal, setStockReal] = useState(String(Number(articulo.stockActual)));
@@ -2691,6 +2574,7 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
   const margenActual = calcularMargen(Number(articulo.costoUnitario), Number(articulo.precioVenta ?? 0));
   const sinStock = Number(articulo.stockActual) <= 0;
   const stockBajo = !sinStock && articulo.stockMinimo != null && Number(articulo.stockActual) <= Number(articulo.stockMinimo);
+  const valorInventario = Number(articulo.costoUnitario) * Number(articulo.stockActual);
 
   const guardarAjuste = async () => {
     if (stockReal === "" || Number(stockReal) < 0) { setError("Indicá el stock real contado"); return; }
@@ -2726,56 +2610,50 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
   const iniciales = articulo.nombre.trim().slice(0, 2).toUpperCase();
 
   return (
-    <div className={`bg-white dark:bg-white/5 rounded-lg border shadow-sm transition-colors ${
-      sinStock ? "border-red-300" : stockBajo ? "border-amber-300" : "border-slate-200/60 dark:border-white/10"
-    } hover:border-teal-500/40`}>
-      <div className="flex items-center justify-between gap-3 p-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 flex-shrink-0 bg-[#E8ECE9] text-[#2B4C3F] font-bold flex items-center justify-center rounded-md text-sm">
-            {iniciales}
+    <>
+      <tr className={`border-b border-slate-200/50 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${sinStock ? "bg-red-500/5" : stockBajo ? "bg-amber-500/5" : ""}`}>
+        <td className="py-2 pl-3 pr-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 flex-shrink-0 bg-[#E8ECE9] text-[#2B4C3F] font-bold flex items-center justify-center rounded-md text-[11px]">
+              {iniciales}
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-slate-800 dark:text-white/80 truncate max-w-[180px]">{articulo.nombre}</div>
+              <div className="text-[10px] text-slate-400 dark:text-white/30">{articulo.categoria || "Sin categoría"}</div>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h4 className="text-sm font-semibold text-slate-800 dark:text-white/80 truncate">{articulo.nombre}</h4>
-            <span className="text-[11px] text-slate-500 dark:text-white/40">SKU: {articulo.sku || "N/A"} · {articulo.categoria || "Sin categoría"}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-5 flex-shrink-0">
-          <div className="text-right hidden sm:block">
-            <span className="block text-[10px] text-slate-400 dark:text-white/30 uppercase tracking-wider">Stock</span>
-            <span className={`text-sm font-bold ${sinStock ? "text-red-500" : stockBajo ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-white/70"}`}>
-              {Number(articulo.stockActual).toFixed(2)} {articulo.unidadMedida}
-            </span>
-          </div>
-          <div className="text-right hidden md:block">
-            <span className="block text-[10px] text-slate-400 dark:text-white/30 uppercase tracking-wider">Costo / Venta</span>
-            <span className="text-sm font-mono text-slate-700 dark:text-white/70">
-              ${Number(articulo.costoUnitario).toFixed(2)} / ${Number(articulo.precioVenta ?? 0).toFixed(2)}
-            </span>
-          </div>
-          <BadgeMargen margen={margenActual} />
-          <div className="flex items-center gap-1">
-            <button onClick={() => setModo("reabastecer")} title="Reabastecer stock" className="text-emerald-600 dark:text-emerald-300 hover:text-emerald-700 cursor-pointer p-1"><IconDownload size={14} /></button>
+        </td>
+        <td className="py-2 px-2 font-mono text-slate-500 dark:text-white/40 whitespace-nowrap">{articulo.sku || "—"}</td>
+        <td className={`py-2 px-2 text-right font-semibold whitespace-nowrap ${sinStock ? "text-red-500" : stockBajo ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-white/70"}`}>
+          {Number(articulo.stockActual).toFixed(2)} {articulo.unidadMedida}
+        </td>
+        <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60 whitespace-nowrap">${Number(articulo.costoUnitario).toFixed(2)}</td>
+        <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60 whitespace-nowrap">${Number(articulo.precioVenta ?? 0).toFixed(2)}</td>
+        <td className="py-2 px-2 text-right font-mono font-semibold text-slate-800 dark:text-white/80 whitespace-nowrap">${valorInventario.toFixed(2)}</td>
+        <td className="py-2 pl-2 pr-3">
+          <div className="flex items-center justify-end gap-1">
+            <button onClick={() => setModo("reabastecer")} title="Añadir inventario" className="text-emerald-600 dark:text-emerald-300 hover:text-emerald-700 cursor-pointer p-1"><IconDownload size={14} /></button>
             <button onClick={() => setModo("ajustar")} title="Corregir stock (conteo físico)" className="text-slate-400 hover:text-teal-500 cursor-pointer p-1"><IconRefresh size={14} /></button>
             <button onClick={() => setModo("editar")} title="Editar artículo" className="text-slate-400 hover:text-teal-500 cursor-pointer p-1"><IconCustomize size={14} /></button>
             <button onClick={eliminar} disabled={guardando} title="Eliminar artículo" className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40 p-1"><IconTrash size={14} /></button>
           </div>
-        </div>
-      </div>
-
+        </td>
+      </tr>
       {modo === "ajustar" && (
-        <div className="px-3 pb-3 space-y-2 border-t border-slate-200/60 dark:border-white/10 pt-2">
-          <p className="text-[10px] text-slate-500 dark:text-white/40">Sistema dice: {Number(articulo.stockActual)} {articulo.unidadMedida}. Escribí lo que realmente hay contado.</p>
-          <div className="flex gap-2">
-            <input value={stockReal} onChange={(e) => setStockReal(e.target.value)} type="number" step="0.001" min="0" className="input-horeca text-sm font-bold flex-1" placeholder="Stock real" autoFocus />
-            <button onClick={guardarAjuste} disabled={guardando} className="g-aurora text-white text-xs font-semibold px-4 rounded-lg cursor-pointer disabled:opacity-60">
-              {guardando ? "Guardando…" : "Corregir"}
-            </button>
-            <button onClick={() => { setModo("ver"); setError(null); }} className="apple-glass-btn text-xs font-semibold px-4 rounded-lg cursor-pointer">Cancelar</button>
-          </div>
-        </div>
+        <tr className="border-b border-slate-200/50 dark:border-white/5 bg-slate-50 dark:bg-white/5">
+          <td colSpan={7} className="px-3 py-2">
+            <p className="text-[10px] text-slate-500 dark:text-white/40 mb-1.5">Sistema dice: {Number(articulo.stockActual)} {articulo.unidadMedida}. Escribí lo que realmente hay contado.</p>
+            <div className="flex gap-2 max-w-md">
+              <input value={stockReal} onChange={(e) => setStockReal(e.target.value)} type="number" step="0.001" min="0" className="input-horeca text-sm font-bold flex-1" placeholder="Stock real" autoFocus />
+              <button onClick={guardarAjuste} disabled={guardando} className="g-aurora text-white text-xs font-semibold px-4 rounded-lg cursor-pointer disabled:opacity-60">
+                {guardando ? "Guardando…" : "Corregir"}
+              </button>
+              <button onClick={() => { setModo("ver"); setError(null); }} className="apple-glass-btn text-xs font-semibold px-4 rounded-lg cursor-pointer">Cancelar</button>
+            </div>
+            {error && <p className="text-[10px] text-red-500 mt-1.5">{error}</p>}
+          </td>
+        </tr>
       )}
-      {error && <p className="text-[10px] text-red-500 px-3 pb-2">{error}</p>}
 
       {modo === "editar" && (
         <ModalEditarArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onGuardado={() => { setModo("ver"); onCambio(); }} />
@@ -2783,7 +2661,7 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
       {modo === "reabastecer" && (
         <ModalReabastecerArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onReabastecido={() => { setModo("ver"); onCambio(); }} />
       )}
-    </div>
+    </>
   );
 }
 
@@ -2799,6 +2677,8 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
   const [cantidad, setCantidad] = useState("");
   const [costoUnitario, setCostoUnitario] = useState(String(articulo.costoUnitario));
   const [precioVenta, setPrecioVenta] = useState(String(articulo.precioVenta ?? 0));
+  const [metodoPago, setMetodoPago] = useState("EFECTIVO");
+  const [moneda, setMoneda] = useState("USD");
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2807,7 +2687,7 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
 
   const guardar = async () => {
     if (!cantidad || Number(cantidad) <= 0) { setError("Indica la cantidad que llegó"); return; }
-    if (!costoUnitario || Number(costoUnitario) < 0) { setError("El costo unitario es obligatorio"); return; }
+    if (!costoUnitario || Number(costoUnitario) <= 0) { setError("El costo unitario es obligatorio: no se puede reabastecer sin registrar cuánto costó"); return; }
     if (!precioVenta || Number(precioVenta) <= 0) { setError("El precio de venta es obligatorio"); return; }
     setGuardando(true);
     setError(null);
@@ -2815,6 +2695,7 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
       await entradaArticulo(tenantId, articulo.id, {
         cantidad: Number(cantidad), costoUnitario: Number(costoUnitario),
         motivo: "Reabastecimiento rápido", fechaVencimiento: fechaVencimiento || undefined,
+        metodoPago, moneda,
       });
       // El precio de venta no es parte del movimiento de stock — se actualiza
       // aparte solo si cambió, así el reabastecimiento sirve también para
@@ -2849,6 +2730,22 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
           <span className="text-[10px] font-semibold text-slate-500">Margen:</span>
           <BadgeMargen margen={margen} />
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label="¿Cómo pagaste esta compra?">
+            <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} className="input-horeca">
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="TARJETA">Tarjeta</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="BILLETERA_DIGITAL">Billetera digital</option>
+            </select>
+          </Campo>
+          <Campo label="Moneda">
+            <select value={moneda} onChange={(e) => setMoneda(e.target.value)} className="input-horeca">
+              {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </Campo>
+        </div>
+        <p className="text-[10px] text-slate-400">Esto registra el gasto real en caja (Ingresos & Gastos), igual que cualquier otra salida de dinero.</p>
         <Campo label="Fecha de vencimiento (opcional)">
           <input value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} type="date" className="input-horeca" />
         </Campo>
@@ -5057,11 +4954,10 @@ function Modal({ titulo, onClose, children, ancho }: { titulo: string; onClose: 
   // depender de dark: evita la colisión en el modo en que de verdad se
   // usa la app.
   // Portal a document.body: cualquier ancestro con backdrop-filter/filter/
-  // transform (ej. .apple-glass en las tarjetas de TarjetaArticulo, que trae
-  // backdrop-filter: blur(...)) crea un containing block nuevo para
-  // position: fixed y "atrapa" al modal dentro de la caja de la tarjeta,
-  // cortándolo o descentrándolo. Renderizar el modal fuera del árbol de la
-  // tarjeta, directo bajo <body>, lo vuelve un overlay de viewport real sin
+  // transform (ej. .apple-glass, que trae backdrop-filter: blur(...)) crea
+  // un containing block nuevo para position: fixed y "atrapa" al modal
+  // dentro de esa caja, cortándolo o descentrándolo. Renderizar el modal
+  // fuera de ese árbol, directo bajo <body>, lo vuelve un overlay de viewport real sin
   // importar qué ancestro lo dispare.
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
