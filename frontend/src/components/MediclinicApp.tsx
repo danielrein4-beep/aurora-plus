@@ -2370,8 +2370,10 @@ function HistoriasClinicas({
     if (onVerDocumento) {
       onVerDocumento({ tipo: "INFORME_MEDICO", data });
     } else {
+      generarPdfInformeConsulta(data);
       const texto = generarTextoWhatsAppConsulta(data);
       abrirWhatsAppDirecto(data.paciente.telefono, texto);
+      dispararToast("📄 PDF descargado automáticamente y WhatsApp abierto.");
     }
   };
 
@@ -3151,8 +3153,10 @@ function Procedimientos({
     if (onVerDocumento) {
       onVerDocumento({ tipo: "COTIZACION", data: dataCot });
     } else {
+      generarPdfCotizacion(dataCot);
       const texto = generarTextoWhatsAppCotizacion(dataCot);
       abrirWhatsAppDirecto(cot.pacienteTelefono, texto);
+      dispararToast("📄 PDF de cotización descargado automáticamente y WhatsApp abierto.");
     }
   };
 

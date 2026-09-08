@@ -97,8 +97,12 @@ export default function DocumentoPreviewModal({
 
   // ── ENVIAR POR WHATSAPP ──
   const handleEnviarWhatsApp = () => {
+    // 1. Descargar automáticamente el PDF oficial
+    handleDescargarPdf();
+    // 2. Abrir WhatsApp con el texto resumen
     const texto = obtenerTextoResumen();
     abrirWhatsAppDirecto(telefonoWhatsApp, texto);
+    mostrarToast("📄 PDF descargado automáticamente. Arrástralo al chat de WhatsApp para adjuntarlo.");
     setModalCompartir(null);
   };
 
@@ -622,6 +626,11 @@ export default function DocumentoPreviewModal({
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400 max-h-32 overflow-y-auto whitespace-pre-wrap font-mono">
               {obtenerTextoResumen()}
             </div>
+            {/* Nota de auto-descarga */}
+            <div className="text-[11px] text-emerald-400/90 bg-emerald-950/40 border border-emerald-800/40 rounded-lg p-2 flex items-center gap-1.5">
+              <span>💡 Al enviar, el PDF oficial se descargará automáticamente en tu equipo para que puedas adjuntarlo (📎) en WhatsApp.</span>
+            </div>
+
             <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-800">
               <button
                 type="button"
@@ -642,8 +651,10 @@ export default function DocumentoPreviewModal({
                 <button
                   type="button"
                   onClick={() => {
+                    handleDescargarPdf();
                     const texto = obtenerTextoResumen();
                     abrirWhatsAppAppDirecto(telefonoWhatsApp, texto);
+                    mostrarToast("📄 PDF descargado automáticamente. Arrástralo al chat de WhatsApp.");
                     setModalCompartir(null);
                   }}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/50 cursor-pointer transition-colors"
@@ -654,8 +665,10 @@ export default function DocumentoPreviewModal({
                 <button
                   type="button"
                   onClick={() => {
+                    handleDescargarPdf();
                     const texto = obtenerTextoResumen();
                     abrirWhatsAppWebDirecto(telefonoWhatsApp, texto);
+                    mostrarToast("📄 PDF descargado automáticamente. Arrástralo al chat de WhatsApp.");
                     setModalCompartir(null);
                   }}
                   className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition-colors shadow-md flex items-center gap-1.5"
