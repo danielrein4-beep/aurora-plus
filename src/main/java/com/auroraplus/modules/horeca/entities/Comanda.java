@@ -78,6 +78,18 @@ public class Comanda {
     @Column(name = "vuelto_monto", precision = 18, scale = 2)
     private BigDecimal vueltoMonto; // vuelto ya convertido a monedaVuelto — lo que físicamente se entrega
 
+    // Auditoría de anulación — nunca se borra una comanda ni sus movimientos:
+    // se revierte inventario/caja y queda registrado quién, cuándo y por qué,
+    // igual que exige una nota de crédito en vez de un simple DELETE.
+    @Column(name = "motivo_anulacion", length = 255)
+    private String motivoAnulacion;
+
+    @Column(name = "fecha_anulacion")
+    private LocalDateTime fechaAnulacion;
+
+    @Column(name = "anulado_por", length = 120)
+    private String anuladoPor;
+
     public enum EstadoComanda { ABIERTA, PAGADA, ANULADA }
 
     public Long getId() { return id; }
@@ -118,4 +130,10 @@ public class Comanda {
     public void setMonedaVuelto(String monedaVuelto) { this.monedaVuelto = monedaVuelto; }
     public BigDecimal getVueltoMonto() { return vueltoMonto; }
     public void setVueltoMonto(BigDecimal vueltoMonto) { this.vueltoMonto = vueltoMonto; }
+    public String getMotivoAnulacion() { return motivoAnulacion; }
+    public void setMotivoAnulacion(String motivoAnulacion) { this.motivoAnulacion = motivoAnulacion; }
+    public LocalDateTime getFechaAnulacion() { return fechaAnulacion; }
+    public void setFechaAnulacion(LocalDateTime fechaAnulacion) { this.fechaAnulacion = fechaAnulacion; }
+    public String getAnuladoPor() { return anuladoPor; }
+    public void setAnuladoPor(String anuladoPor) { this.anuladoPor = anuladoPor; }
 }

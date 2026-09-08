@@ -383,6 +383,76 @@ public class HorecaService {
         return resultado;
     }
 
+    /**
+     * Anula una comanda ya emitida (ABIERTA o PAGADA) — nunca se borra nada:
+     * cada ítem devuelve su inventario/ingredientes de receta, cada pago
+     * recibido y cada vuelto entregado quedan revertidos con un movimiento de
+     * caja compensatorio (nunca eliminando el original), y la comanda queda
+     * marcada ANULADA con motivo, fecha y usuario — el mismo principio de una
+     * nota de crédito: se corrige con un movimiento inverso, no con un DELETE.
+     */
+    @Transactional
+    public Comanda anularComanda(Long comandaId, Long tenantId, String motivo, String usuario, String claveIdempotencia) {
+        java.util.Optional<Long> existente = idempotenciaService.obtenerSiYaProcesada(tenantId, claveIdempotencia);
+        if (existente.isPresent()) {
+            return comandaRepository.findById(existente.get())
+                .orElseThrow(() -> new RuntimeException("Operación idempotente inconsistente: comanda " + existente.get() + " no encontrada"));
+        }
+
+        Comanda comanda = comandaRepository.findById(comandaId)
+            .orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
+        if (!comanda.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Comanda no pertenece a este tenant");
+        }
+        if (comanda.getEstado() == Comanda.EstadoComanda.ANULADA) {
+            throw new RuntimeException("Esta comanda ya está anulada");
+        }
+        if (motivo == null || motivo.isBlank()) {
+            throw new RuntimeException("Debe indicar el motivo de la anulación");
+        }
+
+        boolean estabaPagada = comanda.getEstado() == Comanda.EstadoComanda.PAGADA;
+
+        // 1) Devolver cada ítem al inventario — recetas explotan sus
+        // ingredientes de vuelta, artículos de venta directa regresan su
+        // cantidad. Se hace siempre, esté PAGADA o ABIERTA: el descuento de
+        // stock ocurre al agregar el ítem, no al cerrar la comanda.
+        List<ItemComanda> items = itemComandaRepository.findByComandaId(comandaId);
+        for (ItemComanda item : items) {
+            if (item.getEscandallo() != null) {
+                escandalloService.revertirVentaPlato(item.getEscandallo().getId(), tenantId, item.getCantidad());
+            } else if (item.getArticulo() != null) {
+                inventarioService.registrarMovimientoKardex(item.getArticulo().getId(), tenantId, Kardex.TipoOperacion.ENTRADA,
+                    item.getCantidad(), item.getCostoUnitario(), "Anulación de venta: " + item.getNombrePlato());
+            }
+        }
+
+        // 2) Revertir caja — solo si de verdad se cobró. Cada línea de pago
+        // recibida se compensa con un EGRESO en su misma moneda; el vuelto
+        // entregado (que salió como EGRESO al cerrar) se compensa con un
+        // INGRESO. Ninguno de los movimientos originales se toca ni se borra.
+        if (estabaPagada) {
+            List<PagoVenta> pagos = pagoVentaRepository.findByComandaIdOrderByFechaPagoAsc(comandaId);
+            for (PagoVenta pago : pagos) {
+                motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
+                    pago.getMonto(), pago.getMoneda(), "Anulación de venta " + descripcionComanda(comanda) + " (reverso de " + pago.getMetodoPago() + ")");
+            }
+            if (comanda.getVueltoMonto() != null && comanda.getVueltoMonto().compareTo(BigDecimal.ZERO) > 0) {
+                motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
+                    comanda.getVueltoMonto(), comanda.getMonedaVuelto(), "Anulación de venta " + descripcionComanda(comanda) + " (reverso de vuelto entregado)");
+            }
+        }
+
+        comanda.setEstado(Comanda.EstadoComanda.ANULADA);
+        comanda.setMotivoAnulacion(motivo);
+        comanda.setFechaAnulacion(LocalDateTime.now());
+        comanda.setAnuladoPor(usuario);
+        Comanda anulada = comandaRepository.save(comanda);
+
+        idempotenciaService.registrar(tenantId, claveIdempotencia, "anular_comanda_horeca", anulada.getId());
+        return anulada;
+    }
+
     public Comanda asignarMesero(Long comandaId, Long tenantId, String nuevoMesero) {
         Comanda comanda = comandaRepository.findById(comandaId)
             .orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
