@@ -900,6 +900,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   setPacienteSeleccionadoId(id);
                   setPagina("historias");
                 }}
+                onVerDocumento={setVisorDocumento}
               />
             )}
             {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} />}
@@ -3856,6 +3857,7 @@ function SalaEspera({
   config,
   onNavegar,
   onSeleccionarPacienteParaConsulta,
+  onVerDocumento,
 }: {
   tenantId: number;
   pacientes: Paciente[] | null;
@@ -3867,6 +3869,7 @@ function SalaEspera({
   config: any;
   onNavegar?: (pag: Pagina) => void;
   onSeleccionarPacienteParaConsulta?: (pacienteId: number) => void;
+  onVerDocumento?: (payload: DocumentoVisorPayload) => void;
 }) {
   // Lista de Turnos del Día
   const [turnos, setTurnos] = useState<TurnoSalaEspera[]>(() => {
@@ -4167,7 +4170,8 @@ function SalaEspera({
   const ejecutarCierreCaja = () => {
     const dataCierre: CierreCajaData = {
       clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
-      doctorNombre: config?.doctorNombre || "Dr. Daniel Reina",
+      doctorNombre: config?.doctorNombre || "Dr. Mario Roa",
+      responsableNombre: config?.secretariaNombre || "Recepción / Asistente",
       fecha: hoy(),
       horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       tasaBCV: config?.tasaBCV || tasaBCV,
@@ -4178,10 +4182,14 @@ function SalaEspera({
       totalCOP: totalCajaCOP,
       totalPacientes: cobrosLocales.length,
     };
-    generarPdfCierreCaja(dataCierre);
     onAgregarCierre(dataCierre);
     setMostrarModalCierre(false);
     dispararToast("Cierre de caja generado y guardado.");
+    if (onVerDocumento) {
+      onVerDocumento({ tipo: "CIERRE_CAJA", data: dataCierre });
+    } else {
+      generarPdfCierreCaja(dataCierre);
+    }
   };
 
   return (
