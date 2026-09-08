@@ -13,6 +13,7 @@ import {
   generarTextoEmailCierre,
   generarTextoWhatsAppCotizacion,
   generarTextoEmailCotizacion,
+  abrirWhatsAppDirecto,
 } from "../utils/pdfReports";
 
 export type TipoDocumento = "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION";
@@ -89,11 +90,7 @@ export default function DocumentoPreviewModal({
   // ── ENVIAR POR WHATSAPP ──
   const handleEnviarWhatsApp = () => {
     const texto = obtenerTextoResumen();
-    const telLimpio = telefonoWhatsApp.replace(/\D/g, "");
-    const url = telLimpio
-      ? `https://wa.me/${telLimpio}?text=${encodeURIComponent(texto)}`
-      : `https://wa.me/?text=${encodeURIComponent(texto)}`;
-    window.open(url, "_blank");
+    abrirWhatsAppDirecto(telefonoWhatsApp, texto);
     setModalCompartir(null);
   };
 

@@ -15,7 +15,8 @@ import {
 } from "../api";
 import {
   generarPdfCierreCaja, generarPdfInformeConsulta, generarTextoWhatsAppConsulta,
-  generarPdfCotizacion,
+  generarPdfCotizacion, generarTextoWhatsAppCotizacion,
+  abrirWhatsAppDirecto, formatearTelefonoParaWhatsApp,
   type CobroItem, type CierreCajaData, type ConsultaReportData, type CotizacionData, type CotizacionItem
 } from "../utils/pdfReports";
 import DocumentoPreviewModal, { type DocumentoVisorPayload } from "./DocumentoPreviewModal";
@@ -2369,9 +2370,8 @@ function HistoriasClinicas({
     if (onVerDocumento) {
       onVerDocumento({ tipo: "INFORME_MEDICO", data });
     } else {
-      const texto = encodeURIComponent(generarTextoWhatsAppConsulta(data));
-      const tel = (data.paciente.telefono || "").replace(/\D/g, "");
-      window.open(tel ? `https://wa.me/${tel}?text=${texto}` : `https://wa.me/?text=${texto}`, "_blank");
+      const texto = generarTextoWhatsAppConsulta(data);
+      abrirWhatsAppDirecto(data.paciente.telefono, texto);
     }
   };
 
@@ -3151,9 +3151,8 @@ function Procedimientos({
     if (onVerDocumento) {
       onVerDocumento({ tipo: "COTIZACION", data: dataCot });
     } else {
-      const texto = encodeURIComponent(generarTextoWhatsAppCotizacion(dataCot));
-      const telLimpio = (cot.pacienteTelefono || "").replace(/\D/g, "");
-      window.open(telLimpio ? `https://wa.me/${telLimpio}?text=${texto}` : `https://wa.me/?text=${texto}`, "_blank");
+      const texto = generarTextoWhatsAppCotizacion(dataCot);
+      abrirWhatsAppDirecto(cot.pacienteTelefono, texto);
     }
   };
 
@@ -4437,13 +4436,15 @@ function SalaEspera({
                             <button
                               type="button"
                               onClick={() => {
-                                const tel = t.pacienteTelefono.replace(/\D/g, "");
-                                window.open(`https://wa.me/${tel}?text=Hola%20${encodeURIComponent(t.pacienteNombre)},%20le%20escribimos%20de%20la%20cl%C3%ADnica%20para%20su%20turno%20m%C3%A9dico.`, "_blank");
+                                const msg = `Hola ${t.pacienteNombre}, le escribimos del consultorio médico para notificarle que su turno está próximo a ser atendido.`;
+                                abrirWhatsAppDirecto(t.pacienteTelefono, msg);
                               }}
-                              className="text-emerald-600 hover:text-emerald-500 text-xs cursor-pointer"
-                              title="Enviar mensaje por WhatsApp"
+                              className="p-1 text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-md text-xs cursor-pointer transition-colors"
+                              title="Enviar mensaje de turno por WhatsApp"
                             >
-                              💬
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                              </svg>
                             </button>
                           )}
                         </div>
@@ -5656,16 +5657,21 @@ function AgendaMedica({
                         {cita.motivo}
                       </div>
                       {cita.pacienteTelefono && cita.pacienteTelefono !== "S/T" && (
-                        <a
-                          href={`https://wa.me/${cita.pacienteTelefono.replace(/\D/g, "")}?text=Hola%20${encodeURIComponent(cita.pacienteNombre)},%20le%20recordamos%20su%20cita%20m%C3%A9dica%20para%20el%20${fechaCortaFmt}%20a%20las%20${cita.hora}.`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-emerald-600 hover:text-emerald-500 font-bold flex items-center gap-1 text-[10px]"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const msg = `Hola ${cita.pacienteNombre}, le recordamos su cita médica programada para el día ${fechaCortaFmt} a las ${cita.hora}.`;
+                            abrirWhatsAppDirecto(cita.pacienteTelefono, msg);
+                          }}
+                          className="text-emerald-600 hover:text-emerald-500 font-bold flex items-center gap-1 text-[10px] cursor-pointer hover:underline"
                           title="Enviar recordatorio WhatsApp"
                         >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                          </svg>
                           <span>WhatsApp:</span>
                           <span>{cita.pacienteTelefono}</span>
-                        </a>
+                        </button>
                       )}
                     </div>
 

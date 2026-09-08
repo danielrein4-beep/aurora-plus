@@ -658,3 +658,62 @@ export function generarTextoEmailCotizacion(data: CotizacionData): { subject: st
     `Validez de la cotización: 15 días.\n\nSaludos cordiales,\n${data.clinicaNombre}`;
   return { subject, body };
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// 5. HELPER UNIVERSAL DE WHATSAPP (CORRIGE PREFIJOS INTERNACIONALES +58/+57)
+// ══════════════════════════════════════════════════════════════════════════
+export function formatearTelefonoParaWhatsApp(telRaw: string): string {
+  if (!telRaw) return "";
+  let digits = telRaw.replace(/\D/g, "");
+  if (!digits) return "";
+
+  // Si comienza con 00 (ej. 0058...), quitar 00
+  if (digits.startsWith("00")) {
+    digits = digits.slice(2);
+  }
+
+  // Si ya tiene código de país internacional:
+  // Venezuela (+58): 584XXXXXXXXX (12 dígitos)
+  // Colombia (+57): 573XXXXXXXXX (12 dígitos)
+  // USA (+1): 1XXXXXXXXXX (11 dígitos)
+  if (digits.startsWith("58") && digits.length >= 12) {
+    return digits;
+  }
+  if (digits.startsWith("57") && digits.length >= 12) {
+    return digits;
+  }
+  if (digits.startsWith("1") && digits.length === 11) {
+    return digits;
+  }
+
+  // Si es un número venezolano típico con cero inicial (ej. 04247640913, 0412..., 0414..., 0416..., 0426... -> 11 dígitos)
+  if (digits.startsWith("04") && digits.length === 11) {
+    return `58${digits.slice(1)}`; // Convertir a 584247640913
+  }
+
+  // Si es 10 dígitos empezando en 4 (ej. 4247640913)
+  if (digits.startsWith("4") && digits.length === 10) {
+    return `58${digits}`; // Convertir a 584247640913
+  }
+
+  // Si es 10 dígitos colombiano empezando en 3 (ej. 3124567890)
+  if (digits.startsWith("3") && digits.length === 10) {
+    return `57${digits}`;
+  }
+
+  // Si tiene 10 dígitos con 0 inicial
+  if (digits.startsWith("0") && digits.length === 10) {
+    return `58${digits.slice(1)}`;
+  }
+
+  return digits;
+}
+
+export function abrirWhatsAppDirecto(telefono: string, texto: string) {
+  const telFormateado = formatearTelefonoParaWhatsApp(telefono);
+  const textoCodificado = encodeURIComponent(texto);
+  const url = telFormateado
+    ? `https://api.whatsapp.com/send/?phone=${telFormateado}&text=${textoCodificado}`
+    : `https://api.whatsapp.com/send/?text=${textoCodificado}`;
+  window.open(url, "_blank");
+}
