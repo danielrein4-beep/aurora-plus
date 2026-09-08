@@ -2205,6 +2205,13 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
   const [mostrarImportar, setMostrarImportar] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"cards" | "compact">(
+    () => (localStorage.getItem("inventory_view") as "cards" | "compact") || "cards"
+  );
+  const cambiarViewMode = (modo: "cards" | "compact") => {
+    setViewMode(modo);
+    localStorage.setItem("inventory_view", modo);
+  };
   const [form, setForm] = useState({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "" });
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -2280,6 +2287,22 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
           <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o SKU…" className="input-horeca w-full pl-8" />
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-white/5 p-1 rounded-lg flex-shrink-0">
+            <button
+              onClick={() => cambiarViewMode("cards")}
+              title="Vista de tarjetas"
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${viewMode === "cards" ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-white/40"}`}
+            >
+              Tarjetas
+            </button>
+            <button
+              onClick={() => cambiarViewMode("compact")}
+              title="Vista de lista compacta"
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${viewMode === "compact" ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-white/40"}`}
+            >
+              Lista compacta
+            </button>
+          </div>
           <button onClick={() => setMostrarImportar(true)} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5">
             <IconDownload size={14} /> Importar Excel
           </button>
@@ -2360,6 +2383,12 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
 
       {articulosFiltrados.length === 0 ? (
         <p className="text-xs text-slate-400">Sin artículos {busqueda || categoriaFiltro ? "que coincidan con el filtro" : "cargados todavía"}.</p>
+      ) : viewMode === "compact" ? (
+        <div className="space-y-2">
+          {articulosFiltrados.map((a) => (
+            <FilaArticuloCompacta key={a.id} tenantId={tenantId} articulo={a} onCambio={onCambio} />
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {articulosFiltrados.map((a) => (
@@ -2641,6 +2670,112 @@ function TarjetaArticulo({ tenantId, articulo, onCambio }: { tenantId: number; a
         <IconDownload size={13} /> Reabastecer stock
       </button>
       {error && <p className="text-[10px] text-red-500">{error}</p>}
+
+      {modo === "editar" && (
+        <ModalEditarArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onGuardado={() => { setModo("ver"); onCambio(); }} />
+      )}
+      {modo === "reabastecer" && (
+        <ModalReabastecerArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onReabastecido={() => { setModo("ver"); onCambio(); }} />
+      )}
+    </div>
+  );
+}
+
+/** Vista de lista compacta de Inventario — misma lógica y modales que TarjetaArticulo, densidad más alta para catálogos grandes. */
+function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: number; articulo: Articulo; onCambio: () => void }) {
+  const [modo, setModo] = useState<"ver" | "editar" | "ajustar" | "reabastecer">("ver");
+  const [stockReal, setStockReal] = useState(String(Number(articulo.stockActual)));
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const margenActual = calcularMargen(Number(articulo.costoUnitario), Number(articulo.precioVenta ?? 0));
+  const sinStock = Number(articulo.stockActual) <= 0;
+  const stockBajo = !sinStock && articulo.stockMinimo != null && Number(articulo.stockActual) <= Number(articulo.stockMinimo);
+
+  const guardarAjuste = async () => {
+    if (stockReal === "" || Number(stockReal) < 0) { setError("Indicá el stock real contado"); return; }
+    setGuardando(true);
+    setError(null);
+    try {
+      await ajustarStockArticulo(tenantId, articulo.id, { stockReal: Number(stockReal) });
+      setModo("ver");
+      onCambio();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo ajustar el stock");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const eliminar = async () => {
+    if (!window.confirm(`¿Eliminar "${articulo.nombre}"? Esto no se puede deshacer.`)) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      await eliminarArticulo(tenantId, articulo.id);
+      onCambio();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setGuardando(false);
+    }
+  };
+
+  // Avatar de 2 letras a partir del nombre — un color fijo y siempre legible
+  // (no depende de dark:, mismo criterio que ya se aplicó al resto del
+  // módulo tras encontrar varios casos de texto invisible en Modo Clásico).
+  const iniciales = articulo.nombre.trim().slice(0, 2).toUpperCase();
+
+  return (
+    <div className={`bg-white dark:bg-white/5 rounded-lg border shadow-sm transition-colors ${
+      sinStock ? "border-red-300" : stockBajo ? "border-amber-300" : "border-slate-200/60 dark:border-white/10"
+    } hover:border-teal-500/40`}>
+      <div className="flex items-center justify-between gap-3 p-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 flex-shrink-0 bg-[#E8ECE9] text-[#2B4C3F] font-bold flex items-center justify-center rounded-md text-sm">
+            {iniciales}
+          </div>
+          <div className="min-w-0">
+            <h4 className="text-sm font-semibold text-slate-800 dark:text-white/80 truncate">{articulo.nombre}</h4>
+            <span className="text-[11px] text-slate-500 dark:text-white/40">SKU: {articulo.sku || "N/A"} · {articulo.categoria || "Sin categoría"}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-5 flex-shrink-0">
+          <div className="text-right hidden sm:block">
+            <span className="block text-[10px] text-slate-400 dark:text-white/30 uppercase tracking-wider">Stock</span>
+            <span className={`text-sm font-bold ${sinStock ? "text-red-500" : stockBajo ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-white/70"}`}>
+              {Number(articulo.stockActual).toFixed(2)} {articulo.unidadMedida}
+            </span>
+          </div>
+          <div className="text-right hidden md:block">
+            <span className="block text-[10px] text-slate-400 dark:text-white/30 uppercase tracking-wider">Costo / Venta</span>
+            <span className="text-sm font-mono text-slate-700 dark:text-white/70">
+              ${Number(articulo.costoUnitario).toFixed(2)} / ${Number(articulo.precioVenta ?? 0).toFixed(2)}
+            </span>
+          </div>
+          <BadgeMargen margen={margenActual} />
+          <div className="flex items-center gap-1">
+            <button onClick={() => setModo("reabastecer")} title="Reabastecer stock" className="text-emerald-600 dark:text-emerald-300 hover:text-emerald-700 cursor-pointer p-1"><IconDownload size={14} /></button>
+            <button onClick={() => setModo("ajustar")} title="Corregir stock (conteo físico)" className="text-slate-400 hover:text-teal-500 cursor-pointer p-1"><IconRefresh size={14} /></button>
+            <button onClick={() => setModo("editar")} title="Editar artículo" className="text-slate-400 hover:text-teal-500 cursor-pointer p-1"><IconCustomize size={14} /></button>
+            <button onClick={eliminar} disabled={guardando} title="Eliminar artículo" className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40 p-1"><IconTrash size={14} /></button>
+          </div>
+        </div>
+      </div>
+
+      {modo === "ajustar" && (
+        <div className="px-3 pb-3 space-y-2 border-t border-slate-200/60 dark:border-white/10 pt-2">
+          <p className="text-[10px] text-slate-500 dark:text-white/40">Sistema dice: {Number(articulo.stockActual)} {articulo.unidadMedida}. Escribí lo que realmente hay contado.</p>
+          <div className="flex gap-2">
+            <input value={stockReal} onChange={(e) => setStockReal(e.target.value)} type="number" step="0.001" min="0" className="input-horeca text-sm font-bold flex-1" placeholder="Stock real" autoFocus />
+            <button onClick={guardarAjuste} disabled={guardando} className="g-aurora text-white text-xs font-semibold px-4 rounded-lg cursor-pointer disabled:opacity-60">
+              {guardando ? "Guardando…" : "Corregir"}
+            </button>
+            <button onClick={() => { setModo("ver"); setError(null); }} className="apple-glass-btn text-xs font-semibold px-4 rounded-lg cursor-pointer">Cancelar</button>
+          </div>
+        </div>
+      )}
+      {error && <p className="text-[10px] text-red-500 px-3 pb-2">{error}</p>}
 
       {modo === "editar" && (
         <ModalEditarArticulo tenantId={tenantId} articulo={articulo} onClose={() => setModo("ver")} onGuardado={() => { setModo("ver"); onCambio(); }} />
