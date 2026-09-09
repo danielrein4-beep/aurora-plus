@@ -31,8 +31,8 @@ const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => React.Re
   { id: "procedimientos", label: "Procedimientos & Cotizador", Icon: IconPrescription },
   { id: "sala-espera", label: "Sala de Espera & Caja", Icon: IconHourglass },
   { id: "agenda", label: "Agenda Médica & Calendario", Icon: IconCalendar },
-  { id: "financiero", label: "Resúmenes Financieros", Icon: IconCard },
-  { id: "configuracion", label: "Configuración & Perfil", Icon: IconCustomize },
+  { id: "financiero", label: "Resúmenes Financieros", Icon: IconCard, roles: ["MEDICO"] },
+  { id: "configuracion", label: "Configuración & Perfil", Icon: IconCustomize, roles: ["MEDICO"] },
 ];
 
 const hoy = () => new Date().toISOString().slice(0, 10);
@@ -442,7 +442,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   };
 
   const intentarNavegar = (p: Pagina) => {
-    const esProtegida = p === "historias" || p === "financiero" || p === "configuracion";
+    const esProtegida = p === "financiero" || p === "configuracion";
     // Si el usuario autenticado es el Doctor, tiene acceso total sin pedir PIN
     if (perfilActivo !== "MEDICO" && rolActivo === "SECRETARIA" && esProtegida) {
       setModalClaveDoctor(true);
@@ -668,7 +668,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         <div className="space-y-1">
           {NAV.map((n) => {
             const activo = pagina === n.id;
-            const esProtegida = perfilActivo !== "MEDICO" && rolActivo === "SECRETARIA" && (n.id === "historias" || n.id === "financiero" || n.id === "configuracion");
+            const esProtegida = perfilActivo !== "MEDICO" && rolActivo === "SECRETARIA" && (n.id === "financiero" || n.id === "configuracion");
 
             return (
               <button
@@ -685,7 +685,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   <span className="truncate">{n.label}</span>
                 </div>
                 {esProtegida && (
-                  <span title="Requiere clave del Doctor" className="text-slate-400 dark:text-white/40 flex-shrink-0 ml-1">
+                  <span title="Requiere clave del Doctor" className="p-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 flex-shrink-0 ml-1 border border-amber-500/20">
                     <IconLock size={12} />
                   </span>
                 )}
@@ -6032,6 +6032,29 @@ function ResumenesFinancieros({
   onLimpiarCierres?: () => void;
   onVerDocumento?: (payload: DocumentoVisorPayload) => void;
 }) {
+  if (rol === "SECRETARIA") {
+    return (
+      <div className="apple-glass rounded-3xl p-10 sm:p-14 text-center max-w-lg mx-auto my-12 border border-slate-200/80 dark:border-white/10 shadow-lg bg-white/90 dark:bg-[#071a2e]/90 space-y-4 animate-fade-in">
+        <div className="w-16 h-16 rounded-3xl bg-amber-500/15 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center border border-amber-500/30 shadow-inner">
+          <IconLock size={32} />
+        </div>
+        <div className="space-y-2">
+          <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
+            Módulo Financiero Protegido
+          </h3>
+          <p className="text-xs text-slate-600 dark:text-white/70 max-w-sm mx-auto leading-relaxed">
+            El acceso a los resúmenes financieros, balances de caja y auditorías contables está restringido para el perfil de Recepción y Secretaría.
+          </p>
+        </div>
+        <div className="pt-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[11px] font-mono font-bold text-slate-500 dark:text-white/50">
+            🔒 Requiere autenticación del Doctor Titular
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   const totalUSD = cobrosLocales
     .filter((c) => c.moneda === "USD" || (!c.moneda && (c.metodoPago?.toUpperCase().includes("USD") || (c.montoUSD !== undefined && c.montoUSD > 0 && !c.montoVES))))
     .reduce((s, x) => s + (x.montoUSD || (x.moneda === "USD" ? x.montoCobrado || 0 : 0)), 0);
