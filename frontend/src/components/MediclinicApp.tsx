@@ -849,7 +849,20 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
         <div className="flex-1 p-6 max-w-7xl w-full mx-auto">
           <div key={pagina} className="animate-tab-enter space-y-6">
-            {pagina === "general" && <VistaGeneral pacientes={pacientes} citasHoy={citasHoy} salaEspera={salaEspera} procedimientos={procedimientos} ingresosHoy={ingresosHoy} onNavegar={setPagina} />}
+            {pagina === "general" && (
+              <VistaGeneral
+                pacientes={pacientes}
+                citasHoy={citasHoy}
+                salaEspera={salaEspera}
+                procedimientos={procedimientos}
+                ingresosHoy={ingresosHoy}
+                onNavegar={setPagina}
+                onSeleccionarPaciente={(id, destino) => {
+                  setPacienteSeleccionadoId(id);
+                  setPagina(destino);
+                }}
+              />
+            )}
             {pagina === "pacientes" && (
               <GestionPacientes
                 tenantId={tenantId}
@@ -1190,14 +1203,91 @@ function MiniCalendarioSidebar() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// MOTOR DE BÚSQUEDA INTELIGENTE: BÚSQUEDA UNIFICADA POR NOMBRE, CÉDULA, HC O TELÉFONO
+// ══════════════════════════════════════════════════════════════════════════
+function normalizarTextoBusqueda(texto?: string | null): string {
+  return (texto || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function coincidePaciente(p: Paciente, query: string): boolean {
+  if (!query || !query.trim()) return true;
+  const qNorm = normalizarTextoBusqueda(query);
+  if (!qNorm) return true;
+
+  const qDigits = qNorm.replace(/\D/g, "");
+
+  const nombreComp = normalizarTextoBusqueda(p.nombreCompleto);
+  const nombres = normalizarTextoBusqueda(p.nombres);
+  const apellidos = normalizarTextoBusqueda(p.apellidos);
+  const cedula = normalizarTextoBusqueda(p.identificacion);
+  const cedulaDigits = cedula.replace(/\D/g, "");
+  const telefono = normalizarTextoBusqueda(p.telefono);
+  const numHistoria = `hc-2026-${String(p.id).padStart(4, "0")}`;
+  const numHistoriaNorm = normalizarTextoBusqueda(numHistoria);
+
+  // 1. Coincidencia directa en nombre completo, nombres o apellidos
+  if (nombreComp.includes(qNorm) || nombres.includes(qNorm) || apellidos.includes(qNorm)) {
+    return true;
+  }
+
+  // 2. Coincidencia por tokens de palabras (ej. "carlos gomez" o "medina niccolle")
+  const tokens = qNorm.split(/\s+/).filter(Boolean);
+  if (tokens.length > 1) {
+    const todosTokensEnNombre = tokens.every(
+      (tok) => nombreComp.includes(tok) || cedula.includes(tok)
+    );
+    if (todosTokensEnNombre) return true;
+  }
+
+  // 3. Coincidencia en cédula (con o sin 'V-', '.', '-')
+  if (cedula.includes(qNorm)) return true;
+  if (qDigits && cedulaDigits && (cedulaDigits.includes(qDigits) || qDigits.includes(cedulaDigits))) {
+    return true;
+  }
+
+  // 4. Coincidencia en número de expediente o ID
+  if (numHistoriaNorm.includes(qNorm) || String(p.id) === qDigits) {
+    return true;
+  }
+
+  // 5. Coincidencia en teléfono
+  if (telefono.includes(qNorm)) {
+    return true;
+  }
+
+  return false;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // VISTA GENERAL / DASHBOARD (SINCRONIZACIÓN EN TIEMPO REAL)
 // ══════════════════════════════════════════════════════════════════════════
-function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingresosHoy, onNavegar }: {
-  pacientes: Paciente[] | null; citasHoy: CitaMedica[] | null; salaEspera: SalaEsperaEntrada[] | null;
-  procedimientos: ProcedimientoMedico[] | null; ingresosHoy: number | null;
+function VistaGeneral({
+  pacientes,
+  citasHoy,
+  salaEspera,
+  procedimientos,
+  ingresosHoy,
+  onNavegar,
+  onSeleccionarPaciente,
+}: {
+  pacientes: Paciente[] | null;
+  citasHoy: CitaMedica[] | null;
+  salaEspera: SalaEsperaEntrada[] | null;
+  procedimientos: ProcedimientoMedico[] | null;
+  ingresosHoy: number | null;
   onNavegar: (p: Pagina) => void;
+  onSeleccionarPaciente?: (id: number, destino: Pagina) => void;
 }) {
   const [busquedaRapida, setBusquedaRapida] = useState("");
+
+  const pacientesFiltradosRapidos = useMemo(() => {
+    if (!busquedaRapida.trim()) return [];
+    return (pacientes || []).filter((p) => coincidePaciente(p, busquedaRapida));
+  }, [pacientes, busquedaRapida]);
 
   // Cargar turnos y cotizaciones en tiempo real desde el almacenamiento
   const [turnosVivos, setTurnosVivos] = useState<TurnoSalaEspera[]>(() => {
@@ -1251,20 +1341,29 @@ function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingreso
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
-    onNavegar("pacientes");
+    if (pacientesFiltradosRapidos.length > 0) {
+      const topMatch = pacientesFiltradosRapidos[0];
+      if (onSeleccionarPaciente) {
+        onSeleccionarPaciente(topMatch.id, "historias");
+      } else {
+        onNavegar("historias");
+      }
+    } else {
+      onNavegar("pacientes");
+    }
   };
 
   return (
     <div className="space-y-6">
       {/* ── CARD: MOTOR DE BÚSQUEDA INSTANTÁNEA DE PACIENTES ── */}
-      <div className="apple-glass rounded-2xl p-5 sm:p-6 border border-slate-300/60 dark:border-white/15 shadow-sm space-y-3">
+      <div className="apple-glass rounded-2xl p-5 sm:p-6 border border-slate-300/60 dark:border-white/15 shadow-sm space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white text-base">
             <IconSearch size={18} />
             <span>Motor de Búsqueda Instantánea de Pacientes</span>
           </div>
-          <span className="text-[11px] text-slate-400 font-medium">
-            Búsqueda por Cédula o Historia
+          <span className="text-[11px] text-slate-500 dark:text-white/60 font-mono bg-slate-100 dark:bg-white/5 px-2.5 py-1 rounded-full border border-slate-200 dark:border-white/10">
+            Búsqueda por Nombre, Cédula o Historia
           </span>
         </div>
 
@@ -1272,11 +1371,21 @@ function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingreso
           <div className="relative flex-1 w-full">
             <input
               type="text"
-              placeholder="Ingresa la cédula (ej. V-18456789 o 18456789) o número de expediente..."
+              placeholder="Buscar paciente por nombre (ej. Carlos, Niccolle), cédula (ej. 10987654) o historia..."
               value={busquedaRapida}
               onChange={(e) => setBusquedaRapida(e.target.value)}
-              className="w-full pl-4 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-inner"
+              className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-inner"
             />
+            {busquedaRapida && (
+              <button
+                type="button"
+                onClick={() => setBusquedaRapida("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                title="Limpiar"
+              >
+                <IconClose size={15} />
+              </button>
+            )}
           </div>
           <button
             type="submit"
@@ -1293,6 +1402,76 @@ function VistaGeneral({ pacientes, citasHoy, salaEspera, procedimientos, ingreso
             <span>+ Nuevo Paciente</span>
           </button>
         </form>
+
+        {/* RESULTADOS EN VIVO DE LA BÚSQUEDA */}
+        {busquedaRapida.trim().length > 0 && (
+          <div className="pt-2 space-y-2 border-t border-slate-200/80 dark:border-white/10 animate-fade-in">
+            <div className="text-[11px] font-bold text-slate-500 dark:text-white/60 flex items-center justify-between">
+              <span>Resultados encontrados ({pacientesFiltradosRapidos.length}):</span>
+              <button
+                type="button"
+                onClick={() => setBusquedaRapida("")}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-[10px] cursor-pointer"
+              >
+                Limpiar búsqueda ✕
+              </button>
+            </div>
+
+            {pacientesFiltradosRapidos.length === 0 ? (
+              <div className="p-4 rounded-xl bg-slate-100/60 dark:bg-white/5 border border-dashed border-slate-300 dark:border-white/10 text-center text-xs text-slate-500 dark:text-white/50 space-y-2">
+                <p>No se encontró ningún paciente con: <strong className="text-slate-800 dark:text-white">"{busquedaRapida}"</strong></p>
+                <button
+                  type="button"
+                  onClick={() => onNavegar("pacientes")}
+                  className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs cursor-pointer shadow-xs transition-all"
+                >
+                  + Registrar este Paciente
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                {pacientesFiltradosRapidos.map((p) => {
+                  return (
+                    <div
+                      key={p.id}
+                      className="p-3 rounded-xl bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 hover:border-teal-500/50 shadow-xs flex items-center justify-between gap-3 transition-all"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                          {p.nombreCompleto}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-white/60 font-mono mt-0.5">
+                          <span className="text-sky-600 dark:text-sky-400 font-bold">C.I: {p.identificacion}</span>
+                          <span>·</span>
+                          <span>HC-2026-{String(p.id).padStart(4, "0")}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => onSeleccionarPaciente ? onSeleccionarPaciente(p.id, "historias") : onNavegar("historias")}
+                          className="px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-600 hover:text-white text-teal-700 dark:text-teal-300 font-bold text-[11px] transition-colors cursor-pointer"
+                          title="Abrir Historia Clínica"
+                        >
+                          🩺 Historia
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onSeleccionarPaciente ? onSeleccionarPaciente(p.id, "pacientes") : onNavegar("pacientes")}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-white font-bold text-[11px] transition-colors cursor-pointer"
+                          title="Ver Ficha Completa"
+                        >
+                          👤 Ficha
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── 4 KPI CARDS CON BORDE LATERAL COLOREADO (EXACTO A LA IMAGEN) ── */}
@@ -1539,20 +1718,9 @@ function GestionPacientes({
   const [error, setError] = useState<string | null>(null);
 
   const filtrados = useMemo(() => {
-    const q = busqueda.toLowerCase().trim();
+    const q = busqueda.trim();
     if (!q) return pacientes || [];
-    return (pacientes || []).filter((p) => {
-      const nombre = p.nombreCompleto?.toLowerCase() || `${p.nombres || ""} ${p.apellidos || ""}`.toLowerCase();
-      const cedula = p.identificacion?.toLowerCase() || "";
-      const tel = p.telefono?.toLowerCase() || "";
-      const numHistoria = `hc-2026-${String(p.id).padStart(4, "0")}`.toLowerCase();
-      return (
-        nombre.includes(q) ||
-        cedula.includes(q) ||
-        tel.includes(q) ||
-        numHistoria.includes(q)
-      );
-    });
+    return (pacientes || []).filter((p) => coincidePaciente(p, q));
   }, [pacientes, busqueda]);
 
   // Paciente activo en la ficha derecha: si hay seleccionado y está en la lista filtrada o total, o el primero de la lista
@@ -2104,7 +2272,7 @@ function HistoriasClinicas({
     if (pacientes && pacientes.length > 0) return pacientes[0].id;
     return "";
   });
-  const [busquedaCedula, setBusquedaCedula] = useState("");
+  const [busquedaPaciente, setBusquedaPaciente] = useState("");
   const [historial, setHistorial] = useState<ConsultaMedica[] | null>(null);
   const [consultaDetalle, setConsultaDetalle] = useState<ConsultaMedica | null>(null);
 
@@ -2150,22 +2318,18 @@ function HistoriasClinicas({
       .catch(() => setHistorial([]));
   }, [pacienteSeleccionado]);
 
-  const handleBuscarCedula = (e?: React.FormEvent) => {
+  const handleBuscarPaciente = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const query = busquedaCedula.trim().toLowerCase();
+    const query = busquedaPaciente.trim();
     if (!query || !pacientes) return;
-    const encontrado = pacientes.find((p) => {
-      const ced = (p.identificacion || "").toLowerCase();
-      const nom = (p.nombreCompleto || "").toLowerCase();
-      const exp = `hc-2026-${String(p.id).padStart(4, "0")}`.toLowerCase();
-      return ced.includes(query) || nom.includes(query) || exp.includes(query);
-    });
+    const encontrado = pacientes.find((p) => coincidePaciente(p, query));
     if (encontrado) {
       setPacienteId(encontrado.id);
-      setBusquedaCedula("");
+      setBusquedaPaciente("");
       setError(null);
+      dispararToast(`✓ Expediente cargado: ${encontrado.nombreCompleto}`);
     } else {
-      setError(`No se encontró ningún paciente con: "${busquedaCedula}"`);
+      setError(`No se encontró ningún paciente con: "${busquedaPaciente}"`);
       setTimeout(() => setError(null), 3500);
     }
   };
@@ -2514,14 +2678,14 @@ function HistoriasClinicas({
           </div>
         </div>
 
-        {/* Buscador Rápido por Cédula */}
-        <form onSubmit={handleBuscarCedula} className="flex items-center gap-2 w-full md:w-auto">
+        {/* Buscador Rápido por Nombre o Cédula */}
+        <form onSubmit={handleBuscarPaciente} className="flex items-center gap-2 w-full md:w-auto">
           <input
             type="text"
-            placeholder="O buscar por Cédula..."
-            value={busquedaCedula}
-            onChange={(e) => setBusquedaCedula(e.target.value)}
-            className="w-full md:w-60 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
+            placeholder="Buscar por Nombre o Cédula..."
+            value={busquedaPaciente}
+            onChange={(e) => setBusquedaPaciente(e.target.value)}
+            className="w-full md:w-72 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
           />
           <button
             type="submit"
@@ -3150,13 +3314,7 @@ function Procedimientos({
   // Pacientes filtrados en el buscador
   const pacientesFiltrados = useMemo(() => {
     if (!busquedaPaciente.trim()) return pacientes || [];
-    const q = busquedaPaciente.toLowerCase();
-    return (pacientes || []).filter(
-      (p) =>
-        p.nombreCompleto.toLowerCase().includes(q) ||
-        p.identificacion.toLowerCase().includes(q) ||
-        (p.telefono && p.telefono.toLowerCase().includes(q))
-    );
+    return (pacientes || []).filter((p) => coincidePaciente(p, busquedaPaciente));
   }, [pacientes, busquedaPaciente]);
 
   // Limpiar formulario
