@@ -33,7 +33,7 @@ export default function HistorialImportacionesSalud({ claveDoctor }: Props) {
   const confirmarBorrado = async (clave: string) => {
     if (!fuentePendienteBorrar) return;
     const esperada = (claveDoctor || "1234").trim();
-    if (clave.trim() !== esperada && clave.trim() !== "1234") {
+    if (clave.trim() !== esperada) {
       throw new Error("PIN o contraseña incorrecta.");
     }
     setBorrando(true);

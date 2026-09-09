@@ -162,90 +162,8 @@ export interface Paciente {
   ciudadOrigen?: string | null;
 }
 
-const PACIENTES_DEFAULT: Paciente[] = [
-  {
-    id: 1,
-    nombreCompleto: "Carlos Andrés Gómez Peña",
-    identificacion: "10987654321",
-    nombres: "Carlos Andrés",
-    apellidos: "Gómez Peña",
-    edad: 34,
-    fechaNacimiento: "1992-05-14",
-    telefono: "0414-7654321",
-    email: "carlos.gomez@gmail.com",
-    direccion: "Barrio Blanco, Cúcuta",
-    genero: "M",
-    tipoOrigen: "Foráneo",
-    origen: "Foráneo",
-    ciudadOrigen: "Cúcuta",
-  },
-  {
-    id: 2,
-    nombreCompleto: "Niccolle Angelyc Medina Delgado",
-    identificacion: "30398619",
-    nombres: "Niccolle Angelyc",
-    apellidos: "Medina Delgado",
-    edad: 22,
-    fechaNacimiento: "2004-07-22",
-    telefono: "04247640913",
-    email: "niccolledelgado@gmail.com",
-    direccion: "Urbanización Cumbres Andinas Edif.7 piso 3 apto #",
-    genero: "F",
-    tipoOrigen: "Local",
-    origen: "Local",
-    ciudadOrigen: "San Cristóbal",
-  },
-  {
-    id: 3,
-    nombreCompleto: "Daniel Eduardo Reina Porras",
-    identificacion: "28145920",
-    nombres: "Daniel Eduardo",
-    apellidos: "Reina Porras",
-    edad: 25,
-    fechaNacimiento: "2001-03-10",
-    telefono: "0412-1234567",
-    email: "daniel.reina@gmail.com",
-    direccion: "Pueblo Nuevo, San Cristóbal",
-    genero: "M",
-    tipoOrigen: "Local",
-    origen: "Local",
-    ciudadOrigen: "San Cristóbal",
-  },
-  {
-    id: 4,
-    nombreCompleto: "Valentina Duque",
-    identificacion: "29841203",
-    nombres: "Valentina",
-    apellidos: "Duque",
-    edad: 24,
-    fechaNacimiento: "2002-11-18",
-    telefono: "0414-9876543",
-    email: "valentina.duque@gmail.com",
-    direccion: "Pirineos, San Cristóbal",
-    genero: "F",
-    tipoOrigen: "Local",
-    origen: "Local",
-    ciudadOrigen: "San Cristóbal",
-  },
-];
-
 export async function listarPacientes(tenantId: number): Promise<Paciente[]> {
-  try {
-    const apiRes = await request<Paciente[]>(`/api/salud/pacientes?tenantId=${tenantId}`);
-    if (Array.isArray(apiRes) && apiRes.length > 0) {
-      localStorage.setItem("aurora_mediclinic_pacientes", JSON.stringify(apiRes));
-      return apiRes;
-    }
-  } catch {}
-  try {
-    const raw = localStorage.getItem("aurora_mediclinic_pacientes");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch {}
-  localStorage.setItem("aurora_mediclinic_pacientes", JSON.stringify(PACIENTES_DEFAULT));
-  return PACIENTES_DEFAULT;
+  return request<Paciente[]>(`/api/salud/pacientes?tenantId=${tenantId}`);
 }
 
 export interface NuevoPaciente {
@@ -263,69 +181,23 @@ export interface NuevoPaciente {
 }
 
 export async function crearPaciente(tenantId: number, datos: NuevoPaciente): Promise<Paciente> {
-  const nombreCompleto = `${datos.nombres || ""} ${datos.apellidos || ""}`.trim() || datos.identificacion;
-  let edadCalc: number | null = null;
-  if (datos.fechaNacimiento) {
-    try {
-      const anioNac = new Date(datos.fechaNacimiento).getFullYear();
-      if (!isNaN(anioNac)) edadCalc = Math.max(0, new Date().getFullYear() - anioNac);
-    } catch {}
+  return request<Paciente>(`/api/salud/pacientes?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function buscarPacientePorIdentificacion(tenantId: number, identificacion: string): Promise<Paciente | null> {
+  try {
+    return await request<Paciente>(`/api/salud/pacientes/identificacion/${encodeURIComponent(identificacion)}?tenantId=${tenantId}`);
+  } catch (err) {
+    if (err instanceof ApiError && /404/.test(err.message)) return null;
+    throw err;
   }
-
-  const pacienteGenerado: Paciente = {
-    id: Date.now(),
-    nombreCompleto,
-    identificacion: datos.identificacion,
-    nombres: datos.nombres,
-    apellidos: datos.apellidos,
-    edad: edadCalc || 30,
-    fechaNacimiento: datos.fechaNacimiento || null,
-    telefono: datos.telefono || null,
-    email: datos.email || null,
-    direccion: datos.direccion || null,
-    genero: datos.genero || "M",
-    tipoOrigen: datos.tipoOrigen || "Local",
-    origen: datos.tipoOrigen || "Local",
-    ciudadOrigen: datos.ciudadOrigen || (datos.tipoOrigen === "Foráneo" ? "Cúcuta" : "San Cristóbal"),
-  };
-
-  try {
-    const apiRes = await request<Paciente>(`/api/salud/pacientes?tenantId=${tenantId}`, {
-      method: "POST",
-      body: JSON.stringify(datos),
-    });
-    if (apiRes && apiRes.id) {
-      try {
-        const raw = localStorage.getItem("aurora_mediclinic_pacientes");
-        const list: Paciente[] = raw ? JSON.parse(raw) : [...PACIENTES_DEFAULT];
-        const filtrada = list.filter((p) => p.id !== apiRes.id);
-        localStorage.setItem("aurora_mediclinic_pacientes", JSON.stringify([apiRes, ...filtrada]));
-      } catch {}
-      return apiRes;
-    }
-  } catch {}
-
-  try {
-    const raw = localStorage.getItem("aurora_mediclinic_pacientes");
-    const list: Paciente[] = raw ? JSON.parse(raw) : [...PACIENTES_DEFAULT];
-    const nuevaLista = [pacienteGenerado, ...list.filter((p) => p.identificacion !== pacienteGenerado.identificacion)];
-    localStorage.setItem("aurora_mediclinic_pacientes", JSON.stringify(nuevaLista));
-  } catch {}
-
-  return pacienteGenerado;
 }
 
 export async function eliminarPaciente(id: number): Promise<void> {
-  try {
-    await request(`/api/salud/pacientes/${id}`, { method: "DELETE" });
-  } catch {}
-  try {
-    const raw = localStorage.getItem("aurora_mediclinic_pacientes");
-    if (raw) {
-      const list: Paciente[] = JSON.parse(raw);
-      localStorage.setItem("aurora_mediclinic_pacientes", JSON.stringify(list.filter((p) => p.id !== id)));
-    }
-  } catch {}
+  await request(`/api/salud/pacientes/${id}`, { method: "DELETE" });
 }
 
 export interface CitaMedica {
@@ -340,18 +212,12 @@ export interface CitaMedica {
 }
 
 export async function listarCitasDelDia(tenantId: number, fecha: string): Promise<CitaMedica[]> {
-  try {
-    const apiRes = await request<CitaMedica[]>(`/api/salud/agenda?tenantId=${tenantId}&fecha=${fecha}`);
-    if (Array.isArray(apiRes)) {
-      localStorage.setItem(`aurora_mediclinic_citas_${fecha}`, JSON.stringify(apiRes));
-      return apiRes;
-    }
-  } catch {}
-  try {
-    const raw = localStorage.getItem(`aurora_mediclinic_citas_${fecha}`);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
+  return request<CitaMedica[]>(`/api/salud/agenda?tenantId=${tenantId}&fecha=${fecha}`);
+}
+
+/** Citas de un rango de fechas (ej. el mes visible en el calendario) — una sola llamada en vez de una por día. */
+export async function listarCitasPorRango(tenantId: number, fechaInicio: string, fechaFin: string): Promise<CitaMedica[]> {
+  return request<CitaMedica[]>(`/api/salud/agenda?tenantId=${tenantId}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
 }
 
 export interface NuevaCita {
@@ -365,54 +231,57 @@ export interface NuevaCita {
 }
 
 export async function agendarCita(tenantId: number, datos: NuevaCita): Promise<CitaMedica> {
-  const pacienteMock: Paciente = {
-    id: datos.pacienteId,
-    nombreCompleto: "Paciente Registrado",
-    identificacion: "10987654",
-    edad: 30,
-    telefono: "0414-0000000",
-  };
-  const nuevaCita: CitaMedica = {
-    id: Date.now(),
-    paciente: pacienteMock,
-    fecha: datos.fecha,
-    horaInicio: datos.horaInicio,
-    horaFin: datos.horaFin,
-    motivo: datos.motivo || "Consulta General",
-    especialidad: datos.especialidad || "Medicina General",
-    estado: datos.estado || "PROGRAMADA",
-  };
+  return request<CitaMedica>(`/api/salud/agenda/citas?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({
+      paciente: { id: datos.pacienteId },
+      fecha: datos.fecha,
+      horaInicio: datos.horaInicio,
+      horaFin: datos.horaFin,
+      motivo: datos.motivo,
+      especialidad: datos.especialidad,
+      estado: datos.estado || "PROGRAMADA",
+    }),
+  });
+}
 
-  try {
-    const apiRes = await request<CitaMedica>(`/api/salud/agenda/citas?tenantId=${tenantId}`, {
-      method: "POST",
-      body: JSON.stringify({
-        paciente: { id: datos.pacienteId },
-        fecha: datos.fecha,
-        horaInicio: datos.horaInicio,
-        horaFin: datos.horaFin,
-        motivo: datos.motivo,
-        especialidad: datos.especialidad,
-        estado: datos.estado || "PROGRAMADA",
-      }),
-    });
-    if (apiRes && apiRes.id) {
-      try {
-        const raw = localStorage.getItem(`aurora_mediclinic_citas_${datos.fecha}`);
-        const list: CitaMedica[] = raw ? JSON.parse(raw) : [];
-        localStorage.setItem(`aurora_mediclinic_citas_${datos.fecha}`, JSON.stringify([apiRes, ...list]));
-      } catch {}
-      return apiRes;
-    }
-  } catch {}
+/** Cambia el estado de una cita (ej. CANCELADA, ATENDIDA, NO_ASISTIO) — la agenda nunca borra una cita, la marca. */
+export function actualizarEstadoCita(id: number, estado: string): Promise<CitaMedica> {
+  return request<CitaMedica>(`/api/salud/agenda/citas/${id}/estado?estado=${estado}`, { method: "PATCH" });
+}
 
-  try {
-    const raw = localStorage.getItem(`aurora_mediclinic_citas_${datos.fecha}`);
-    const list: CitaMedica[] = raw ? JSON.parse(raw) : [];
-    localStorage.setItem(`aurora_mediclinic_citas_${datos.fecha}`, JSON.stringify([nuevaCita, ...list]));
-  } catch {}
+/** Mueve una cita a otra fecha/hora, con la misma validación de solapamiento que agendar una nueva. */
+export function reprogramarCita(id: number, fecha: string, horaInicio: string, horaFin: string): Promise<CitaMedica> {
+  return request<CitaMedica>(`/api/salud/agenda/citas/${id}/reprogramar`, {
+    method: "PATCH",
+    body: JSON.stringify({ fecha, horaInicio, horaFin }),
+  });
+}
 
-  return nuevaCita;
+export interface BloqueoAgenda {
+  id: number;
+  medicoId: number;
+  fechaInicio: string;
+  fechaFin: string;
+  horaInicio: string | null;
+  horaFin: string | null;
+  motivo: string;
+}
+
+/** Bloquea un día (o rango) completo de la agenda de un médico — ej. día no laborable, feriado, congreso. */
+export function registrarBloqueoAgenda(tenantId: number, datos: { fechaInicio: string; fechaFin: string; motivo: string }): Promise<BloqueoAgenda> {
+  return request<BloqueoAgenda>(`/api/salud/agenda/bloqueos?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function listarBloqueosAgenda(medicoId: number): Promise<BloqueoAgenda[]> {
+  return request<BloqueoAgenda[]>(`/api/salud/agenda/bloqueos/medico/${medicoId}`);
+}
+
+export function eliminarBloqueoAgenda(id: number): Promise<void> {
+  return request<void>(`/api/salud/agenda/bloqueos/${id}`, { method: "DELETE" });
 }
 
 export interface CobroConsulta {

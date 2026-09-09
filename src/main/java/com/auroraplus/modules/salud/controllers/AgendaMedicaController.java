@@ -77,6 +77,13 @@ public class AgendaMedicaController {
         return ResponseEntity.ok(agendaMedicaService.actualizarEstado(id, estado));
     }
 
+    public record ReprogramarCitaRequest(java.time.LocalDate fecha, java.time.LocalTime horaInicio, java.time.LocalTime horaFin) {}
+
+    @PatchMapping("/citas/{id}/reprogramar")
+    public ResponseEntity<CitaMedica> reprogramarCita(@PathVariable Long id, @RequestBody ReprogramarCitaRequest datos) {
+        return ResponseEntity.ok(agendaMedicaService.reprogramarCita(id, datos.fecha(), datos.horaInicio(), datos.horaFin()));
+    }
+
     @PostMapping("/bloqueos")
     public ResponseEntity<BloqueoAgenda> registrarBloqueo(@RequestParam(required = false) Long tenantId, @RequestBody BloqueoAgenda bloqueo) {
         Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
@@ -87,5 +94,11 @@ public class AgendaMedicaController {
     @GetMapping("/bloqueos/medico/{medicoId}")
     public List<BloqueoAgenda> listarBloqueosPorMedico(@PathVariable Long medicoId) {
         return agendaMedicaService.listarBloqueosPorMedico(medicoId);
+    }
+
+    @DeleteMapping("/bloqueos/{id}")
+    public ResponseEntity<Void> eliminarBloqueo(@PathVariable Long id) {
+        agendaMedicaService.eliminarBloqueo(id);
+        return ResponseEntity.noContent().build();
     }
 }

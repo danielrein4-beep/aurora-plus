@@ -16,7 +16,8 @@ import HistorialImportacionesSalud from "./HistorialImportacionesSalud";
 import { useAuth } from "../context/AuthContext";
 import {
   contadorInboxLaboratorio, listarOrdenesLaboratorioPaciente, type OrdenLaboratorio,
-  listarPacientes, crearPaciente, eliminarPaciente, listarCitasDelDia, agendarCita, listarCobrosDelDia,
+  listarPacientes, crearPaciente, eliminarPaciente, buscarPacientePorIdentificacion,
+  listarCitasDelDia, listarCitasPorRango, agendarCita, actualizarEstadoCita, reprogramarCita, listarCobrosDelDia,
   listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera,
   listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta, eliminarConsulta,
   type Paciente, type CitaMedica, type SalaEsperaEntrada, type ProcedimientoMedico, type ConsultaMedica,
@@ -287,8 +288,11 @@ function ModalClaveDoctor({
   const validar = (e: React.FormEvent) => {
     e.preventDefault();
     const input = clave.trim();
+    // Solo el PIN que el médico configuró en Configuración & Perfil abre este panel — el valor
+    // por defecto ("1234") es únicamente el que trae de fábrica un tenant nuevo hasta que el
+    // médico lo cambie, no un atajo permanente. Nunca aceptar "admin"/"doctor" como comodín.
     const esperada = (claveCorrecta || "1234").trim();
-    if (input === esperada || input === "1234" || input === "admin" || input === "doctor") {
+    if (input === esperada) {
       onExito();
     } else {
       setError("Contraseña o PIN incorrecto. Intenta de nuevo.");
@@ -5580,8 +5584,54 @@ export interface CitaAgendaItem {
   fecha: string; // YYYY-MM-DD
   hora: string;  // e.g. "09:00 AM"
   motivo: string;
-  estado: "PROGRAMADA" | "CONFIRMADA" | "CANCELADA" | "ATENDIDA";
+  estado: string;
   creadoEn: string;
+}
+
+/** "09:00 AM" (UI) -> "09:00:00" (backend, LocalTime). */
+function horaAmPmA24(hora12: string): string {
+  const m = hora12.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!m) return "09:00:00";
+  let h = parseInt(m[1], 10);
+  const min = m[2];
+  const ampm = m[3].toUpperCase();
+  if (ampm === "PM" && h !== 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  return `${String(h).padStart(2, "0")}:${min}:00`;
+}
+
+/** "09:00:00" o "09:00" (backend) -> "09:00 AM" (UI). */
+function hora24AAmPm(hora24: string): string {
+  const [hStr, mStr] = hora24.split(":");
+  const h = parseInt(hStr, 10);
+  const ampm = h >= 12 ? "PM" : "AM";
+  let h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  return `${String(h12).padStart(2, "0")}:${mStr} ${ampm}`;
+}
+
+/** Suma minutos a una hora "HH:mm" o "HH:mm:ss" — para calcular la hora de fin de una cita (bloque de 30 min por defecto). */
+function sumarMinutos(hora24: string, minutos: number): string {
+  const [hStr, mStr] = hora24.split(":");
+  const total = parseInt(hStr, 10) * 60 + parseInt(mStr, 10) + minutos;
+  const h = Math.floor(((total % (24 * 60)) + 24 * 60) % (24 * 60) / 60);
+  const m = ((total % 60) + 60) % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
+}
+
+function mapCitaMedicaAAgendaItem(c: CitaMedica): CitaAgendaItem {
+  return {
+    id: String(c.id),
+    pacienteId: c.paciente?.id ?? null,
+    pacienteNombre: c.paciente?.nombreCompleto || "Paciente",
+    pacienteCedula: c.paciente?.identificacion || "S/C",
+    pacienteTelefono: c.paciente?.telefono || "S/T",
+    fecha: c.fecha,
+    hora: hora24AAmPm(c.horaInicio),
+    motivo: c.motivo || "Consulta Médica",
+    estado: c.estado || "PROGRAMADA",
+    creadoEn: "",
+  };
 }
 
 const CITAS_STORE_KEY = "aurora_mediclinic_citas_store_v2";
@@ -5619,19 +5669,14 @@ function AgendaMedica({
   const [mesActual, setMesActual] = useState<number>(() => new Date().getMonth());
   const [añoActual, setAñoActual] = useState<number>(() => new Date().getFullYear());
 
-  // Store de Citas
-  const [citas, setCitas] = useState<CitaAgendaItem[]>(() => {
-    try {
-      const raw = localStorage.getItem(CITAS_STORE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
-  });
+  // Citas del mes visible — vienen del backend real (tabla salud_citas), no de localStorage: así
+  // una cita agendada por Recepción en una PC aparece de verdad en la pantalla del Doctor en otra.
+  const [citas, setCitas] = useState<CitaAgendaItem[]>([]);
+  const [cargandoCitas, setCargandoCitas] = useState(false);
 
-  // Fechas bloqueadas (días no laborables / feriados / congresos)
+  // Fechas bloqueadas (días no laborables / feriados / congresos) — se mantiene por ahora en
+  // localStorage (configuración de baja frecuencia, no datos clínicos); migrar a BloqueoAgenda
+  // del backend queda pendiente para una siguiente pasada.
   const [fechasBloqueadas, setFechasBloqueadas] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(FECHAS_BLOQUEADAS_KEY);
@@ -5653,43 +5698,33 @@ function AgendaMedica({
   const [citaParaReprogramar, setCitaParaReprogramar] = useState<CitaAgendaItem | null>(null);
   const [reprogFecha, setReprogFecha] = useState("");
   const [reprogHora, setReprogHora] = useState("09:00 AM");
+  const [reprogramando, setReprogramando] = useState(false);
 
   const dispararToast = (msg: string) => {
     setToastAgenda(msg);
     setTimeout(() => setToastAgenda(null), 3500);
   };
 
-  // Guardar en localStorage y sincronizar en tiempo real entre Doctor y Secretaria
-  const guardarCitasStore = (nuevasCitas: CitaAgendaItem[]) => {
-    setCitas(nuevasCitas);
-    try {
-      localStorage.setItem(CITAS_STORE_KEY, JSON.stringify(nuevasCitas));
-      window.dispatchEvent(new Event("aurora_agenda_updated"));
-    } catch {}
-    onCambio();
+  // Trae del backend todas las citas del mes que se está viendo en el calendario.
+  const cargarCitasDelMes = () => {
+    const diasEnMes = new Date(añoActual, mesActual + 1, 0).getDate();
+    const inicio = `${añoActual}-${String(mesActual + 1).padStart(2, "0")}-01`;
+    const fin = `${añoActual}-${String(mesActual + 1).padStart(2, "0")}-${String(diasEnMes).padStart(2, "0")}`;
+    setCargandoCitas(true);
+    listarCitasPorRango(tenantId, inicio, fin)
+      .then((lista) => setCitas(lista.map(mapCitaMedicaAAgendaItem)))
+      .catch(() => dispararToast("⚠️ No se pudieron cargar las citas del mes — revisa tu conexión."))
+      .finally(() => setCargandoCitas(false));
   };
 
-  // Listener para sincronización simultánea e instantánea entre roles y ventanas
   useEffect(() => {
-    const handleSync = () => {
-      try {
-        const raw = localStorage.getItem(CITAS_STORE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) setCitas(parsed);
-        }
-        const rawBloq = localStorage.getItem(FECHAS_BLOQUEADAS_KEY);
-        if (rawBloq) setFechasBloqueadas(JSON.parse(rawBloq));
-      } catch {}
-    };
-
-    window.addEventListener("storage", handleSync);
-    window.addEventListener("aurora_agenda_updated", handleSync);
-    return () => {
-      window.removeEventListener("storage", handleSync);
-      window.removeEventListener("aurora_agenda_updated", handleSync);
-    };
-  }, []);
+    cargarCitasDelMes();
+    // Re-consulta periódica: no hay WebSocket todavía, así que esto es lo que hace que Recepción
+    // y Doctor vean (con hasta 20s de rezago) las citas que agenda el otro desde su propia pantalla.
+    const intervalo = setInterval(cargarCitasDelMes, 20000);
+    return () => clearInterval(intervalo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId, mesActual, añoActual]);
 
   // Navegación de Meses
   const mesAnterior = () => {
@@ -5869,8 +5904,30 @@ function AgendaMedica({
     setPacienteDetectado(null);
   };
 
-  // Guardar nueva cita
-  const handleGuardarCita = (e: React.FormEvent) => {
+  // Busca el paciente por cédula ya sea en la lista cargada, o en el backend; si no existe en
+  // ningún lado, lo crea — así agendar una cita para alguien nuevo no exige un paso aparte.
+  const resolverPacienteId = async (): Promise<number> => {
+    const cedula = formCedula.trim();
+    if (cedula && pacientes) {
+      const cedulaLimpia = cedula.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const match = pacientes.find((p) => (p.identificacion || "").toLowerCase().replace(/[^a-z0-9]/g, "") === cedulaLimpia);
+      if (match) return match.id;
+    }
+    if (cedula) {
+      const encontrado = await buscarPacientePorIdentificacion(tenantId, cedula);
+      if (encontrado) return encontrado.id;
+    }
+    const creado = await crearPaciente(tenantId, {
+      identificacion: cedula || `SC-${Date.now()}`,
+      nombres: formNombres.trim(),
+      apellidos: formApellidos.trim(),
+      telefono: formTelefono.trim() || undefined,
+    });
+    return creado.id;
+  };
+
+  // Guardar nueva cita — va directo al backend (tabla salud_citas), no a localStorage.
+  const handleGuardarCita = async (e: React.FormEvent) => {
     e.preventDefault();
     if (estaBloqueadaSeleccionada) {
       alert("⚠️ La fecha seleccionada se encuentra BLOQUEADA. Desbloquéala primero para poder agendar pacientes.");
@@ -5884,32 +5941,36 @@ function AgendaMedica({
 
     setGuardando(true);
     try {
-      const nueva: CitaAgendaItem = {
-        id: `cita-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        pacienteNombre: nombreCompleto,
-        pacienteCedula: formCedula.trim() || "S/C",
-        pacienteTelefono: formTelefono.trim() || "S/T",
+      const pacienteId = await resolverPacienteId();
+      const horaInicio24 = horaAmPmA24(formHora);
+      await agendarCita(tenantId, {
+        pacienteId,
         fecha: fechaSeleccionada,
-        hora: formHora,
+        horaInicio: horaInicio24,
+        horaFin: sumarMinutos(horaInicio24, 30),
         motivo: formMotivo.trim() || "Consulta Médica",
-        estado: "PROGRAMADA",
-        creadoEn: new Date().toISOString(),
-      };
-
-      guardarCitasStore([nueva, ...citas]);
+      });
       limpiarFormulario();
+      cargarCitasDelMes();
+      onCambio();
       dispararToast(`¡Cita agendada con éxito para ${nombreCompleto} a las ${formHora}!`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "No se pudo agendar la cita.");
     } finally {
       setGuardando(false);
     }
   };
 
-  // Eliminar cita
-  const handleEliminarCita = (id: string) => {
-    if (confirm("¿Estás seguro de eliminar esta cita de la agenda?")) {
-      const filtradas = citas.filter((c) => c.id !== id);
-      guardarCitasStore(filtradas);
-      dispararToast("Cita eliminada de la agenda.");
+  // Cancelar cita — la agenda nunca borra el registro (queda como CANCELADA, con trazabilidad).
+  const handleEliminarCita = async (id: string) => {
+    if (!confirm("¿Estás seguro de cancelar esta cita?")) return;
+    try {
+      await actualizarEstadoCita(Number(id), "CANCELADA");
+      cargarCitasDelMes();
+      onCambio();
+      dispararToast("Cita cancelada.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "No se pudo cancelar la cita.");
     }
   };
 
@@ -5920,7 +5981,7 @@ function AgendaMedica({
     setReprogHora(cita.hora || "09:00 AM");
   };
 
-  const ejecutarReprogramacion = (e: React.FormEvent) => {
+  const ejecutarReprogramacion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!citaParaReprogramar) return;
     if (fechasBloqueadas.includes(reprogFecha)) {
@@ -5928,14 +5989,19 @@ function AgendaMedica({
       return;
     }
 
-    const actualizadas = citas.map((c) =>
-      c.id === citaParaReprogramar.id
-        ? { ...c, fecha: reprogFecha, hora: reprogHora }
-        : c
-    );
-    guardarCitasStore(actualizadas);
-    dispararToast(`✓ Cita reprogramada para el ${reprogFecha} a las ${reprogHora}`);
-    setCitaParaReprogramar(null);
+    setReprogramando(true);
+    try {
+      const horaInicio24 = horaAmPmA24(reprogHora);
+      await reprogramarCita(Number(citaParaReprogramar.id), reprogFecha, horaInicio24, sumarMinutos(horaInicio24, 30));
+      cargarCitasDelMes();
+      onCambio();
+      dispararToast(`✓ Cita reprogramada para el ${reprogFecha} a las ${reprogHora}`);
+      setCitaParaReprogramar(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "No se pudo reprogramar la cita.");
+    } finally {
+      setReprogramando(false);
+    }
   };
 
   // Pasar paciente directamente a sala de espera
@@ -5974,7 +6040,7 @@ function AgendaMedica({
   // Mapeo de citas agrupadas por fecha (para conteos en el calendario)
   const citasPorFecha = useMemo(() => {
     const map: Record<string, CitaAgendaItem[]> = {};
-    citas.forEach((c) => {
+    citas.filter((c) => c.estado !== "CANCELADA").forEach((c) => {
       if (!map[c.fecha]) map[c.fecha] = [];
       map[c.fecha].push(c);
     });
@@ -6211,7 +6277,7 @@ function AgendaMedica({
                 </p>
               </div>
               <span className="px-3 py-1 rounded-full bg-sky-50 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-300/60 dark:border-sky-500/30 text-xs font-bold font-mono shadow-xs">
-                {citasDelDiaSeleccionado.length} {citasDelDiaSeleccionado.length === 1 ? "cita" : "citas"}
+                {cargandoCitas ? "Actualizando…" : `${citasDelDiaSeleccionado.length} ${citasDelDiaSeleccionado.length === 1 ? "cita" : "citas"}`}
               </span>
             </div>
 
@@ -6543,9 +6609,10 @@ function AgendaMedica({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-md cursor-pointer"
+                  disabled={reprogramando}
+                  className="flex-1 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
                 >
-                  Confirmar Cambio
+                  {reprogramando ? "Guardando…" : "Confirmar Cambio"}
                 </button>
               </div>
             </form>

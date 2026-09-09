@@ -55,6 +55,19 @@ public class AgendaMedicaService {
         return citaMedicaRepository.save(cita);
     }
 
+    /** Mueve una cita a otra fecha/hora — misma validación de disponibilidad que agendar una nueva,
+     * excluyendo la propia cita del chequeo de solapamiento (si no, siempre "chocaría" consigo misma). */
+    @Transactional
+    public CitaMedica reprogramarCita(Long citaId, LocalDate fecha, LocalTime horaInicio, LocalTime horaFin) {
+        CitaMedica cita = citaMedicaRepository.findById(citaId)
+            .orElseThrow(() -> new RuntimeException("Cita no encontrada con ID: " + citaId));
+        validarDisponibilidad(cita.getMedicoId(), fecha, horaInicio, horaFin, citaId);
+        cita.setFecha(fecha);
+        cita.setHoraInicio(horaInicio);
+        cita.setHoraFin(horaFin);
+        return citaMedicaRepository.save(cita);
+    }
+
     @Transactional
     public BloqueoAgenda registrarBloqueo(Long tenantId, BloqueoAgenda bloqueo) {
         bloqueo.setTenantId(tenantId);
@@ -63,6 +76,11 @@ public class AgendaMedicaService {
 
     public List<BloqueoAgenda> listarBloqueosPorMedico(Long medicoId) {
         return bloqueoAgendaRepository.findByMedicoId(medicoId);
+    }
+
+    @Transactional
+    public void eliminarBloqueo(Long id) {
+        bloqueoAgendaRepository.deleteById(id);
     }
 
     private void validarDisponibilidad(Long medicoId, LocalDate fecha, LocalTime inicio, LocalTime fin, Long citaExcluidaId) {
