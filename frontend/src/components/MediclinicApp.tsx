@@ -12,6 +12,7 @@ import {
 import ThemeToggle from "./ThemeToggle";
 import CanalEndemico from "./CanalEndemico";
 import Cie10Buscador from "./Cie10Buscador";
+import HistorialImportacionesSalud from "./HistorialImportacionesSalud";
 import { useAuth } from "../context/AuthContext";
 import {
   contadorInboxLaboratorio, listarOrdenesLaboratorioPaciente, type OrdenLaboratorio,
@@ -6974,6 +6975,8 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
           Actualizar PIN del Doctor
         </button>
       </form>
+
+      <HistorialImportacionesSalud claveDoctor={config.claveDoctor} />
     </div>
   );
 }
