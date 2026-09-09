@@ -21,7 +21,6 @@ import {
   obtenerBase64PdfDocumento,
   compartirNativoConArchivo,
 } from "../utils/pdfReports";
-import { enviarEmailDocumento } from "../api";
 
 export type TipoDocumento = "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION";
 
@@ -128,61 +127,14 @@ export default function DocumentoPreviewModal({
     }
   };
 
-  // ── ENVIAR AUTOMÁTICAMENTE DESDE EL SERVIDOR CON PDF ADJUNTO REAL (1 CLIC) ──
-  const handleEnviarEmailDirectoServidor = async () => {
-    if (!correoDestino || !correoDestino.trim()) {
-      mostrarToast("Por favor ingresa un correo electrónico válido");
-      return;
-    }
-    setEnviandoEmail(true);
-    try {
-      const { base64, nombreArchivo } = obtenerBase64PdfDocumento(payload.tipo, docData);
-      const { subject, body } = obtenerDatosEmail();
-
-      await enviarEmailDocumento({
-        destinatario: correoDestino.trim(),
-        asunto: subject,
-        cuerpo: body.replace(/\n/g, "<br>"),
-        pdfBase64: base64,
-        nombreArchivo,
-      });
-
-      mostrarToast(`✓ Correo enviado con PDF adjunto a ${correoDestino.trim()}`);
-      setModalCompartir(null);
-    } catch (err: any) {
-      console.warn("Servicio SMTP directo no disponible o backend sin conexión, usando fallback Gmail Web:", err);
-      // Fallback inmediato y transparente: Descarga el PDF localmente y abre Gmail Web con destinatario y texto
-      handleDescargarPdf();
-      const { subject, body } = obtenerDatosEmail();
-      const to = correoDestino.trim();
-      const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.open(url, "_blank", "noopener,noreferrer");
-      mostrarToast(`📄 PDF descargado y Gmail abierto con datos listos para enviar a ${to}`);
-      setModalCompartir(null);
-    } finally {
-      setEnviandoEmail(false);
-    }
-  };
-
-  // ── ENVIAR VÍA GMAIL WEB ──
+  // ── ENVIAR VÍA GMAIL WEB (DESCARGA PDF Y ABRE GMAIL CON DESTINATARIO Y MENSAJE) ──
   const handleEnviarGmail = () => {
     handleDescargarPdf();
     const { subject, body } = obtenerDatosEmail();
     const to = correoDestino.trim();
     const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.open(url, "_blank", "noopener,noreferrer");
-    mostrarToast("📄 PDF descargado y Gmail abierto con destinatario y texto.");
-    setModalCompartir(null);
-  };
-
-  // ── ENVIAR VÍA CLIENTE DE CORREO (OUTLOOK / NATIVO) ──
-  const handleEnviarEmail = () => {
-    handleDescargarPdf();
-    const { subject, body } = obtenerDatosEmail();
-    const to = correoDestino.trim();
-    const mailto = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailto;
-    mostrarToast("📄 PDF descargado y cliente de correo abierto.");
+    mostrarToast("📄 PDF descargado y Gmail abierto con destinatario y texto listos.");
     setModalCompartir(null);
   };
 
@@ -760,56 +712,25 @@ export default function DocumentoPreviewModal({
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono focus:border-rose-500 focus:outline-none"
               />
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
               <button
                 type="button"
                 onClick={() => setModalCompartir(null)}
-                disabled={enviandoEmail}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white cursor-pointer transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="button"
-                onClick={handleEnviarEmail}
-                disabled={enviandoEmail}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors"
-                title="Abrir a través de Outlook o app de correo nativa"
-              >
-                Outlook / App
-              </button>
-              <button
-                type="button"
                 onClick={handleEnviarGmail}
-                disabled={enviandoEmail}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800/50 cursor-pointer transition-colors flex items-center gap-1"
-                title="Abrir redacción en Gmail Web con destinatario y texto listos"
+                disabled={!correoDestino}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white cursor-pointer transition-all shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Descargar PDF y abrir redacción en Gmail Web con destinatario y texto listos"
               >
-                <svg className="w-3.5 h-3.5 text-rose-400" viewBox="0 0 24 24" fill="currentColor">
+                <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
                 </svg>
-                <span>Gmail Web</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleEnviarEmailDirectoServidor}
-                disabled={enviandoEmail || !correoDestino}
-                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white cursor-pointer transition-colors shadow-md flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Envía el correo directamente desde el servidor adjuntando el archivo PDF oficial"
-              >
-                {enviandoEmail ? (
-                  <>
-                    <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>Enviando PDF...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🚀 Enviar con PDF Adjunto</span>
-                  </>
-                )}
+                <span>Abrir en Gmail Web</span>
               </button>
             </div>
           </div>
