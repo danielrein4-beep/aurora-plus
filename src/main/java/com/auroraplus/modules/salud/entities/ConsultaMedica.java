@@ -100,6 +100,9 @@ public class ConsultaMedica {
     @Column(name = "orden_examenes", columnDefinition = "TEXT")
     private String ordenExamenes;
 
+    @Column(name = "anotaciones_privadas", columnDefinition = "TEXT")
+    private String anotacionesPrivadas;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -116,6 +119,8 @@ public class ConsultaMedica {
     public void setFechaHora(LocalDateTime fechaHora) { this.fechaHora = fechaHora; }
     public String getMotivoConsulta() { return motivoConsulta; }
     public void setMotivoConsulta(String motivoConsulta) { this.motivoConsulta = motivoConsulta; }
+    public String getAnotacionesPrivadas() { return anotacionesPrivadas; }
+    public void setAnotacionesPrivadas(String anotacionesPrivadas) { this.anotacionesPrivadas = anotacionesPrivadas; }
     public String getEnfermedadActual() { return enfermedadActual; }
     public void setEnfermedadActual(String enfermedadActual) { this.enfermedadActual = enfermedadActual; }
     public String getExamenFisico() { return examenFisico; }

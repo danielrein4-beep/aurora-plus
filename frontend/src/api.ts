@@ -574,6 +574,11 @@ export interface ConsultaMedica {
   motivoConsulta: string;
   descripcionDiagnostico?: string;
   planTratamiento?: string;
+  anotacionesPrivadas?: string;
+  observacionFisica?: string;
+  talla?: string;
+  peso?: string;
+  evolucionClinica?: string;
   fechaHora?: string;
   fechaConsulta?: string;
 }
@@ -603,6 +608,11 @@ export async function registrarConsulta(
     motivoConsulta: datos.motivoConsulta || "Consulta Médica",
     descripcionDiagnostico: datos.descripcionDiagnostico,
     planTratamiento: datos.planTratamiento,
+    anotacionesPrivadas: datos.anotacionesPrivadas,
+    observacionFisica: datos.observacionFisica,
+    talla: datos.talla,
+    peso: datos.peso,
+    evolucionClinica: datos.evolucionClinica,
     fechaHora: new Date().toISOString(),
     fechaConsulta: new Date().toISOString().slice(0, 10),
   };

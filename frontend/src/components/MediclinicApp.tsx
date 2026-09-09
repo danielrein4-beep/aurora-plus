@@ -2282,6 +2282,7 @@ function HistoriasClinicas({
     peso: "70.0",
     observacionFisica: "",
     evolucionClinica: "",
+    anotacionesPrivadas: "",
     descripcionDiagnostico: "",
     planTratamiento: "",
     proximaCita: "",
@@ -2341,6 +2342,7 @@ function HistoriasClinicas({
       peso: "70.0",
       observacionFisica: "",
       evolucionClinica: "",
+      anotacionesPrivadas: "",
       descripcionDiagnostico: "",
       planTratamiento: "",
       proximaCita: "",
@@ -2416,6 +2418,11 @@ function HistoriasClinicas({
         motivoConsulta: form.motivoConsulta,
         descripcionDiagnostico: form.descripcionDiagnostico,
         planTratamiento: form.planTratamiento,
+        anotacionesPrivadas: form.anotacionesPrivadas,
+        talla: form.talla,
+        peso: form.peso,
+        observacionFisica: form.observacionFisica,
+        evolucionClinica: form.evolucionClinica,
       });
 
       // Refrescar historial
@@ -2990,6 +2997,27 @@ function HistoriasClinicas({
               />
             </div>
 
+            {/* ── CAMPO EN ROJO: ANOTACIONES PRIVADAS Y RESERVADAS DEL MÉDICO / COMENTARIOS ── */}
+            <div className="rounded-2xl p-4 border-2 border-rose-500/80 dark:border-rose-500/60 bg-rose-50/80 dark:bg-rose-950/30 space-y-2 shadow-xs">
+              <div className="flex items-center gap-2 text-xs font-black text-rose-700 dark:text-rose-400 uppercase tracking-wide">
+                <svg className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <span>ANOTACIONES PRIVADAS Y RESERVADAS DEL MÉDICO / COMENTARIOS</span>
+              </div>
+              <p className="text-[11px] text-rose-600/90 dark:text-rose-300/80 font-semibold">
+                🔒 Confidencial: Este campo es estrictamente privado para lectura del médico. No se mostrará ni anexará en ningún informe, PDF, correo o WhatsApp.
+              </p>
+              <textarea
+                rows={3}
+                placeholder="Escribe aquí observaciones privadas, sospechas clínicas, comentarios confidenciales o antecedentes reservados para tus futuras consultas..."
+                value={form.anotacionesPrivadas}
+                onChange={(e) => setForm({ ...form, anotacionesPrivadas: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-rose-300 dark:border-rose-500/40 bg-white dark:bg-black/50 text-xs text-rose-950 dark:text-rose-100 placeholder:text-rose-300 dark:placeholder:text-rose-400/40 focus:outline-none focus:border-rose-600 focus:ring-1 focus:ring-rose-500 font-sans shadow-xs"
+              />
+            </div>
+
             {/* 4. Diagnóstico Clínico (Dx) */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 dark:text-white/90">
@@ -3096,6 +3124,22 @@ function HistoriasClinicas({
                 <span className="font-bold text-slate-500 dark:text-white/50 block">Motivo:</span>
                 <p className="text-slate-900 dark:text-white font-medium mt-0.5">{consultaDetalle.motivoConsulta}</p>
               </div>
+
+              {/* Anotaciones Privadas y Reservadas del Médico */}
+              {rol === "MEDICO" && consultaDetalle.anotacionesPrivadas && (
+                <div className="rounded-2xl p-3.5 border-2 border-rose-500/80 dark:border-rose-500/50 bg-rose-50/80 dark:bg-rose-950/30 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-black text-rose-700 dark:text-rose-400 uppercase tracking-wide">
+                    <svg className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    <span>ANOTACIONES PRIVADAS Y RESERVADAS DEL MÉDICO / COMENTARIOS</span>
+                  </div>
+                  <p className="text-rose-950 dark:text-rose-100 font-medium text-xs whitespace-pre-wrap leading-relaxed">
+                    {consultaDetalle.anotacionesPrivadas}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <span className="font-bold text-slate-500 dark:text-white/50 block">Diagnóstico (Dx):</span>
