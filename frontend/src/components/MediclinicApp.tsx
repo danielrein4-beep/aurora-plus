@@ -3,7 +3,8 @@ import {
   AuroraGradientDef,
   IconStethoscope, IconUsers, IconFileText, IconPrescription, IconHourglass, IconCalendar,
   IconCard, IconCustomize, IconSearch, IconUser, IconCheck, IconTrash, IconRefresh,
-  IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconUnlock, IconWarning, IconClose, IconBank
+  IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconUnlock, IconWarning, IconClose, IconBank,
+  IconWhatsApp, IconMail
 } from "../Icons";
 import ThemeToggle from "./ThemeToggle";
 import { useAuth } from "../context/AuthContext";
@@ -2385,6 +2386,69 @@ function HistoriasClinicas({
     }
   };
 
+  const handleEnviarCorreoConsulta = (c: ConsultaMedica) => {
+    if (!pacienteSeleccionado) return;
+    const esForaneo =
+      pacienteSeleccionado.tipoOrigen === "Foráneo" ||
+      pacienteSeleccionado.tipoOrigen === "FORANEO" ||
+      (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
+
+    const data: ConsultaReportData = {
+      clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
+      doctorNombre: config.doctorNombre || "Dr. Mario Roa",
+      especialidad: config.especialidad || "Dermatología / Medicina General",
+      matriculaMPPS: config.matriculaMPPS || "109842",
+      colegioMedicos: config.colegioMedicos || "5421",
+      paciente: {
+        expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
+        nombreCompleto: pacienteSeleccionado.nombreCompleto,
+        identificacion: pacienteSeleccionado.identificacion,
+        edad: pacienteSeleccionado.fechaNacimiento
+          ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
+          : pacienteSeleccionado.edad || 34,
+        telefono: pacienteSeleccionado.telefono || "No registrado",
+        email: pacienteSeleccionado.email || "",
+        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
+        fechaConsulta: c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy(),
+      },
+      signosVitales: {
+        ta: "120/80",
+        fc: "75",
+        fr: "18",
+        temp: "36.8",
+        peso: "70 kg",
+        talla: "1.75 m",
+        imc: "22.8",
+        satO2: "99%",
+      },
+      motivoConsulta: c.motivoConsulta || "Consulta Médica",
+      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
+      planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
+      proximaCita: undefined,
+    };
+
+    if (onVerDocumento) {
+      onVerDocumento({ tipo: "INFORME_MEDICO", data });
+    } else {
+      generarPdfInformeConsulta(data);
+      const to = (pacienteSeleccionado.email || "").trim();
+      const subject = `Informe Médico y Prescripción - ${pacienteSeleccionado.nombreCompleto} (${data.paciente.expediente})`;
+      const body = `Estimado/a ${pacienteSeleccionado.nombreCompleto},\n\n` +
+        `Adjunto encontrará el informe médico correspondiente a su consulta del ${data.paciente.fechaConsulta}.\n\n` +
+        `• Expediente: ${data.paciente.expediente}\n` +
+        `• Diagnóstico: ${data.diagnosticoCIE10}\n` +
+        `• Indicaciones / Prescripción:\n${data.planTratamiento || "Sin indicaciones adicionales"}\n\n` +
+        `Atentamente,\n` +
+        `${data.doctorNombre} · ${data.especialidad}\n` +
+        `${data.clinicaNombre}`;
+
+      const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+      dispararToast(to ? `📧 PDF generado y Gmail abierto para enviar a ${to}` : "📧 PDF generado y Gmail abierto listo para redactar");
+    }
+  };
+
   const handleEliminarConsulta = async (c: ConsultaMedica) => {
     if (!pacienteSeleccionado) return;
     const motivo = c.motivoConsulta || "Consulta";
@@ -2622,9 +2686,17 @@ function HistoriasClinicas({
                                 type="button"
                                 title="Enviar por WhatsApp"
                                 onClick={() => handleEnviarWhatsAppConsulta(c)}
-                                className="w-7 h-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 flex items-center justify-center transition-colors cursor-pointer"
+                                className="w-7 h-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors cursor-pointer"
                               >
-                                <IconBank size={13} />
+                                <IconWhatsApp size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                title="Enviar por Correo Electrónico (Gmail)"
+                                onClick={() => handleEnviarCorreoConsulta(c)}
+                                className="w-7 h-7 rounded-lg bg-sky-500/10 hover:bg-sky-600 hover:text-white text-sky-600 dark:text-sky-400 flex items-center justify-center transition-colors cursor-pointer"
+                              >
+                                <IconMail size={14} />
                               </button>
                               <button
                                 type="button"
@@ -2898,7 +2970,7 @@ function HistoriasClinicas({
                     setConsultaDetalle(null);
                     handleDescargarPdfConsulta(c);
                   }}
-                  className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                  className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
                 >
                   <IconFileText size={14} />
                   <span>Ver Informe / Imprimir</span>
@@ -2910,10 +2982,22 @@ function HistoriasClinicas({
                     setConsultaDetalle(null);
                     handleEnviarWhatsAppConsulta(c);
                   }}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
                 >
-                  <IconBank size={14} />
+                  <IconWhatsApp size={14} />
                   <span>WhatsApp</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = consultaDetalle;
+                    setConsultaDetalle(null);
+                    handleEnviarCorreoConsulta(c);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                >
+                  <IconMail size={14} />
+                  <span>Enviar por Correo</span>
                 </button>
                 <button
                   type="button"
@@ -3772,7 +3856,7 @@ function Procedimientos({
                               className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-white/10 transition-colors cursor-pointer"
                               title="Enviar por WhatsApp"
                             >
-                              <span className="font-bold text-xs">💬</span>
+                              <IconWhatsApp size={15} />
                             </button>
 
                             {/* Eliminar */}

@@ -428,11 +428,11 @@ export function IconStar({ size = 24 }: IconProps) {
   );
 }
 
-export function IconMail({ size = 24 }: IconProps) {
+export function IconMail({ size = 24, className }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <rect x="2" y="4" width="20" height="16" rx="2" {...s} />
-      <path d="M3 6l9 7 9-7" {...s} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="2" y="4" width="20" height="16" rx="3" />
+      <path d="M22 7l-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
     </svg>
   );
 }
@@ -489,6 +489,14 @@ export function IconFileText({ size = 24 }: IconProps) {
       <path d="M6 2h8l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" {...s} />
       <path d="M14 2v5h5" {...s} />
       <path d="M8 13h8M8 17h5" {...s} />
+    </svg>
+  );
+}
+
+export function IconWhatsApp({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm5.79 14.07c-.24.68-1.4 1.28-1.92 1.35-.49.07-1.12.1-3.23-.77-2.69-1.12-4.43-3.87-4.57-4.05-.13-.18-1.1-1.46-1.1-2.79 0-1.32.69-1.97.94-2.24.25-.26.54-.33.72-.33.18 0 .36.01.52.01.17 0 .4-.06.63.48.24.57.81 1.97.88 2.12.07.15.12.33.02.53-.1.19-.15.31-.3.48-.15.18-.31.4-.45.54-.15.15-.31.31-.13.62.18.31.79 1.3 1.7 2.11 1.17 1.04 2.15 1.36 2.46 1.51.31.15.49.13.67-.08.18-.21.78-.91.99-1.22.21-.31.42-.26.71-.15.29.11 1.83.86 2.15 1.02.31.15.52.23.6.36.07.13.07.76-.17 1.44z" />
     </svg>
   );
 }
