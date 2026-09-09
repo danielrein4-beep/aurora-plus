@@ -150,8 +150,15 @@ export default function DocumentoPreviewModal({
       mostrarToast(`✓ Correo enviado con PDF adjunto a ${correoDestino.trim()}`);
       setModalCompartir(null);
     } catch (err: any) {
-      console.error("Error enviando email:", err);
-      mostrarToast(`Error al enviar: ${err.message || "Servicio de correo no disponible"}`);
+      console.warn("Servicio SMTP directo no disponible o backend sin conexión, usando fallback Gmail Web:", err);
+      // Fallback inmediato y transparente: Descarga el PDF localmente y abre Gmail Web con destinatario y texto
+      handleDescargarPdf();
+      const { subject, body } = obtenerDatosEmail();
+      const to = correoDestino.trim();
+      const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+      mostrarToast(`📄 PDF descargado y Gmail abierto con datos listos para enviar a ${to}`);
+      setModalCompartir(null);
     } finally {
       setEnviandoEmail(false);
     }
