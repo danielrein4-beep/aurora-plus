@@ -2501,11 +2501,11 @@ function HistoriasClinicas({
         </div>
       )}
 
-      {/* ── 3. WORKSPACE EN 2 COLUMNAS: HISTORIAL (IZQ) + FORMULARIO (DER) ── */}
+      {/* ── 3. WORKSPACE: HISTORIAL (FULL-WIDTH EN SECRETARIA) O DUAL (EN MEDICO) ── */}
       {pacienteSeleccionado && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* ── COLUMNA IZQUIERDA: HISTORIAL DE CONSULTAS MÉDICAS ── */}
-          <div className="lg:col-span-12 xl:col-span-5 apple-glass rounded-3xl p-5 border border-slate-200/80 dark:border-white/10 shadow-sm bg-white/80 dark:bg-[#071a2e]/60 space-y-4">
+        <div className={rol === "SECRETARIA" ? "space-y-6" : "grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"}>
+          {/* ── HISTORIAL DE CONSULTAS MÉDICAS ── */}
+          <div className={`${rol === "SECRETARIA" ? "w-full p-6" : "lg:col-span-12 xl:col-span-5 p-5"} apple-glass rounded-3xl border border-slate-200/80 dark:border-white/10 shadow-sm bg-white/80 dark:bg-[#071a2e]/60 space-y-4`}>
             <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-white/10 pb-3">
               <div className="flex items-center gap-2">
                 <IconFileText size={18} className="text-teal-600 dark:text-teal-400" />
@@ -2523,29 +2523,30 @@ function HistoriasClinicas({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200/80 dark:border-white/10 bg-slate-100/70 dark:bg-white/5 text-[11px] font-bold text-slate-500 dark:text-white/50 uppercase tracking-wider">
-                    <th className="py-2.5 px-3 whitespace-nowrap">Fecha / H...</th>
-                    <th className="py-2.5 px-3">Motivo</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">Fecha / Hora</th>
+                    <th className="py-2.5 px-3">Motivo de Consulta</th>
                     <th className="py-2.5 px-3">Diagnóstico</th>
-                    <th className="py-2.5 px-3 whitespace-nowrap">Próx...</th>
-                    <th className="py-2.5 px-3 text-center">Acciones...</th>
+                    {rol === "SECRETARIA" && <th className="py-2.5 px-3">Tratamiento / Rx</th>}
+                    <th className="py-2.5 px-3 whitespace-nowrap">Próx. Cita</th>
+                    <th className="py-2.5 px-3 text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200/60 dark:divide-white/5 text-xs">
                   {historial === null ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-slate-400">
+                      <td colSpan={rol === "SECRETARIA" ? 6 : 5} className="py-12 text-center text-slate-400">
                         Cargando historial de consultas…
                       </td>
                     </tr>
                   ) : historial.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-16 text-center text-slate-400 dark:text-white/40">
+                      <td colSpan={rol === "SECRETARIA" ? 6 : 5} className="py-16 text-center text-slate-400 dark:text-white/40">
                         <div className="space-y-1">
                           <p className="text-sm font-bold text-slate-500 dark:text-white/60">
-                            Tabla sin contenido
+                            Sin consultas registradas
                           </p>
                           <p className="text-[11px] text-slate-400/80">
-                            No hay consultas registradas para este paciente todavía.
+                            No hay consultas clínicas registradas para este paciente todavía.
                           </p>
                         </div>
                       </td>
@@ -2558,14 +2559,19 @@ function HistoriasClinicas({
                           <td className="py-3 px-3 font-mono font-bold text-teal-600 dark:text-teal-400 whitespace-nowrap">
                             {fechaC}
                           </td>
-                          <td className="py-3 px-3 text-slate-800 dark:text-white/90 truncate max-w-[120px]" title={c.motivoConsulta}>
+                          <td className="py-3 px-3 text-slate-800 dark:text-white/90 truncate max-w-[150px]" title={c.motivoConsulta}>
                             {c.motivoConsulta || "—"}
                           </td>
                           <td className="py-3 px-3">
-                            <span className="px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-700 dark:text-teal-300 text-[10px] font-bold border border-teal-500/20 truncate block max-w-[110px]" title={c.descripcionDiagnostico}>
+                            <span className="px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-700 dark:text-teal-300 text-[10px] font-bold border border-teal-500/20 truncate block max-w-[140px]" title={c.descripcionDiagnostico}>
                               {c.descripcionDiagnostico || "Sin Dx"}
                             </span>
                           </td>
+                          {rol === "SECRETARIA" && (
+                            <td className="py-3 px-3 text-slate-600 dark:text-white/70 truncate max-w-[180px]" title={c.planTratamiento}>
+                              {c.planTratamiento || "—"}
+                            </td>
+                          )}
                           <td className="py-3 px-3 font-mono text-slate-500 dark:text-white/60 whitespace-nowrap">
                             —
                           </td>
@@ -2606,21 +2612,22 @@ function HistoriasClinicas({
             </div>
           </div>
 
-          {/* ── COLUMNA DERECHA: REGISTRAR NUEVA CONSULTA ── */}
-          <form
-            onSubmit={handleGuardarSolo}
-            className="lg:col-span-12 xl:col-span-7 apple-glass rounded-3xl p-6 border border-slate-200/80 dark:border-white/10 shadow-sm bg-white/90 dark:bg-[#071a2e]/80 space-y-4"
-          >
-            {/* Header del Formulario */}
-            <div className="border-b border-slate-200/80 dark:border-white/10 pb-3">
-              <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white flex items-center gap-2">
-                <span className="text-teal-600 dark:text-teal-400 font-black text-xl leading-none">+</span>
-                <span>Registrar Nueva Consulta</span>
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5">
-                Ingresa los datos físicos, motivo, diagnóstico y récipe del paciente.
-              </p>
-            </div>
+          {/* ── COLUMNA DERECHA: REGISTRAR NUEVA CONSULTA (RESERVADA EXCLUSIVAMENTE AL MÉDICO) ── */}
+          {rol !== "SECRETARIA" && (
+            <form
+              onSubmit={handleGuardarSolo}
+              className="lg:col-span-12 xl:col-span-7 apple-glass rounded-3xl p-6 border border-slate-200/80 dark:border-white/10 shadow-sm bg-white/90 dark:bg-[#071a2e]/80 space-y-4"
+            >
+              {/* Header del Formulario */}
+              <div className="border-b border-slate-200/80 dark:border-white/10 pb-3">
+                <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                  <span className="text-teal-600 dark:text-teal-400 font-black text-xl leading-none">+</span>
+                  <span>Registrar Nueva Consulta</span>
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5">
+                  Ingresa los datos físicos, motivo, diagnóstico y récipe del paciente.
+                </p>
+              </div>
 
             {/* Mensajes de Estado */}
             {error && (
@@ -2786,6 +2793,7 @@ function HistoriasClinicas({
               </div>
             </div>
           </form>
+        )}
         </div>
       )}
 
