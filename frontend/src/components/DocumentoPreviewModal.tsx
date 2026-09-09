@@ -97,30 +97,7 @@ export default function DocumentoPreviewModal({
     mostrarToast("Resumen copiado al portapapeles");
   };
 
-  // ── ENVIAR CON PDF ADJUNTO NATIVO (EL USUARIO CONFIRMA EN WHATSAPP) ──
-  const handleEnviarConPdfNativo = async () => {
-    try {
-      const file = obtenerArchivoPdfDocumento(payload.tipo, docData);
-      const texto = obtenerTextoResumen();
-      const compartido = await compartirNativoConArchivo(
-        file,
-        texto,
-        payload.tipo === "INFORME_MEDICO" ? "Informe Médico" : "Documento Clínico"
-      );
-      if (compartido) {
-        setModalCompartir(null);
-        return;
-      }
-    } catch (e) {
-      console.warn("Fallo compartir nativo, recurriendo a web:", e);
-    }
-    // Fallback si no está disponible Web Share de archivos en el navegador
-    const texto = obtenerTextoResumen();
-    abrirWhatsAppDirecto(telefonoWhatsApp, texto);
-    setModalCompartir(null);
-  };
-
-  // ── ENVIAR POR WHATSAPP (DIRECTO) ──
+  // ── ENVIAR POR WHATSAPP ──
   const handleEnviarWhatsApp = () => {
     const texto = obtenerTextoResumen();
     abrirWhatsAppDirecto(telefonoWhatsApp, texto);
@@ -666,11 +643,15 @@ export default function DocumentoPreviewModal({
                 </button>
                 <button
                   type="button"
-                  onClick={handleEnviarConPdfNativo}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white border border-teal-400/40 cursor-pointer transition-colors shadow-md flex items-center gap-1.5"
-                  title="Adjunta el archivo PDF y el texto a WhatsApp mediante el diálogo nativo para confirmar antes de enviar"
+                  onClick={() => {
+                    const texto = obtenerTextoResumen();
+                    abrirWhatsAppAppDirecto(telefonoWhatsApp, texto);
+                    setModalCompartir(null);
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/50 cursor-pointer transition-colors"
+                  title="Abrir a través de WhatsApp Desktop App"
                 >
-                  <span>📎 Adjuntar PDF y Enviar</span>
+                  App Escritorio
                 </button>
                 <button
                   type="button"
@@ -679,7 +660,7 @@ export default function DocumentoPreviewModal({
                     abrirWhatsAppWebDirecto(telefonoWhatsApp, texto);
                     setModalCompartir(null);
                   }}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-700/80 hover:bg-emerald-600 text-white cursor-pointer transition-colors shadow-sm flex items-center gap-1"
+                  className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition-colors shadow-md flex items-center gap-1.5"
                   title="Abrir chat directo en WhatsApp Web (Navegador)"
                 >
                   <span>WhatsApp Web</span>
