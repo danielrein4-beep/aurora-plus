@@ -845,3 +845,54 @@ export function abrirWhatsAppAppDirecto(telefono: string, texto: string, codigoP
 export function abrirWhatsAppDirecto(telefono: string, texto: string, codigoPaisManual?: string) {
   abrirWhatsAppWebDirecto(telefono, texto, codigoPaisManual);
 }
+
+export function obtenerArchivoPdfDocumento(
+  tipo: "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION",
+  data: any
+): File {
+  let doc: jsPDF;
+  let nombreArchivo = "Documento.pdf";
+  if (tipo === "INFORME_MEDICO") {
+    doc = construirDocInformeConsulta(data as ConsultaReportData);
+    const nombrePaciente = (data as ConsultaReportData).paciente?.nombreCompleto?.replace(/[^a-zA-Z0-9_-]/g, "_") || "Paciente";
+    const expediente = (data as ConsultaReportData).paciente?.expediente || "HC";
+    nombreArchivo = `Informe_${expediente}_${nombrePaciente}.pdf`;
+  } else if (tipo === "CIERRE_CAJA") {
+    doc = construirDocCierreCaja(data as CierreCajaData);
+    nombreArchivo = `Cierre_Caja_${(data as CierreCajaData).fecha || "Hoy"}.pdf`;
+  } else {
+    doc = construirDocCotizacion(data as CotizacionData);
+    const nombrePaciente = (data as CotizacionData).pacienteNombre?.replace(/[^a-zA-Z0-9_-]/g, "_") || "Paciente";
+    nombreArchivo = `Presupuesto_${nombrePaciente}.pdf`;
+  }
+  const blob = doc.output("blob");
+  return new File([blob], nombreArchivo, { type: "application/pdf" });
+}
+
+export async function compartirNativoConArchivo(
+  file: File,
+  texto: string,
+  titulo: string = "Informe Médico"
+): Promise<boolean> {
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.share &&
+    navigator.canShare &&
+    navigator.canShare({ files: [file] })
+  ) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: titulo,
+        text: texto,
+      });
+      return true;
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        return true; // Cancelado voluntariamente por el usuario en el diálogo
+      }
+      console.warn("Error en Web Share API:", err);
+    }
+  }
+  return false;
+}
