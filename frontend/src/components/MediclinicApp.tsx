@@ -2275,6 +2275,7 @@ function HistoriasClinicas({
   const [busquedaPaciente, setBusquedaPaciente] = useState("");
   const [historial, setHistorial] = useState<ConsultaMedica[] | null>(null);
   const [consultaDetalle, setConsultaDetalle] = useState<ConsultaMedica | null>(null);
+  const [consultaSeleccionadaFicha, setConsultaSeleccionadaFicha] = useState<ConsultaMedica | null>(null);
 
   const [form, setForm] = useState({
     motivoConsulta: "",
@@ -2297,6 +2298,7 @@ function HistoriasClinicas({
   };
 
   useEffect(() => {
+    setConsultaSeleccionadaFicha(null);
     if (pacienteInicialId) {
       setPacienteId(pacienteInicialId);
     } else if (!pacienteId && pacientes && pacientes.length > 0) {
@@ -2822,8 +2824,18 @@ function HistoriasClinicas({
                   ) : (
                     historial.map((c) => {
                       const fechaC = c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy();
+                      const isSelected = consultaSeleccionadaFicha?.id === c.id;
                       return (
-                        <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors">
+                        <tr
+                          key={c.id}
+                          onClick={() => setConsultaSeleccionadaFicha(isSelected ? null : c)}
+                          className={`transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-teal-50/90 dark:bg-teal-950/50 border-l-4 border-teal-500 font-medium shadow-xs"
+                              : "hover:bg-slate-50/90 dark:hover:bg-white/5"
+                          }`}
+                          title="Haz clic para ver la ficha detallada de esta consulta"
+                        >
                           <td className="py-3 px-3 font-mono font-bold text-teal-600 dark:text-teal-400 whitespace-nowrap">
                             {fechaC}
                           </td>
@@ -2844,7 +2856,7 @@ function HistoriasClinicas({
                             —
                           </td>
                           <td className="py-3 px-3">
-                            <div className="flex items-center justify-center gap-1">
+                            <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                               <button
                                 type="button"
                                 title="Descargar Informe PDF"
@@ -2898,24 +2910,193 @@ function HistoriasClinicas({
             </div>
           </div>
 
-          {/* ── COLUMNA DERECHA: REGISTRAR NUEVA CONSULTA (RESERVADA EXCLUSIVAMENTE AL MÉDICO) ── */}
-          {rol !== "SECRETARIA" && (
-            <form
-              onSubmit={handleGuardarSolo}
-              className="lg:col-span-12 xl:col-span-7 apple-glass rounded-3xl p-6 border border-slate-200/80 dark:border-white/10 shadow-sm bg-white/90 dark:bg-[#071a2e]/80 space-y-4"
-            >
-              {/* Header del Formulario */}
-              <div className="border-b border-slate-200/80 dark:border-white/10 pb-3">
-                <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white flex items-center gap-2">
-                  <span className="text-teal-600 dark:text-teal-400 font-black text-xl leading-none">+</span>
-                  <span>Registrar Nueva Consulta</span>
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5">
-                  Ingresa los datos físicos, motivo, diagnóstico y récipe del paciente.
-                </p>
-              </div>
+          {/* ── COLUMNA DERECHA: FICHA DE CONSULTA SELECCIONADA + REGISTRAR NUEVA CONSULTA ── */}
+          <div className="lg:col-span-12 xl:col-span-7 space-y-6">
 
-            {/* Mensajes de Estado */}
+            {/* 1. FICHA DE RESUMEN DE CONSULTA PREVIA SELECCIONADA */}
+            {consultaSeleccionadaFicha && (
+              <div className="apple-glass rounded-3xl p-6 border-2 border-teal-500/50 dark:border-teal-500/40 shadow-xl bg-white/95 dark:bg-[#071a2e]/95 space-y-4 animate-fade-in">
+                {/* Header de la Ficha */}
+                <div className="flex items-start justify-between pb-3 border-b border-slate-200/80 dark:border-white/10">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-lg bg-teal-600 text-white font-mono font-bold text-xs shadow-xs">
+                        {consultaSeleccionadaFicha.fechaConsulta ? consultaSeleccionadaFicha.fechaConsulta.slice(0, 10) : hoy()}
+                      </span>
+                      <span className="text-xs font-bold text-teal-800 dark:text-teal-300">
+                        Ficha Resumen de Consulta
+                      </span>
+                    </div>
+                    <h4 className="font-['Outfit'] font-extrabold text-base text-slate-900 dark:text-white mt-1.5">
+                      {pacienteSeleccionado?.nombreCompleto}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-white/50">
+                      C.I: {pacienteSeleccionado?.identificacion} | Expediente: HC-2026-{String(pacienteSeleccionado?.id).padStart(4, "0")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConsultaSeleccionadaFicha(null)}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-500 hover:text-slate-900 dark:text-white/60 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    ✕ Ocultar Ficha
+                  </button>
+                </div>
+
+                {/* Contenido Clínico */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  {/* Motivo */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-black/30 border border-slate-200/70 dark:border-white/5 space-y-1">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-white/50 block">
+                      Motivo de Consulta
+                    </span>
+                    <p className="text-slate-900 dark:text-white font-semibold">
+                      {consultaSeleccionadaFicha.motivoConsulta || "Consulta Médica"}
+                    </p>
+                  </div>
+
+                  {/* Diagnóstico */}
+                  <div className="p-3.5 rounded-2xl bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/70 dark:border-teal-500/20 space-y-1">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-teal-800 dark:text-teal-400 block">
+                      Diagnóstico Clínico (Dx)
+                    </span>
+                    <p className="text-teal-950 dark:text-teal-100 font-bold">
+                      {consultaSeleccionadaFicha.descripcionDiagnostico || "Sin diagnóstico registrado"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Datos Físicos si existen */}
+                {(consultaSeleccionadaFicha.talla || consultaSeleccionadaFicha.peso || consultaSeleccionadaFicha.observacionFisica) && (
+                  <div className="p-3.5 rounded-2xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/70 dark:border-sky-500/20 flex flex-wrap gap-4 text-xs">
+                    {consultaSeleccionadaFicha.talla && (
+                      <div>
+                        <span className="text-[10px] font-bold text-sky-700 dark:text-sky-300 block">Talla:</span>
+                        <span className="font-semibold text-slate-800 dark:text-white">{consultaSeleccionadaFicha.talla} m</span>
+                      </div>
+                    )}
+                    {consultaSeleccionadaFicha.peso && (
+                      <div>
+                        <span className="text-[10px] font-bold text-sky-700 dark:text-sky-300 block">Peso:</span>
+                        <span className="font-semibold text-slate-800 dark:text-white">{consultaSeleccionadaFicha.peso} kg</span>
+                      </div>
+                    )}
+                    {consultaSeleccionadaFicha.observacionFisica && (
+                      <div className="flex-1 min-w-[200px]">
+                        <span className="text-[10px] font-bold text-sky-700 dark:text-sky-300 block">Observación Física:</span>
+                        <span className="font-semibold text-slate-800 dark:text-white">{consultaSeleccionadaFicha.observacionFisica}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Anotaciones y Evolución Médica si existen */}
+                {consultaSeleccionadaFicha.evolucionClinica && (
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-black/30 border border-slate-200/70 dark:border-white/5 space-y-1 text-xs">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-white/50 block">
+                      Anotaciones y Evolución Médica
+                    </span>
+                    <p className="text-slate-800 dark:text-white/90 whitespace-pre-wrap leading-relaxed">
+                      {consultaSeleccionadaFicha.evolucionClinica}
+                    </p>
+                  </div>
+                )}
+
+                {/* Prescripción Farmacológica / Récipe */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-black/30 border border-slate-200/70 dark:border-white/5 space-y-1 text-xs">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-600 dark:text-white/60 block">
+                    Prescripción Farmacológica / Récipe (Rx)
+                  </span>
+                  <pre className="p-3 rounded-xl bg-white dark:bg-black/40 font-mono text-[11px] text-slate-900 dark:text-white/90 whitespace-pre-wrap border border-slate-200/60 dark:border-white/5">
+                    {consultaSeleccionadaFicha.planTratamiento || "Sin récipe farmacológico registrado."}
+                  </pre>
+                </div>
+
+                {/* ── CAMPO EN ROJO: ANOTACIONES PRIVADAS Y RESERVADAS DEL MÉDICO / COMENTARIOS ── */}
+                {rol === "MEDICO" && (
+                  <div className="rounded-2xl p-4 border-2 border-rose-500/80 dark:border-rose-500/60 bg-rose-50/80 dark:bg-rose-950/30 space-y-1.5 shadow-xs">
+                    <div className="flex items-center gap-2 text-xs font-black text-rose-700 dark:text-rose-400 uppercase tracking-wide">
+                      <svg className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                      <span>ANOTACIONES PRIVADAS Y RESERVADAS DEL MÉDICO / COMENTARIOS</span>
+                    </div>
+                    <p className="text-[11px] text-rose-600/90 dark:text-rose-300/80 font-semibold">
+                      🔒 Confidencial: Este campo es estrictamente privado para lectura médica en esta consulta.
+                    </p>
+                    <div className="p-3 rounded-xl bg-white/90 dark:bg-black/50 border border-rose-300/80 dark:border-rose-500/40 text-xs text-rose-950 dark:text-rose-100 whitespace-pre-wrap leading-relaxed font-sans font-medium">
+                      {consultaSeleccionadaFicha.anotacionesPrivadas || "Sin comentarios o notas reservadas registradas para esta consulta."}
+                    </div>
+                  </div>
+                )}
+
+                {/* Botones de Acción de la Ficha */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/80 dark:border-white/10 flex-wrap">
+                  <div>
+                    {rol === "MEDICO" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const c = consultaSeleccionadaFicha;
+                          setConsultaSeleccionadaFicha(null);
+                          handleEliminarConsulta(c);
+                        }}
+                        className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-600 hover:text-white text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                      >
+                        <IconTrash size={14} />
+                        <span>Eliminar Consulta</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleDescargarPdfConsulta(consultaSeleccionadaFicha)}
+                      className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                    >
+                      <IconFileText size={14} />
+                      <span>Ver Informe / Imprimir</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleEnviarWhatsAppConsulta(consultaSeleccionadaFicha)}
+                      className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                    >
+                      <IconWhatsApp size={14} />
+                      <span>WhatsApp</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleEnviarCorreoConsulta(consultaSeleccionadaFicha)}
+                      className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                    >
+                      <IconMail size={14} />
+                      <span>Enviar por Correo</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. FORMULARIO REGISTRAR NUEVA CONSULTA (SIEMPRE DISPONIBLE ABAJO) */}
+            {rol !== "SECRETARIA" && (
+              <form
+                onSubmit={handleGuardarSolo}
+                className="apple-glass rounded-3xl p-6 border border-slate-200/80 dark:border-white/10 shadow-sm bg-white/90 dark:bg-[#071a2e]/80 space-y-4"
+              >
+                {/* Header del Formulario */}
+                <div className="border-b border-slate-200/80 dark:border-white/10 pb-3">
+                  <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                    <span className="text-teal-600 dark:text-teal-400 font-black text-xl leading-none">+</span>
+                    <span>Registrar Nueva Consulta</span>
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5">
+                    Ingresa los datos físicos, motivo, diagnóstico y récipe del paciente.
+                  </p>
+                </div>
+
+              {/* Mensajes de Estado */}
             {error && (
               <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-300 text-xs font-bold flex items-center gap-2">
                 <IconWarning size={16} className="text-red-500 flex-shrink-0" />
@@ -3095,7 +3276,8 @@ function HistoriasClinicas({
           </form>
         )}
         </div>
-      )}
+      </div>
+    )}
 
       {/* ── MODAL DE DETALLE DE CONSULTA PREVIA ── */}
       {consultaDetalle && (
