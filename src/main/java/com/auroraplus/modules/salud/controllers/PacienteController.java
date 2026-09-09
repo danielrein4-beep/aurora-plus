@@ -31,23 +31,26 @@ public class PacienteController {
     }
 
     @GetMapping
-    public List<Paciente> listar(@RequestParam(required = false) String buscar) {
+    public List<Paciente> listar(@RequestParam(required = false) Long tenantId, @RequestParam(required = false) String buscar) {
+        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
         asegurarFiltroTenant();
-        return pacienteService.buscar(buscar);
+        return pacienteService.buscar(tenantActivo, buscar);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Paciente> obtener(@PathVariable Long id) {
+    public ResponseEntity<Paciente> obtener(@PathVariable Long id, @RequestParam(required = false) Long tenantId) {
+        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
         asegurarFiltroTenant();
-        return pacienteService.obtenerPorId(id)
+        return pacienteService.obtenerPorId(tenantActivo, id)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/identificacion/{identificacion}")
-    public ResponseEntity<Paciente> buscarPorIdentificacion(@PathVariable String identificacion) {
+    public ResponseEntity<Paciente> buscarPorIdentificacion(@PathVariable String identificacion, @RequestParam(required = false) Long tenantId) {
+        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
         asegurarFiltroTenant();
-        return pacienteService.obtenerPorIdentificacion(identificacion)
+        return pacienteService.obtenerPorIdentificacion(tenantActivo, identificacion)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }
