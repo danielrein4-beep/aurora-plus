@@ -2203,6 +2203,7 @@ function HistoriasClinicas({
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
           : pacienteSeleccionado.edad || 34,
         telefono: pacienteSeleccionado.telefono || "No registrado",
+        email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: hoy(),
       },
@@ -2301,6 +2302,7 @@ function HistoriasClinicas({
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
           : pacienteSeleccionado.edad || 34,
         telefono: pacienteSeleccionado.telefono || "No registrado",
+        email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy(),
       },
@@ -2348,6 +2350,7 @@ function HistoriasClinicas({
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
           : pacienteSeleccionado.edad || 34,
         telefono: pacienteSeleccionado.telefono || "No registrado",
+        email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy(),
       },

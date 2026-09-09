@@ -43,6 +43,7 @@ export interface ConsultaReportData {
     identificacion: string;
     edad: number | string;
     telefono: string;
+    email?: string;
     origen: string;
     fechaConsulta: string;
   };
@@ -77,6 +78,7 @@ export interface CotizacionData {
   pacienteNombre: string;
   pacienteCedula: string;
   pacienteTelefono?: string;
+  pacienteEmail?: string;
   fecha: string;
   fechaPlanificada?: string;
   items: CotizacionItem[];

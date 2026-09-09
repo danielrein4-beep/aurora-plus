@@ -44,7 +44,15 @@ export default function DocumentoPreviewModal({
       ? (payload.data as CotizacionData).pacienteTelefono || ""
       : ""
   );
-  const [correoDestino, setCorreoDestino] = useState<string>("");
+  const [correoDestino, setCorreoDestino] = useState<string>(() => {
+    if (payload.tipo === "INFORME_MEDICO") {
+      return (payload.data as ConsultaReportData).paciente?.email || "";
+    }
+    if (payload.tipo === "COTIZACION") {
+      return (payload.data as CotizacionData).pacienteEmail || "";
+    }
+    return "";
+  });
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [modalCompartir, setModalCompartir] = useState<"whatsapp" | "email" | null>(null);
 
@@ -106,27 +114,36 @@ export default function DocumentoPreviewModal({
     setModalCompartir(null);
   };
 
-  // ── ENVIAR POR CORREO ──
-  const handleEnviarEmail = () => {
-    let subject = "";
-    let body = "";
-
+  // ── GENERAR ASUNTO Y CUERPO DE CORREO ──
+  const obtenerDatosEmail = (): { subject: string; body: string } => {
     if (payload.tipo === "INFORME_MEDICO") {
-      const res = generarTextoEmailConsulta(docData as ConsultaReportData);
-      subject = res.subject;
-      body = res.body;
+      return generarTextoEmailConsulta(docData as ConsultaReportData);
     } else if (payload.tipo === "CIERRE_CAJA") {
-      const res = generarTextoEmailCierre(docData as CierreCajaData);
-      subject = res.subject;
-      body = res.body;
+      return generarTextoEmailCierre(docData as CierreCajaData);
     } else {
-      const res = generarTextoEmailCotizacion(docData as CotizacionData);
-      subject = res.subject;
-      body = res.body;
+      return generarTextoEmailCotizacion(docData as CotizacionData);
     }
+  };
 
-    const mailto = `mailto:${correoDestino.trim()}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // ── ENVIAR VÍA GMAIL WEB ──
+  const handleEnviarGmail = () => {
+    handleDescargarPdf();
+    const { subject, body } = obtenerDatosEmail();
+    const to = correoDestino.trim();
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    mostrarToast("📄 PDF descargado y Gmail abierto con destinatario y texto.");
+    setModalCompartir(null);
+  };
+
+  // ── ENVIAR VÍA CLIENTE DE CORREO (OUTLOOK / NATIVO) ──
+  const handleEnviarEmail = () => {
+    handleDescargarPdf();
+    const { subject, body } = obtenerDatosEmail();
+    const to = correoDestino.trim();
+    const mailto = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailto;
+    mostrarToast("📄 PDF descargado y cliente de correo abierto.");
     setModalCompartir(null);
   };
 
@@ -681,12 +698,19 @@ export default function DocumentoPreviewModal({
       {modalCompartir === "email" && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-md w-full text-slate-100 space-y-4 shadow-2xl">
-            <h4 className="font-bold text-sm text-white flex items-center gap-2">
-              <svg className="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              <span>Enviar por Correo Electrónico</span>
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                <svg className="w-4 h-4 text-rose-400" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
+                </svg>
+                <span>Enviar por Correo Electrónico</span>
+              </h4>
+              {correoDestino && (
+                <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded-full font-medium">
+                  ✓ Detectado de la ficha
+                </span>
+              )}
+            </div>
             <div>
               <label className="block text-[11px] text-slate-400 uppercase font-bold mb-1">Correo Electrónico Destino</label>
               <input
@@ -694,21 +718,35 @@ export default function DocumentoPreviewModal({
                 value={correoDestino}
                 onChange={(e) => setCorreoDestino(e.target.value)}
                 placeholder="paciente@correo.com"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono focus:border-rose-500 focus:outline-none"
               />
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
               <button
+                type="button"
                 onClick={() => setModalCompartir(null)}
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
               >
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={handleEnviarEmail}
-                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white cursor-pointer transition-colors shadow-md"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors"
+                title="Abrir a través de Outlook o app de correo nativa"
               >
-                Abrir Cliente de Correo
+                Outlook / App
+              </button>
+              <button
+                type="button"
+                onClick={handleEnviarGmail}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white cursor-pointer transition-colors shadow-md flex items-center gap-1.5"
+                title="Abrir redacción en Gmail Web con destinatario y texto listos"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
+                </svg>
+                <span>Abrir en Gmail</span>
               </button>
             </div>
           </div>
