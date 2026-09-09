@@ -99,8 +99,10 @@ export default function DocumentoPreviewModal({
 
   // ── ENVIAR POR WHATSAPP ──
   const handleEnviarWhatsApp = () => {
+    handleDescargarPdf();
     const texto = obtenerTextoResumen();
     abrirWhatsAppDirecto(telefonoWhatsApp, texto);
+    mostrarToast("📄 PDF descargado. Adjúntalo con el clip (📎) en WhatsApp.");
     setModalCompartir(null);
   };
 
@@ -644,8 +646,10 @@ export default function DocumentoPreviewModal({
                 <button
                   type="button"
                   onClick={() => {
+                    handleDescargarPdf();
                     const texto = obtenerTextoResumen();
                     abrirWhatsAppAppDirecto(telefonoWhatsApp, texto);
+                    mostrarToast("📄 PDF descargado. Adjúntalo con el clip (📎) en WhatsApp.");
                     setModalCompartir(null);
                   }}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/50 cursor-pointer transition-colors"
@@ -656,8 +660,10 @@ export default function DocumentoPreviewModal({
                 <button
                   type="button"
                   onClick={() => {
+                    handleDescargarPdf();
                     const texto = obtenerTextoResumen();
                     abrirWhatsAppWebDirecto(telefonoWhatsApp, texto);
+                    mostrarToast("📄 PDF descargado. Adjúntalo con el clip (📎) en WhatsApp.");
                     setModalCompartir(null);
                   }}
                   className="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition-colors shadow-md flex items-center gap-1.5"
