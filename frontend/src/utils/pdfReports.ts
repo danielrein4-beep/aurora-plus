@@ -888,7 +888,6 @@ export async function compartirNativoConArchivo(
         title: titulo,
         text: texto,
       });
-      return true;
     } catch (err: any) {
       if (err.name === "AbortError") {
         return true; // Cancelado voluntariamente por el usuario en el diálogo
@@ -897,4 +896,27 @@ export async function compartirNativoConArchivo(
     }
   }
   return false;
+}
+
+export function obtenerBase64PdfDocumento(
+  tipo: "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION",
+  data: any
+): { base64: string; nombreArchivo: string } {
+  let doc: jsPDF;
+  let nombreArchivo = "Documento.pdf";
+  if (tipo === "INFORME_MEDICO") {
+    doc = construirDocInformeConsulta(data as ConsultaReportData);
+    const nombrePaciente = (data as ConsultaReportData).paciente?.nombreCompleto?.replace(/[^a-zA-Z0-9_-]/g, "_") || "Paciente";
+    const expediente = (data as ConsultaReportData).paciente?.expediente || "HC";
+    nombreArchivo = `Informe_${expediente}_${nombrePaciente}.pdf`;
+  } else if (tipo === "CIERRE_CAJA") {
+    doc = construirDocCierreCaja(data as CierreCajaData);
+    nombreArchivo = `Cierre_Caja_${(data as CierreCajaData).fecha || "Hoy"}.pdf`;
+  } else {
+    doc = construirDocCotizacion(data as CotizacionData);
+    const nombrePaciente = (data as CotizacionData).pacienteNombre?.replace(/[^a-zA-Z0-9_-]/g, "_") || "Paciente";
+    nombreArchivo = `Presupuesto_${nombrePaciente}.pdf`;
+  }
+  const dataUri = doc.output("datauristring");
+  return { base64: dataUri, nombreArchivo };
 }

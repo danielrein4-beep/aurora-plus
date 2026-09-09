@@ -1282,3 +1282,16 @@ export function metricasCliente(tenantId: number, id: number): Promise<MetricasC
 export function ticketsCliente(tenantId: number, id: number): Promise<Comanda[]> {
   return request(`/api/crm/clientes/${id}/tickets?tenantId=${tenantId}`);
 }
+
+export function enviarEmailDocumento(datos: {
+  destinatario: string;
+  asunto: string;
+  cuerpo: string;
+  pdfBase64?: string;
+  nombreArchivo?: string;
+}): Promise<{ success: boolean; mensaje: string }> {
+  return request(`/api/salud/documentos/enviar-email`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
