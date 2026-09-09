@@ -48,10 +48,16 @@ const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => React.Re
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
-const MODO_CLASICO_KEY = "aurora_mediclinic_modo_clasico";
-const FECHAS_BLOQUEADAS_KEY = "aurora_mediclinic_fechas_bloqueadas";
-const HISTORIAL_CIERRES_KEY = "aurora_mediclinic_historial_cierres";
-const CONFIG_PERFIL_KEY = "aurora_mediclinic_config_perfil";
+const MODO_CLASICO_KEY = "aurora_mediclinic_modo_clasico"; // preferencia visual, no datos de negocio — se deja global a propósito
+
+// Todo lo demás guardado en localStorage SÍ es específico de un médico (perfil, cierres de caja,
+// cotizaciones, turnos de sala de espera...) — la clave DEBE llevar el tenantId, si no, cuando dos
+// médicos distintos usan el mismo navegador (una laptop compartida, una demo), el segundo hereda
+// los datos guardados del primero (hallazgo real: "inicié sesión como danielrein420 y me abrió el
+// perfil del Doctor Mario").
+const claveFechasBloqueadas = (tenantId: number) => `aurora_mediclinic_fechas_bloqueadas_${tenantId}`;
+const claveHistorialCierres = (tenantId: number) => `aurora_mediclinic_historial_cierres_${tenantId}`;
+const claveConfigPerfil = (tenantId: number) => `aurora_mediclinic_config_perfil_${tenantId}`;
 
 function EstiloClasico() {
   return (
@@ -401,39 +407,32 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [modalClaveDoctor, setModalClaveDoctor] = useState(false);
   const [accionPendienteDoctor, setAccionPendienteDoctor] = useState<(() => void) | null>(null);
 
-  // Configuración de perfil y tasas persistente
+  // Configuración de perfil y tasas persistente — SIEMPRE bajo una clave con el tenantId (ver nota
+  // junto a claveConfigPerfil): sin esto, el perfil guardado de un médico se le mostraba a
+  // cualquier otro que iniciara sesión después en el mismo navegador.
+  const configPerfilPorDefecto = () => ({
+    doctorNombre: user?.nombre || "Médico Titular",
+    secretariaNombre: "Recepción / Asistente",
+    especialidad: "Medicina General / Especialista",
+    matriculaMPPS: "",
+    colegioMedicos: "",
+    clinicaNombre: user?.empresa || "Mi Consultorio Médico",
+    tasaBCV: 56.40,
+    tasaCOP: 4200,
+    claveDoctor: "1234",
+  });
+
   const [configPerfil, setConfigPerfil] = useState(() => {
     try {
-      const raw = localStorage.getItem(CONFIG_PERFIL_KEY);
-      return raw ? JSON.parse(raw) : {
-        doctorNombre: user?.nombre || "Dr. Mario Roa",
-        secretariaNombre: "Recepción / Asistente",
-        especialidad: "Medicina General / Especialista",
-        matriculaMPPS: "109842",
-        colegioMedicos: "5421",
-        clinicaNombre: user?.empresa || "Clínica & Consultorios Médicos",
-        tasaBCV: 56.40,
-        tasaCOP: 4200,
-        claveDoctor: "1234",
-      };
-    } catch {
-      return {
-        doctorNombre: user?.nombre || "Dr. Mario Roa",
-        secretariaNombre: "Recepción / Asistente",
-        especialidad: "Medicina General / Especialista",
-        matriculaMPPS: "109842",
-        colegioMedicos: "5421",
-        clinicaNombre: user?.empresa || "Clínica & Consultorios Médicos",
-        tasaBCV: 56.40,
-        tasaCOP: 4200,
-        claveDoctor: "1234",
-      };
-    }
+      const raw = localStorage.getItem(claveConfigPerfil(tenantId));
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return configPerfilPorDefecto();
   });
 
   const guardarConfigPerfil = (nuevaConfig: any) => {
     setConfigPerfil(nuevaConfig);
-    try { localStorage.setItem(CONFIG_PERFIL_KEY, JSON.stringify(nuevaConfig)); } catch {}
+    try { localStorage.setItem(claveConfigPerfil(tenantId), JSON.stringify(nuevaConfig)); } catch {}
   };
 
   const seleccionarDoctor = () => {
@@ -519,16 +518,18 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [procedimientos, setProcedimientos] = useState<ProcedimientoMedico[] | null>(null);
   const [ingresosHoy, setIngresosHoy] = useState<number | null>(null);
 
+  const claveCobrosLocales = () => `aurora_mediclinic_cobros_locales_${tenantId}_${hoy()}`;
+
   const [cobrosLocales, setCobrosLocales] = useState<CobroItem[]>(() => {
     try {
-      const raw = localStorage.getItem(`cobros_locales_${hoy()}`);
+      const raw = localStorage.getItem(claveCobrosLocales());
       return raw ? JSON.parse(raw) : [];
     } catch { return []; }
   });
 
   const [historialCierres, setHistorialCierres] = useState<CierreCajaData[]>(() => {
     try {
-      const raw = localStorage.getItem(HISTORIAL_CIERRES_KEY);
+      const raw = localStorage.getItem(claveHistorialCierres(tenantId));
       return raw ? JSON.parse(raw) : [];
     } catch { return []; }
   });
@@ -560,12 +561,13 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   };
 
   useEffect(() => {
-    try { localStorage.setItem(`cobros_locales_${hoy()}`, JSON.stringify(cobrosLocales)); } catch {}
-  }, [cobrosLocales]);
+    try { localStorage.setItem(claveCobrosLocales(), JSON.stringify(cobrosLocales)); } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cobrosLocales, tenantId]);
 
   useEffect(() => {
-    try { localStorage.setItem(HISTORIAL_CIERRES_KEY, JSON.stringify(historialCierres)); } catch {}
-  }, [historialCierres]);
+    try { localStorage.setItem(claveHistorialCierres(tenantId), JSON.stringify(historialCierres)); } catch {}
+  }, [historialCierres, tenantId]);
 
   const agregarCobroLocal = (item: CobroItem) => {
     setCobrosLocales((prev) => [item, ...prev]);
@@ -574,7 +576,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const eliminarCobroLocal = (index: number) => {
     setCobrosLocales((prev) => {
       const nuevas = prev.filter((_, i) => i !== index);
-      try { localStorage.setItem(`cobros_locales_${hoy()}`, JSON.stringify(nuevas)); } catch {}
+      try { localStorage.setItem(claveCobrosLocales(), JSON.stringify(nuevas)); } catch {}
       return nuevas;
     });
     setToastTasa("✓ Cobro eliminado de la auditoría.");
@@ -583,7 +585,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   const limpiarCobrosLocales = () => {
     setCobrosLocales([]);
-    try { localStorage.removeItem(`cobros_locales_${hoy()}`); } catch {}
+    try { localStorage.removeItem(claveCobrosLocales()); } catch {}
     setToastTasa("✓ Caja de hoy reiniciada correctamente.");
     setTimeout(() => setToastTasa(null), 3000);
   };
@@ -595,7 +597,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const eliminarCierreAuditado = (index: number) => {
     setHistorialCierres((prev) => {
       const nuevas = prev.filter((_, i) => i !== index);
-      try { localStorage.setItem(HISTORIAL_CIERRES_KEY, JSON.stringify(nuevas)); } catch {}
+      try { localStorage.setItem(claveHistorialCierres(tenantId), JSON.stringify(nuevas)); } catch {}
       return nuevas;
     });
     setToastTasa("✓ Cierre auditado eliminado del historial.");
@@ -604,7 +606,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   const limpiarHistorialCierres = () => {
     setHistorialCierres([]);
-    try { localStorage.removeItem(HISTORIAL_CIERRES_KEY); } catch {}
+    try { localStorage.removeItem(claveHistorialCierres(tenantId)); } catch {}
     setToastTasa("✓ Historial de auditorías vaciado.");
     setTimeout(() => setToastTasa(null), 3000);
   };
@@ -3511,7 +3513,7 @@ export interface CotizacionGuardada {
   fechaPlanificada?: string;
 }
 
-const COTIZACIONES_STORAGE_KEY = "aurora_mediclinic_cotizaciones";
+const claveCotizaciones = (tenantId: number) => `aurora_mediclinic_cotizaciones_${tenantId}`;
 
 const PROCEDIMIENTOS_SUGERIDOS = [
   { nombre: "Cirugía Menor Ambulatoria", precio: 250, desc: "Intervención ambulatoria con anestesia local y curación" },
@@ -3540,46 +3542,29 @@ function Procedimientos({
   pacienteInicialId?: number | null;
   onVerDocumento?: (payload: DocumentoVisorPayload) => void;
 }) {
-  // Lista de Cotizaciones Guardadas
+  // Lista de Cotizaciones Guardadas — scopeadas por tenant (ver claveCotizaciones); sin datos de
+  // demostración por defecto, una clínica nueva empieza con la lista real vacía, no con una
+  // paciente inventada que parecería un registro real.
   const [cotizaciones, setCotizaciones] = useState<CotizacionGuardada[]>(() => {
     try {
-      const guardado = localStorage.getItem(COTIZACIONES_STORAGE_KEY);
+      const guardado = localStorage.getItem(claveCotizaciones(tenantId));
       if (guardado) {
         return JSON.parse(guardado);
       }
     } catch {
       // Ignorar error de parseo
     }
-    // Datos de demostración iniciales
-    return [
-      {
-        id: "cot-1",
-        pacienteId: 1,
-        pacienteNombre: "Valentina Duque",
-        pacienteCedula: "V-28.450.123",
-        pacienteTelefono: "+584121234567",
-        procedimientoNombre: "Cirugía Menor Ambulatoria",
-        descripcion: "Resección de quiste sebáceo en región dorsal con anestesia local",
-        costoUSD: 250,
-        costoVES: 250 * (config?.tasaBCV || 950),
-        costoCOP: 250 * (config?.tasaCOP || 4000),
-        tasaBCV: config?.tasaBCV || 950,
-        tasaCOP: config?.tasaCOP || 4000,
-        estado: "COTIZADA",
-        fecha: "2026-09-06",
-        fechaPlanificada: "2026-09-12",
-      },
-    ];
+    return [];
   });
 
   // Guardar en localStorage cuando cambie
   useEffect(() => {
     try {
-      localStorage.setItem(COTIZACIONES_STORAGE_KEY, JSON.stringify(cotizaciones));
+      localStorage.setItem(claveCotizaciones(tenantId), JSON.stringify(cotizaciones));
     } catch {
       // ignore
     }
-  }, [cotizaciones]);
+  }, [cotizaciones, tenantId]);
 
   // Formulario de Nueva Cotización / Procedimiento
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
@@ -4457,7 +4442,7 @@ export interface TurnoSalaEspera {
   referenciaPago?: string;
 }
 
-const SALA_ESPERA_TURNOS_KEY = "aurora_mediclinic_sala_espera_turnos_v2";
+const claveSalaEsperaTurnos = (tenantId: number) => `aurora_mediclinic_sala_espera_turnos_v2_${tenantId}`;
 
 const MOTIVOS_CONSULTA_SUGERIDOS = [
   "Consulta Médica General",
@@ -4497,7 +4482,7 @@ function SalaEspera({
   // Lista de Turnos del Día
   const [turnos, setTurnos] = useState<TurnoSalaEspera[]>(() => {
     try {
-      const guardado = localStorage.getItem(SALA_ESPERA_TURNOS_KEY);
+      const guardado = localStorage.getItem(claveSalaEsperaTurnos(tenantId));
       if (guardado) {
         const parsed = JSON.parse(guardado);
         if (Array.isArray(parsed)) return parsed;
@@ -4509,9 +4494,9 @@ function SalaEspera({
   // Guardar turnos en localStorage cuando cambie
   useEffect(() => {
     try {
-      localStorage.setItem(SALA_ESPERA_TURNOS_KEY, JSON.stringify(turnos));
+      localStorage.setItem(claveSalaEsperaTurnos(tenantId), JSON.stringify(turnos));
     } catch {}
-  }, [turnos]);
+  }, [turnos, tenantId]);
 
   // Modales
   const [modalAdmitir, setModalAdmitir] = useState(false);
@@ -5634,8 +5619,6 @@ function mapCitaMedicaAAgendaItem(c: CitaMedica): CitaAgendaItem {
   };
 }
 
-const CITAS_STORE_KEY = "aurora_mediclinic_citas_store_v2";
-
 const HORAS_DISPONIBLES_AGENDA = [
   "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM",
   "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
@@ -5679,7 +5662,7 @@ function AgendaMedica({
   // del backend queda pendiente para una siguiente pasada.
   const [fechasBloqueadas, setFechasBloqueadas] = useState<string[]>(() => {
     try {
-      const raw = localStorage.getItem(FECHAS_BLOQUEADAS_KEY);
+      const raw = localStorage.getItem(claveFechasBloqueadas(tenantId));
       return raw ? JSON.parse(raw) : [];
     } catch { return []; }
   });
@@ -5758,7 +5741,7 @@ function AgendaMedica({
     const nuevas = yaBloqueada ? fechasBloqueadas.filter((x) => x !== f) : [...fechasBloqueadas, f];
     setFechasBloqueadas(nuevas);
     try {
-      localStorage.setItem(FECHAS_BLOQUEADAS_KEY, JSON.stringify(nuevas));
+      localStorage.setItem(claveFechasBloqueadas(tenantId), JSON.stringify(nuevas));
       window.dispatchEvent(new Event("aurora_agenda_updated"));
     } catch {}
     dispararToast(yaBloqueada ? `✓ Fecha ${f} desbloqueada para consultas.` : `🔒 Fecha ${f} bloqueada (No laborable).`);
@@ -5838,8 +5821,8 @@ function AgendaMedica({
       } catch {}
     }
 
-    // 3. Buscar en Citas previas o Sala de Espera
-    const clavesOtras = [CITAS_STORE_KEY, SALA_ESPERA_TURNOS_KEY, "aurora_mediclinic_presupuestos"];
+    // 3. Buscar en Sala de Espera de este mismo médico (las citas ya viven en el backend, no aquí)
+    const clavesOtras = [claveSalaEsperaTurnos(tenantId)];
     for (const key of clavesOtras) {
       try {
         const raw = localStorage.getItem(key);
@@ -6007,7 +5990,7 @@ function AgendaMedica({
   // Pasar paciente directamente a sala de espera
   const handlePasarASalaEspera = (cita: CitaAgendaItem) => {
     try {
-      const turnosRaw = localStorage.getItem(SALA_ESPERA_TURNOS_KEY);
+      const turnosRaw = localStorage.getItem(claveSalaEsperaTurnos(tenantId));
       const turnosList: TurnoSalaEspera[] = turnosRaw ? JSON.parse(turnosRaw) : [];
       const maxNum = turnosList.reduce((max, t) => Math.max(max, t.turnoNumero || 0), 0);
       const nuevoNumero = maxNum + 1;
@@ -6029,7 +6012,7 @@ function AgendaMedica({
         estadoPago: "PENDIENTE",
       };
 
-      localStorage.setItem(SALA_ESPERA_TURNOS_KEY, JSON.stringify([...turnosList, nuevoTurno]));
+      localStorage.setItem(claveSalaEsperaTurnos(tenantId), JSON.stringify([...turnosList, nuevoTurno]));
       dispararToast(`¡${cita.pacienteNombre} ingresado a Sala de Espera con Turno ${codigoTurno}!`);
       onCambio();
     } catch {
