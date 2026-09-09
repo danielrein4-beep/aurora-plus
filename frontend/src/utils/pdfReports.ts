@@ -47,7 +47,7 @@ export interface ConsultaReportData {
     origen: string;
     fechaConsulta: string;
   };
-  signosVitales: {
+  signosVitales?: {
     ta: string; // Tensión arterial (ej. 120/80)
     fc: string; // Frecuencia cardíaca (ej. 75 lpm)
     fr: string; // Frecuencia respiratoria (ej. 18 rpm)
@@ -332,31 +332,8 @@ export function construirDocInformeConsulta(data: ConsultaReportData): jsPDF {
   doc.setFont("helvetica", "normal");
   doc.text(data.paciente.origen || "Local", 158, y + 13);
 
-  // ── SIGNOS VITALES ──
-  y += 24;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(13, 148, 136);
-  doc.text("SIGNOS VITALES & SOMATOMETRÍA", 14, y);
-
-  y += 3;
-  doc.setFillColor(240, 253, 250);
-  doc.roundedRect(14, y, pageWidth - 28, 16, 2, 2, "F");
-
-  doc.setFontSize(8);
-  doc.setTextColor(30, 41, 59);
-  doc.text(`T/A: ${data.signosVitales?.ta || "—"}`, 18, y + 6);
-  doc.text(`FC: ${data.signosVitales?.fc || "—"}`, 55, y + 6);
-  doc.text(`FR: ${data.signosVitales?.fr || "—"}`, 90, y + 6);
-  doc.text(`Temp: ${data.signosVitales?.temp || "—"}`, 125, y + 6);
-  doc.text(`SatO2: ${data.signosVitales?.satO2 || "—"}`, 165, y + 6);
-
-  doc.text(`Peso: ${data.signosVitales?.peso || "—"}`, 18, y + 12);
-  doc.text(`Talla: ${data.signosVitales?.talla || "—"}`, 55, y + 12);
-  doc.text(`IMC: ${data.signosVitales?.imc || "—"}`, 90, y + 12);
-
   // ── MOTIVO DE CONSULTA & EVOLUCIÓN ──
-  y += 22;
+  y += 24;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);

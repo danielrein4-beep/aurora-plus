@@ -807,23 +807,6 @@ function DocumentoContenidoImpreso({
             </div>
           </div>
 
-          {/* Signos Vitales */}
-          {docData.signosVitales && (
-            <div className="bg-teal-50/40 border border-teal-100 rounded-lg px-3 py-2">
-              <span className="text-[9px] font-bold text-teal-800 uppercase block mb-1">
-                Signos Vitales & Somatometría
-              </span>
-              <div className="grid grid-cols-6 gap-2 text-[10px] text-slate-700">
-                <div><strong className="text-slate-500">T/A:</strong> {docData.signosVitales.ta || "—"}</div>
-                <div><strong className="text-slate-500">FC:</strong> {docData.signosVitales.fc || "—"}</div>
-                <div><strong className="text-slate-500">FR:</strong> {docData.signosVitales.fr || "—"}</div>
-                <div><strong className="text-slate-500">Temp:</strong> {docData.signosVitales.temp || "—"}</div>
-                <div><strong className="text-slate-500">SatO2:</strong> {docData.signosVitales.satO2 || "—"}</div>
-                <div><strong className="text-slate-500">Peso:</strong> {docData.signosVitales.peso || "—"}</div>
-              </div>
-            </div>
-          )}
-
           {/* Motivo de Consulta */}
           <div className="space-y-0.5">
             <h4 className="font-bold text-slate-800 uppercase text-[10px] border-b border-slate-200 pb-0.5">
