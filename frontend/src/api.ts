@@ -57,8 +57,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   const res = await fetch(path, { ...options, headers });
   if (res.status === 401) {
-    manejarSesionVencida();
-    throw new ApiError("Sesión vencida — redirigiendo al login");
+    if (!path.includes("/api/auth/")) {
+      manejarSesionVencida();
+    }
+    throw new ApiError("Usuario o contraseña incorrectos");
   }
   if (!res.ok) {
     let mensaje = `Error ${res.status}`;
@@ -685,6 +687,7 @@ export interface ItemComanda {
   cantidad: number;
   precioUnitario: number;
   fechaCreacion: string;
+  notas?: string;
 }
 
 export function listarMesas(): Promise<Mesa[]> {
@@ -727,7 +730,7 @@ export function abrirComanda(tenantId: number, datos: {
 }
 
 export function agregarItemComanda(tenantId: number, comandaId: number, datos: {
-  escandalloId?: number; articuloId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number;
+  escandalloId?: number; articuloId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number; notas?: string;
 }): Promise<ItemComanda> {
   const params = new URLSearchParams({ tenantId: String(tenantId), cantidad: String(datos.cantidad) });
   if (datos.escandalloId != null) params.set("escandalloId", String(datos.escandalloId));
@@ -735,6 +738,7 @@ export function agregarItemComanda(tenantId: number, comandaId: number, datos: {
   if (datos.nombrePlato) params.set("nombrePlato", datos.nombrePlato);
   if (datos.estacionCocina) params.set("estacionCocina", datos.estacionCocina);
   if (datos.precioUnitario != null) params.set("precioUnitario", String(datos.precioUnitario));
+  if (datos.notas) params.set("notas", datos.notas);
   return request(`/api/horeca/mesas/comandas/${comandaId}/items?${params}`, { method: "POST" });
 }
 
@@ -1281,4 +1285,95 @@ export function metricasCliente(tenantId: number, id: number): Promise<MetricasC
 
 export function ticketsCliente(tenantId: number, id: number): Promise<Comanda[]> {
   return request(`/api/crm/clientes/${id}/tickets?tenantId=${tenantId}`);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// RED DE ÓRDENES Y RESULTADOS DE LABORATORIO (MEDICLINIC LAB NETWORK)
+// ══════════════════════════════════════════════════════════════════════════
+export interface AdjuntoResultadoLab {
+  id?: number;
+  nombreArchivo: string;
+  tipoMime: string;
+  contenidoBase64: string;
+}
+
+export interface ResultadoLaboratorio {
+  id?: number;
+  nombreLaboratorio: string;
+  bioanalistaResponsable: string;
+  colegiaturaBioanalista?: string;
+  fechaCarga: string;
+  informeDetallado?: string;
+  conclusionDiagnostica?: string;
+  observacionesMuestra?: string;
+  valoresCriticos: boolean;
+  detalleValoresCriticos?: string;
+  ipCarga?: string;
+  adjuntos?: AdjuntoResultadoLab[];
+}
+
+export interface OrdenLaboratorio {
+  id: number;
+  tenantId: number;
+  codigoOrden: string;
+  tokenSeguro: string;
+  pacienteId: number;
+  pacienteNombre: string;
+  pacienteCedula?: string;
+  pacienteTelefono?: string;
+  medicoId?: number;
+  medicoNombre?: string;
+  consultaId?: number;
+  fechaEmision: string;
+  estado: "EMITIDA" | "SELLADA" | "CANCELADA";
+  examenesSolicitados: string;
+  indicacionesClinicas?: string;
+  diagnosticoPresuntivo?: string;
+  laboratorioSugerido?: string;
+  revisadoPorMedico: boolean;
+  fechaRevisionMedico?: string;
+  notasRevisionMedico?: string;
+  resultado?: ResultadoLaboratorio;
+}
+
+export function crearOrdenLaboratorio(tenantId: number, orden: Partial<OrdenLaboratorio>): Promise<OrdenLaboratorio> {
+  return request(`/api/salud/laboratorio/ordenes?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(orden),
+  });
+}
+
+export function listarOrdenesLaboratorio(tenantId: number): Promise<OrdenLaboratorio[]> {
+  return request(`/api/salud/laboratorio/ordenes?tenantId=${tenantId}`);
+}
+
+export function listarOrdenesLaboratorioPaciente(tenantId: number, pacienteId: number): Promise<OrdenLaboratorio[]> {
+  return request(`/api/salud/laboratorio/ordenes/paciente/${pacienteId}?tenantId=${tenantId}`);
+}
+
+export function listarInboxLaboratorio(tenantId: number): Promise<OrdenLaboratorio[]> {
+  return request(`/api/salud/laboratorio/ordenes/inbox?tenantId=${tenantId}`);
+}
+
+export function contadorInboxLaboratorio(tenantId: number): Promise<{ pendientes: number }> {
+  return request(`/api/salud/laboratorio/ordenes/inbox/contador?tenantId=${tenantId}`);
+}
+
+export function marcarRevisadoOrdenLaboratorio(tenantId: number, id: number, notas?: string): Promise<OrdenLaboratorio> {
+  return request(`/api/salud/laboratorio/ordenes/${id}/revisar?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ notas }),
+  });
+}
+
+// Endpoints públicos para el bioanalista sin sesión
+export function consultarOrdenPublicaLaboratorio(token: string): Promise<any> {
+  return request(`/api/public/laboratorio/${token}`);
+}
+
+export function subirResultadoPublicoLaboratorio(token: string, payload: any): Promise<any> {
+  return request(`/api/public/laboratorio/${token}/subir`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
