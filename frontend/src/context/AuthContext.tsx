@@ -151,6 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const login = async (email: string, password: string) => {
+    const usuarioAnterior = user;
     let sesion: SesionAurora;
     let empresa = email;
     let industry = "clinica";
@@ -192,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       guardarSesion(sesion);
     }
 
-    setUser({
+    const nuevoUsuario: User = {
       email: sesion.username,
       nombre: nombreUsuario,
       empresa,
@@ -206,7 +207,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       plan: "Estándar",
       planStatus: "trial",
       payments: [],
-    });
+    };
+    setUser(nuevoUsuario);
+
+    // Recarga real (no solo navegación de React Router) si YA había un usuario distinto activo en
+    // esta pestaña — sin esto, quien inicia sesión con otra cuenta sin cerrar sesión primero hereda
+    // en memoria el perfil/caja/etc. del médico anterior (ver logout(), mismo motivo).
+    if (typeof window !== "undefined" && usuarioAnterior && usuarioAnterior.tenantId !== nuevoUsuario.tenantId) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(nuevoUsuario)); } catch {}
+      window.location.href = "/dashboard";
+    }
   };
 
   // Registro de autoservicio real con fallback de desarrollo si el backend local no está corriendo
@@ -311,6 +321,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     borrarSesion();
     localStorage.removeItem(STORAGE_KEY);
+    // Recarga real de página (no solo navegación de React Router): los módulos como Mediclinic
+    // guardan caché por tenant en localStorage usando `useState(() => ...)`, que solo se lee al
+    // MONTAR el componente. Si el siguiente login ocurre en la misma pestaña sin recargar, ese
+    // estado queda pegado del usuario anterior — un médico veía el perfil/caja del médico que
+    // había usado el navegador antes que él. Forzar la recarga garantiza que todo se re-lea desde
+    // cero para la cuenta que entra después.
+    if (typeof window !== "undefined") {
+      window.location.href = "/auth";
+    }
   };
 
   const trialDaysLeft = (() => {
