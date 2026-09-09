@@ -631,6 +631,27 @@ export async function registrarConsulta(
   return nuevaConsulta;
 }
 
+export async function eliminarConsulta(
+  tenantId: number,
+  pacienteId: number,
+  consultaId: number
+): Promise<void> {
+  try {
+    await request(`/api/salud/consultas/${consultaId}?tenantId=${tenantId}`, {
+      method: "DELETE",
+    });
+  } catch {}
+
+  try {
+    const raw = localStorage.getItem(`aurora_mediclinic_consultas_${pacienteId}`);
+    if (raw) {
+      const list: ConsultaMedica[] = JSON.parse(raw);
+      const filtrada = list.filter((c) => c.id !== consultaId);
+      localStorage.setItem(`aurora_mediclinic_consultas_${pacienteId}`, JSON.stringify(filtrada));
+    }
+  } catch {}
+}
+
 // --- Horeca / Restaurantes ---
 
 export interface Mesa {

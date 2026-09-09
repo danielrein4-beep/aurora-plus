@@ -55,4 +55,9 @@ public class ConsultaMedicaService {
 
         return guardada;
     }
+
+    @Transactional
+    public void eliminarConsulta(Long id) {
+        consultaMedicaRepository.deleteById(id);
+    }
 }

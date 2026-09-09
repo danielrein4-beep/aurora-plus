@@ -102,4 +102,14 @@ public class ConsultaMedicaController {
 
         return ResponseEntity.ok(consultaMedicaService.registrarConsulta(tenantActivo, consulta));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarConsulta(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long tenantId) {
+        validarPermisoClinico();
+        asegurarFiltroTenant();
+        consultaMedicaService.eliminarConsulta(id);
+        return ResponseEntity.noContent().build();
+    }
 }

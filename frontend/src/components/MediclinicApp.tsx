@@ -10,7 +10,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   listarPacientes, crearPaciente, eliminarPaciente, listarCitasDelDia, agendarCita, listarCobrosDelDia,
   listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera,
-  listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta,
+  listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta, eliminarConsulta,
   type Paciente, type CitaMedica, type SalaEsperaEntrada, type ProcedimientoMedico, type ConsultaMedica,
 } from "../api";
 import {
@@ -2121,6 +2121,11 @@ function HistoriasClinicas({
   const [error, setError] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
 
+  const dispararToast = (msg: string) => {
+    setMensajeExito(msg);
+    setTimeout(() => setMensajeExito(null), 3500);
+  };
+
   useEffect(() => {
     if (pacienteInicialId) {
       setPacienteId(pacienteInicialId);
@@ -2380,8 +2385,36 @@ function HistoriasClinicas({
     }
   };
 
+  const handleEliminarConsulta = async (c: ConsultaMedica) => {
+    if (!pacienteSeleccionado) return;
+    const motivo = c.motivoConsulta || "Consulta";
+    const fecha = c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy();
+    if (!confirm(`¿Estás seguro de eliminar la consulta del ${fecha} ("${motivo}")? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+    try {
+      await eliminarConsulta(tenantId, Number(pacienteSeleccionado.id), Number(c.id));
+      setHistorial((prev) => (prev || []).filter((item) => item.id !== c.id));
+      if (consultaDetalle && consultaDetalle.id === c.id) {
+        setConsultaDetalle(null);
+      }
+      dispararToast("✓ Consulta eliminada del historial correctamente");
+    } catch (e) {
+      console.error(e);
+      dispararToast("Error al eliminar la consulta");
+    }
+  };
+
   return (
     <div className="space-y-5">
+      {/* ── MENSAJE TOAST / ÉXITO GLOBAL ── */}
+      {mensajeExito && (
+        <div className="apple-glass rounded-2xl p-3.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-2 animate-fade-in shadow-xs">
+          <IconCheck size={16} className="text-emerald-500 flex-shrink-0" />
+          <span>{mensajeExito}</span>
+        </div>
+      )}
+
       {/* ── ALERTA DE ROL SECRETARÍA SI APLICA ── */}
       {rol === "SECRETARIA" && (
         <div className="apple-glass rounded-2xl p-3.5 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center gap-2">
@@ -2601,6 +2634,16 @@ function HistoriasClinicas({
                               >
                                 <IconSearch size={13} />
                               </button>
+                              {rol === "MEDICO" && (
+                                <button
+                                  type="button"
+                                  title="Eliminar Consulta del Historial"
+                                  onClick={() => handleEliminarConsulta(c)}
+                                  className="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-600 hover:text-white text-rose-600 dark:text-rose-400 flex items-center justify-center transition-colors cursor-pointer"
+                                >
+                                  <IconTrash size={13} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2634,13 +2677,6 @@ function HistoriasClinicas({
               <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-300 text-xs font-bold flex items-center gap-2">
                 <IconWarning size={16} className="text-red-500 flex-shrink-0" />
                 <span>{error}</span>
-              </div>
-            )}
-
-            {mensajeExito && (
-              <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-700 dark:text-teal-300 text-xs font-bold flex items-center gap-2">
-                <IconCheck size={16} className="text-teal-500 flex-shrink-0" />
-                <span>{mensajeExito}</span>
               </div>
             )}
 
@@ -2838,38 +2874,55 @@ function HistoriasClinicas({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-white/10">
-              <button
-                type="button"
-                onClick={() => {
-                  const c = consultaDetalle;
-                  setConsultaDetalle(null);
-                  handleDescargarPdfConsulta(c);
-                }}
-                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
-              >
-                <IconFileText size={14} />
-                <span>Ver Informe / Imprimir</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const c = consultaDetalle;
-                  setConsultaDetalle(null);
-                  handleEnviarWhatsAppConsulta(c);
-                }}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
-              >
-                <IconBank size={14} />
-                <span>WhatsApp</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setConsultaDetalle(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer"
-              >
-                Cerrar
-              </button>
+            <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-200 dark:border-white/10 flex-wrap">
+              <div>
+                {rol === "MEDICO" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const c = consultaDetalle;
+                      handleEliminarConsulta(c);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-600 hover:text-white text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                  >
+                    <IconTrash size={14} />
+                    <span>Eliminar Consulta</span>
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = consultaDetalle;
+                    setConsultaDetalle(null);
+                    handleDescargarPdfConsulta(c);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                >
+                  <IconFileText size={14} />
+                  <span>Ver Informe / Imprimir</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = consultaDetalle;
+                    setConsultaDetalle(null);
+                    handleEnviarWhatsAppConsulta(c);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                >
+                  <IconBank size={14} />
+                  <span>WhatsApp</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConsultaDetalle(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
