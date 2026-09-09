@@ -2298,13 +2298,16 @@ function HistoriasClinicas({
   };
 
   useEffect(() => {
-    setConsultaSeleccionadaFicha(null);
     if (pacienteInicialId) {
       setPacienteId(pacienteInicialId);
     } else if (!pacienteId && pacientes && pacientes.length > 0) {
       setPacienteId(pacientes[0].id);
     }
   }, [pacienteInicialId, pacientes]);
+
+  useEffect(() => {
+    setConsultaSeleccionadaFicha(null);
+  }, [pacienteId]);
 
   const pacienteSeleccionado = useMemo(() => {
     if (!pacienteId && pacientes && pacientes.length > 0) return pacientes[0];
@@ -2828,13 +2831,13 @@ function HistoriasClinicas({
                       return (
                         <tr
                           key={c.id}
-                          onClick={() => setConsultaSeleccionadaFicha(isSelected ? null : c)}
+                          onClick={() => setConsultaSeleccionadaFicha(c)}
                           className={`transition-all cursor-pointer ${
                             isSelected
-                              ? "bg-teal-50/90 dark:bg-teal-950/50 border-l-4 border-teal-500 font-medium shadow-xs"
-                              : "hover:bg-slate-50/90 dark:hover:bg-white/5"
+                              ? "bg-teal-500/20 dark:bg-teal-950/70 border-l-4 border-teal-500 font-bold shadow-xs text-teal-950 dark:text-teal-100"
+                              : "hover:bg-slate-100/90 dark:hover:bg-white/10"
                           }`}
-                          title="Haz clic para ver la ficha detallada de esta consulta"
+                          title="Haz clic para ver la ficha continua de esta consulta"
                         >
                           <td className="py-3 px-3 font-mono font-bold text-teal-600 dark:text-teal-400 whitespace-nowrap">
                             {fechaC}
@@ -2883,9 +2886,13 @@ function HistoriasClinicas({
                               </button>
                               <button
                                 type="button"
-                                title="Ver detalles completos"
-                                onClick={() => setConsultaDetalle(c)}
-                                className="w-7 h-7 rounded-lg bg-slate-200/80 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-white flex items-center justify-center transition-colors cursor-pointer"
+                                title="Ver Ficha Continua de esta Consulta"
+                                onClick={() => setConsultaSeleccionadaFicha(c)}
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? "bg-teal-600 text-white"
+                                    : "bg-teal-500/15 hover:bg-teal-600 hover:text-white text-teal-700 dark:text-teal-300"
+                                }`}
                               >
                                 <IconSearch size={13} />
                               </button>
