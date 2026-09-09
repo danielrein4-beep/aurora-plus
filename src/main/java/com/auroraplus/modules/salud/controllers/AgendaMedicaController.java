@@ -90,6 +90,7 @@ public class AgendaMedicaController {
 
     @PatchMapping("/citas/{id}/estado")
     public ResponseEntity<CitaMedica> actualizarEstado(@PathVariable Long id, @RequestParam CitaMedica.EstadoCita estado) {
+        asegurarFiltroTenant();
         return ResponseEntity.ok(agendaMedicaService.actualizarEstado(id, estado));
     }
 
