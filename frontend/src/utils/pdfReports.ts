@@ -332,57 +332,37 @@ export function construirDocInformeConsulta(data: ConsultaReportData): jsPDF {
   doc.setFont("helvetica", "normal");
   doc.text(data.paciente.origen || "Local", 158, y + 13);
 
-  // ── MOTIVO DE CONSULTA & EVOLUCIÓN ──
-  y += 24;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
-  doc.text("MOTIVO DE CONSULTA:", 14, y);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(data.motivoConsulta || "Consulta médica general", 14, y + 5, { maxWidth: pageWidth - 28 });
-
-  y += 15;
-  if (data.evolucionClinica) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("EXAMEN FÍSICO / EVOLUCIÓN CLÍNICA:", 14, y);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(data.evolucionClinica, 14, y + 5, { maxWidth: pageWidth - 28 });
-    y += 18;
-  }
-
   // ── DIAGNÓSTICO CIE-10 ──
+  y += 26;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(13, 148, 136);
   doc.text("DIAGNÓSTICO (CIE-10):", 14, y);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(9.5);
   doc.setTextColor(15, 23, 42);
-  doc.text(data.diagnosticoCIE10 || "Sin diagnóstico especificado", 14, y + 5, { maxWidth: pageWidth - 28 });
+  doc.text(data.diagnosticoCIE10 || "Sin diagnóstico especificado", 14, y + 6, { maxWidth: pageWidth - 28 });
 
   // ── PLAN DE TRATAMIENTO & RECETA MÉDICA ──
-  y += 15;
+  y += 18;
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(14, y, pageWidth - 28, 48, 2, 2, "F");
+  doc.roundedRect(14, y, pageWidth - 28, 70, 2, 2, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(13, 148, 136);
-  doc.text("PLAN DE TRATAMIENTO & INDICACIONES / RECETA (Rx):", 18, y + 7);
+  doc.text("PLAN DE TRATAMIENTO & INDICACIONES / RECETA (Rx):", 18, y + 8);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
-  doc.text(data.planTratamiento || "Indicaciones médicas según evaluación.", 18, y + 14, { maxWidth: pageWidth - 36 });
+  doc.text(data.planTratamiento || "Indicaciones médicas según evaluación.", 18, y + 16, { maxWidth: pageWidth - 36 });
 
   if (data.proximaCita) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(225, 29, 72);
-    doc.text(`Próxima Cita / Control: ${data.proximaCita}`, 18, y + 42);
+    doc.text(`Próxima Cita / Control: ${data.proximaCita}`, 18, y + 62);
   }
 
   // ── SELLO Y FIRMA ──

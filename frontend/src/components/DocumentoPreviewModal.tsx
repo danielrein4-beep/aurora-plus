@@ -807,14 +807,6 @@ function DocumentoContenidoImpreso({
             </div>
           </div>
 
-          {/* Motivo de Consulta */}
-          <div className="space-y-0.5">
-            <h4 className="font-bold text-slate-800 uppercase text-[10px] border-b border-slate-200 pb-0.5">
-              Motivo de Consulta
-            </h4>
-            <p className="text-slate-700 text-xs leading-snug">{docData.motivoConsulta || "Evaluación Médica"}</p>
-          </div>
-
           {/* Diagnóstico */}
           <div className="space-y-0.5">
             <h4 className="font-bold text-teal-800 uppercase text-[10px] border-b border-slate-200 pb-0.5">
