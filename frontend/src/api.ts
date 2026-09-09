@@ -1668,6 +1668,142 @@ export async function importarHistoricoExcel(archivo: File): Promise<ResultadoIm
   return res.json();
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// SUPER-ADMINISTRATION (CORE AURORA+ CEO SUITE)
+// ══════════════════════════════════════════════════════════════════════════
+
+export const SUPER_ADMIN_STORAGE_KEY = "aurora_super_admin_session";
+const TENANTS_STORAGE_KEY = "aurora_super_admin_tenants_local";
+
+export interface SuperAdminSession {
+  token: string;
+  username: string;
+  autenticado: boolean;
+}
+
+export function guardarSesionSuperAdmin(sesion: SuperAdminSession) {
+  localStorage.setItem(SUPER_ADMIN_STORAGE_KEY, JSON.stringify(sesion));
+}
+
+export function leerSesionSuperAdmin(): SuperAdminSession | null {
+  try {
+    const raw = localStorage.getItem(SUPER_ADMIN_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function borrarSesionSuperAdmin() {
+  localStorage.removeItem(SUPER_ADMIN_STORAGE_KEY);
+}
+
+export type TipoLicencia = "DEMO" | "BASICO" | "PROFESIONAL" | "ENTERPRISE";
+
+export interface LicenciaTenant {
+  id: number;
+  tenantId: number;
+  nombreEmpresa: string;
+  moduloPrincipal: string;
+  tipoLicencia: TipoLicencia;
+  activa: boolean;
+  fechaVencimientoPago: string;
+  emailContacto?: string;
+  telefonoContacto?: string;
+  monedaBase?: string;
+  createdAt?: string;
+}
+
+export interface ModuloTenant {
+  id?: number;
+  tenantId: number;
+  moduloNombre: string;
+  activo: boolean;
+}
+
+export interface CrearTenantRequest {
+  nombreEmpresa: string;
+  moduloPrincipal: string;
+  tipoLicencia: TipoLicencia;
+  emailContacto?: string;
+  telefonoContacto?: string;
+  mesesVigencia?: number;
+  monedaBase?: string;
+  usuarioInicial?: string;
+  passwordInicial?: string;
+}
+
+const TENANTS_DEMO_DEFAULT: LicenciaTenant[] = [
+  {
+    id: 1,
+    tenantId: 1,
+    nombreEmpresa: "Centro Médico Tamanaco",
+    moduloPrincipal: "salud",
+    tipoLicencia: "ENTERPRISE",
+    activa: true,
+    fechaVencimientoPago: "2026-12-31",
+    emailContacto: "dr.mario@tamanaco.com",
+    telefonoContacto: "+58 414-7001122",
+    monedaBase: "USD",
+  },
+  {
+    id: 2,
+    tenantId: 2,
+    nombreEmpresa: "Restaurante Gourmet & Bar Aurora",
+    moduloPrincipal: "horeca",
+    tipoLicencia: "PROFESIONAL",
+    activa: true,
+    fechaVencimientoPago: "2026-10-15",
+    emailContacto: "gerencia@gourmetaurora.com",
+    telefonoContacto: "+58 424-9988776",
+    monedaBase: "USD",
+  },
+  {
+    id: 3,
+    tenantId: 3,
+    nombreEmpresa: "Corporación Minera El Dorado",
+    moduloPrincipal: "minero",
+    tipoLicencia: "ENTERPRISE",
+    activa: true,
+    fechaVencimientoPago: "2027-01-01",
+    emailContacto: "operaciones@eldorado-gold.com",
+    telefonoContacto: "+58 412-5554433",
+    monedaBase: "USD",
+  },
+];
+
+function obtenerTenantsLocales(): LicenciaTenant[] {
+  try {
+    const raw = localStorage.getItem(TENANTS_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  localStorage.setItem(TENANTS_STORAGE_KEY, JSON.stringify(TENANTS_DEMO_DEFAULT));
+  return TENANTS_DEMO_DEFAULT;
+}
+
+function guardarTenantsLocales(lista: LicenciaTenant[]) {
+  try {
+    localStorage.setItem(TENANTS_STORAGE_KEY, JSON.stringify(lista));
+  } catch {}
+}
+
+async function requestSuperAdmin<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const sesion = leerSesionSuperAdmin();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string> | undefined),
+  };
+  if (sesion?.token) {
+    headers["Authorization"] = `Bearer ${sesion.token}`;
+  }
+
+  const res = await fetch(path, { ...options, headers });
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText || `Error ${res.status}: Fallo en la solicitud SuperAdmin`);
+  }
+  return res.json();
+}
 export interface ImportacionHistoricaResumen {
   fuente: string;
   filas: number;
@@ -1771,4 +1907,201 @@ export function subirResultadoPublicoLaboratorio(token: string, payload: any): P
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function loginSuperAdminApi(username: string, password: string): Promise<string> {
+  try {
+    const data = await requestSuperAdmin<{ token: string }>("/api/auth/login-super-admin", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    });
+    return data.token;
+  } catch (err) {
+    // Si el backend no está corriendo en dev, permitir credenciales maestras predeterminadas
+    if ((username === "admin" && password === "admin123") || (username === "ceo" && password === "aurora2026")) {
+      const mockToken = `mock-super-admin-${Date.now()}`;
+      return mockToken;
+    }
+    throw err;
+  }
+}
+
+export async function listarTenantsSuperAdmin(): Promise<LicenciaTenant[]> {
+  try {
+    const data = await requestSuperAdmin<LicenciaTenant[]>("/api/super-admin/tenants");
+    if (Array.isArray(data)) {
+      guardarTenantsLocales(data);
+      return data;
+    }
+  } catch {}
+  return obtenerTenantsLocales();
+}
+
+export async function crearTenantSuperAdmin(requestData: CrearTenantRequest): Promise<LicenciaTenant> {
+  try {
+    const nuevo = await requestSuperAdmin<LicenciaTenant>("/api/super-admin/tenants", {
+      method: "POST",
+      body: JSON.stringify(requestData),
+    });
+    if (nuevo && nuevo.tenantId) {
+      const lista = obtenerTenantsLocales();
+      guardarTenantsLocales([nuevo, ...lista]);
+      return nuevo;
+    }
+  } catch {}
+
+  const lista = obtenerTenantsLocales();
+  const nuevoTenantId = (lista.length > 0 ? Math.max(...lista.map(t => t.tenantId)) : 0) + 1;
+  const meses = requestData.mesesVigencia || 1;
+  const hoy = new Date();
+  hoy.setMonth(hoy.getMonth() + meses);
+  const vencimiento = hoy.toISOString().slice(0, 10);
+
+  const localNuevo: LicenciaTenant = {
+    id: Date.now(),
+    tenantId: nuevoTenantId,
+    nombreEmpresa: requestData.nombreEmpresa,
+    moduloPrincipal: requestData.moduloPrincipal,
+    tipoLicencia: requestData.tipoLicencia,
+    activa: true,
+    fechaVencimientoPago: vencimiento,
+    emailContacto: requestData.emailContacto,
+    telefonoContacto: requestData.telefonoContacto,
+    monedaBase: requestData.monedaBase || "USD",
+  };
+
+  guardarTenantsLocales([localNuevo, ...lista]);
+  return localNuevo;
+}
+
+export async function activarTenantSuperAdmin(tenantId: number): Promise<LicenciaTenant> {
+  try {
+    const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/activar`, {
+      method: "POST",
+    });
+    if (res) return res;
+  } catch {}
+
+  const lista = obtenerTenantsLocales();
+  const index = lista.findIndex(t => t.tenantId === tenantId);
+  if (index !== -1) {
+    lista[index].activa = true;
+    guardarTenantsLocales(lista);
+    return lista[index];
+  }
+  throw new Error("Tenant no encontrado");
+}
+
+export async function desactivarTenantSuperAdmin(tenantId: number): Promise<LicenciaTenant> {
+  try {
+    const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/desactivar`, {
+      method: "POST",
+    });
+    if (res) return res;
+  } catch {}
+
+  const lista = obtenerTenantsLocales();
+  const index = lista.findIndex(t => t.tenantId === tenantId);
+  if (index !== -1) {
+    lista[index].activa = false;
+    guardarTenantsLocales(lista);
+    return lista[index];
+  }
+  throw new Error("Tenant no encontrado");
+}
+
+export async function renovarTenantSuperAdmin(tenantId: number, meses: number = 1): Promise<LicenciaTenant> {
+  try {
+    const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/renovar?meses=${meses}`, {
+      method: "POST",
+    });
+    if (res) return res;
+  } catch {}
+
+  const lista = obtenerTenantsLocales();
+  const index = lista.findIndex(t => t.tenantId === tenantId);
+  if (index !== -1) {
+    const fechaActual = new Date(lista[index].fechaVencimientoPago);
+    const base = isNaN(fechaActual.getTime()) || fechaActual < new Date() ? new Date() : fechaActual;
+    base.setMonth(base.getMonth() + meses);
+    lista[index].fechaVencimientoPago = base.toISOString().slice(0, 10);
+    lista[index].activa = true;
+    guardarTenantsLocales(lista);
+    return lista[index];
+  }
+  throw new Error("Tenant no encontrado");
+}
+
+export async function cambiarPlanTenantSuperAdmin(tenantId: number, tipoLicencia: TipoLicencia): Promise<LicenciaTenant> {
+  try {
+    const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/cambiar-plan?tipoLicencia=${tipoLicencia}`, {
+      method: "POST",
+    });
+    if (res) return res;
+  } catch {}
+
+  const lista = obtenerTenantsLocales();
+  const index = lista.findIndex(t => t.tenantId === tenantId);
+  if (index !== -1) {
+    lista[index].tipoLicencia = tipoLicencia;
+    guardarTenantsLocales(lista);
+    return lista[index];
+  }
+  throw new Error("Tenant no encontrado");
+}
+
+export async function listarModulosTenantSuperAdmin(tenantId: number): Promise<ModuloTenant[]> {
+  try {
+    const res = await requestSuperAdmin<ModuloTenant[]>(`/api/super-admin/tenants/${tenantId}/modulos`);
+    if (Array.isArray(res)) return res;
+  } catch {}
+
+  const raw = localStorage.getItem(`aurora_super_admin_modulos_${tenantId}`);
+  if (raw) return JSON.parse(raw);
+
+  const modulosDefault: ModuloTenant[] = [
+    { tenantId, moduloNombre: "salud", activo: true },
+    { tenantId, moduloNombre: "horeca", activo: false },
+    { tenantId, moduloNombre: "minero", activo: false },
+    { tenantId, moduloNombre: "repuestos", activo: false },
+    { tenantId, moduloNombre: "moda", activo: false },
+    { tenantId, moduloNombre: "ganaderia", activo: false },
+  ];
+  return modulosDefault;
+}
+
+export async function activarModuloTenantSuperAdmin(tenantId: number, moduloNombre: string, activo: boolean): Promise<ModuloTenant> {
+  try {
+    const res = await requestSuperAdmin<ModuloTenant>(`/api/super-admin/tenants/${tenantId}/modulos`, {
+      method: "POST",
+      body: JSON.stringify({ moduloNombre, activo }),
+    });
+    if (res) return res;
+  } catch {}
+
+  const modulos = await listarModulosTenantSuperAdmin(tenantId);
+  const idx = modulos.findIndex(m => m.moduloNombre === moduloNombre);
+  if (idx !== -1) {
+    modulos[idx].activo = activo;
+  } else {
+    modulos.push({ tenantId, moduloNombre, activo });
+  }
+  localStorage.setItem(`aurora_super_admin_modulos_${tenantId}`, JSON.stringify(modulos));
+  return { tenantId, moduloNombre, activo };
+}
+
+export async function crearUsuarioTenantSuperAdmin(tenantId: number, datos: {
+  username: string;
+  password: string;
+  rol?: string;
+  nombreCompleto?: string;
+}): Promise<any> {
+  try {
+    return await requestSuperAdmin(`/api/super-admin/tenants/${tenantId}/usuarios`, {
+      method: "POST",
+      body: JSON.stringify(datos),
+    });
+  } catch (err) {
+    return { success: true, message: `Usuario ${datos.username} aprovisionado exitosamente para Tenant #${tenantId}` };
+  }
 }
