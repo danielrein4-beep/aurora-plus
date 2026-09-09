@@ -33,6 +33,14 @@ public class PresentacionArticulo {
     @Column(name = "unidades_por_presentacion", nullable = false, precision = 18, scale = 4)
     private BigDecimal unidadesPorPresentacion;
 
+    // "Pricing por volumen" (Ferretería): precio propio de la presentación
+    // cerrada, normalmente más barato por unidad que comprarla suelta. Null =
+    // comportamiento de siempre (se calcula como precioVenta del artículo ×
+    // unidadesPorPresentacion); si viene seteado, el POS lo usa tal cual en
+    // vez de la cuenta unitaria.
+    @Column(name = "precio_venta", precision = 18, scale = 4)
+    private BigDecimal precioVenta;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -43,4 +51,13 @@ public class PresentacionArticulo {
     public void setNombre(String nombre) { this.nombre = nombre; }
     public BigDecimal getUnidadesPorPresentacion() { return unidadesPorPresentacion; }
     public void setUnidadesPorPresentacion(BigDecimal unidadesPorPresentacion) { this.unidadesPorPresentacion = unidadesPorPresentacion; }
+    public BigDecimal getPrecioVenta() { return precioVenta; }
+    public void setPrecioVenta(BigDecimal precioVenta) { this.precioVenta = precioVenta; }
+
+    /** Precio efectivo de venta de esta presentación — el propio si se cargó, o el calculado desde el artículo si no. */
+    @Transient
+    public BigDecimal getPrecioVentaEfectivo() {
+        if (precioVenta != null) return precioVenta;
+        return articulo.getPrecioVenta().multiply(unidadesPorPresentacion);
+    }
 }

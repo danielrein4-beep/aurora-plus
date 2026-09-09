@@ -52,6 +52,13 @@
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
+        <!-- AOP: reactiva el filtro de tenant de Hibernate automaticamente antes de
+             CUALQUIER acceso a un repositorio (ver TenantFilterAspect) - no depende
+             de que cada controller se acuerde de hacerlo a mano. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-hibernate6</artifactId>
@@ -86,6 +93,20 @@
             <artifactId>jjwt-jackson</artifactId>
             <version>0.12.6</version>
             <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Base en memoria solo para tests de integración (perfil "test") — el
+             proyecto sigue usando PostgreSQL en dev/producción, esto evita que
+             los tests dependan de tener Postgres corriendo localmente. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

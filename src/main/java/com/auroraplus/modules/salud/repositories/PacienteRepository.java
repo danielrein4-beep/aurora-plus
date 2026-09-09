@@ -16,8 +16,20 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
 
     List<Paciente> findByActivoTrue();
 
+    List<Paciente> findByTenantIdAndActivoTrue(Long tenantId);
+
+    Optional<Paciente> findByTenantIdAndId(Long tenantId, Long id);
+
+    Optional<Paciente> findByTenantIdAndIdentificacion(Long tenantId, String identificacion);
+
     @Query("SELECT p FROM Paciente p WHERE LOWER(p.nombres) LIKE LOWER(CONCAT('%', :query, '%')) " +
            "OR LOWER(p.apellidos) LIKE LOWER(CONCAT('%', :query, '%')) " +
            "OR LOWER(p.identificacion) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<Paciente> buscarPorFiltro(@Param("query") String query);
+
+    @Query("SELECT p FROM Paciente p WHERE p.tenantId = :tenantId AND p.activo = true AND (" +
+           "LOWER(p.nombres) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "OR LOWER(p.apellidos) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "OR LOWER(p.identificacion) LIKE LOWER(CONCAT('%', :query, '%')))")
+    List<Paciente> buscarPorFiltroYTenant(@Param("tenantId") Long tenantId, @Param("query") String query);
 }

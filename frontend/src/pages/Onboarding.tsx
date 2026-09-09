@@ -4,7 +4,7 @@ import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconClinic, IconVet, IconHardware, IconRestaurant, IconFarm, IconMining,
   IconEducation, IconRetail, IconConstruction, IconCustomize, IconWarning, IconClose, IconCheck, IconLock,
-  IconCard, IconBank,
+  IconCard, IconBank, IconPrescription, IconFactory,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 
@@ -47,9 +47,28 @@ const INDUSTRIES: IndustryItem[] = [
     id: "ferreteria",
     label: "Ferretería & Materiales",
     Icon: IconHardware,
-    desc: "Control de stock, POS mostrador, compras y créditos",
-    badge: "Próximamente (Fase 2)",
-    isReady: false,
+    desc: "POS mostrador, venta fraccionada (metros/kilos), precio por volumen, compras y créditos",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Aurora Retail",
+  },
+  {
+    id: "farmacia",
+    label: "Farmacia & Droguería",
+    Icon: IconPrescription,
+    desc: "POS mostrador con FEFO obligatorio (primero vence, primero sale) y sugerencia de genéricos por principio activo",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Aurora Retail",
+  },
+  {
+    id: "repuestos",
+    label: "Repuestos Automotrices",
+    Icon: IconFactory,
+    desc: "POS mostrador con catálogo de cruce: código OEM y compatibilidad por vehículo",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Aurora Retail",
   },
   {
     id: "restaurante",
@@ -119,33 +138,65 @@ const CLINIC_MODULES = [
 ];
 
 const RESTAURANT_MODULES = [
-  { id: "salon", label: "Salón & Mapa de Mesas", desc: "Abrir comandas por mesa, delivery propio o recoger en tienda", defaultOn: true },
-  { id: "cocina", label: "Cocina en Tiempo Real (KDS)", desc: "Tablero por estación: pendiente, preparando, listo", defaultOn: true },
+  // Salón/Mesas y Cocina (KDS) todavía no están disponibles en producción
+  // (ver PLAN_ACTUAL/premium en RestauranteApp.tsx — quedan en pausa
+  // mientras el negocio se enfoca en Ventas/Inventario/Administración) —
+  // ofrecerlos como si ya se pudieran activar acá sería prometer algo que
+  // el tenant nuevo no va a encontrar disponible al entrar.
+  { id: "salon", label: "Salón & Mapa de Mesas", desc: "Abrir comandas por mesa, delivery propio o recoger en tienda", defaultOn: true, disponible: false },
+  { id: "cocina", label: "Cocina en Tiempo Real (KDS)", desc: "Tablero por estación: pendiente, preparando, listo", defaultOn: true, disponible: false },
   { id: "recetas", label: "Recetas & Escandallo de Costos", desc: "Costeo por ingrediente y margen real por plato", defaultOn: true },
   { id: "fastbar", label: "Fast-Bar", desc: "Venta rápida de tragos por botella/mililitraje", defaultOn: true },
   { id: "compras", label: "Compras, Proveedores & Vencimientos", desc: "Registro de facturas de insumos con alertas de caducidad", defaultOn: true },
 ];
 
+// Ferretería/Farmacia/Repuestos comparten el mismo motor (Aurora Retail) y
+// por lo tanto el mismo set de módulos — lo que las distingue no es un
+// módulo opcional más, es comportamiento automático de la vertical (FEFO en
+// Farmacia, catálogo de cruce en Repuestos, fraccionado en Ferretería), no
+// algo que el dueño prenda/apague acá.
+const RETAIL_MODULES = [
+  { id: "pos", label: "Punto de Venta & Código de Barras", desc: "Venta de mostrador rápida, escaneo de productos y cobro multi-moneda", defaultOn: true },
+  { id: "inventario", label: "Inventario & Kárdex", desc: "Stock por artículo, lotes y alertas de reposición", defaultOn: true },
+  { id: "compras", label: "Compras & Proveedores", desc: "Registro de facturas de proveedor y control de pagos", defaultOn: true },
+  { id: "clientes", label: "Clientes & Créditos", desc: "Ficha de cliente y ventas fiadas (cuentas por cobrar)", defaultOn: true },
+  { id: "caja", label: "Caja & Moneda Base", desc: "Ingresos, gastos y tasas de cambio del negocio", defaultOn: true },
+];
+
 // Mapa de "clinica"/"restaurante"/etc. (id del onboarding) al moduloPrincipal
-// real que entiende el backend (ver TenantProvisioningService).
+// real que entiende el backend (ver TenantProvisioningService y
+// LicenciaService.VERTICALES_CONTROLADAS — farmacia/ferreteria/repuestos ya
+// están dadas de alta ahí con ese mismo nombre exacto).
 const INDUSTRIA_A_MODULO: Record<string, string> = {
   clinica: "salud",
   restaurante: "horeca",
+  ferreteria: "ferreteria",
+  farmacia: "farmacia",
+  repuestos: "repuestos",
 };
 
 const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
   clinica: CLINIC_MODULES,
   restaurante: RESTAURANT_MODULES,
+  ferreteria: RETAIL_MODULES,
+  farmacia: RETAIL_MODULES,
+  repuestos: RETAIL_MODULES,
 };
 
 const NOMBRE_POR_DEFECTO: Record<string, string> = {
   clinica: "Clínica & Consultorios Médicos",
   restaurante: "Mi Restaurante",
+  ferreteria: "Mi Ferretería",
+  farmacia: "Mi Farmacia",
+  repuestos: "Mi Casa de Repuestos",
 };
 
 const VERTICAL_LABEL: Record<string, string> = {
   clinica: "Mediclinic Pro (Clínica & Salud)",
   restaurante: "Aurora Horeca (Restaurante & Gastronomía)",
+  ferreteria: "Aurora Retail (Ferretería & Materiales)",
+  farmacia: "Aurora Retail (Farmacia & Droguería)",
+  repuestos: "Aurora Retail (Repuestos Automotrices)",
 };
 
 export default function Onboarding() {
@@ -168,17 +219,18 @@ export default function Onboarding() {
   const [errorActivacion, setErrorActivacion] = useState<string | null>(null);
 
   const modulosDisponibles = MODULOS_POR_INDUSTRIA[selectedIndustry] || CLINIC_MODULES;
+  const esRetail = ["ferreteria", "farmacia", "repuestos"].includes(selectedIndustry);
 
   const handleSelectIndustry = (ind: IndustryItem) => {
     if (!ind.isReady) {
       setLockedNotice(
-        `El rubro "${ind.label}" está en fase de desarrollo. Las verticales listas y operativas hoy son Mediclinic Pro (Clínica & Salud) y Aurora Horeca (Restaurante & Gastronomía).`
+        `El rubro "${ind.label}" está en fase de desarrollo. Las verticales listas y operativas hoy son Mediclinic Pro (Clínica & Salud), Aurora Horeca (Restaurante & Gastronomía) y Aurora Retail (Ferretería, Farmacia y Repuestos).`
       );
       return;
     }
     setLockedNotice(null);
     setSelectedIndustry(ind.id);
-    setModules((MODULOS_POR_INDUSTRIA[ind.id] || CLINIC_MODULES).map((m) => m.id));
+    setModules((MODULOS_POR_INDUSTRIA[ind.id] || CLINIC_MODULES).filter((m: any) => m.disponible !== false).map((m) => m.id));
     if (!user?.empresa) {
       setEmpresaNombre(NOMBRE_POR_DEFECTO[ind.id] || NOMBRE_POR_DEFECTO.clinica);
     }
@@ -301,7 +353,7 @@ export default function Onboarding() {
                   ¿A qué rubro se dedica tu negocio?
                 </h2>
                 <p className="text-white/50 text-sm mt-1">
-                  Actualmente <strong className="text-teal-400">Mediclinic Pro</strong> y <strong className="text-teal-400">Aurora Horeca</strong> están 100% habilitadas y listas para operar. Las demás verticales se encuentran en proceso de despliegue.
+                  Actualmente <strong className="text-teal-400">Mediclinic Pro</strong>, <strong className="text-teal-400">Aurora Horeca</strong> y <strong className="text-teal-400">Aurora Retail</strong> (Ferretería, Farmacia y Repuestos) están 100% habilitadas y listas para operar. Las demás verticales se encuentran en proceso de despliegue.
                 </p>
               </div>
 
@@ -339,7 +391,7 @@ export default function Onboarding() {
               )}
 
               {/* Grid de rubros con indicación clara de candado y disponibilidad */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-h-[380px] overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[380px] overflow-y-auto pr-1">
                 {INDUSTRIES.map((ind) => {
                   const isSelected = selectedIndustry === ind.id;
                   return (
@@ -347,7 +399,7 @@ export default function Onboarding() {
                       key={ind.id}
                       type="button"
                       onClick={() => handleSelectIndustry(ind)}
-                      className={`relative flex items-start gap-3.5 p-4 rounded-2xl border text-left transition-all duration-300 ${
+                      className={`relative flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all duration-300 ${
                         ind.isReady
                           ? isSelected
                             ? "bg-gradient-to-r from-teal-500/20 via-cyan-500/15 to-purple-500/20 border-teal-400/80 shadow-[0_0_25px_rgba(0,242,254,0.3)] scale-[1.01]"
@@ -357,56 +409,46 @@ export default function Onboarding() {
                     >
                       {/* Icono */}
                       <div
-                        className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
                           ind.isReady
                             ? "bg-teal-400/15 border border-teal-400/30 shadow-inner text-teal-300"
                             : "bg-white/5 border border-white/10 text-white/50"
                         }`}
                       >
-                        <ind.Icon size={22} />
+                        <ind.Icon size={16} />
                       </div>
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`font-bold text-sm truncate ${ind.isReady ? "text-white" : "text-white/70"}`}>
-                            {ind.label}
-                          </span>
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold flex-shrink-0 ${
-                              ind.isReady
-                                ? "bg-teal-400/20 text-teal-300 border border-teal-400/40 animate-pulse"
-                                : "bg-white/10 text-white/40 border border-white/10"
-                            }`}
-                          >
-                            {ind.badge}
-                          </span>
-                        </div>
-                        <p className="text-xs text-white/50 mt-1 leading-snug">
-                          {ind.desc}
-                        </p>
-                        {ind.tagline && (
-                          <div className="text-[11px] font-semibold text-teal-300 mt-1.5 flex items-center gap-1.5">
-                            <IconCheck size={11} /> {ind.tagline}
-                          </div>
-                        )}
+                        <span className={`font-bold text-xs leading-tight block ${ind.isReady ? "text-white" : "text-white/70"}`}>
+                          {ind.label}
+                        </span>
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono font-semibold inline-block mt-0.5 ${
+                            ind.isReady
+                              ? "bg-teal-400/20 text-teal-300 border border-teal-400/40"
+                              : "bg-white/10 text-white/40 border border-white/10"
+                          }`}
+                        >
+                          {ind.badge}
+                        </span>
                       </div>
 
                       {/* Check / Lock indicator */}
                       <div className="flex-shrink-0 self-center">
                         {ind.isReady ? (
                           <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+                            className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
                               isSelected
                                 ? "bg-teal-400 text-black shadow-[0_0_10px_#00f2fe]"
                                 : "border border-teal-400/40 text-transparent"
                             }`}
                           >
-                            <IconCheck size={13} />
+                            <IconCheck size={11} />
                           </div>
                         ) : (
-                          <div className="w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
-                            <IconLock size={12} />
+                          <div className="w-5 h-5 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
+                            <IconLock size={10} />
                           </div>
                         )}
                       </div>
@@ -443,14 +485,16 @@ export default function Onboarding() {
             <div className="space-y-6">
               <div>
                 <div className="inline-block px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[11px] font-mono uppercase tracking-wider mb-2">
-                  Paso 2 · {selectedIndustry === "restaurante" ? "Arquitectura del Local" : "Arquitectura Médica"}
+                  Paso 2 · {selectedIndustry === "restaurante" ? "Arquitectura del Local" : esRetail ? "Arquitectura del Negocio" : "Arquitectura Médica"}
                 </div>
                 <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white leading-tight">
-                  {selectedIndustry === "restaurante" ? "Personaliza tu Restaurante" : "Personaliza tu Clínica o Consultorio"}
+                  {selectedIndustry === "restaurante" ? "Personaliza tu Restaurante" : esRetail ? "Personaliza tu Negocio" : "Personaliza tu Clínica o Consultorio"}
                 </h2>
                 <p className="text-white/50 text-sm mt-1">
                   {selectedIndustry === "restaurante"
                     ? "Indica el nombre de tu local y activa los módulos que utilizará tu equipo."
+                    : esRetail
+                    ? "Indica el nombre de tu negocio y activa los módulos que utilizará tu equipo."
                     : "Indica el nombre de tu centro de salud y activa los módulos que utilizará tu equipo médico."}
                 </p>
               </div>
@@ -458,11 +502,11 @@ export default function Onboarding() {
               {/* Nombre del negocio */}
               <div>
                 <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1.5">
-                  {selectedIndustry === "restaurante" ? "Nombre del Restaurante / Local" : "Nombre de la Clínica / Consultorio / Doctor"}
+                  {selectedIndustry === "restaurante" ? "Nombre del Restaurante / Local" : esRetail ? "Nombre del Negocio" : "Nombre de la Clínica / Consultorio / Doctor"}
                 </label>
                 <input
                   type="text"
-                  placeholder={selectedIndustry === "restaurante" ? "Ej. Restaurante La Terraza" : "Ej. Centro Médico Especializado San Cristóbal"}
+                  placeholder={selectedIndustry === "restaurante" ? "Ej. Restaurante La Terraza" : esRetail ? "Ej. Ferretería El Tornillo Feliz" : "Ej. Centro Médico Especializado San Cristóbal"}
                   value={empresaNombre}
                   onChange={(e) => setEmpresaNombre(e.target.value)}
                   className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none transition-all shadow-inner"
@@ -475,8 +519,26 @@ export default function Onboarding() {
                   Módulos de {VERTICAL_LABEL[selectedIndustry]?.split(" (")[0] || "la vertical"} habilitados ({modules.length}/{modulosDisponibles.length})
                 </label>
                 <div className="grid grid-cols-1 gap-2.5">
-                  {modulosDisponibles.map((m) => {
+                  {modulosDisponibles.map((m: any) => {
                     const isChecked = modules.includes(m.id);
+                    const disponible = m.disponible !== false;
+                    if (!disponible) {
+                      return (
+                        <div key={m.id} title="Próximamente disponible" aria-disabled
+                          className="flex items-center gap-3.5 p-3.5 rounded-2xl border text-left bg-white/[0.02] border-white/10 text-white/30 cursor-not-allowed">
+                          <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 border border-white/10 text-white/30">
+                            <IconLock size={11} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm flex items-center gap-2">
+                              {m.label}
+                              <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/10 text-white/40">Próximamente</span>
+                            </div>
+                            <div className="text-xs mt-0.5 text-white/25">{m.desc}</div>
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
                       <button
                         key={m.id}
@@ -594,14 +656,14 @@ export default function Onboarding() {
               <div className="flex justify-center">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#00f2fe] via-[#7928ca] to-[#ff007f] p-0.5 shadow-[0_0_30px_rgba(0,242,254,0.5)]">
                   <div className="w-full h-full bg-[#0d131f] rounded-2xl flex items-center justify-center text-teal-300">
-                    {selectedIndustry === "restaurante" ? <IconRestaurant size={26} /> : <IconClinic size={26} />}
+                    {(() => { const Icon = INDUSTRIES.find((i) => i.id === selectedIndustry)?.Icon || IconClinic; return <Icon size={26} />; })()}
                   </div>
                 </div>
               </div>
 
               <div>
                 <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white">
-                  {selectedIndustry === "restaurante" ? "¡Todo Listo para tu Restaurante!" : "¡Todo Listo para tu Clínica!"}
+                  {selectedIndustry === "restaurante" ? "¡Todo Listo para tu Restaurante!" : esRetail ? "¡Todo Listo para tu Negocio!" : "¡Todo Listo para tu Clínica!"}
                 </h2>
                 <p className="text-white/50 text-sm mt-1 max-w-md mx-auto">
                   Tu entorno privado en <strong>Aurora Hub</strong> ha sido preparado con la vertical{" "}
@@ -618,7 +680,7 @@ export default function Onboarding() {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-white/40 uppercase tracking-wider font-mono">Vertical:</span>
                   <span className="text-teal-300 font-semibold flex items-center gap-1.5">
-                    {selectedIndustry === "restaurante" ? <IconRestaurant size={13} /> : <IconClinic size={13} />} {VERTICAL_LABEL[selectedIndustry] || "Mediclinic Pro (Clínica & Salud)"}
+                    {(() => { const Icon = INDUSTRIES.find((i) => i.id === selectedIndustry)?.Icon || IconClinic; return <Icon size={13} />; })()} {VERTICAL_LABEL[selectedIndustry] || "Mediclinic Pro (Clínica & Salud)"}
                   </span>
                 </div>
                 <div className="flex items-start justify-between text-xs">

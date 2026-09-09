@@ -11,10 +11,25 @@ import { useAuth } from "../context/AuthContext";
 import { listarPacientes, listarCitasDelDia, listarCobrosDelDia, type Paciente, type CitaMedica } from "../api";
 import MediclinicApp from "../components/MediclinicApp";
 
+// Segunda frase del hero, complementa vertical.desc — antes era un ternario
+// binario (restaurante vs "todo lo demás", con la frase de Clínica como
+// fallback) que le pegaba texto de historias clínicas a Ferretería/Farmacia/
+// Repuestos apenas se activaron como verticales reales.
+const VERTICAL_TAGLINE: Record<string, string> = {
+  clinica: "Administra consultas médicas, historias clínicas, agenda de especialistas, sala de espera reactiva y cotizaciones multi-moneda en tiempo real.",
+  veterinaria: "Administra fichas de mascotas, vacunación, cirugías y venta de farmacia veterinaria en tiempo real.",
+  restaurante: "Gestiona mesas, comandas y cocina en tiempo real desde un solo lugar.",
+  ferreteria: "Gestiona tu punto de venta, inventario fraccionado y compras a proveedor desde un solo lugar.",
+  farmacia: "Gestiona tu punto de venta, vencimientos por lote (FEFO) y ventas a crédito desde un solo lugar.",
+  repuestos: "Gestiona tu punto de venta, catálogo de cruce por vehículo y compras a proveedor desde un solo lugar.",
+};
+
 const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNode> = {
   clinica: IconClinic,
   veterinaria: IconVet,
   ferreteria: IconHardware,
+  farmacia: IconPrescription,
+  repuestos: IconHardware,
   restaurante: IconRestaurant,
 };
 
@@ -111,6 +126,42 @@ const VERTICAL_METADATA: Record<string, {
       { name: "Taller Mecánico Ramos", age: "Crédito 15d", reason: "Tornillería y Discos de Corte", status: "Facturado", time: "09:45 AM" },
     ],
   },
+  farmacia: {
+    name: "Aurora Retail (Farmacia)",
+    badge: "EDICIÓN FARMACIA",
+    desc: "POS de mostrador con FEFO obligatorio (primero vence, primero sale) y sugerencia de genéricos por principio activo.",
+    stats: [
+      { label: "Ventas de Hoy", val: "$1,240", change: "89 tickets", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Lotes por Vencer", val: "5", change: "Próximos 30 días", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Ventas a Crédito", val: "$310", change: "Cuentas x cobrar", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Artículos Bajo Mínimo", val: "3", change: "Reponer pronto", color: "text-sky-500 dark:text-sky-400" },
+    ],
+    actions: [
+      { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
+      { label: "Consultar Kardex", desc: "Stock por lote y fecha de vencimiento" },
+      { label: "Nueva Cotización", desc: "Presupuesto con validez temporal" },
+      { label: "Cierre de Turno", desc: "Arqueo de caja y corte Z" },
+    ],
+    defaultPatients: [],
+  },
+  repuestos: {
+    name: "Aurora Retail (Repuestos)",
+    badge: "EDICIÓN REPUESTOS AUTOMOTRICES",
+    desc: "POS con catálogo de cruce: busca por código OEM y muestra para qué otros vehículos sirve la pieza.",
+    stats: [
+      { label: "Ventas de Hoy", val: "$2,180", change: "63 tickets", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Artículos en Stock", val: "3,940", change: "12 bajo mínimo", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Cuentas x Cobrar", val: "$980", change: "Créditos al día", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Órdenes de Compra", val: "2", change: "En despacho", color: "text-amber-500 dark:text-amber-400" },
+    ],
+    actions: [
+      { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
+      { label: "Consultar Kardex", desc: "Stock y catálogo de cruce por vehículo" },
+      { label: "Nueva Cotización", desc: "Presupuesto con validez temporal" },
+      { label: "Cierre de Turno", desc: "Arqueo de caja y corte Z" },
+    ],
+    defaultPatients: [],
+  },
   restaurante: {
     name: "Aurora Horeca",
     badge: "EDICIÓN RESTAURANTES & HORECA",
@@ -160,8 +211,17 @@ export default function Dashboard() {
   const [ingresosHoy, setIngresosHoy] = useState<number | null>(null);
   const esClinicaReal = userIndustry === "clinica" && !!user?.tenantId;
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
-  const rutaVertical = userIndustry === "restaurante" ? "/restaurante" : "/mediclinic";
-  const esVerticalReal = esClinicaReal || esRestauranteReal;
+  // Farmacia, Ferretería y Repuestos comparten el mismo motor (Aurora Retail,
+  // ver RetailApp.tsx) — las tres entran a la misma ruta /retail.
+  const esRetailReal = ["farmacia", "ferreteria", "repuestos"].includes(userIndustry) && !!user?.tenantId;
+  const RUTA_POR_INDUSTRIA: Record<string, string> = {
+    restaurante: "/restaurante",
+    farmacia: "/retail",
+    ferreteria: "/retail",
+    repuestos: "/retail",
+  };
+  const rutaVertical = RUTA_POR_INDUSTRIA[userIndustry] || "/mediclinic";
+  const esVerticalReal = esClinicaReal || esRestauranteReal || esRetailReal;
 
   useEffect(() => {
     if (!esClinicaReal || !user?.tenantId) return;
@@ -316,7 +376,7 @@ export default function Dashboard() {
                   Estás disfrutando de tu prueba gratuita de {vertical.name}
                 </h4>
                 <p className="text-slate-500 dark:text-white/50 text-xs mt-0.5">
-                  Te quedan <strong className="text-teal-600 dark:text-teal-400 font-bold">{daysLeft} días</strong> de acceso completo. Tus datos e historias clínicas se guardan permanentemente.
+                  Te quedan <strong className="text-teal-600 dark:text-teal-400 font-bold">{daysLeft} días</strong> de acceso completo. Tus datos se guardan permanentemente.
                 </p>
               </div>
             </div>
@@ -351,10 +411,7 @@ export default function Dashboard() {
                   </h2>
 
                   <p className="text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
-                    {vertical.desc}{" "}
-                    {userIndustry === "restaurante"
-                      ? "Gestiona mesas, comandas y cocina en tiempo real desde un solo lugar."
-                      : "Administra consultas médicas, historias clínicas, agenda de especialistas, sala de espera reactiva y cotizaciones multi-moneda en tiempo real."}
+                    {vertical.desc} {VERTICAL_TAGLINE[userIndustry] || VERTICAL_TAGLINE.clinica}
                   </p>
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">

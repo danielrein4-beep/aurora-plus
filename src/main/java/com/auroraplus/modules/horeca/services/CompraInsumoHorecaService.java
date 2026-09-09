@@ -61,6 +61,12 @@ public class CompraInsumoHorecaService {
         public Long articuloId;
         public BigDecimal cantidad;
         public BigDecimal costoUnitario;
+        // Moneda en la que se escribió costoUnitario (ej. proveedor colombiano que
+        // cobra en COP). Null/vacío = ya viene en la moneda base del tenant. Sin
+        // esto, un costo tecleado en pesos se guardaba tal cual como si fuera
+        // dólares — un insumo de 2500 COP (~$0.60) quedaba costando "$2500" y
+        // reventaba el Valor Total en Inventario.
+        public String monedaCosto;
         // Opcional: si se compra por presentación (six-pack, bolsa x30, caja x24)
         // en vez de la unidad base del artículo. "cantidad" y "costoUnitario" se
         // siguen llenando en la unidad de la presentación (ej. 10 six-packs a $3
@@ -116,11 +122,20 @@ public class CompraInsumoHorecaService {
                 throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
             }
 
+            // Si el costo se escribió en otra moneda (ej. proveedor que cobra en
+            // pesos colombianos), se convierte a la moneda base del tenant ANTES
+            // de cualquier otro cálculo — todo el resto del sistema (Valor Total en
+            // Inventario, margen, costeo de recetas) asume que costoUnitario del
+            // artículo siempre está en la moneda base.
+            BigDecimal costoUnitarioEntrada = (item.monedaCosto != null && !item.monedaCosto.isBlank())
+                ? motorFinancieroService.convertirAMonedaBase(tenantId, item.costoUnitario, item.monedaCosto)
+                : item.costoUnitario;
+
             // Si se compró por presentación (six-pack, bolsa x30, etc.), se convierte
             // a la unidad base del artículo — el stock y el costeo de recetas siempre
             // se llevan en unidad base, la presentación es solo cómo llegó la mercancía.
             BigDecimal cantidadBase = item.cantidad;
-            BigDecimal costoUnitarioBase = item.costoUnitario;
+            BigDecimal costoUnitarioBase = costoUnitarioEntrada;
             String detallePresentacion = "";
             if (item.presentacionId != null) {
                 PresentacionArticulo presentacion = presentacionArticuloRepository.findById(item.presentacionId)
@@ -132,7 +147,7 @@ public class CompraInsumoHorecaService {
                     throw new RuntimeException("La presentación no corresponde a este artículo");
                 }
                 cantidadBase = item.cantidad.multiply(presentacion.getUnidadesPorPresentacion());
-                costoUnitarioBase = item.costoUnitario.divide(presentacion.getUnidadesPorPresentacion(), 4, RoundingMode.HALF_UP);
+                costoUnitarioBase = costoUnitarioEntrada.divide(presentacion.getUnidadesPorPresentacion(), 4, RoundingMode.HALF_UP);
                 detallePresentacion = " (" + item.cantidad + " x " + presentacion.getNombre() + ")";
             }
 
@@ -156,7 +171,7 @@ public class CompraInsumoHorecaService {
                 loteArticuloRepository.save(lote);
             }
 
-            BigDecimal subtotal = item.cantidad.multiply(item.costoUnitario);
+            BigDecimal subtotal = item.cantidad.multiply(costoUnitarioEntrada);
             totalCompra = totalCompra.add(subtotal);
 
             DetalleCompraInsumoHoreca detalle = new DetalleCompraInsumoHoreca();

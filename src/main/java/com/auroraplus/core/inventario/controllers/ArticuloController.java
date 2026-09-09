@@ -9,8 +9,6 @@ import com.auroraplus.core.inventario.repositories.KardexRepository;
 import com.auroraplus.core.inventario.repositories.LoteArticuloRepository;
 import com.auroraplus.core.inventario.services.InventarioService;
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
-import jakarta.persistence.EntityManager;
-import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
@@ -38,9 +36,6 @@ public class ArticuloController {
     private InventarioService inventarioService;
 
     @Autowired
-    private EntityManager entityManager;
-
-    @Autowired
     private LoteArticuloRepository loteArticuloRepository;
 
     @Autowired
@@ -50,12 +45,10 @@ public class ArticuloController {
     public List<Articulo> listar() {
         // El filtro de Hibernate habilitado en TenantInterceptor no llega vivo
         // hasta acá (ver hallazgo de seguridad — el enableFilter del
-        // interceptor no persiste a la sesión que ejecuta esta query), así
-        // que se re-habilita explícitamente aquí antes de consultar. Sin esto,
-        // findAll() devuelve artículos de TODOS los tenants sin distinción.
-        entityManager.unwrap(Session.class).enableFilter("tenantFilter")
-            .setParameter("tenantId", TenantContext.getCurrentTenant());
-        return articuloRepository.findAll();
+        // interceptor no persiste a la sesión que ejecuta esta query). En vez
+        // de volver a depender de ese mecanismo frágil, se pide el tenant
+        // explícito al repositorio.
+        return articuloRepository.findByTenantId(TenantContext.getCurrentTenant());
     }
 
     @GetMapping("/{id}")
@@ -85,6 +78,20 @@ public class ArticuloController {
         if (articulo.getCategoria() == null || articulo.getCategoria().isBlank()) {
             articulo.setCategoria("General");
         }
+        // costoUnitario llega tal cual lo tecleó el usuario, en articulo.monedaCosto (o en
+        // la moneda base del tenant si no la mandó) — se normaliza acá a la moneda base
+        // (LicenciaTenant.monedaBase, configurable por el Dueño/Administrador) para que
+        // costoUnitario sea siempre comparable con precioVenta y con el resto del
+        // inventario, sin importar en qué moneda se haya tecleado. Mismo criterio que
+        // /entrada más abajo.
+        if (articulo.getCostoUnitario() != null) {
+            String monedaCosto = (articulo.getMonedaCosto() != null && !articulo.getMonedaCosto().isBlank())
+                ? articulo.getMonedaCosto() : motorFinancieroService.obtenerMonedaBase(tenantId);
+            BigDecimal costoOriginal = articulo.getCostoUnitario();
+            articulo.setCostoUnitario(motorFinancieroService.convertirAMonedaBase(tenantId, costoOriginal, monedaCosto));
+            articulo.setMonedaCosto(monedaCosto);
+            articulo.setCostoUnitarioOriginal(costoOriginal);
+        }
         return ResponseEntity.ok(articuloRepository.save(articulo));
     }
 
@@ -103,6 +110,9 @@ public class ArticuloController {
         public BigDecimal precioVenta;
         public BigDecimal stockMinimo;
         public String sku;
+        // Aurora Retail — opcionales, ignorados por las demás verticales.
+        public String codigoBarras;
+        public String principioActivo;
     }
 
     /** Corrige datos del artículo (nombre, categoría, unidad, costo, precio de venta, stock mínimo) — NO toca stockActual, que solo cambia vía Kardex (entrada/salida/ajuste) para no perder el rastro de auditoría. */
@@ -119,6 +129,8 @@ public class ArticuloController {
         if (request.precioVenta != null) articulo.setPrecioVenta(request.precioVenta);
         if (request.stockMinimo != null) articulo.setStockMinimo(request.stockMinimo);
         if (request.sku != null && !request.sku.isBlank()) articulo.setSku(request.sku.trim());
+        if (request.codigoBarras != null) articulo.setCodigoBarras(request.codigoBarras.isBlank() ? null : request.codigoBarras.trim());
+        if (request.principioActivo != null) articulo.setPrincipioActivo(request.principioActivo.isBlank() ? null : request.principioActivo.trim());
         return ResponseEntity.ok(articuloRepository.save(articulo));
     }
 
@@ -192,6 +204,8 @@ public class ArticuloController {
         // factura formal de Compras & Proveedores y por eso antes no dejaba
         // ningún rastro de cuánta plata salió de caja.
         public String metodoPago;
+        // Moneda en la que el usuario tecleó costoUnitario (ej. "COP" si compró en
+        // pesos). Si viene vacío, se asume que ya está en la moneda base del tenant.
         public String moneda;
     }
 
@@ -202,18 +216,38 @@ public class ArticuloController {
         if (!articulo.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
         }
+        String monedaBaseTenant = motorFinancieroService.obtenerMonedaBase(tenantId);
+        // costoUnitario del request viene tal cual lo tecleó el usuario, en
+        // request.moneda (o ya en la moneda base si no la mandó) — se convierte acá
+        // a la moneda base del tenant ANTES de guardarlo: costoUnitario del
+        // artículo siempre debe quedar en esa moneda para que sea comparable con
+        // precioVenta y con el resto del inventario (ver también ArticuloController.crear
+        // y CompraInsumoHorecaService, que ya seguían este mismo criterio). El
+        // frontend ya NO convierte nada de antemano, evita que las dos conversiones
+        // (frontend a USD fijo, backend a la moneda base real) puedan divergir.
         if (request.costoUnitario != null) {
-            articulo.setCostoUnitario(request.costoUnitario);
+            String monedaCosto = (request.moneda != null && !request.moneda.isBlank()) ? request.moneda : monedaBaseTenant;
+            BigDecimal costoOriginal = request.costoUnitario;
+            articulo.setCostoUnitario(motorFinancieroService.convertirAMonedaBase(tenantId, costoOriginal, monedaCosto));
+            articulo.setMonedaCosto(monedaCosto);
+            articulo.setCostoUnitarioOriginal(costoOriginal);
             articuloRepository.save(articulo);
         }
-        BigDecimal costoAplicado = request.costoUnitario != null ? request.costoUnitario : articulo.getCostoUnitario();
+        BigDecimal costoAplicado = articulo.getCostoUnitario();
         Kardex movimiento = inventarioService.registrarMovimientoKardex(id, tenantId, Kardex.TipoOperacion.ENTRADA,
             request.cantidad, costoAplicado, request.motivo != null ? request.motivo : "Entrada de stock");
 
         if (request.metodoPago != null && !request.metodoPago.isBlank() && costoAplicado != null) {
-            BigDecimal montoGasto = costoAplicado.multiply(request.cantidad);
-            if (montoGasto.compareTo(BigDecimal.ZERO) > 0) {
-                String monedaGasto = (request.moneda != null && !request.moneda.isBlank()) ? request.moneda : motorFinancieroService.obtenerMonedaBase(tenantId);
+            // costoAplicado (costoUnitario del artículo) ya está en la moneda base del
+            // tenant. El gasto en caja se registra en la moneda real con la que se
+            // pagó, así que ese total en la base hay que convertirlo a esa moneda
+            // antes de guardarlo — guardarlo tal cual etiquetado con otra moneda
+            // infla o reduce el gasto por el valor entero de la tasa de cambio.
+            BigDecimal montoGastoBase = costoAplicado.multiply(request.cantidad);
+            if (montoGastoBase.compareTo(BigDecimal.ZERO) > 0) {
+                String monedaGasto = (request.moneda != null && !request.moneda.isBlank()) ? request.moneda : monedaBaseTenant;
+                BigDecimal montoGasto = monedaGasto.equals(monedaBaseTenant) ? montoGastoBase
+                    : motorFinancieroService.convertirMoneda(tenantId, montoGastoBase, monedaBaseTenant, monedaGasto);
                 motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
                     montoGasto, monedaGasto, "Reabastecimiento: " + articulo.getNombre() + " (" + request.metodoPago + ")");
             }

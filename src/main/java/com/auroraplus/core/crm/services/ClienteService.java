@@ -44,12 +44,17 @@ public class ClienteService {
 
     @Transactional
     public Cliente crear(Long tenantId, String nombre, String identificacionRif, String telefono, String correo) {
-        if (nombre == null || nombre.isBlank()) {
-            throw new RuntimeException("El nombre del cliente es obligatorio");
+        // Registro rápido desde el POS: el cajero puede tipear solo la
+        // cédula y nada más — nombre/teléfono son opcionales ahí. Sin un
+        // nombre real, se usa la cédula como identificador provisional en
+        // vez de bloquear el alta exigiendo un dato que todavía no dieron.
+        if ((nombre == null || nombre.isBlank()) && (identificacionRif == null || identificacionRif.isBlank())) {
+            throw new RuntimeException("Indique al menos el nombre o la cédula/RIF del cliente");
         }
+        String nombreFinal = (nombre != null && !nombre.isBlank()) ? nombre.trim() : "Cliente " + identificacionRif.trim();
         Cliente cliente = new Cliente();
         cliente.setTenantId(tenantId);
-        cliente.setNombre(nombre.trim());
+        cliente.setNombre(nombreFinal);
         cliente.setIdentificacionRif(identificacionRif != null && !identificacionRif.isBlank() ? identificacionRif.trim() : null);
         cliente.setTelefono(telefono != null && !telefono.isBlank() ? telefono.trim() : null);
         cliente.setCorreo(correo != null && !correo.isBlank() ? correo.trim() : null);

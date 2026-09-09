@@ -52,6 +52,16 @@ public class ItemComanda {
     @JoinColumn(name = "articulo_id")
     private Articulo articulo;
 
+    // Presente cuando este ítem es un trago de Fast-Bar (ver FastBarTrago) —
+    // vender uno descuenta los mililitros correspondientes de su botella en
+    // inventario. Antes esta venta pasaba por un endpoint aparte
+    // (FastBarController/vender) que descontaba inventario pero no dejaba
+    // ticket ni aparecía en reportes; unificado acá, en el mismo flujo de
+    // agregarItemComanda que usan escandallo y articulo.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fast_bar_trago_id")
+    private FastBarTrago fastBarTrago;
+
     // Costo por unidad CONGELADO al momento de la venta (del escandallo o del
     // artículo de inventario) — no se recalcula después aunque cambien costos
     // de insumos o compras, para que el reporte de utilidad de un día no
@@ -89,6 +99,8 @@ public class ItemComanda {
     public void setPrecioUnitario(BigDecimal precioUnitario) { this.precioUnitario = precioUnitario; }
     public Articulo getArticulo() { return articulo; }
     public void setArticulo(Articulo articulo) { this.articulo = articulo; }
+    public FastBarTrago getFastBarTrago() { return fastBarTrago; }
+    public void setFastBarTrago(FastBarTrago fastBarTrago) { this.fastBarTrago = fastBarTrago; }
     public BigDecimal getCostoUnitario() { return costoUnitario; }
     public void setCostoUnitario(BigDecimal costoUnitario) { this.costoUnitario = costoUnitario; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }

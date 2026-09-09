@@ -26,6 +26,7 @@ public class CompraInsumoHorecaController {
         public Long articuloId;
         public BigDecimal cantidad;
         public BigDecimal costoUnitario;
+        public String monedaCosto; // opcional — moneda en que se escribió costoUnitario, si no es la moneda base
         public Long presentacionId;
         public LocalDate fechaVencimiento;
     }
@@ -53,6 +54,7 @@ public class CompraInsumoHorecaController {
             item.articuloId = itemReq.articuloId;
             item.cantidad = itemReq.cantidad;
             item.costoUnitario = itemReq.costoUnitario;
+            item.monedaCosto = itemReq.monedaCosto;
             item.presentacionId = itemReq.presentacionId;
             item.fechaVencimiento = itemReq.fechaVencimiento;
             items.add(item);

@@ -5,7 +5,8 @@
       "name": "aurora-frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
-      "port": 8443
+      "port": 8443,
+      "autoPort": true
     }
   ]
 }

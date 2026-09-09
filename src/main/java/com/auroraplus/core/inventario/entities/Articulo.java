@@ -51,8 +51,46 @@ public class Articulo {
     @Column(name = "stock_minimo", precision = 18, scale = 4)
     private BigDecimal stockMinimo;
 
+    // costoUnitario arriba SIEMPRE está en la moneda base del tenant
+    // (LicenciaTenant.monedaBase — configurable por el Dueño/Administrador en
+    // Configuración, USD por defecto; así lo usan margen, kardex y el catálogo
+    // del POS) — pero un negocio puede haber comprado este artículo pagando en
+    // otra moneda. Estos dos campos guardan el monto y la moneda TAL COMO se
+    // compró, solo para mostrar en Inventario "lo compré en 4500 COP" en vez
+    // de forzar todo a la moneda base — no participan en ningún cálculo
+    // financiero, son de visualización.
+    @Column(name = "moneda_costo", length = 10, columnDefinition = "varchar(10) default 'USD'")
+    private String monedaCosto = "USD";
+
+    @Column(name = "costo_unitario_original", precision = 18, scale = 4)
+    private BigDecimal costoUnitarioOriginal;
+
+    // Campos de Aurora Retail (Ferretería/Farmacia/Repuestos) — opcionales,
+    // ausentes/null para artículos de HORECA u otros módulos que no los usan.
+    // Un solo Articulo del core sirve a todas las verticales; cada capa solo
+    // lee/pinta el campo que le corresponde.
+    @Column(name = "codigo_barras", length = 64)
+    private String codigoBarras;
+
+    // Solo relevante para Farmacia — permite al cajero ofrecer un genérico
+    // por principio activo si no hay stock de la marca buscada.
+    @Column(name = "principio_activo", length = 120)
+    private String principioActivo;
+
+    // Bloqueo optimista: sin esto, dos ventas simultáneas del mismo artículo
+    // (ej. la última unidad, vendida desde dos cajas a la vez) leen el mismo
+    // stockActual antes de que la otra confirme, y ambas descuentan como si
+    // hubiera stock suficiente — el stock termina en negativo. Con @Version,
+    // la segunda transacción que intenta guardar falla con un error claro en
+    // vez de corromper el stock en silencio (ver GlobalExceptionHandler).
+    @Version
+    @Column(name = "version", nullable = false, columnDefinition = "bigint default 0")
+    private Long version = 0L;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
     public Long getTenantId() { return tenantId; }
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
     public String getSku() { return sku; }
@@ -73,6 +111,21 @@ public class Articulo {
     public void setPrecioVenta(BigDecimal precioVenta) { this.precioVenta = precioVenta; }
     public BigDecimal getStockMinimo() { return stockMinimo; }
     public void setStockMinimo(BigDecimal stockMinimo) { this.stockMinimo = stockMinimo; }
+    public String getMonedaCosto() { return monedaCosto; }
+    public void setMonedaCosto(String monedaCosto) { this.monedaCosto = monedaCosto; }
+    public BigDecimal getCostoUnitarioOriginal() { return costoUnitarioOriginal; }
+    public void setCostoUnitarioOriginal(BigDecimal costoUnitarioOriginal) { this.costoUnitarioOriginal = costoUnitarioOriginal; }
+    public String getCodigoBarras() { return codigoBarras; }
+    public void setCodigoBarras(String codigoBarras) { this.codigoBarras = codigoBarras; }
+    public String getPrincipioActivo() { return principioActivo; }
+    public void setPrincipioActivo(String principioActivo) { this.principioActivo = principioActivo; }
+
+    /** Valor en inventario en la moneda en que se compró (para mostrar) — costoUnitarioOriginal * stockActual; cae a costoUnitario (USD) si el artículo no tiene el original registrado (altas viejas). */
+    @Transient
+    public BigDecimal getValorInventarioOriginal() {
+        BigDecimal costo = costoUnitarioOriginal != null ? costoUnitarioOriginal : costoUnitario;
+        return costo.multiply(stockActual);
+    }
 
     @Transient
     public boolean isStockBajoMinimo() {

@@ -877,3 +877,391 @@ export function obtenerBase64PdfDocumento(
   const dataUri = doc.output("datauristring");
   return { base64: dataUri, nombreArchivo };
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// 4. CONSTRUCCIÓN DE PDF: CANAL ENDÉMICO (VIGILANCIA EPIDEMIOLÓGICA)
+// ══════════════════════════════════════════════════════════════════════════
+export interface PuntoCanalPdf {
+  etiqueta: string;
+  casos: number | null; // null = período proyectado a futuro, sin dato real
+  minimo: number;
+  q1: number;
+  mediana: number;
+  q3: number;
+  maximo: number;
+}
+
+export interface CanalEndemicoPdfData {
+  clinicaNombre: string;
+  doctorNombre: string;
+  cie10: string;
+  descripcionDiagnostico?: string;
+  granularidad: "Semanal" | "Mensual" | "Anual";
+  anio: number;
+  casosEsteAnio: number;
+  totalHistorico: number;
+  aniosUsados: number;
+  aniosExcluidos: number[];
+  puntos: PuntoCanalPdf[];
+  /** Si NO hay historial real (aniosUsados/aniosHistoricosUsados = 0), las barras van en azul neutro — nunca "epidemia" solo porque el umbral está en cero. */
+  hayHistorial: boolean;
+  fecha: string;
+}
+
+type ZonaCanalPdf = "exito" | "seguridad" | "alarma" | "epidemia" | "sin_historial";
+
+// Paleta del VEREDICTO (banner de texto) — igual a ZONA_INFO en CanalEndemico.tsx.
+const ZONA_PDF_INFO: Record<ZonaCanalPdf, { color: [number, number, number]; texto: string }> = {
+  exito: { color: [34, 197, 94], texto: "Zona de éxito" },
+  seguridad: { color: [59, 130, 246], texto: "Zona de seguridad" },
+  alarma: { color: [245, 158, 11], texto: "Zona de alarma" },
+  epidemia: { color: [239, 68, 68], texto: "Zona de epidemia" },
+  sin_historial: { color: [100, 116, 139], texto: "Sin historial suficiente para comparar" },
+};
+
+// Paleta del CORREDOR (bandas del gráfico + leyenda) — igual a los colores hardcodeados
+// en el <Area>/<LeyendaItem> de CanalEndemico.tsx (nota: "seguridad" es dorado aquí,
+// no azul — así se ve en pantalla, dos paletas distintas para dos usos distintos).
+const ZONA_CHART_COLOR: Record<"exito" | "seguridad" | "alarma" | "epidemia", [number, number, number]> = {
+  exito: [34, 197, 94],
+  seguridad: [234, 179, 8],
+  alarma: [249, 115, 22],
+  epidemia: [239, 68, 68],
+};
+
+function calcularZonaPdf(casos: number, q1: number, mediana: number, q3: number, hayHistorial: boolean): ZonaCanalPdf {
+  if (!hayHistorial) return "sin_historial";
+  if (casos <= q1) return "exito";
+  if (casos <= mediana) return "seguridad";
+  if (casos <= q3) return "alarma";
+  return "epidemia";
+}
+
+/** Rellena un polígono arbitrario (usado para las bandas del corredor — la misma forma que dibuja
+ * recharts <Area stackId>, pero vectorial). `puntos` en coordenadas absolutas mm, sentido cualquiera. */
+function rellenarPoligono(doc: jsPDF, puntos: [number, number][], color: [number, number, number]) {
+  if (puntos.length < 3) return;
+  doc.setFillColor(color[0], color[1], color[2]);
+  const [sx, sy] = puntos[0];
+  const deltas: [number, number][] = [];
+  for (let i = 1; i < puntos.length; i++) {
+    deltas.push([puntos[i][0] - puntos[i - 1][0], puntos[i][1] - puntos[i - 1][1]]);
+  }
+  deltas.push([sx - puntos[puntos.length - 1][0], sy - puntos[puntos.length - 1][1]]);
+  doc.lines(deltas, sx, sy, [1, 1], "F", true);
+}
+
+/** Traza una polilínea (línea de casos reales, mediana histórica punteada, etc). */
+function trazarPolilinea(doc: jsPDF, puntos: [number, number][], color: [number, number, number], grosor: number, punteada = false) {
+  if (puntos.length < 2) return;
+  doc.setDrawColor(color[0], color[1], color[2]);
+  doc.setLineWidth(grosor);
+  doc.setLineDashPattern(punteada ? [1.2, 1] : [], 0);
+  const [sx, sy] = puntos[0];
+  const deltas: [number, number][] = [];
+  for (let i = 1; i < puntos.length; i++) {
+    deltas.push([puntos[i][0] - puntos[i - 1][0], puntos[i][1] - puntos[i - 1][1]]);
+  }
+  doc.lines(deltas, sx, sy, [1, 1], "S", false);
+  doc.setLineDashPattern([], 0);
+}
+
+/** Vista Semana/Mes: el mismo corredor de 4 bandas apiladas (éxito/seguridad/alarma/epidemia)
+ * que el <ComposedChart> en pantalla, con la mediana histórica punteada y la línea sólida de
+ * casos reales del año consultado encima. */
+function dibujarCorredorPeriodico(
+  doc: jsPDF,
+  puntos: PuntoCanalPdf[],
+  hayHistorial: boolean,
+  chartX: number,
+  chartY: number,
+  chartWidth: number,
+  chartHeight: number
+) {
+  const n = puntos.length;
+  const xAt = (i: number) => (n <= 1 ? chartX + chartWidth / 2 : chartX + (i / (n - 1)) * chartWidth);
+  const maxValor = Math.max(1, ...puntos.map((p) => Math.max(p.maximo, p.casos ?? 0)));
+  const escala = chartHeight / (maxValor * 1.15);
+  const yAt = (v: number) => chartY + chartHeight - v * escala;
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.line(chartX, chartY, chartX, chartY + chartHeight);
+  doc.line(chartX, chartY + chartHeight, chartX + chartWidth, chartY + chartHeight);
+
+  if (hayHistorial) {
+    const bandas: ["exito" | "seguridad" | "alarma" | "epidemia", (p: PuntoCanalPdf) => number, (p: PuntoCanalPdf) => number][] = [
+      ["exito", () => 0, (p) => p.q1],
+      ["seguridad", (p) => p.q1, (p) => p.mediana],
+      ["alarma", (p) => p.mediana, (p) => p.q3],
+      ["epidemia", (p) => p.q3, (p) => p.maximo],
+    ];
+    bandas.forEach(([zona, bottomFn, topFn]) => {
+      const arriba: [number, number][] = puntos.map((p, i): [number, number] => [xAt(i), yAt(Math.max(bottomFn(p), topFn(p)))]);
+      const abajo: [number, number][] = puntos.map((p, i): [number, number] => [xAt(i), yAt(bottomFn(p))]).reverse();
+      rellenarPoligono(doc, [...arriba, ...abajo], ZONA_CHART_COLOR[zona]);
+    });
+
+    trazarPolilinea(doc, puntos.map((p, i): [number, number] => [xAt(i), yAt(p.mediana)]), [100, 116, 139], 0.35, true);
+  }
+
+  const puntosCasos: [number, number][] = [];
+  puntos.forEach((p, i) => { if (p.casos != null) puntosCasos.push([xAt(i), yAt(p.casos)]); });
+  trazarPolilinea(doc, puntosCasos, [14, 165, 233], 0.6);
+  doc.setFillColor(14, 165, 233);
+  puntosCasos.forEach(([x, y]) => doc.circle(x, y, 0.9, "F"));
+
+  const salto = Math.max(1, Math.ceil(n / 14));
+  doc.setFontSize(5.5);
+  doc.setTextColor(100, 116, 139);
+  puntos.forEach((p, i) => { if (i % salto === 0) doc.text(p.etiqueta, xAt(i), chartY + chartHeight + 4, { align: "center" }); });
+}
+
+/** Vista Año: una banda de referencia horizontal (percentil 25-75, constante — un año no arma un
+ * corredor por período), mediana punteada, y la serie de un punto por año (morado = años
+ * anteriores, azul y más grande = año consultado) — igual al <LineChart>+<ReferenceArea> en pantalla. */
+function dibujarBandaAnual(
+  doc: jsPDF,
+  puntos: PuntoCanalPdf[],
+  hayHistorial: boolean,
+  anioConsultado: number,
+  chartX: number,
+  chartY: number,
+  chartWidth: number,
+  chartHeight: number
+) {
+  const n = puntos.length;
+  const xAt = (i: number) => (n <= 1 ? chartX + chartWidth / 2 : chartX + (i / (n - 1)) * chartWidth);
+  const maxValor = Math.max(1, ...puntos.map((p) => Math.max(p.maximo, p.casos ?? 0)));
+  const escala = chartHeight / (maxValor * 1.15);
+  const yAt = (v: number) => chartY + chartHeight - v * escala;
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.line(chartX, chartY, chartX, chartY + chartHeight);
+  doc.line(chartX, chartY + chartHeight, chartX + chartWidth, chartY + chartHeight);
+
+  if (hayHistorial) {
+    const ref = puntos[0]; // la banda es la misma para todos los puntos (referencia anual constante)
+    const pastel = ZONA_CHART_COLOR.seguridad.map((c) => Math.round(c + (255 - c) * 0.82)) as [number, number, number];
+    doc.setFillColor(pastel[0], pastel[1], pastel[2]);
+    doc.rect(chartX, yAt(ref.q3), chartWidth, yAt(ref.q1) - yAt(ref.q3), "F");
+    trazarPolilinea(doc, [[chartX, yAt(ref.mediana)], [chartX + chartWidth, yAt(ref.mediana)]], [100, 116, 139], 0.35, true);
+  }
+
+  let anterior: [number, number] | null = null;
+  puntos.forEach((p, i) => {
+    const actual: [number, number] | null = p.casos != null ? [xAt(i), yAt(p.casos)] : null;
+    if (actual && anterior) trazarPolilinea(doc, [anterior, actual], [14, 165, 233], 0.6);
+    anterior = actual;
+  });
+  puntos.forEach((p, i) => {
+    if (p.casos == null) return;
+    const esAnioConsultado = p.etiqueta === String(anioConsultado);
+    const [r, g, b] = esAnioConsultado ? [14, 165, 233] : [168, 85, 247];
+    doc.setFillColor(r, g, b);
+    doc.circle(xAt(i), yAt(p.casos), esAnioConsultado ? 1.6 : 1.1, "F");
+  });
+
+  doc.setFontSize(6);
+  doc.setTextColor(100, 116, 139);
+  puntos.forEach((p, i) => doc.text(p.etiqueta, xAt(i), chartY + chartHeight + 4, { align: "center" }));
+}
+
+export function construirDocCanalEndemico(data: CanalEndemicoPdfData): jsPDF {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // ── ENCABEZADO ──
+  doc.setFillColor(14, 165, 233);
+  doc.rect(0, 0, pageWidth, 24, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(255, 255, 255);
+  doc.text((data.clinicaNombre || "CENTRO MÉDICO").toUpperCase(), 14, 11);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  const tituloDiag = data.descripcionDiagnostico ? `${data.cie10} - ${data.descripcionDiagnostico}` : data.cie10;
+  doc.text(`CANAL ENDÉMICO — VIGILANCIA EPIDEMIOLÓGICA · ${data.granularidad.toUpperCase()} · ${tituloDiag}`, 14, 17);
+  doc.text(`Año ${data.anio}  ·  Generado: ${data.fecha}  ·  ${data.doctorNombre || ""}`, 14, 22);
+
+  // ── TARJETAS DE RESUMEN ──
+  const y0 = 32;
+  const cards: { label: string; val: string; color: [number, number, number] }[] = [
+    { label: `CASOS EN ${data.anio}`, val: String(data.casosEsteAnio), color: [14, 165, 233] },
+    { label: "TOTAL HISTÓRICO", val: String(data.totalHistorico), color: [16, 185, 129] },
+    { label: "AÑOS DE HISTORIA USADOS", val: String(data.aniosUsados), color: [168, 85, 247] },
+  ];
+  const cardW = 60;
+  const gap = 6;
+  let startX = 14;
+  cards.forEach((c) => {
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(startX, y0, cardW, 16, 2, 2, "F");
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text(c.label, startX + 4, y0 + 6);
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(c.color[0], c.color[1], c.color[2]);
+    doc.text(c.val, startX + 4, y0 + 13);
+    doc.setFont("helvetica", "normal");
+    startX += cardW + gap;
+  });
+
+  // ── VEREDICTO EN PALABRAS — lo primero que se lee, no solo colores y bandas ──
+  const puntosConDato = data.puntos.filter((p) => p.casos !== null) as (PuntoCanalPdf & { casos: number })[];
+  // Vista Año: igual que en pantalla, el veredicto compara el AÑO CONSULTADO específicamente
+  // (no el año con más casos de toda la serie histórica+proyección). Semana/Mes: sí es el pico,
+  // igual que "periodoDestacado" en pantalla.
+  const puntoPico = data.granularidad === "Anual"
+    ? puntosConDato.find((p) => p.etiqueta === String(data.anio)) ?? null
+    : puntosConDato.length > 0
+    ? puntosConDato.reduce((peor, actual) => (actual.casos > peor.casos ? actual : peor), puntosConDato[0])
+    : null;
+  const zonaVeredicto: ZonaCanalPdf = puntoPico
+    ? calcularZonaPdf(puntoPico.casos, puntoPico.q1, puntoPico.mediana, puntoPico.q3, data.hayHistorial)
+    : "sin_historial";
+  const infoZona = ZONA_PDF_INFO[zonaVeredicto];
+
+  let y = y0 + 22;
+  // Fondo pastel de la zona (mezcla del color con blanco al 90% — más seguro entre versiones
+  // de jsPDF que depender de opacidad real, que no todas soportan igual).
+  const pastel = infoZona.color.map((c) => Math.round(c + (255 - c) * 0.88)) as [number, number, number];
+  doc.setFillColor(pastel[0], pastel[1], pastel[2]);
+  doc.roundedRect(14, y, pageWidth - 28, 14, 2, 2, "F");
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(infoZona.color[0], infoZona.color[1], infoZona.color[2]);
+  const textoVeredicto = puntoPico
+    ? `${infoZona.texto.toUpperCase()} — ${puntoPico.etiqueta}: ${puntoPico.casos} caso(s)${data.hayHistorial ? ` (mediana histórica: ${puntoPico.mediana})` : " — aún sin historial para comparar"}`
+    : "SIN CASOS REGISTRADOS EN ESTE PERÍODO";
+  doc.text(textoVeredicto, 18, y + 9);
+  doc.setFont("helvetica", "normal");
+  y += 20;
+
+  if (data.aniosExcluidos.length > 0) {
+    doc.setFontSize(7.5);
+    doc.setTextColor(217, 119, 6);
+    doc.text(
+      `Años excluidos del rango normal por brote atípico: ${data.aniosExcluidos.join(", ")} (evita que un brote real infle el umbral de alerta)`,
+      14,
+      y
+    );
+    y += 6;
+  }
+
+  // ── GRÁFICO (dibujado vectorial, no captura de pantalla — texto nítido al imprimir) — el mismo
+  // corredor/banda apilada que se ve en pantalla, no barras sueltas por color: eso era justo lo que
+  // se veía "feo" antes — un solo color por barra no comunica el corredor real de comportamiento.
+  const anchoTabla = 62;
+  const chartY = y + 6;
+  const chartHeight = pageHeight - chartY - 40;
+  const chartX = 20;
+  const chartWidth = pageWidth - chartX - 14 - anchoTabla - 8;
+
+  if (data.granularidad === "Anual") {
+    dibujarBandaAnual(doc, data.puntos, data.hayHistorial, data.anio, chartX, chartY, chartWidth, chartHeight);
+  } else {
+    dibujarCorredorPeriodico(doc, data.puntos, data.hayHistorial, chartX, chartY, chartWidth, chartHeight);
+  }
+
+  // ── TABLA DE DATOS — la parte que realmente "dice números": período, casos y contra qué se compara. ──
+  const tablaX = chartX + chartWidth + 8;
+  let ty = chartY;
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.hayHistorial ? "PERÍODO / CASOS / MEDIANA" : "PERÍODO / CASOS", tablaX, ty);
+  ty += 4;
+  doc.setDrawColor(226, 232, 240);
+  doc.line(tablaX, ty, tablaX + anchoTabla, ty);
+  ty += 3.5;
+
+  doc.setFont("helvetica", "normal");
+  const filasTabla = puntosConDato.length > 0 ? puntosConDato : data.puntos.slice(0, 8);
+  const maxFilas = Math.floor((chartHeight - 6) / 4.2);
+  filasTabla.slice(0, maxFilas).forEach((p, i) => {
+    if (i % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(tablaX, ty - 2.8, anchoTabla, 4, "F");
+    }
+    doc.setFontSize(6.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text(p.etiqueta, tablaX + 1, ty);
+    doc.setFont("helvetica", "bold");
+    doc.text(String(p.casos ?? 0), tablaX + anchoTabla * 0.55, ty, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    if (data.hayHistorial) {
+      doc.setTextColor(100, 116, 139);
+      doc.text(`med. ${p.mediana}`, tablaX + anchoTabla, ty, { align: "right" });
+    }
+    ty += 4.2;
+  });
+  if (filasTabla.length > maxFilas) {
+    doc.setFontSize(6);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`... y ${filasTabla.length - maxFilas} período(s) más con casos`, tablaX + 1, ty);
+  }
+
+  // ── LEYENDA — igual a la de pantalla: distinta para Semana/Mes (corredor de 4 bandas +
+  // mediana + casos) que para Año (rango normal + años anteriores/consultado). ──
+  const ly = chartY + chartHeight + 14;
+  let lx = chartX;
+  const swCuadro = (color: [number, number, number]) => {
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.rect(lx, ly - 3, 3.5, 3.5, "F");
+  };
+  const swLinea = (color: [number, number, number], punteada = false) => {
+    doc.setDrawColor(color[0], color[1], color[2]);
+    doc.setLineWidth(0.5);
+    doc.setLineDashPattern(punteada ? [0.8, 0.6] : [], 0);
+    doc.line(lx, ly - 1.2, lx + 3.5, ly - 1.2);
+    doc.setLineDashPattern([], 0);
+  };
+  const swPunto = (color: [number, number, number]) => {
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.circle(lx + 1.75, ly - 1.2, 1, "F");
+  };
+  const etiquetaLeyenda = (texto: string) => {
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(texto, lx + 5, ly);
+    lx += doc.getTextWidth(texto) + 16;
+  };
+
+  if (!data.hayHistorial) {
+    swCuadro(ZONA_PDF_INFO.sin_historial.color);
+    etiquetaLeyenda("Sin historial suficiente para clasificar por zona");
+  } else if (data.granularidad === "Anual") {
+    swPunto([168, 85, 247]); etiquetaLeyenda("Años anteriores");
+    swPunto([14, 165, 233]); etiquetaLeyenda("Año consultado");
+    swCuadro(ZONA_CHART_COLOR.seguridad); etiquetaLeyenda("Rango normal (p25-p75)");
+    swLinea([100, 116, 139], true); etiquetaLeyenda("Mediana histórica");
+  } else {
+    swCuadro(ZONA_CHART_COLOR.exito); etiquetaLeyenda("Zona de éxito");
+    swCuadro(ZONA_CHART_COLOR.seguridad); etiquetaLeyenda("Zona de seguridad");
+    swCuadro(ZONA_CHART_COLOR.alarma); etiquetaLeyenda("Zona de alarma");
+    swCuadro(ZONA_CHART_COLOR.epidemia); etiquetaLeyenda("Zona de epidemia");
+    swLinea([100, 116, 139], true); etiquetaLeyenda("Mediana histórica");
+    swLinea([14, 165, 233]); etiquetaLeyenda(`Casos ${data.anio}`);
+  }
+
+  // ── PIE ──
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text(
+    "Generado automáticamente por Mediclinic Pro — Aurora+. Este documento es una referencia estadística de vigilancia epidemiológica, no reemplaza el criterio clínico.",
+    14,
+    pageHeight - 8
+  );
+
+  return doc;
+}
+
+export function generarPdfCanalEndemico(data: CanalEndemicoPdfData) {
+  const doc = construirDocCanalEndemico(data);
+  const ts = Date.now() % 100000;
+  doc.save(`Canal_Endemico_${data.cie10}_${data.anio}_${ts}.pdf`);
+}

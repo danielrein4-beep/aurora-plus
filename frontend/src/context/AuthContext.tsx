@@ -113,11 +113,16 @@ function marcarTenantVisitado(tenantId: number) {
 // que todavía no tiene su propia plantilla cae en "clinica" por defecto (ver
 // VERTICAL_METADATA en Dashboard.tsx), así que agregar aquí una vertical
 // nueva no rompe nada, solo mejora qué tan preciso se ve el panel.
+// Farmacia/Ferretería/Repuestos NO entran acá a propósito: comparten el mismo
+// motor (Aurora Retail) pero cada una necesita distinguirse de las otras dos
+// dentro de la app (FEFO/Principio Activo en Farmacia, catálogo de cruce en
+// Repuestos, fraccionado en Ferretería) — así que su "industry" es su propio
+// nombre de módulo tal cual, no una categoría compartida. Ver el fallback más
+// abajo y RetailApp.tsx.
 const MODULO_A_INDUSTRIA: Record<string, string> = {
   salud: "clinica",
   horeca: "restaurante",
   ganaderia: "finca",
-  repuestos: "ferreteria",
   moda: "ferreteria",
   minero: "mineria",
   "tamanaco-comercial": "mineria",
@@ -160,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const negocio = await obtenerMiNegocio();
         empresa = negocio.nombreEmpresa || empresa;
-        industry = MODULO_A_INDUSTRIA[negocio.moduloPrincipal] || "clinica";
+        industry = MODULO_A_INDUSTRIA[negocio.moduloPrincipal] || negocio.moduloPrincipal || "clinica";
       } catch {
         // Si mi-negocio falla usamos datos de la cuenta local si existen
         if (cuentaLocal) {
@@ -220,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       guardarSesion(sesion);
     }
 
-    const industry = MODULO_A_INDUSTRIA[datos.moduloPrincipal] || "clinica";
+    const industry = MODULO_A_INDUSTRIA[datos.moduloPrincipal] || datos.moduloPrincipal || "clinica";
     const nombreUsuario = datos.username?.includes("@") ? datos.username.split("@")[0] : datos.username || "Usuario";
 
     // Guardar cuenta registrada localmente para que sea recordada siempre en futuros inicios de sesión

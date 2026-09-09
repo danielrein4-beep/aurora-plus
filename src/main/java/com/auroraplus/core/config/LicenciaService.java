@@ -42,6 +42,11 @@ public class LicenciaService {
         NIVEL_REQUERIDO_POR_MODULO.put("minero", LicenciaTenant.TipoLicencia.COMERCIAL);
         NIVEL_REQUERIDO_POR_MODULO.put("horeca", LicenciaTenant.TipoLicencia.COMERCIAL);
         NIVEL_REQUERIDO_POR_MODULO.put("repuestos", LicenciaTenant.TipoLicencia.COMERCIAL);
+        // Farmacia y Ferretería comparten el mismo motor que Repuestos (Aurora
+        // Retail: mostrador + POS + inventario sobre el núcleo core) — mismo
+        // nivel de licencia que el resto de verticales de industria.
+        NIVEL_REQUERIDO_POR_MODULO.put("farmacia", LicenciaTenant.TipoLicencia.COMERCIAL);
+        NIVEL_REQUERIDO_POR_MODULO.put("ferreteria", LicenciaTenant.TipoLicencia.COMERCIAL);
         NIVEL_REQUERIDO_POR_MODULO.put("moda", LicenciaTenant.TipoLicencia.COMERCIAL);
         NIVEL_REQUERIDO_POR_MODULO.put("ganaderia", LicenciaTenant.TipoLicencia.COMERCIAL);
         NIVEL_REQUERIDO_POR_MODULO.put("salud", LicenciaTenant.TipoLicencia.COMERCIAL);
@@ -56,7 +61,7 @@ public class LicenciaService {
     // módulos núcleo (financiero, inventario, reportes, config) no están en
     // esta lista y siguen abiertos a cualquier tenant con licencia activa.
     private static final Set<String> VERTICALES_CONTROLADAS = Set.of(
-        "minero", "horeca", "repuestos", "moda", "ganaderia", "salud", "tamanaco-comercial"
+        "minero", "horeca", "repuestos", "farmacia", "ferreteria", "moda", "ganaderia", "salud", "tamanaco-comercial"
     );
 
     public static class ResultadoValidacion {

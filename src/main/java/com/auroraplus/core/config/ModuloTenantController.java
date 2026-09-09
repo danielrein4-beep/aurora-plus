@@ -138,4 +138,47 @@ public class ModuloTenantController {
         licenciaTenantRepository.save(licencia);
         return obtenerMarca();
     }
+
+    // --- Moneda base del negocio: hasta ahora solo un super-admin podía
+    // cambiarla (ver SuperAdminController.actualizar) — un negocio que
+    // factura y precia todo en Bs o en COP, no en USD, necesita poder
+    // elegirlo él mismo. MotorFinancieroService.obtenerMonedaBase ya lee
+    // este mismo campo, así que basta con exponerlo acá para que todo el
+    // motor financiero (tasas, conversiones, caja) lo respete de una.
+
+    private static final List<String> MONEDAS_VALIDAS = List.of("USD", "VES", "COP");
+
+    public static class MonedaBaseResponse {
+        public String monedaBase;
+        public MonedaBaseResponse(String monedaBase) { this.monedaBase = monedaBase; }
+    }
+
+    @GetMapping("/mi-negocio/moneda-base")
+    public MonedaBaseResponse obtenerMonedaBase() {
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        return new MonedaBaseResponse(licencia.getMonedaBase());
+    }
+
+    public static class ActualizarMonedaBaseRequest {
+        public String monedaBase;
+    }
+
+    @PutMapping("/mi-negocio/moneda-base")
+    public MonedaBaseResponse actualizarMonedaBase(@RequestBody ActualizarMonedaBaseRequest request) {
+        String rol = AuthContext.getRol();
+        if (!"DUENO_ADMIN".equals(rol)) {
+            throw new RuntimeException("Solo el Dueño/Administrador puede cambiar la moneda principal del negocio");
+        }
+        if (request.monedaBase == null || !MONEDAS_VALIDAS.contains(request.monedaBase)) {
+            throw new RuntimeException("Moneda inválida. Use una de: " + MONEDAS_VALIDAS);
+        }
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        licencia.setMonedaBase(request.monedaBase);
+        licenciaTenantRepository.save(licencia);
+        return new MonedaBaseResponse(licencia.getMonedaBase());
+    }
 }

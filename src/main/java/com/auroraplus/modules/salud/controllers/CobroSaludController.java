@@ -6,8 +6,6 @@ import com.auroraplus.modules.salud.entities.CobroConsulta;
 import com.auroraplus.modules.salud.entities.Paciente;
 import com.auroraplus.modules.salud.services.PacienteService;
 import com.auroraplus.modules.salud.services.SaludFinanzasService;
-import jakarta.persistence.EntityManager;
-import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -25,16 +23,6 @@ public class CobroSaludController {
 
     @Autowired
     private PacienteService pacienteService;
-
-    @Autowired
-    private EntityManager entityManager;
-
-    // Ver hallazgo de seguridad en PacienteController — el filtro de tenant
-    // del interceptor no llega vivo hasta esta query, hay que re-habilitarlo.
-    private void asegurarFiltroTenant() {
-        entityManager.unwrap(Session.class).enableFilter("tenantFilter")
-            .setParameter("tenantId", TenantContext.getCurrentTenant());
-    }
 
     @PostMapping
     public ResponseEntity<CobroConsulta> procesarCobro(
@@ -60,7 +48,6 @@ public class CobroSaludController {
 
     @GetMapping("/paciente/{pacienteId}")
     public List<CobroConsulta> historialPorPaciente(@PathVariable Long pacienteId) {
-        asegurarFiltroTenant();
         return saludFinanzasService.historialPorPaciente(pacienteId);
     }
 
@@ -68,7 +55,6 @@ public class CobroSaludController {
     public List<CobroConsulta> reporteCobros(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fin) {
-        asegurarFiltroTenant();
         return saludFinanzasService.listarPorRangoFechas(inicio, fin);
     }
 }

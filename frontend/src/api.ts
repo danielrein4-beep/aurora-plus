@@ -134,6 +134,15 @@ export function obtenerMiNegocio(): Promise<MiNegocio> {
   return request("/api/config/mi-negocio/marca");
 }
 
+/** Moneda principal del negocio (USD/VES/COP) — la usa todo el motor financiero (tasas, conversiones, caja) como base de precios. Solo el Dueño/Administrador la puede cambiar. */
+export function obtenerMonedaBaseNegocio(): Promise<{ monedaBase: string }> {
+  return request("/api/config/mi-negocio/moneda-base");
+}
+
+export function actualizarMonedaBaseNegocio(monedaBase: string): Promise<{ monedaBase: string }> {
+  return request("/api/config/mi-negocio/moneda-base", { method: "PUT", body: JSON.stringify({ monedaBase }) });
+}
+
 // --- Salud / Mediclinic Pro ---
 
 export interface Paciente {
@@ -573,6 +582,8 @@ export interface ConsultaMedica {
   id: number;
   motivoConsulta: string;
   descripcionDiagnostico?: string;
+  /** Código CIE-10 del diagnóstico principal — es el dato que alimenta el Canal Endémico (ver CanalEndemico.tsx). */
+  diagnosticoPrincipalCIE10?: string;
   planTratamiento?: string;
   anotacionesPrivadas?: string;
   observacionFisica?: string;
@@ -758,11 +769,12 @@ export function abrirComanda(tenantId: number, datos: {
 }
 
 export function agregarItemComanda(tenantId: number, comandaId: number, datos: {
-  escandalloId?: number; articuloId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number;
+  escandalloId?: number; articuloId?: number; fastBarTragoId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number;
 }): Promise<ItemComanda> {
   const params = new URLSearchParams({ tenantId: String(tenantId), cantidad: String(datos.cantidad) });
   if (datos.escandalloId != null) params.set("escandalloId", String(datos.escandalloId));
   if (datos.articuloId != null) params.set("articuloId", String(datos.articuloId));
+  if (datos.fastBarTragoId != null) params.set("fastBarTragoId", String(datos.fastBarTragoId));
   if (datos.nombrePlato) params.set("nombrePlato", datos.nombrePlato);
   if (datos.estacionCocina) params.set("estacionCocina", datos.estacionCocina);
   if (datos.precioUnitario != null) params.set("precioUnitario", String(datos.precioUnitario));
@@ -945,10 +957,6 @@ export function crearTragoFastBar(tenantId: number, datos: { nombreTrago: string
   return request(`/api/horeca/fastbar?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function venderTragoRapido(tenantId: number, fastBarTragoId: number, cantidadTragos: number): Promise<number> {
-  return request(`/api/horeca/fastbar/vender?tenantId=${tenantId}&fastBarTragoId=${fastBarTragoId}&cantidadTragos=${cantidadTragos}`, { method: "POST" });
-}
-
 export interface ProveedorHoreca {
   id: number;
   tenantId: number;
@@ -981,22 +989,174 @@ export interface Articulo {
   costoUnitario: number;
   precioVenta: number;
   stockMinimo: number | null;
+  // Moneda en la que se compró de verdad este artículo y el monto tal cual
+  // se tecleó en esa moneda (costoUnitario arriba siempre está en la moneda
+  // base del tenant, para que el margen/kardex funcione) — solo para
+  // mostrar "se compró en COP" en vez de forzar todo a la moneda base.
+  // Ausentes en artículos viejos.
+  monedaCosto?: string | null;
+  costoUnitarioOriginal?: number | null;
+  // Aurora Retail (Ferretería/Farmacia/Repuestos) — ambos opcionales, ausentes
+  // en artículos de otras verticales que no los usan.
+  codigoBarras?: string | null;
+  principioActivo?: string | null;
 }
 
 export function listarArticulos(): Promise<Articulo[]> {
   return request(`/api/inventario/articulos`);
 }
 
-export function crearArticulo(tenantId: number, datos: { sku: string; nombre: string; unidadMedida?: string; categoria?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number }): Promise<Articulo> {
+// costoUnitario va tal cual lo tecleó el usuario en `monedaCosto` (o en la
+// moneda base del tenant si se omite) — el backend lo convierte a la
+// moneda base antes de guardar.
+export function crearArticulo(tenantId: number, datos: { sku: string; nombre: string; unidadMedida?: string; categoria?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; monedaCosto?: string; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
   return request(`/api/inventario/articulos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
+// costoUnitario va tal cual lo tecleó el usuario en `moneda` (o en la moneda
+// base del tenant si se omite) — el backend lo convierte a la moneda base
+// antes de guardar.
 export function entradaArticulo(tenantId: number, articuloId: number, datos: { cantidad: number; costoUnitario?: number; motivo?: string; fechaVencimiento?: string; metodoPago?: string; moneda?: string }): Promise<unknown> {
   return request(`/api/inventario/articulos/${articuloId}/entrada?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function editarArticulo(tenantId: number, articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; sku?: string }): Promise<Articulo> {
+export function editarArticulo(tenantId: number, articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; sku?: string; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
   return request(`/api/inventario/articulos/${articuloId}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+// --- Presentaciones de artículo (six-pack, caja x24, etc.) ---
+
+export interface PresentacionArticulo {
+  id: number;
+  tenantId: number;
+  articulo: Articulo;
+  nombre: string;
+  unidadesPorPresentacion: number;
+  // "Pricing por volumen" (Ferretería) — null = se calcula como precioVenta del artículo × unidadesPorPresentacion.
+  precioVenta: number | null;
+}
+
+export function listarPresentaciones(articuloId: number): Promise<PresentacionArticulo[]> {
+  return request(`/api/inventario/presentaciones?articuloId=${articuloId}`);
+}
+
+export function crearPresentacion(tenantId: number, articuloId: number, datos: { nombre: string; unidadesPorPresentacion: number; precioVenta?: number }): Promise<PresentacionArticulo> {
+  return request(`/api/inventario/presentaciones?tenantId=${tenantId}&articuloId=${articuloId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+// --- Aurora Retail (Ferretería / Farmacia / Repuestos) ---
+
+export interface ProveedorRetail {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  rif: string | null;
+  telefono: string | null;
+  contacto: string | null;
+  direccion: string | null;
+  activo: boolean;
+}
+
+export function listarProveedoresRetail(): Promise<ProveedorRetail[]> {
+  return request(`/api/retail/proveedores`);
+}
+
+export function crearProveedorRetail(tenantId: number, datos: { nombre: string; rif?: string; telefono?: string; contacto?: string; direccion?: string }): Promise<ProveedorRetail> {
+  return request(`/api/retail/proveedores?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export interface ItemCompraRetail {
+  articuloId: number;
+  cantidad: number;
+  costoUnitario: number;
+  monedaCosto?: string;
+  presentacionId?: number;
+  fechaVencimiento?: string;
+}
+
+export interface CompraRetail {
+  id: number;
+  tenantId: number;
+  proveedor: ProveedorRetail;
+  numeroFactura: string | null;
+  fechaCompra: string;
+  total: number;
+  montoPagado: number | null;
+}
+
+export function listarComprasRetail(tenantId: number): Promise<CompraRetail[]> {
+  return request(`/api/retail/compras?tenantId=${tenantId}`);
+}
+
+export function registrarCompraRetail(tenantId: number, datos: { proveedorId: number; numeroFactura: string; items: ItemCompraRetail[]; montoPagadoAhora?: number; monedaPago?: string }): Promise<CompraRetail> {
+  return request(`/api/retail/compras?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+/** Búsqueda unificada del POS de mostrador: código de barras, nombre/SKU, principio activo (Farmacia) o código OEM (Repuestos). */
+export function buscarArticulosRetail(tenantId: number, texto: string): Promise<Articulo[]> {
+  return request(`/api/retail/articulos/buscar?tenantId=${tenantId}&texto=${encodeURIComponent(texto)}`);
+}
+
+export interface ItemVentaRetailRequest {
+  articuloId: number;
+  cantidad: number;
+  presentacionId?: number;
+}
+
+export interface ItemVentaRetail {
+  id: number;
+  articulo: Articulo;
+  presentacion: PresentacionArticulo | null;
+  cantidad: number;
+  precioUnitario: number;
+  costoUnitario: number;
+}
+
+export interface VentaRetail {
+  id: number;
+  tenantId: number;
+  cliente: Cliente | null;
+  total: number;
+  moneda: string;
+  esCredito: boolean;
+  fechaRegistro: string;
+}
+
+export function registrarVentaRetail(tenantId: number, datos: {
+  clienteId?: number; items: ItemVentaRetailRequest[]; esCredito?: boolean;
+  metodoPago?: string; monedaPago?: string; montoRecibido?: number;
+}): Promise<{ venta: VentaRetail; items: ItemVentaRetail[] }> {
+  return request(`/api/retail/ventas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function listarVentasRetail(tenantId: number): Promise<VentaRetail[]> {
+  return request(`/api/retail/ventas?tenantId=${tenantId}`);
+}
+
+// --- Catálogo de cruce (Repuestos): qué código OEM/vehículos cruzan con un artículo ---
+
+export interface CruceRepuesto {
+  id: number;
+  tenantId: number;
+  articulo: Articulo;
+  codigoOem: string;
+  marcaVehiculo: string;
+  modeloVehiculo: string;
+  anioDesde: number | null;
+  anioHasta: number | null;
+  notas: string | null;
+}
+
+export function listarCrucesPorArticulo(articuloId: number, tenantId: number): Promise<CruceRepuesto[]> {
+  return request(`/api/retail/cruces?articuloId=${articuloId}&tenantId=${tenantId}`);
+}
+
+export function crearCruceRepuesto(tenantId: number, articuloId: number, datos: { codigoOem: string; marcaVehiculo: string; modeloVehiculo: string; anioDesde?: number; anioHasta?: number; notas?: string }): Promise<CruceRepuesto> {
+  return request(`/api/retail/cruces?tenantId=${tenantId}&articuloId=${articuloId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function eliminarCruceRepuesto(id: number, tenantId: number): Promise<void> {
+  return request(`/api/retail/cruces/${id}?tenantId=${tenantId}`, { method: "DELETE" });
 }
 
 /** Corrección de inventario: indicá el stock REAL contado y el sistema calcula/ audita la diferencia solo. */
@@ -1053,6 +1213,43 @@ export interface CompraInsumoHoreca {
   montoPagado: number | null;
 }
 
+export interface ItemExtraidoFactura {
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+}
+
+export interface FacturaExtraidaOcr {
+  numeroFactura: string;
+  proveedor: string;
+  fecha: string;
+  items: ItemExtraidoFactura[];
+  total: number;
+}
+
+/** Sube una foto (o PDF) de la factura del proveedor y devuelve una PROPUESTA leída por IA — nunca registra la compra sola, el usuario revisa y confirma en el formulario. */
+export async function extraerFacturaOcr(archivo: File): Promise<FacturaExtraidaOcr> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const formData = new FormData();
+  formData.append("file", archivo);
+  const res = await fetch(`/api/ocr/facturas/extraer`, { method: "POST", body: formData, headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) {
+    let mensaje = `Error ${res.status}`;
+    try {
+      const body = await res.json();
+      mensaje = body.error || body.message || mensaje;
+    } catch {}
+    throw new ApiError(mensaje);
+  }
+  return res.json();
+}
+
 export function listarComprasInsumo(tenantId: number): Promise<CompraInsumoHoreca[]> {
   return request(`/api/horeca/compras-insumo?tenantId=${tenantId}`);
 }
@@ -1070,6 +1267,18 @@ export interface LoteArticulo {
 
 export function alertasVencimiento(tenantId: number, diasAnticipacion = 7): Promise<LoteArticulo[]> {
   return request(`/api/inventario/lotes/alertas-vencimiento?tenantId=${tenantId}&diasAnticipacion=${diasAnticipacion}`);
+}
+
+export interface InventarioKpis {
+  cajaHoy: number;
+  valorBodega: number;
+  gananciaProyectada: number;
+  alertasReposicion: number;
+}
+
+/** Panel de KPIs financieros de Inventario — caja neta de hoy, capital inmovilizado en bodega, utilidad proyectada y artículos que necesitan reposición. */
+export function kpisInventario(tenantId: number): Promise<InventarioKpis> {
+  return request(`/api/inventario/kpis?tenantId=${tenantId}`);
 }
 
 // --- Comandas: historial e ítems (antes solo se podía crear/modificar, no consultar) ---
@@ -1294,7 +1503,7 @@ export function obtenerCliente(tenantId: number, id: number): Promise<Cliente> {
   return request(`/api/crm/clientes/${id}?tenantId=${tenantId}`);
 }
 
-export function crearCliente(tenantId: number, datos: { nombre: string; identificacionRif?: string; telefono?: string; correo?: string }): Promise<Cliente> {
+export function crearCliente(tenantId: number, datos: { nombre?: string; identificacionRif?: string; telefono?: string; correo?: string }): Promise<Cliente> {
   return request(`/api/crm/clientes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
@@ -1324,5 +1533,242 @@ export function enviarEmailDocumento(datos: {
   return request(`/api/salud/documentos/enviar-email`, {
     method: "POST",
     body: JSON.stringify(datos),
+  });
+}
+
+// --- Canal Endémico (vigilancia epidemiológica a partir de los diagnósticos
+// CIE-10 que ya se registran en cada consulta médica) ---
+
+export interface DiagnosticoFrecuente {
+  cie10: string;
+  totalCasos: number;
+}
+
+export interface PuntoAnualCanal {
+  anio: number;
+  casos: number;
+}
+
+export interface PuntoMensualCanal {
+  anio: number;
+  mes: number;
+  casos: number;
+}
+
+export interface PuntoSemanalCanal {
+  semana: number;
+  casos: number;
+}
+
+export interface PuntoDelMesCanal {
+  mes: number;
+  casos: number;
+}
+
+/** Banda del corredor endémico para un período (`periodo` = número de semana ISO o de mes, según el arreglo donde venga). */
+export interface BandaPeriodoCanal {
+  periodo: number;
+  minimo: number;
+  percentil25: number;
+  mediana: number;
+  percentil75: number;
+  maximo: number;
+}
+
+/** Banda de referencia para la vista ANUAL — percentiles de los totales de los años históricos (excluye el año consultado), no un corredor por período (un año no se repite). */
+export interface ResumenAnualCanal {
+  minimo: number;
+  percentil25: number;
+  mediana: number;
+  percentil75: number;
+  maximo: number;
+  aniosUsados: number;
+}
+
+export interface CanalEndemico {
+  cie10: string;
+  anioConsultado: number;
+  totalCasosHistorico: number;
+  aniosHistoricosUsados: number;
+  porAnio: PuntoAnualCanal[];
+  porMes: PuntoMensualCanal[];
+  semanasAnioConsultado: PuntoSemanalCanal[];
+  corredorHistorico: BandaPeriodoCanal[];
+  mesesAnioConsultado: PuntoDelMesCanal[];
+  corredorHistoricoMensual: BandaPeriodoCanal[];
+  bandaReferenciaAnual: ResumenAnualCanal;
+  /** Años descartados del cálculo por ser brotes atípicos (ver CanalEndemicoService.detectarAniosAtipicos) — se excluyen para que no inflen el umbral de alerta. */
+  aniosExcluidosPorAtipicos: number[];
+}
+
+/** Diagnósticos más frecuentes de ESTE médico — para elegir cuál canal ver (aislado por tenant, como todo lo demás del módulo salud). */
+export function diagnosticosFrecuentesSalud(limite = 10): Promise<DiagnosticoFrecuente[]> {
+  return request(`/api/salud/canal-endemico/diagnosticos-frecuentes?limite=${limite}`);
+}
+
+/** Canal endémico de ESTE médico para un diagnóstico y año dados. */
+export function obtenerCanalEndemico(cie10: string, anio: number): Promise<CanalEndemico> {
+  return request(`/api/salud/canal-endemico?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
+}
+
+/** Vista consolidada de TODA la red (solo super-admin). */
+export function diagnosticosFrecuentesRed(limite = 20): Promise<DiagnosticoFrecuente[]> {
+  return request(`/api/super-admin/canal-endemico/diagnosticos-frecuentes?limite=${limite}`);
+}
+
+export function obtenerCanalEndemicoRed(cie10: string, anio: number): Promise<CanalEndemico> {
+  return request(`/api/super-admin/canal-endemico?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
+}
+
+export interface CasosPorClinica {
+  tenantId: number;
+  totalCasos: number;
+}
+
+export function desglosePorClinicaRed(cie10: string, anio: number): Promise<CasosPorClinica[]> {
+  return request(`/api/super-admin/canal-endemico/desglose-por-clinica?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
+}
+
+// --- Importación de historiales epidemiológicos desde Excel (ver
+// SaludImportacionHistoricaService en el backend) ---
+
+export interface ErrorFilaImportacion {
+  numeroFila: number;
+  motivo: string;
+}
+
+export interface ResultadoImportacionHistorica {
+  filasImportadas: number;
+  filasConError: number;
+  errores: ErrorFilaImportacion[];
+}
+
+/** Sube un .xlsx con el historial epidemiológico — multipart, por eso no usa request() (necesita dejar que el navegador ponga su propio Content-Type con el boundary). */
+export async function importarHistoricoExcel(archivo: File): Promise<ResultadoImportacionHistorica> {
+  const sesion = leerSesion();
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+
+  const res = await fetch("/api/salud/canal-endemico/historico/importar", {
+    method: "POST",
+    headers: sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {},
+    body: formData,
+  });
+  if (res.status === 401) {
+    throw new ApiError("Sesión vencida — vuelve a iniciar sesión");
+  }
+  if (!res.ok) {
+    let mensaje = `Error ${res.status}`;
+    try {
+      const body = await res.json();
+      mensaje = body.message || body.error || mensaje;
+    } catch {}
+    throw new ApiError(mensaje);
+  }
+  return res.json();
+}
+
+export interface ImportacionHistoricaResumen {
+  fuente: string;
+  filas: number;
+}
+
+export function listarImportacionesHistoricas(): Promise<ImportacionHistoricaResumen[]> {
+  return request(`/api/salud/canal-endemico/historico/importaciones`);
+}
+
+export function eliminarImportacionHistorica(fuente: string): Promise<void> {
+  return request(`/api/salud/canal-endemico/historico/importaciones/${encodeURIComponent(fuente)}`, { method: "DELETE" });
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// RED DE ÓRDENES Y RESULTADOS DE LABORATORIO (MEDICLINIC LAB NETWORK)
+// ══════════════════════════════════════════════════════════════════════════
+export interface AdjuntoResultadoLab {
+  id?: number;
+  nombreArchivo: string;
+  tipoMime: string;
+  contenidoBase64: string;
+}
+
+export interface ResultadoLaboratorio {
+  id?: number;
+  nombreLaboratorio: string;
+  bioanalistaResponsable: string;
+  colegiaturaBioanalista?: string;
+  fechaCarga: string;
+  informeDetallado?: string;
+  conclusionDiagnostica?: string;
+  observacionesMuestra?: string;
+  valoresCriticos: boolean;
+  detalleValoresCriticos?: string;
+  ipCarga?: string;
+  adjuntos?: AdjuntoResultadoLab[];
+}
+
+export interface OrdenLaboratorio {
+  id: number;
+  tenantId: number;
+  codigoOrden: string;
+  tokenSeguro: string;
+  pacienteId: number;
+  pacienteNombre: string;
+  pacienteCedula?: string;
+  pacienteTelefono?: string;
+  medicoId?: number;
+  medicoNombre?: string;
+  consultaId?: number;
+  fechaEmision: string;
+  estado: "EMITIDA" | "SELLADA" | "CANCELADA";
+  examenesSolicitados: string;
+  indicacionesClinicas?: string;
+  diagnosticoPresuntivo?: string;
+  laboratorioSugerido?: string;
+  revisadoPorMedico: boolean;
+  fechaRevisionMedico?: string;
+  notasRevisionMedico?: string;
+  resultado?: ResultadoLaboratorio;
+}
+
+export function crearOrdenLaboratorio(tenantId: number, orden: Partial<OrdenLaboratorio>): Promise<OrdenLaboratorio> {
+  return request(`/api/salud/laboratorio/ordenes?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(orden),
+  });
+}
+
+export function listarOrdenesLaboratorio(tenantId: number): Promise<OrdenLaboratorio[]> {
+  return request(`/api/salud/laboratorio/ordenes?tenantId=${tenantId}`);
+}
+
+export function listarOrdenesLaboratorioPaciente(tenantId: number, pacienteId: number): Promise<OrdenLaboratorio[]> {
+  return request(`/api/salud/laboratorio/ordenes/paciente/${pacienteId}?tenantId=${tenantId}`);
+}
+
+export function listarInboxLaboratorio(tenantId: number): Promise<OrdenLaboratorio[]> {
+  return request(`/api/salud/laboratorio/ordenes/inbox?tenantId=${tenantId}`);
+}
+
+export function contadorInboxLaboratorio(tenantId: number): Promise<{ pendientes: number }> {
+  return request(`/api/salud/laboratorio/ordenes/inbox/contador?tenantId=${tenantId}`);
+}
+
+export function marcarRevisadoOrdenLaboratorio(tenantId: number, id: number, notas?: string): Promise<OrdenLaboratorio> {
+  return request(`/api/salud/laboratorio/ordenes/${id}/revisar?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ notas }),
+  });
+}
+
+// Endpoints públicos para el bioanalista sin sesión
+export function consultarOrdenPublicaLaboratorio(token: string): Promise<any> {
+  return request(`/api/public/laboratorio/${token}`);
+}
+
+export function subirResultadoPublicoLaboratorio(token: string, payload: any): Promise<any> {
+  return request(`/api/public/laboratorio/${token}/subir`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }

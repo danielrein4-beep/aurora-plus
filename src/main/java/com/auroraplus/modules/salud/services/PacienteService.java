@@ -19,6 +19,13 @@ public class PacienteService {
         return pacienteRepository.findByActivoTrue();
     }
 
+    public List<Paciente> listarActivos(Long tenantId) {
+        if (tenantId != null) {
+            return pacienteRepository.findByTenantIdAndActivoTrue(tenantId);
+        }
+        return pacienteRepository.findByActivoTrue();
+    }
+
     public List<Paciente> buscar(String query) {
         if (query == null || query.isBlank()) {
             return pacienteRepository.findByActivoTrue();
@@ -26,11 +33,35 @@ public class PacienteService {
         return pacienteRepository.buscarPorFiltro(query.trim());
     }
 
+    public List<Paciente> buscar(Long tenantId, String query) {
+        if (tenantId != null) {
+            if (query == null || query.isBlank()) {
+                return pacienteRepository.findByTenantIdAndActivoTrue(tenantId);
+            }
+            return pacienteRepository.buscarPorFiltroYTenant(tenantId, query.trim());
+        }
+        return buscar(query);
+    }
+
     public Optional<Paciente> obtenerPorId(Long id) {
         return pacienteRepository.findById(id);
     }
 
+    public Optional<Paciente> obtenerPorId(Long tenantId, Long id) {
+        if (tenantId != null) {
+            return pacienteRepository.findByTenantIdAndId(tenantId, id);
+        }
+        return pacienteRepository.findById(id);
+    }
+
     public Optional<Paciente> obtenerPorIdentificacion(String identificacion) {
+        return pacienteRepository.findByIdentificacion(identificacion);
+    }
+
+    public Optional<Paciente> obtenerPorIdentificacion(Long tenantId, String identificacion) {
+        if (tenantId != null) {
+            return pacienteRepository.findByTenantIdAndIdentificacion(tenantId, identificacion);
+        }
         return pacienteRepository.findByIdentificacion(identificacion);
     }
 

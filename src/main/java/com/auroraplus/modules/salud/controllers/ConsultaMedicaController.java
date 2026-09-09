@@ -5,8 +5,6 @@ import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.ConsultaMedica;
 import com.auroraplus.modules.salud.services.ConsultaMedicaService;
 import com.auroraplus.modules.salud.services.MedicoTenantResolver;
-import jakarta.persistence.EntityManager;
-import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,16 +28,6 @@ public class ConsultaMedicaController {
 
     @Autowired
     private MedicoTenantResolver medicoTenantResolver;
-
-    @Autowired
-    private EntityManager entityManager;
-
-    // Ver hallazgo de seguridad en PacienteController — el filtro de tenant
-    // del interceptor no llega vivo hasta esta query, hay que re-habilitarlo.
-    private void asegurarFiltroTenant() {
-        entityManager.unwrap(Session.class).enableFilter("tenantFilter")
-            .setParameter("tenantId", TenantContext.getCurrentTenant());
-    }
 
     /**
      * Cada tenant de Salud es la práctica de UN SOLO médico — no hace falta
@@ -68,21 +56,18 @@ public class ConsultaMedicaController {
     @GetMapping("/paciente/{pacienteId}")
     public List<ConsultaMedica> historialPorPaciente(@PathVariable Long pacienteId) {
         validarPermisoClinico();
-        asegurarFiltroTenant();
         return consultaMedicaService.historialPorPaciente(pacienteId);
     }
 
     @GetMapping("/medico/{medicoId}")
     public List<ConsultaMedica> listarPorMedico(@PathVariable Long medicoId) {
         validarPermisoClinico();
-        asegurarFiltroTenant();
         return consultaMedicaService.listarPorMedico(medicoId);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ConsultaMedica> obtenerPorId(@PathVariable Long id) {
         validarPermisoClinico();
-        asegurarFiltroTenant();
         return consultaMedicaService.obtenerPorId(id)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
@@ -108,7 +93,6 @@ public class ConsultaMedicaController {
             @PathVariable Long id,
             @RequestParam(required = false) Long tenantId) {
         validarPermisoClinico();
-        asegurarFiltroTenant();
         consultaMedicaService.eliminarConsulta(id);
         return ResponseEntity.noContent().build();
     }

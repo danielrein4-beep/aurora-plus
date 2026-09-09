@@ -1,3 +1,4 @@
+import PortalPublicoBioanalista from "./pages/PortalPublicoBioanalista";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import Layout from "./Layout";
 import Home from "./pages/Home";
@@ -10,6 +11,7 @@ import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import MediclinicApp from "./components/MediclinicApp";
 import RestauranteApp from "./components/RestauranteApp";
+import RetailApp from "./components/RetailApp";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -28,6 +30,11 @@ function RestaurantePage() {
   return <RestauranteApp onSalir={() => navigate("/dashboard")} />;
 }
 
+function RetailPage() {
+  const navigate = useNavigate();
+  return <RetailApp onSalir={() => navigate("/dashboard")} />;
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -42,6 +49,8 @@ export default function App() {
               <Route path="/precios"    element={<Precios />} />
               <Route path="/nosotros"   element={<Nosotros />} />
             </Route>
+            {/* Portal público para laboratorios sin sesión */}
+            <Route path="/lab/:token" element={<PortalPublicoBioanalista />} />
             {/* Auth + onboarding — full screen con transiciones fluidas */}
             <Route path="/auth"       element={<AnimatedRoute><Auth /></AnimatedRoute>} />
             <Route path="/onboarding" element={<AnimatedRoute><Onboarding /></AnimatedRoute>} />
@@ -49,6 +58,7 @@ export default function App() {
             <Route path="/dashboard"  element={<ProtectedRoute><AnimatedRoute><Dashboard /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/mediclinic" element={<ProtectedRoute><AnimatedRoute><MediclinicPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/restaurante" element={<ProtectedRoute><AnimatedRoute><RestaurantePage /></AnimatedRoute></ProtectedRoute>} />
+            <Route path="/retail" element={<ProtectedRoute><AnimatedRoute><RetailPage /></AnimatedRoute></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

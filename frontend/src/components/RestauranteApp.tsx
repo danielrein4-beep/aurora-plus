@@ -17,6 +17,8 @@ import {
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
+  obtenerMonedaBaseNegocio, actualizarMonedaBaseNegocio,
+  extraerFacturaOcr,
   tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos, abonarMovimiento,
   cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria, reporteTickets,
   abrirTurno, turnoAbierto, historialTurnos, registrarEgresoTurno, cerrarTurno,
@@ -25,7 +27,8 @@ import {
   type EscandalloReceta, type DetalleReceta, type FastBarTrago, type ProveedorHoreca,
   type Articulo, type ItemCompraInsumo, type LoteArticulo, type TasaCambio, type MovimientoCaja,
   type ResumenPeriodoAbierto, type ArqueoCaja, type PagoParcial, type ResumenUtilidadProducto, type ReporteTicket, type Turno,
-  type ItemImportacionArticulo, type ResultadoImportacionArticulos, type Cliente, type MetricasCliente,
+  type ItemImportacionArticulo, type ResultadoImportacionArticulos, type Cliente, type MetricasCliente, type InventarioKpis,
+  type FacturaExtraidaOcr,
 } from "../api";
 
 type Pagina = "general" | "resumen" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
@@ -186,6 +189,12 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     setConfig(c);
     try { localStorage.setItem(CONFIG_KEY, JSON.stringify(c)); } catch {}
   };
+  // No todo negocio Horeca prepara platos con receta (una bodega o una venta
+  // de productos empacados no la usa) — a diferencia de Salón/Cocina, esto
+  // no es un gate de plan, es una preferencia del propio negocio, por eso el
+  // default es "activo" (comportamiento de siempre) hasta que alguien lo
+  // apague a propósito desde Configuración.
+  const recetasActivas = config.modulosActivos?.recetas !== false;
 
   const [modoClasico, setModoClasico] = useState(() => {
     try {
@@ -326,7 +335,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {NAV_GRUPOS.map((grupo) => (
             <div key={grupo.titulo} className="space-y-1">
               <div className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/25">{grupo.titulo}</div>
-              {sidebarItemsVisibles(grupo.items).map((n) => {
+              {sidebarItemsVisibles(grupo.items).filter((n) => n.id !== "recetas" || recetasActivas).map((n) => {
                 const alertaVencimiento = n.id === "inventario" && (lotesPorVencer || []).length > 0;
                 return (
                   <button
@@ -420,6 +429,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
               ventasHoy={ventasHoy} nombreLocal={config.nombreLocal} tasaValida={tasaValida}
               cargosPorDefecto={{ ...CARGOS_POR_DEFECTO, ...(config.cargosPorDefecto || {}) }}
               impuestosPorDefecto={{ ...IMPUESTOS_POR_DEFECTO, ...(config.impuestosPorDefecto || {}) }}
+              recetasActivas={recetasActivas}
               onVenta={(monto, metodo) => { registrarVenta(monto, metodo); }}
               onRegistrarTasa={() => setBloqueoTasa(true)}
               onArticuloActualizado={actualizarArticuloEnEstado} />
@@ -440,13 +450,27 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
               )
           )}
           {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} />)}
-          {pagina === "recetas" && <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} onCambio={recargarTodo} />}
+          {pagina === "recetas" && (recetasActivas
+            ? <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} onCambio={recargarTodo} />
+            : (
+              <div className="apple-glass rounded-2xl p-10 text-center space-y-3">
+                <IconFileText size={28} />
+                <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-lg">Recetas & Escandallo está desactivado</h3>
+                <p className="text-sm text-slate-500 dark:text-white/40 max-w-md mx-auto">
+                  Este negocio no lo necesita (ej. bodega o venta de productos empacados). Actívalo en Configuración si en algún momento empiezas a preparar platos con receta.
+                </p>
+                <button onClick={() => setPagina("configuracion")} className="g-aurora text-white text-xs font-semibold px-5 py-2.5 rounded-xl cursor-pointer">
+                  Ir a Configuración
+                </button>
+              </div>
+            )
+          )}
           {pagina === "compras" && (
             <ComprasProveedores tenantId={tenantId} proveedores={proveedores} articulos={articulos} onCambio={recargarTodo} />
           )}
           {pagina === "inventario" && <Inventario tenantId={tenantId} articulos={articulos} onCambio={recargarTodo} />}
           {pagina === "clientes" && <Clientes tenantId={tenantId} />}
-          {pagina === "administracion" && <Administracion tenantId={tenantId} />}
+          {pagina === "administracion" && <Administracion tenantId={tenantId} monedasActivas={{ ...MONEDAS_POR_DEFECTO, ...(config.monedasActivas || {}) }} />}
           {pagina === "estadisticas" && <ResumenFinanciero tenantId={tenantId} />}
           {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
@@ -685,18 +709,18 @@ function KpiCard({ label, val, sub, color, onClick }: { label: string; val: stri
  */
 function VistaGeneral({
   tenantId, escandallos, fastbar, articulos, tasaBcv, tasaCop, ventasHoy, nombreLocal, tasaValida,
-  cargosPorDefecto, impuestosPorDefecto, onVenta, onRegistrarTasa, onArticuloActualizado,
+  cargosPorDefecto, impuestosPorDefecto, recetasActivas, onVenta, onRegistrarTasa, onArticuloActualizado,
 }: {
   tenantId: number; escandallos: EscandalloReceta[] | null; fastbar: FastBarTrago[] | null; articulos: Articulo[] | null;
   tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null; ventasHoy: { total: number; moneda: string } | null; nombreLocal: string;
-  tasaValida: boolean; cargosPorDefecto: typeof CARGOS_POR_DEFECTO; impuestosPorDefecto: typeof IMPUESTOS_POR_DEFECTO;
+  tasaValida: boolean; cargosPorDefecto: typeof CARGOS_POR_DEFECTO; impuestosPorDefecto: typeof IMPUESTOS_POR_DEFECTO; recetasActivas: boolean;
   onVenta: (monto: number, metodo: string) => void; onRegistrarTasa: () => void;
   onArticuloActualizado: (articulo: Articulo) => void;
 }) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <VentaRapida
-        embebido tenantId={tenantId} escandallos={escandallos} fastbar={fastbar} articulos={articulos}
+        embebido tenantId={tenantId} escandallos={recetasActivas ? escandallos : []} fastbar={fastbar} articulos={articulos}
         tasaBcv={tasaBcv} tasaCop={tasaCop} ventasHoy={ventasHoy} nombreLocal={nombreLocal}
         tasaValida={tasaValida} cargosPorDefecto={cargosPorDefecto} impuestosPorDefecto={impuestosPorDefecto}
         onRegistrarTasa={onRegistrarTasa} onVenta={onVenta}
@@ -2119,6 +2143,21 @@ function calcularMargen(costo: number, precio: number): number | null {
   return ((precio - costo) / precio) * 100;
 }
 
+// costoUnitario/precioVenta de Articulo son SIEMPRE en la moneda base del
+// tenant en todo el sistema (así se usan para margen, kardex, catálogo del
+// POS, etc.) — pero un negocio puede comprar mercancía pagando en otra
+// moneda. El monto que escribe el cajero se manda tal cual junto con la
+// moneda elegida; es el backend (ArticuloController, con
+// MotorFinancieroService) el que convierte a la moneda base antes de
+// guardar — así solo hay un lugar haciendo esa conversión (antes el
+// frontend convertía a USD fijo acá mismo, lo que rompía en cuanto un
+// negocio configuraba una moneda base distinta a USD).
+/** "$4.50" en USD, "COP 4.500,00" en cualquier otra moneda — para mostrar un costo en la moneda en que de verdad se compró. */
+function fmtCostoEnMoneda(monto: number, moneda: string): string {
+  if (moneda === "USD" || !moneda) return `$${monto.toFixed(2)}`;
+  return `${moneda} ${monto.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 /**
  * Filtro defensivo para categorías de artículo: descarta vacíos y valores
  * puramente numéricos ("1", "2.5") — basura que puede colarse desde una
@@ -2227,7 +2266,21 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
   const [mostrarImportar, setMostrarImportar] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
-  const [form, setForm] = useState({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "" });
+  // Moneda base real del negocio (Configuración > Moneda principal) — el
+  // costo por defecto se asume tecleado en esta moneda, no en USD fijo.
+  const [monedaBaseTenant, setMonedaBaseTenant] = useState("USD");
+  useEffect(() => { monedaBase(tenantId).then(setMonedaBaseTenant).catch(() => {}); }, [tenantId]);
+  const [form, setForm] = useState({
+    nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "",
+    // Al cargar cantidad inicial, por defecto se asume que fue una compra
+    // real (el caso más común al operar el día a día) — el dueño puede
+    // destildarlo si en realidad está solo digitalizando stock que ya tenía.
+    registrarGasto: true, metodoPago: "EFECTIVO", moneda: "USD",
+  });
+  // El selector de moneda de la compra arranca en la moneda base real del
+  // negocio en cuanto se conoce (en vez de asumir USD) — solo la primera vez,
+  // para no pisar lo que el usuario ya haya elegido a mano.
+  useEffect(() => { setForm((f) => (f.moneda === "USD" ? { ...f, moneda: monedaBaseTenant } : f)); }, [monedaBaseTenant]);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -2248,23 +2301,33 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     setGuardando(true);
     setError(null);
     try {
+      // El costo se escribe en la moneda elegida para la compra (form.moneda,
+      // solo relevante si hay cantidad inicial + "registrar gasto"; si no, se
+      // asume tecleado en la moneda base del negocio) — se manda tal cual, es
+      // el backend (ArticuloController) el que lo convierte a la moneda base
+      // del tenant antes de guardarlo.
+      const monedaCompra = Number(form.cantidadInicial) > 0 && form.registrarGasto ? form.moneda : monedaBaseTenant;
+      const costoIngresado = Number(form.costoUnitario);
       const nuevo = await crearArticulo(tenantId, {
         sku: generarSku(form.nombre),
         nombre: form.nombre.trim(),
         unidadMedida: form.unidadMedida,
         categoria: form.categoria.trim(),
-        costoUnitario: Number(form.costoUnitario),
+        costoUnitario: costoIngresado,
         precioVenta: Number(form.precioVenta),
+        monedaCosto: monedaCompra,
       });
       if (form.cantidadInicial && Number(form.cantidadInicial) > 0) {
         await entradaArticulo(tenantId, nuevo.id, {
           cantidad: Number(form.cantidadInicial),
-          costoUnitario: Number(form.costoUnitario),
+          costoUnitario: costoIngresado,
           motivo: "Carga inicial de inventario",
           fechaVencimiento: form.fechaVencimiento || undefined,
+          metodoPago: form.registrarGasto ? form.metodoPago : undefined,
+          moneda: form.registrarGasto ? form.moneda : undefined,
         });
       }
-      setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "" });
+      setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "", registrarGasto: true, metodoPago: "EFECTIVO", moneda: monedaBaseTenant });
       setMostrarForm(false);
       onCambio();
     } catch (e) {
@@ -2342,10 +2405,10 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
             </Campo>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-300/50 dark:border-white/10">
-            <Campo label="Costo unitario $">
+            <Campo label={`Costo unitario (${Number(form.cantidadInicial) > 0 && form.registrarGasto ? form.moneda : monedaBaseTenant})`}>
               <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
-            <Campo label="Precio de venta $">
+            <Campo label={`Precio de venta (siempre en ${monedaBaseTenant})`}>
               <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
             <Campo label={`Cantidad a ingresar ahora (${form.unidadMedida})`}>
@@ -2353,6 +2416,31 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
               <p className="text-[10px] text-slate-400 mt-1">Cuánto tenés físicamente de este producto ahora mismo. Podés dejarlo en 0 y cargar stock después con "Reabastecer".</p>
             </Campo>
           </div>
+          {Number(form.cantidadInicial) > 0 && (
+            <div className="space-y-2 pt-2 border-t border-slate-300/50 dark:border-white/10">
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-white/60 cursor-pointer">
+                <input type="checkbox" checked={form.registrarGasto} onChange={(e) => setForm({ ...form, registrarGasto: e.target.checked })} className="cursor-pointer" />
+                Esto fue una compra — registrar el gasto en caja
+              </label>
+              {form.registrarGasto && (
+                <div className="grid grid-cols-2 gap-3">
+                  <Campo label="¿Cómo la pagaste?">
+                    <select value={form.metodoPago} onChange={(e) => setForm({ ...form, metodoPago: e.target.value })} className="input-horeca">
+                      <option value="EFECTIVO">Efectivo</option>
+                      <option value="TARJETA">Tarjeta</option>
+                      <option value="TRANSFERENCIA">Transferencia</option>
+                      <option value="BILLETERA_DIGITAL">Billetera digital</option>
+                    </select>
+                  </Campo>
+                  <Campo label="Moneda">
+                    <select value={form.moneda} onChange={(e) => setForm({ ...form, moneda: e.target.value })} className="input-horeca">
+                      {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </Campo>
+                </div>
+              )}
+            </div>
+          )}
           {(form.costoUnitario || form.precioVenta) && (
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-semibold text-slate-500 dark:text-white/40">Margen de utilidad bruta:</span>
@@ -2596,7 +2684,12 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
   const margenActual = calcularMargen(Number(articulo.costoUnitario), Number(articulo.precioVenta ?? 0));
   const sinStock = Number(articulo.stockActual) <= 0;
   const stockBajo = !sinStock && articulo.stockMinimo != null && Number(articulo.stockActual) <= Number(articulo.stockMinimo);
-  const valorInventario = Number(articulo.costoUnitario) * Number(articulo.stockActual);
+  // Costo/Valor se muestran en la moneda en que de verdad se compró (ej.
+  // "COP 4.500,00"), no forzados a dólares — costoUnitario en USD sigue
+  // siendo la fuente de verdad para margen/kardex, esto es solo visual.
+  const monedaCosto = articulo.monedaCosto || "USD";
+  const costoEnMoneda = articulo.costoUnitarioOriginal ?? Number(articulo.costoUnitario);
+  const valorInventario = costoEnMoneda * Number(articulo.stockActual);
 
   const guardarAjuste = async () => {
     if (stockReal === "" || Number(stockReal) < 0) { setError("Indicá el stock real contado"); return; }
@@ -2626,41 +2719,57 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
     }
   };
 
-  // Avatar de 2 letras a partir del nombre — un color fijo y siempre legible
-  // (no depende de dark:, mismo criterio que ya se aplicó al resto del
-  // módulo tras encontrar varios casos de texto invisible en Modo Clásico).
-  const iniciales = articulo.nombre.trim().slice(0, 2).toUpperCase();
-
   return (
     <>
-      <tr className={`border-b border-slate-200/50 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${sinStock ? "bg-red-500/5" : stockBajo ? "bg-amber-500/5" : ""}`}>
-        <td className="py-2 pl-3 pr-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 flex-shrink-0 bg-[#E8ECE9] text-[#2B4C3F] font-bold flex items-center justify-center rounded-md text-[11px]">
-              {iniciales}
-            </div>
-            <div className="min-w-0">
-              <div className="font-semibold text-slate-800 dark:text-white/80 truncate max-w-[180px]">{articulo.nombre}</div>
-              <div className="text-[10px] text-slate-400 dark:text-white/30">{articulo.categoria || "Sin categoría"}</div>
-            </div>
+      <tr className={`border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors ${
+        sinStock ? "border-l-2 border-l-red-400" : stockBajo ? "border-l-2 border-l-amber-400" : "border-l-2 border-l-transparent"
+      }`}>
+        <td className="py-2.5 pl-3 pr-2">
+          <div className="min-w-0">
+            <div className="font-semibold text-slate-800 dark:text-white/80 truncate max-w-[220px]">{articulo.nombre}</div>
+            <div className="text-[10px] text-slate-400 dark:text-white/30">{articulo.categoria || "Sin categoría"}</div>
           </div>
         </td>
-        <td className="py-2 px-2 font-mono text-slate-500 dark:text-white/40 whitespace-nowrap">{articulo.sku || "—"}</td>
-        <td className={`py-2 px-2 text-right font-semibold whitespace-nowrap ${sinStock ? "text-red-500" : stockBajo ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-white/70"}`}>
-          {Number(articulo.stockActual).toFixed(2)} {articulo.unidadMedida}
+        <td className="py-2.5 px-2 font-mono text-slate-400 dark:text-white/30 whitespace-nowrap">{articulo.sku || "—"}</td>
+        <td className="py-2.5 px-2 text-right whitespace-nowrap">
+          <span className={`font-semibold ${sinStock ? "text-red-500" : stockBajo ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-white/70"}`}>
+            {Number(articulo.stockActual).toFixed(2)} {articulo.unidadMedida}
+          </span>
+          {sinStock && <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wide text-red-400">Agotado</span>}
+          {stockBajo && <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wide text-amber-500">Bajo mínimo</span>}
         </td>
-        <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60 whitespace-nowrap">${Number(articulo.costoUnitario).toFixed(2)}</td>
-        <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60 whitespace-nowrap">${Number(articulo.precioVenta ?? 0).toFixed(2)}</td>
-        <td className="py-2 px-2 text-right font-mono font-semibold text-slate-800 dark:text-white/80 whitespace-nowrap">${valorInventario.toFixed(2)}</td>
-        <td className="py-2 pl-2 pr-3">
-          <div className="flex items-center justify-end gap-1">
-            <button onClick={() => setModo("reabastecer")} title="Añadir inventario" className="text-emerald-600 dark:text-emerald-300 hover:text-emerald-700 cursor-pointer p-1"><IconDownload size={14} /></button>
-            <button onClick={() => setModo("ajustar")} title="Corregir stock (conteo físico)" className="text-slate-400 hover:text-teal-500 cursor-pointer p-1"><IconRefresh size={14} /></button>
-            <button onClick={() => setModo("editar")} title="Editar artículo" className="text-slate-400 hover:text-teal-500 cursor-pointer p-1"><IconCustomize size={14} /></button>
-            <button onClick={eliminar} disabled={guardando} title="Eliminar artículo" className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40 p-1"><IconTrash size={14} /></button>
+        {/* Costo/Precio/Valor en $0 se atenúan a propósito — con catálogos
+            recién cargados o sin precio definido todavía, la mitad de la
+            tabla puede estar en cero; que compitan visualmente con los
+            datos reales solo agrega ruido. */}
+        <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${costoEnMoneda === 0 ? "text-slate-300 dark:text-white/15" : "text-slate-600 dark:text-white/60"}`}>{fmtCostoEnMoneda(costoEnMoneda, monedaCosto)}</td>
+        <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${Number(articulo.precioVenta ?? 0) === 0 ? "text-slate-300 dark:text-white/15" : "text-slate-600 dark:text-white/60"}`}>${Number(articulo.precioVenta ?? 0).toFixed(2)}</td>
+        <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${valorInventario === 0 ? "text-slate-300 dark:text-white/15 font-semibold" : "text-slate-800 dark:text-white/80 font-semibold"}`}>{fmtCostoEnMoneda(valorInventario, monedaCosto)}</td>
+        <td className="py-2.5 pl-2 pr-3">
+          {/* Color permanente por acción (no solo al hover) — con 4 íconos
+              finos del mismo gris eran indistinguibles a simple vista; ahora
+              cada uno tiene su propio color + fondo, se leen como 4 botones
+              distintos en vez de una fila de trazos iguales. */}
+          <div className="flex items-center justify-end gap-1.5">
+            <button onClick={() => setModo("reabastecer")} title="Añadir inventario (reabastecer)"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 cursor-pointer transition-colors"><IconDownload size={16} /></button>
+            <button onClick={() => setModo("ajustar")} title="Corregir stock (conteo físico)"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-500/20 cursor-pointer transition-colors"><IconRefresh size={16} /></button>
+            <button onClick={() => setModo("editar")} title="Editar artículo"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/20 cursor-pointer transition-colors"><IconCustomize size={16} /></button>
+            <button onClick={eliminar} disabled={guardando} title="Eliminar artículo"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-red-50 dark:bg-red-500/10 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 cursor-pointer disabled:opacity-40 transition-colors"><IconTrash size={16} /></button>
           </div>
         </td>
       </tr>
+      {modo === "ver" && error && (
+        <tr className="border-b border-slate-100 dark:border-white/5 bg-red-50 dark:bg-red-500/5">
+          <td colSpan={7} className="px-3 py-2 flex items-center justify-between gap-3">
+            <span className="text-[11px] text-red-600 dark:text-red-400">{error}</span>
+            <button onClick={() => setError(null)} className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 cursor-pointer flex-shrink-0">Cerrar</button>
+          </td>
+        </tr>
+      )}
       {modo === "ajustar" && (
         <tr className="border-b border-slate-200/50 dark:border-white/5 bg-slate-50 dark:bg-white/5">
           <td colSpan={7} className="px-3 py-2">
@@ -2700,7 +2809,16 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
   const [costoUnitario, setCostoUnitario] = useState(String(articulo.costoUnitario));
   const [precioVenta, setPrecioVenta] = useState(String(articulo.precioVenta ?? 0));
   const [metodoPago, setMetodoPago] = useState("EFECTIVO");
+  // Moneda base real del negocio — el selector arranca acá (no en USD fijo)
+  // en cuanto se conoce, salvo que el usuario ya haya elegido otra a mano.
+  const [monedaBaseTenant, setMonedaBaseTenant] = useState("USD");
   const [moneda, setMoneda] = useState("USD");
+  useEffect(() => {
+    monedaBase(tenantId).then((m) => {
+      setMonedaBaseTenant(m);
+      setMoneda((actual) => (actual === "USD" ? m : actual));
+    }).catch(() => {});
+  }, [tenantId]);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2714,6 +2832,9 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
     setGuardando(true);
     setError(null);
     try {
+      // El costo se manda tal cual lo tecleó el usuario junto con `moneda` — es
+      // el backend (ArticuloController) el que lo convierte a la moneda base
+      // del tenant antes de guardarlo.
       await entradaArticulo(tenantId, articulo.id, {
         cantidad: Number(cantidad), costoUnitario: Number(costoUnitario),
         motivo: "Reabastecimiento rápido", fechaVencimiento: fechaVencimiento || undefined,
@@ -2741,11 +2862,14 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
           <Campo label={`Cantidad a sumar (${articulo.unidadMedida})`}>
             <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} type="number" step="0.001" min="0.001" placeholder="0" className="input-horeca" autoFocus />
           </Campo>
-          <Campo label="Costo unitario $">
+          <Campo label={`Costo unitario (${moneda})`}>
             <input value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
           </Campo>
         </div>
-        <Campo label="Precio de venta $">
+        {moneda !== monedaBaseTenant && (
+          <p className="text-[10px] text-slate-400">El costo se guarda convertido a {monedaBaseTenant} con la tasa vigente al momento de guardar — todo el sistema valora el inventario en esa moneda.</p>
+        )}
+        <Campo label={`Precio de venta (siempre en ${monedaBaseTenant})`}>
           <input value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
         </Campo>
         <div className="flex items-center gap-2">
@@ -2862,11 +2986,75 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [exito, setExito] = useState(false);
+  const [leyendoFoto, setLeyendoFoto] = useState(false);
+  const [avisoOcr, setAvisoOcr] = useState<string | null>(null);
+  const inputFotoRef = useRef<HTMLInputElement | null>(null);
 
   const actualizarFila = (idx: number, campo: keyof FilaCompra, valor: string) => {
     setFilas((prev) => prev.map((f, i) => (i === idx ? { ...f, [campo]: valor } : f)));
   };
   const agregarFila = () => setFilas((prev) => [...prev, filaVacia()]);
+
+  // Busca el artículo cuyo nombre o SKU más se acerque a la descripción leída por IA —
+  // coincidencia simple por inclusión de texto, nunca exacta (la IA transcribe con variaciones).
+  const buscarArticuloPorDescripcion = (descripcion: string): Articulo | null => {
+    const q = descripcion.trim().toLowerCase();
+    if (!q || !articulos) return null;
+    return (
+      articulos.find((a) => a.nombre.toLowerCase() === q) ||
+      articulos.find((a) => a.nombre.toLowerCase().includes(q) || q.includes(a.nombre.toLowerCase())) ||
+      articulos.find((a) => a.sku.toLowerCase() === q) ||
+      null
+    );
+  };
+
+  const subirFotoFactura = async (file: File) => {
+    setLeyendoFoto(true);
+    setError(null);
+    setAvisoOcr(null);
+    try {
+      const datos = await extraerFacturaOcr(file);
+
+      if (datos.numeroFactura) setNumeroFactura(datos.numeroFactura);
+
+      if (datos.proveedor && proveedores) {
+        const pNombre = datos.proveedor.trim().toLowerCase();
+        const match = proveedores.find(
+          (p) => p.nombre.toLowerCase() === pNombre || p.nombre.toLowerCase().includes(pNombre) || pNombre.includes(p.nombre.toLowerCase())
+        );
+        if (match) setProveedorId(String(match.id));
+      }
+
+      const nuevasFilas: FilaCompra[] = (datos.items || [])
+        .filter((it) => it.descripcion)
+        .map((it) => {
+          const encontrado = buscarArticuloPorDescripcion(it.descripcion);
+          return {
+            articuloId: encontrado ? String(encontrado.id) : "",
+            cantidad: it.cantidad ? String(it.cantidad) : "",
+            costoUnitario: it.precioUnitario ? String(it.precioUnitario) : "",
+            fechaVencimiento: "",
+          };
+        });
+
+      if (nuevasFilas.length === 0) {
+        setError("La foto no arrojó ítems legibles — cárgalos manualmente o probá con una foto más clara.");
+      } else {
+        setFilas(nuevasFilas);
+        const sinMatch = nuevasFilas.filter((f) => !f.articuloId).length;
+        setAvisoOcr(
+          sinMatch === 0
+            ? `Se leyeron ${nuevasFilas.length} artículos y se emparejaron todos con tu inventario. Revisa cantidades y costos antes de guardar.`
+            : `Se leyeron ${nuevasFilas.length} artículos. ${sinMatch} no se pudieron emparejar con tu inventario — selecciónalos manualmente en la lista. Revisa todo antes de guardar.`
+        );
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo leer la factura");
+    } finally {
+      setLeyendoFoto(false);
+      if (inputFotoRef.current) inputFotoRef.current.value = "";
+    }
+  };
   const quitarFila = (idx: number) => setFilas((prev) => prev.filter((_, i) => i !== idx));
 
   const totalCompra = filas.reduce((s, f) => s + (Number(f.cantidad) || 0) * (Number(f.costoUnitario) || 0), 0);
@@ -2911,6 +3099,28 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
       <p className="text-xs text-slate-500 dark:text-white/40 max-w-xl">
         Si el insumo tiene fecha de vencimiento, indícala aquí — Aurora crea automáticamente el lote y te avisará en <strong>Vencimientos</strong> cuando esté por caducar.
       </p>
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <input
+          ref={inputFotoRef}
+          type="file"
+          accept="image/*,application/pdf"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFotoFactura(f); }}
+        />
+        <button
+          type="button"
+          onClick={() => inputFotoRef.current?.click()}
+          disabled={leyendoFoto}
+          className="flex items-center gap-2 apple-glass-btn text-xs font-semibold py-2 px-3.5 rounded-xl cursor-pointer disabled:opacity-60"
+        >
+          <IconFileText size={14} />
+          {leyendoFoto ? "Leyendo factura…" : "Cargar con foto de la factura"}
+        </button>
+        <span className="text-[10px] text-slate-400">Sube una foto o PDF y Aurora completa los artículos, cantidades y costos — siempre revisa antes de guardar.</span>
+      </div>
+      {avisoOcr && <p className="text-xs text-teal-600 dark:text-teal-400">{avisoOcr}</p>}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)} className="input-horeca">
@@ -3063,12 +3273,18 @@ function Vencimientos({ tenantId, onCambio }: { tenantId: number; onCambio: () =
 // cada venta, sin tener que escribir el monto/porcentaje cada vez.
 const CARGOS_POR_DEFECTO = { propinaPct: 10, deliveryMonto: 2, empaqueMonto: 0.5, comisionPct: 3 };
 const IMPUESTOS_POR_DEFECTO = { ivaPct: 16, igtfPct: 3 };
+// USD siempre está disponible como moneda de cobro/gasto (sin importar cuál
+// sea la moneda base del negocio) — VES/COP se pueden apagar si el negocio
+// no opera con esa moneda (ej. lejos de la frontera colombiana).
+const MONEDAS_POR_DEFECTO = { VES: true, COP: true };
 
 function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; config: any; onGuardar: (c: any) => void }) {
   const [form, setForm] = useState({
     ...config,
     cargosPorDefecto: { ...CARGOS_POR_DEFECTO, ...(config.cargosPorDefecto || {}) },
     impuestosPorDefecto: { ...IMPUESTOS_POR_DEFECTO, ...(config.impuestosPorDefecto || {}) },
+    modulosActivos: { recetas: true, ...(config.modulosActivos || {}) },
+    monedasActivas: { ...MONEDAS_POR_DEFECTO, ...(config.monedasActivas || {}) },
   });
   const [guardado, setGuardado] = useState(false);
 
@@ -3088,6 +3304,8 @@ function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; conf
           {guardado ? "✓ Guardado" : "Guardar configuración"}
         </button>
       </div>
+
+      <MonedaBaseNegocio />
 
       <div className="apple-glass rounded-2xl p-6 space-y-4">
         <div>
@@ -3132,16 +3350,118 @@ function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; conf
         <p className="text-[10px] text-slate-400">IGTF aplica típicamente a pagos en divisas (efectivo USD, tarjeta internacional) — actívalo según el método de pago de cada venta, no todas lo requieren.</p>
       </div>
 
-      <TasasDeCambio tenantId={tenantId} />
+      <div className="apple-glass rounded-2xl p-6 space-y-4">
+        <div>
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Módulos del negocio</h3>
+          <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">No todos los Horeca preparan platos con receta — apágalo si no aplica y desaparece del menú y del catálogo de venta.</p>
+        </div>
+        <label className="flex items-center justify-between gap-3 cursor-pointer">
+          <div>
+            <div className="text-sm font-semibold text-slate-800 dark:text-white/80">Recetas & Escandallo</div>
+            <div className="text-[11px] text-slate-500 dark:text-white/40">Para cocinas que arman platos a partir de ingredientes. Una bodega o venta de productos empacados no lo necesita.</div>
+          </div>
+          <button type="button" onClick={() => setForm({ ...form, modulosActivos: { ...form.modulosActivos, recetas: !form.modulosActivos.recetas } })}
+            className={`w-11 h-6 rounded-full transition-colors relative p-0.5 cursor-pointer flex-shrink-0 ${form.modulosActivos.recetas ? "bg-teal-600" : "bg-slate-300 dark:bg-white/15"}`}>
+            <div className={`w-5 h-5 rounded-full bg-white transition-transform ${form.modulosActivos.recetas ? "translate-x-5" : "translate-x-0"}`} />
+          </button>
+        </label>
+      </div>
+
+      <div className="apple-glass rounded-2xl p-6 space-y-4">
+        <div>
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Monedas activas</h3>
+          <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">USD siempre está disponible para cobros y gastos. Apaga las que tu negocio no use — dejan de pedirse en cobros y desaparecen de los totales.</p>
+        </div>
+        {([["VES", "Bolívares (VES)"], ["COP", "Pesos colombianos (COP)"]] as const).map(([clave, label]) => (
+          <label key={clave} className="flex items-center justify-between gap-3 cursor-pointer">
+            <div className="text-sm font-semibold text-slate-800 dark:text-white/80">{label}</div>
+            <button type="button" onClick={() => setForm({ ...form, monedasActivas: { ...form.monedasActivas, [clave]: !form.monedasActivas[clave] } })}
+              className={`w-11 h-6 rounded-full transition-colors relative p-0.5 cursor-pointer flex-shrink-0 ${form.monedasActivas[clave] ? "bg-teal-600" : "bg-slate-300 dark:bg-white/15"}`}>
+              <div className={`w-5 h-5 rounded-full bg-white transition-transform ${form.monedasActivas[clave] ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </label>
+        ))}
+      </div>
+
+      <TasasDeCambio tenantId={tenantId} monedasActivas={form.monedasActivas} />
     </div>
   );
 }
 
-function TasasDeCambio({ tenantId }: { tenantId: number }) {
-  const PARES = [
-    { origen: "USD", destino: "VES", label: "Dólar → Bolívar (BCV)" },
-    { origen: "USD", destino: "COP", label: "Dólar → Peso colombiano" },
-  ];
+/**
+ * Moneda principal del negocio — a diferencia de "Monedas activas" (que solo
+ * decide cuáles aparecen como opción), esto es la moneda en la que el motor
+ * financiero entero valora todo: precios, costos, caja. Antes solo un
+ * super-admin la podía cambiar; ahora el propio Dueño/Administrador puede.
+ */
+function MonedaBaseNegocio() {
+  const [monedaBase, setMonedaBaseState] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [guardado, setGuardado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    obtenerMonedaBaseNegocio().then((r) => setMonedaBaseState(r.monedaBase)).catch(() => setMonedaBaseState("USD"));
+  }, []);
+
+  const cambiar = async (nueva: string) => {
+    if (nueva === monedaBase) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      const r = await actualizarMonedaBaseNegocio(nueva);
+      setMonedaBaseState(r.monedaBase);
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cambiar la moneda principal");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="apple-glass rounded-2xl p-6 space-y-4">
+      <div>
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Moneda principal del negocio</h3>
+        <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">
+          En qué moneda opera tu negocio de fondo: precios, costos y caja se valoran en esta. Cambiarla no convierte los montos ya guardados — solo cambia con qué se mide todo de ahora en adelante.
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        {["USD", "VES", "COP"].map((m) => (
+          <button key={m} type="button" onClick={() => cambiar(m)} disabled={guardando || monedaBase === null}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all disabled:opacity-50 ${
+              monedaBase === m ? "bg-teal-600 text-white" : "bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-300/60 dark:hover:bg-white/15"
+            }`}>
+            {m}
+          </button>
+        ))}
+        {guardando && <span className="text-[11px] text-slate-400">Guardando…</span>}
+        {guardado && <span className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold">✓ Guardado</span>}
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+function TasasDeCambio({ tenantId, monedasActivas }: { tenantId: number; monedasActivas: typeof MONEDAS_POR_DEFECTO }) {
+  // Las tasas se piden SIEMPRE respecto a la moneda base real del negocio
+  // (Configuración > Moneda principal), no fijas en USD: un negocio que
+  // opera en COP necesita registrar "COP → USD" y "COP → VES", no al revés
+  // — es la dirección que de verdad usa el motor de conversión al valorar
+  // todo en la moneda base (MotorFinancieroService.convertirAMonedaBase).
+  const [monedaBaseTenant, setMonedaBaseTenant] = useState<string | null>(null);
+  useEffect(() => { monedaBase(tenantId).then(setMonedaBaseTenant).catch(() => setMonedaBaseTenant("USD")); }, [tenantId]);
+
+  const TODAS_LAS_MONEDAS = ["USD", "VES", "COP"];
+  const monedasHabilitadas = TODAS_LAS_MONEDAS.filter((m) => m === "USD" || monedasActivas[m as keyof typeof monedasActivas]);
+  const NOMBRE_MONEDA: Record<string, string> = { USD: "Dólar", VES: "Bolívar", COP: "Peso colombiano" };
+  const PARES = monedaBaseTenant
+    ? monedasHabilitadas
+        .filter((m) => m !== monedaBaseTenant)
+        .map((m) => ({ origen: monedaBaseTenant, destino: m, label: `${NOMBRE_MONEDA[monedaBaseTenant] || monedaBaseTenant} → ${NOMBRE_MONEDA[m] || m}` }))
+    : [];
 
   const [vigentes, setVigentes] = useState<Record<string, TasaCambio | null>>({});
   const [nuevaTasa, setNuevaTasa] = useState<Record<string, string>>({});
@@ -3157,7 +3477,8 @@ function TasasDeCambio({ tenantId }: { tenantId: number }) {
         .catch(() => setVigentes((prev) => ({ ...prev, [clave(p.origen, p.destino)]: null })));
     });
   };
-  useEffect(() => { cargar(); }, [tenantId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (monedaBaseTenant) cargar(); }, [tenantId, monedaBaseTenant, JSON.stringify(monedasActivas)]);
 
   const actualizar = async (par: typeof PARES[number]) => {
     const k = clave(par.origen, par.destino);
@@ -3237,7 +3558,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   // decide si los activa en esta venta puntual, no los vuelve a escribir.
   cargosPorDefecto?: typeof CARGOS_POR_DEFECTO; impuestosPorDefecto?: typeof IMPUESTOS_POR_DEFECTO;
 }) {
-  interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; estacionCocina?: string }
+  interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; fastBarTragoId?: number; estacionCocina?: string }
   interface ReciboVenta {
     comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string;
     totalRecibido?: number; vuelto?: number; monedaVuelto?: string;
@@ -3284,9 +3605,16 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   // siempre. Nada de esto toca el flujo hasta que el cajero abre el
   // buscador de cliente a propósito.
   const [clienteSel, setClienteSel] = useState<Cliente | null>(null);
-  const [busquedaCliente, setBusquedaCliente] = useState("");
-  const [resultadosCliente, setResultadosCliente] = useState<Cliente[]>([]);
-  const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
+  // Flujo por cédula: se escribe primero la cédula/RIF — si ya existe un
+  // cliente con esa identificación, se autocompletan nombre y teléfono; si
+  // no existe, al salir del campo se registra de una vez en Clientes (con
+  // lo que haya, nombre/teléfono son opcionales). Todo en línea, sin abrir
+  // ninguna ventana aparte.
+  const [cedulaCliente, setCedulaCliente] = useState("");
+  const [nombreClienteInline, setNombreClienteInline] = useState("");
+  const [telefonoClienteInline, setTelefonoClienteInline] = useState("");
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
+  const [guardandoCliente, setGuardandoCliente] = useState(false);
 
   useEffect(() => { monedaBase(tenantId).then(setMoneda).catch(() => setMoneda("USD")); }, [tenantId]);
   // Estado del turno de caja para el header operativo — solo lectura acá,
@@ -3344,13 +3672,63 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     [catalogoFiltrado, paginaCatalogo]
   );
 
+  // Busca por cédula/RIF a medida que se escribe — si hay un cliente ya
+  // registrado con esa identificación exacta, se autocompleta nombre y
+  // teléfono. Si no aparece nada, se deja que el cajero siga escribiendo
+  // libremente (es un cliente nuevo).
   useEffect(() => {
-    if (clienteSel || !busquedaCliente.trim()) { setResultadosCliente([]); return; }
+    if (clienteSel) return;
+    const cedula = cedulaCliente.trim();
+    if (!cedula) return;
+    setBuscandoCliente(true);
     const id = setTimeout(() => {
-      listarClientes(tenantId, busquedaCliente.trim()).then((r) => setResultadosCliente(r.slice(0, 6))).catch(() => setResultadosCliente([]));
-    }, 200);
+      listarClientes(tenantId, cedula)
+        .then((r) => {
+          const match = r.find((c) => (c.identificacionRif || "").trim().toLowerCase() === cedula.toLowerCase());
+          if (match) {
+            setClienteSel(match);
+            setNombreClienteInline(match.nombre || "");
+            setTelefonoClienteInline(match.telefono || "");
+          }
+        })
+        .catch(() => {})
+        .finally(() => setBuscandoCliente(false));
+    }, 300);
     return () => clearTimeout(id);
-  }, [tenantId, busquedaCliente, clienteSel]);
+  }, [tenantId, cedulaCliente, clienteSel]);
+
+  // Al salir del campo de cédula: si quedó algo escrito y no matcheó ningún
+  // cliente existente, se registra de una vez en Clientes — nombre/teléfono
+  // van con lo que haya (pueden ir vacíos).
+  const confirmarClienteNuevo = async () => {
+    const cedula = cedulaCliente.trim();
+    if (clienteSel || !cedula) return;
+    setGuardandoCliente(true);
+    try {
+      const nuevo = await crearCliente(tenantId, {
+        nombre: nombreClienteInline.trim() || undefined,
+        identificacionRif: cedula,
+        telefono: telefonoClienteInline.trim() || undefined,
+      });
+      setClienteSel(nuevo);
+      // No se pisa el campo con el nombre de relleno que puso el backend
+      // (ej. "Cliente V-30111222") cuando no se escribió nombre — eso se
+      // vería como un dato real cuando no lo es. El campo se queda tal cual
+      // estaba (vacío, si no se tipeó nada).
+    } catch {
+      // Si falla (ej. cédula duplicada por una carrera con otra pestaña) la
+      // venta sigue igual sin cliente asociado — no bloquea el cobro.
+    } finally {
+      setGuardandoCliente(false);
+    }
+  };
+
+  const limpiarCliente = () => {
+    setClienteSel(null);
+    setCedulaCliente("");
+    setNombreClienteInline("");
+    setTelefonoClienteInline("");
+  };
 
   const agregarConCantidad = (linea: Omit<LineaCarrito, "cantidad">, cant: number) => {
     setCarrito((prev) => {
@@ -3361,6 +3739,21 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   };
   const cambiarCantidad = (key: string, delta: number) => {
     setCarrito((prev) => prev.map((l) => (l.key === key ? { ...l, cantidad: Math.max(1, l.cantidad + delta) } : l)).filter((l) => l.cantidad > 0));
+  };
+  // Escribir la cantidad directo (ej. una cotización de 100 unidades) sin
+  // tener que darle a "+" cien veces — mismo carrito, solo otra forma de
+  // llegar al mismo número.
+  // Mientras se edita se deja pasar 0 tal cual (input vacío) — forzar un
+  // mínimo en cada tecla pisaba lo que la persona estaba por escribir (borrar
+  // el "1" de una y ponerse a teclear "1945" terminaba en "01945", porque el
+  // valor ya se había re-normalizado a 0.001 a mitad de la escritura).
+  const establecerCantidad = (key: string, valor: number) => {
+    setCarrito((prev) => prev.map((l) => (l.key === key ? { ...l, cantidad: valor } : l)));
+  };
+  // Al salir del campo si quedó en 0 (vacío o borrado del todo) se repone en
+  // 1 — así nunca queda una línea "fantasma" en 0 en el carrito.
+  const confirmarCantidad = (key: string) => {
+    setCarrito((prev) => prev.map((l) => (l.key === key && l.cantidad <= 0 ? { ...l, cantidad: 1 } : l)));
   };
   const quitarLinea = (key: string) => setCarrito((prev) => prev.filter((l) => l.key !== key));
 
@@ -3379,6 +3772,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
       key: item.key, nombre: item.nombre, precio: item.precio,
       articuloId: item.tipo === "articulo" ? item.id : undefined,
       escandalloId: item.tipo === "receta" ? item.id : undefined,
+      fastBarTragoId: item.tipo === "fastbar" ? item.id : undefined,
       estacionCocina: item.tipo === "receta" ? item.estacionCocina : item.tipo === "fastbar" ? "BAR" : undefined,
     }, 1);
     setBusqueda("");
@@ -3430,6 +3824,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
         await agregarItemComanda(tenantId, comanda.id, {
           escandalloId: linea.escandalloId,
           articuloId: linea.articuloId,
+          fastBarTragoId: linea.fastBarTragoId,
           nombrePlato: linea.nombre,
           estacionCocina: linea.estacionCocina,
           cantidad: linea.cantidad,
@@ -3446,7 +3841,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
       setCarrito([]);
       setCargosActivos({ propina: false, delivery: false, empaque: false, comision: false });
       setImpuestosActivos({ iva: false, igtf: false });
-      setClienteSel(null); setBusquedaCliente("");
+      limpiarCliente();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo procesar la venta");
     } finally {
@@ -3752,38 +4147,37 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             Con esto, en vez de desaparecer, el panel completo se puede
             desplazar hasta él. */}
         <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex lg:col-span-6 flex-1 min-w-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col h-full min-h-0 overflow-y-auto bg-white/30 dark:bg-black/10`}>
-          {/* Cabecera: cliente CRM */}
-          <div className="p-4 border-b border-slate-300/50 dark:border-white/10 flex-shrink-0">
-            <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1.5">Cliente (opcional)</p>
-            {clienteSel ? (
-              <div className="flex items-center justify-between gap-2 bg-teal-500/10 border border-teal-500/25 rounded-xl px-3 py-2">
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{clienteSel.nombre}</div>
-                  {clienteSel.identificacionRif && <div className="text-[10px] text-slate-500 dark:text-white/40">{clienteSel.identificacionRif}</div>}
-                </div>
-                <button onClick={() => setClienteSel(null)} className="text-slate-400 hover:text-red-500 cursor-pointer flex-shrink-0"><IconClose size={14} /></button>
+          {/* Cabecera: cliente CRM — todo en línea, sin ventana aparte.
+              Cédula primero: si ya existe, autocompleta nombre/teléfono; si
+              no, se registra sola al salir del campo. Nombre y teléfono
+              siempre quedan editables y son opcionales. */}
+          <div className="p-4 border-b border-slate-300/50 dark:border-white/10 flex-shrink-0 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Cliente (opcional)</p>
+              {clienteSel && (
+                <button onClick={limpiarCliente} className="text-[10px] font-semibold text-slate-400 hover:text-red-500 cursor-pointer flex items-center gap-1">
+                  <IconClose size={11} /> Quitar
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className="relative col-span-1">
+                <input
+                  value={cedulaCliente}
+                  onChange={(e) => { setCedulaCliente(e.target.value); if (clienteSel) { setClienteSel(null); setNombreClienteInline(""); setTelefonoClienteInline(""); } }}
+                  onBlur={confirmarClienteNuevo}
+                  placeholder="Cédula / RIF" className="input-horeca w-full text-xs"
+                />
+                {clienteSel && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-500" title="Cliente existente"><IconCheckCircle size={13} /></span>}
+                {(buscandoCliente || guardandoCliente) && !clienteSel && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">…</span>}
               </div>
-            ) : (
-              <div className="relative flex items-center gap-1.5">
-                <div className="relative flex-1">
-                  <input value={busquedaCliente} onChange={(e) => setBusquedaCliente(e.target.value)} placeholder="Buscar por nombre o RIF…" className="input-horeca w-full text-xs" />
-                  {resultadosCliente.length > 0 && (
-                    <div className="absolute z-10 mt-1 min-w-[200px] w-max max-w-[280px] bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-40 overflow-y-auto shadow-lg">
-                      {resultadosCliente.map((c) => (
-                        <button key={c.id} type="button"
-                          onClick={() => { setClienteSel(c); setBusquedaCliente(""); setResultadosCliente([]); }}
-                          className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer">
-                          <div className="font-semibold text-slate-800 dark:text-white/80 truncate">{c.nombre}</div>
-                          {c.identificacionRif && <div className="text-[10px] text-slate-400 truncate">{c.identificacionRif}</div>}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <button onClick={() => setMostrarNuevoCliente(true)} title="Registrar cliente nuevo"
-                  className="w-8 h-8 flex-shrink-0 rounded-xl bg-teal-500/15 text-teal-600 dark:text-teal-300 hover:bg-teal-500/25 cursor-pointer flex items-center justify-center font-bold">+</button>
-              </div>
-            )}
+              <input value={telefonoClienteInline} onChange={(e) => setTelefonoClienteInline(e.target.value)}
+                onBlur={() => { if (clienteSel) editarCliente(tenantId, clienteSel.id, { telefono: telefonoClienteInline.trim() || undefined }).then(setClienteSel).catch(() => {}); }}
+                placeholder="Teléfono (opcional)" className="input-horeca w-full text-xs" />
+            </div>
+            <input value={nombreClienteInline} onChange={(e) => setNombreClienteInline(e.target.value)}
+              onBlur={() => { if (clienteSel && nombreClienteInline.trim()) editarCliente(tenantId, clienteSel.id, { nombre: nombreClienteInline.trim() }).then(setClienteSel).catch(() => {}); }}
+              placeholder="Nombre y apellido (opcional)" className="input-horeca w-full text-xs" />
           </div>
 
           {/* Cuerpo: líneas del carrito — flex-1 lo deja crecer con el
@@ -3808,7 +4202,14 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                       ni deformarse verticalmente. */}
                   <div className="flex items-center gap-2 shrink-0">
                     <button onClick={() => cambiarCantidad(l.key, -1)} className="w-8 h-8 rounded-full bg-slate-200/80 dark:bg-white/10 text-sm font-bold cursor-pointer shrink-0">−</button>
-                    <span className="text-sm font-bold w-6 text-center shrink-0">{l.cantidad}</span>
+                    <input
+                      value={l.cantidad === 0 ? "" : l.cantidad}
+                      onChange={(e) => establecerCantidad(l.key, e.target.value === "" ? 0 : Number(e.target.value))}
+                      onBlur={() => confirmarCantidad(l.key)}
+                      type="number" step="0.001" min="0"
+                      title="Escribí la cantidad directo (ej. para una cotización grande)"
+                      className="text-sm font-bold w-14 text-center shrink-0 bg-transparent border border-slate-300/60 dark:border-white/15 rounded-lg py-1"
+                    />
                     <button onClick={() => cambiarCantidad(l.key, 1)} className="w-8 h-8 rounded-full bg-slate-200/80 dark:bg-white/10 text-sm font-bold cursor-pointer shrink-0">+</button>
                     <button onClick={() => quitarLinea(l.key)} title="Quitar de la venta"
                       className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer shrink-0 ml-0.5">
@@ -3923,11 +4324,6 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
         </Modal>
       )}
 
-      {mostrarNuevoCliente && (
-        <ModalClienteRapido tenantId={tenantId} onClose={() => setMostrarNuevoCliente(false)}
-          onCreado={(c) => { setClienteSel(c); setMostrarNuevoCliente(false); }} />
-      )}
-
       {recibo && (
         <Modal onClose={() => setRecibo(null)} titulo="Venta registrada">
           <div className="space-y-4">
@@ -4004,43 +4400,6 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
         </Modal>
       )}
     </div>
-  );
-}
-
-/** Modal hiper-ligero (3 campos) para registrar un cliente sin salir de Venta Rápida. */
-function ModalClienteRapido({ tenantId, onClose, onCreado }: { tenantId: number; onClose: () => void; onCreado: (c: Cliente) => void }) {
-  const [nombre, setNombre] = useState("");
-  const [identificacionRif, setIdentificacionRif] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const guardar = async () => {
-    if (!nombre.trim()) { setError("El nombre es obligatorio"); return; }
-    setGuardando(true);
-    setError(null);
-    try {
-      const cliente = await crearCliente(tenantId, { nombre: nombre.trim(), identificacionRif: identificacionRif.trim() || undefined, telefono: telefono.trim() || undefined });
-      onCreado(cliente);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo registrar el cliente");
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  return (
-    <Modal onClose={onClose} titulo="Cliente nuevo">
-      <div className="space-y-3">
-        <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre" className="input-horeca" autoFocus onKeyDown={(e) => e.key === "Enter" && guardar()} />
-        <input value={identificacionRif} onChange={(e) => setIdentificacionRif(e.target.value)} placeholder="Cédula / RIF (opcional)" className="input-horeca" onKeyDown={(e) => e.key === "Enter" && guardar()} />
-        <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="Teléfono (opcional)" className="input-horeca" onKeyDown={(e) => e.key === "Enter" && guardar()} />
-        {error && <p className="text-xs text-red-500">{error}</p>}
-        <button onClick={guardar} disabled={guardando} className="w-full btn-cyber-neon text-white text-sm font-bold py-3 rounded-xl cursor-pointer disabled:opacity-60">
-          {guardando ? "Guardando…" : "Guardar y seleccionar"}
-        </button>
-      </div>
-    </Modal>
   );
 }
 
@@ -4397,7 +4756,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [ventasHoy, setVentasHoy] = useState(0);
   const [ventasMes, setVentasMes] = useState(0);
-  const [egresosHoy, setEgresosHoy] = useState(0);
+  const [egresosHoyPorMoneda, setEgresosHoyPorMoneda] = useState<Record<string, number>>({});
   const [utilidadHoy, setUtilidadHoy] = useState(0);
   const [ticketsHoy, setTicketsHoy] = useState(0);
   const [topProductos, setTopProductos] = useState<ResumenUtilidadProducto[]>([]);
@@ -4429,7 +4788,15 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
         setVentasMes(sumaUsd(ticketsMesLista));
         setTicketsHoy(ticketsHoyLista.length);
         setUtilidadHoy(utilidadHoyLista.reduce((s, u) => s + Number(u.utilidad), 0));
-        setEgresosHoy(egresos.filter((m) => m.fechaRegistro.slice(0, 10) === hoyStr).reduce((s, m) => s + Number(m.monto), 0));
+        // Igual que en Ingresos & Gastos: cada moneda se suma aparte — un
+        // egreso en Bs y uno en USD no son la misma unidad, mezclarlos en un
+        // solo número daba una cifra sin sentido.
+        setEgresosHoyPorMoneda(
+          egresos.filter((m) => m.fechaRegistro.slice(0, 10) === hoyStr).reduce<Record<string, number>>((acc, m) => {
+            acc[m.moneda] = (acc[m.moneda] || 0) + Number(m.monto);
+            return acc;
+          }, {})
+        );
         setTopProductos([...utilidadHoyLista].sort((a, b) => b.cantidadVendida - a.cantidadVendida).slice(0, 5));
 
         // Serie de 7 días con huecos rellenados en 0 (para que el gráfico no salte días sin ventas)
@@ -4454,6 +4821,10 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
   }, [tenantId]);
 
   const ticketPromedio = ticketsHoy > 0 ? ventasHoy / ticketsHoy : 0;
+  const monedasEgresoHoy = Object.keys(egresosHoyPorMoneda);
+  const egresosHoyTexto = monedasEgresoHoy.length === 0
+    ? "$0.00"
+    : monedasEgresoHoy.map((m) => `${m === "USD" ? "$" : `${m} `}${egresosHoyPorMoneda[m].toFixed(2)}`).join("   ·   ");
 
   if (cargando) return <p className="text-xs text-slate-400">Cargando indicadores…</p>;
 
@@ -4463,7 +4834,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Ventas Totales" val={`$${ventasHoy.toFixed(2)}`} sub={`Mes: $${ventasMes.toFixed(2)}`} color="#0ea5e9" />
-        <KpiCard label="Egresos Operativos" val={`$${egresosHoy.toFixed(2)}`} sub="Salidas de caja de hoy" color="#ef4444" />
+        <KpiCard label="Egresos Operativos" val={egresosHoyTexto} sub="Salidas de caja de hoy" color="#ef4444" />
         <KpiCard label="Utilidad Bruta Estimada" val={`$${utilidadHoy.toFixed(2)}`} sub="Ventas de hoy con costo conocido" color="#22c55e" />
         <KpiCard label="Ticket Promedio" val={`$${ticketPromedio.toFixed(2)}`} sub={`${ticketsHoy} ticket${ticketsHoy === 1 ? "" : "s"} hoy`} color="#a855f7" />
       </div>
@@ -4505,15 +4876,15 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
 // ══════════════════════════════════════════════════════════════════════════
 // ADMINISTRACIÓN — ingresos/gastos + cuentas x cobrar/pagar + cierre de caja, unidos
 // ══════════════════════════════════════════════════════════════════════════
-function Administracion({ tenantId }: { tenantId: number }) {
-  const [tab, setTab] = useState<"turnos" | "finanzas" | "cuentas" | "cierre" | "resumen">("turnos");
+function Administracion({ tenantId, monedasActivas }: { tenantId: number; monedasActivas: typeof MONEDAS_POR_DEFECTO }) {
+  const [tab, setTab] = useState<"turnos" | "finanzas" | "cuentas" | "cierre" | "resumen">("finanzas");
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit flex-wrap">
         {[
-          { id: "turnos", label: "Control de Caja (Turnos)" },
           { id: "finanzas", label: "Ingresos & Gastos" },
+          { id: "turnos", label: "Control de Caja (Turnos)" },
           { id: "cuentas", label: "Cuentas x Cobrar/Pagar" },
           { id: "cierre", label: "Cierre de Caja" },
           { id: "resumen", label: "Resumen Diario" },
@@ -4526,7 +4897,7 @@ function Administracion({ tenantId }: { tenantId: number }) {
       </div>
 
       {tab === "turnos" && <TurnosCaja tenantId={tenantId} />}
-      {tab === "finanzas" && <Finanzas tenantId={tenantId} />}
+      {tab === "finanzas" && <Finanzas tenantId={tenantId} monedasActivas={monedasActivas} />}
       {tab === "cuentas" && <CuentasPorCobrarPagar tenantId={tenantId} />}
       {tab === "cierre" && <CierreDeCaja tenantId={tenantId} />}
       {tab === "resumen" && <ResumenDiario tenantId={tenantId} />}
@@ -4955,7 +5326,9 @@ function CierreDeCaja({ tenantId }: { tenantId: number }) {
 // ══════════════════════════════════════════════════════════════════════════
 // INGRESOS & GASTOS
 // ══════════════════════════════════════════════════════════════════════════
-function Finanzas({ tenantId }: { tenantId: number }) {
+function Finanzas({ tenantId, monedasActivas }: { tenantId: number; monedasActivas: typeof MONEDAS_POR_DEFECTO }) {
+  // USD es la base, siempre disponible; VES/COP solo si el negocio los activó en Configuración.
+  const monedasHabilitadas = ["USD", ...(Object.keys(monedasActivas) as (keyof typeof monedasActivas)[]).filter((m) => monedasActivas[m])];
   const [movimientos, setMovimientos] = useState<MovimientoCaja[] | null>(null);
   const [form, setForm] = useState({ tipo: "EGRESO" as "INGRESO" | "EGRESO", monto: "", moneda: "USD", concepto: "" });
   const [error, setError] = useState<string | null>(null);
@@ -4982,14 +5355,49 @@ function Finanzas({ tenantId }: { tenantId: number }) {
     }
   };
 
-  const totalIngresos = (movimientos || []).filter((m) => m.tipo === "INGRESO").reduce((s, m) => s + Number(m.monto), 0);
-  const totalEgresos = (movimientos || []).filter((m) => m.tipo === "EGRESO").reduce((s, m) => s + Number(m.monto), 0);
+  // Cada moneda se suma aparte — nunca se mezcla USD con VES/COP en un solo
+  // número (eso daba totales sin sentido, ej. "$10,087" sumando 2 dólares
+  // con 10 mil bolívares como si fueran la misma unidad).
+  const porMoneda = (tipo: "INGRESO" | "EGRESO") =>
+    (movimientos || []).filter((m) => m.tipo === tipo).reduce<Record<string, number>>((acc, m) => {
+      acc[m.moneda] = (acc[m.moneda] || 0) + Number(m.monto);
+      return acc;
+    }, {});
+  const ingresosPorMoneda = porMoneda("INGRESO");
+  const egresosPorMoneda = porMoneda("EGRESO");
+  // Siempre se muestran las monedas activas del negocio (aunque todavía no
+  // tengan movimientos, en $0.00) más cualquier otra moneda que sí tenga
+  // historial real — la plata registrada nunca se esconde, aunque después
+  // hayan desactivado esa moneda en Configuración.
+  const monedasConMovimiento = Array.from(new Set([
+    ...monedasHabilitadas, ...Object.keys(ingresosPorMoneda), ...Object.keys(egresosPorMoneda),
+  ])).sort();
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <KpiCard label="Total Ingresos" val={`$${totalIngresos.toFixed(2)}`} sub="Histórico registrado" color="#10b981" />
-        <KpiCard label="Total Gastos" val={`$${totalEgresos.toFixed(2)}`} sub="Histórico registrado" color="#ef4444" />
+        <div className="apple-glass rounded-2xl p-5 border-l-4" style={{ borderLeftColor: "#10b981" }}>
+          <div className="text-xs text-slate-500 dark:text-white/40 mb-2">Total Ingresos</div>
+          <div className="space-y-1">
+            {monedasConMovimiento.map((moneda) => (
+              <div key={moneda} className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-slate-400 dark:text-white/30">{moneda}</span>
+                <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{(ingresosPorMoneda[moneda] || 0).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="apple-glass rounded-2xl p-5 border-l-4" style={{ borderLeftColor: "#ef4444" }}>
+          <div className="text-xs text-slate-500 dark:text-white/40 mb-2">Total Gastos</div>
+          <div className="space-y-1">
+            {monedasConMovimiento.map((moneda) => (
+              <div key={moneda} className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-slate-400 dark:text-white/30">{moneda}</span>
+                <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{(egresosPorMoneda[moneda] || 0).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="apple-glass rounded-2xl p-5 space-y-3">
@@ -5005,7 +5413,7 @@ function Finanzas({ tenantId }: { tenantId: number }) {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <input value={form.monto} onChange={(e) => setForm({ ...form, monto: e.target.value })} type="number" step="0.01" placeholder="Monto" className="input-horeca" />
           <select value={form.moneda} onChange={(e) => setForm({ ...form, moneda: e.target.value })} className="input-horeca">
-            {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+            {monedasHabilitadas.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
           <input value={form.concepto} onChange={(e) => setForm({ ...form, concepto: e.target.value })} placeholder="Concepto (ej. Pago de electricidad)" className="input-horeca sm:col-span-2" />
         </div>

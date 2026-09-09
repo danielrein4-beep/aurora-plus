@@ -1,14 +1,20 @@
-import { useState, useEffect, useMemo } from "react";
+import InboxLaboratorioMedico from "./laboratorio/InboxLaboratorioMedico";
+import ModalNuevaOrdenLab from "./laboratorio/ModalNuevaOrdenLab";
+import {
+  useState, useEffect, useMemo } from "react";
 import {
   AuroraGradientDef,
   IconStethoscope, IconUsers, IconFileText, IconPrescription, IconHourglass, IconCalendar,
   IconCard, IconCustomize, IconSearch, IconUser, IconCheck, IconTrash, IconRefresh,
   IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconUnlock, IconWarning, IconClose, IconBank,
-  IconWhatsApp, IconMail
+  IconWhatsApp, IconMail, IconChart
 } from "../Icons";
 import ThemeToggle from "./ThemeToggle";
+import CanalEndemico from "./CanalEndemico";
+import Cie10Buscador from "./Cie10Buscador";
 import { useAuth } from "../context/AuthContext";
 import {
+  contadorInboxLaboratorio, listarOrdenesLaboratorioPaciente, type OrdenLaboratorio,
   listarPacientes, crearPaciente, eliminarPaciente, listarCitasDelDia, agendarCita, listarCobrosDelDia,
   listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera,
   listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta, eliminarConsulta,
@@ -22,16 +28,18 @@ import {
 } from "../utils/pdfReports";
 import DocumentoPreviewModal, { type DocumentoVisorPayload } from "./DocumentoPreviewModal";
 
-type Pagina = "general" | "pacientes" | "historias" | "procedimientos" | "sala-espera" | "agenda" | "financiero" | "configuracion";
+type Pagina = "general" | "pacientes" | "historias" | "laboratorio" | "procedimientos" | "sala-espera" | "agenda" | "canal-endemico" | "financiero" | "configuracion";
 type RolVista = "MEDICO" | "SECRETARIA";
 
 const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; roles?: RolVista[] }[] = [
   { id: "general", label: "Vista General", Icon: IconCustomize },
   { id: "pacientes", label: "Gestión de Pacientes", Icon: IconUsers },
   { id: "historias", label: "Historias Clínicas", Icon: IconFileText },
+  { id: "laboratorio", label: "Red Laboratorios & Inbox", Icon: IconPrescription },
   { id: "procedimientos", label: "Procedimientos & Cotizador", Icon: IconPrescription },
   { id: "sala-espera", label: "Sala de Espera & Caja", Icon: IconHourglass },
   { id: "agenda", label: "Agenda Médica & Calendario", Icon: IconCalendar },
+  { id: "canal-endemico", label: "Canal Endémico", Icon: IconChart, roles: ["MEDICO"] },
   { id: "financiero", label: "Resúmenes Financieros", Icon: IconCard, roles: ["MEDICO"] },
   { id: "configuracion", label: "Configuración & Perfil", Icon: IconCustomize, roles: ["MEDICO"] },
 ];
@@ -370,6 +378,13 @@ function ModalClaveDoctor({
 }
 
 export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
+  const [inboxLabPendientes, setInboxLabPendientes] = useState(0);
+
+  const cargarContadorLab = () => {
+    contadorInboxLaboratorio(tenantId)
+      .then((res: { pendientes: number }) => setInboxLabPendientes(res.pendientes))
+      .catch(() => {});
+  };
   const { user } = useAuth();
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
@@ -590,6 +605,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   };
 
   const recargarTodo = () => {
+    cargarContadorLab();
     listarPacientes(tenantId).then(setPacientes).catch(() => setPacientes([]));
     listarCitasDelDia(tenantId, hoy()).then(setCitasHoy).catch(() => setCitasHoy([]));
     listarSalaEspera().then(setSalaEspera).catch(() => setSalaEspera([]));
@@ -685,7 +701,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   <n.Icon size={16} />
                   <span className="truncate">{n.label}</span>
                 </div>
-                {esProtegida && (
+                {n.id === "laboratorio" && inboxLabPendientes > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[10px] font-black animate-pulse">
+                      {inboxLabPendientes}
+                    </span>
+                  )}
+                  {esProtegida && (
                   <span title="Requiere clave del Doctor" className="p-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 flex-shrink-0 ml-1 border border-amber-500/20">
                     <IconLock size={12} />
                   </span>
@@ -815,6 +836,17 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               </button>
             </div>
 
+            {inboxLabPendientes > 0 && (
+              <button
+                type="button"
+                onClick={() => intentarNavegar("laboratorio")}
+                className="px-3.5 py-1.5 rounded-2xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-600 dark:text-red-400 text-xs font-black flex items-center gap-1.5 animate-pulse cursor-pointer shadow-xs transition-all"
+                title="Exámenes de laboratorio pendientes de revisión médica"
+              >
+                <span>🔬</span>
+                <span>Inbox: {inboxLabPendientes} {inboxLabPendientes === 1 ? "examen" : "exámenes"}</span>
+              </button>
+            )}
             <button onClick={recargarTodo} className="p-2 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
               <IconRefresh size={16} />
             </button>
@@ -918,7 +950,15 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onVerDocumento={setVisorDocumento}
               />
             )}
-            {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} />}
+            {pagina === "laboratorio" && (
+            <InboxLaboratorioMedico
+              tenantId={tenantId}
+              medicoNombre={configPerfil.doctorNombre}
+              onActualizarContador={cargarContadorLab}
+            />
+          )}
+          {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} />}
+            {pagina === "canal-endemico" && <CanalEndemico modo="medico" clinicaNombre={configPerfil.clinicaNombre} doctorNombre={configPerfil.doctorNombre} />}
             {pagina === "financiero" && (
               <ResumenesFinancieros
                 ingresosHoy={ingresosHoy}
@@ -2285,6 +2325,7 @@ function HistoriasClinicas({
     evolucionClinica: "",
     anotacionesPrivadas: "",
     descripcionDiagnostico: "",
+    diagnosticoPrincipalCIE10: "",
     planTratamiento: "",
     proximaCita: "",
   });
@@ -2346,6 +2387,7 @@ function HistoriasClinicas({
       evolucionClinica: "",
       anotacionesPrivadas: "",
       descripcionDiagnostico: "",
+      diagnosticoPrincipalCIE10: "",
       planTratamiento: "",
       proximaCita: "",
     });
@@ -2419,6 +2461,7 @@ function HistoriasClinicas({
       const res = await registrarConsulta(tenantId, Number(pacienteSeleccionado.id), {
         motivoConsulta: form.motivoConsulta,
         descripcionDiagnostico: form.descripcionDiagnostico,
+        diagnosticoPrincipalCIE10: form.diagnosticoPrincipalCIE10 || undefined,
         planTratamiento: form.planTratamiento,
         anotacionesPrivadas: form.anotacionesPrivadas,
         talla: form.talla,
@@ -3199,15 +3242,27 @@ function HistoriasClinicas({
               />
             </div>
 
-            {/* 4. Diagnóstico Clínico (Dx) */}
+            {/* 4. Diagnóstico Clínico (Dx) — buscador sobre el catálogo CIE-10 completo */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 dark:text-white/90">
                 Diagnóstico Clínico (Dx) *
               </label>
+              <Cie10Buscador
+                valorCodigo={form.diagnosticoPrincipalCIE10}
+                valorDescripcion={form.descripcionDiagnostico}
+                onSeleccionar={(d) =>
+                  setForm({ ...form, diagnosticoPrincipalCIE10: d.codigo, descripcionDiagnostico: d.descripcion })
+                }
+              />
+              {form.diagnosticoPrincipalCIE10 && (
+                <p className="text-[10px] text-teal-600 dark:text-teal-400">
+                  Código CIE-10 seleccionado: <span className="font-bold">{form.diagnosticoPrincipalCIE10}</span> — se usará para el Canal Endémico.
+                </p>
+              )}
               <input
                 type="text"
                 required
-                placeholder="Ej. Gastritis aguda / Hipertensión arterial estadio 1"
+                placeholder="Puedes ajustar el texto del diagnóstico aquí (ej. agregar severidad, lateralidad, etc.)"
                 value={form.descripcionDiagnostico}
                 onChange={(e) => setForm({ ...form, descripcionDiagnostico: e.target.value })}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
@@ -3687,7 +3742,11 @@ function Procedimientos({
     } else {
       generarPdfCotizacion(dataCot);
       const texto = generarTextoWhatsAppCotizacion(dataCot);
-      abrirWhatsAppDirecto(cot.pacienteTelefono, texto);
+      if (cot.pacienteTelefono) {
+        abrirWhatsAppDirecto(cot.pacienteTelefono, texto);
+      } else {
+        dispararToast("⚠️ Este paciente no tiene teléfono registrado — no se pudo abrir WhatsApp.");
+      }
       dispararToast("📄 Presupuesto PDF descargado en tu equipo. Adjúntalo con el clip (📎) en WhatsApp.");
     }
   };
@@ -6573,7 +6632,7 @@ function ResumenesFinancieros({
                 const dataHoy: CierreCajaData = {
                   clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
                   doctorNombre: config?.doctorNombre || "Dr. Mario Roa",
-                  responsableNombre: config?.secretariaNombre || (rol === "SECRETARIA" ? "Recepción / Asistente" : config?.doctorNombre) || "Recepción y Caja",
+                  responsableNombre: config?.secretariaNombre || config?.doctorNombre || "Recepción y Caja",
                   fecha: hoy(),
                   horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                   tasaBCV: config?.tasaBCV || 56.4,

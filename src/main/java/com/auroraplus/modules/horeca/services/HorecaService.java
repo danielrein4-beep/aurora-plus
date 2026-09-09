@@ -11,10 +11,12 @@ import com.auroraplus.core.inventario.services.InventarioService;
 import com.auroraplus.core.sync.IdempotenciaService;
 import com.auroraplus.modules.horeca.entities.Comanda;
 import com.auroraplus.modules.horeca.entities.EscandalloReceta;
+import com.auroraplus.modules.horeca.entities.FastBarTrago;
 import com.auroraplus.modules.horeca.entities.ItemComanda;
 import com.auroraplus.modules.horeca.entities.PagoVenta;
 import com.auroraplus.modules.horeca.repositories.ComandaRepository;
 import com.auroraplus.modules.horeca.repositories.EscandalloRecetaRepository;
+import com.auroraplus.modules.horeca.repositories.FastBarTragoRepository;
 import com.auroraplus.modules.horeca.repositories.ItemComandaRepository;
 import com.auroraplus.modules.horeca.repositories.PagoVentaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,6 +60,9 @@ public class HorecaService {
 
     @Autowired
     private ClienteRepository clienteRepository;
+
+    @Autowired
+    private FastBarTragoRepository fastBarTragoRepository;
 
     public Comanda obtenerComanda(Long comandaId) {
         return comandaRepository.findById(comandaId).orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
@@ -130,6 +135,20 @@ public class HorecaService {
         }
         if ("DELIVERY_PROPIO".equals(canalFinal) && (direccionEntrega == null || direccionEntrega.isBlank())) {
             throw new RuntimeException("El canal DELIVERY_PROPIO requiere direccionEntrega");
+        }
+
+        // Evita abrir dos comandas para la misma mesa física (doble-click, dos
+        // meseros pulsando "abrir" casi a la vez, reintento de red sin la
+        // misma claveIdempotencia). No sustituye una restricción a nivel de
+        // base de datos bajo concurrencia real, pero cierra el caso práctico.
+        if (numeroMesa != null) {
+            boolean mesaYaAbierta = comandaRepository
+                .findByTenantIdAndEstadoOrderByFechaAperturaDesc(tenantId, Comanda.EstadoComanda.ABIERTA)
+                .stream()
+                .anyMatch(c -> numeroMesa.equals(c.getNumeroMesa()));
+            if (mesaYaAbierta) {
+                throw new RuntimeException("La mesa " + numeroMesa + " ya tiene una comanda abierta");
+            }
         }
 
         Comanda comanda = new Comanda();
@@ -512,7 +531,7 @@ public class HorecaService {
     @Transactional
     public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, String nombrePlato,
                                            String estacionCocina, BigDecimal cantidad, BigDecimal precioUnitario) {
-        return agregarItemComanda(comandaId, tenantId, escandalloId, null, nombrePlato, estacionCocina, cantidad, precioUnitario, null);
+        return agregarItemComanda(comandaId, tenantId, escandalloId, null, null, nombrePlato, estacionCocina, cantidad, precioUnitario, null);
     }
 
     /**
@@ -525,7 +544,7 @@ public class HorecaService {
     public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, String nombrePlato,
                                            String estacionCocina, BigDecimal cantidad, BigDecimal precioUnitario,
                                            String claveIdempotencia) {
-        return agregarItemComanda(comandaId, tenantId, escandalloId, null, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia);
+        return agregarItemComanda(comandaId, tenantId, escandalloId, null, null, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia);
     }
 
     /**
@@ -541,6 +560,23 @@ public class HorecaService {
     @Transactional
     public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, Long articuloId, String nombrePlato,
                                            String estacionCocina, BigDecimal cantidad, BigDecimal precioUnitario,
+                                           String claveIdempotencia) {
+        return agregarItemComanda(comandaId, tenantId, escandalloId, articuloId, null, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia);
+    }
+
+    /**
+     * Variante que además admite fastBarTragoId: venta de un trago de
+     * Fast-Bar (ver FastBarTrago) dentro del mismo flujo de comanda — antes
+     * esto vivía en un endpoint aparte (FastBarController/vender) que
+     * descontaba inventario pero no dejaba ticket ni aparecía en reportes.
+     * Descuenta los mililitros correspondientes de la botella asociada
+     * (InventarioService, que rechaza la salida si no alcanza) y no pasa por
+     * cocina. escandalloId, articuloId y fastBarTragoId son mutuamente
+     * excluyentes entre sí.
+     */
+    @Transactional
+    public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, Long articuloId, Long fastBarTragoId,
+                                           String nombrePlato, String estacionCocina, BigDecimal cantidad, BigDecimal precioUnitario,
                                            String claveIdempotencia) {
         java.util.Optional<Long> existente = idempotenciaService.obtenerSiYaProcesada(tenantId, claveIdempotencia);
         if (existente.isPresent()) {
@@ -558,8 +594,9 @@ public class HorecaService {
         if (comanda.getEstado() != Comanda.EstadoComanda.ABIERTA) {
             throw new RuntimeException("No se pueden agregar ítems a una comanda que no está ABIERTA");
         }
-        if (escandalloId != null && articuloId != null) {
-            throw new RuntimeException("Indique escandalloId o articuloId, no ambos");
+        int nMutuamenteExcluyentes = (escandalloId != null ? 1 : 0) + (articuloId != null ? 1 : 0) + (fastBarTragoId != null ? 1 : 0);
+        if (nMutuamenteExcluyentes > 1) {
+            throw new RuntimeException("Indique como máximo uno de: escandalloId, articuloId, fastBarTragoId");
         }
         if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("La cantidad debe ser mayor a cero");
@@ -618,9 +655,30 @@ public class HorecaService {
             item.setPrecioUnitario(precioUnitario);
             item.setCostoUnitario(articulo.getCostoUnitario());
             item.setEstadoItem(ItemComanda.EstadoItem.ENTREGADO);
+        } else if (fastBarTragoId != null) {
+            FastBarTrago trago = fastBarTragoRepository.findById(fastBarTragoId)
+                .orElseThrow(() -> new RuntimeException("Trago de Fast-Bar no encontrado"));
+            if (!trago.getTenantId().equals(tenantId)) {
+                throw new RuntimeException("Violación de seguridad: Trago no pertenece a este tenant");
+            }
+            Articulo botella = articuloRepository.findBySkuAndTenantId(trago.getBotellaSku(), tenantId)
+                .orElseThrow(() -> new RuntimeException("Botella no encontrada en inventario: " + trago.getBotellaSku()));
+
+            // Descuenta los mililitros de la botella ANTES de aceptar el ítem: si no
+            // alcanza, revienta aquí (InventarioService) y la transacción se revierte.
+            BigDecimal mililitrosADescontar = trago.getMililitrosPorTrago().multiply(cantidad);
+            inventarioService.registrarMovimientoKardex(botella.getId(), tenantId, Kardex.TipoOperacion.SALIDA,
+                mililitrosADescontar, botella.getCostoUnitario(), "Venta Fast-Bar: " + trago.getNombreTrago());
+
+            item.setFastBarTrago(trago);
+            item.setNombrePlato(trago.getNombreTrago());
+            item.setEstacionCocina("BAR");
+            item.setPrecioUnitario(trago.getPrecioVenta() != null ? trago.getPrecioVenta() : precioUnitario);
+            item.setCostoUnitario(botella.getCostoUnitario().multiply(trago.getMililitrosPorTrago()));
+            item.setEstadoItem(ItemComanda.EstadoItem.ENTREGADO);
         } else {
             if (nombrePlato == null || estacionCocina == null || precioUnitario == null) {
-                throw new RuntimeException("Sin escandalloId ni articuloId debe indicar nombrePlato, estacionCocina y precioUnitario");
+                throw new RuntimeException("Sin escandalloId, articuloId ni fastBarTragoId debe indicar nombrePlato, estacionCocina y precioUnitario");
             }
             item.setNombrePlato(nombrePlato);
             item.setEstacionCocina(estacionCocina);
