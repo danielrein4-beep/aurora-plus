@@ -18,9 +18,12 @@ import {
   contadorInboxLaboratorio, listarOrdenesLaboratorioPaciente, type OrdenLaboratorio,
   listarPacientes, crearPaciente, eliminarPaciente, buscarPacientePorIdentificacion,
   listarCitasDelDia, listarCitasPorRango, agendarCita, actualizarEstadoCita, reprogramarCita, listarCobrosDelDia,
-  listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera,
+  listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera, procesarCobro,
+  listarCierresCaja, registrarCierreCaja,
   listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta, eliminarConsulta,
+  listarCotizaciones, crearCotizacion, actualizarEstadoCotizacion, eliminarCotizacion as eliminarCotizacionApi,
   type Paciente, type CitaMedica, type SalaEsperaEntrada, type ProcedimientoMedico, type ConsultaMedica,
+  type CierreCajaRegistro, type CotizacionMedicaApi,
 } from "../api";
 import {
   generarPdfCierreCaja, generarPdfInformeConsulta, generarTextoWhatsAppConsulta,
@@ -55,6 +58,18 @@ const hoy = () => new Date().toISOString().slice(0, 10);
 function fechaDeConsulta(c: { fechaHora?: string; fechaConsulta?: string }): string {
   const raw = c.fechaHora || c.fechaConsulta;
   return raw ? raw.slice(0, 10) : hoy();
+}
+
+/** Traduce la etiqueta libre del selector de método de pago ("Pago Móvil VES", "Zelle USD"...) al
+ * enum real que espera el backend (CobroConsulta.MetodoPago). */
+function metodoPagoBackend(texto: string): "EFECTIVO" | "TRANSFERENCIA" | "PUNTO_VENTA" | "PAGO_MOVIL" | "ZELLE" | "OTRO" {
+  const t = (texto || "").toUpperCase();
+  if (t.includes("ZELLE")) return "ZELLE";
+  if (t.includes("PAGO MÓVIL") || t.includes("PAGO MOVIL")) return "PAGO_MOVIL";
+  if (t.includes("PUNTO")) return "PUNTO_VENTA";
+  if (t.includes("TRANSFERENCIA")) return "TRANSFERENCIA";
+  if (t.includes("EFECTIVO")) return "EFECTIVO";
+  return "OTRO";
 }
 
 const MODO_CLASICO_KEY = "aurora_mediclinic_modo_clasico"; // preferencia visual, no datos de negocio — se deja global a propósito
@@ -3536,6 +3551,9 @@ function HistoriasClinicas({
 
 export interface CotizacionGuardada {
   id: string;
+  /** ID real en el backend (tabla salud_cotizaciones) — solo existe si la cotización tiene un
+   * paciente registrado vinculado; se usa para sincronizar cambios de estado después. */
+  backendId?: number;
   pacienteId: number | null;
   pacienteNombre: string;
   pacienteCedula: string;
@@ -3720,6 +3738,27 @@ function Procedimientos({
       setCotizaciones((prev) => [nuevaCot, ...prev]);
       dispararToast("¡Cotización / Procedimiento registrado exitosamente!");
 
+      // Persistir en el backend real cuando la cotización está vinculada a un paciente
+      // registrado (la tabla exige un paciente real — un prospecto sin ficha se queda
+      // como registro local hasta que se le cree su ficha).
+      if (pacienteSeleccionado) {
+        crearCotizacion(tenantId, {
+          pacienteId: pacienteSeleccionado.id,
+          procedimientoNombre: nombreProcedimiento.trim(),
+          descripcion: descripcionClinica.trim() || undefined,
+          costoUSD: usdNum,
+          costoVES: vesNum,
+          costoCOP: copNum,
+          tasaBCV,
+          tasaCOP,
+          fechaPlanificada: fechaPlanificada || undefined,
+        }).then((creada) => {
+          setCotizaciones((prev) => prev.map((c) => (c.id === nuevaCot.id ? { ...c, backendId: creada.id } : c)));
+        }).catch((err) => {
+          dispararToast(`⚠️ Cotización guardada localmente, pero no en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+        });
+      }
+
       if (generarPdfDespues) {
         ejecutarPdfCotizacion(nuevaCot);
       }
@@ -3735,7 +3774,7 @@ function Procedimientos({
   const ejecutarPdfCotizacion = (cot: CotizacionGuardada) => {
     const dataCot: CotizacionData = {
       clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
-      doctorNombre: config?.doctorNombre || "Dr. Daniel Reina",
+      doctorNombre: config?.doctorNombre || "Médico Titular",
       pacienteNombre: cot.pacienteNombre,
       pacienteCedula: cot.pacienteCedula,
       pacienteTelefono: cot.pacienteTelefono,
@@ -3767,7 +3806,7 @@ function Procedimientos({
   const ejecutarWhatsAppCotizacion = (cot: CotizacionGuardada) => {
     const dataCot: CotizacionData = {
       clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
-      doctorNombre: config?.doctorNombre || "Dr. Daniel Reina",
+      doctorNombre: config?.doctorNombre || "Médico Titular",
       pacienteNombre: cot.pacienteNombre,
       pacienteCedula: cot.pacienteCedula,
       pacienteTelefono: cot.pacienteTelefono,
@@ -3808,13 +3847,23 @@ function Procedimientos({
       prev.map((c) => (c.id === id ? { ...c, estado: nuevoEstado } : c))
     );
     dispararToast(`Estado actualizado a: ${nuevoEstado}`);
+    const cot = cotizaciones.find((c) => c.id === id);
+    if (cot?.backendId) {
+      actualizarEstadoCotizacion(cot.backendId, nuevoEstado).catch((err) => {
+        dispararToast(`⚠️ Estado actualizado localmente, pero no en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+      });
+    }
   };
 
   // Eliminar una cotización
   const eliminarCotizacion = (id: string) => {
     if (confirm("¿Estás seguro de eliminar este registro del historial?")) {
+      const cot = cotizaciones.find((c) => c.id === id);
       setCotizaciones((prev) => prev.filter((c) => c.id !== id));
       dispararToast("Registro eliminado.");
+      if (cot?.backendId) {
+        eliminarCotizacionApi(cot.backendId).catch(() => {});
+      }
     }
   };
 
@@ -4667,7 +4716,8 @@ function SalaEspera({
         referenciaPago: admitirEstadoPago === "PAGADO" ? admitirReferencia.trim() : undefined,
       };
 
-      // Si se registró como PAGADO, agregarlo al flujo de cobros locales de caja
+      // Si se registró como PAGADO, procesarlo como cobro real en el backend (tabla
+      // salud_cobros_consulta) — antes solo quedaba en el "cobros locales" del navegador.
       if (admitirEstadoPago === "PAGADO" && montoNum > 0) {
         const cobroItem: CobroItem = {
           turno: nuevoNumero,
@@ -4684,6 +4734,20 @@ function SalaEspera({
           hora: nuevoTurno.horaLlegada,
         };
         onAgregarCobro(cobroItem);
+        try {
+          await procesarCobro(tenantId, {
+            pacienteId: admitirPacienteId ? Number(admitirPacienteId) : undefined,
+            concepto: admitirMotivo.trim() || "Consulta Médica",
+            montoTotal: montoNum,
+            monedaCobrada: monedaCobro,
+            montoRecibido: montoNum,
+            monedaPago: monedaCobro,
+            metodoPago: metodoPagoBackend(admitirMetodoPago),
+            referenciaPago: admitirReferencia.trim() || undefined,
+          });
+        } catch (err) {
+          dispararToast(`⚠️ El pago se registró en caja pero no se pudo guardar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+        }
       }
 
       // Backend sync
@@ -4723,7 +4787,7 @@ function SalaEspera({
   };
 
   // Registrar/Modificar pago de un turno
-  const handleGuardarPagoModal = (e: React.FormEvent) => {
+  const handleGuardarPagoModal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!modalPago) return;
 
@@ -4779,6 +4843,20 @@ function SalaEspera({
         hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       onAgregarCobro(cobroItem);
+      try {
+        await procesarCobro(tenantId, {
+          pacienteId: modalPago.pacienteId ?? undefined,
+          concepto: modalPago.motivo || "Consulta Médica",
+          montoTotal: montoNum,
+          monedaCobrada: monedaCobro,
+          montoRecibido: montoNum,
+          monedaPago: monedaCobro,
+          metodoPago: metodoPagoBackend(pagoMetodo),
+          referenciaPago: pagoReferencia.trim() || undefined,
+        });
+      } catch (err) {
+        dispararToast(`⚠️ El pago se registró en caja pero no se pudo guardar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+      }
     }
 
     dispararToast("Pago registrado exitosamente.");
@@ -4809,8 +4887,9 @@ function SalaEspera({
     .filter((c) => c.moneda === "COP" || (!c.moneda && (c.metodoPago?.toUpperCase().includes("COP") || (c.montoCOP !== undefined && c.montoCOP > 0))))
     .reduce((acc, c) => acc + (c.montoCOP || (c.moneda === "COP" ? c.montoCobrado || 0 : 0)), 0);
 
-  // Cierre de caja
-  const ejecutarCierreCaja = () => {
+  // Cierre de caja — se guarda en el backend real (tabla salud_cierres_caja) además de local,
+  // para que el historial de auditorías sobreviva a cambiar de PC/navegador.
+  const ejecutarCierreCaja = async () => {
     const dataCierre: CierreCajaData = {
       clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
       doctorNombre: config?.doctorNombre || "Médico Titular",
@@ -4827,7 +4906,22 @@ function SalaEspera({
     };
     onAgregarCierre(dataCierre);
     setMostrarModalCierre(false);
-    dispararToast("Cierre de caja generado y guardado.");
+    try {
+      await registrarCierreCaja(tenantId, {
+        fecha: dataCierre.fecha,
+        horaCierre: dataCierre.horaCierre,
+        responsableNombre: dataCierre.responsableNombre,
+        tasaBCV: dataCierre.tasaBCV,
+        tasaCOP: dataCierre.tasaCOP,
+        totalUSD: dataCierre.totalUSD,
+        totalVES: dataCierre.totalVES,
+        totalCOP: dataCierre.totalCOP,
+        totalPacientes: dataCierre.totalPacientes,
+      });
+      dispararToast("Cierre de caja generado y guardado en el servidor.");
+    } catch (err) {
+      dispararToast(`⚠️ Cierre generado localmente, pero no se pudo guardar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+    }
     if (onVerDocumento) {
       onVerDocumento({ tipo: "CIERRE_CAJA", data: dataCierre });
     } else {

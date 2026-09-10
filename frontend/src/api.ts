@@ -311,6 +311,73 @@ export async function listarCobrosDelDia(inicioIso: string, finIso: string): Pro
   }
 }
 
+export interface NuevoCobro {
+  pacienteId?: number;
+  concepto: string;
+  montoTotal: number;
+  monedaCobrada: string;
+  montoRecibido: number;
+  monedaPago: string;
+  metodoPago: "EFECTIVO" | "TRANSFERENCIA" | "PUNTO_VENTA" | "PAGO_MOVIL" | "ZELLE" | "OTRO";
+  referenciaPago?: string;
+}
+
+function generarClaveIdempotencia(): string {
+  try {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  } catch {}
+  return `cobro-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Registra un cobro real en el backend (tabla salud_cobros_consulta) — idempotente: reintentar
+ * con la misma claveIdempotencia (generada una vez por intento de cobro, no por request) nunca
+ * duplica el movimiento de caja. */
+export function procesarCobro(tenantId: number, datos: NuevoCobro, claveIdempotencia?: string): Promise<CobroConsulta> {
+  return request<CobroConsulta>(`/api/salud/cobros?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({
+      claveIdempotencia: claveIdempotencia || generarClaveIdempotencia(),
+      pacienteId: datos.pacienteId,
+      concepto: datos.concepto,
+      montoTotal: datos.montoTotal,
+      monedaCobrada: datos.monedaCobrada,
+      montoRecibido: datos.montoRecibido,
+      monedaPago: datos.monedaPago,
+      metodoPago: datos.metodoPago,
+      referenciaPago: datos.referenciaPago,
+    }),
+  });
+}
+
+export interface CierreCajaRegistro {
+  id: number;
+  fecha: string;
+  horaCierre: string;
+  responsableNombre?: string;
+  tasaBCV?: number;
+  tasaCOP?: number;
+  totalUSD: number;
+  totalVES: number;
+  totalCOP?: number;
+  totalPacientes: number;
+  observaciones?: string;
+}
+
+export function listarCierresCaja(): Promise<CierreCajaRegistro[]> {
+  return request<CierreCajaRegistro[]>(`/api/salud/cierres-caja`);
+}
+
+export function registrarCierreCaja(tenantId: number, datos: Omit<CierreCajaRegistro, "id">): Promise<CierreCajaRegistro> {
+  return request<CierreCajaRegistro>(`/api/salud/cierres-caja?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function eliminarCierreCaja(id: number): Promise<void> {
+  return request<void>(`/api/salud/cierres-caja/${id}`, { method: "DELETE" });
+}
+
 export interface SalaEsperaEntrada {
   id: number;
   paciente: Paciente;
@@ -359,6 +426,52 @@ export async function crearProcedimiento(
     method: "POST",
     body: JSON.stringify(datos),
   });
+}
+
+export interface CotizacionMedicaApi {
+  id: number;
+  paciente: Paciente;
+  procedimientoNombre: string;
+  descripcion: string | null;
+  costoUSD: number;
+  costoVES: number | null;
+  costoCOP: number | null;
+  tasaBCV: number | null;
+  tasaCOP: number | null;
+  estado: "COTIZADA" | "PLANIFICADA" | "REALIZADA" | "CANCELADA";
+  fecha: string;
+  fechaPlanificada: string | null;
+}
+
+export interface NuevaCotizacion {
+  pacienteId: number;
+  procedimientoNombre: string;
+  descripcion?: string;
+  costoUSD: number;
+  costoVES?: number;
+  costoCOP?: number;
+  tasaBCV?: number;
+  tasaCOP?: number;
+  fechaPlanificada?: string;
+}
+
+export function listarCotizaciones(): Promise<CotizacionMedicaApi[]> {
+  return request<CotizacionMedicaApi[]>(`/api/salud/cotizaciones`);
+}
+
+export function crearCotizacion(tenantId: number, datos: NuevaCotizacion): Promise<CotizacionMedicaApi> {
+  return request<CotizacionMedicaApi>(`/api/salud/cotizaciones?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ paciente: { id: datos.pacienteId }, ...datos }),
+  });
+}
+
+export function actualizarEstadoCotizacion(id: number, estado: CotizacionMedicaApi["estado"]): Promise<CotizacionMedicaApi> {
+  return request<CotizacionMedicaApi>(`/api/salud/cotizaciones/${id}/estado?estado=${estado}`, { method: "PATCH" });
+}
+
+export function eliminarCotizacion(id: number): Promise<void> {
+  return request<void>(`/api/salud/cotizaciones/${id}`, { method: "DELETE" });
 }
 
 export interface ConsultaMedica {
