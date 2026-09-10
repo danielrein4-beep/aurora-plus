@@ -38,9 +38,13 @@ public class CobroSaludController {
             req.cajeroUsuario = AuthContext.getUsername() != null ? AuthContext.getUsername() : "Cajero";
         }
 
+        // Se pasa tenantActivo explícitamente (no el overload de 1 argumento):
+        // findById() no respeta el filtro de tenant, así que sin esto una
+        // clínica podía asociar a su cobro el paciente de OTRA clínica pasando
+        // su pacienteId (ver mismo hallazgo en ConsultaMedicaService).
         Paciente paciente = null;
         if (req.pacienteId != null) {
-            paciente = pacienteService.obtenerPorId(req.pacienteId).orElse(null);
+            paciente = pacienteService.obtenerPorId(tenantActivo, req.pacienteId).orElse(null);
         }
 
         return ResponseEntity.ok(saludFinanzasService.procesarCobro(tenantActivo, req, paciente));

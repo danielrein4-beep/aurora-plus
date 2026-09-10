@@ -28,9 +28,15 @@ public class ProcedimientoMedicoController {
         return ResponseEntity.ok(procedimientoMedicoRepository.save(proc));
     }
 
+    // findById() no respeta el filtro de tenant (ver hallazgo de seguridad en
+    // ConsultaMedicaService) — sin este chequeo, cualquier clínica podía
+    // modificar el precio/nombre de un procedimiento de OTRA clínica.
     @PutMapping("/{id}")
     public ResponseEntity<ProcedimientoMedico> actualizar(@PathVariable Long id, @RequestBody ProcedimientoMedico datos) {
-        return procedimientoMedicoRepository.findById(id).map(p -> {
+        Long tenantId = TenantContext.getCurrentTenant();
+        return procedimientoMedicoRepository.findById(id)
+            .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))
+            .map(p -> {
             p.setNombre(datos.getNombre());
             p.setDescripcion(datos.getDescripcion());
             p.setCosto(datos.getCosto());

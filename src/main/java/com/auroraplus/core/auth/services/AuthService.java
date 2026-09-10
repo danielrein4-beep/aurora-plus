@@ -54,10 +54,26 @@ public class AuthService {
         }
     }
 
-    /** Credenciales inválidas o usuario inactivo dan el MISMO mensaje genérico — no revelar cuál de las dos falló. */
+    /**
+     * Requisito de producto: distinguir "la cuenta no existe" de "contraseña
+     * incorrecta" con un mensaje propio ("Cuenta no existente, por favor
+     * registrarse..."). OJO — esto es un trade-off de seguridad deliberado,
+     * no un descuido: revelar si un correo/usuario existe o no es lo que se
+     * conoce como "enumeración de usuarios" (OWASP), porque le permite a
+     * quien ataca probar una lista de correos y aprender cuáles están
+     * registrados en Aurora sin nunca acertar una contraseña. Antes de este
+     * cambio, login() devolvía el MISMO mensaje genérico en ambos casos
+     * exactamente para cerrar esa puerta.
+     *
+     * Mitigación ya presente en el sistema que hace este riesgo aceptable:
+     * RateLimitInterceptor limita /api/auth/login a 5 intentos/minuto por IP
+     * (ver WebConfig), así que enumerar en masa es lento y queda registrado.
+     * Si el negocio necesita cerrar esto del todo más adelante, la opción es
+     * volver al mensaje genérico o añadir CAPTCHA tras varios intentos.
+     */
     public ResultadoLogin login(Long tenantId, String username, String password) {
         Usuario usuario = usuarioRepository.buscarPorTenantYUsername(tenantId, username)
-            .orElseThrow(() -> new RuntimeException("Usuario o contraseña incorrectos"));
+            .orElseThrow(() -> new RuntimeException("Cuenta no existente, por favor registrarse..."));
 
         if (!usuario.isActivo() || !passwordEncoder.matches(password, usuario.getPasswordHash())) {
             throw new RuntimeException("Usuario o contraseña incorrectos");
@@ -76,7 +92,8 @@ public class AuthService {
     public ResultadoLogin loginPorUsername(String username, String password) {
         List<Usuario> candidatos = usuarioRepository.buscarPorUsernameEnTodosLosTenants(username);
         if (candidatos.isEmpty()) {
-            throw new RuntimeException("Usuario o contraseña incorrectos");
+            // Mismo trade-off deliberado que en login() — ver el comentario ahí.
+            throw new RuntimeException("Cuenta no existente, por favor registrarse...");
         }
         if (candidatos.size() > 1) {
             throw new RuntimeException("Este usuario existe en más de un negocio — inicia sesión indicando el negocio");
