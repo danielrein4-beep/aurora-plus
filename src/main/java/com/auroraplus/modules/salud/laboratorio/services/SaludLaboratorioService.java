@@ -109,6 +109,7 @@ public class SaludLaboratorioService {
         }
 
         ResultadoLaboratorio res = new ResultadoLaboratorio();
+        res.setTenantId(orden.getTenantId());
         res.setNombreLaboratorio(nombreLaboratorio);
         res.setBioanalistaResponsable(bioanalistaResponsable);
         res.setColegiaturaBioanalista(colegiaturaBioanalista);
@@ -124,6 +125,7 @@ public class SaludLaboratorioService {
             for (AdjuntoPayload ap : adjuntosPayload) {
                 if (ap.contenidoBase64 != null && !ap.contenidoBase64.isBlank()) {
                     AdjuntoResultadoLab adj = new AdjuntoResultadoLab();
+                    adj.setTenantId(orden.getTenantId());
                     adj.setNombreArchivo(ap.nombreArchivo != null ? ap.nombreArchivo : "adjunto");
                     adj.setTipoMime(ap.tipoMime != null ? ap.tipoMime : "application/octet-stream");
                     adj.setContenidoBase64(ap.contenidoBase64);

@@ -169,6 +169,7 @@ public class RetailVentaService {
             totalVenta = totalVenta.add(subtotal);
 
             ItemVentaRetail item = new ItemVentaRetail();
+            item.setTenantId(tenantId);
             item.setVenta(venta);
             item.setArticulo(articulo);
             item.setPresentacion(presentacion);

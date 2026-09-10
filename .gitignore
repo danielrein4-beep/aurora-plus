@@ -43,3 +43,4 @@ build/
 
 ### Herramientas locales (JDK/Maven portables descargados para esta sesión) ###
 .tools/
+backend-dev.log

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.salud.services;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.Paciente;
 import com.auroraplus.modules.salud.repositories.PacienteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,11 +82,17 @@ public class PacienteService {
         return pacienteRepository.save(paciente);
     }
 
+    // findById() no respeta el filtro de tenant (ver hallazgo de seguridad en
+    // ConsultaMedicaService) — sin este chequeo, cualquier clínica podía
+    // desactivar el paciente de OTRA clínica con solo adivinar el id.
     @Transactional
     public void desactivar(Long id) {
-        pacienteRepository.findById(id).ifPresent(p -> {
-            p.setActivo(false);
-            pacienteRepository.save(p);
-        });
+        Long tenantId = TenantContext.getCurrentTenant();
+        pacienteRepository.findById(id)
+            .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))
+            .ifPresent(p -> {
+                p.setActivo(false);
+                pacienteRepository.save(p);
+            });
     }
 }
