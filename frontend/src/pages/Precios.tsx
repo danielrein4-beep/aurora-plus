@@ -2,75 +2,44 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconCheck } from "../Icons";
 
-const PLANS = [
-  {
-    name: "Básico",
-    price: "$25",
-    period: "/mes",
-    desc: "Para negocios que están comenzando",
-    color: "border-white/5",
-    features: [
-      "Acceso web + versión móvil",
-      "3 módulos esenciales",
-      "1 sucursal",
-      "Hasta 3 usuarios",
-      "Reportes básicos",
-      "Soporte por correo",
-    ],
-    cta: "Comenzar ahora",
-    highlight: false,
-  },
-  {
-    name: "Estándar",
-    price: "$35",
-    period: "/mes",
-    desc: "Para negocios en crecimiento",
-    color: "border-teal-500/40",
-    features: [
-      "Acceso web + versión móvil",
-      "6 módulos a elegir",
-      "Hasta 3 sucursales",
-      "Hasta 10 usuarios",
-      "Reportes avanzados",
-      "Facturación electrónica",
-      "Soporte prioritario",
-    ],
-    cta: "Empezar ahora",
-    highlight: true,
-  },
-  {
-    name: "Full",
-    price: "$60",
-    period: "/mes",
-    desc: "Para operaciones de gran escala",
-    color: "border-white/5",
-    features: [
-      "Acceso web + versión móvil",
-      "Módulos ilimitados",
-      "Sucursales ilimitadas",
-      "Usuarios ilimitados",
-      "BI y analítica avanzada",
-      "Integraciones contables",
-      "Capacitación incluida",
-      "Soporte 24/7",
-    ],
-    cta: "Solicitar demo",
-    highlight: false,
-  },
+const PRECIO_BASE_MENSUAL = 25;
+
+// Un solo plan, acceso completo — la única diferencia entre opciones es el período de
+// facturación y el descuento por compromiso más largo, no qué módulos incluye.
+const PERIODOS = [
+  { id: "mensual", label: "Mensual", meses: 1, descuento: 0 },
+  { id: "semestral", label: "Semestral", meses: 6, descuento: 0.10 },
+  { id: "anual", label: "Anual", meses: 12, descuento: 0.15 },
+] as const;
+
+const FEATURES_PLAN_UNICO = [
+  "Acceso a TODOS los módulos, sin excepción",
+  "Acceso web + versión móvil",
+  "Sucursales ilimitadas",
+  "Usuarios ilimitados",
+  "Multi-moneda (USD · VES · COP)",
+  "Reportes y BI avanzado",
+  "Facturación electrónica",
+  "Soporte prioritario",
 ];
 
 const FAQ = [
-  { q: "¿Puedo cambiar de plan después?", a: "Sí, puedes subir o bajar de plan en cualquier momento. El cambio aplica en el siguiente ciclo de facturación." },
+  { q: "¿Puedo cambiar de período de facturación después?", a: "Sí, puedes pasar de mensual a semestral o anual (o al revés) cuando quieras. El cambio aplica en el siguiente ciclo de facturación." },
   { q: "¿Cuánto tarda la implementación?", a: "La mayoría de nuestros clientes están operando en menos de 2 semanas. Incluimos capacitación y acompañamiento inicial." },
   { q: "¿Los datos son seguros?", a: "Todos los datos se almacenan cifrados en servidores con respaldo diario. Cumplimos con estándares internacionales de seguridad." },
   { q: "¿Necesito instalar algo?", a: "No. Aurora Plus funciona 100% desde el navegador. La versión móvil también es web, sin necesidad de descargar apps." },
-  { q: "¿Qué pasa si necesito más módulos de los incluidos?", a: "Puedes agregar módulos adicionales a tu plan o actualizar al siguiente nivel. Nuestro equipo te ayuda a encontrar la opción más conveniente." },
-  { q: "¿Ofrecen descuentos por pago anual?", a: "Sí, contamos con descuentos especiales para planes anuales. Contáctanos para obtener tu cotización personalizada." },
+  { q: "¿Hay un plan con menos módulos y más barato?", a: "No — el plan es único y siempre incluye acceso completo a todos los módulos. Así nunca te quedas corto ni tienes que negociar un upgrade." },
+  { q: "¿Ofrecen descuentos por pago semestral o anual?", a: "Sí: 10% de descuento pagando cada 6 meses, y 15% pagando anual — el precio se aplica automáticamente al elegir el período arriba." },
 ];
 
 export default function Precios() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [periodoId, setPeriodoId] = useState<(typeof PERIODOS)[number]["id"]>("mensual");
   const navigate = useNavigate();
+
+  const periodo = PERIODOS.find((p) => p.id === periodoId) ?? PERIODOS[0];
+  const precioMensualConDescuento = PRECIO_BASE_MENSUAL * (1 - periodo.descuento);
+  const totalPeriodo = precioMensualConDescuento * periodo.meses;
 
   return (
     <main className="pt-28 pb-24 relative">
@@ -82,57 +51,76 @@ export default function Precios() {
           Sin contratos de permanencia
         </div>
         <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 dark:text-white mb-5">
-          Planes simples,<br />
-          <span className="text-aurora">precios transparentes</span>
+          Un solo plan,<br />
+          <span className="text-aurora">acceso completo</span>
         </h1>
         <p className="text-slate-500 dark:text-white/45 text-lg max-w-xl mx-auto leading-relaxed">
-          Desde $25 al mes. Sin cobros ocultos, sin letra pequeña. Cancela cuando quieras.
+          Desde $25 al mes con acceso a TODOS los módulos — sin niveles, sin funciones bloqueadas. Cancela cuando quieras.
         </p>
       </section>
 
-      {/* Plans */}
-      <section className="px-4 sm:px-6 max-w-5xl mx-auto mb-20">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {PLANS.map((plan) => (
-            <div key={plan.name}
-              className={`relative rounded-2xl p-7 flex flex-col transition-all shadow-lg ${
-                plan.highlight
-                  ? "apple-glass border-2 border-teal-500/50 scale-[1.03] shadow-2xl"
-                  : "apple-glass border border-slate-200/80 dark:border-white/5 hover:border-teal-400/40"
-              }`}>
-              {plan.highlight && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 g-aurora text-white text-[11px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-md">
-                  MÁS POPULAR
-                </div>
+      {/* Plan único con selector de período */}
+      <section className="px-4 sm:px-6 max-w-2xl mx-auto mb-20">
+        {/* Selector de período de facturación */}
+        <div className="flex items-center justify-center gap-1.5 mb-8 p-1.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 max-w-md mx-auto">
+          {PERIODOS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setPeriodoId(p.id)}
+              className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                periodoId === p.id
+                  ? "g-aurora text-white shadow-md"
+                  : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              {p.label}
+              {p.descuento > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  periodoId === p.id ? "bg-white/20" : "bg-teal-500/15 text-teal-600 dark:text-teal-400"
+                }`}>
+                  -{Math.round(p.descuento * 100)}%
+                </span>
               )}
-
-              <div className="mb-6">
-                <h2 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-2xl">{plan.name}</h2>
-                <p className="text-slate-500 dark:text-white/35 text-xs mt-0.5">{plan.desc}</p>
-                <div className="mt-5 flex items-end gap-1">
-                  <span className="font-['Outfit'] font-black text-5xl text-slate-900 dark:text-white leading-none">{plan.price}</span>
-                  <span className="text-slate-500 dark:text-white/35 text-base mb-1">{plan.period}</span>
-                </div>
-              </div>
-
-              <ul className="space-y-3 mb-8 flex-1">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-3 text-sm text-slate-700 dark:text-white/60 font-medium">
-                    <span className="mt-0.5 w-4 h-4 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0"><IconCheck size={9} /></span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              <button className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-                plan.highlight
-                  ? "g-aurora text-white hover:opacity-90 shadow-md"
-                  : "bg-white/70 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white/60 hover:border-slate-400 dark:hover:border-white/30 hover:text-black dark:hover:text-white"
-              }`}>
-                {plan.cta}
-              </button>
-            </div>
+            </button>
           ))}
+        </div>
+
+        <div className="relative rounded-2xl p-8 sm:p-10 flex flex-col items-center text-center apple-glass border-2 border-teal-500/50 shadow-2xl">
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 g-aurora text-white text-[11px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-md">
+            TODO INCLUIDO
+          </div>
+
+          <h2 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-2xl mb-1">Aurora Plus</h2>
+          <p className="text-slate-500 dark:text-white/35 text-xs mb-5">Para cualquier negocio, sin importar el tamaño</p>
+
+          <div className="flex items-end gap-1 mb-1">
+            <span className="font-['Outfit'] font-black text-6xl text-slate-900 dark:text-white leading-none">
+              ${precioMensualConDescuento.toFixed(2).replace(/\.00$/, "")}
+            </span>
+            <span className="text-slate-500 dark:text-white/35 text-base mb-2">/mes</span>
+          </div>
+
+          {periodo.descuento > 0 ? (
+            <p className="text-xs text-teal-600 dark:text-teal-400 font-semibold mb-6">
+              Facturado {periodo.meses === 6 ? "cada 6 meses" : "una vez al año"}: ${totalPeriodo.toFixed(2).replace(/\.00$/, "")} total
+              <span className="text-slate-400 dark:text-white/30 font-normal"> (antes ${(PRECIO_BASE_MENSUAL * periodo.meses).toFixed(0)})</span>
+            </p>
+          ) : (
+            <p className="text-xs text-slate-400 dark:text-white/30 mb-6">Facturado mes a mes</p>
+          )}
+
+          <ul className="space-y-3 mb-8 w-full max-w-xs text-left">
+            {FEATURES_PLAN_UNICO.map((f) => (
+              <li key={f} className="flex items-start gap-3 text-sm text-slate-700 dark:text-white/60 font-medium">
+                <span className="mt-0.5 w-4 h-4 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0"><IconCheck size={9} /></span>
+                {f}
+              </li>
+            ))}
+          </ul>
+
+          <button className="w-full max-w-xs py-3.5 rounded-xl text-sm font-semibold transition-all cursor-pointer g-aurora text-white hover:opacity-90 shadow-md">
+            Comenzar ahora
+          </button>
         </div>
       </section>
 
