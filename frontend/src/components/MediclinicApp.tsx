@@ -58,6 +58,31 @@ const MODO_CLASICO_KEY = "aurora_mediclinic_modo_clasico"; // preferencia visual
 const claveFechasBloqueadas = (tenantId: number) => `aurora_mediclinic_fechas_bloqueadas_${tenantId}`;
 const claveHistorialCierres = (tenantId: number) => `aurora_mediclinic_historial_cierres_${tenantId}`;
 const claveConfigPerfil = (tenantId: number) => `aurora_mediclinic_config_perfil_${tenantId}`;
+export const claveCotizaciones = (tenantId: number) => `aurora_mediclinic_cotizaciones_${tenantId}`;
+export const claveSalaEsperaTurnos = (tenantId: number) => `aurora_mediclinic_sala_espera_turnos_v2_${tenantId}`;
+
+export interface TurnoSalaEspera {
+  id: string;
+  turnoNumero: number;
+  codigoTurno: string;
+  pacienteId: number | null;
+  pacienteNombre: string;
+  pacienteCedula: string;
+  pacienteTelefono: string;
+  horaLlegada: string;
+  fecha: string;
+  motivo: string;
+  consultorio: string;
+  estado: "EN_ESPERA" | "EN_CONSULTA" | "ATENDIDO" | "CANCELADO";
+  estadoPago: "PAGADO" | "PENDIENTE" | "EXONERADO" | "PARCIAL";
+  metodoPago?: string;
+  moneda?: "USD" | "VES" | "COP";
+  montoCobrado?: number;
+  montoUSD?: number;
+  montoVES?: number;
+  montoCOP?: number;
+  referenciaPago?: string;
+}
 
 function EstiloClasico() {
   return (
@@ -615,8 +640,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     cargarContadorLab();
     listarPacientes(tenantId).then(setPacientes).catch(() => setPacientes([]));
     listarCitasDelDia(tenantId, hoy()).then(setCitasHoy).catch(() => setCitasHoy([]));
-    listarSalaEspera().then(setSalaEspera).catch(() => setSalaEspera([]));
-    listarProcedimientos().then(setProcedimientos).catch(() => setProcedimientos([]));
+    listarSalaEspera(tenantId).then(setSalaEspera).catch(() => setSalaEspera([]));
+    listarProcedimientos(tenantId).then(setProcedimientos).catch(() => setProcedimientos([]));
     listarCobrosDelDia(`${hoy()}T00:00:00`, `${hoy()}T23:59:59`)
       .then((c) => {
         const totalApi = c.reduce((s, x) => s + Number(x.montoTotal), 0);
@@ -890,6 +915,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           <div key={pagina} className="animate-tab-enter space-y-6">
             {pagina === "general" && (
               <VistaGeneral
+                tenantId={tenantId}
                 pacientes={pacientes}
                 citasHoy={citasHoy}
                 salaEspera={salaEspera}
@@ -1313,6 +1339,7 @@ function coincidePaciente(p: Paciente, query: string): boolean {
 // VISTA GENERAL / DASHBOARD (SINCRONIZACIÓN EN TIEMPO REAL)
 // ══════════════════════════════════════════════════════════════════════════
 function VistaGeneral({
+  tenantId,
   pacientes,
   citasHoy,
   salaEspera,
@@ -1321,6 +1348,7 @@ function VistaGeneral({
   onNavegar,
   onSeleccionarPaciente,
 }: {
+  tenantId: number;
   pacientes: Paciente[] | null;
   citasHoy: CitaMedica[] | null;
   salaEspera: SalaEsperaEntrada[] | null;
@@ -1336,10 +1364,10 @@ function VistaGeneral({
     return (pacientes || []).filter((p) => coincidePaciente(p, busquedaRapida));
   }, [pacientes, busquedaRapida]);
 
-  // Cargar turnos y cotizaciones en tiempo real desde el almacenamiento
+  // Cargar turnos y cotizaciones en tiempo real desde el almacenamiento aislado por tenant
   const [turnosVivos, setTurnosVivos] = useState<TurnoSalaEspera[]>(() => {
     try {
-      const raw = localStorage.getItem("aurora_mediclinic_sala_espera_turnos_v2");
+      const raw = localStorage.getItem(claveSalaEsperaTurnos(tenantId));
       if (raw) return JSON.parse(raw);
     } catch {}
     return [];
@@ -1347,7 +1375,7 @@ function VistaGeneral({
 
   const [cotizacionesVivas, setCotizacionesVivas] = useState<any[]>(() => {
     try {
-      const raw = localStorage.getItem("aurora_mediclinic_cotizaciones");
+      const raw = localStorage.getItem(claveCotizaciones(tenantId));
       if (raw) return JSON.parse(raw);
     } catch {}
     return [];
@@ -1357,16 +1385,18 @@ function VistaGeneral({
   useEffect(() => {
     const refrescarDatos = () => {
       try {
-        const rawT = localStorage.getItem("aurora_mediclinic_sala_espera_turnos_v2");
+        const rawT = localStorage.getItem(claveSalaEsperaTurnos(tenantId));
         if (rawT) setTurnosVivos(JSON.parse(rawT));
-        const rawC = localStorage.getItem("aurora_mediclinic_cotizaciones");
+        else setTurnosVivos([]);
+        const rawC = localStorage.getItem(claveCotizaciones(tenantId));
         if (rawC) setCotizacionesVivas(JSON.parse(rawC));
+        else setCotizacionesVivas([]);
       } catch {}
     };
     refrescarDatos();
     window.addEventListener("storage", refrescarDatos);
     return () => window.removeEventListener("storage", refrescarDatos);
-  }, []);
+  }, [tenantId]);
 
   // Cálculos en tiempo real
   const enEspera = turnosVivos.length > 0
@@ -3513,8 +3543,6 @@ export interface CotizacionGuardada {
   fechaPlanificada?: string;
 }
 
-const claveCotizaciones = (tenantId: number) => `aurora_mediclinic_cotizaciones_${tenantId}`;
-
 const PROCEDIMIENTOS_SUGERIDOS = [
   { nombre: "Cirugía Menor Ambulatoria", precio: 250, desc: "Intervención ambulatoria con anestesia local y curación" },
   { nombre: "Resección de quiste sebáceo", precio: 180, desc: "Resección quirúrgica completa con hemostasia y sutura intradérmica" },
@@ -4441,8 +4469,6 @@ export interface TurnoSalaEspera {
   montoCOP?: number;
   referenciaPago?: string;
 }
-
-const claveSalaEsperaTurnos = (tenantId: number) => `aurora_mediclinic_sala_espera_turnos_v2_${tenantId}`;
 
 const MOTIVOS_CONSULTA_SUGERIDOS = [
   "Consulta Médica General",
