@@ -48,6 +48,15 @@ const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => React.Re
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
+/** Fecha real de una consulta para mostrar en pantalla. El backend solo devuelve `fechaHora`
+ * (nunca `fechaConsulta` — ese campo ni existe en la entidad real); si se usaba únicamente
+ * `fechaConsulta`, toda consulta cargada del historial mostraba la fecha de HOY en vez de la
+ * fecha real en que ocurrió (hallazgo real: 6 meses de historial mostrando la misma fecha). */
+function fechaDeConsulta(c: { fechaHora?: string; fechaConsulta?: string }): string {
+  const raw = c.fechaHora || c.fechaConsulta;
+  return raw ? raw.slice(0, 10) : hoy();
+}
+
 const MODO_CLASICO_KEY = "aurora_mediclinic_modo_clasico"; // preferencia visual, no datos de negocio — se deja global a propósito
 
 // Todo lo demás guardado en localStorage SÍ es específico de un médico (perfil, cierres de caja,
@@ -202,7 +211,7 @@ function SelectorPerfilesNetflix({
 
             <div className="space-y-1">
               <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-[#00FFC2] transition-colors">
-                {configPerfil.doctorNombre || "Dr. Mario Roa"}
+                {configPerfil.doctorNombre || "Médico Titular"}
               </h3>
               <p className="text-xs text-teal-600 dark:text-teal-300/90 font-medium">
                 {configPerfil.especialidad || "Médico Titular & Administrador"}
@@ -2417,7 +2426,7 @@ function HistoriasClinicas({
 
     return {
       clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
-      doctorNombre: config.doctorNombre || "Dr. Mario Roa",
+      doctorNombre: config.doctorNombre || "Médico Titular",
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
@@ -2522,7 +2531,7 @@ function HistoriasClinicas({
 
     const data: ConsultaReportData = {
       clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
-      doctorNombre: config.doctorNombre || "Dr. Mario Roa",
+      doctorNombre: config.doctorNombre || "Médico Titular",
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
@@ -2536,7 +2545,7 @@ function HistoriasClinicas({
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
-        fechaConsulta: c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy(),
+        fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
         ta: "120/80",
@@ -2570,7 +2579,7 @@ function HistoriasClinicas({
 
     const data: ConsultaReportData = {
       clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
-      doctorNombre: config.doctorNombre || "Dr. Mario Roa",
+      doctorNombre: config.doctorNombre || "Médico Titular",
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
@@ -2584,7 +2593,7 @@ function HistoriasClinicas({
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
-        fechaConsulta: c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy(),
+        fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
         ta: "120/80",
@@ -2621,7 +2630,7 @@ function HistoriasClinicas({
 
     const data: ConsultaReportData = {
       clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
-      doctorNombre: config.doctorNombre || "Dr. Mario Roa",
+      doctorNombre: config.doctorNombre || "Médico Titular",
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
@@ -2635,7 +2644,7 @@ function HistoriasClinicas({
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
-        fechaConsulta: c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy(),
+        fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
         ta: "120/80",
@@ -2678,7 +2687,7 @@ function HistoriasClinicas({
   const handleEliminarConsulta = async (c: ConsultaMedica) => {
     if (!pacienteSeleccionado) return;
     const motivo = c.motivoConsulta || "Consulta";
-    const fecha = c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy();
+    const fecha = fechaDeConsulta(c);
     if (!confirm(`¿Estás seguro de eliminar la consulta del ${fecha} ("${motivo}")? Esta acción no se puede deshacer.`)) {
       return;
     }
@@ -2876,7 +2885,7 @@ function HistoriasClinicas({
                     </tr>
                   ) : (
                     historial.map((c) => {
-                      const fechaC = c.fechaConsulta ? c.fechaConsulta.slice(0, 10) : hoy();
+                      const fechaC = fechaDeConsulta(c);
                       const isSelected = consultaSeleccionadaFicha?.id === c.id;
                       return (
                         <tr
@@ -4778,7 +4787,7 @@ function SalaEspera({
   const ejecutarCierreCaja = () => {
     const dataCierre: CierreCajaData = {
       clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
-      doctorNombre: config?.doctorNombre || "Dr. Mario Roa",
+      doctorNombre: config?.doctorNombre || "Médico Titular",
       responsableNombre: config?.secretariaNombre || "Recepción / Asistente",
       fecha: hoy(),
       horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -6706,7 +6715,7 @@ function ResumenesFinancieros({
               onClick={() => {
                 const dataHoy: CierreCajaData = {
                   clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
-                  doctorNombre: config?.doctorNombre || "Dr. Mario Roa",
+                  doctorNombre: config?.doctorNombre || "Médico Titular",
                   responsableNombre: config?.secretariaNombre || config?.doctorNombre || "Recepción y Caja",
                   fecha: hoy(),
                   horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
