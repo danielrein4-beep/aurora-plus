@@ -158,39 +158,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let nombreUsuario = email.includes("@") ? email.split("@")[0] : email;
     let modulosUsuario: string[] = [];
 
-    // Buscar si existe en el registro local persistente
+    // Buscar si existe en el registro local persistente (solo para completar nombre/empresa en la
+    // UI si el backend no puede resolverlo — NUNCA para decidir si el login es válido).
     const cuentaLocal = obtenerCuentasLocales().find((c) => c.email.toLowerCase() === email.toLowerCase());
 
+    // El login SIEMPRE se valida contra el backend real. Antes, si loginDirecto fallaba por
+    // CUALQUIER motivo — incluida una contraseña incorrecta — se caía a una "sesión dev" falsa que
+    // dejaba entrar de todos modos (hallazgo de seguridad real: se podía iniciar sesión con
+    // cualquier credencial). No hay ningún camino alterno: si el backend rechaza el login, el error
+    // se propaga tal cual a quien llamó login() (ver Auth.tsx, ya lo muestra en pantalla).
+    sesion = await loginDirecto(email, password);
     try {
-      sesion = await loginDirecto(email, password);
-      try {
-        const negocio = await obtenerMiNegocio();
-        empresa = negocio.nombreEmpresa || empresa;
-        industry = MODULO_A_INDUSTRIA[negocio.moduloPrincipal] || negocio.moduloPrincipal || "clinica";
-      } catch {
-        // Si mi-negocio falla usamos datos de la cuenta local si existen
-        if (cuentaLocal) {
-          empresa = cuentaLocal.empresa || empresa;
-          industry = cuentaLocal.industry || industry;
-          nombreUsuario = cuentaLocal.nombre || nombreUsuario;
-          modulosUsuario = cuentaLocal.modules || [];
-        }
-      }
-    } catch (e) {
-      console.warn("Backend local no disponible o proxy 502, activando sesión dev local:", e);
+      const negocio = await obtenerMiNegocio();
+      empresa = negocio.nombreEmpresa || empresa;
+      industry = MODULO_A_INDUSTRIA[negocio.moduloPrincipal] || negocio.moduloPrincipal || "clinica";
+    } catch {
+      // La autenticación ya fue válida — esto solo completa metadata de UI si el endpoint de
+      // negocio falla por alguna otra razón, no decide si la sesión es legítima.
       if (cuentaLocal) {
         empresa = cuentaLocal.empresa || empresa;
         industry = cuentaLocal.industry || industry;
         nombreUsuario = cuentaLocal.nombre || nombreUsuario;
         modulosUsuario = cuentaLocal.modules || [];
       }
-      sesion = {
-        token: `dev-session-${Date.now()}`,
-        rol: cuentaLocal?.rol || "MEDICO",
-        username: email,
-        tenantId: cuentaLocal?.tenantId || 1,
-      };
-      guardarSesion(sesion);
     }
 
     const nuevoUsuario: User = {
@@ -221,19 +211,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Registro de autoservicio real con fallback de desarrollo si el backend local no está corriendo
   const completarRegistro = async (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string }) => {
-    let sesion: SesionAurora;
-    try {
-      sesion = await registrarNegocio(datos);
-    } catch (e) {
-      console.warn("Backend de registro no disponible (502), continuando en modo local/desarrollo:", e);
-      sesion = {
-        token: `dev-session-${Date.now()}`,
-        rol: "MEDICO",
-        username: datos.username || datos.emailContacto,
-        tenantId: 1,
-      };
-      guardarSesion(sesion);
-    }
+    // El registro SIEMPRE crea el tenant contra el backend real — si falla, el error se propaga
+    // (ver Onboarding.tsx). Antes, cualquier fallo caía a una sesión falsa en el tenant 1 como si
+    // el registro hubiera funcionado, sin que existiera ninguna cuenta real en el backend.
+    const sesion: SesionAurora = await registrarNegocio(datos);
 
     const industry = MODULO_A_INDUSTRIA[datos.moduloPrincipal] || datos.moduloPrincipal || "clinica";
     const nombreUsuario = datos.username?.includes("@") ? datos.username.split("@")[0] : datos.username || "Usuario";

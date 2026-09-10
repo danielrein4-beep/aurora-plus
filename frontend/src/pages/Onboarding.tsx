@@ -249,7 +249,10 @@ export default function Onboarding() {
     const modulosPorDefecto = modulosDisponibles.map((m) => m.id);
     try {
       if (pendingSignup) {
-        // Registro real de un negocio nuevo — crea el tenant en el backend o activa sesión local
+        // Registro real de un negocio nuevo — DEBE crear el tenant de verdad en el backend. Si
+        // falla (email duplicado, backend caído, validación), el error se muestra tal cual: antes
+        // esto se "resolvía" fingiendo éxito y entrando de todos modos sin que existiera ninguna
+        // cuenta real, lo cual dejaba a la persona pensando que se registró cuando no pasó nada.
         await completarRegistro({
           nombreEmpresa: empresaNombre.trim() || nombrePorDefecto,
           moduloPrincipal: INDUSTRIA_A_MODULO[selectedIndustry] || "salud",
@@ -260,7 +263,8 @@ export default function Onboarding() {
           metodoPagoPreferido: METODOS_PAGO.find((m) => m.id === metodoPago)?.label,
         });
       } else {
-        // Usuario ya existente reconfigurando su rubro/módulos (ej. "Cambiar Rubro")
+        // Usuario ya existente reconfigurando su rubro/módulos (ej. "Cambiar Rubro") — esto no crea
+        // ninguna cuenta nueva, solo actualiza preferencias del usuario ya autenticado.
         completeOnboarding({
           industry: selectedIndustry,
           empresa: empresaNombre.trim() || nombrePorDefecto,
@@ -270,14 +274,7 @@ export default function Onboarding() {
       }
       navigate("/dashboard");
     } catch (err) {
-      console.warn("Fallo en registro backend (502), continuando en modo seguro local:", err);
-      completeOnboarding({
-        industry: selectedIndustry,
-        empresa: empresaNombre.trim() || nombrePorDefecto,
-        modules: modules.length > 0 ? modules : modulosPorDefecto,
-        hasCompletedOnboarding: true,
-      });
-      navigate("/dashboard");
+      setErrorActivacion(err instanceof Error ? err.message : "No se pudo completar el registro. Intenta de nuevo.");
     } finally {
       setActivando(false);
     }
