@@ -3,6 +3,7 @@ import { useNavigate, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import { AuroraGradientDef, IconLock } from "../Icons";
 import { useAuth } from "../context/AuthContext";
+import { solicitarRecuperacionClave } from "../api";
 
 type Mode = "login" | "register";
 
@@ -21,6 +22,11 @@ export default function Auth() {
   const [enviando, setEnviando] = useState(false);
   const navigate = useNavigate();
   const { login, isLoggedIn, user } = useAuth();
+
+  const [modalOlvide, setModalOlvide] = useState(false);
+  const [emailOlvide, setEmailOlvide] = useState("");
+  const [enviandoOlvide, setEnviandoOlvide] = useState(false);
+  const [mensajeOlvide, setMensajeOlvide] = useState<string | null>(null);
 
   if (isLoggedIn) {
     return <Navigate to="/dashboard" replace />;
@@ -61,6 +67,20 @@ export default function Auth() {
       setErrors({ submit: err instanceof Error ? err.message : "No se pudo iniciar sesión" });
     } finally {
       setEnviando(false);
+    }
+  };
+
+  const handleSolicitarOlvide = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEnviandoOlvide(true);
+    setMensajeOlvide(null);
+    try {
+      await solicitarRecuperacionClave(emailOlvide.trim());
+      setMensajeOlvide("Si ese correo está registrado, te enviamos un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada (y spam).");
+    } catch (err) {
+      setMensajeOlvide(err instanceof Error ? err.message : "No se pudo procesar la solicitud.");
+    } finally {
+      setEnviandoOlvide(false);
     }
   };
 
@@ -252,7 +272,11 @@ export default function Auth() {
                 </label>
 
                 {mode === "login" && (
-                  <button type="button" className="text-xs text-teal-400 hover:text-teal-300 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => { setModalOlvide(true); setEmailOlvide(form.email); setMensajeOlvide(null); }}
+                    className="text-xs text-teal-400 hover:text-teal-300 transition-colors cursor-pointer"
+                  >
                     ¿Olvidaste tu clave?
                   </button>
                 )}
@@ -312,6 +336,46 @@ export default function Auth() {
 
         </div>
       </div>
+
+      {modalOlvide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
+          <div className="relative w-full max-w-sm rounded-3xl p-6 bg-[#0a0e17] border border-white/10 text-white space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-lg">Recuperar contraseña</h3>
+              <button
+                type="button"
+                onClick={() => setModalOlvide(false)}
+                className="text-white/40 hover:text-white cursor-pointer text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-xs text-white/50">
+              Ingresa tu correo y te enviamos un enlace para elegir una nueva contraseña.
+            </p>
+            <form onSubmit={handleSolicitarOlvide} className="space-y-3">
+              {mensajeOlvide && (
+                <p className="text-xs text-teal-300 bg-teal-500/10 border border-teal-500/20 rounded-xl p-3">{mensajeOlvide}</p>
+              )}
+              <input
+                type="email"
+                required
+                value={emailOlvide}
+                onChange={(e) => setEmailOlvide(e.target.value)}
+                placeholder="tu@correo.com"
+                className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-white/5 text-white text-sm focus:outline-none focus:border-teal-400"
+              />
+              <button
+                type="submit"
+                disabled={enviandoOlvide}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 text-slate-900 text-sm font-bold cursor-pointer disabled:opacity-50"
+              >
+                {enviandoOlvide ? "Enviando…" : "Enviar enlace de recuperación"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

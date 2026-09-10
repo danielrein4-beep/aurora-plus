@@ -1,13 +1,20 @@
 package com.auroraplus.core.auth.services;
 
+import com.auroraplus.core.auth.entities.TokenRecuperacionClave;
 import com.auroraplus.core.auth.entities.Usuario;
 import com.auroraplus.core.auth.entities.UsuarioSuperAdmin;
+import com.auroraplus.core.auth.repositories.TokenRecuperacionClaveRepository;
 import com.auroraplus.core.auth.repositories.UsuarioRepository;
 import com.auroraplus.core.auth.repositories.UsuarioSuperAdminRepository;
+import com.auroraplus.core.config.CorreoService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -20,9 +27,19 @@ public class AuthService {
     private UsuarioSuperAdminRepository usuarioSuperAdminRepository;
 
     @Autowired
+    private TokenRecuperacionClaveRepository tokenRecuperacionClaveRepository;
+
+    @Autowired
+    private CorreoService correoService;
+
+    @Autowired
     private JwtService jwtService;
 
+    @Value("${app.frontend.url:http://localhost:8443}")
+    private String frontendUrl;
+
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final SecureRandom random = new SecureRandom();
 
     public static class ResultadoLogin {
         public final String token;
@@ -131,5 +148,64 @@ public class AuthService {
         admin.setUsername(username);
         admin.setPasswordHash(passwordEncoder.encode(password));
         usuarioSuperAdminRepository.save(admin);
+    }
+
+    private String generarToken() {
+        byte[] bytes = new byte[32];
+        random.nextBytes(bytes);
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) sb.append(String.format("%02x", b));
+        return sb.toString();
+    }
+
+    /**
+     * "Olvidé mi clave": genera un token de un solo uso (30 min de vigencia) y lo manda por correo
+     * con el link de reseteo. Deliberadamente NO indica si el correo existe o no en la respuesta —
+     * eso evita que alguien use este endpoint para averiguar qué correos están registrados
+     * (enumeración de usuarios). Si hay más de una cuenta con ese correo (en distintos tenants), se
+     * manda un token para cada una.
+     */
+    @Transactional
+    public void solicitarRecuperacionClave(String email) {
+        if (email == null || email.isBlank()) return;
+        List<Usuario> candidatos = usuarioRepository.buscarPorUsernameEnTodosLosTenants(email.trim());
+        for (Usuario usuario : candidatos) {
+            if (!usuario.isActivo()) continue;
+            TokenRecuperacionClave token = new TokenRecuperacionClave();
+            token.setUsuarioId(usuario.getId());
+            token.setToken(generarToken());
+            token.setExpiraEn(LocalDateTime.now().plusMinutes(30));
+            tokenRecuperacionClaveRepository.save(token);
+
+            String enlace = frontendUrl + "/resetear-clave?token=" + token.getToken();
+            String cuerpo = "<p>Hola,</p>"
+                + "<p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en Aurora Plus (" + usuario.getUsername() + ").</p>"
+                + "<p><a href=\"" + enlace + "\">Haz clic aquí para elegir una nueva contraseña</a></p>"
+                + "<p>Este enlace vence en 30 minutos. Si no fuiste tú quien lo solicitó, puedes ignorar este correo.</p>";
+            correoService.enviarHtml(usuario.getUsername(), "Restablecer tu contraseña — Aurora Plus", cuerpo);
+        }
+    }
+
+    /** Aplica la nueva contraseña si el token es válido, no venció y no se usó antes. */
+    @Transactional
+    public void resetearClave(String token, String nuevaClave) {
+        if (nuevaClave == null || nuevaClave.length() < 6) {
+            throw new RuntimeException("La contraseña debe tener al menos 6 caracteres");
+        }
+        TokenRecuperacionClave tokenEntity = tokenRecuperacionClaveRepository.findByToken(token)
+            .orElseThrow(() -> new RuntimeException("Enlace de recuperación inválido"));
+        if (tokenEntity.isUsado()) {
+            throw new RuntimeException("Este enlace ya fue usado — solicita uno nuevo");
+        }
+        if (tokenEntity.getExpiraEn().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Este enlace venció — solicita uno nuevo");
+        }
+        Usuario usuario = usuarioRepository.findById(tokenEntity.getUsuarioId())
+            .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        usuario.setPasswordHash(passwordEncoder.encode(nuevaClave));
+        usuarioRepository.save(usuario);
+
+        tokenEntity.setUsado(true);
+        tokenRecuperacionClaveRepository.save(tokenEntity);
     }
 }

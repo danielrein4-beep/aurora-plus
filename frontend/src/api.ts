@@ -125,6 +125,22 @@ export async function registrarNegocio(datos: RegistroNegocio): Promise<SesionAu
   return sesion;
 }
 
+/** Solicita el correo de recuperación de contraseña — el backend siempre responde éxito genérico
+ * (exista o no la cuenta) para no revelar qué correos están registrados. */
+export function solicitarRecuperacionClave(email: string): Promise<{ message: string }> {
+  return request(`/api/auth/olvide-clave`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetearClave(token: string, nuevaClave: string): Promise<{ message: string }> {
+  return request(`/api/auth/resetear-clave`, {
+    method: "POST",
+    body: JSON.stringify({ token, nuevaClave }),
+  });
+}
+
 export async function loginDirecto(username: string, password: string): Promise<SesionAurora> {
   const data = await request<{ token: string; rol: string; username: string; tenantId: number }>(
     "/api/auth/login-directo",

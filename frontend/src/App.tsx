@@ -7,6 +7,7 @@ import Industrias from "./pages/Industrias";
 import Precios from "./pages/Precios";
 import Nosotros from "./pages/Nosotros";
 import Auth from "./pages/Auth";
+import ResetearClave from "./pages/ResetearClave";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import MediclinicApp from "./components/MediclinicApp";
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="/lab/:token" element={<PortalPublicoBioanalista />} />
             {/* Auth + onboarding — full screen con transiciones fluidas */}
             <Route path="/auth"       element={<AnimatedRoute><Auth /></AnimatedRoute>} />
+            <Route path="/resetear-clave" element={<AnimatedRoute><ResetearClave /></AnimatedRoute>} />
             <Route path="/onboarding" element={<AnimatedRoute><Onboarding /></AnimatedRoute>} />
             {/* Protected — requiere sesión activa */}
             <Route path="/dashboard"  element={<ProtectedRoute><AnimatedRoute><Dashboard /></AnimatedRoute></ProtectedRoute>} />

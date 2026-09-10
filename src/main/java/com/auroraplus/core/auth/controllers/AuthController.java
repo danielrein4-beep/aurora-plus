@@ -91,6 +91,29 @@ public class AuthController {
         return ResponseEntity.ok(authService.loginPorUsername(request.username, request.password));
     }
 
+    public static class OlvideClaveRequest {
+        public String email;
+    }
+
+    // Siempre responde éxito genérico, exista o no el correo — evita que este endpoint sirva para
+    // averiguar qué correos están registrados en la plataforma (enumeración de usuarios).
+    @PostMapping("/olvide-clave")
+    public ResponseEntity<Map<String, String>> olvideClave(@RequestBody OlvideClaveRequest request) {
+        authService.solicitarRecuperacionClave(request.email);
+        return ResponseEntity.ok(Map.of("message", "Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña."));
+    }
+
+    public static class ResetearClaveRequest {
+        public String token;
+        public String nuevaClave;
+    }
+
+    @PostMapping("/resetear-clave")
+    public ResponseEntity<Map<String, String>> resetearClave(@RequestBody ResetearClaveRequest request) {
+        authService.resetearClave(request.token, request.nuevaClave);
+        return ResponseEntity.ok(Map.of("message", "Contraseña actualizada exitosamente."));
+    }
+
     public static class LoginSuperAdminRequest {
         public String username;
         public String password;
