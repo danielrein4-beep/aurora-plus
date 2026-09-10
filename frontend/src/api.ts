@@ -320,19 +320,7 @@ export interface SalaEsperaEntrada {
 }
 
 export async function listarSalaEspera(tenantId: number = 1): Promise<SalaEsperaEntrada[]> {
-  const storageKey = `aurora_mediclinic_sala_espera_${tenantId}`;
-  try {
-    const apiRes = await request<SalaEsperaEntrada[]>(`/api/salud/sala-espera?tenantId=${tenantId}`);
-    if (Array.isArray(apiRes)) {
-      localStorage.setItem(storageKey, JSON.stringify(apiRes));
-      return apiRes;
-    }
-  } catch {}
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
+  return request<SalaEsperaEntrada[]>(`/api/salud/sala-espera?tenantId=${tenantId}`);
 }
 
 export async function registrarLlegadaSalaEspera(
@@ -340,69 +328,14 @@ export async function registrarLlegadaSalaEspera(
   pacienteId: number,
   consultorio?: string
 ): Promise<SalaEsperaEntrada> {
-  const storageKey = `aurora_mediclinic_sala_espera_${tenantId}`;
-  const nuevaEntrada: SalaEsperaEntrada = {
-    id: Date.now(),
-    paciente: {
-      id: pacienteId,
-      nombreCompleto: "Paciente En Espera",
-      identificacion: "10987654",
-      edad: 30,
-      telefono: "0414-0000000",
-    },
-    consultorio: consultorio || "Consultorio 1",
-    estado: "EN_ESPERA",
-    horaLlegada: new Date().toLocaleTimeString().slice(0, 5),
-  };
-
-  try {
-    const apiRes = await request<SalaEsperaEntrada>(`/api/salud/sala-espera/check-in?tenantId=${tenantId}`, {
-      method: "POST",
-      body: JSON.stringify({ paciente: { id: pacienteId }, consultorio }),
-    });
-    if (apiRes && apiRes.id) {
-      try {
-        const raw = localStorage.getItem(storageKey);
-        const list: SalaEsperaEntrada[] = raw ? JSON.parse(raw) : [];
-        localStorage.setItem(storageKey, JSON.stringify([apiRes, ...list]));
-      } catch {}
-      return apiRes;
-    }
-  } catch {}
-
-  try {
-    const raw = localStorage.getItem(storageKey);
-    const list: SalaEsperaEntrada[] = raw ? JSON.parse(raw) : [];
-    localStorage.setItem(storageKey, JSON.stringify([nuevaEntrada, ...list]));
-  } catch {}
-
-  return nuevaEntrada;
+  return request<SalaEsperaEntrada>(`/api/salud/sala-espera/check-in?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ paciente: { id: pacienteId }, consultorio }),
+  });
 }
 
 export async function finalizarAtencionSalaEspera(id: number, tenantId: number = 1): Promise<SalaEsperaEntrada> {
-  const storageKey = `aurora_mediclinic_sala_espera_${tenantId}`;
-  try {
-    return await request(`/api/salud/sala-espera/${id}/finalizar?tenantId=${tenantId}`, { method: "POST" });
-  } catch {
-    const mock: SalaEsperaEntrada = {
-      id,
-      paciente: { id: 1, nombreCompleto: "Paciente Atendido", identificacion: "10987654", edad: 30, telefono: "" },
-      consultorio: "Consultorio 1",
-      estado: "FINALIZADO",
-      horaLlegada: "10:00",
-    };
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const list: SalaEsperaEntrada[] = JSON.parse(raw);
-        localStorage.setItem(
-          storageKey,
-          JSON.stringify(list.map((e) => (e.id === id ? { ...e, estado: "FINALIZADO" } : e)))
-        );
-      }
-    } catch {}
-    return mock;
-  }
+  return request(`/api/salud/sala-espera/${id}/finalizar?tenantId=${tenantId}`, { method: "POST" });
 }
 
 export interface ProcedimientoMedico {
@@ -415,53 +348,17 @@ export interface ProcedimientoMedico {
 }
 
 export async function listarProcedimientos(tenantId: number = 1): Promise<ProcedimientoMedico[]> {
-  const storageKey = `aurora_mediclinic_procedimientos_${tenantId}`;
-  try {
-    const apiRes = await request<ProcedimientoMedico[]>(`/api/salud/procedimientos?tenantId=${tenantId}`);
-    if (Array.isArray(apiRes)) {
-      localStorage.setItem(storageKey, JSON.stringify(apiRes));
-      return apiRes;
-    }
-  } catch {}
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
+  return request<ProcedimientoMedico[]>(`/api/salud/procedimientos?tenantId=${tenantId}`);
 }
 
 export async function crearProcedimiento(
   tenantId: number,
   datos: Omit<ProcedimientoMedico, "id">
 ): Promise<ProcedimientoMedico> {
-  const storageKey = `aurora_mediclinic_procedimientos_${tenantId}`;
-  const nuevo: ProcedimientoMedico = {
-    id: Date.now(),
-    ...datos,
-  };
-
-  try {
-    const apiRes = await request<ProcedimientoMedico>(`/api/salud/procedimientos?tenantId=${tenantId}`, {
-      method: "POST",
-      body: JSON.stringify(datos),
-    });
-    if (apiRes && apiRes.id) {
-      try {
-        const raw = localStorage.getItem(storageKey);
-        const list: ProcedimientoMedico[] = raw ? JSON.parse(raw) : [];
-        localStorage.setItem(storageKey, JSON.stringify([apiRes, ...list]));
-      } catch {}
-      return apiRes;
-    }
-  } catch {}
-
-  try {
-    const raw = localStorage.getItem(storageKey);
-    const list: ProcedimientoMedico[] = raw ? JSON.parse(raw) : [];
-    localStorage.setItem(storageKey, JSON.stringify([nuevo, ...list]));
-  } catch {}
-
-  return nuevo;
+  return request<ProcedimientoMedico>(`/api/salud/procedimientos?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
 }
 
 export interface ConsultaMedica {
