@@ -14,7 +14,14 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     // Sin filtro de tenant activo todavía en este punto del login (es lo que
     // estamos resolviendo) — por eso la query es explícita por tenantId+username,
     // no depende del Hibernate filter.
-    @Query("SELECT u FROM UsuarioAuth u WHERE u.tenantId = :tenantId AND u.username = :username")
+    //
+    // Comparación por LOWER() a propósito: el username casi siempre es un correo, y un correo
+    // es case-insensitive por convención — "Nombre@Gmail.com" y "nombre@gmail.com" son la MISMA
+    // cuenta para cualquier persona real. Antes esto comparaba con "=" exacto, así que una cuenta
+    // guardada como "DANIELREIN420@GMAIL.COM" (por ejemplo, tecleada en mayúsculas al registrarse)
+    // nunca hacía login si la persona escribía su correo en minúsculas — "usuario o contraseña
+    // incorrectos" con la contraseña correcta, un bug real que confundía con un problema de clave.
+    @Query("SELECT u FROM UsuarioAuth u WHERE u.tenantId = :tenantId AND LOWER(u.username) = LOWER(:username)")
     Optional<Usuario> buscarPorTenantYUsername(@Param("tenantId") Long tenantId, @Param("username") String username);
 
     List<Usuario> findByTenantId(Long tenantId);
@@ -23,6 +30,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     // login por correo, sin que el cliente conozca su tenantId, se busca en todos
     // los tenants; si hay más de una coincidencia se le pide al usuario que
     // desambigüe (caso raro: mismo username elegido en dos negocios distintos).
-    @Query("SELECT u FROM UsuarioAuth u WHERE u.username = :username")
+    @Query("SELECT u FROM UsuarioAuth u WHERE LOWER(u.username) = LOWER(:username)")
     List<Usuario> buscarPorUsernameEnTodosLosTenants(@Param("username") String username);
 }

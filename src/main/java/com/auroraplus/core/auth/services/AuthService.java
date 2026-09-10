@@ -92,16 +92,20 @@ public class AuthService {
         if (username == null || username.isBlank()) {
             throw new RuntimeException("El nombre de usuario es obligatorio");
         }
+        // Normalizado a minúsculas al guardar: el username casi siempre es un correo, y un correo
+        // es case-insensitive por convención — sin esto, "Nombre@Gmail.com" y "nombre@gmail.com"
+        // podían terminar como dos filas "distintas" con la misma identidad real.
+        String usernameNormalizado = username.trim().toLowerCase();
         if (password == null || password.length() < 6) {
             throw new RuntimeException("La contraseña debe tener al menos 6 caracteres");
         }
-        if (usuarioRepository.buscarPorTenantYUsername(tenantId, username).isPresent()) {
+        if (usuarioRepository.buscarPorTenantYUsername(tenantId, usernameNormalizado).isPresent()) {
             throw new RuntimeException("Ya existe un usuario '" + username + "' en este negocio");
         }
 
         Usuario usuario = new Usuario();
         usuario.setTenantId(tenantId);
-        usuario.setUsername(username);
+        usuario.setUsername(usernameNormalizado);
         usuario.setPasswordHash(passwordEncoder.encode(password));
         usuario.setRol(rol);
         usuario.setNombreCompleto(nombreCompleto);
