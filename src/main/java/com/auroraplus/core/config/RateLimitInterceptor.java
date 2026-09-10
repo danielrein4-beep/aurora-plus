@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {
 
-    private static final int LIMITE_PETICIONES = 8;
+    private static final int LIMITE_PETICIONES = 5;
     private static final long VENTANA_MS = 60_000;
     // Un contador sin actividad por más de esto se considera abandonado y se
     // limpia oportunistamente — evita que el mapa crezca sin límite con IPs
