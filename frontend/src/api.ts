@@ -28,7 +28,19 @@ export function borrarSesion() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  /** Código HTTP real de la respuesta del backend. Si es `undefined`, el backend NUNCA respondió
+   * (fetch falló a nivel de red/DNS/CORS/502 de un proxy) — eso es lo único que distingue un
+   * "no hay conexión" real de un rechazo legítimo del backend (credenciales inválidas, validación,
+   * etc.), que siempre trae un status. No usar el texto del mensaje para adivinar esto: es frágil
+   * (un mensaje de negocio real podría contener casualmente palabras como "servidor").
+   */
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}
 
 const SESSION_USER_KEY = "aurora_session_user";
 
@@ -58,7 +70,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(path, { ...options, headers });
   if (res.status === 401) {
     manejarSesionVencida();
-    throw new ApiError("Sesión vencida — redirigiendo al login");
+    throw new ApiError("Sesión vencida — redirigiendo al login", 401);
   }
   if (!res.ok) {
     let mensaje = `Error ${res.status}`;
@@ -68,7 +80,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       // el backend a veces responde texto plano en errores no controlados
     }
-    throw new ApiError(mensaje);
+    throw new ApiError(mensaje, res.status);
   }
   if (res.status === 204) return undefined as T;
   return res.json();

@@ -6,9 +6,21 @@ import {
   loginDirecto,
   registrarNegocio,
   obtenerMiNegocio,
+  ApiError,
   type RegistroNegocio,
   type SesionAurora,
 } from "../api";
+
+const MENSAJE_SIN_CONEXION = "No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo en un momento.";
+
+/** true si el backend respondió con un rechazo real (credenciales, validación, etc. — siempre trae
+ * un status HTTP < 500). false si nunca hubo respuesta real del backend (falla de red/DNS, o un
+ * 502/503 de un proxy que no llegó a producir una respuesta genuina de la app) — en ese caso NO se
+ * sabe si las credenciales son correctas o no, así que nunca se puede "dejar entrar de todos modos".
+ */
+function esRechazoRealDelBackend(err: unknown): err is ApiError {
+  return err instanceof ApiError && typeof err.status === "number" && err.status < 500;
+}
 
 export interface PaymentRecord {
   id: string;
@@ -158,56 +170,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let nombreUsuario = email.includes("@") ? email.split("@")[0] : email;
     let modulosUsuario: string[] = [];
 
-    // Buscar si existe en el registro local persistente
+    // Buscar cuenta local SOLO para completar nombre/empresa en la UI si el backend no puede
+    // resolverlo (obtenerMiNegocio falla) — nunca para decidir si el login es válido.
     const cuentaLocal = obtenerCuentasLocales().find((c) => c.email.toLowerCase() === email.toLowerCase());
 
     try {
       sesion = await loginDirecto(email, password);
-      try {
-        const negocio = await obtenerMiNegocio();
-        empresa = negocio.nombreEmpresa || empresa;
-        industry = MODULO_A_INDUSTRIA[negocio.moduloPrincipal] || negocio.moduloPrincipal || "clinica";
-      } catch {
-        if (cuentaLocal) {
-          empresa = cuentaLocal.empresa || empresa;
-          industry = cuentaLocal.industry || industry;
-          nombreUsuario = cuentaLocal.nombre || nombreUsuario;
-          modulosUsuario = cuentaLocal.modules || [];
-        }
-      }
-    } catch (err: any) {
-      // Si el error es un rechazo explícito de credenciales del backend (400/401/403), propagarlo
-      const esErrorConexion = !err?.status && (/502|503|Failed to fetch|NetworkError|conexión|servidor/i.test(err?.message || "") || err instanceof TypeError);
-      
-      if (!esErrorConexion) {
-        throw err;
-      }
+    } catch (err) {
+      // Un rechazo real del backend (usuario/contraseña incorrectos, cuenta inactiva, etc.) se
+      // muestra tal cual. Solo si NUNCA hubo respuesta real del backend (sin conexión, 502/503 de
+      // un proxy) se informa que es un problema de conexión — nunca se inventa una sesión: no hay
+      // forma de saber si esas credenciales son válidas sin preguntarle al backend real.
+      if (esRechazoRealDelBackend(err)) throw err;
+      throw new Error(MENSAJE_SIN_CONEXION);
+    }
 
-      // Si el backend no está disponible localmente (502), verificar contra cuentas locales
+    try {
+      const negocio = await obtenerMiNegocio();
+      empresa = negocio.nombreEmpresa || empresa;
+      industry = MODULO_A_INDUSTRIA[negocio.moduloPrincipal] || negocio.moduloPrincipal || "clinica";
+    } catch {
+      // La autenticación ya fue válida — esto solo completa metadata de UI.
       if (cuentaLocal) {
-        if (cuentaLocal.password && cuentaLocal.password !== password) {
-          throw new Error("Contraseña incorrecta");
-        }
         empresa = cuentaLocal.empresa || empresa;
         industry = cuentaLocal.industry || industry;
         nombreUsuario = cuentaLocal.nombre || nombreUsuario;
         modulosUsuario = cuentaLocal.modules || [];
-        sesion = {
-          token: `dev-session-${Date.now()}`,
-          rol: cuentaLocal.rol || "MEDICO",
-          username: email,
-          tenantId: cuentaLocal.tenantId || 1,
-        };
-        guardarSesion(sesion);
-      } else {
-        // Cuenta demo por defecto en desarrollo si no existe registrada
-        sesion = {
-          token: `dev-session-${Date.now()}`,
-          rol: "MEDICO",
-          username: email,
-          tenantId: 1,
-        };
-        guardarSesion(sesion);
       }
     }
 
@@ -234,31 +222,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Registro de autoservicio real con fallback inteligente si el backend local está apagado (502)
+  // Registro de autoservicio — SIEMPRE contra el backend real, ver esRechazoRealDelBackend arriba.
   const completarRegistro = async (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string }) => {
+    // El registro SIEMPRE crea el tenant contra el backend real. Un rechazo real (ej. "Ya existe
+    // una cuenta con este correo") se muestra tal cual; una falla de conexión real avisa que no
+    // hay conexión — nunca se finge que se creó una cuenta que en realidad no existe en el backend.
     let sesion: SesionAurora;
-
     try {
       sesion = await registrarNegocio(datos);
-    } catch (err: any) {
-      const esErrorConexion = !err?.status && (/502|503|Failed to fetch|NetworkError|conexión|servidor/i.test(err?.message || "") || err instanceof TypeError);
-      
-      // Si el backend respondió con un error de negocio real (ej. "Ya existe una cuenta con este correo"), propagarlo
-      if (!esErrorConexion && !/502/.test(err?.message || "")) {
-        throw err;
-      }
-
-      // Si el backend local no está corriendo (502 Bad Gateway), generar sesión local aislada
-      const cuentas = obtenerCuentasLocales();
-      const nuevoTenantId = (cuentas.length > 0 ? Math.max(...cuentas.map((c) => c.tenantId || 1)) : 1) + 1;
-
-      sesion = {
-        token: `dev-session-${Date.now()}`,
-        rol: "MEDICO",
-        username: datos.username || datos.emailContacto,
-        tenantId: nuevoTenantId,
-      };
-      guardarSesion(sesion);
+    } catch (err) {
+      if (esRechazoRealDelBackend(err)) throw err;
+      throw new Error(MENSAJE_SIN_CONEXION);
     }
 
     const industry = MODULO_A_INDUSTRIA[datos.moduloPrincipal] || datos.moduloPrincipal || "clinica";
