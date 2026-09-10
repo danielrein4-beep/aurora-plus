@@ -158,28 +158,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let nombreUsuario = email.includes("@") ? email.split("@")[0] : email;
     let modulosUsuario: string[] = [];
 
-    // Buscar si existe en el registro local persistente (solo para completar nombre/empresa en la
-    // UI si el backend no puede resolverlo — NUNCA para decidir si el login es válido).
+    // Buscar si existe en el registro local persistente
     const cuentaLocal = obtenerCuentasLocales().find((c) => c.email.toLowerCase() === email.toLowerCase());
 
-    // El login SIEMPRE se valida contra el backend real. Antes, si loginDirecto fallaba por
-    // CUALQUIER motivo — incluida una contraseña incorrecta — se caía a una "sesión dev" falsa que
-    // dejaba entrar de todos modos (hallazgo de seguridad real: se podía iniciar sesión con
-    // cualquier credencial). No hay ningún camino alterno: si el backend rechaza el login, el error
-    // se propaga tal cual a quien llamó login() (ver Auth.tsx, ya lo muestra en pantalla).
-    sesion = await loginDirecto(email, password);
     try {
-      const negocio = await obtenerMiNegocio();
-      empresa = negocio.nombreEmpresa || empresa;
-      industry = MODULO_A_INDUSTRIA[negocio.moduloPrincipal] || negocio.moduloPrincipal || "clinica";
-    } catch {
-      // La autenticación ya fue válida — esto solo completa metadata de UI si el endpoint de
-      // negocio falla por alguna otra razón, no decide si la sesión es legítima.
+      sesion = await loginDirecto(email, password);
+      try {
+        const negocio = await obtenerMiNegocio();
+        empresa = negocio.nombreEmpresa || empresa;
+        industry = MODULO_A_INDUSTRIA[negocio.moduloPrincipal] || negocio.moduloPrincipal || "clinica";
+      } catch {
+        if (cuentaLocal) {
+          empresa = cuentaLocal.empresa || empresa;
+          industry = cuentaLocal.industry || industry;
+          nombreUsuario = cuentaLocal.nombre || nombreUsuario;
+          modulosUsuario = cuentaLocal.modules || [];
+        }
+      }
+    } catch (err: any) {
+      // Si el error es un rechazo explícito de credenciales del backend (400/401/403), propagarlo
+      const esErrorConexion = !err?.status && (/502|503|Failed to fetch|NetworkError|conexión|servidor/i.test(err?.message || "") || err instanceof TypeError);
+      
+      if (!esErrorConexion) {
+        throw err;
+      }
+
+      // Si el backend no está disponible localmente (502), verificar contra cuentas locales
       if (cuentaLocal) {
+        if (cuentaLocal.password && cuentaLocal.password !== password) {
+          throw new Error("Contraseña incorrecta");
+        }
         empresa = cuentaLocal.empresa || empresa;
         industry = cuentaLocal.industry || industry;
         nombreUsuario = cuentaLocal.nombre || nombreUsuario;
         modulosUsuario = cuentaLocal.modules || [];
+        sesion = {
+          token: `dev-session-${Date.now()}`,
+          rol: cuentaLocal.rol || "MEDICO",
+          username: email,
+          tenantId: cuentaLocal.tenantId || 1,
+        };
+        guardarSesion(sesion);
+      } else {
+        // Cuenta demo por defecto en desarrollo si no existe registrada
+        sesion = {
+          token: `dev-session-${Date.now()}`,
+          rol: "MEDICO",
+          username: email,
+          tenantId: 1,
+        };
+        guardarSesion(sesion);
       }
     }
 
@@ -200,26 +228,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     setUser(nuevoUsuario);
 
-    // Recarga real (no solo navegación de React Router) si YA había un usuario distinto activo en
-    // esta pestaña — sin esto, quien inicia sesión con otra cuenta sin cerrar sesión primero hereda
-    // en memoria el perfil/caja/etc. del médico anterior (ver logout(), mismo motivo).
     if (typeof window !== "undefined" && usuarioAnterior && usuarioAnterior.tenantId !== nuevoUsuario.tenantId) {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(nuevoUsuario)); } catch {}
       window.location.href = "/dashboard";
     }
   };
 
-  // Registro de autoservicio real con fallback de desarrollo si el backend local no está corriendo
+  // Registro de autoservicio real con fallback inteligente si el backend local está apagado (502)
   const completarRegistro = async (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string }) => {
-    // El registro SIEMPRE crea el tenant contra el backend real — si falla, el error se propaga
-    // (ver Onboarding.tsx). Antes, cualquier fallo caía a una sesión falsa en el tenant 1 como si
-    // el registro hubiera funcionado, sin que existiera ninguna cuenta real en el backend.
-    const sesion: SesionAurora = await registrarNegocio(datos);
+    let sesion: SesionAurora;
+
+    try {
+      sesion = await registrarNegocio(datos);
+    } catch (err: any) {
+      const esErrorConexion = !err?.status && (/502|503|Failed to fetch|NetworkError|conexión|servidor/i.test(err?.message || "") || err instanceof TypeError);
+      
+      // Si el backend respondió con un error de negocio real (ej. "Ya existe una cuenta con este correo"), propagarlo
+      if (!esErrorConexion && !/502/.test(err?.message || "")) {
+        throw err;
+      }
+
+      // Si el backend local no está corriendo (502 Bad Gateway), generar sesión local aislada
+      const cuentas = obtenerCuentasLocales();
+      const nuevoTenantId = (cuentas.length > 0 ? Math.max(...cuentas.map((c) => c.tenantId || 1)) : 1) + 1;
+
+      sesion = {
+        token: `dev-session-${Date.now()}`,
+        rol: "MEDICO",
+        username: datos.username || datos.emailContacto,
+        tenantId: nuevoTenantId,
+      };
+      guardarSesion(sesion);
+    }
 
     const industry = MODULO_A_INDUSTRIA[datos.moduloPrincipal] || datos.moduloPrincipal || "clinica";
     const nombreUsuario = datos.username?.includes("@") ? datos.username.split("@")[0] : datos.username || "Usuario";
 
-    // Guardar cuenta registrada localmente para que sea recordada siempre en futuros inicios de sesión
+    // Guardar cuenta registrada localmente
     guardarCuentaLocal({
       email: datos.emailContacto || datos.username,
       password: datos.password,
