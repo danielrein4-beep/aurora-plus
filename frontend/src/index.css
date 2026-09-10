@@ -558,6 +558,14 @@ html.light .input-horeca:hover { background: #ffffff; }
   animation: float 5s ease-in-out infinite;
 }
 
+/* Ticker de módulos en Home.tsx: se renderiza 3 veces la misma lista seguida, así que
+   desplazar exactamente 1/3 del ancho hace que el loop sea perfectamente continuo (invisible
+   al ojo dónde "empieza de nuevo"). */
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-33.3333%); }
+}
+
 /* =========================================================================
    PAGE & TAB TRANSITION ENGINE (SMOOTH & SUBTLE TRANSITIONS - CINEMATIC PACING)
    ========================================================================= */
