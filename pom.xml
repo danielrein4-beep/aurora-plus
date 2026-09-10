@@ -38,6 +38,17 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- Migraciones controladas del esquema — reemplaza a ddl-auto=update. A partir
+             de aquí, cualquier cambio de esquema es un script en db/migration, no algo
+             que Hibernate adivina solo al arrancar (ver FlywayBaselineREADME.md). -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
