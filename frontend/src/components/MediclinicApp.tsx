@@ -2924,10 +2924,14 @@ function HistoriasClinicas({
                     c.evolucionEstado === "EMPEORO" ? "bg-rose-500 border-rose-600" :
                     c.evolucionEstado === "IGUAL" ? "bg-slate-400 border-slate-500" :
                     "bg-sky-400 border-sky-500";
-                  const emojiEvolucion =
-                    c.evolucionEstado === "MEJORO" ? "🙂" :
-                    c.evolucionEstado === "EMPEORO" ? "🙁" :
-                    c.evolucionEstado === "IGUAL" ? "😐" : null;
+                  const signoEvolucion =
+                    c.evolucionEstado === "MEJORO" ? "▲" :
+                    c.evolucionEstado === "EMPEORO" ? "▼" :
+                    c.evolucionEstado === "IGUAL" ? "▬" : null;
+                  const colorSigno =
+                    c.evolucionEstado === "MEJORO" ? "text-emerald-600 dark:text-emerald-400" :
+                    c.evolucionEstado === "EMPEORO" ? "text-rose-600 dark:text-rose-400" :
+                    "text-slate-500 dark:text-white/60";
                   return (
                     <div key={c.id} className="flex items-stretch">
                       <div
@@ -2941,8 +2945,8 @@ function HistoriasClinicas({
                         <span className={`relative w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 transition-all ${colorEvolucion} ${
                           consultaSeleccionadaFicha?.id === c.id ? "scale-125" : "group-hover:scale-110"
                         }`}>
-                          {emojiEvolucion && (
-                            <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[11px]">{emojiEvolucion}</span>
+                          {signoEvolucion && (
+                            <span className={`absolute -top-3.5 left-1/2 -translate-x-1/2 text-[9px] font-black leading-none ${colorSigno}`}>{signoEvolucion}</span>
                           )}
                         </span>
                         <span className="text-[10px] font-bold text-slate-700 dark:text-white/80 text-center max-w-[110px] truncate whitespace-nowrap">
@@ -3468,9 +3472,9 @@ function HistoriasClinicas({
                 </label>
                 <div className="flex gap-2">
                   {([
-                    { valor: "MEJORO", label: "Mejoró", emoji: "🙂", activo: "bg-emerald-500 border-emerald-600 text-white" },
-                    { valor: "IGUAL", label: "Igual", emoji: "😐", activo: "bg-slate-500 border-slate-600 text-white" },
-                    { valor: "EMPEORO", label: "Empeoró", emoji: "🙁", activo: "bg-rose-500 border-rose-600 text-white" },
+                    { valor: "MEJORO", label: "Mejoró", signo: "▲", activo: "bg-emerald-500 border-emerald-600 text-white" },
+                    { valor: "IGUAL", label: "Igual", signo: "▬", activo: "bg-slate-500 border-slate-600 text-white" },
+                    { valor: "EMPEORO", label: "Empeoró", signo: "▼", activo: "bg-rose-500 border-rose-600 text-white" },
                   ] as const).map((op) => (
                     <button
                       key={op.valor}
@@ -3482,7 +3486,7 @@ function HistoriasClinicas({
                           : "bg-white dark:bg-black/30 border-slate-300 dark:border-white/15 text-slate-600 dark:text-white/70 hover:border-slate-400 dark:hover:border-white/30"
                       }`}
                     >
-                      <span>{op.emoji}</span> {op.label}
+                      <span className="text-[10px] font-black">{op.signo}</span> {op.label}
                     </button>
                   ))}
                 </div>
