@@ -14,6 +14,9 @@ public class WebConfig implements WebMvcConfigurer {
     @Autowired
     private LicenciaInterceptor licenciaInterceptor;
 
+    @Autowired
+    private RateLimitInterceptor rateLimitInterceptor;
+
     // SOLO estas dos rutas de /api/auth/** son públicas — es donde se consigue
     // el token en primer lugar. Todo lo demás bajo /api/auth/** (ej.
     // /api/auth/usuarios, gestión de usuarios del propio tenant) SÍ debe pasar
@@ -27,6 +30,16 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // Primero el rate limiter, y solo sobre las rutas de /api/auth/** sin
+        // token — son las únicas que alguien sin ninguna sesión puede
+        // martillar (login, registro, olvidé/resetear clave). El resto de la
+        // API ya exige un JWT válido (ver TenantInterceptor), lo que de por
+        // sí encarece mucho un abuso automatizado.
+        registry.addInterceptor(rateLimitInterceptor)
+            .addPathPatterns(
+                "/api/auth/login", "/api/auth/login-super-admin", "/api/auth/login-directo",
+                "/api/auth/registro-negocio", "/api/auth/olvide-clave", "/api/auth/resetear-clave"
+            );
         registry.addInterceptor(tenantInterceptor)
             .addPathPatterns("/api/**")
             .excludePathPatterns(RUTAS_LOGIN_PUBLICAS);
