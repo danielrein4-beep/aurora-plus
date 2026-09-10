@@ -1,0 +1,24 @@
+# Reverse proxy de Aurora Plus. Caddy detecta solo si {$DOMAIN} es un dominio
+# público (pide y renueva el certificado de Let's Encrypt automáticamente) o
+# "localhost" (sirve en HTTP plano, sin intentar HTTPS — así el docker-compose
+# funciona igual en desarrollo local sin configurar nada extra).
+#
+# En el servidor real: poner DOMAIN=tu-dominio.com en el .env, apuntar el
+# registro A/AAAA de ese dominio a la IP del servidor ANTES de levantar el
+# stack, y confirmar que los puertos 80 y 443 estén abiertos — Caddy necesita
+# el 80 para completar el reto HTTP-01 de Let's Encrypt la primera vez.
+{$DOMAIN} {
+	reverse_proxy app:8080
+
+	encode gzip
+
+	header {
+		# Cabeceras de seguridad básicas — no reemplazan nada del backend,
+		# solo endurecen lo que el navegador hace con la respuesta. HSTS no
+		# va aquí a propósito: forzarla también en DOMAIN=localhost dejaría
+		# el navegador exigiendo HTTPS en local incluso sin certificado.
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
