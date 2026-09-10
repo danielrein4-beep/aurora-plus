@@ -32,6 +32,9 @@ import {
   type CobroItem, type CierreCajaData, type ConsultaReportData, type CotizacionData, type CotizacionItem
 } from "../utils/pdfReports";
 import DocumentoPreviewModal, { type DocumentoVisorPayload } from "./DocumentoPreviewModal";
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+} from "recharts";
 
 type Pagina = "general" | "pacientes" | "historias" | "laboratorio" | "procedimientos" | "sala-espera" | "agenda" | "canal-endemico" | "financiero" | "configuracion";
 type RolVista = "MEDICO" | "SECRETARIA";
@@ -58,6 +61,21 @@ const hoy = () => new Date().toISOString().slice(0, 10);
 function fechaDeConsulta(c: { fechaHora?: string; fechaConsulta?: string }): string {
   const raw = c.fechaHora || c.fechaConsulta;
   return raw ? raw.slice(0, 10) : hoy();
+}
+
+/** Construye la serie de peso/IMC para la gráfica de evolución del paciente, en orden
+ * cronológico ascendente (el historial llega del backend más reciente primero). Solo
+ * cuenta consultas donde el peso quedó registrado con un número válido. */
+function datosEvolucionPeso(historial: ConsultaMedica[]): { fecha: string; peso: number; imc: number | null }[] {
+  return [...historial]
+    .filter((c) => c.peso && !isNaN(parseFloat(c.peso)))
+    .sort((a, b) => fechaDeConsulta(a).localeCompare(fechaDeConsulta(b)))
+    .map((c) => {
+      const peso = parseFloat(c.peso!);
+      const talla = c.talla ? parseFloat(c.talla) : null;
+      const imc = talla && talla > 0 ? Number((peso / (talla * talla)).toFixed(1)) : null;
+      return { fecha: fechaDeConsulta(c), peso, imc };
+    });
 }
 
 /** Traduce la etiqueta libre del selector de método de pago ("Pago Móvil VES", "Zelle USD"...) al
@@ -2875,6 +2893,83 @@ function HistoriasClinicas({
       ) : (
         <div className="p-8 text-center rounded-2xl border border-dashed border-slate-300 dark:border-white/10 text-slate-400 text-xs">
           Selecciona o busca un paciente para ver su ficha y gestionar su consulta.
+        </div>
+      )}
+
+      {/* ── 2.5. TRAZABILIDAD Y EVOLUCIÓN DEL PACIENTE ── */}
+      {pacienteSeleccionado && historial && historial.length > 0 && (
+        <div className="apple-glass rounded-3xl p-5 border border-slate-200/80 dark:border-white/10 shadow-sm bg-white/80 dark:bg-[#071a2e]/60 space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-200/80 dark:border-white/10 pb-3">
+            <IconChart size={18} className="text-sky-600 dark:text-sky-400" />
+            <h4 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">
+              Trazabilidad y Evolución del Paciente
+            </h4>
+            <span className="text-xs text-slate-500 dark:text-white/50 font-mono font-bold ml-auto">
+              {historial.length} visita(s) en el expediente
+            </span>
+          </div>
+
+          {/* Línea de tiempo de diagnósticos — siempre visible con >=1 consulta */}
+          <div className="overflow-x-auto pb-2">
+            <div className="flex items-stretch gap-0 min-w-max">
+              {[...historial]
+                .sort((a, b) => fechaDeConsulta(a).localeCompare(fechaDeConsulta(b)))
+                .map((c, idx, arr) => (
+                  <div key={c.id} className="flex items-stretch">
+                    <div
+                      className="flex flex-col items-center gap-1.5 px-3 cursor-pointer group"
+                      onClick={() => setConsultaSeleccionadaFicha(c)}
+                      title={c.descripcionDiagnostico || "Sin diagnóstico registrado"}
+                    >
+                      <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-white/50 whitespace-nowrap">
+                        {fechaDeConsulta(c)}
+                      </span>
+                      <span className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 transition-all ${
+                        consultaSeleccionadaFicha?.id === c.id
+                          ? "bg-teal-500 border-teal-600 scale-125"
+                          : "bg-sky-400 border-sky-500 group-hover:scale-110"
+                      }`} />
+                      <span className="text-[10px] font-bold text-slate-700 dark:text-white/80 text-center max-w-[110px] truncate whitespace-nowrap">
+                        {c.descripcionDiagnostico || "Sin Dx"}
+                      </span>
+                    </div>
+                    {idx < arr.length - 1 && (
+                      <div className="w-10 self-start mt-[26px] h-0.5 bg-gradient-to-r from-sky-400/70 to-sky-400/20 flex-shrink-0" />
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Gráfica de peso/IMC — solo si hay al menos 2 mediciones con las que trazar una curva */}
+          {(() => {
+            const serie = datosEvolucionPeso(historial);
+            if (serie.length < 2) {
+              return (
+                <p className="text-[11px] text-slate-400 dark:text-white/40 italic px-1">
+                  Se necesitan al menos 2 consultas con peso registrado para trazar la curva de evolución de peso/IMC.
+                </p>
+              );
+            }
+            return (
+              <div>
+                <p className="text-[11px] font-bold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1.5 px-1">
+                  Evolución de Peso / IMC
+                </p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={serie} margin={{ left: 0, right: 10, top: 5, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.08} />
+                    <XAxis dataKey="fecha" tick={{ fontSize: 10 }} />
+                    <YAxis yAxisId="peso" tick={{ fontSize: 10 }} width={36} />
+                    <YAxis yAxisId="imc" orientation="right" tick={{ fontSize: 10 }} width={30} />
+                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                    <Line yAxisId="peso" type="monotone" dataKey="peso" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 3 }} name="Peso (kg)" />
+                    <Line yAxisId="imc" type="monotone" dataKey="imc" stroke="#14b8a6" strokeWidth={2} strokeDasharray="4 3" dot={{ r: 2 }} name="IMC" connectNulls />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            );
+          })()}
         </div>
       )}
 
