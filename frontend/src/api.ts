@@ -502,6 +502,10 @@ export interface ConsultaMedica {
   talla?: string;
   peso?: string;
   evolucionClinica?: string;
+  /** Cómo llegó el paciente respecto a su visita anterior — alimenta la gráfica de
+   * tendencia de evolución en Historias Clínicas. Solo tiene sentido en consultas de
+   * seguimiento (no en la primera visita de un paciente). */
+  evolucionEstado?: "MEJORO" | "IGUAL" | "EMPEORO";
   fechaHora?: string;
   fechaConsulta?: string;
 }

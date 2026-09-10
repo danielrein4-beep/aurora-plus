@@ -2402,6 +2402,7 @@ function HistoriasClinicas({
     peso: "70.0",
     observacionFisica: "",
     evolucionClinica: "",
+    evolucionEstado: "" as "" | "MEJORO" | "IGUAL" | "EMPEORO",
     anotacionesPrivadas: "",
     descripcionDiagnostico: "",
     diagnosticoPrincipalCIE10: "",
@@ -2467,6 +2468,7 @@ function HistoriasClinicas({
       peso: "70.0",
       observacionFisica: "",
       evolucionClinica: "",
+      evolucionEstado: "",
       anotacionesPrivadas: "",
       descripcionDiagnostico: "",
       diagnosticoPrincipalCIE10: "",
@@ -2550,6 +2552,7 @@ function HistoriasClinicas({
         peso: form.peso,
         observacionFisica: form.observacionFisica,
         evolucionClinica: form.evolucionClinica,
+        evolucionEstado: form.evolucionEstado || undefined,
       });
 
       // Refrescar historial
@@ -2909,37 +2912,93 @@ function HistoriasClinicas({
             </span>
           </div>
 
-          {/* Línea de tiempo de diagnósticos — siempre visible con >=1 consulta */}
+          {/* Línea de tiempo de diagnósticos — el color del punto refleja cómo llegó el paciente
+              respecto a su visita anterior (verde=mejoró, gris=igual, rojo=empeoró, celeste=sin dato) */}
           <div className="overflow-x-auto pb-2">
             <div className="flex items-stretch gap-0 min-w-max">
               {[...historial]
                 .sort((a, b) => fechaDeConsulta(a).localeCompare(fechaDeConsulta(b)))
-                .map((c, idx, arr) => (
-                  <div key={c.id} className="flex items-stretch">
-                    <div
-                      className="flex flex-col items-center gap-1.5 px-3 cursor-pointer group"
-                      onClick={() => setConsultaSeleccionadaFicha(c)}
-                      title={c.descripcionDiagnostico || "Sin diagnóstico registrado"}
-                    >
-                      <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-white/50 whitespace-nowrap">
-                        {fechaDeConsulta(c)}
-                      </span>
-                      <span className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 transition-all ${
-                        consultaSeleccionadaFicha?.id === c.id
-                          ? "bg-teal-500 border-teal-600 scale-125"
-                          : "bg-sky-400 border-sky-500 group-hover:scale-110"
-                      }`} />
-                      <span className="text-[10px] font-bold text-slate-700 dark:text-white/80 text-center max-w-[110px] truncate whitespace-nowrap">
-                        {c.descripcionDiagnostico || "Sin Dx"}
-                      </span>
+                .map((c, idx, arr) => {
+                  const colorEvolucion =
+                    c.evolucionEstado === "MEJORO" ? "bg-emerald-500 border-emerald-600" :
+                    c.evolucionEstado === "EMPEORO" ? "bg-rose-500 border-rose-600" :
+                    c.evolucionEstado === "IGUAL" ? "bg-slate-400 border-slate-500" :
+                    "bg-sky-400 border-sky-500";
+                  const emojiEvolucion =
+                    c.evolucionEstado === "MEJORO" ? "🙂" :
+                    c.evolucionEstado === "EMPEORO" ? "🙁" :
+                    c.evolucionEstado === "IGUAL" ? "😐" : null;
+                  return (
+                    <div key={c.id} className="flex items-stretch">
+                      <div
+                        className="flex flex-col items-center gap-1.5 px-3 cursor-pointer group"
+                        onClick={() => setConsultaSeleccionadaFicha(c)}
+                        title={c.descripcionDiagnostico || "Sin diagnóstico registrado"}
+                      >
+                        <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-white/50 whitespace-nowrap">
+                          {fechaDeConsulta(c)}
+                        </span>
+                        <span className={`relative w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 transition-all ${colorEvolucion} ${
+                          consultaSeleccionadaFicha?.id === c.id ? "scale-125" : "group-hover:scale-110"
+                        }`}>
+                          {emojiEvolucion && (
+                            <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[11px]">{emojiEvolucion}</span>
+                          )}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-700 dark:text-white/80 text-center max-w-[110px] truncate whitespace-nowrap">
+                          {c.descripcionDiagnostico || "Sin Dx"}
+                        </span>
+                      </div>
+                      {idx < arr.length - 1 && (
+                        <div className="w-10 self-start mt-[26px] h-0.5 bg-gradient-to-r from-sky-400/70 to-sky-400/20 flex-shrink-0" />
+                      )}
                     </div>
-                    {idx < arr.length - 1 && (
-                      <div className="w-10 self-start mt-[26px] h-0.5 bg-gradient-to-r from-sky-400/70 to-sky-400/20 flex-shrink-0" />
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           </div>
+
+          {/* Gráfica de tendencia de evolución — solo si el médico ha marcado Mejoró/Igual/Empeoró
+              en al menos 2 consultas (si no hay suficientes datos, no tiene sentido mostrar una línea) */}
+          {(() => {
+            const puntos = [...historial]
+              .filter((c) => c.evolucionEstado)
+              .sort((a, b) => fechaDeConsulta(a).localeCompare(fechaDeConsulta(b)))
+              .map((c) => ({
+                fecha: fechaDeConsulta(c),
+                nivel: c.evolucionEstado === "MEJORO" ? 1 : c.evolucionEstado === "EMPEORO" ? -1 : 0,
+                estado: c.evolucionEstado,
+              }));
+            if (puntos.length < 2) return null;
+            return (
+              <div>
+                <p className="text-[11px] font-bold text-slate-500 dark:text-white/50 uppercase tracking-wider mb-1.5 px-1">
+                  Tendencia de Evolución Clínica (según lo marcado por el médico en cada visita)
+                </p>
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={puntos} margin={{ left: 0, right: 10, top: 5, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.08} />
+                    <XAxis dataKey="fecha" tick={{ fontSize: 10 }} />
+                    <YAxis
+                      domain={[-1.2, 1.2]}
+                      ticks={[-1, 0, 1]}
+                      tickFormatter={(v) => (v === 1 ? "Mejoró" : v === -1 ? "Empeoró" : "Igual")}
+                      tick={{ fontSize: 10 }}
+                      width={52}
+                    />
+                    <Tooltip
+                      contentStyle={{ fontSize: 11, borderRadius: 8 }}
+                      formatter={((_v: unknown, _n: unknown, item: any) => [
+                        item?.payload?.estado === "MEJORO" ? "Mejoró" : item?.payload?.estado === "EMPEORO" ? "Empeoró" : "Igual",
+                        "Evolución",
+                      ]) as any}
+                    />
+                    <Line type="stepAfter" dataKey="nivel" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 4 }} name="Evolución" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            );
+          })()}
 
           {/* Gráfica de peso/IMC — solo si hay al menos 2 mediciones con las que trazar una curva */}
           {(() => {
@@ -3400,6 +3459,35 @@ function HistoriasClinicas({
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
               />
             </div>
+
+            {/* ── ¿CÓMO LLEGÓ RESPECTO A LA VISITA ANTERIOR? — solo aplica si ya tiene historial ── */}
+            {historial && historial.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-white/90">
+                  ¿Cómo llegó el paciente respecto a su visita anterior? <span className="font-normal text-slate-400">(opcional)</span>
+                </label>
+                <div className="flex gap-2">
+                  {([
+                    { valor: "MEJORO", label: "Mejoró", emoji: "🙂", activo: "bg-emerald-500 border-emerald-600 text-white" },
+                    { valor: "IGUAL", label: "Igual", emoji: "😐", activo: "bg-slate-500 border-slate-600 text-white" },
+                    { valor: "EMPEORO", label: "Empeoró", emoji: "🙁", activo: "bg-rose-500 border-rose-600 text-white" },
+                  ] as const).map((op) => (
+                    <button
+                      key={op.valor}
+                      type="button"
+                      onClick={() => setForm({ ...form, evolucionEstado: form.evolucionEstado === op.valor ? "" : op.valor })}
+                      className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        form.evolucionEstado === op.valor
+                          ? op.activo
+                          : "bg-white dark:bg-black/30 border-slate-300 dark:border-white/15 text-slate-600 dark:text-white/70 hover:border-slate-400 dark:hover:border-white/30"
+                      }`}
+                    >
+                      <span>{op.emoji}</span> {op.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* ── CAMPO EN ROJO: ANOTACIONES PRIVADAS Y RESERVADAS DEL MÉDICO / COMENTARIOS ── */}
             <div className="rounded-2xl p-4 border-2 border-rose-500/80 dark:border-rose-500/60 bg-rose-50/80 dark:bg-rose-950/30 space-y-2 shadow-xs">

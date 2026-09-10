@@ -1,6 +1,8 @@
 package com.auroraplus.modules.salud.entities;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 
@@ -50,8 +52,25 @@ public class ConsultaMedica {
     @Column(name = "enfermedad_actual", columnDefinition = "TEXT")
     private String enfermedadActual;
 
+    /** El formulario de consulta del frontend llama a este campo "Observación Física" —
+     * se alía el nombre JSON para que ese texto deje de perderse silenciosamente. */
     @Column(name = "examen_fisico", columnDefinition = "TEXT")
+    @JsonProperty("observacionFisica")
     private String examenFisico;
+
+    /** Notas de evolución clínica en texto libre (antecedentes, hallazgos, evolución
+     * respecto a la visita anterior) — antes se perdía porque el frontend enviaba
+     * "evolucionClinica" y el backend no tenía ninguna columna con ese nombre. */
+    @Column(name = "evolucion_clinica", columnDefinition = "TEXT")
+    private String evolucionClinica;
+
+    /** Evaluación rápida de cómo llegó el paciente respecto a su visita anterior —
+     * permite graficar una tendencia real de evolución clínica en el tiempo. */
+    public enum EstadoEvolucion { MEJORO, IGUAL, EMPEORO }
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "evolucion_estado", length = 20)
+    private EstadoEvolucion evolucionEstado;
 
     // --- Signos Vitales ---
     @Column(name = "presion_arterial", length = 20)
@@ -69,10 +88,17 @@ public class ConsultaMedica {
     @Column(name = "saturacion_oxigeno")
     private Integer saturacionOxigeno; // %
 
+    /** El formulario del frontend envía y espera este dato como "peso"/"talla" (strings
+     * simples como "70.0") — antes se perdía silenciosamente porque Jackson ignora
+     * propiedades JSON desconocidas y "peso"≠"pesoKg" a nivel de nombre de campo. */
     @Column(name = "peso_kg", precision = 6, scale = 2)
+    @JsonProperty("peso")
+    @JsonAlias("pesoKg")
     private BigDecimal pesoKg;
 
     @Column(name = "talla_m", precision = 4, scale = 2)
+    @JsonProperty("talla")
+    @JsonAlias("tallaM")
     private BigDecimal tallaM;
 
     @Column(precision = 5, scale = 2)
@@ -155,6 +181,10 @@ public class ConsultaMedica {
     public void setIndicacionesGenerales(String indicacionesGenerales) { this.indicacionesGenerales = indicacionesGenerales; }
     public String getOrdenExamenes() { return ordenExamenes; }
     public void setOrdenExamenes(String ordenExamenes) { this.ordenExamenes = ordenExamenes; }
+    public String getEvolucionClinica() { return evolucionClinica; }
+    public void setEvolucionClinica(String evolucionClinica) { this.evolucionClinica = evolucionClinica; }
+    public EstadoEvolucion getEvolucionEstado() { return evolucionEstado; }
+    public void setEvolucionEstado(EstadoEvolucion evolucionEstado) { this.evolucionEstado = evolucionEstado; }
 
     @PrePersist
     @PreUpdate
