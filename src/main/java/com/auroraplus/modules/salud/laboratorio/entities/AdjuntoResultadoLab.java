@@ -2,14 +2,19 @@ package com.auroraplus.modules.salud.laboratorio.entities;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "salud_adjuntos_resultado_lab")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class AdjuntoResultadoLab {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
 
     @ManyToOne
     @JoinColumn(name = "resultado_id", nullable = false)
@@ -27,6 +32,9 @@ public class AdjuntoResultadoLab {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 
     public ResultadoLaboratorio getResultado() { return resultado; }
     public void setResultado(ResultadoLaboratorio resultado) { this.resultado = resultado; }

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.salud.services;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.CitaMedica;
 import com.auroraplus.modules.salud.entities.SalaEspera;
 import com.auroraplus.modules.salud.repositories.CitaMedicaRepository;
@@ -35,10 +36,12 @@ public class SalaEsperaService {
         SalaEspera guardada = salaEsperaRepository.save(entrada);
 
         if (entrada.getCitaId() != null) {
-            citaMedicaRepository.findById(entrada.getCitaId()).ifPresent(c -> {
-                c.setEstado(CitaMedica.EstadoCita.EN_SALA);
-                citaMedicaRepository.save(c);
-            });
+            citaMedicaRepository.findById(entrada.getCitaId())
+                .filter(c -> tenantId.equals(c.getTenantId()))
+                .ifPresent(c -> {
+                    c.setEstado(CitaMedica.EstadoCita.EN_SALA);
+                    citaMedicaRepository.save(c);
+                });
         }
 
         return guardada;
@@ -49,6 +52,18 @@ public class SalaEsperaService {
         return llamarAConsultorio(id, consultorio, null, null);
     }
 
+    /** findById() no respeta el filtro de tenant (ver hallazgo en ConsultaMedicaService) —
+     * sin esta verificación, cualquier clínica podía tocar la cola de sala de espera de OTRA. */
+    private SalaEspera obtenerEntradaPropia(Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
+        SalaEspera entrada = salaEsperaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Entrada de sala no encontrada con ID: " + id));
+        if (tenantId == null || !tenantId.equals(entrada.getTenantId())) {
+            throw new RuntimeException("Violación de seguridad: la entrada de sala no pertenece a este tenant");
+        }
+        return entrada;
+    }
+
     /**
      * medicoId/medicoNombre opcionales: para un walk-in sin cita previa, es
      * en ESTE momento (no en el check-in) cuando recepción sabe a qué médico
@@ -57,8 +72,8 @@ public class SalaEsperaService {
      */
     @Transactional
     public SalaEspera llamarAConsultorio(Long id, String consultorio, Long medicoId, String medicoNombre) {
-        SalaEspera entrada = salaEsperaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Entrada de sala no encontrada con ID: " + id));
+        SalaEspera entrada = obtenerEntradaPropia(id);
+        Long tenantId = entrada.getTenantId();
 
         entrada.setEstado(SalaEspera.EstadoEspera.EN_CONSULTA);
         entrada.setHoraLlamado(LocalDateTime.now());
@@ -67,10 +82,12 @@ public class SalaEsperaService {
         if (medicoNombre != null) entrada.setMedicoNombre(medicoNombre);
 
         if (entrada.getCitaId() != null) {
-            citaMedicaRepository.findById(entrada.getCitaId()).ifPresent(c -> {
-                c.setEstado(CitaMedica.EstadoCita.EN_CONSULTA);
-                citaMedicaRepository.save(c);
-            });
+            citaMedicaRepository.findById(entrada.getCitaId())
+                .filter(c -> tenantId.equals(c.getTenantId()))
+                .ifPresent(c -> {
+                    c.setEstado(CitaMedica.EstadoCita.EN_CONSULTA);
+                    citaMedicaRepository.save(c);
+                });
         }
 
         return salaEsperaRepository.save(entrada);
@@ -78,8 +95,7 @@ public class SalaEsperaService {
 
     @Transactional
     public SalaEspera finalizarAtencion(Long id) {
-        SalaEspera entrada = salaEsperaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Entrada de sala no encontrada con ID: " + id));
+        SalaEspera entrada = obtenerEntradaPropia(id);
 
         entrada.setEstado(SalaEspera.EstadoEspera.ATENDIDO);
         entrada.setHoraFinalizacion(LocalDateTime.now());

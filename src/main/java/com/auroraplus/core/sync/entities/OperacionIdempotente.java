@@ -1,6 +1,7 @@
 package com.auroraplus.core.sync.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 import java.time.LocalDateTime;
 
 /**
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "operaciones_idempotentes", uniqueConstraints = @UniqueConstraint(columnNames = {"tenant_id", "clave_idempotencia"}))
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class OperacionIdempotente {
 
     @Id

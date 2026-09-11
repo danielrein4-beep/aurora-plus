@@ -3,8 +3,12 @@ package com.auroraplus.core.config.entities;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
+// UNIQUE en tenant_id (ver migración V2__...sql) — candado de base de datos
+// contra la condición de carrera ya corregida en TenantProvisioningService,
+// donde dos altas de negocio simultáneas podían terminar con el mismo
+// tenant_id calculado por MAX()+1 sin serializar.
 @Entity
-@Table(name = "licencias_tenant")
+@Table(name = "licencias_tenant", uniqueConstraints = @UniqueConstraint(columnNames = "tenant_id"))
 public class LicenciaTenant {
 
     @Id

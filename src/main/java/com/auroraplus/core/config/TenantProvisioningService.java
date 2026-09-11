@@ -6,6 +6,8 @@ import com.auroraplus.core.config.entities.LicenciaTenant;
 import com.auroraplus.core.config.entities.ModuloTenant;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.core.config.repositories.ModuloTenantRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,9 @@ public class TenantProvisioningService {
 
     @Autowired
     private AuthService authService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public static class AltaTenantRequest {
         public String nombreEmpresa;
@@ -53,6 +58,18 @@ public class TenantProvisioningService {
             throw new RuntimeException("El tipo de licencia es obligatorio");
         }
 
+        // HALLAZGO DE SEGURIDAD: "MAX(tenant_id)+1" sin serializar permitía que
+        // dos altas de negocio simultáneas (dos POST /api/auth/registro-negocio
+        // casi al mismo tiempo) leyeran el mismo MAX antes de que ninguna
+        // terminara su transacción, y ambas terminaran usando el MISMO
+        // tenant_id — dos negocios distintos mezclando datos y usuarios bajo
+        // un solo tenant, la peor violación posible de aislamiento. El
+        // advisory lock (mismo patrón ya usado en IdempotenciaService) obliga
+        // a que las altas de tenant se serialicen: la segunda espera a que la
+        // primera termine su transacción completa antes de calcular su propio
+        // MAX+1. El UNIQUE en licencias_tenant.tenant_id (ver migración V2) es
+        // el candado de base de datos por si este código se vuelve a romper.
+        entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(445566)").getResultList();
         Long nuevoTenantId = licenciaTenantRepository.buscarMaximoTenantId() + 1;
         int meses = request.mesesVigencia != null ? request.mesesVigencia : 1;
 

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.salud.services;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.BloqueoAgenda;
 import com.auroraplus.modules.salud.entities.CitaMedica;
 import com.auroraplus.modules.salud.repositories.BloqueoAgendaRepository;
@@ -47,10 +48,21 @@ public class AgendaMedicaService {
         return citaMedicaRepository.save(cita);
     }
 
-    @Transactional
-    public CitaMedica actualizarEstado(Long citaId, CitaMedica.EstadoCita nuevoEstado) {
+    /** findById() no respeta el filtro de tenant (ver hallazgo en ConsultaMedicaService) —
+     * sin esta verificación, cualquier clínica podía cambiar el estado de la cita de OTRA. */
+    private CitaMedica obtenerCitaPropia(Long citaId) {
+        Long tenantId = TenantContext.getCurrentTenant();
         CitaMedica cita = citaMedicaRepository.findById(citaId)
             .orElseThrow(() -> new RuntimeException("Cita no encontrada con ID: " + citaId));
+        if (tenantId == null || !tenantId.equals(cita.getTenantId())) {
+            throw new RuntimeException("Violación de seguridad: la cita no pertenece a este tenant");
+        }
+        return cita;
+    }
+
+    @Transactional
+    public CitaMedica actualizarEstado(Long citaId, CitaMedica.EstadoCita nuevoEstado) {
+        CitaMedica cita = obtenerCitaPropia(citaId);
         cita.setEstado(nuevoEstado);
         return citaMedicaRepository.save(cita);
     }
@@ -59,8 +71,7 @@ public class AgendaMedicaService {
      * excluyendo la propia cita del chequeo de solapamiento (si no, siempre "chocaría" consigo misma). */
     @Transactional
     public CitaMedica reprogramarCita(Long citaId, LocalDate fecha, LocalTime horaInicio, LocalTime horaFin) {
-        CitaMedica cita = citaMedicaRepository.findById(citaId)
-            .orElseThrow(() -> new RuntimeException("Cita no encontrada con ID: " + citaId));
+        CitaMedica cita = obtenerCitaPropia(citaId);
         validarDisponibilidad(cita.getMedicoId(), fecha, horaInicio, horaFin, citaId);
         cita.setFecha(fecha);
         cita.setHoraInicio(horaInicio);
@@ -80,7 +91,13 @@ public class AgendaMedicaService {
 
     @Transactional
     public void eliminarBloqueo(Long id) {
-        bloqueoAgendaRepository.deleteById(id);
+        Long tenantId = TenantContext.getCurrentTenant();
+        BloqueoAgenda bloqueo = bloqueoAgendaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Bloqueo no encontrado con ID: " + id));
+        if (tenantId == null || !tenantId.equals(bloqueo.getTenantId())) {
+            throw new RuntimeException("Violación de seguridad: el bloqueo no pertenece a este tenant");
+        }
+        bloqueoAgendaRepository.delete(bloqueo);
     }
 
     private void validarDisponibilidad(Long medicoId, LocalDate fecha, LocalTime inicio, LocalTime fin, Long citaExcluidaId) {

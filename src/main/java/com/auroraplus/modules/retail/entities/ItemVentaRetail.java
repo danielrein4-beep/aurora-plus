@@ -3,15 +3,28 @@ package com.auroraplus.modules.retail.entities;
 import com.auroraplus.core.inventario.entities.Articulo;
 import com.auroraplus.core.inventario.entities.PresentacionArticulo;
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 
+/**
+ * tenant_id (y el filtro de Hibernate) se agregaron después de detectar que
+ * GET /api/retail/ventas/{id}/items no validaba a qué tenant pertenecía la
+ * venta consultada — cualquier usuario autenticado de CUALQUIER negocio podía
+ * enumerar ids de venta ajenos y ver sus items (productos, precios, costos).
+ * Con el filtro activo (ver TenantFilterAspect/TenantInterceptor) esa misma
+ * query ahora excluye automáticamente filas de otros tenants.
+ */
 @Entity
 @Table(name = "items_venta_retail")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class ItemVentaRetail {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "venta_id", nullable = false)
@@ -45,6 +58,8 @@ public class ItemVentaRetail {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
     public VentaRetail getVenta() { return venta; }
     public void setVenta(VentaRetail venta) { this.venta = venta; }
     public Articulo getArticulo() { return articulo; }

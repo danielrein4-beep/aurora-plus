@@ -2,18 +2,30 @@ package com.auroraplus.modules.salud.laboratorio.entities;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * tenant_id agregado como defensa en profundidad: hoy este resultado solo se
+ * lee a través de OrdenLaboratorio (ya filtrada por tenant), pero sin su
+ * propio filtro, un repositorio/endpoint nuevo que use findById directo
+ * quedaría sin aislamiento entre tenants desde el primer día — exactamente
+ * el escenario que TenantFilterAspect existe para prevenir.
+ */
 @Entity
 @Table(name = "salud_resultados_laboratorio")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class ResultadoLaboratorio {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
 
     @OneToOne
     @JoinColumn(name = "orden_id", nullable = false, unique = true)
@@ -56,6 +68,9 @@ public class ResultadoLaboratorio {
     // Getters y Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 
     public OrdenLaboratorio getOrden() { return orden; }
     public void setOrden(OrdenLaboratorio orden) { this.orden = orden; }

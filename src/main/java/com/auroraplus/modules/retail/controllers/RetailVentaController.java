@@ -44,8 +44,12 @@ public class RetailVentaController {
         return ventaRetailRepository.findByTenantIdOrderByFechaRegistroDesc(tenantId);
     }
 
+    // tenantId es obligatorio aquí (no solo el filtro de Hibernate) para que
+    // TenantInterceptor pueda comparalo contra el del JWT — antes este
+    // endpoint no pedía tenantId y cualquier usuario autenticado podía leer
+    // los items de la venta de CUALQUIER tenant con solo cambiar el {id}.
     @GetMapping("/ventas/{id}/items")
-    public List<ItemVentaRetail> itemsDeVenta(@PathVariable Long id) {
+    public List<ItemVentaRetail> itemsDeVenta(@RequestParam Long tenantId, @PathVariable Long id) {
         return itemVentaRetailRepository.findByVentaId(id);
     }
 }
