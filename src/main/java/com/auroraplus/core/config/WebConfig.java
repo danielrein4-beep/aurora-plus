@@ -38,7 +38,10 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(rateLimitInterceptor)
             .addPathPatterns(
                 "/api/auth/login", "/api/auth/login-super-admin", "/api/auth/login-directo",
-                "/api/auth/registro-negocio", "/api/auth/olvide-clave", "/api/auth/resetear-clave"
+                "/api/auth/registro-negocio", "/api/auth/olvide-clave", "/api/auth/resetear-clave",
+                // Portal público de recepción de laboratorio (sin login, como los de
+                // arriba) — sin límite, cualquiera podría martillarlo con cargas falsas.
+                "/api/public/laboratorio/portal/*/subir"
             );
         registry.addInterceptor(tenantInterceptor)
             .addPathPatterns("/api/**")

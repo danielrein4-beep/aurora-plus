@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { obtenerQrPortalLaboratorioDataUrl } from "../api";
 import {
   type ConsultaReportData,
   type CierreCajaData,
@@ -57,6 +58,17 @@ export default function DocumentoPreviewModal({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [modalCompartir, setModalCompartir] = useState<"whatsapp" | "email" | null>(null);
   const [enviandoEmail, setEnviandoEmail] = useState<boolean>(false);
+  // QR fijo del portal de recepción de laboratorio — se incrusta como página 2
+  // del informe (ver pdfReports.ts). Se precarga al abrir el modal para que
+  // "Descargar"/"Imprimir" no tengan que esperar una petición de red.
+  const [qrLaboratorioDataUrl, setQrLaboratorioDataUrl] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (payload.tipo !== "INFORME_MEDICO") return;
+    obtenerQrPortalLaboratorioDataUrl()
+      .then(setQrLaboratorioDataUrl)
+      .catch((err) => console.warn("No se pudo cargar el QR de laboratorio para el informe:", err));
+  }, [payload.tipo]);
 
   const mostrarToast = (msg: string) => {
     setToastMsg(msg);
@@ -72,7 +84,7 @@ export default function DocumentoPreviewModal({
   const handleDescargarPdf = () => {
     try {
       if (payload.tipo === "INFORME_MEDICO") {
-        generarPdfInformeConsulta(docData as ConsultaReportData);
+        generarPdfInformeConsulta(docData as ConsultaReportData, qrLaboratorioDataUrl);
       } else if (payload.tipo === "CIERRE_CAJA") {
         generarPdfCierreCaja(docData as CierreCajaData);
       } else if (payload.tipo === "COTIZACION") {

@@ -1771,6 +1771,109 @@ export function subirResultadoPublicoLaboratorio(token: string, payload: any): P
   });
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// PORTAL DE RECEPCIÓN DE LABORATORIO (el PACIENTE sube resultados vía QR)
+// ══════════════════════════════════════════════════════════════════════════
+export interface ArchivoExamenRecibido {
+  id?: number;
+  nombreArchivo: string;
+  tipoMime: string;
+  contenidoBase64: string;
+  orden: number;
+}
+
+export interface ExamenRecibidoPaciente {
+  id: number;
+  tenantId: number;
+  pacienteId?: number | null;
+  cedulaIngresada: string;
+  nombreIngresado?: string;
+  telefonoIngresado?: string;
+  fechaHoraRecepcion: string;
+  leido: boolean;
+  fechaHoraLeido?: string;
+  leidoPor?: string;
+  archivos: ArchivoExamenRecibido[];
+}
+
+// --- Lado del doctor (autenticado) ---
+export function obtenerUrlPortalLaboratorio(): Promise<{ url: string }> {
+  return request(`/api/salud/laboratorio/portal/url`);
+}
+
+/** Descarga el PNG del QR fijo del consultorio (autenticado) y lo devuelve como
+ * data URL, listo para incrustar con jsPDF.addImage() en la página 2 del informe. */
+export async function obtenerQrPortalLaboratorioDataUrl(): Promise<string> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const res = await fetch(`/api/salud/laboratorio/portal/qr.png`, { headers });
+  if (!res.ok) throw new ApiError(`No se pudo generar el QR (${res.status})`, res.status);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+export function listarInboxExamenesRecibidos(tenantId: number): Promise<ExamenRecibidoPaciente[]> {
+  return request(`/api/salud/laboratorio/inbox?tenantId=${tenantId}`);
+}
+
+export function contadorInboxExamenesRecibidos(tenantId: number): Promise<{ pendientes: number }> {
+  return request(`/api/salud/laboratorio/inbox/contador?tenantId=${tenantId}`);
+}
+
+export function listarExamenesRecibidosPorPaciente(tenantId: number, pacienteId: number): Promise<ExamenRecibidoPaciente[]> {
+  return request(`/api/salud/laboratorio/inbox/paciente/${pacienteId}?tenantId=${tenantId}`);
+}
+
+export function marcarLeidoExamenRecibido(tenantId: number, id: number): Promise<ExamenRecibidoPaciente> {
+  return request(`/api/salud/laboratorio/inbox/${id}/marcar-leido?tenantId=${tenantId}`, { method: "POST" });
+}
+
+export function vincularPacienteExamenRecibido(tenantId: number, id: number, pacienteId: number): Promise<ExamenRecibidoPaciente> {
+  return request(`/api/salud/laboratorio/inbox/${id}/vincular-paciente?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ pacienteId }),
+  });
+}
+
+// --- Lado del paciente (público, sin sesión) ---
+export function consultarPortalLaboratorioPublico(token: string): Promise<{ nombreConsultorio: string }> {
+  return request(`/api/public/laboratorio/portal/${token}`);
+}
+
+export async function subirExamenPortalLaboratorioPublico(
+  token: string,
+  cedula: string,
+  nombre: string,
+  telefono: string,
+  archivos: File[]
+): Promise<{ success: boolean; mensaje: string }> {
+  const form = new FormData();
+  form.append("cedula", cedula);
+  if (nombre) form.append("nombre", nombre);
+  if (telefono) form.append("telefono", telefono);
+  archivos.forEach((f) => form.append("archivos", f));
+
+  const res = await fetch(`/api/public/laboratorio/portal/${token}/subir`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    let mensaje = `Error ${res.status}`;
+    try {
+      const body = await res.json();
+      mensaje = body.message || body.error || mensaje;
+    } catch { /* respuesta no-JSON */ }
+    throw new ApiError(mensaje, res.status);
+  }
+  return res.json();
+}
+
 export async function loginSuperAdminApi(username: string, password: string): Promise<string> {
   try {
     const data = await requestSuperAdmin<{ token: string }>("/api/auth/login-super-admin", {

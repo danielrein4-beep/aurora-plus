@@ -1,4 +1,5 @@
 import PortalPublicoBioanalista from "./pages/PortalPublicoBioanalista";
+import PortalLaboratorioPaciente from "./pages/PortalLaboratorioPaciente";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import Layout from "./Layout";
 import Home from "./pages/Home";
@@ -52,6 +53,8 @@ export default function App() {
             </Route>
             {/* Portal público para laboratorios sin sesión */}
             <Route path="/lab/:token" element={<PortalPublicoBioanalista />} />
+            {/* Portal público donde el PACIENTE sube sus resultados de laboratorio (QR fijo del consultorio) */}
+            <Route path="/lab-paciente/:token" element={<PortalLaboratorioPaciente />} />
             {/* Auth + onboarding — full screen con transiciones fluidas */}
             <Route path="/auth"       element={<AnimatedRoute><Auth /></AnimatedRoute>} />
             <Route path="/resetear-clave" element={<AnimatedRoute><ResetearClave /></AnimatedRoute>} />

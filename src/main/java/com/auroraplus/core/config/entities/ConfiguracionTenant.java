@@ -19,6 +19,13 @@ public class ConfiguracionTenant {
     @Column(name = "usa_cop", nullable = false)
     private boolean usaCop = false; // Inactivo por defecto, se activa solo en estados fronterizos
 
+    // Token público fijo del portal de recepción de laboratorios (QR que va en
+    // la página 2 de cada informe de consulta) — uno solo por consultorio,
+    // generado la primera vez que se pide (ver
+    // PortalLaboratorioPacienteService.obtenerOCrearToken). NULL hasta ese momento.
+    @Column(name = "token_portal_laboratorio", unique = true, length = 64)
+    private String tokenPortalLaboratorio;
+
     // Getters y Setters
     public Long getTenantId() { return tenantId; }
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
@@ -28,4 +35,6 @@ public class ConfiguracionTenant {
     public void setUsaVes(boolean usaVes) { this.usaVes = usaVes; }
     public boolean isUsaCop() { return usaCop; }
     public void setUsaCop(boolean usaCop) { this.usaCop = usaCop; }
+    public String getTokenPortalLaboratorio() { return tokenPortalLaboratorio; }
+    public void setTokenPortalLaboratorio(String tokenPortalLaboratorio) { this.tokenPortalLaboratorio = tokenPortalLaboratorio; }
 }
