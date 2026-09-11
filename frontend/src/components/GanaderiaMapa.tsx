@@ -69,6 +69,7 @@ export default function GanaderiaMapa({
   const drawingLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const pointsLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const fincaMarkerRef = useRef<L.Marker | null>(null);
+  const referenceLayerRef = useRef<L.TileLayer | null>(null);
 
   const [capaActiva, setCapaActiva] = useState<"satelital" | "terreno" | "calles">("satelital");
   const [potreroSeleccionado, setPotreroSeleccionado] = useState<PotreroGanaderia | null>(null);
@@ -148,6 +149,16 @@ export default function GanaderiaMapa({
 
     (map as any)._currentBaseLayer = esriSatellite;
 
+    // Capa de referencia (ciudades, carreteras, fronteras) sobre la foto satelital —
+    // sin esto, la imagen satelital pura no tiene ningún texto ni punto de
+    // orientación, especialmente notorio en la vista panorámica inicial sin
+    // finca fijada todavía (zoom alejado).
+    const referenceLayer = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19, attribution: "Esri Reference" }
+    ).addTo(map);
+    referenceLayerRef.current = referenceLayer;
+
     const polyGroup = L.layerGroup().addTo(map);
     polygonsLayerGroupRef.current = polyGroup;
 
@@ -194,6 +205,19 @@ export default function GanaderiaMapa({
     }
 
     newLayer.addTo(map);
+
+    // La capa de referencia (ciudades/carreteras) solo hace falta sobre la foto
+    // satelital pura — Terreno y Calles ya traen sus propias etiquetas.
+    const ref = referenceLayerRef.current;
+    if (ref) {
+      if (capaActiva === "satelital") {
+        if (!map.hasLayer(ref)) ref.addTo(map);
+        ref.bringToFront();
+      } else if (map.hasLayer(ref)) {
+        map.removeLayer(ref);
+      }
+    }
+
     (map as any)._currentBaseLayer = newLayer;
   }, [capaActiva]);
 
