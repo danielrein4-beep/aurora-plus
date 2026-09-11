@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconChat, IconMail, IconCheck } from "../Icons";
+import { IconChat, IconMail, IconInstagram, IconCheck } from "../Icons";
 
 const VALORES = [
   { title: "Simplicidad", desc: "La tecnología debe facilitar el trabajo, no complicarlo. Diseñamos cada pantalla pensando en el usuario final, no en el programador." },
@@ -15,7 +15,8 @@ const EQUIPO = [
 
 const CONTACTO_MEDIOS = [
   { label: "WhatsApp", valor: "Próximamente", Icon: IconChat },
-  { label: "Correo", valor: "Próximamente", Icon: IconMail },
+  { label: "Correo", valor: "auroraplussoftware@gmail.com", Icon: IconMail },
+  { label: "Instagram", valor: "@auroraplusoftware", Icon: IconInstagram },
 ];
 
 export default function Nosotros() {
