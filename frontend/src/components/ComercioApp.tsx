@@ -794,6 +794,17 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           >
             <span>🔒 Cierre Z</span>
           </button>
+          <button
+            type="button"
+            title="Próximamente: tu catálogo público con precios y código QR para que tus clientes lo vean desde el celular"
+            onClick={() => mostrarToast("🔒 Catálogo QR — muy pronto vas a poder compartir tus precios con un código QR. ¡Ya viene en camino!", "info")}
+            className="px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 hover:text-slate-300 opacity-70"
+          >
+            <span>🔒 Catálogo QR</span>
+            <span className="text-[9px] font-black uppercase tracking-wider bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full">
+              Próximamente
+            </span>
+          </button>
         </nav>
 
         {/* Derecha: Multi-Tasa Badge + Salir */}
