@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.InventarioPatio;
 import com.auroraplus.modules.tamanacocomercial.repositories.DespachoComercialRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.InventarioPatioRepository;
@@ -52,7 +53,10 @@ public class InventarioRestController {
 
     @PutMapping("/pilas/{id}")
     public ResponseEntity<?> actualizarPila(@PathVariable Long id, @RequestBody InventarioPatio datos) {
-        return inventarioPatioRepository.findById(id).map(p -> {
+        Long tenantId = TenantContext.getCurrentTenant();
+        return inventarioPatioRepository.findById(id)
+            .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))
+            .map(p -> {
             if (datos.getPilaAcopio() != null) p.setPilaAcopio(datos.getPilaAcopio());
             if (datos.getCapacidadMaximaTon() != null) p.setCapacidadMaximaTon(datos.getCapacidadMaximaTon());
             return ResponseEntity.ok(inventarioPatioRepository.save(p));
@@ -68,8 +72,9 @@ public class InventarioRestController {
 
     @PostMapping("/pilas/{id}/movimiento")
     public ResponseEntity<?> registrarMovimiento(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Long tenantActual = TenantContext.getCurrentTenant();
         InventarioPatio pila = inventarioPatioRepository.findById(id).orElse(null);
-        if (pila == null) return ResponseEntity.notFound().build();
+        if (pila == null || tenantActual == null || !tenantActual.equals(pila.getTenantId())) return ResponseEntity.notFound().build();
 
         String tipo = body.get("tipo") != null ? body.get("tipo").toString() : null;
         BigDecimal toneladas = body.get("toneladas") != null ? new BigDecimal(body.get("toneladas").toString()) : null;

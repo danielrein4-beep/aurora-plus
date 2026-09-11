@@ -1,5 +1,6 @@
 package com.auroraplus.modules.moda.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.moda.entities.ProductoModa;
 import com.auroraplus.modules.moda.entities.VarianteModa;
 import com.auroraplus.modules.moda.repositories.ProductoModaRepository;
@@ -28,7 +29,10 @@ public class ProductoModaController {
 
     @GetMapping("/{id}")
     public ProductoModa obtener(@PathVariable Long id) {
-        return productoModaRepository.findById(id).orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        return productoModaRepository.findById(id)
+            .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
     }
 
     @PostMapping
@@ -39,7 +43,10 @@ public class ProductoModaController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ProductoModa> actualizar(@PathVariable Long id, @RequestBody ProductoModa datos) {
-        ProductoModa producto = productoModaRepository.findById(id).orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        ProductoModa producto = productoModaRepository.findById(id)
+            .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
         producto.setNombre(datos.getNombre());
         producto.setCategoria(datos.getCategoria());
         producto.setMarca(datos.getMarca());

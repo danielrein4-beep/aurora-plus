@@ -1,5 +1,6 @@
 package com.auroraplus.modules.moda.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.moda.entities.VarianteModa;
 import com.auroraplus.modules.moda.repositories.VarianteModaRepository;
 import com.auroraplus.modules.moda.services.EtiquetaModaPdfService;
@@ -25,7 +26,9 @@ public class EtiquetaModaController {
 
     @GetMapping(value = "/{varianteId}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> etiquetaIndividual(@PathVariable Long varianteId) throws Exception {
+        Long tenantId = TenantContext.getCurrentTenant();
         VarianteModa variante = varianteModaRepository.findById(varianteId)
+            .filter(v -> tenantId != null && tenantId.equals(v.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Variante no encontrada"));
         byte[] pdf = etiquetaModaPdfService.generarEtiquetaIndividual(variante);
         return ResponseEntity.ok()
@@ -37,9 +40,12 @@ public class EtiquetaModaController {
     @GetMapping(value = "/hoja/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> hojaEtiquetas(@RequestParam List<Long> varianteIds,
                                                  @RequestParam(defaultValue = "1") int copias) throws Exception {
+        Long tenantId = TenantContext.getCurrentTenant();
         List<VarianteModa> variantes = new ArrayList<>();
         for (Long id : varianteIds) {
-            variantes.add(varianteModaRepository.findById(id).orElseThrow(() -> new RuntimeException("Variante no encontrada: " + id)));
+            variantes.add(varianteModaRepository.findById(id)
+                .filter(v -> tenantId != null && tenantId.equals(v.getTenantId()))
+                .orElseThrow(() -> new RuntimeException("Variante no encontrada: " + id)));
         }
         byte[] pdf = etiquetaModaPdfService.generarHojaEtiquetas(variantes, copias);
         return ResponseEntity.ok()

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.DetalleVentaComercial;
 import com.auroraplus.modules.tamanacocomercial.entities.MovimientoStock;
 import com.auroraplus.modules.tamanacocomercial.entities.ProductoComercial;
@@ -152,8 +153,9 @@ public class VentaController {
     @PutMapping("/{id}/anular")
     @Transactional
     public ResponseEntity<?> anularVenta(@PathVariable Long id, @RequestParam Long tenantId) {
+        Long tenantActual = TenantContext.getCurrentTenant();
         VentaComercial v = ventaRepository.findById(id).orElse(null);
-        if (v == null) return ResponseEntity.notFound().build();
+        if (v == null || tenantActual == null || !tenantActual.equals(v.getTenantId())) return ResponseEntity.notFound().build();
         if (v.getEstado() == VentaComercial.EstadoVenta.ANULADA) {
             return ResponseEntity.badRequest().body(Map.of("error", "La venta ya está anulada"));
         }

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.minero.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.minero.entities.TipoTrabajoMinero;
 import com.auroraplus.modules.minero.repositories.TipoTrabajoMineroRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +30,10 @@ public class TipoTrabajoMineroController {
 
     @PutMapping("/{id}")
     public ResponseEntity<TipoTrabajoMinero> actualizar(@PathVariable Long id, @RequestBody TipoTrabajoMinero datos) {
-        TipoTrabajoMinero tipoTrabajo = tipoTrabajoMineroRepository.findById(id).orElseThrow(() -> new RuntimeException("Tipo de trabajo no encontrado"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        TipoTrabajoMinero tipoTrabajo = tipoTrabajoMineroRepository.findById(id)
+            .filter(t -> tenantId != null && tenantId.equals(t.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Tipo de trabajo no encontrado"));
         tipoTrabajo.setNombre(datos.getNombre());
         tipoTrabajo.setUnidadMedida(datos.getUnidadMedida());
         tipoTrabajo.setTarifaPorUnidad(datos.getTarifaPorUnidad());

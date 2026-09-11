@@ -1,5 +1,6 @@
 package com.auroraplus.modules.moda.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.moda.entities.ProveedorModa;
 import com.auroraplus.modules.moda.repositories.ProveedorModaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +29,10 @@ public class ProveedorModaController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ProveedorModa> actualizar(@PathVariable Long id, @RequestBody ProveedorModa datos) {
-        ProveedorModa proveedor = proveedorModaRepository.findById(id).orElseThrow(() -> new RuntimeException("Proveedor no encontrado"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        ProveedorModa proveedor = proveedorModaRepository.findById(id)
+            .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Proveedor no encontrado"));
         proveedor.setNombre(datos.getNombre());
         proveedor.setRif(datos.getRif());
         proveedor.setTelefono(datos.getTelefono());

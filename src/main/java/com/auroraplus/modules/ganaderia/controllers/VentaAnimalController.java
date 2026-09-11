@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.VentaAnimal;
 import com.auroraplus.modules.ganaderia.repositories.VentaAnimalRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaVentaService;
@@ -48,7 +49,10 @@ public class VentaAnimalController {
 
     @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> pdf(@PathVariable Long id) throws Exception {
-        VentaAnimal venta = ventaAnimalRepository.findById(id).orElseThrow(() -> new RuntimeException("Venta no encontrada"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        VentaAnimal venta = ventaAnimalRepository.findById(id)
+            .filter(v -> tenantId != null && tenantId.equals(v.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Venta no encontrada"));
         byte[] pdf = ventaAnimalPdfService.generarLiquidacionPdf(venta);
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"liquidacion-" + venta.getNumeroTicket() + ".pdf\"")

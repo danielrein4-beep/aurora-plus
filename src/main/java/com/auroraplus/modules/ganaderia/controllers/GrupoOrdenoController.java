@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.GrupoOrdeno;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
@@ -47,7 +48,11 @@ public class GrupoOrdenoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<GrupoOrdeno> actualizar(@PathVariable Long id, @RequestBody GrupoOrdeno datos) {
+        Long tenantId = TenantContext.getCurrentTenant();
         GrupoOrdeno grupo = grupoOrdenoRepository.findById(id).orElseThrow(() -> new RuntimeException("Grupo de ordeño no encontrado"));
+        if (tenantId == null || !grupo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Grupo no pertenece a este tenant");
+        }
         grupo.setNombre(datos.getNombre());
         grupo.setHorario(datos.getHorario());
         grupo.setOrdenRotacion(datos.getOrdenRotacion());

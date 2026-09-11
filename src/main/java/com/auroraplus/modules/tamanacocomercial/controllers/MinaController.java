@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.Mina;
 import com.auroraplus.modules.tamanacocomercial.repositories.MinaRepository;
 import jakarta.transaction.Transactional;
@@ -32,7 +33,9 @@ public class MinaController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Mina> actualizar(@PathVariable Long id, @RequestBody Mina datos) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return minaRepository.findById(id)
+            .filter(mina -> tenantId != null && tenantId.equals(mina.getTenantId()))
             .map(mina -> {
                 mina.setNombre(datos.getNombre());
                 mina.setTarifaCopPorTon(datos.getTarifaCopPorTon());
@@ -45,7 +48,9 @@ public class MinaController {
     @DeleteMapping("/{id}")
     @Transactional
     public ResponseEntity<Map<String, String>> eliminar(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return minaRepository.findById(id)
+            .filter(mina -> tenantId != null && tenantId.equals(mina.getTenantId()))
             .map(mina -> {
                 mina.setActiva(false);
                 minaRepository.save(mina);

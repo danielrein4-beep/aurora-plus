@@ -97,7 +97,11 @@ public class ArticuloController {
 
     @PutMapping("/{id}/stock-minimo")
     public ResponseEntity<Articulo> actualizarStockMinimo(@PathVariable Long id, @RequestParam BigDecimal stockMinimo) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
+        if (tenantId == null || !articulo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
+        }
         articulo.setStockMinimo(stockMinimo);
         return ResponseEntity.ok(articuloRepository.save(articulo));
     }

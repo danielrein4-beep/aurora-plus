@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.Chofer;
 import com.auroraplus.modules.tamanacocomercial.entities.CuotaDespacho;
 import com.auroraplus.modules.tamanacocomercial.entities.DespachoComercial;
@@ -190,7 +191,10 @@ public class DespachoController {
 
     @PutMapping("/{id}")
     public DespachoComercial editarDespacho(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody DespachoComercial detalles) {
-        DespachoComercial despacho = despachoComercialRepository.findById(id).orElseThrow();
+        Long tenantActual = TenantContext.getCurrentTenant();
+        DespachoComercial despacho = despachoComercialRepository.findById(id)
+                .filter(d -> tenantActual != null && tenantActual.equals(d.getTenantId()))
+                .orElseThrow();
 
         LocalDate fechaOp = despacho.getFechaDespacho() != null ? despacho.getFechaDespacho().toLocalDate() : LocalDate.now();
         if (cierreSemanaService.estaSemanaCerrada(fechaOp)) {
@@ -221,7 +225,10 @@ public class DespachoController {
     @PostMapping("/{id}/ticket")
     public DespachoComercial subirTicket(@PathVariable Long id, @RequestParam Long tenantId,
                                           @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
-        DespachoComercial despacho = despachoComercialRepository.findById(id).orElseThrow();
+        Long tenantActual = TenantContext.getCurrentTenant();
+        DespachoComercial despacho = despachoComercialRepository.findById(id)
+                .filter(d -> tenantActual != null && tenantActual.equals(d.getTenantId()))
+                .orElseThrow();
 
         java.nio.file.Path uploadDir = java.nio.file.Paths.get("uploads/tickets");
         if (!java.nio.file.Files.exists(uploadDir)) {
@@ -241,7 +248,10 @@ public class DespachoController {
 
     @DeleteMapping("/{id}/ticket")
     public DespachoComercial eliminarTicket(@PathVariable Long id, @RequestParam Long tenantId) {
-        DespachoComercial despacho = despachoComercialRepository.findById(id).orElseThrow();
+        Long tenantActual = TenantContext.getCurrentTenant();
+        DespachoComercial despacho = despachoComercialRepository.findById(id)
+                .filter(d -> tenantActual != null && tenantActual.equals(d.getTenantId()))
+                .orElseThrow();
         String ticketUrl = despacho.getTicketUrl();
         if (ticketUrl != null && !ticketUrl.isEmpty()) {
             try {
@@ -257,7 +267,9 @@ public class DespachoController {
 
     @DeleteMapping("/{id}")
     public void eliminarDespacho(@PathVariable Long id, @RequestParam Long tenantId) {
-        Optional<DespachoComercial> d = despachoComercialRepository.findById(id);
+        Long tenantActual = TenantContext.getCurrentTenant();
+        Optional<DespachoComercial> d = despachoComercialRepository.findById(id)
+                .filter(desp -> tenantActual != null && tenantActual.equals(desp.getTenantId()));
         if (d.isPresent()) {
             LocalDate fechaOp = d.get().getFechaDespacho() != null ? d.get().getFechaDespacho().toLocalDate() : LocalDate.now();
             if (cierreSemanaService.estaSemanaCerrada(fechaOp)) {
@@ -273,7 +285,9 @@ public class DespachoController {
 
     @GetMapping("/ticket/{id}")
     public ResponseEntity<?> obtenerDetalleTicket(@PathVariable Long id) {
+        Long tenantActual = TenantContext.getCurrentTenant();
         return despachoComercialRepository.findById(id)
+                .filter(d -> tenantActual != null && tenantActual.equals(d.getTenantId()))
                 .map(d -> ResponseEntity.ok(Map.of(
                         "id", d.getId(),
                         "fecha", d.getFechaDespacho() != null ? d.getFechaDespacho().toString() : "",
@@ -289,8 +303,10 @@ public class DespachoController {
 
     @GetMapping("/{id}/foto")
     public ResponseEntity<org.springframework.core.io.Resource> obtenerFotoDespacho(@PathVariable Long id) {
+        Long tenantActual = TenantContext.getCurrentTenant();
         DespachoComercial despacho = despachoComercialRepository.findById(id).orElse(null);
-        if (despacho == null || despacho.getTicketUrl() == null || despacho.getTicketUrl().trim().isEmpty()) {
+        if (despacho == null || tenantActual == null || !tenantActual.equals(despacho.getTenantId())
+                || despacho.getTicketUrl() == null || despacho.getTicketUrl().trim().isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 

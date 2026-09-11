@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.Usuario;
 import com.auroraplus.modules.tamanacocomercial.repositories.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -84,9 +85,15 @@ public class UsuarioController {
         return ResponseEntity.status(HttpStatus.CREATED).body(sanitizarUsuario(guardado));
     }
 
+    // HALLAZGO DE SEGURIDAD: findById() de Hibernate ignora el @Filter de tenant (a diferencia de
+    // los findByXxx derivados, que sí pasan por TenantFilterAspect) — sin este chequeo, cualquier
+    // usuario autenticado de CUALQUIER tenant podía editar/deshabilitar la cuenta de un usuario de
+    // OTRO tenant con solo adivinar/incrementar el id. Mismo patrón que ConsultaMedicaService.
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizarUsuario(@PathVariable Long id, @RequestBody Usuario datos) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return usuarioRepository.findById(id)
+            .filter(u -> tenantId != null && tenantId.equals(u.getTenantId()))
             .map(u -> {
                 if (datos.getNombre() != null && !datos.getNombre().trim().isEmpty()) {
                     u.setNombre(datos.getNombre().trim());
@@ -138,7 +145,9 @@ public class UsuarioController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarODesactivar(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return usuarioRepository.findById(id)
+            .filter(u -> tenantId != null && tenantId.equals(u.getTenantId()))
             .map(u -> {
                 if (esCEO(u)) {
                     long ceoActivos = usuarioRepository.findAll().stream()

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.CambioMoneda;
 import com.auroraplus.modules.tamanacocomercial.entities.Gasto;
 import com.auroraplus.modules.tamanacocomercial.entities.Ingreso;
@@ -72,7 +73,9 @@ public class TesoreriaController {
 
     @PutMapping("/ingresos/{id}")
     public ResponseEntity<?> actualizarIngreso(@PathVariable Long id, @RequestBody Ingreso datos) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ingresoRepository.findById(id)
+            .filter(i -> tenantId != null && tenantId.equals(i.getTenantId()))
             .map(i -> {
                 i.setFecha(datos.getFecha());
                 i.setClienteOrigen(datos.getClienteOrigen());
@@ -120,7 +123,9 @@ public class TesoreriaController {
 
     @PutMapping("/cambios/{id}")
     public ResponseEntity<?> actualizarCambio(@PathVariable Long id, @RequestBody CambioMoneda datos) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return cambioMonedaRepository.findById(id)
+            .filter(c -> tenantId != null && tenantId.equals(c.getTenantId()))
             .map(c -> {
                 c.setFecha(datos.getFecha());
                 c.setMonedaOrigen(datos.getMonedaOrigen());

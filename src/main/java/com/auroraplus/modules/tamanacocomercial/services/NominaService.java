@@ -50,7 +50,7 @@ public class NominaService {
 
     public Map<String, Object> guardarAjusteRapido(Long tenantId, Long id, BigDecimal ajuste, String nota) {
         Nomina nomina = nominaRepository.findById(id).orElse(null);
-        if (nomina == null) {
+        if (nomina == null || tenantId == null || !tenantId.equals(nomina.getTenantId())) {
             throw new RuntimeException("No se encontró el registro de nómina ID " + id);
         }
         BigDecimal ajusteFinal = ajuste != null ? ajuste : BigDecimal.ZERO;
@@ -338,10 +338,12 @@ public class NominaService {
 
         if (request.getPrestamosIds() != null) {
             for (Long pid : request.getPrestamosIds()) {
-                gastoRepository.findById(pid).ifPresent(p -> {
-                    p.setDescontado(true);
-                    gastoRepository.save(p);
-                });
+                gastoRepository.findById(pid)
+                    .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))
+                    .ifPresent(p -> {
+                        p.setDescontado(true);
+                        gastoRepository.save(p);
+                    });
             }
         }
 

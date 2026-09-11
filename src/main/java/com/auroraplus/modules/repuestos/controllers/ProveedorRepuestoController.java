@@ -1,5 +1,6 @@
 package com.auroraplus.modules.repuestos.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.repuestos.entities.ProveedorRepuesto;
 import com.auroraplus.modules.repuestos.repositories.ProveedorRepuestoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +34,9 @@ public class ProveedorRepuestoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ProveedorRepuesto> actualizar(@PathVariable Long id, @RequestBody ProveedorRepuesto datos) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return proveedorRepuestoRepository.findById(id)
+            .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))
             .map(p -> {
                 if (datos.getNombre() != null) p.setNombre(datos.getNombre());
                 if (datos.getRif() != null) p.setRif(datos.getRif());
