@@ -5,7 +5,7 @@ import {
   AuroraGradientDef, IconClinic, IconVet, IconHardware, IconCard, IconUsers, IconCustomize,
   IconStethoscope, IconCalendar, IconPrescription, IconRocket, IconDownload, IconKey,
   IconHourglass, IconUser, IconClose, IconCheckCircle, IconBank, IconChat, IconFileText,
-  IconRestaurant,
+  IconRestaurant, IconFarm,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import { listarPacientes, listarCitasDelDia, listarCobrosDelDia, type Paciente, type CitaMedica } from "../api";
@@ -13,9 +13,13 @@ import MediclinicApp from "../components/MediclinicApp";
 
 const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNode> = {
   clinica: IconClinic,
+  farmacia: IconPrescription,
   veterinaria: IconVet,
   ferreteria: IconHardware,
+  retail: IconCard,
   restaurante: IconRestaurant,
+  finca: IconFarm,
+  ganaderia: IconFarm,
 };
 
 const ACTION_ICON: Record<string, (props: { size?: number }) => React.ReactNode> = {
@@ -35,6 +39,10 @@ const ACTION_ICON: Record<string, (props: { size?: number }) => React.ReactNode>
   "Ver Cocina (KDS)": IconHourglass,
   "Escandallo de Recetas": IconFileText,
   "Cerrar Cuenta": IconCard,
+  "Nuevo Animal": IconFarm,
+  "Rotar Potrero": IconRocket,
+  "Registrar Ordeño": IconFileText,
+  "Plan Sanitario": IconPrescription,
 };
 
 const VERTICAL_METADATA: Record<string, {
@@ -67,6 +75,24 @@ const VERTICAL_METADATA: Record<string, {
       { name: "Santiago Pérez", age: "8 años", reason: "Chequeo Pediátrico", status: "Confirmado", time: "10:45 AM" },
       { name: "Mariana Rivas", age: "35 años", reason: "Entrega de Laboratorio", status: "Finalizado", time: "08:45 AM" },
     ],
+  },
+  farmacia: {
+    name: "Farmacia & Droguería",
+    badge: "EDICIÓN FARMACIA & DROGUERÍA",
+    desc: "Dispensación de medicamentos, control de lotes y vencimientos, POS mostrador y alertas de stock.",
+    stats: [
+      { label: "Ventas de Hoy", val: "$1,250", change: "86 recetas y tickets", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Stock Farmacia", val: "98%", change: "3 alertas de reorden", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Lotes por Vencer", val: "4", change: "Próximos 30 días", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Caja del Día", val: "$920", change: "Multi-moneda (USD/VES/COP)", color: "text-purple-500 dark:text-purple-400" },
+    ],
+    actions: [
+      { label: "Cobrar Factura", desc: "Venta de medicamentos por mostrador" },
+      { label: "Emitir Receta", desc: "Dispensación y verificación de récipes" },
+      { label: "Consultar Kardex", desc: "Control de lotes, vencimiento y principio activo" },
+      { label: "Cierre de Turno", desc: "Arqueo de caja y cuadre diario" },
+    ],
+    defaultPatients: [],
   },
   veterinaria: {
     name: "Mediclinic Vet",
@@ -129,6 +155,60 @@ const VERTICAL_METADATA: Record<string, {
     ],
     defaultPatients: [],
   },
+  retail: {
+    name: "Aurora Retail & Minimarket",
+    badge: "EDICIÓN RETAIL & COMERCIO",
+    desc: "Caja rápida mostrador, lector de código de barras, control de inventario y cuentas por cobrar.",
+    stats: [
+      { label: "Ventas de Hoy", val: "$1,840", change: "112 tickets emitidos", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Artículos en Stock", val: "3,450", change: "12 bajo mínimo", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Cuentas x Cobrar", val: "$420", change: "Créditos clientes", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Caja del Día", val: "$1,380", change: "USD / VES / COP", color: "text-amber-500 dark:text-amber-400" },
+    ],
+    actions: [
+      { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
+      { label: "Consultar Kardex", desc: "Stock por bodega y listas de precio" },
+      { label: "Nueva Cotización", desc: "Presupuesto con validez temporal" },
+      { label: "Cierre de Turno", desc: "Arqueo de caja y corte Z" },
+    ],
+    defaultPatients: [],
+  },
+  finca: {
+    name: "Aurora Agro & Finca",
+    badge: "EDICIÓN FINCAS & GANADERÍA",
+    desc: "Rotación agronómica de potreros, control de hato, producción lechera, GDP y trazabilidad.",
+    stats: [
+      { label: "Cabezas en Hato", val: "148", change: "+6 este mes", color: "text-emerald-500 dark:text-emerald-400" },
+      { label: "Litros Ordeñados", val: "840 L", change: "Turno mañana + tarde", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Potreros Activos", val: "4 / 12", change: "8 en descanso", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Alertas Retiro", val: "0", change: "100% apto consumo", color: "text-teal-500 dark:text-teal-400" },
+    ],
+    actions: [
+      { label: "Nuevo Animal", desc: "Alta por arete, raza y potrero" },
+      { label: "Rotar Potrero", desc: "Pastoreo rotacional Voisin" },
+      { label: "Registrar Ordeño", desc: "Pesaje por turno y control de sólidos" },
+      { label: "Plan Sanitario", desc: "Vacunas y cálculo de retiro" },
+    ],
+    defaultPatients: [],
+  },
+  ganaderia: {
+    name: "Aurora Agro & Finca",
+    badge: "EDICIÓN FINCAS & GANADERÍA",
+    desc: "Rotación agronómica de potreros, control de hato, producción lechera, GDP y trazabilidad.",
+    stats: [
+      { label: "Cabezas en Hato", val: "148", change: "+6 este mes", color: "text-emerald-500 dark:text-emerald-400" },
+      { label: "Litros Ordeñados", val: "840 L", change: "Turno mañana + tarde", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Potreros Activos", val: "4 / 12", change: "8 en descanso", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Alertas Retiro", val: "0", change: "100% apto consumo", color: "text-teal-500 dark:text-teal-400" },
+    ],
+    actions: [
+      { label: "Nuevo Animal", desc: "Alta por arete, raza y potrero" },
+      { label: "Rotar Potrero", desc: "Pastoreo rotacional Voisin" },
+      { label: "Registrar Ordeño", desc: "Pesaje por turno y control de sólidos" },
+      { label: "Plan Sanitario", desc: "Vacunas y cálculo de retiro" },
+    ],
+    defaultPatients: [],
+  },
 };
 
 export default function Dashboard() {
@@ -160,8 +240,17 @@ export default function Dashboard() {
   const [ingresosHoy, setIngresosHoy] = useState<number | null>(null);
   const esClinicaReal = userIndustry === "clinica" && !!user?.tenantId;
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
-  const rutaVertical = userIndustry === "restaurante" ? "/restaurante" : "/mediclinic";
-  const esVerticalReal = esClinicaReal || esRestauranteReal;
+  const esComercioReal = (userIndustry === "ferreteria" || userIndustry === "farmacia" || userIndustry === "retail") && !!user?.tenantId;
+  const esGanaderiaReal = (userIndustry === "finca" || userIndustry === "ganaderia") && !!user?.tenantId;
+  const rutaVertical = 
+    userIndustry === "restaurante" 
+      ? "/restaurante" 
+      : (userIndustry === "ferreteria" || userIndustry === "farmacia" || userIndustry === "retail")
+        ? "/comercio"
+        : (userIndustry === "finca" || userIndustry === "ganaderia")
+          ? "/ganaderia"
+          : "/mediclinic";
+  const esVerticalReal = esClinicaReal || esRestauranteReal || esComercioReal || esGanaderiaReal;
 
   useEffect(() => {
     if (!esClinicaReal || !user?.tenantId) return;
@@ -410,14 +499,20 @@ export default function Dashboard() {
               <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-300/60 dark:border-white/10">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-300 flex items-center justify-center">
-                    <IconStethoscope size={20} />
+                    <VerticalIcon size={20} />
                   </div>
                   <div className="text-left">
                     <h3 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white">
-                      Espacio de Trabajo Clínico en Vivo
+                      {userIndustry === "restaurante" ? "Espacio Gastronómico & POS en Vivo" :
+                       userIndustry === "farmacia" ? "Espacio de Farmacia & Droguería en Vivo" :
+                       userIndustry === "ferreteria" ? "Espacio de Ferretería & Retail en Vivo" :
+                       "Espacio de Trabajo Clínico en Vivo"}
                     </h3>
                     <p className="text-slate-500 dark:text-white/40 text-xs">
-                      Base de datos PostgreSQL Multi-tenant sincronizada en tiempo real.
+                      {userIndustry === "restaurante" ? "Venta rápida, mapa de mesas, KDS de cocina y control de caja multi-moneda." :
+                       userIndustry === "farmacia" ? "Dispensación de medicamentos, control de lotes y ventas por mostrador." :
+                       userIndustry === "ferreteria" ? "Kardex multi-unidad, mostrador POS, compras y cuentas por cobrar." :
+                       "Base de datos PostgreSQL Multi-tenant sincronizada en tiempo real."}
                     </p>
                   </div>
                 </div>

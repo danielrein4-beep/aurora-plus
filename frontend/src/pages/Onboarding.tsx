@@ -4,7 +4,7 @@ import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconClinic, IconVet, IconHardware, IconRestaurant, IconFarm, IconMining,
   IconEducation, IconRetail, IconConstruction, IconCustomize, IconWarning, IconClose, IconCheck, IconLock,
-  IconCard, IconBank,
+  IconCard, IconBank, IconPrescription,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 
@@ -27,6 +27,33 @@ interface IndustryItem {
 
 const INDUSTRIES: IndustryItem[] = [
   {
+    id: "restaurante",
+    label: "Restaurante & Gastronomía",
+    Icon: IconRestaurant,
+    desc: "Mapa de mesas, comandas digitales, cocina en tiempo real y escandallo de recetas",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Aurora Horeca",
+  },
+  {
+    id: "farmacia",
+    label: "Farmacia & Droguería",
+    Icon: IconPrescription,
+    desc: "Dispensación de medicamentos, control de lotes, alertas de vencimiento y POS mostrador",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Farmacia & Insumos",
+  },
+  {
+    id: "ferreteria",
+    label: "Ferretería & Materiales",
+    Icon: IconHardware,
+    desc: "Control de stock, POS mostrador, compras a proveedores y cuentas por cobrar",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: FerrePlus ERP",
+  },
+  {
     id: "clinica",
     label: "Clínica & Salud",
     Icon: IconClinic,
@@ -36,29 +63,22 @@ const INDUSTRIES: IndustryItem[] = [
     tagline: "Vertical Insignia: Mediclinic Pro",
   },
   {
+    id: "retail",
+    label: "Retail & Comercio",
+    Icon: IconRetail,
+    desc: "Punto de venta multi-caja, inventario en tiempo real y catálogo de productos",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Retail POS",
+  },
+  {
     id: "veterinaria",
     label: "Veterinaria & Mascotas",
     Icon: IconVet,
     desc: "Consultas, vacunas, hospitalización y control de peso",
-    badge: "Próximamente (Fase 2)",
-    isReady: false,
-  },
-  {
-    id: "ferreteria",
-    label: "Ferretería & Materiales",
-    Icon: IconHardware,
-    desc: "Control de stock, POS mostrador, compras y créditos",
-    badge: "Próximamente (Fase 2)",
-    isReady: false,
-  },
-  {
-    id: "restaurante",
-    label: "Restaurante & Gastronomía",
-    Icon: IconRestaurant,
-    desc: "Mapa de mesas, comandas digitales, cocina en tiempo real y escandallo de recetas",
     badge: "100% DISPONIBLE (Listo)",
     isReady: true,
-    tagline: "Vertical Insignia: Aurora Horeca",
+    tagline: "Vertical: Mediclinic Vet",
   },
   {
     id: "finca",
@@ -85,14 +105,6 @@ const INDUSTRIES: IndustryItem[] = [
     isReady: false,
   },
   {
-    id: "retail",
-    label: "Retail & Comercio",
-    Icon: IconRetail,
-    desc: "Punto de venta multi-caja y fidelización",
-    badge: "Próximamente (Fase 2)",
-    isReady: false,
-  },
-  {
     id: "construccion",
     label: "Construcción & Obras",
     Icon: IconConstruction,
@@ -105,8 +117,8 @@ const INDUSTRIES: IndustryItem[] = [
     label: "Otro Rubro Comercial",
     Icon: IconCustomize,
     desc: "Arquitectura modular para industrias a medida",
-    badge: "Lista de Espera",
-    isReady: false,
+    badge: "Disponible",
+    isReady: true,
   },
 ];
 
@@ -118,6 +130,22 @@ const CLINIC_MODULES = [
   { id: "reportes", label: "Generador de Informes Médicos PDF", desc: "Descarga de reportes clínicos con membrete y firma digital", defaultOn: true },
 ];
 
+const PHARMACY_MODULES = [
+  { id: "dispensacion", label: "Dispensación & Venta Mostrador", desc: "Cobro rápido de fármacos con o sin récipe médico", defaultOn: true },
+  { id: "lotes", label: "Control de Lotes & Vencimientos", desc: "Trazabilidad por lote y alertas automáticas de caducidad", defaultOn: true },
+  { id: "stock", label: "Stock Mínimo & Reposición", desc: "Alertas de reorden y pedidos automáticos a droguerías", defaultOn: true },
+  { id: "caja", label: "Caja Multi-Moneda (USD / Bs / COP)", desc: "Cobros en efectivo, punto de venta y pago móvil a tasa del día", defaultOn: true },
+  { id: "proveedores", label: "Proveedores & Facturas de Compra", desc: "Recepción de mercancía y cuentas por pagar", defaultOn: true },
+];
+
+const HARDWARE_MODULES = [
+  { id: "pos", label: "Punto de Venta Mostrador (POS)", desc: "Búsqueda rápida de códigos, tornillos y materiales", defaultOn: true },
+  { id: "kardex", label: "Kardex Multi-Unidad & Stock", desc: "Metros, kilos, bultos y unidades sueltas con costo promedio", defaultOn: true },
+  { id: "cotizaciones", label: "Cotizaciones & Presupuestos", desc: "Generación de proformas con vigencia temporal", defaultOn: true },
+  { id: "creditos", label: "Cuentas por Cobrar & Créditos", desc: "Gestión de clientes de confianza y límites de saldo", defaultOn: true },
+  { id: "compras", label: "Órdenes de Compra & Proveedores", desc: "Control de insumos de construcción y repuestos", defaultOn: true },
+];
+
 const RESTAURANT_MODULES = [
   { id: "salon", label: "Salón & Mapa de Mesas", desc: "Abrir comandas por mesa, delivery propio o recoger en tienda", defaultOn: true },
   { id: "cocina", label: "Cocina en Tiempo Real (KDS)", desc: "Tablero por estación: pendiente, preparando, listo", defaultOn: true },
@@ -126,26 +154,45 @@ const RESTAURANT_MODULES = [
   { id: "compras", label: "Compras, Proveedores & Vencimientos", desc: "Registro de facturas de insumos con alertas de caducidad", defaultOn: true },
 ];
 
-// Mapa de "clinica"/"restaurante"/etc. (id del onboarding) al moduloPrincipal
-// real que entiende el backend (ver TenantProvisioningService).
+// Mapa de industrias al moduloPrincipal del backend
 const INDUSTRIA_A_MODULO: Record<string, string> = {
   clinica: "salud",
+  farmacia: "salud",
   restaurante: "horeca",
+  ferreteria: "repuestos",
+  retail: "repuestos",
+  veterinaria: "salud",
+  otro: "horeca",
 };
 
 const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
   clinica: CLINIC_MODULES,
+  farmacia: PHARMACY_MODULES,
   restaurante: RESTAURANT_MODULES,
+  ferreteria: HARDWARE_MODULES,
+  retail: HARDWARE_MODULES,
+  veterinaria: CLINIC_MODULES,
+  otro: RESTAURANT_MODULES,
 };
 
 const NOMBRE_POR_DEFECTO: Record<string, string> = {
   clinica: "Clínica & Consultorios Médicos",
+  farmacia: "Mi Farmacia",
   restaurante: "Mi Restaurante",
+  ferreteria: "Mi Ferretería",
+  retail: "Mi Tienda",
+  veterinaria: "Mi Veterinaria",
+  otro: "Mi Negocio",
 };
 
 const VERTICAL_LABEL: Record<string, string> = {
   clinica: "Mediclinic Pro (Clínica & Salud)",
+  farmacia: "Farmacia & Droguería",
   restaurante: "Aurora Horeca (Restaurante & Gastronomía)",
+  ferreteria: "FerrePlus (Ferretería & Materiales)",
+  retail: "Retail POS (Comercio & Tiendas)",
+  veterinaria: "Mediclinic Vet",
+  otro: "Aurora Suite Comercial",
 };
 
 export default function Onboarding() {
@@ -156,12 +203,17 @@ export default function Onboarding() {
   // Datos básicos recogidos en Auth.tsx (registro) — si no hay sesión activa
   // ni datos pendientes de un registro recién iniciado, no hay nada que
   // configurar aquí todavía.
-  const pendingSignup = location.state as { nombre: string; email: string; password: string } | undefined;
+  const pendingSignup = location.state as { nombre: string; email: string; password: string; empresa?: string; industry?: string } | undefined;
 
+  const initialIndustry = pendingSignup?.industry || user?.industry || "restaurante";
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [selectedIndustry, setSelectedIndustry] = useState<string>("clinica");
-  const [empresaNombre, setEmpresaNombre] = useState<string>(user?.empresa || NOMBRE_POR_DEFECTO.clinica);
-  const [modules, setModules] = useState<string[]>(CLINIC_MODULES.map((m) => m.id));
+  const [selectedIndustry, setSelectedIndustry] = useState<string>(initialIndustry);
+  const [empresaNombre, setEmpresaNombre] = useState<string>(
+    pendingSignup?.empresa || user?.empresa || NOMBRE_POR_DEFECTO[initialIndustry] || "Mi Negocio"
+  );
+  const [modules, setModules] = useState<string[]>(
+    (MODULOS_POR_INDUSTRIA[initialIndustry] || RESTAURANT_MODULES).map((m) => m.id)
+  );
   const [lockedNotice, setLockedNotice] = useState<string | null>(null);
   const [metodoPago, setMetodoPago] = useState<string>(METODOS_PAGO[0].id);
   const [activando, setActivando] = useState(false);
@@ -172,7 +224,7 @@ export default function Onboarding() {
   const handleSelectIndustry = (ind: IndustryItem) => {
     if (!ind.isReady) {
       setLockedNotice(
-        `El rubro "${ind.label}" está en fase de desarrollo. Las verticales listas y operativas hoy son Mediclinic Pro (Clínica & Salud) y Aurora Horeca (Restaurante & Gastronomía).`
+        `El rubro "${ind.label}" está en fase de desarrollo. Las verticales listas y operativas hoy son Aurora Horeca (Restaurante), Farmacia & Droguería, FerrePlus (Ferretería & Retail) y Mediclinic Pro.`
       );
       return;
     }
@@ -180,7 +232,7 @@ export default function Onboarding() {
     setSelectedIndustry(ind.id);
     setModules((MODULOS_POR_INDUSTRIA[ind.id] || CLINIC_MODULES).map((m) => m.id));
     if (!user?.empresa) {
-      setEmpresaNombre(NOMBRE_POR_DEFECTO[ind.id] || NOMBRE_POR_DEFECTO.clinica);
+      setEmpresaNombre(NOMBRE_POR_DEFECTO[ind.id] || NOMBRE_POR_DEFECTO.restaurante);
     }
   };
 
@@ -193,14 +245,21 @@ export default function Onboarding() {
   const handleActivate = async () => {
     setErrorActivacion(null);
     setActivando(true);
-    const nombrePorDefecto = NOMBRE_POR_DEFECTO[selectedIndustry] || NOMBRE_POR_DEFECTO.clinica;
+    const nombrePorDefecto = NOMBRE_POR_DEFECTO[selectedIndustry] || NOMBRE_POR_DEFECTO.restaurante;
     const modulosPorDefecto = modulosDisponibles.map((m) => m.id);
+    const rutaDestino =
+      selectedIndustry === "restaurante"
+        ? "/restaurante"
+        : selectedIndustry === "clinica" || selectedIndustry === "farmacia" || selectedIndustry === "veterinaria"
+        ? "/mediclinic"
+        : "/dashboard";
+
     try {
       if (pendingSignup) {
         // Registro real de un negocio nuevo — crea el tenant en el backend o activa sesión local
         await completarRegistro({
           nombreEmpresa: empresaNombre.trim() || nombrePorDefecto,
-          moduloPrincipal: INDUSTRIA_A_MODULO[selectedIndustry] || "salud",
+          moduloPrincipal: INDUSTRIA_A_MODULO[selectedIndustry] || "horeca",
           emailContacto: pendingSignup.email,
           username: pendingSignup.email,
           password: pendingSignup.password,
@@ -216,7 +275,7 @@ export default function Onboarding() {
           hasCompletedOnboarding: true,
         });
       }
-      navigate("/dashboard");
+      navigate(rutaDestino);
     } catch (err) {
       console.warn("Fallo en registro backend (502), continuando en modo seguro local:", err);
       completeOnboarding({
@@ -225,7 +284,7 @@ export default function Onboarding() {
         modules: modules.length > 0 ? modules : modulosPorDefecto,
         hasCompletedOnboarding: true,
       });
-      navigate("/dashboard");
+      navigate(rutaDestino);
     } finally {
       setActivando(false);
     }

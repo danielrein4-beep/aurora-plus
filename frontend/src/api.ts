@@ -1377,3 +1377,511 @@ export function subirResultadoPublicoLaboratorio(token: string, payload: any): P
     body: JSON.stringify(payload),
   });
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// MÓDULO FERRETERÍA & REPUESTOS (Backend: com.auroraplus.modules.repuestos)
+// ══════════════════════════════════════════════════════════════════════════
+
+export interface RepuestoItem {
+  id: number;
+  tenantId: number;
+  codigoSku: string;
+  codigoOriginalOem?: string | null;
+  descripcion: string;
+  stockActual: number;
+  precioVenta: number; // Precio detal
+  unidadBase: string; // UNIDAD, METRO, KILOGRAMO, SACO, etc.
+  precioMayorista?: number | null;
+  cantidadMinimaMayorista?: number | null;
+  costoUnitario?: number;
+}
+
+export interface PresentacionRepuesto {
+  id: number;
+  tenantId: number;
+  repuestoId?: number;
+  nombrePresentacion: string; // ej: Caja 100u, Metro, Rollo, Saco
+  factorConversion: number; // multiplicador hacia la unidad base
+  precioVenta: number;
+}
+
+export interface MovimientoRepuesto {
+  id: number;
+  tenantId: number;
+  tipo: "ENTRADA" | "SALIDA" | "AJUSTE" | "VENTA" | "COMPRA";
+  cantidad: number;
+  stockAnterior: number;
+  stockNuevo: number;
+  motivo?: string;
+  fechaRegistro: string;
+}
+
+export interface ProveedorRepuesto {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  rif?: string | null;
+  telefono?: string | null;
+  contacto?: string | null;
+  direccion?: string | null;
+  activo: boolean;
+}
+
+export interface DetalleCompraRepuesto {
+  id?: number;
+  repuesto: RepuestoItem;
+  cantidad: number;
+  costoUnitario: number;
+  subtotal: number;
+}
+
+export interface CompraRepuesto {
+  id: number;
+  tenantId: number;
+  proveedor: ProveedorRepuesto;
+  numeroFactura?: string | null;
+  fechaCompra: string;
+  total: number;
+  detalles?: DetalleCompraRepuesto[];
+}
+
+export interface ItemCompraRepuestoRequest {
+  repuestoId: number;
+  cantidad: number;
+  costoUnitario: number;
+}
+
+export interface CompraRepuestoRequest {
+  proveedorId: number;
+  numeroFactura: string;
+  items: ItemCompraRepuestoRequest[];
+}
+
+export interface ResultadoVentaRepuestoVolumen {
+  precioUnitarioAplicado: number;
+  total: number;
+  esMayorista: boolean;
+}
+
+export function listarRepuestos(): Promise<RepuestoItem[]> {
+  return request(`/api/repuestos/items`);
+}
+
+export function buscarRepuestoPorSku(tenantId: number, sku: string): Promise<RepuestoItem> {
+  return request(`/api/repuestos/items/sku/${encodeURIComponent(sku)}?tenantId=${tenantId}`);
+}
+
+export function buscarRepuestoPorOem(tenantId: number, oem: string): Promise<RepuestoItem[]> {
+  return request(`/api/repuestos/items/oem/${encodeURIComponent(oem)}?tenantId=${tenantId}`);
+}
+
+export function crearRepuesto(tenantId: number, datos: Partial<RepuestoItem>): Promise<RepuestoItem> {
+  return request(`/api/repuestos/items?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarRepuesto(id: number, datos: Partial<RepuestoItem>): Promise<RepuestoItem> {
+  return request(`/api/repuestos/items/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function eliminarRepuesto(id: number): Promise<void> {
+  return request(`/api/repuestos/items/${id}`, { method: "DELETE" });
+}
+
+export function historialMovimientosRepuesto(id: number): Promise<MovimientoRepuesto[]> {
+  return request(`/api/repuestos/items/${id}/movimientos`);
+}
+
+export function venderRepuestoPorVolumen(
+  id: number,
+  tenantId: number,
+  cantidad: number,
+  monedaPago?: string,
+  montoRecibido?: number,
+  claveIdempotencia?: string
+): Promise<ResultadoVentaRepuestoVolumen> {
+  const params = new URLSearchParams({
+    tenantId: String(tenantId),
+    cantidad: String(cantidad),
+  });
+  if (monedaPago) params.append("monedaPago", monedaPago);
+  if (montoRecibido !== undefined) params.append("montoRecibido", String(montoRecibido));
+  if (claveIdempotencia) params.append("claveIdempotencia", claveIdempotencia);
+
+  return request(`/api/repuestos/items/${id}/vender?${params.toString()}`, {
+    method: "POST",
+  });
+}
+
+export function listarPresentacionesRepuesto(tenantId: number, repuestoId: number): Promise<PresentacionRepuesto[]> {
+  return request(`/api/repuestos/presentaciones/repuesto/${repuestoId}?tenantId=${tenantId}`);
+}
+
+export function crearPresentacionRepuesto(
+  tenantId: number,
+  repuestoId: number,
+  nombrePresentacion: string,
+  factorConversion: number,
+  precioVenta: number
+): Promise<PresentacionRepuesto> {
+  const params = new URLSearchParams({
+    tenantId: String(tenantId),
+    repuestoId: String(repuestoId),
+    nombrePresentacion,
+    factorConversion: String(factorConversion),
+    precioVenta: String(precioVenta),
+  });
+  return request(`/api/repuestos/presentaciones?${params.toString()}`, {
+    method: "POST",
+  });
+}
+
+export function despacharPorPresentacion(
+  presentacionId: number,
+  tenantId: number,
+  cantidad: number,
+  monedaPago?: string,
+  montoRecibido?: number,
+  claveIdempotencia?: string
+): Promise<number> {
+  const params = new URLSearchParams({
+    tenantId: String(tenantId),
+    cantidad: String(cantidad),
+  });
+  if (monedaPago) params.append("monedaPago", monedaPago);
+  if (montoRecibido !== undefined) params.append("montoRecibido", String(montoRecibido));
+  if (claveIdempotencia) params.append("claveIdempotencia", claveIdempotencia);
+
+  return request(`/api/repuestos/presentaciones/${presentacionId}/despachar?${params.toString()}`, {
+    method: "POST",
+  });
+}
+
+export function listarProveedoresRepuesto(): Promise<ProveedorRepuesto[]> {
+  return request(`/api/repuestos/proveedores`);
+}
+
+export function crearProveedorRepuesto(tenantId: number, proveedor: Partial<ProveedorRepuesto>): Promise<ProveedorRepuesto> {
+  return request(`/api/repuestos/proveedores?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(proveedor),
+  });
+}
+
+export function actualizarProveedorRepuesto(id: number, proveedor: Partial<ProveedorRepuesto>): Promise<ProveedorRepuesto> {
+  return request(`/api/repuestos/proveedores/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(proveedor),
+  });
+}
+
+export function listarComprasRepuesto(): Promise<CompraRepuesto[]> {
+  return request(`/api/repuestos/compras`);
+}
+
+export function registrarCompraRepuesto(tenantId: number, compra: CompraRepuestoRequest): Promise<CompraRepuesto> {
+  return request(`/api/repuestos/compras?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(compra),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// --- Módulo Ganadería & Fincas ---
+// ─────────────────────────────────────────────────────────────
+
+export interface PotreroGanaderia {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  codigo?: string;
+  areaHectareas: number;
+  capacidadAnimales?: number;
+  tipoPasto?: string;
+  color?: string;
+  observaciones?: string;
+  diasDescansoMinimo?: number;
+  estado: "ACTIVO" | "EN_DESCANSO" | "EN_MANTENIMIENTO" | string;
+  ordenRotacion?: number;
+  posX?: number;
+  posY?: number;
+  ancho?: number;
+  alto?: number;
+  forma?: string;
+  fechaInicioDescanso?: string;
+  fechaInicioUso?: string;
+}
+
+export interface AnimalGanaderia {
+  id: number;
+  tenantId: number;
+  arete: string;
+  tipoIdentificador?: "ARETE" | "CHIP" | "QR" | string;
+  nombre?: string;
+  especie?: string;
+  raza?: string;
+  sexo: "MACHO" | "HEMBRA";
+  tipoAnimal?: string;
+  fechaNacimiento?: string;
+  pesoActual?: number;
+  estado?: "ACTIVO" | "VENDIDO" | "MUERTO" | "DESCARTADO" | string;
+  potrero?: PotreroGanaderia | null;
+  costoAdquisicion?: number;
+  valorEstimado?: number;
+  codigoQr?: string;
+}
+
+export interface RegistroOrdenoGanaderia {
+  id: number;
+  tenantId: number;
+  animal: AnimalGanaderia;
+  fecha: string;
+  turno: "MANANA" | "TARDE";
+  cantidadLitros: number;
+  precioVentaLitro?: number;
+  montoVenta?: number;
+  porcentajeGrasa?: number;
+  porcentajeProteina?: number;
+}
+
+export interface ReporteOrdenoGanaderia {
+  desde: string;
+  hasta: string;
+  totalLitros: number;
+  totalIngresos: number;
+  cantidadRegistros: number;
+  registros: RegistroOrdenoGanaderia[];
+}
+
+export interface RegistroPesoGanaderia {
+  id: number;
+  tenantId: number;
+  animal: AnimalGanaderia;
+  fecha: string;
+  pesoKg: number;
+}
+
+export interface GdpGanaderiaResponse {
+  pesoInicial?: number;
+  pesoActual?: number;
+  fechaInicial?: string;
+  fechaActual?: string;
+  gananciaTotalKg?: number;
+  dias?: number;
+  gdpKgDia?: number | null;
+  cantidadPesajes: number;
+  mensaje?: string;
+}
+
+export interface VacunaGanaderia {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  diasParaRefuerzo?: number;
+  diasRetiroLeche?: number;
+  diasRetiroCarne?: number;
+}
+
+export interface AplicacionVacunaGanaderia {
+  id: number;
+  tenantId: number;
+  animal: AnimalGanaderia;
+  vacuna: VacunaGanaderia;
+  fechaAplicacion: string;
+  lote?: string;
+  veterinarioResponsable?: string;
+  costo?: number;
+  fechaProximoRefuerzo?: string;
+  fechaFinRetiroLeche?: string;
+  fechaFinRetiroCarne?: string;
+}
+
+export interface AlertaSanitariaGanaderia {
+  tipo: string;
+  animal: AnimalGanaderia;
+  producto: string;
+  fechaRelevante: string;
+  mensaje: string;
+}
+
+export interface EventoReproductivoGanaderia {
+  id: number;
+  tenantId: number;
+  hembra: AnimalGanaderia;
+  tipo: "SERVICIO" | "DIAGNOSTICO_PRENEZ" | "PARTO" | string;
+  fecha: string;
+  semental?: AnimalGanaderia;
+  sementalReferenciaExterna?: string;
+  resultado?: string;
+  fechaProbableParto?: string;
+}
+
+export interface TableroAlertasGanaderia {
+  fechaConsulta: string;
+  diasAdelante: number;
+  refuerzosVacunaPendientes: AplicacionVacunaGanaderia[];
+  retirosSanitariosVigentes: AplicacionVacunaGanaderia[];
+  partosProximos: EventoReproductivoGanaderia[];
+}
+
+export interface ResumenFinancieroGanaderia {
+  desde: string;
+  hasta: string;
+  totalGastos: number;
+  totalIngresosVenta: number;
+  utilidadNeta: number;
+  gastos: Array<{ id: number; fecha: string; categoria: string; descripcion: string; monto: number }>;
+  ventas: Array<{ id: number; fecha: string; numeroTicket: string; comprador?: string; total: number }>;
+}
+
+export function listarAnimalesGanaderia(estado?: string): Promise<AnimalGanaderia[]> {
+  const q = estado ? `?estado=${encodeURIComponent(estado)}` : "";
+  return request(`/api/ganaderia/animales${q}`);
+}
+
+export function crearAnimalGanaderia(tenantId: number, datos: {
+  arete: string;
+  tipoIdentificador?: string;
+  nombre?: string;
+  especie?: string;
+  raza?: string;
+  sexo: string;
+  tipoAnimal?: string;
+  fechaNacimiento?: string;
+  pesoActual?: number;
+  valorEstimado?: number;
+  potreroId?: number;
+}): Promise<AnimalGanaderia> {
+  return request(`/api/ganaderia/animales?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarAnimalGanaderia(id: number, tenantId: number, datos: Partial<AnimalGanaderia>): Promise<AnimalGanaderia> {
+  return request(`/api/ganaderia/animales/${id}?tenantId=${tenantId}`, {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function listarPotrerosGanaderia(): Promise<PotreroGanaderia[]> {
+  return request(`/api/ganaderia/potreros`);
+}
+
+export function crearPotreroGanaderia(tenantId: number, datos: Partial<PotreroGanaderia>): Promise<PotreroGanaderia> {
+  return request(`/api/ganaderia/potreros?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarPotreroGanaderia(id: number, tenantId: number, datos: Partial<PotreroGanaderia>): Promise<PotreroGanaderia> {
+  return request(`/api/ganaderia/potreros/${id}?tenantId=${tenantId}`, {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function rotarPotreroGanaderia(id: number, tenantId: number, potreroDestinoId: number, animalIds?: number[]): Promise<any> {
+  return request(`/api/ganaderia/potreros/${id}/rotar?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ potreroDestinoId, animalIds }),
+  });
+}
+
+export function registrarOrdenoGanaderia(tenantId: number, datos: {
+  animalId: number;
+  fecha?: string;
+  turno: string;
+  cantidadLitros: number;
+  precioVentaLitro?: number;
+  porcentajeGrasa?: number;
+  porcentajeProteina?: number;
+}): Promise<RegistroOrdenoGanaderia> {
+  return request(`/api/ganaderia/ordeno?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function obtenerReporteOrdenoGanaderia(tenantId: number, desde: string, hasta: string): Promise<ReporteOrdenoGanaderia> {
+  return request(`/api/ganaderia/ordeno/reporte?tenantId=${tenantId}&desde=${desde}&hasta=${hasta}`);
+}
+
+export function registrarPesoGanaderia(tenantId: number, animalId: number, pesoKg: number, fecha?: string): Promise<RegistroPesoGanaderia> {
+  return request(`/api/ganaderia/pesos?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ animalId, pesoKg, fecha }),
+  });
+}
+
+export function obtenerCurvaPesoGanaderia(animalId: number): Promise<RegistroPesoGanaderia[]> {
+  return request(`/api/ganaderia/pesos/animal/${animalId}`);
+}
+
+export function obtenerGdpGanaderia(animalId: number): Promise<GdpGanaderiaResponse> {
+  return request(`/api/ganaderia/pesos/animal/${animalId}/gdp`);
+}
+
+export function listarVacunasGanaderia(): Promise<VacunaGanaderia[]> {
+  return request(`/api/ganaderia/vacunas`);
+}
+
+export function crearVacunaGanaderia(tenantId: number, datos: Partial<VacunaGanaderia>): Promise<VacunaGanaderia> {
+  return request(`/api/ganaderia/vacunas?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function aplicarVacunaGanaderia(tenantId: number, datos: {
+  animalId: number;
+  vacunaId: number;
+  fechaAplicacion: string;
+  lote?: string;
+  veterinarioResponsable?: string;
+  costo?: number;
+}): Promise<AplicacionVacunaGanaderia> {
+  return request(`/api/ganaderia/vacunas/aplicar?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function obtenerAlertasSanitariasGanaderia(tenantId: number): Promise<AlertaSanitariaGanaderia[]> {
+  return request(`/api/ganaderia/sanidad/alertas?tenantId=${tenantId}`);
+}
+
+export function obtenerAlertasGanaderia(tenantId: number, diasAdelante: number = 15): Promise<TableroAlertasGanaderia> {
+  return request(`/api/ganaderia/alertas?tenantId=${tenantId}&diasAdelante=${diasAdelante}`);
+}
+
+export function registrarEventoReproductivoGanaderia(tenantId: number, datos: {
+  hembraId: number;
+  tipo: string;
+  fecha: string;
+  sementalId?: number;
+  sementalReferenciaExterna?: string;
+  resultado?: string;
+  fechaProbableParto?: string;
+  areteCria?: string;
+  sexoCria?: string;
+  pesoCria?: number;
+}): Promise<EventoReproductivoGanaderia> {
+  return request(`/api/ganaderia/reproduccion?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function obtenerFinanzasGanaderia(tenantId: number, desde: string, hasta: string): Promise<ResumenFinancieroGanaderia> {
+  return request(`/api/ganaderia/finanzas/resumen-periodo?tenantId=${tenantId}&desde=${desde}&hasta=${hasta}`);
+}
+
+

@@ -117,9 +117,10 @@ public class HorecaController {
             @RequestParam(required = false) String estacionCocina,
             @RequestParam BigDecimal cantidad,
             @RequestParam(required = false) BigDecimal precioUnitario,
-            @RequestParam(required = false) String claveIdempotencia) {
+            @RequestParam(required = false) String claveIdempotencia,
+            @RequestParam(required = false) String notas) {
         return ResponseEntity.ok(horecaService.agregarItemComanda(
-            comandaId, tenantId, escandalloId, articuloId, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia));
+            comandaId, tenantId, escandalloId, articuloId, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia, notas));
     }
 
     @PatchMapping("/items/{itemId}/estado")

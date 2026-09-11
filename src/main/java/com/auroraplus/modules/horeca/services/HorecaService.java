@@ -542,6 +542,13 @@ public class HorecaService {
     public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, Long articuloId, String nombrePlato,
                                            String estacionCocina, BigDecimal cantidad, BigDecimal precioUnitario,
                                            String claveIdempotencia) {
+        return agregarItemComanda(comandaId, tenantId, escandalloId, articuloId, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia, null);
+    }
+
+    @Transactional
+    public ItemComanda agregarItemComanda(Long comandaId, Long tenantId, Long escandalloId, Long articuloId, String nombrePlato,
+                                           String estacionCocina, BigDecimal cantidad, BigDecimal precioUnitario,
+                                           String claveIdempotencia, String notas) {
         java.util.Optional<Long> existente = idempotenciaService.obtenerSiYaProcesada(tenantId, claveIdempotencia);
         if (existente.isPresent()) {
             return itemComandaRepository.findById(existente.get())
@@ -578,6 +585,7 @@ public class HorecaService {
         item.setTenantId(tenantId);
         item.setComanda(comanda);
         item.setCantidad(cantidad);
+        item.setNotas(notas);
 
         if (escandalloId != null) {
             EscandalloReceta escandallo = escandalloRecetaRepository.findById(escandalloId)

@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import MediclinicApp from "./components/MediclinicApp";
 import RestauranteApp from "./components/RestauranteApp";
 import ComercioApp from "./components/ComercioApp";
+import GanaderiaApp from "./components/GanaderiaApp";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -28,6 +29,11 @@ function RestaurantePage() {
 function ComercioPage() {
   const navigate = useNavigate();
   return <ComercioApp onSalir={() => navigate("/dashboard")} />;
+}
+
+function GanaderiaPage() {
+  const navigate = useNavigate();
+  return <GanaderiaApp onSalir={() => navigate("/dashboard")} />;
 }
 
 import PortalPublicoBioanalista from "./pages/PortalPublicoBioanalista";
@@ -56,6 +62,7 @@ export default function App() {
             <Route path="/mediclinic" element={<ProtectedRoute><MediclinicPage /></ProtectedRoute>} />
             <Route path="/restaurante" element={<ProtectedRoute><RestaurantePage /></ProtectedRoute>} />
             <Route path="/comercio"   element={<ProtectedRoute><ComercioPage /></ProtectedRoute>} />
+            <Route path="/ganaderia"  element={<ProtectedRoute><GanaderiaPage /></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

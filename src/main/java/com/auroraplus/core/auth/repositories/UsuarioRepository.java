@@ -23,6 +23,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     // login por correo, sin que el cliente conozca su tenantId, se busca en todos
     // los tenants; si hay más de una coincidencia se le pide al usuario que
     // desambigüe (caso raro: mismo username elegido en dos negocios distintos).
-    @Query("SELECT u FROM UsuarioAuth u WHERE u.username = :username")
+    @Query("SELECT u FROM UsuarioAuth u WHERE LOWER(u.username) = LOWER(:username)")
     List<Usuario> buscarPorUsernameEnTodosLosTenants(@Param("username") String username);
 }

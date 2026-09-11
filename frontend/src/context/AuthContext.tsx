@@ -115,12 +115,16 @@ function marcarTenantVisitado(tenantId: number) {
 // nueva no rompe nada, solo mejora qué tan preciso se ve el panel.
 const MODULO_A_INDUSTRIA: Record<string, string> = {
   salud: "clinica",
+  farmacia: "farmacia",
   horeca: "restaurante",
+  restaurante: "restaurante",
   ganaderia: "finca",
   repuestos: "ferreteria",
+  ferreteria: "ferreteria",
+  retail: "ferreteria",
   moda: "ferreteria",
   minero: "mineria",
-  "tamanaco-comercial": "mineria",
+  "tamanaco-comercial": "ferreteria",
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -156,7 +160,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cuentaLocal = obtenerCuentasLocales().find((c) => c.email.toLowerCase() === email.toLowerCase());
 
     try {
-      sesion = await loginDirecto(email, password);
+      let resSesion: SesionAurora | null = null;
+      try {
+        resSesion = await loginDirecto(email.trim(), password);
+      } catch (errPrimario) {
+        if (!email.includes("@")) {
+          try {
+            resSesion = await loginDirecto(`${email.trim()}@gmail.com`, password);
+          } catch {
+            throw errPrimario;
+          }
+        } else {
+          throw errPrimario;
+        }
+      }
+      sesion = resSesion;
+
       try {
         const negocio = await obtenerMiNegocio();
         empresa = negocio.nombreEmpresa || empresa;
@@ -171,6 +190,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (e) {
+      // Si el servidor respondió explícitamente con credenciales inválidas, mostrar error real
+      const errMsg = e instanceof Error ? e.message : String(e);
+      if (
+        errMsg.toLowerCase().includes("usuario o contraseña") ||
+        errMsg.toLowerCase().includes("incorrect") ||
+        errMsg.toLowerCase().includes("contraseña")
+      ) {
+        throw new Error("Usuario o contraseña incorrectos. Verifica tus datos.");
+      }
+
       console.warn("Backend local no disponible o proxy 502, activando sesión dev local:", e);
       if (cuentaLocal) {
         empresa = cuentaLocal.empresa || empresa;
@@ -207,13 +236,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Registro de autoservicio real con fallback de desarrollo si el backend local no está corriendo
   const completarRegistro = async (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string }) => {
     let sesion: SesionAurora;
+    const rolAsignado = datos.moduloPrincipal === "salud" ? "MEDICO" : "DUENO_ADMIN";
     try {
       sesion = await registrarNegocio(datos);
     } catch (e) {
       console.warn("Backend de registro no disponible (502), continuando en modo local/desarrollo:", e);
       sesion = {
         token: `dev-session-${Date.now()}`,
-        rol: "MEDICO",
+        rol: rolAsignado,
         username: datos.username || datos.emailContacto,
         tenantId: 1,
       };
@@ -228,11 +258,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: datos.emailContacto || datos.username,
       password: datos.password,
       nombre: nombreUsuario,
-      empresa: datos.nombreEmpresa || "Clínica & Consultorios Médicos",
+      empresa: datos.nombreEmpresa || "Mi Empresa",
       industry,
-      moduloPrincipal: datos.moduloPrincipal || "salud",
+      moduloPrincipal: datos.moduloPrincipal || "horeca",
       tenantId: sesion.tenantId,
-      rol: sesion.rol || "MEDICO",
+      rol: sesion.rol || rolAsignado,
       modules: datos.modules || [],
       metodoPagoPreferido: datos.metodoPagoPreferido,
       fechaRegistro: new Date().toISOString(),
