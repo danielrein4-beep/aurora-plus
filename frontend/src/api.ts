@@ -2301,6 +2301,7 @@ export interface AnimalGanaderia {
   costoAdquisicion?: number;
   valorEstimado?: number;
   codigoQr?: string;
+  lote?: string;
 }
 
 export interface RegistroOrdenoGanaderia {
@@ -2423,6 +2424,7 @@ export function crearAnimalGanaderia(tenantId: number, datos: {
   pesoActual?: number;
   valorEstimado?: number;
   potreroId?: number;
+  lote?: string;
 }): Promise<AnimalGanaderia> {
   return request(`/api/ganaderia/animales?tenantId=${tenantId}`, {
     method: "POST",
@@ -2505,6 +2507,14 @@ export function crearVacunaGanaderia(tenantId: number, datos: Partial<VacunaGana
     method: "POST",
     body: JSON.stringify(datos),
   });
+}
+
+export function obtenerVacunasPorAnimal(animalId: number): Promise<AplicacionVacunaGanaderia[]> {
+  return request(`/api/ganaderia/vacunas/animal/${animalId}`);
+}
+
+export function obtenerEventosReproductivosPorHembra(hembraId: number): Promise<EventoReproductivoGanaderia[]> {
+  return request(`/api/ganaderia/reproduccion/hembra/${hembraId}`);
 }
 
 export function aplicarVacunaGanaderia(tenantId: number, datos: {
