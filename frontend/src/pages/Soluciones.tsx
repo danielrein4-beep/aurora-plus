@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import {
   IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile, IconCheck,
 } from "../Icons";
@@ -54,6 +55,7 @@ const SOLUCIONES = [
 ];
 
 export default function Soluciones() {
+  const navigate = useNavigate();
   return (
     <main className="pt-28 pb-24 relative">
 
@@ -115,7 +117,9 @@ export default function Soluciones() {
           <span className="text-aurora">funcionando en tu negocio?</span>
         </h2>
         <p className="text-slate-500 dark:text-white/40 mb-8">Agenda una demo personalizada — te mostramos exactamente lo que necesitas, sin perder tu tiempo.</p>
-        <button className="g-aurora glow-teal text-white font-semibold px-10 py-4 rounded-xl hover:opacity-90 transition-opacity shadow-lg cursor-pointer">
+        <button
+          onClick={() => navigate("/onboarding")}
+          className="g-aurora glow-teal text-white font-semibold px-10 py-4 rounded-xl hover:opacity-90 transition-opacity shadow-lg cursor-pointer">
           Solicitar demo gratuita
         </button>
       </section>

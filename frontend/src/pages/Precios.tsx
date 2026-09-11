@@ -116,7 +116,9 @@ export default function Precios() {
             ))}
           </ul>
 
-          <button className="w-full max-w-xs py-3.5 rounded-xl text-sm font-semibold transition-all cursor-pointer g-aurora text-white hover:opacity-90 shadow-md">
+          <button
+            onClick={() => navigate("/onboarding")}
+            className="w-full max-w-xs py-3.5 rounded-xl text-sm font-semibold transition-all cursor-pointer g-aurora text-white hover:opacity-90 shadow-md">
             Comenzar ahora
           </button>
         </div>
@@ -155,7 +157,9 @@ export default function Precios() {
                   </li>
                 ))}
               </ul>
-              <button className="bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm shadow-md cursor-pointer">
+              <button
+                onClick={() => navigate("/nosotros")}
+                className="bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm shadow-md cursor-pointer">
                 Cotizar mi página web →
               </button>
             </div>
