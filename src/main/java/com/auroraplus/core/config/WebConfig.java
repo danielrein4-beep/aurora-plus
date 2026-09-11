@@ -39,6 +39,7 @@ public class WebConfig implements WebMvcConfigurer {
             .addPathPatterns(
                 "/api/auth/login", "/api/auth/login-super-admin", "/api/auth/login-directo",
                 "/api/auth/registro-negocio", "/api/auth/olvide-clave", "/api/auth/resetear-clave",
+                "/api/public/contacto",
                 // Portal público de recepción de laboratorio (sin login, como los de
                 // arriba) — sin límite, cualquiera podría martillarlo con cargas falsas.
                 "/api/public/laboratorio/portal/*/subir"

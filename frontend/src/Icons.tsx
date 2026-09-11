@@ -437,6 +437,16 @@ export function IconMail({ size = 24, className }: IconProps) {
   );
 }
 
+export function IconInstagram({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="2" y="2" width="20" height="20" rx="5" />
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M17.2 6.8h.01" />
+    </svg>
+  );
+}
+
 export function IconSearch({ size = 24 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">

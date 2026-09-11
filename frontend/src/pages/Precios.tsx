@@ -15,18 +15,16 @@ const PERIODOS = [
 const FEATURES_PLAN_UNICO = [
   "Acceso a TODOS los módulos, sin excepción",
   "Acceso web + versión móvil",
-  "Sucursales ilimitadas",
-  "Usuarios ilimitados",
+  "Sin costo extra por usuario adicional",
   "Multi-moneda (USD · VES · COP)",
   "Reportes y BI avanzado",
-  "Facturación electrónica",
-  "Soporte prioritario",
+  "Acompañamiento directo del equipo fundador",
 ];
 
 const FAQ = [
   { q: "¿Puedo cambiar de período de facturación después?", a: "Sí, puedes pasar de mensual a semestral o anual (o al revés) cuando quieras. El cambio aplica en el siguiente ciclo de facturación." },
-  { q: "¿Cuánto tarda la implementación?", a: "La mayoría de nuestros clientes están operando en menos de 2 semanas. Incluimos capacitación y acompañamiento inicial." },
-  { q: "¿Los datos son seguros?", a: "Todos los datos se almacenan cifrados en servidores con respaldo diario. Cumplimos con estándares internacionales de seguridad." },
+  { q: "¿Cuánto tarda la implementación?", a: "Nuestra meta es tenerte operando en menos de 2 semanas, con capacitación y acompañamiento directo incluidos." },
+  { q: "¿Los datos son seguros?", a: "Toda la comunicación va cifrada (HTTPS), las contraseñas nunca se guardan en texto plano, y la base de datos tiene respaldo automático diario." },
   { q: "¿Necesito instalar algo?", a: "No. Aurora Plus funciona 100% desde el navegador. La versión móvil también es web, sin necesidad de descargar apps." },
   { q: "¿Hay un plan con menos módulos y más barato?", a: "No — el plan es único y siempre incluye acceso completo a todos los módulos. Así nunca te quedas corto ni tienes que negociar un upgrade." },
   { q: "¿Ofrecen descuentos por pago semestral o anual?", a: "Sí: 10% de descuento pagando cada 6 meses, y 15% pagando anual — el precio se aplica automáticamente al elegir el período arriba." },

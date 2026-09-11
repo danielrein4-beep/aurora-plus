@@ -7,6 +7,8 @@ import Soluciones from "./pages/Soluciones";
 import Industrias from "./pages/Industrias";
 import Precios from "./pages/Precios";
 import Nosotros from "./pages/Nosotros";
+import Terminos from "./pages/Terminos";
+import Privacidad from "./pages/Privacidad";
 import Auth from "./pages/Auth";
 import ResetearClave from "./pages/ResetearClave";
 import Onboarding from "./pages/Onboarding";
@@ -50,6 +52,8 @@ export default function App() {
               <Route path="/industrias" element={<Industrias />} />
               <Route path="/precios"    element={<Precios />} />
               <Route path="/nosotros"   element={<Nosotros />} />
+              <Route path="/terminos"   element={<Terminos />} />
+              <Route path="/privacidad" element={<Privacidad />} />
             </Route>
             {/* Portal público para laboratorios sin sesión */}
             <Route path="/lab/:token" element={<PortalPublicoBioanalista />} />

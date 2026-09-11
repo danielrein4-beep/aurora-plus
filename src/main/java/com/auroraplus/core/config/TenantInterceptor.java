@@ -1,6 +1,8 @@
 package com.auroraplus.core.config;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auth.entities.Usuario;
+import com.auroraplus.core.auth.repositories.UsuarioRepository;
 import com.auroraplus.core.auth.services.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -38,6 +40,9 @@ public class TenantInterceptor implements HandlerInterceptor {
 
     @Autowired
     private JwtService jwtService;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
@@ -99,6 +104,19 @@ public class TenantInterceptor implements HandlerInterceptor {
                 }
             } catch (NumberFormatException e) {
                 rechazar(response, "tenantId inválido");
+                return false;
+            }
+        }
+
+        // Un token firmado antes de un cambio de contraseña (ver Usuario.tokenVersion) queda
+        // desactualizado aquí y se rechaza de inmediato, en vez de seguir siendo válido hasta su
+        // expiración natural — cambiar la clave ahora sí cierra las sesiones abiertas en otros
+        // dispositivos.
+        Integer tokenVersionClaim = claims.get("tokenVersion", Integer.class);
+        if (tokenVersionClaim != null) {
+            Usuario usuario = usuarioRepository.buscarPorTenantYUsername(tenantId, claims.getSubject()).orElse(null);
+            if (usuario == null || usuario.getTokenVersion() != tokenVersionClaim) {
+                rechazar(response, "Sesión invalidada — la contraseña cambió, inicia sesión de nuevo");
                 return false;
             }
         }
