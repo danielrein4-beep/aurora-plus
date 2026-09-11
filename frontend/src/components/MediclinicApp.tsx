@@ -53,6 +53,12 @@ const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => React.Re
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
+const mañana = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
 /** Fecha real de una consulta para mostrar en pantalla. El backend solo devuelve `fechaHora`
  * (nunca `fechaConsulta` — ese campo ni existe en la entidad real); si se usaba únicamente
  * `fechaConsulta`, toda consulta cargada del historial mostraba la fecha de HOY en vez de la
@@ -4495,7 +4501,9 @@ function Procedimientos({
       setCotizaciones((prev) => prev.filter((c) => c.id !== id));
       dispararToast("Registro eliminado.");
       if (cot?.backendId) {
-        eliminarCotizacionApi(cot.backendId).catch(() => {});
+        eliminarCotizacionApi(cot.backendId).catch((err) => {
+          dispararToast(`⚠️ Se quitó de la lista, pero no se pudo eliminar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+        });
       }
     }
   };
@@ -5385,7 +5393,9 @@ function SalaEspera({
 
       // Backend sync
       if (admitirPacienteId && tenantId) {
-        registrarLlegadaSalaEspera(tenantId, Number(admitirPacienteId), admitirConsultorio).catch(() => {});
+        registrarLlegadaSalaEspera(tenantId, Number(admitirPacienteId), admitirConsultorio).catch((err) => {
+          dispararToast(`⚠️ El paciente quedó en la sala de espera local, pero no se pudo registrar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+        });
       }
 
       // Agregar al final (los nuevos van abajo, el primero queda arriba)
@@ -6450,6 +6460,21 @@ function AgendaMedica({
     setTimeout(() => setToastAgenda(null), 3500);
   };
 
+  // Recordatorios de mañana: el correo se envía solo (job automático en el backend a las 8am),
+  // pero WhatsApp sigue siendo manual (no hay integración con la API de WhatsApp todavía) — este
+  // panel le ahorra a la secretaria tener que navegar el calendario buscando las citas de mañana
+  // una por una, agrupándolas todas en un solo lugar apenas abre la Agenda.
+  const [citasMañana, setCitasMañana] = useState<CitaAgendaItem[]>([]);
+  const cargarCitasDeMañana = () => {
+    listarCitasDelDia(tenantId, mañana())
+      .then((lista) => setCitasMañana(lista.filter((c) => c.estado !== "CANCELADA" && c.estado !== "NO_ASISTIO").map(mapCitaMedicaAAgendaItem)))
+      .catch(() => setCitasMañana([]));
+  };
+  useEffect(() => {
+    cargarCitasDeMañana();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
+
   // Trae del backend todas las citas del mes que se está viendo en el calendario.
   const cargarCitasDelMes = () => {
     const diasEnMes = new Date(añoActual, mesActual + 1, 0).getDate();
@@ -6697,6 +6722,7 @@ function AgendaMedica({
       });
       limpiarFormulario();
       cargarCitasDelMes();
+      cargarCitasDeMañana();
       onCambio();
       dispararToast(`¡Cita agendada con éxito para ${nombreCompleto} a las ${formHora}!`);
     } catch (err) {
@@ -6712,6 +6738,7 @@ function AgendaMedica({
     try {
       await actualizarEstadoCita(Number(id), "CANCELADA");
       cargarCitasDelMes();
+      cargarCitasDeMañana();
       onCambio();
       dispararToast("Cita cancelada.");
     } catch (err) {
@@ -6739,6 +6766,7 @@ function AgendaMedica({
       const horaInicio24 = horaAmPmA24(reprogHora);
       await reprogramarCita(Number(citaParaReprogramar.id), reprogFecha, horaInicio24, sumarMinutos(horaInicio24, 30));
       cargarCitasDelMes();
+      cargarCitasDeMañana();
       onCambio();
       dispararToast(`✓ Cita reprogramada para el ${reprogFecha} a las ${reprogHora}`);
       setCitaParaReprogramar(null);
@@ -6920,6 +6948,64 @@ function AgendaMedica({
           </div>
         </div>
       </div>
+
+      {/* ── RECORDATORIOS DE MAÑANA: correo ya sale automático (job del backend a las 8am);
+          WhatsApp queda semi-manual aquí porque no hay API de WhatsApp integrada todavía ── */}
+      {citasMañana.length > 0 && (
+        <div className="apple-glass rounded-2xl p-4 sm:p-5 border border-amber-400/40 bg-amber-50/50 dark:bg-amber-950/10 shadow-sm space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/30">
+                🔔
+              </div>
+              <div>
+                <h3 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white">
+                  Recordatorios de Mañana ({citasMañana.length})
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-white/50">
+                  El correo se envía automático — manda el WhatsApp con un clic por cada paciente
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFechaSeleccionada(mañana())}
+              className="text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:underline cursor-pointer"
+            >
+              Ver agenda de mañana →
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {citasMañana.map((cita) => (
+              <div
+                key={cita.id}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 text-xs"
+              >
+                <span className="font-mono font-black text-amber-700 dark:text-amber-300">{cita.hora}</span>
+                <span className="font-bold text-slate-800 dark:text-white/90">{cita.pacienteNombre}</span>
+                {cita.pacienteTelefono && cita.pacienteTelefono !== "S/T" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const [my, mm, md] = mañana().split("-");
+                      const msg = `Hola ${cita.pacienteNombre}, le recordamos su cita médica programada para mañana ${md}/${mm}/${my} a las ${cita.hora}.`;
+                      abrirWhatsAppDirecto(cita.pacienteTelefono, msg);
+                    }}
+                    className="text-emerald-600 hover:text-emerald-500 font-bold flex items-center gap-1 cursor-pointer"
+                    title="Enviar recordatorio por WhatsApp"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <span>Recordar</span>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── CUADRÍCULA PRINCIPAL (CALENDARIO A LA IZQUIERDA + DETALLE & AGENDAR A LA DERECHA) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
