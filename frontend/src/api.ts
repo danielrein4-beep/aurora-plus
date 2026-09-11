@@ -2352,6 +2352,7 @@ export interface VacunaGanaderia {
   id: number;
   tenantId: number;
   nombre: string;
+  enfermedadPrevenida?: string;
   diasParaRefuerzo?: number;
   diasRetiroLeche?: number;
   diasRetiroCarne?: number;
@@ -2524,8 +2525,9 @@ export function obtenerGdpGanaderia(animalId: number): Promise<GdpGanaderiaRespo
   return request(`/api/ganaderia/pesos/animal/${animalId}/gdp`);
 }
 
-export function listarVacunasGanaderia(): Promise<VacunaGanaderia[]> {
-  return request(`/api/ganaderia/vacunas`);
+export function listarVacunasGanaderia(tenantId?: number): Promise<VacunaGanaderia[]> {
+  const q = tenantId ? `?tenantId=${tenantId}` : "";
+  return request(`/api/ganaderia/vacunas${q}`);
 }
 
 export function crearVacunaGanaderia(tenantId: number, datos: Partial<VacunaGanaderia>): Promise<VacunaGanaderia> {
@@ -2552,6 +2554,20 @@ export function aplicarVacunaGanaderia(tenantId: number, datos: {
   costo?: number;
 }): Promise<AplicacionVacunaGanaderia> {
   return request(`/api/ganaderia/vacunas/aplicar?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function aplicarVacunaLoteGanaderia(tenantId: number, datos: {
+  animalIds: number[];
+  vacunaId: number;
+  fechaAplicacion: string;
+  lote?: string;
+  veterinarioResponsable?: string;
+  costo?: number;
+}): Promise<AplicacionVacunaGanaderia[]> {
+  return request(`/api/ganaderia/vacunas/aplicar-lote?tenantId=${tenantId}`, {
     method: "POST",
     body: JSON.stringify(datos),
   });
