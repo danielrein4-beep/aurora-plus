@@ -266,24 +266,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
       setAnimales(prev => [nuevo, ...prev]);
       notificar(`Animal arete ${nuevo.arete} registrado con éxito en el hato.`);
     } catch {
-      const opt: AnimalGanaderia = {
-        id: Date.now(),
-        tenantId,
-        arete: formAnimal.arete,
-        tipoIdentificador: formAnimal.tipoIdentificador,
-        nombre: formAnimal.nombre,
-        especie: formAnimal.especie,
-        raza: formAnimal.raza,
-        sexo: formAnimal.sexo as any,
-        tipoAnimal: formAnimal.tipoAnimal,
-        fechaNacimiento: formAnimal.fechaNacimiento,
-        pesoActual: Number(formAnimal.pesoActual),
-        valorEstimado: Number(formAnimal.valorEstimado),
-        estado: "ACTIVO",
-        potrero: potreros.find(p => p.id === Number(formAnimal.potreroId)) || potreros[0]
-      };
-      setAnimales(prev => [opt, ...prev]);
-      notificar(`Animal arete ${opt.arete} registrado localmente.`);
+      notificar(`⚠️ No se pudo registrar el animal arete ${formAnimal.arete} — revisa tu conexión e inténtalo de nuevo.`);
+      return;
     }
 
     setModalNuevoAnimal(false);
@@ -325,7 +309,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
     try {
       await crearPotreroGanaderia(tenantId, nuevo);
-    } catch {}
+    } catch {
+      notificar(`⚠️ No se pudo guardar el potrero ${nuevo.nombre} — revisa tu conexión e inténtalo de nuevo.`);
+      return;
+    }
 
     setPotreros(prev => [...prev, nuevo]);
     notificar(`Potrero ${nuevo.nombre} (${nuevo.areaHectareas} ha) guardado en el mapa satelital.`);
@@ -443,7 +430,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
     if (!modalRotar) return;
     try {
       await rotarPotreroGanaderia(modalRotar.id, tenantId, potreroDestinoId);
-    } catch {}
+    } catch {
+      notificar(`⚠️ No se pudo rotar el hato de ${modalRotar.nombre} — revisa tu conexión e inténtalo de nuevo.`);
+      return;
+    }
 
     setPotreros(prev => prev.map(p => {
       if (p.id === modalRotar.id) return { ...p, estado: "EN_DESCANSO", fechaInicioDescanso: new Date().toISOString().slice(0, 10) };
@@ -472,19 +462,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
       });
       setOrdenos(prev => [nuevoReg, ...prev]);
     } catch {
-      const opt: RegistroOrdenoGanaderia = {
-        id: Date.now(),
-        tenantId,
-        animal: animalSeleccionado,
-        fecha: new Date().toISOString().slice(0, 10),
-        turno: formOrdeno.turno as any,
-        cantidadLitros: Number(formOrdeno.cantidadLitros),
-        precioVentaLitro: Number(formOrdeno.precioVentaLitro),
-        montoVenta: Number(formOrdeno.cantidadLitros) * Number(formOrdeno.precioVentaLitro),
-        porcentajeGrasa: Number(formOrdeno.porcentajeGrasa),
-        porcentajeProteina: Number(formOrdeno.porcentajeProteina),
-      };
-      setOrdenos(prev => [opt, ...prev]);
+      notificar(`⚠️ No se pudo registrar el ordeño de ${animalSeleccionado.nombre || animalSeleccionado.arete} — revisa tu conexión e inténtalo de nuevo.`);
+      return;
     }
 
     notificar(`${formOrdeno.cantidadLitros} L registrados para ${animalSeleccionado.nombre || animalSeleccionado.arete}.`);
@@ -500,7 +479,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
       await registrarPesoGanaderia(tenantId, modalPesaje.id, Number(pesoNuevo));
       const resGdp = await obtenerGdpGanaderia(modalPesaje.id).catch(() => null);
       if (resGdp) setGdpData(resGdp);
-    } catch {}
+    } catch {
+      notificar(`⚠️ No se pudo registrar el pesaje — revisa tu conexión e inténtalo de nuevo.`);
+      return;
+    }
 
     setAnimales(prev => prev.map(a => a.id === modalPesaje.id ? { ...a, pesoActual: Number(pesoNuevo) } : a));
     notificar(`Pesaje registrado: ${pesoNuevo} kg.`);
@@ -522,7 +504,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
         veterinarioResponsable: formVacuna.veterinario,
         costo: Number(formVacuna.costo),
       });
-    } catch {}
+    } catch {
+      notificar(`⚠️ No se pudo registrar el tratamiento sanitario — revisa tu conexión e inténtalo de nuevo.`);
+      return;
+    }
     notificar(`Tratamiento sanitario aplicado con éxito.`);
     setModalVacuna(false);
   };
@@ -539,7 +524,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
         fechaProbableParto: formRepro.fechaProbableParto,
         sementalReferenciaExterna: formRepro.sementalReferenciaExterna,
       });
-    } catch {}
+    } catch {
+      notificar(`⚠️ No se pudo registrar el evento reproductivo — revisa tu conexión e inténtalo de nuevo.`);
+      return;
+    }
     notificar(`Evento reproductivo registrado en el expediente.`);
     setModalReproduccion(false);
   };

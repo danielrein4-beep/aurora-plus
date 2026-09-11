@@ -76,15 +76,24 @@ public class RepuestoItemController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        if (!repuestoItemRepository.existsById(id)) return ResponseEntity.notFound().build();
+    public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+        RepuestoItem item = repuestoItemRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Repuesto no encontrado"));
+        if (!item.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("No autorizado para eliminar este repuesto");
+        }
         repuestoItemRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }
 
     /** Kárdex: historial completo de compras/ventas/ajustes de un ítem, para auditar cualquier descuadre. */
     @GetMapping("/{id}/movimientos")
-    public List<MovimientoRepuesto> historialMovimientos(@PathVariable Long id) {
+    public List<MovimientoRepuesto> historialMovimientos(@PathVariable Long id, @RequestParam Long tenantId) {
+        RepuestoItem item = repuestoItemRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Repuesto no encontrado"));
+        if (!item.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("No autorizado para consultar este repuesto");
+        }
         return movimientoRepuestoRepository.findByRepuestoIdOrderByFechaRegistroDesc(id);
     }
 

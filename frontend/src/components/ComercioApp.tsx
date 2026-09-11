@@ -272,6 +272,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       if (guardado === "farmacia" || guardado === "ferreteria" || guardado === "retail") return guardado;
       if (user?.industry === "farmacia") return "farmacia";
       if (user?.industry === "ferreteria") return "ferreteria";
+      if (user?.industry === "retail") return "retail";
       return "ferreteria";
     } catch {
       return "ferreteria";
@@ -376,8 +377,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             codigo: r.codigoSku,
             codigoOem: r.codigoOriginalOem || "",
             nombre: r.descripcion,
-            categoria: "Repuestos & Ferretería",
-            rubro: "ferreteria",
+            categoria: r.codigoOriginalOem ? "Repuestos & Ferretería" : "General",
+            rubro: perfilActivo,
             precio: r.precioVenta,
             costo: r.costoUnitario || 0,
             stock: r.stockActual,
@@ -389,8 +390,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             ubicacion: "Almacén Central",
           }));
           setProductos((prev) => {
-            const noFerreteria = prev.filter((p) => p.rubro !== "ferreteria");
-            return [...noFerreteria, ...mapeados];
+            const otros = prev.filter((p) => p.rubro !== perfilActivo);
+            return [...otros, ...mapeados];
           });
         }
       }
@@ -402,7 +403,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   };
 
   useEffect(() => {
-    if (user?.tenantId && perfilActivo === "ferreteria") {
+    if (user?.tenantId) {
       cargarRepuestosBackend();
       listarProveedoresRepuesto().then(setProveedoresRepuesto).catch(() => {});
     }
@@ -411,12 +412,13 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   useEffect(() => {
     if (kardexModalItem?.backendId) {
       setKardexCargando(true);
-      historialMovimientosRepuesto(kardexModalItem.backendId)
+      const tid = user?.tenantId || 1;
+      historialMovimientosRepuesto(kardexModalItem.backendId, tid)
         .then(setKardexMovimientos)
         .catch(() => setKardexMovimientos([]))
         .finally(() => setKardexCargando(false));
     }
-  }, [kardexModalItem]);
+  }, [kardexModalItem, user?.tenantId]);
 
   useEffect(() => {
     if (presentacionesModalItem?.backendId && user?.tenantId) {
@@ -612,8 +614,10 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       monedaVuelto,
     };
 
-    // Registrar en backend Spring Boot para Ferretería & Repuestos si hay tenant activo
-    if (user?.tenantId && perfilActivo === "ferreteria") {
+    let errorSincronizacion = false;
+
+    // Registrar en backend Spring Boot para Ferretería & Retail si hay tenant activo
+    if (user?.tenantId) {
       try {
         for (const item of carrito) {
           if (!item.backendId) continue;
@@ -627,22 +631,25 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         cargarRepuestosBackend();
         mostrarToast("Venta registrada y sincronizada en base de datos (Kárdex y Caja actualizados)", "success");
       } catch (err: any) {
-        console.warn("Venta procesada localmente (alerta backend):", err);
-        mostrarToast("Venta procesada con éxito", "info");
+        console.error("Fallo al sincronizar venta en backend:", err);
+        errorSincronizacion = true;
+        mostrarToast("⚠️ La venta se registró localmente pero no se sincronizó — revisa tu conexión", "error");
       }
     }
 
-    // Descontar inventario localmente
-    setProductos((prev) =>
-      prev.map((prod) => {
-        const items = carrito.filter((c) => c.productoId === prod.id);
-        if (items.length > 0) {
-          const totalCant = items.reduce((s, it) => s + (it.factorConversion ? it.cantidad * it.factorConversion : it.cantidad), 0);
-          return { ...prod, stock: Math.max(0, prod.stock - totalCant) };
-        }
-        return prod;
-      })
-    );
+    // Solo descontar inventario localmente si NO hubo fallo del backend
+    if (!errorSincronizacion) {
+      setProductos((prev) =>
+        prev.map((prod) => {
+          const items = carrito.filter((c) => c.productoId === prod.id);
+          if (items.length > 0) {
+            const totalCant = items.reduce((s, it) => s + (it.factorConversion ? it.cantidad * it.factorConversion : it.cantidad), 0);
+            return { ...prod, stock: Math.max(0, prod.stock - totalCant) };
+          }
+          return prod;
+        })
+      );
+    }
 
     // Si es crédito, sumar a saldo del cliente
     if (esCredito && clienteSel.id !== "c-1") {
@@ -1154,7 +1161,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {perfilActivo === "ferreteria" && (
+                {(perfilActivo === "ferreteria" || perfilActivo === "retail") && (
                   <>
                     <button
                       onClick={() => cargarRepuestosBackend()}
@@ -1677,11 +1684,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
                 let backendId: number | undefined = undefined;
 
-                if (user?.tenantId && perfilActivo === "ferreteria") {
+                if (user?.tenantId) {
                   try {
                     const guardado = await crearRepuesto(user.tenantId, {
                       codigoSku: codigo,
-                      codigoOriginalOem: codigoOem,
+                      codigoOriginalOem: codigoOem || undefined,
                       descripcion: nombre,
                       precioVenta: precio,
                       costoUnitario: costo,
@@ -2059,7 +2066,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       {modalCompraProveedor && (
         <ModalCompraProveedorFerreteria
           tenantId={user?.tenantId || 1}
-          productos={productos.filter((p) => p.rubro === "ferreteria")}
+          productos={productos.filter((p) => p.rubro === perfilActivo)}
           proveedores={proveedoresRepuesto}
           onClose={() => setModalCompraProveedor(false)}
           onCompraExitosa={() => {

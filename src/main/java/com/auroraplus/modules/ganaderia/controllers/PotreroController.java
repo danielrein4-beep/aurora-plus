@@ -89,6 +89,9 @@ public class PotreroController {
     @PutMapping("/{id}")
     public ResponseEntity<Potrero> actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Potrero datos) {
         Potrero potrero = potreroRepository.findById(id).orElseThrow(() -> new RuntimeException("Potrero no encontrado"));
+        if (!potrero.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Potrero no pertenece a este tenant");
+        }
         potrero.setNombre(datos.getNombre());
         potrero.setAreaHectareas(datos.getAreaHectareas());
         potrero.setCapacidadAnimales(datos.getCapacidadAnimales());
@@ -154,6 +157,9 @@ public class PotreroController {
     @GetMapping("/{id}/recomendacion")
     public ReferenciaPastoreoService.Recomendacion recomendacion(@PathVariable Long id, @RequestParam Long tenantId) {
         Potrero potrero = potreroRepository.findById(id).orElseThrow(() -> new RuntimeException("Potrero no encontrado"));
+        if (!potrero.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Potrero no pertenece a este tenant");
+        }
         return referenciaPastoreoService.calcular(tenantId, potrero.getAreaHectareas(), potrero.getTipoPasto());
     }
 
