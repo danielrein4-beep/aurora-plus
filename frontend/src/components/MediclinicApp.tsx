@@ -212,7 +212,7 @@ function SelectorPerfilesNetflix({
               Mediclinic <span className="text-teal-600 dark:text-[#00FFC2]">Pro</span>
             </div>
             <div className="text-[10px] text-slate-500 dark:text-white/50 uppercase font-mono tracking-widest">
-              {configPerfil.clinicaNombre || "Centro Médico Especializado"}
+              {configPerfil.clinicaNombre || "Mi Consultorio Médico"}
             </div>
           </div>
         </div>
@@ -2913,7 +2913,7 @@ function HistoriasClinicas({
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     return {
-      clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
+      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config.doctorNombre || "Médico Titular",
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
@@ -3019,7 +3019,7 @@ function HistoriasClinicas({
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     const data: ConsultaReportData = {
-      clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
+      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config.doctorNombre || "Médico Titular",
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
@@ -3067,7 +3067,7 @@ function HistoriasClinicas({
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     const data: ConsultaReportData = {
-      clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
+      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config.doctorNombre || "Médico Titular",
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
@@ -3118,7 +3118,7 @@ function HistoriasClinicas({
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     const data: ConsultaReportData = {
-      clinicaNombre: config.clinicaNombre || "Centro Médico Especializado",
+      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config.doctorNombre || "Médico Titular",
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
@@ -4406,7 +4406,7 @@ function Procedimientos({
   // Generar PDF para una cotización dada
   const ejecutarPdfCotizacion = (cot: CotizacionGuardada) => {
     const dataCot: CotizacionData = {
-      clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
+      clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config?.doctorNombre || "Médico Titular",
       pacienteNombre: cot.pacienteNombre,
       pacienteCedula: cot.pacienteCedula,
@@ -4438,7 +4438,7 @@ function Procedimientos({
   // Enviar WhatsApp para una cotización
   const ejecutarWhatsAppCotizacion = (cot: CotizacionGuardada) => {
     const dataCot: CotizacionData = {
-      clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
+      clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config?.doctorNombre || "Médico Titular",
       pacienteNombre: cot.pacienteNombre,
       pacienteCedula: cot.pacienteCedula,
@@ -5524,7 +5524,7 @@ function SalaEspera({
   // para que el historial de auditorías sobreviva a cambiar de PC/navegador.
   const ejecutarCierreCaja = async () => {
     const dataCierre: CierreCajaData = {
-      clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
+      clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config?.doctorNombre || "Médico Titular",
       responsableNombre: config?.secretariaNombre || "Recepción / Asistente",
       fecha: hoy(),
@@ -7467,7 +7467,7 @@ function ResumenesFinancieros({
             <button
               onClick={() => {
                 const dataHoy: CierreCajaData = {
-                  clinicaNombre: config?.clinicaNombre || "Centro Médico Especializado",
+                  clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
                   doctorNombre: config?.doctorNombre || "Médico Titular",
                   responsableNombre: config?.secretariaNombre || config?.doctorNombre || "Recepción y Caja",
                   fecha: hoy(),

@@ -221,7 +221,7 @@ const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
 };
 
 const NOMBRE_POR_DEFECTO: Record<string, string> = {
-  clinica: "Clínica & Consultorios Médicos",
+  clinica: "Mi Consultorio Médico",
   farmacia: "Mi Farmacia",
   restaurante: "Mi Restaurante",
   ferreteria: "Mi Ferretería",
@@ -543,7 +543,7 @@ export default function Onboarding() {
                   Paso 2 · {selectedIndustry === "restaurante" ? "Arquitectura del Local" : esRetail ? "Arquitectura del Negocio" : esGanaderia ? "Arquitectura de la Finca" : "Arquitectura Médica"}
                 </div>
                 <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white leading-tight">
-                  {selectedIndustry === "restaurante" ? "Personaliza tu Restaurante" : esRetail ? "Personaliza tu Negocio" : esGanaderia ? "Personaliza tu Finca" : "Personaliza tu Clínica o Consultorio"}
+                  {selectedIndustry === "restaurante" ? "Personaliza tu Restaurante" : esRetail ? "Personaliza tu Negocio" : esGanaderia ? "Personaliza tu Finca" : "Personaliza tu Consultorio"}
                 </h2>
                 <p className="text-white/50 text-sm mt-1">
                   {selectedIndustry === "restaurante"
@@ -552,18 +552,18 @@ export default function Onboarding() {
                     ? "Indica el nombre de tu negocio y activa los módulos que utilizará tu equipo."
                     : esGanaderia
                     ? "Indica el nombre de tu finca y activa los módulos que utilizará tu equipo de campo."
-                    : "Indica el nombre de tu centro de salud y activa los módulos que utilizará tu equipo médico."}
+                    : "Indica el nombre de tu consultorio y activa los módulos que utilizarán tú y tu secretaria."}
                 </p>
               </div>
 
               {/* Nombre del negocio */}
               <div>
                 <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1.5">
-                  {selectedIndustry === "restaurante" ? "Nombre del Restaurante / Local" : esRetail ? "Nombre del Negocio" : esGanaderia ? "Nombre de la Finca" : "Nombre de la Clínica / Consultorio / Doctor"}
+                  {selectedIndustry === "restaurante" ? "Nombre del Restaurante / Local" : esRetail ? "Nombre del Negocio" : esGanaderia ? "Nombre de la Finca" : "Nombre de tu Consultorio (o tu nombre, Dr./Dra.)"}
                 </label>
                 <input
                   type="text"
-                  placeholder={selectedIndustry === "restaurante" ? "Ej. Restaurante La Terraza" : esRetail ? "Ej. Ferretería El Tornillo Feliz" : esGanaderia ? "Ej. Finca Los Alpes" : "Ej. Centro Médico Especializado San Cristóbal"}
+                  placeholder={selectedIndustry === "restaurante" ? "Ej. Restaurante La Terraza" : esRetail ? "Ej. Ferretería El Tornillo Feliz" : esGanaderia ? "Ej. Finca Los Alpes" : "Ej. Consultorio Dr. Carlos Mendoza"}
                   value={empresaNombre}
                   onChange={(e) => setEmpresaNombre(e.target.value)}
                   className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none transition-all shadow-inner"
@@ -720,7 +720,7 @@ export default function Onboarding() {
 
               <div>
                 <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white">
-                  {selectedIndustry === "restaurante" ? "¡Todo Listo para tu Restaurante!" : esRetail ? "¡Todo Listo para tu Negocio!" : esGanaderia ? "¡Todo Listo para tu Finca!" : "¡Todo Listo para tu Clínica!"}
+                  {selectedIndustry === "restaurante" ? "¡Todo Listo para tu Restaurante!" : esRetail ? "¡Todo Listo para tu Negocio!" : esGanaderia ? "¡Todo Listo para tu Finca!" : "¡Todo Listo para tu Consultorio!"}
                 </h2>
                 <p className="text-white/50 text-sm mt-1 max-w-md mx-auto">
                   Tu entorno privado en <strong>Aurora Hub</strong> ha sido preparado con la vertical{" "}
