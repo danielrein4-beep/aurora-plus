@@ -9,7 +9,7 @@ import GanaderiaMapa from "./GanaderiaMapa";
 import { useAuth } from "../context/AuthContext";
 import * as XLSX from "xlsx";
 import {
-  listarAnimalesGanaderia, crearAnimalGanaderia,
+  listarAnimalesGanaderia, crearAnimalGanaderia, actualizarAnimalGanaderia,
   listarPotrerosGanaderia, crearPotreroGanaderia, rotarPotreroGanaderia,
   registrarOrdenoGanaderia, obtenerReporteOrdenoGanaderia,
   registrarPesoGanaderia, obtenerGdpGanaderia,
@@ -94,7 +94,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Sub-vistas Sanidad & Trazabilidad
   const [subSanidad, setSubSanidad] = useState<"individual" | "lotes">("individual");
-  const [animalFichaId, setAnimalFichaId] = useState<number | null>(201);
+  const [animalFichaId, setAnimalFichaId] = useState<number | null>(null);
   const [alertasSanitarias, setAlertasSanitarias] = useState<AlertaSanitariaGanaderia[]>([]);
   const [fichaVacunas, setFichaVacunas] = useState<AplicacionVacunaGanaderia[]>([]);
   const [fichaEventosRepro, setFichaEventosRepro] = useState<EventoReproductivoGanaderia[]>([]);
@@ -126,9 +126,9 @@ export default function GanaderiaApp({ onSalir }: Props) {
   const [modalVacuna, setModalVacuna] = useState(false);
   const [modalReproduccion, setModalReproduccion] = useState(false);
   const [modalFichaAnimal, setModalFichaAnimal] = useState<AnimalGanaderia | null>(null);
-  const [modalEventoGenerico, setModalEventoGenerico] = useState<{ tipo: string; titulo: string; descripcion: string } | null>(null);
+  const [modalVentaAnimal, setModalVentaAnimal] = useState(false);
 
-  // Formulario nuevo animal
+  // Formulario nuevo animal con soporte de Origen (Nacimiento / Compra)
   const [formAnimal, setFormAnimal] = useState({
     arete: "",
     tipoIdentificador: "ARETE",
@@ -142,6 +142,20 @@ export default function GanaderiaApp({ onSalir }: Props) {
     valorEstimado: 900,
     potreroId: DEMO_POTREROS[0]?.id || 101,
     lote: "",
+    origen: "NACIMIENTO" as "NACIMIENTO" | "COMPRA",
+    madreId: null as number | null,
+    proveedor: "",
+    costoCompra: 0,
+    fechaCompra: new Date().toISOString().slice(0, 10),
+  });
+
+  // Formulario de Venta / Beneficio
+  const [formVenta, setFormVenta] = useState({
+    animalId: 0,
+    comprador: "",
+    precioUSD: 0,
+    pesoSalida: 0,
+    motivo: "BENEFICIO",
   });
 
   // Formulario nuevo potrero con color distintivo (estilo GanSoft)
@@ -225,6 +239,17 @@ export default function GanaderiaApp({ onSalir }: Props) {
       .then(setAlertasSanitarias)
       .catch(() => setAlertasSanitarias([]));
   }, [tenantId]);
+
+  // Auto-seleccionar primer animal real para Ficha Sanitaria si no hay ninguno seleccionado
+  useEffect(() => {
+    if (animales.length > 0) {
+      if (!animalFichaId || !animales.some(a => a.id === animalFichaId)) {
+        setAnimalFichaId(animales[0].id);
+      }
+    } else {
+      setAnimalFichaId(null);
+    }
+  }, [animales, animalFichaId]);
 
   useEffect(() => {
     if (!animalFichaId) return;
@@ -327,15 +352,40 @@ export default function GanaderiaApp({ onSalir }: Props) {
     return coincideCat && coincideBusqueda;
   });
 
-  // Manejador: Crear nuevo animal
+  // Manejador: Crear nuevo animal (Nacimiento en Finca o Ingreso por Compra)
   const handleGuardarAnimal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAnimal.arete.trim()) return;
 
     try {
-      const nuevo = await crearAnimalGanaderia(tenantId, formAnimal);
+      const payload: any = {
+        arete: formAnimal.arete.trim(),
+        tipoIdentificador: formAnimal.tipoIdentificador,
+        nombre: formAnimal.nombre.trim() || undefined,
+        especie: formAnimal.especie,
+        raza: formAnimal.raza,
+        sexo: formAnimal.sexo,
+        tipoAnimal: formAnimal.tipoAnimal,
+        fechaNacimiento: formAnimal.fechaNacimiento,
+        pesoActual: Number(formAnimal.pesoActual) || 0,
+        potreroId: formAnimal.potreroId ? Number(formAnimal.potreroId) : undefined,
+        costoAdquisicion: formAnimal.origen === "COMPRA" ? Number(formAnimal.costoCompra) : undefined,
+        madreId: (formAnimal.origen === "NACIMIENTO" && formAnimal.madreId) ? Number(formAnimal.madreId) : undefined,
+        valorEstimado: formAnimal.origen === "COMPRA" ? Number(formAnimal.costoCompra) : Number(formAnimal.valorEstimado),
+      };
+
+      if (formAnimal.origen === "COMPRA" && formAnimal.proveedor.trim()) {
+        payload.lote = formAnimal.lote.trim()
+          ? `${formAnimal.lote} (Proveedor: ${formAnimal.proveedor.trim()})`
+          : `Compra: ${formAnimal.proveedor.trim()}`;
+      } else if (formAnimal.lote.trim()) {
+        payload.lote = formAnimal.lote.trim();
+      }
+
+      const nuevo = await crearAnimalGanaderia(tenantId, payload);
       setAnimales(prev => [nuevo, ...prev]);
-      notificar(`Animal arete ${nuevo.arete} registrado con éxito en el hato.`);
+      setAnimalFichaId(nuevo.id);
+      notificar(`Animal arete ${nuevo.arete} (${formAnimal.origen === "COMPRA" ? "Compra" : "Nacimiento en Finca"}) registrado con éxito en el hato.`);
     } catch {
       notificar(`⚠️ No se pudo registrar el animal arete ${formAnimal.arete} — revisa tu conexión e inténtalo de nuevo.`);
       return;
@@ -355,6 +405,35 @@ export default function GanaderiaApp({ onSalir }: Props) {
       valorEstimado: 900,
       potreroId: potreros[0]?.id || 101,
       lote: "",
+      origen: "NACIMIENTO",
+      madreId: null,
+      proveedor: "",
+      costoCompra: 0,
+      fechaCompra: new Date().toISOString().slice(0, 10),
+    });
+  };
+
+  // Manejador: Despacho por Venta / Beneficio
+  const handleRegistrarVentaAnimal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formVenta.animalId) return;
+
+    try {
+      await actualizarAnimalGanaderia(formVenta.animalId, tenantId, { estado: "VENDIDO" });
+      setAnimales(prev => prev.map(a => a.id === formVenta.animalId ? { ...a, estado: "VENDIDO" } : a));
+      notificar("Animal despachado por venta/beneficio exitosamente. Marcado como VENDIDO.");
+    } catch {
+      notificar("⚠️ No se pudo procesar la salida por venta — revisa tu conexión e inténtalo de nuevo.");
+      return;
+    }
+
+    setModalVentaAnimal(false);
+    setFormVenta({
+      animalId: 0,
+      comprador: "",
+      precioUSD: 0,
+      pesoSalida: 0,
+      motivo: "BENEFICIO",
     });
   };
 
@@ -1440,7 +1519,28 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
             {/* VISTA 1: FICHA CONSOLIDADA POR ANIMAL ÚNICO */}
             {subSanidad === "individual" && (
-              <div className="space-y-6">
+              animales.length === 0 ? (
+                <div className="p-12 text-center rounded-3xl apple-glass border border-white/10 space-y-4 max-w-md mx-auto my-8">
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-3xl mx-auto">
+                    💉
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Ficha Sanitaria por Animal</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Registra tu primer animal para ver su ficha sanitaria aquí.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormAnimal(prev => ({ ...prev, origen: "NACIMIENTO" }));
+                      setModalNuevoAnimal(true);
+                    }}
+                    className="btn-cyber-neon text-white font-bold px-5 py-2.5 rounded-xl cursor-pointer text-xs"
+                  >
+                    + Registrar Primer Animal
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6">
                 {/* Selector rápido de Arete */}
                 <div className="p-4 rounded-3xl apple-glass border border-white/10 space-y-3">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1664,7 +1764,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     </div>
                   );
                 })()}
-              </div>
+                </div>
+              )
             )}
 
             {/* VISTA 2: CONSOLIDADO POR LOTE */}
@@ -1809,19 +1910,33 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
-                    onClick={() => { setModalReproduccion(true); setFormRepro({ ...formRepro, tipo: "PARTO" }); }}
+                    onClick={() => {
+                      setFormAnimal(prev => ({
+                        ...prev,
+                        origen: "NACIMIENTO",
+                        tipoAnimal: "BECERRA",
+                        fechaNacimiento: new Date().toISOString().slice(0, 10),
+                      }));
+                      setModalNuevoAnimal(true);
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Partos (Alta Cría)</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
+                    <span>• Partos / Alta de Cría en Finca</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">Dar de alta →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "ABORTO", titulo: "Registro de Aborto / Pérdida", descripcion: "Registra la pérdida gestacional y pasa la hembra a descanso reproductivo." })}
+                    onClick={() => {
+                      setModalReproduccion(true);
+                      setFormRepro({ ...formRepro, tipo: "DIAGNOSTICO_PRENEZ", resultado: "ABORTO_NO_GESTANTE" });
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Abortos & Pérdidas</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "CELO", titulo: "Detección de Celo", descripcion: "Registra el celo natural o inducido para programar inseminación en 12 horas." })}
+                    onClick={() => {
+                      setModalReproduccion(true);
+                      setFormRepro({ ...formRepro, tipo: "SERVICIO", sementalReferenciaExterna: "Celo detectado - Programado para IA" });
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Celos & Sincronización</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
@@ -1849,7 +1964,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "SECADO", titulo: "Secado de Vaca", descripcion: "Pasa la hembra a período seco 60 días antes del parto para recuperación de ubre." })}
+                    onClick={() => {
+                      setModalReproduccion(true);
+                      setFormRepro({ ...formRepro, tipo: "DIAGNOSTICO_PRENEZ", resultado: "SECADO_PREVIO_PARTO" });
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Secados</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
@@ -1883,9 +2001,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Ejecutar →</span>
                   </button>
                   <button
-                    onClick={() => setModalNuevoAnimal(true)}
+                    onClick={() => {
+                      setFormAnimal(prev => ({ ...prev, origen: "NACIMIENTO" }));
+                      setModalNuevoAnimal(true);
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Alta de Animales</span>
+                    <span>• Alta de Animales (Nacimiento / Compra)</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                 </div>
@@ -1905,9 +2026,16 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Aplicar →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "MASTITIS", titulo: "Control de Mastitis", descripcion: "Registro de prueba de California Mastitis Test (CMT) y tratamiento antibiótico intramamario." })}
+                    onClick={() => {
+                      setModalVacuna(true);
+                      setFormVacuna(prev => ({
+                        ...prev,
+                        nombreVacuna: "Tratamiento Mastitis / Antibiótico Intramamario",
+                        costo: 8.5,
+                      }));
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Mastitis / Prueba CMT</span>
+                    <span>• Mastitis / Prueba CMT & Tratamiento</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
@@ -1939,9 +2067,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Rotar →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "AFORO", titulo: "Aforo de Pastura", descripcion: "Pesaje de metro cuadrado de forraje verde para calcular disponibilidad de materia seca." })}
+                    onClick={() => {
+                      setTab("potreros");
+                      notificar("Selecciona un potrero para calcular y registrar el aforo de forraje.");
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Aforos & Planificación</span>
+                    <span>• Aforos & Planificación de Pastoreo</span>
                     <span className="text-[10px] text-slate-400">Calcular →</span>
                   </button>
                 </div>
@@ -1955,16 +2086,36 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 </div>
                 <div className="space-y-1 text-xs">
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "COMPRA", titulo: "Ingreso por Compra", descripcion: "Registro de lote adquirido en subasta o compra directa con guía de traslado." })}
+                    onClick={() => {
+                      setFormAnimal(prev => ({
+                        ...prev,
+                        origen: "COMPRA",
+                        proveedor: "",
+                        costoCompra: 0,
+                        lote: prev.lote || "Lote Compra",
+                      }));
+                      setModalNuevoAnimal(true);
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Compras de Ganado</span>
-                    <span className="text-[10px] text-slate-400">Ingresar →</span>
+                    <span>• Compras de Ganado (Ingreso Real)</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">Ingresar →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "VENTA", titulo: "Despacho por Venta", descripcion: "Salida de ganado para beneficio o cría con liquidación en báscula." })}
+                    onClick={() => {
+                      if (animales.length > 0) {
+                        setFormVenta({
+                          animalId: animales[0].id,
+                          comprador: "",
+                          precioUSD: 0,
+                          pesoSalida: animales[0].pesoActual || 0,
+                          motivo: "BENEFICIO",
+                        });
+                      }
+                      setModalVentaAnimal(true);
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Venta / Beneficio</span>
-                    <span className="text-[10px] text-slate-400">Despachar →</span>
+                    <span>• Venta / Beneficio (Salida Real)</span>
+                    <span className="text-[10px] text-rose-400 font-bold">Despachar →</span>
                   </button>
                 </div>
               </div>
@@ -2282,6 +2433,114 @@ export default function GanaderiaApp({ onSalir }: Props) {
             </div>
 
             <form onSubmit={handleGuardarAnimal} className="space-y-4 text-xs">
+              {/* Selector de Origen: Nacimiento vs Compra */}
+              <div>
+                <label className="text-slate-400 block mb-1.5 font-bold">Origen del Animal *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormAnimal({ ...formAnimal, origen: "NACIMIENTO", tipoAnimal: formAnimal.tipoAnimal === "VACA" ? "BECERRA" : formAnimal.tipoAnimal })}
+                    className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer border ${
+                      formAnimal.origen === "NACIMIENTO"
+                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-md"
+                        : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <span>🐣</span>
+                    <span>Nacimiento en Finca</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormAnimal({ ...formAnimal, origen: "COMPRA" })}
+                    className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer border ${
+                      formAnimal.origen === "COMPRA"
+                        ? "bg-sky-500/20 border-sky-500 text-sky-400 shadow-md"
+                        : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <span>🛒</span>
+                    <span>Ingreso por Compra</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Campos específicos según Origen */}
+              {formAnimal.origen === "NACIMIENTO" ? (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-3">
+                  <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
+                    <span>🌱</span>
+                    <span>Datos de Nacimiento & Trazabilidad Maternal</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-400 block mb-1">Madre (Opcional - Genealogía)</label>
+                      <select
+                        value={formAnimal.madreId || ""}
+                        onChange={e => setFormAnimal({ ...formAnimal, madreId: e.target.value ? Number(e.target.value) : null })}
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white text-xs">
+                        <option value="">Sin madre vinculada</option>
+                        {animales.filter(a => a.sexo === "HEMBRA").map(h => (
+                          <option key={h.id} value={h.id}>
+                            {h.arete} - {h.nombre || h.tipoAnimal} ({h.raza || "Brahman"})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-slate-400 block mb-1">Fecha de Nacimiento</label>
+                      <input
+                        type="date"
+                        value={formAnimal.fechaNacimiento}
+                        onChange={e => setFormAnimal({ ...formAnimal, fechaNacimiento: e.target.value })}
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 space-y-3">
+                  <div className="text-[11px] font-bold text-sky-400 flex items-center gap-1.5">
+                    <span>💵</span>
+                    <span>Datos de Adquisición & Proveedor</span>
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Proveedor / Subasta / Vendedor *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Subasta Barinas / Agropecuaria El Samán"
+                      value={formAnimal.proveedor}
+                      onChange={e => setFormAnimal({ ...formAnimal, proveedor: e.target.value })}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-400 block mb-1">Precio de Compra (USD) *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        placeholder="Ej. 850"
+                        value={formAnimal.costoCompra}
+                        onChange={e => setFormAnimal({ ...formAnimal, costoCompra: Number(e.target.value) })}
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 block mb-1">Fecha de Compra / Entrada</label>
+                      <input
+                        type="date"
+                        value={formAnimal.fechaCompra}
+                        onChange={e => setFormAnimal({ ...formAnimal, fechaCompra: e.target.value })}
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-400 block mb-1">Número de Arete / Chapeta *</label>
@@ -2376,7 +2635,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-medium"
                 />
                 <p className="text-[10px] text-slate-500 mt-1">
-                  Permite agrupar y trazar animales comprados o ingresados en un mismo embarque/feria.
+                  Permite agrupar y trazar animales nacidos o comprados en un mismo embarque/feria.
                 </p>
               </div>
 
@@ -2909,53 +3168,121 @@ export default function GanaderiaApp({ onSalir }: Props) {
         </div>
       )}
 
-      {/* MODAL: EVENTO GENÉRICO DE CAMPO */}
-      {modalEventoGenerico && (
+      {/* MODAL: REGISTRO DE VENTA / DESPACHO DE ANIMAL */}
+      {modalVentaAnimal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-emerald-500/30 text-left space-y-4">
-            <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-              {modalEventoGenerico.titulo}
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-white/60">
-              {modalEventoGenerico.descripcion}
-            </p>
-
-            <div className="space-y-3 text-xs">
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-rose-500/30 text-left space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div>
-                <label className="text-slate-400 block mb-1">Animal o Lote Afectado</label>
-                <select className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
-                  <option value="">Todo el Lote en Potrero Activo</option>
-                  {animales.map(a => (
-                    <option key={a.id} value={a.id}>{a.arete} - {a.nombre || a.tipoAnimal}</option>
+                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>🏷️</span>
+                  <span>Despacho por Venta / Beneficio</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-white/60 mt-1">
+                  Registra la salida formal del animal y márcalo como vendido en el hato.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalVentaAnimal(false)}
+                className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleRegistrarVentaAnimal} className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-400 block mb-1">Animal a Despachar *</label>
+                <select
+                  required
+                  value={formVenta.animalId}
+                  onChange={e => {
+                    const selId = Number(e.target.value);
+                    const animalObj = animales.find(a => a.id === selId);
+                    setFormVenta({
+                      ...formVenta,
+                      animalId: selId,
+                      pesoSalida: animalObj?.pesoActual || formVenta.pesoSalida,
+                    });
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold"
+                >
+                  <option value="">Selecciona un animal activo...</option>
+                  {animales.filter(a => a.estado === "ACTIVO").map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.arete} - {a.nombre || a.tipoAnimal} ({a.pesoActual || 0} kg)
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Notas Técnicas / Diagnóstico</label>
-                <textarea
-                  rows={3}
-                  placeholder="Detalles de la labor o tratamiento aplicado..."
-                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white resize-none"
+                <label className="text-slate-400 block mb-1">Comprador / Frigorífico / Destino *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Matadero Frigorífico Central / Ganadería La Gloria"
+                  value={formVenta.comprador}
+                  onChange={e => setFormVenta({ ...formVenta, comprador: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-medium"
                 />
               </div>
-            </div>
 
-            <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setModalEventoGenerico(null)}
-                className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  notificar(`Evento ${modalEventoGenerico.titulo} guardado exitosamente.`);
-                  setModalEventoGenerico(null);
-                }}
-                className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer">
-                Registrar Novedad
-              </button>
-            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Peso en Báscula (kg)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="Ej. 480"
+                    value={formVenta.pesoSalida || ""}
+                    onChange={e => setFormVenta({ ...formVenta, pesoSalida: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Precio Total (USD) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    placeholder="Ej. 1100"
+                    value={formVenta.precioUSD || ""}
+                    onChange={e => setFormVenta({ ...formVenta, precioUSD: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Motivo / Tipo de Salida</label>
+                <select
+                  value={formVenta.motivo}
+                  onChange={e => setFormVenta({ ...formVenta, motivo: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
+                >
+                  <option value="BENEFICIO">Venta para Beneficio / Matadero (Carne)</option>
+                  <option value="CRIA">Venta para Cría / Hato Comercial</option>
+                  <option value="SUBASTA">Subasta Ganadera</option>
+                </select>
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModalVentaAnimal(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer transition-colors shadow-lg">
+                  Confirmar Salida por Venta
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

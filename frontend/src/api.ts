@@ -2425,6 +2425,8 @@ export function crearAnimalGanaderia(tenantId: number, datos: {
   valorEstimado?: number;
   potreroId?: number;
   lote?: string;
+  madreId?: number;
+  costoAdquisicion?: number;
 }): Promise<AnimalGanaderia> {
   return request(`/api/ganaderia/animales?tenantId=${tenantId}`, {
     method: "POST",
