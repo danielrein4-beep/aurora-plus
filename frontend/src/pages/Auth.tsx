@@ -1,13 +1,38 @@
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
-import { AuroraGradientDef, IconLock } from "../Icons";
+import {
+  AuroraGradientDef, IconLock,
+  IconRestaurant, IconPrescription, IconHardware, IconClinic,
+  IconRetail, IconVet, IconFarm, IconBank,
+} from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import { solicitarRecuperacionClave } from "../api";
 
 type Mode = "login" | "register";
 
 const REMEMBERED_EMAIL_KEY = "aurora_remembered_email";
+
+interface RubroNegocioItem {
+  id: string;
+  label: string;
+  sub: string;
+  Icon: (p: { size?: number; className?: string }) => React.ReactNode;
+  modulo: string;
+  ruta: string;
+  nombreDefault: string;
+}
+
+const RUBROS_REGISTRO: RubroNegocioItem[] = [
+  { id: "restaurante", label: "Restaurante & Cafetería", sub: "Comandas, KDS, mesas y delivery", Icon: IconRestaurant, modulo: "horeca", ruta: "/restaurante", nombreDefault: "Mi Restaurante" },
+  { id: "farmacia", label: "Farmacia & Droguería", sub: "Medicamentos, lotes y mostrador", Icon: IconPrescription, modulo: "salud", ruta: "/comercio", nombreDefault: "Mi Farmacia" },
+  { id: "ferreteria", label: "Ferretería & Materiales", sub: "POS, inventario y retail", Icon: IconHardware, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Ferretería" },
+  { id: "clinica", label: "Clínica & Consultorios", sub: "Historias clínicas y citas", Icon: IconClinic, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Consultorio" },
+  { id: "retail", label: "Comercio & Tienda Retail", sub: "Venta mostrador y stock", Icon: IconRetail, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Tienda" },
+  { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "Fichas, vacunas y petshop", Icon: IconVet, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Veterinaria" },
+  { id: "finca", label: "Finca & Ganadería", sub: "Potreros, vacunas y animales", Icon: IconFarm, modulo: "ganaderia", ruta: "/dashboard", nombreDefault: "Mi Finca" },
+  { id: "otro", label: "Otro Rubro Comercial", sub: "ERP y suite administrativa", Icon: IconBank, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Empresa" },
+];
 
 export default function Auth() {
   const [mode, setMode] = useState<Mode>("login");
@@ -16,12 +41,21 @@ export default function Auth() {
     try {
       email = localStorage.getItem(REMEMBERED_EMAIL_KEY) || "";
     } catch {}
-    return { nombre: "", email, password: "", confirmar: "", remember: true, terms: false };
+    return {
+      nombre: "",
+      empresa: "",
+      industry: "restaurante",
+      email,
+      password: "",
+      confirmar: "",
+      remember: true,
+      terms: false,
+    };
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [enviando, setEnviando] = useState(false);
   const navigate = useNavigate();
-  const { login, isLoggedIn, user } = useAuth();
+  const { login, isLoggedIn, user, completarRegistro } = useAuth();
 
   const [modalOlvide, setModalOlvide] = useState(false);
   const [emailOlvide, setEmailOlvide] = useState("");
@@ -34,10 +68,17 @@ export default function Auth() {
 
   const set = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
 
+  const rubroActual = RUBROS_REGISTRO.find((r) => r.id === form.industry) || RUBROS_REGISTRO[0];
+
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.nombre.trim() && mode === "register") e.nombre = "Ingresa tu nombre";
-    if (!form.email.includes("@")) e.email = "Ingresa un correo electrónico válido";
+    if (!form.nombre.trim() && mode === "register") e.nombre = "Ingresa tu nombre completo";
+    if (!form.empresa.trim() && mode === "register") e.empresa = "Indica el nombre de tu negocio o local";
+    if (mode === "register" && !form.email.includes("@")) {
+      e.email = "Ingresa un correo electrónico válido";
+    } else if (!form.email.trim()) {
+      e.email = "Ingresa tu usuario o correo electrónico";
+    }
     if (form.password.length < 6) e.password = "Mínimo 6 caracteres";
     if (mode === "register" && form.password !== form.confirmar) e.confirmar = "Las contraseñas no coinciden";
     if (mode === "register" && !form.terms) e.terms = "Debes aceptar los términos para continuar";
@@ -51,10 +92,21 @@ export default function Auth() {
     setEnviando(true);
     try {
       if (mode === "register") {
-        // El registro real (crear el negocio en el backend) ocurre al final del
-        // onboarding, después de elegir módulo y método de pago — aquí solo se
-        // recogen los datos básicos y se pasan a la siguiente pantalla.
-        navigate("/onboarding", { state: { nombre: form.nombre, email: form.email, password: form.password } });
+        // Registra el negocio en backend / local y conecta de inmediato a la vertical correspondiente
+        await completarRegistro({
+          nombreEmpresa: form.empresa.trim() || rubroActual.nombreDefault,
+          moduloPrincipal: rubroActual.modulo,
+          emailContacto: form.email,
+          username: form.email,
+          password: form.password,
+          metodoPagoPreferido: "Pago Móvil / Efectivo",
+        });
+
+        // Conexión inmediata a la aplicación de su negocio
+        if (form.industry === "farmacia" || form.industry === "ferreteria" || form.industry === "retail") {
+          try { localStorage.setItem("aurora_perfil_comercio", form.industry); } catch {}
+        }
+        navigate(rubroActual.ruta);
       } else {
         if (form.remember) {
           try { localStorage.setItem(REMEMBERED_EMAIL_KEY, form.email); } catch {}
@@ -62,10 +114,23 @@ export default function Auth() {
           try { localStorage.removeItem(REMEMBERED_EMAIL_KEY); } catch {}
         }
         await login(form.email, form.password);
-        navigate("/dashboard");
+        
+        // Conexión directa a la vertical del negocio del usuario
+        let rutaDestino = "/dashboard";
+        try {
+          const rawU = localStorage.getItem("aurora_session_user");
+          if (rawU) {
+            const u = JSON.parse(rawU);
+            if (u.industry === "restaurante") rutaDestino = "/restaurante";
+            else if (u.industry === "ferreteria" || u.industry === "farmacia" || u.industry === "retail") rutaDestino = "/comercio";
+            else if (u.industry === "clinica") rutaDestino = "/mediclinic";
+          }
+        } catch {}
+
+        navigate(rutaDestino);
       }
     } catch (err) {
-      setErrors({ submit: err instanceof Error ? err.message : "No se pudo iniciar sesión" });
+      setErrors({ submit: err instanceof Error ? err.message : "No se pudo procesar la solicitud" });
     } finally {
       setEnviando(false);
     }
@@ -187,28 +252,76 @@ export default function Auth() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === "register" && (
-                <div>
-                  <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
-                    Nombre Completo
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Alejandro Ramos"
-                    value={form.nombre}
-                    onChange={(e) => set("nombre", e.target.value)}
-                    className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
-                  />
-                  {errors.nombre && <p className="text-[#ff3b80] text-xs mt-1">{errors.nombre}</p>}
-                </div>
+                <>
+                  <div>
+                    <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                      Nombre Completo
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Alejandro Ramos"
+                      value={form.nombre}
+                      onChange={(e) => set("nombre", e.target.value)}
+                      className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                    />
+                    {errors.nombre && <p className="text-[#ff3b80] text-xs mt-1">{errors.nombre}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                      Nombre de tu Negocio / Local
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Hamburguesas El Catire, Ferretería San Cristóbal, etc."
+                      value={form.empresa}
+                      onChange={(e) => set("empresa", e.target.value)}
+                      className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                    />
+                    {errors.empresa && <p className="text-[#ff3b80] text-xs mt-1">{errors.empresa}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-2">
+                      ¿De qué se trata tu negocio?
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {RUBROS_REGISTRO.map((r) => {
+                        const sel = form.industry === r.id;
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => set("industry", r.id)}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                              sel
+                                ? "bg-teal-500/20 border-teal-400 text-white shadow-[0_0_15px_rgba(45,212,191,0.25)] scale-[1.02]"
+                                : "bg-white/[0.03] hover:bg-white/[0.06] border-white/10 text-white/70 hover:text-white"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <r.Icon size={22} className={sel ? "text-teal-300" : "text-white/60"} />
+                              {sel && <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />}
+                            </div>
+                            <div className="mt-1.5">
+                              <div className="text-xs font-bold leading-tight">{r.label}</div>
+                              <div className="text-[10px] text-white/40 leading-snug mt-0.5 line-clamp-1">{r.sub}</div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
               )}
 
               <div>
                 <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
-                  Correo Electrónico
+                  {mode === "register" ? "Correo Electrónico" : "Usuario o Correo Electrónico"}
                 </label>
                 <input
-                  type="email"
-                  placeholder="usuario@empresa.com"
+                  type={mode === "register" ? "email" : "text"}
+                  placeholder={mode === "register" ? "usuario@empresa.com" : "danielrein4 o correo@empresa.com"}
                   value={form.email}
                   onChange={(e) => set("email", e.target.value)}
                   className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
@@ -306,7 +419,7 @@ export default function Auth() {
                 type="submit"
                 disabled={enviando}
                 className="w-full btn-cyber-neon text-white font-bold py-3.5 rounded-full text-sm mt-4 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
-                {enviando ? "Verificando…" : mode === "register" ? "Crear cuenta y comenzar →" : "Ingresar a la plataforma →"}
+                {enviando ? "Configurando tu negocio…" : mode === "register" ? `Crear cuenta y entrar a ${rubroActual.label} →` : "Ingresar a la plataforma →"}
               </button>
             </form>
           </div>

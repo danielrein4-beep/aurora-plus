@@ -69,8 +69,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   const res = await fetch(path, { ...options, headers });
   if (res.status === 401) {
-    manejarSesionVencida();
-    throw new ApiError("Sesión vencida — redirigiendo al login", 401);
+    // Un 401 en un endpoint de /api/auth/ (ej. login con credenciales incorrectas) es un rechazo
+    // normal del intento de autenticación, no una sesión vencida — no debe forzar la redirección a
+    // /auth (ya estamos ahí) ni pisar el mensaje real con uno genérico de "sesión vencida".
+    if (!path.includes("/api/auth/")) {
+      manejarSesionVencida();
+      throw new ApiError("Sesión vencida — redirigiendo al login", 401);
+    }
+    throw new ApiError("Usuario o contraseña incorrectos", 401);
   }
   if (!res.ok) {
     let mensaje = `Error ${res.status}`;
@@ -605,6 +611,7 @@ export interface ItemComanda {
   cantidad: number;
   precioUnitario: number;
   fechaCreacion: string;
+  notas?: string;
 }
 
 export function listarMesas(): Promise<Mesa[]> {
@@ -647,7 +654,7 @@ export function abrirComanda(tenantId: number, datos: {
 }
 
 export function agregarItemComanda(tenantId: number, comandaId: number, datos: {
-  escandalloId?: number; articuloId?: number; fastBarTragoId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number;
+  escandalloId?: number; articuloId?: number; fastBarTragoId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number; notas?: string;
 }): Promise<ItemComanda> {
   const params = new URLSearchParams({ tenantId: String(tenantId), cantidad: String(datos.cantidad) });
   if (datos.escandalloId != null) params.set("escandalloId", String(datos.escandalloId));
@@ -656,6 +663,7 @@ export function agregarItemComanda(tenantId: number, comandaId: number, datos: {
   if (datos.nombrePlato) params.set("nombrePlato", datos.nombrePlato);
   if (datos.estacionCocina) params.set("estacionCocina", datos.estacionCocina);
   if (datos.precioUnitario != null) params.set("precioUnitario", String(datos.precioUnitario));
+  if (datos.notas) params.set("notas", datos.notas);
   return request(`/api/horeca/mesas/comandas/${comandaId}/items?${params}`, { method: "POST" });
 }
 
@@ -1788,20 +1796,16 @@ export function subirResultadoPublicoLaboratorio(token: string, payload: any): P
 }
 
 export async function loginSuperAdminApi(username: string, password: string): Promise<string> {
-  try {
-    const data = await requestSuperAdmin<{ token: string }>("/api/auth/login-super-admin", {
-      method: "POST",
-      body: JSON.stringify({ username, password }),
-    });
-    return data.token;
-  } catch (err) {
-    // Si el backend no está corriendo en dev, permitir credenciales maestras predeterminadas
-    if ((username === "admin" && password === "admin123") || (username === "ceo" && password === "aurora2026")) {
-      const mockToken = `mock-super-admin-${Date.now()}`;
-      return mockToken;
-    }
-    throw err;
-  }
+  // Nunca fingir un login de super-admin exitoso — antes esto aceptaba
+  // "admin"/"admin123" o "ceo"/"aurora2026" como puerta trasera hardcodeada
+  // cada vez que el backend rechazaba o no respondía, sin importar si el
+  // rechazo era real. Un token real, firmado por el backend, es la única
+  // forma válida de entrar al panel de super-admin.
+  const data = await requestSuperAdmin<{ token: string }>("/api/auth/login-super-admin", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+  return data.token;
 }
 
 export async function listarTenantsSuperAdmin(): Promise<LicenciaTenant[]> {
@@ -1815,117 +1819,60 @@ export async function listarTenantsSuperAdmin(): Promise<LicenciaTenant[]> {
   return obtenerTenantsLocales();
 }
 
+// Las funciones de escritura de este panel (crear/activar/desactivar/renovar/
+// cambiar plan) antes fingían éxito guardando el cambio SOLO en localStorage
+// si el backend real fallaba — el super-admin veía "listo" en pantalla
+// mientras el tenant real seguía exactamente igual en el servidor. Activar o
+// desactivar el acceso de un cliente real es la peor operación para
+// equivocarse así, así que ahora todas propagan el error real tal cual.
 export async function crearTenantSuperAdmin(requestData: CrearTenantRequest): Promise<LicenciaTenant> {
-  try {
-    const nuevo = await requestSuperAdmin<LicenciaTenant>("/api/super-admin/tenants", {
-      method: "POST",
-      body: JSON.stringify(requestData),
-    });
-    if (nuevo && nuevo.tenantId) {
-      const lista = obtenerTenantsLocales();
-      guardarTenantsLocales([nuevo, ...lista]);
-      return nuevo;
-    }
-  } catch {}
-
+  const nuevo = await requestSuperAdmin<LicenciaTenant>("/api/super-admin/tenants", {
+    method: "POST",
+    body: JSON.stringify(requestData),
+  });
   const lista = obtenerTenantsLocales();
-  const nuevoTenantId = (lista.length > 0 ? Math.max(...lista.map(t => t.tenantId)) : 0) + 1;
-  const meses = requestData.mesesVigencia || 1;
-  const hoy = new Date();
-  hoy.setMonth(hoy.getMonth() + meses);
-  const vencimiento = hoy.toISOString().slice(0, 10);
-
-  const localNuevo: LicenciaTenant = {
-    id: Date.now(),
-    tenantId: nuevoTenantId,
-    nombreEmpresa: requestData.nombreEmpresa,
-    moduloPrincipal: requestData.moduloPrincipal,
-    tipoLicencia: requestData.tipoLicencia,
-    activa: true,
-    fechaVencimientoPago: vencimiento,
-    emailContacto: requestData.emailContacto,
-    telefonoContacto: requestData.telefonoContacto,
-    monedaBase: requestData.monedaBase || "USD",
-  };
-
-  guardarTenantsLocales([localNuevo, ...lista]);
-  return localNuevo;
+  guardarTenantsLocales([nuevo, ...lista]);
+  return nuevo;
 }
 
 export async function activarTenantSuperAdmin(tenantId: number): Promise<LicenciaTenant> {
-  try {
-    const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/activar`, {
-      method: "POST",
-    });
-    if (res) return res;
-  } catch {}
-
+  const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/activar`, {
+    method: "POST",
+  });
   const lista = obtenerTenantsLocales();
   const index = lista.findIndex(t => t.tenantId === tenantId);
-  if (index !== -1) {
-    lista[index].activa = true;
-    guardarTenantsLocales(lista);
-    return lista[index];
-  }
-  throw new Error("Tenant no encontrado");
+  if (index !== -1) { lista[index] = res; guardarTenantsLocales(lista); }
+  return res;
 }
 
 export async function desactivarTenantSuperAdmin(tenantId: number): Promise<LicenciaTenant> {
-  try {
-    const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/desactivar`, {
-      method: "POST",
-    });
-    if (res) return res;
-  } catch {}
-
+  const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/desactivar`, {
+    method: "POST",
+  });
   const lista = obtenerTenantsLocales();
   const index = lista.findIndex(t => t.tenantId === tenantId);
-  if (index !== -1) {
-    lista[index].activa = false;
-    guardarTenantsLocales(lista);
-    return lista[index];
-  }
-  throw new Error("Tenant no encontrado");
+  if (index !== -1) { lista[index] = res; guardarTenantsLocales(lista); }
+  return res;
 }
 
 export async function renovarTenantSuperAdmin(tenantId: number, meses: number = 1): Promise<LicenciaTenant> {
-  try {
-    const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/renovar?meses=${meses}`, {
-      method: "POST",
-    });
-    if (res) return res;
-  } catch {}
-
+  const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/renovar?meses=${meses}`, {
+    method: "POST",
+  });
   const lista = obtenerTenantsLocales();
   const index = lista.findIndex(t => t.tenantId === tenantId);
-  if (index !== -1) {
-    const fechaActual = new Date(lista[index].fechaVencimientoPago);
-    const base = isNaN(fechaActual.getTime()) || fechaActual < new Date() ? new Date() : fechaActual;
-    base.setMonth(base.getMonth() + meses);
-    lista[index].fechaVencimientoPago = base.toISOString().slice(0, 10);
-    lista[index].activa = true;
-    guardarTenantsLocales(lista);
-    return lista[index];
-  }
-  throw new Error("Tenant no encontrado");
+  if (index !== -1) { lista[index] = res; guardarTenantsLocales(lista); }
+  return res;
 }
 
 export async function cambiarPlanTenantSuperAdmin(tenantId: number, tipoLicencia: TipoLicencia): Promise<LicenciaTenant> {
-  try {
-    const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/cambiar-plan?tipoLicencia=${tipoLicencia}`, {
-      method: "POST",
-    });
-    if (res) return res;
-  } catch {}
-
+  const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/cambiar-plan?tipoLicencia=${tipoLicencia}`, {
+    method: "POST",
+  });
   const lista = obtenerTenantsLocales();
   const index = lista.findIndex(t => t.tenantId === tenantId);
-  if (index !== -1) {
-    lista[index].tipoLicencia = tipoLicencia;
-    guardarTenantsLocales(lista);
-    return lista[index];
-  }
-  throw new Error("Tenant no encontrado");
+  if (index !== -1) { lista[index] = res; guardarTenantsLocales(lista); }
+  return res;
 }
 
 export async function listarModulosTenantSuperAdmin(tenantId: number): Promise<ModuloTenant[]> {
@@ -1949,23 +1896,15 @@ export async function listarModulosTenantSuperAdmin(tenantId: number): Promise<M
 }
 
 export async function activarModuloTenantSuperAdmin(tenantId: number, moduloNombre: string, activo: boolean): Promise<ModuloTenant> {
-  try {
-    const res = await requestSuperAdmin<ModuloTenant>(`/api/super-admin/tenants/${tenantId}/modulos`, {
-      method: "POST",
-      body: JSON.stringify({ moduloNombre, activo }),
-    });
-    if (res) return res;
-  } catch {}
-
+  const res = await requestSuperAdmin<ModuloTenant>(`/api/super-admin/tenants/${tenantId}/modulos`, {
+    method: "POST",
+    body: JSON.stringify({ moduloNombre, activo }),
+  });
   const modulos = await listarModulosTenantSuperAdmin(tenantId);
   const idx = modulos.findIndex(m => m.moduloNombre === moduloNombre);
-  if (idx !== -1) {
-    modulos[idx].activo = activo;
-  } else {
-    modulos.push({ tenantId, moduloNombre, activo });
-  }
+  if (idx !== -1) modulos[idx] = res; else modulos.push(res);
   localStorage.setItem(`aurora_super_admin_modulos_${tenantId}`, JSON.stringify(modulos));
-  return { tenantId, moduloNombre, activo };
+  return res;
 }
 
 export async function crearUsuarioTenantSuperAdmin(tenantId: number, datos: {
@@ -1974,12 +1913,517 @@ export async function crearUsuarioTenantSuperAdmin(tenantId: number, datos: {
   rol?: string;
   nombreCompleto?: string;
 }): Promise<any> {
-  try {
-    return await requestSuperAdmin(`/api/super-admin/tenants/${tenantId}/usuarios`, {
-      method: "POST",
-      body: JSON.stringify(datos),
-    });
-  } catch (err) {
-    return { success: true, message: `Usuario ${datos.username} aprovisionado exitosamente para Tenant #${tenantId}` };
-  }
+  // Antes, si esto fallaba, igual devolvía {success:true} — el super-admin creía
+  // haber aprovisionado un usuario que en realidad nunca se creó en el backend.
+  return requestSuperAdmin(`/api/super-admin/tenants/${tenantId}/usuarios`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// MÓDULO FERRETERÍA & REPUESTOS (Backend: com.auroraplus.modules.repuestos)
+// ══════════════════════════════════════════════════════════════════════════
+
+export interface RepuestoItem {
+  id: number;
+  tenantId: number;
+  codigoSku: string;
+  codigoOriginalOem?: string | null;
+  descripcion: string;
+  stockActual: number;
+  precioVenta: number; // Precio detal
+  unidadBase: string; // UNIDAD, METRO, KILOGRAMO, SACO, etc.
+  precioMayorista?: number | null;
+  cantidadMinimaMayorista?: number | null;
+  costoUnitario?: number;
+}
+
+export interface PresentacionRepuesto {
+  id: number;
+  tenantId: number;
+  repuestoId?: number;
+  nombrePresentacion: string; // ej: Caja 100u, Metro, Rollo, Saco
+  factorConversion: number; // multiplicador hacia la unidad base
+  precioVenta: number;
+}
+
+export interface MovimientoRepuesto {
+  id: number;
+  tenantId: number;
+  tipo: "ENTRADA" | "SALIDA" | "AJUSTE" | "VENTA" | "COMPRA";
+  cantidad: number;
+  stockAnterior: number;
+  stockNuevo: number;
+  motivo?: string;
+  fechaRegistro: string;
+}
+
+export interface ProveedorRepuesto {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  rif?: string | null;
+  telefono?: string | null;
+  contacto?: string | null;
+  direccion?: string | null;
+  activo: boolean;
+}
+
+export interface DetalleCompraRepuesto {
+  id?: number;
+  repuesto: RepuestoItem;
+  cantidad: number;
+  costoUnitario: number;
+  subtotal: number;
+}
+
+export interface CompraRepuesto {
+  id: number;
+  tenantId: number;
+  proveedor: ProveedorRepuesto;
+  numeroFactura?: string | null;
+  fechaCompra: string;
+  total: number;
+  detalles?: DetalleCompraRepuesto[];
+}
+
+export interface ItemCompraRepuestoRequest {
+  repuestoId: number;
+  cantidad: number;
+  costoUnitario: number;
+}
+
+export interface CompraRepuestoRequest {
+  proveedorId: number;
+  numeroFactura: string;
+  items: ItemCompraRepuestoRequest[];
+}
+
+export interface ResultadoVentaRepuestoVolumen {
+  precioUnitarioAplicado: number;
+  total: number;
+  esMayorista: boolean;
+}
+
+export function listarRepuestos(): Promise<RepuestoItem[]> {
+  return request(`/api/repuestos/items`);
+}
+
+export function buscarRepuestoPorSku(tenantId: number, sku: string): Promise<RepuestoItem> {
+  return request(`/api/repuestos/items/sku/${encodeURIComponent(sku)}?tenantId=${tenantId}`);
+}
+
+export function buscarRepuestoPorOem(tenantId: number, oem: string): Promise<RepuestoItem[]> {
+  return request(`/api/repuestos/items/oem/${encodeURIComponent(oem)}?tenantId=${tenantId}`);
+}
+
+export function crearRepuesto(tenantId: number, datos: Partial<RepuestoItem>): Promise<RepuestoItem> {
+  return request(`/api/repuestos/items?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarRepuesto(id: number, datos: Partial<RepuestoItem>): Promise<RepuestoItem> {
+  return request(`/api/repuestos/items/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function eliminarRepuesto(id: number): Promise<void> {
+  return request(`/api/repuestos/items/${id}`, { method: "DELETE" });
+}
+
+export function historialMovimientosRepuesto(id: number): Promise<MovimientoRepuesto[]> {
+  return request(`/api/repuestos/items/${id}/movimientos`);
+}
+
+export function venderRepuestoPorVolumen(
+  id: number,
+  tenantId: number,
+  cantidad: number,
+  monedaPago?: string,
+  montoRecibido?: number,
+  claveIdempotencia?: string
+): Promise<ResultadoVentaRepuestoVolumen> {
+  const params = new URLSearchParams({
+    tenantId: String(tenantId),
+    cantidad: String(cantidad),
+  });
+  if (monedaPago) params.append("monedaPago", monedaPago);
+  if (montoRecibido !== undefined) params.append("montoRecibido", String(montoRecibido));
+  if (claveIdempotencia) params.append("claveIdempotencia", claveIdempotencia);
+
+  return request(`/api/repuestos/items/${id}/vender?${params.toString()}`, {
+    method: "POST",
+  });
+}
+
+export function listarPresentacionesRepuesto(tenantId: number, repuestoId: number): Promise<PresentacionRepuesto[]> {
+  return request(`/api/repuestos/presentaciones/repuesto/${repuestoId}?tenantId=${tenantId}`);
+}
+
+export function crearPresentacionRepuesto(
+  tenantId: number,
+  repuestoId: number,
+  nombrePresentacion: string,
+  factorConversion: number,
+  precioVenta: number
+): Promise<PresentacionRepuesto> {
+  const params = new URLSearchParams({
+    tenantId: String(tenantId),
+    repuestoId: String(repuestoId),
+    nombrePresentacion,
+    factorConversion: String(factorConversion),
+    precioVenta: String(precioVenta),
+  });
+  return request(`/api/repuestos/presentaciones?${params.toString()}`, {
+    method: "POST",
+  });
+}
+
+export function despacharPorPresentacion(
+  presentacionId: number,
+  tenantId: number,
+  cantidad: number,
+  monedaPago?: string,
+  montoRecibido?: number,
+  claveIdempotencia?: string
+): Promise<number> {
+  const params = new URLSearchParams({
+    tenantId: String(tenantId),
+    cantidad: String(cantidad),
+  });
+  if (monedaPago) params.append("monedaPago", monedaPago);
+  if (montoRecibido !== undefined) params.append("montoRecibido", String(montoRecibido));
+  if (claveIdempotencia) params.append("claveIdempotencia", claveIdempotencia);
+
+  return request(`/api/repuestos/presentaciones/${presentacionId}/despachar?${params.toString()}`, {
+    method: "POST",
+  });
+}
+
+export function listarProveedoresRepuesto(): Promise<ProveedorRepuesto[]> {
+  return request(`/api/repuestos/proveedores`);
+}
+
+export function crearProveedorRepuesto(tenantId: number, proveedor: Partial<ProveedorRepuesto>): Promise<ProveedorRepuesto> {
+  return request(`/api/repuestos/proveedores?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(proveedor),
+  });
+}
+
+export function actualizarProveedorRepuesto(id: number, proveedor: Partial<ProveedorRepuesto>): Promise<ProveedorRepuesto> {
+  return request(`/api/repuestos/proveedores/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(proveedor),
+  });
+}
+
+export function listarComprasRepuesto(): Promise<CompraRepuesto[]> {
+  return request(`/api/repuestos/compras`);
+}
+
+export function registrarCompraRepuesto(tenantId: number, compra: CompraRepuestoRequest): Promise<CompraRepuesto> {
+  return request(`/api/repuestos/compras?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(compra),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// --- Módulo Ganadería & Fincas ---
+// ─────────────────────────────────────────────────────────────
+
+export interface PotreroGanaderia {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  codigo?: string;
+  areaHectareas: number;
+  capacidadAnimales?: number;
+  tipoPasto?: string;
+  color?: string;
+  observaciones?: string;
+  diasDescansoMinimo?: number;
+  estado: "ACTIVO" | "EN_DESCANSO" | "EN_MANTENIMIENTO" | string;
+  ordenRotacion?: number;
+  posX?: number;
+  posY?: number;
+  ancho?: number;
+  alto?: number;
+  poligono?: [number, number][];
+  fechaInicioDescanso?: string;
+  fechaInicioUso?: string;
+}
+
+export interface AnimalGanaderia {
+  id: number;
+  tenantId: number;
+  arete: string;
+  tipoIdentificador?: "ARETE" | "CHIP" | "QR" | string;
+  nombre?: string;
+  especie?: string;
+  raza?: string;
+  sexo: "MACHO" | "HEMBRA";
+  tipoAnimal?: string;
+  fechaNacimiento?: string;
+  pesoActual?: number;
+  estado?: "ACTIVO" | "VENDIDO" | "MUERTO" | "DESCARTADO" | string;
+  potrero?: PotreroGanaderia | null;
+  costoAdquisicion?: number;
+  valorEstimado?: number;
+  codigoQr?: string;
+}
+
+export interface RegistroOrdenoGanaderia {
+  id: number;
+  tenantId: number;
+  animal: AnimalGanaderia;
+  fecha: string;
+  turno: "MANANA" | "TARDE";
+  cantidadLitros: number;
+  precioVentaLitro?: number;
+  montoVenta?: number;
+  porcentajeGrasa?: number;
+  porcentajeProteina?: number;
+}
+
+export interface ReporteOrdenoGanaderia {
+  desde: string;
+  hasta: string;
+  totalLitros: number;
+  totalIngresos: number;
+  cantidadRegistros: number;
+  registros: RegistroOrdenoGanaderia[];
+}
+
+export interface RegistroPesoGanaderia {
+  id: number;
+  tenantId: number;
+  animal: AnimalGanaderia;
+  fecha: string;
+  pesoKg: number;
+}
+
+export interface GdpGanaderiaResponse {
+  pesoInicial?: number;
+  pesoActual?: number;
+  fechaInicial?: string;
+  fechaActual?: string;
+  gananciaTotalKg?: number;
+  dias?: number;
+  gdpKgDia?: number | null;
+  cantidadPesajes: number;
+  mensaje?: string;
+}
+
+export interface VacunaGanaderia {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  diasParaRefuerzo?: number;
+  diasRetiroLeche?: number;
+  diasRetiroCarne?: number;
+}
+
+export interface AplicacionVacunaGanaderia {
+  id: number;
+  tenantId: number;
+  animal: AnimalGanaderia;
+  vacuna: VacunaGanaderia;
+  fechaAplicacion: string;
+  lote?: string;
+  veterinarioResponsable?: string;
+  costo?: number;
+  fechaProximoRefuerzo?: string;
+  fechaFinRetiroLeche?: string;
+  fechaFinRetiroCarne?: string;
+}
+
+export interface AlertaSanitariaGanaderia {
+  tipo: string;
+  animal: AnimalGanaderia;
+  producto: string;
+  fechaRelevante: string;
+  mensaje: string;
+}
+
+export interface EventoReproductivoGanaderia {
+  id: number;
+  tenantId: number;
+  hembra: AnimalGanaderia;
+  tipo: "SERVICIO" | "DIAGNOSTICO_PRENEZ" | "PARTO" | string;
+  fecha: string;
+  semental?: AnimalGanaderia;
+  sementalReferenciaExterna?: string;
+  resultado?: string;
+  fechaProbableParto?: string;
+}
+
+export interface TableroAlertasGanaderia {
+  fechaConsulta: string;
+  diasAdelante: number;
+  refuerzosVacunaPendientes: AplicacionVacunaGanaderia[];
+  retirosSanitariosVigentes: AplicacionVacunaGanaderia[];
+  partosProximos: EventoReproductivoGanaderia[];
+}
+
+export interface ResumenFinancieroGanaderia {
+  desde: string;
+  hasta: string;
+  totalGastos: number;
+  totalIngresosVenta: number;
+  utilidadNeta: number;
+  gastos: Array<{ id: number; fecha: string; categoria: string; descripcion: string; monto: number }>;
+  ventas: Array<{ id: number; fecha: string; numeroTicket: string; comprador?: string; total: number }>;
+}
+
+export function listarAnimalesGanaderia(estado?: string): Promise<AnimalGanaderia[]> {
+  const q = estado ? `?estado=${encodeURIComponent(estado)}` : "";
+  return request(`/api/ganaderia/animales${q}`);
+}
+
+export function crearAnimalGanaderia(tenantId: number, datos: {
+  arete: string;
+  tipoIdentificador?: string;
+  nombre?: string;
+  especie?: string;
+  raza?: string;
+  sexo: string;
+  tipoAnimal?: string;
+  fechaNacimiento?: string;
+  pesoActual?: number;
+  valorEstimado?: number;
+  potreroId?: number;
+}): Promise<AnimalGanaderia> {
+  return request(`/api/ganaderia/animales?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarAnimalGanaderia(id: number, tenantId: number, datos: Partial<AnimalGanaderia>): Promise<AnimalGanaderia> {
+  return request(`/api/ganaderia/animales/${id}?tenantId=${tenantId}`, {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function listarPotrerosGanaderia(): Promise<PotreroGanaderia[]> {
+  return request(`/api/ganaderia/potreros`);
+}
+
+export function crearPotreroGanaderia(tenantId: number, datos: Partial<PotreroGanaderia>): Promise<PotreroGanaderia> {
+  return request(`/api/ganaderia/potreros?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function actualizarPotreroGanaderia(id: number, tenantId: number, datos: Partial<PotreroGanaderia>): Promise<PotreroGanaderia> {
+  return request(`/api/ganaderia/potreros/${id}?tenantId=${tenantId}`, {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function rotarPotreroGanaderia(id: number, tenantId: number, potreroDestinoId: number, animalIds?: number[]): Promise<any> {
+  return request(`/api/ganaderia/potreros/${id}/rotar?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ potreroDestinoId, animalIds }),
+  });
+}
+
+export function registrarOrdenoGanaderia(tenantId: number, datos: {
+  animalId: number;
+  fecha?: string;
+  turno: string;
+  cantidadLitros: number;
+  precioVentaLitro?: number;
+  porcentajeGrasa?: number;
+  porcentajeProteina?: number;
+}): Promise<RegistroOrdenoGanaderia> {
+  return request(`/api/ganaderia/ordeno?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function obtenerReporteOrdenoGanaderia(tenantId: number, desde: string, hasta: string): Promise<ReporteOrdenoGanaderia> {
+  return request(`/api/ganaderia/ordeno/reporte?tenantId=${tenantId}&desde=${desde}&hasta=${hasta}`);
+}
+
+export function registrarPesoGanaderia(tenantId: number, animalId: number, pesoKg: number, fecha?: string): Promise<RegistroPesoGanaderia> {
+  return request(`/api/ganaderia/pesos?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ animalId, pesoKg, fecha }),
+  });
+}
+
+export function obtenerCurvaPesoGanaderia(animalId: number): Promise<RegistroPesoGanaderia[]> {
+  return request(`/api/ganaderia/pesos/animal/${animalId}`);
+}
+
+export function obtenerGdpGanaderia(animalId: number): Promise<GdpGanaderiaResponse> {
+  return request(`/api/ganaderia/pesos/animal/${animalId}/gdp`);
+}
+
+export function listarVacunasGanaderia(): Promise<VacunaGanaderia[]> {
+  return request(`/api/ganaderia/vacunas`);
+}
+
+export function crearVacunaGanaderia(tenantId: number, datos: Partial<VacunaGanaderia>): Promise<VacunaGanaderia> {
+  return request(`/api/ganaderia/vacunas?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function aplicarVacunaGanaderia(tenantId: number, datos: {
+  animalId: number;
+  vacunaId: number;
+  fechaAplicacion: string;
+  lote?: string;
+  veterinarioResponsable?: string;
+  costo?: number;
+}): Promise<AplicacionVacunaGanaderia> {
+  return request(`/api/ganaderia/vacunas/aplicar?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function obtenerAlertasSanitariasGanaderia(tenantId: number): Promise<AlertaSanitariaGanaderia[]> {
+  return request(`/api/ganaderia/sanidad/alertas?tenantId=${tenantId}`);
+}
+
+export function obtenerAlertasGanaderia(tenantId: number, diasAdelante: number = 15): Promise<TableroAlertasGanaderia> {
+  return request(`/api/ganaderia/alertas?tenantId=${tenantId}&diasAdelante=${diasAdelante}`);
+}
+
+export function registrarEventoReproductivoGanaderia(tenantId: number, datos: {
+  hembraId: number;
+  tipo: string;
+  fecha: string;
+  sementalId?: number;
+  sementalReferenciaExterna?: string;
+  resultado?: string;
+  fechaProbableParto?: string;
+  areteCria?: string;
+  sexoCria?: string;
+  pesoCria?: number;
+}): Promise<EventoReproductivoGanaderia> {
+  return request(`/api/ganaderia/reproduccion?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function obtenerFinanzasGanaderia(tenantId: number, desde: string, hasta: string): Promise<ResumenFinancieroGanaderia> {
+  return request(`/api/ganaderia/finanzas/resumen-periodo?tenantId=${tenantId}&desde=${desde}&hasta=${hasta}`);
+}
+

@@ -696,7 +696,11 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       });
   };
 
-  useEffect(() => { recargarTodo(); }, [tenantId]);
+  useEffect(() => {
+    recargarTodo();
+    const interval = setInterval(cargarContadorLab, 30000);
+    return () => clearInterval(interval);
+  }, [tenantId]);
 
   // Si no hay perfil activo seleccionado, renderizar la pantalla estilo Netflix
   if (perfilActivo === null) {
@@ -775,16 +779,18 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   <n.Icon size={16} />
                   <span className="truncate">{n.label}</span>
                 </div>
-                {n.id === "laboratorio" && inboxLabPendientes > 0 && (
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
+                  {n.id === "laboratorio" && inboxLabPendientes > 0 && (
                     <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[10px] font-black animate-pulse">
                       {inboxLabPendientes}
                     </span>
                   )}
                   {esProtegida && (
-                  <span title="Requiere clave del Doctor" className="p-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 flex-shrink-0 ml-1 border border-amber-500/20">
-                    <IconLock size={12} />
-                  </span>
-                )}
+                    <span title="Requiere clave del Doctor" className="p-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      <IconLock size={12} />
+                    </span>
+                  )}
+                </div>
               </button>
             );
           })}
@@ -882,6 +888,18 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   <span>Secretaria</span>
                 </button>
               </div>
+            )}
+
+            {inboxLabPendientes > 0 && (
+              <button
+                type="button"
+                onClick={() => intentarNavegar("laboratorio")}
+                className="px-3.5 py-1.5 rounded-2xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-600 dark:text-red-400 text-xs font-black flex items-center gap-1.5 animate-pulse cursor-pointer shadow-xs transition-all"
+                title="Exámenes de laboratorio pendientes de revisión médica"
+              >
+                <span>🔬</span>
+                <span>Inbox: {inboxLabPendientes} {inboxLabPendientes === 1 ? "examen" : "exámenes"}</span>
+              </button>
             )}
 
             <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/70 dark:bg-white/5 border border-slate-300/60 dark:border-white/15 shadow-sm text-xs">
@@ -1026,6 +1044,13 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               />
             )}
             {pagina === "laboratorio" && (
+            <InboxLaboratorioMedico
+              tenantId={tenantId}
+              medicoNombre={configPerfil.doctorNombre}
+              onActualizarContador={cargarContadorLab}
+            />
+          )}
+          {pagina === "laboratorio" && (
             <InboxLaboratorioMedico
               tenantId={tenantId}
               medicoNombre={configPerfil.doctorNombre}
@@ -2438,12 +2463,28 @@ function HistoriasClinicas({
   useEffect(() => {
     if (!pacienteSeleccionado) {
       setHistorial(null);
+      setOrdenesLab([]);
       return;
     }
     historialConsultasPaciente(Number(pacienteSeleccionado.id))
       .then(setHistorial)
       .catch(() => setHistorial([]));
+    cargarOrdenesLab();
   }, [pacienteSeleccionado]);
+
+  const [ordenesLab, setOrdenesLab] = useState<OrdenLaboratorio[]>([]);
+  const [modalNuevaOrdenLab, setModalNuevaOrdenLab] = useState(false);
+  const [ordenDetalleLab, setOrdenDetalleLab] = useState<OrdenLaboratorio | null>(null);
+
+  const cargarOrdenesLab = () => {
+    if (!pacienteSeleccionado) {
+      setOrdenesLab([]);
+      return;
+    }
+    listarOrdenesLaboratorioPaciente(tenantId, Number(pacienteSeleccionado.id))
+      .then(setOrdenesLab)
+      .catch(() => setOrdenesLab([]));
+  };
 
   const handleBuscarPaciente = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -2891,6 +2932,18 @@ function HistoriasClinicas({
                 <span>Tel: {pacienteSeleccionado.telefono || "No registrado"}</span>
               </div>
             </div>
+
+            {/* Acción de Laboratorio */}
+            <div className="flex items-center gap-2 pl-2">
+              <button
+                type="button"
+                onClick={() => setModalNuevaOrdenLab(true)}
+                className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs shadow-md shadow-teal-500/20 flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap active:scale-95"
+              >
+                <span>🔬</span>
+                <span>Emitir Orden de Laboratorio</span>
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -3033,6 +3086,84 @@ function HistoriasClinicas({
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* ── SECCIÓN DE ÓRDENES Y RESULTADOS DE LABORATORIO DEL PACIENTE ── */}
+      {pacienteSeleccionado && ordenesLab.length > 0 && (
+        <div className="rounded-3xl p-5 bg-teal-500/5 border border-teal-500/25 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🧪</span>
+              <h4 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white uppercase tracking-wider">
+                Órdenes & Resultados de Laboratorio Clínico ({ordenesLab.length})
+              </h4>
+            </div>
+            <button
+              type="button"
+              onClick={() => setModalNuevaOrdenLab(true)}
+              className="px-3 py-1.5 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-600 dark:text-teal-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
+            >
+              <span>➕</span> Nueva Orden
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {ordenesLab.map((ord) => (
+              <div
+                key={ord.id}
+                className={`rounded-2xl p-4 border text-xs space-y-2.5 transition-all ${
+                  ord.resultado?.valoresCriticos
+                    ? "border-red-500/50 bg-red-500/10 shadow-sm"
+                    : ord.estado === "SELLADA"
+                    ? "border-teal-500/40 bg-teal-500/10"
+                    : "border-slate-200 dark:border-white/10 bg-white/50 dark:bg-black/20"
+                }`}
+              >
+                <div className="flex justify-between items-start gap-1">
+                  <div>
+                    <span className="font-mono font-bold text-teal-600 dark:text-teal-300 text-xs">{ord.codigoOrden}</span>
+                    <p className="text-[10px] text-slate-400">{new Date(ord.fechaEmision).toLocaleDateString("es-VE")}</p>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                    ord.estado === "SELLADA"
+                      ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                      : "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                  }`}>
+                    {ord.estado === "SELLADA" ? "✓ Resultados Listos" : "⏳ Esperando Lab"}
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Exámenes:</span>
+                  <p className="text-[11px] text-slate-700 dark:text-slate-200 font-medium line-clamp-2 bg-white/40 dark:bg-black/30 p-2 rounded-lg">
+                    {ord.examenesSolicitados}
+                  </p>
+                </div>
+
+                {ord.estado === "SELLADA" && ord.resultado && (
+                  <div className="pt-2 border-t border-slate-200 dark:border-white/10 space-y-1.5">
+                    <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400">
+                      <span>Laboratorio:</span>
+                      <strong className="text-slate-900 dark:text-white truncate max-w-[140px]">{ord.resultado.nombreLaboratorio}</strong>
+                    </div>
+                    {ord.resultado.valoresCriticos && (
+                      <span className="block px-2 py-0.5 rounded-md bg-red-500/20 text-red-600 dark:text-red-300 text-[10px] font-bold">
+                        🚨 {ord.resultado.detalleValoresCriticos || "Valor crítico reportado"}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setOrdenDetalleLab(ord)}
+                      className="w-full mt-1 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-[11px] transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1"
+                    >
+                      <span>🔍</span> Ver Informe Completo & Fotos
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -3725,6 +3856,142 @@ function HistoriasClinicas({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA EMITIR ORDEN DE LABORATORIO */}
+      {modalNuevaOrdenLab && pacienteSeleccionado && (
+        <ModalNuevaOrdenLab
+          tenantId={tenantId}
+          pacientePreseleccionado={pacienteSeleccionado}
+          medicoNombre={config.doctorNombre}
+          onClose={() => setModalNuevaOrdenLab(false)}
+          onOrdenCreada={(nueva) => {
+            setModalNuevaOrdenLab(false);
+            setOrdenesLab((prev) => [nueva, ...prev]);
+            alert(`¡Orden ${nueva.codigoOrden} generada! El paciente o laboratorio puede acceder mediante el enlace o código QR.`);
+          }}
+        />
+      )}
+
+      {/* MODAL DETALLE DE RESULTADO DE LABORATORIO */}
+      {ordenDetalleLab && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="max-w-3xl w-full bg-slate-900 border border-teal-500/40 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl my-8 text-left text-white max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-800">
+              <div>
+                <span className="text-xs font-bold text-teal-400 uppercase tracking-wider">
+                  Informe de Resultados de Laboratorio Clínico
+                </span>
+                <h3 className="font-['Outfit'] font-black text-2xl text-white mt-0.5">
+                  {ordenDetalleLab.pacienteNombre}
+                </h3>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                  Orden: {ordenDetalleLab.codigoOrden} • C.I.: {ordenDetalleLab.pacienteCedula || "S/D"}
+                </p>
+              </div>
+              <button
+                onClick={() => setOrdenDetalleLab(null)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-sm transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div>
+                <span className="text-slate-500 block">Laboratorio Emisor:</span>
+                <strong className="text-teal-300 text-sm">{ordenDetalleLab.resultado?.nombreLaboratorio || "Laboratorio Clínico"}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Bioanalista Responsable:</span>
+                <span className="text-white font-medium">{ordenDetalleLab.resultado?.bioanalistaResponsable || "No indicado"}</span>
+                {ordenDetalleLab.resultado?.colegiaturaBioanalista && (
+                  <span className="text-slate-400 block text-[10px]">Col: {ordenDetalleLab.resultado.colegiaturaBioanalista}</span>
+                )}
+              </div>
+              <div>
+                <span className="text-slate-500 block">Fecha y Hora de Carga:</span>
+                <span className="text-slate-300 font-mono">
+                  {ordenDetalleLab.resultado?.fechaCarga ? new Date(ordenDetalleLab.resultado.fechaCarga).toLocaleString("es-VE") : "Reciente"}
+                </span>
+              </div>
+            </div>
+
+            {ordenDetalleLab.resultado?.valoresCriticos && (
+              <div className="bg-red-500/20 border border-red-500/50 rounded-2xl p-4 text-xs text-red-200 space-y-1">
+                <span className="font-black text-red-400 text-sm flex items-center gap-1.5">
+                  <span>🚨</span> ALERTA DE VALOR CRÍTICO / RANGO DE PÁNICO
+                </span>
+                <p className="text-sm font-semibold">{ordenDetalleLab.resultado.detalleValoresCriticos}</p>
+              </div>
+            )}
+
+            {ordenDetalleLab.resultado?.informeDetallado && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-teal-400 uppercase tracking-wider">
+                  📝 Informe Analítico / Microscopía / Conteos:
+                </h4>
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-sm text-slate-200 whitespace-pre-wrap font-mono leading-relaxed max-h-60 overflow-y-auto">
+                  {ordenDetalleLab.resultado.informeDetallado}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              {ordenDetalleLab.resultado?.conclusionDiagnostica && (
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3">
+                  <span className="text-slate-400 font-semibold block mb-1">Conclusión Bioanalista:</span>
+                  <p className="text-slate-200 font-medium">{ordenDetalleLab.resultado.conclusionDiagnostica}</p>
+                </div>
+              )}
+              {ordenDetalleLab.resultado?.observacionesMuestra && (
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3">
+                  <span className="text-slate-400 font-semibold block mb-1">Observaciones de la Muestra:</span>
+                  <p className="text-slate-200 font-medium">{ordenDetalleLab.resultado.observacionesMuestra}</p>
+                </div>
+              )}
+            </div>
+
+            {ordenDetalleLab.resultado?.adjuntos && ordenDetalleLab.resultado.adjuntos.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <h4 className="text-xs font-bold text-teal-400 uppercase tracking-wider">
+                  📸 Evidencias Fotográficas & Documentos ({ordenDetalleLab.resultado.adjuntos.length})
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {ordenDetalleLab.resultado.adjuntos.map((adj, idx) => {
+                    const esImagen = adj.tipoMime.startsWith("image/") || adj.contenidoBase64.startsWith("data:image");
+                    return (
+                      <div
+                        key={idx}
+                        className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden p-2 text-center group cursor-pointer hover:border-teal-500/50 transition-all"
+                        onClick={() => {
+                          const win = window.open();
+                          if (esImagen) {
+                            win?.document.write(`<img src="${adj.contenidoBase64}" style="max-width:100%; height:auto; margin:auto; display:block;" />`);
+                          } else {
+                            win?.document.write(`<iframe src="${adj.contenidoBase64}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                          }
+                        }}
+                      >
+                        {esImagen ? (
+                          <div className="w-full h-28 rounded-xl overflow-hidden bg-slate-900 mb-2">
+                            <img src={adj.contenidoBase64} alt={adj.nombreArchivo} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          </div>
+                        ) : (
+                          <div className="w-full h-28 rounded-xl bg-slate-900 flex flex-col items-center justify-center text-3xl mb-2 text-red-400">
+                            <span>📄</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase mt-1">Ver PDF</span>
+                          </div>
+                        )}
+                        <p className="text-[11px] text-slate-300 truncate font-medium">{adj.nombreArchivo}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
