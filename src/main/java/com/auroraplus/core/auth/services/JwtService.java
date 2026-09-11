@@ -39,13 +39,14 @@ public class JwtService {
         return Keys.hmacShaKeyFor(secretConfigurado.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generarTokenTenant(Long tenantId, String username, String rol) {
+    public String generarTokenTenant(Long tenantId, String username, String rol, int tokenVersion) {
         Instant ahora = Instant.now();
         return Jwts.builder()
             .subject(username)
             .claim("tipo", "TENANT")
             .claim("tenantId", tenantId)
             .claim("rol", rol)
+            .claim("tokenVersion", tokenVersion)
             .issuedAt(Date.from(ahora))
             .expiration(Date.from(ahora.plusSeconds(expiracionHorasTenant * 3600)))
             .signWith(signingKey())

@@ -38,7 +38,8 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(rateLimitInterceptor)
             .addPathPatterns(
                 "/api/auth/login", "/api/auth/login-super-admin", "/api/auth/login-directo",
-                "/api/auth/registro-negocio", "/api/auth/olvide-clave", "/api/auth/resetear-clave"
+                "/api/auth/registro-negocio", "/api/auth/olvide-clave", "/api/auth/resetear-clave",
+                "/api/public/contacto"
             );
         registry.addInterceptor(tenantInterceptor)
             .addPathPatterns("/api/**")

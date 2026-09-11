@@ -79,7 +79,7 @@ public class AuthService {
             throw new RuntimeException("Usuario o contraseña incorrectos");
         }
 
-        String token = jwtService.generarTokenTenant(tenantId, usuario.getUsername(), usuario.getRol().name());
+        String token = jwtService.generarTokenTenant(tenantId, usuario.getUsername(), usuario.getRol().name(), usuario.getTokenVersion());
         return new ResultadoLogin(token, usuario.getRol().name(), usuario.getUsername(), tenantId);
     }
 
@@ -102,7 +102,7 @@ public class AuthService {
         if (!usuario.isActivo() || !passwordEncoder.matches(password, usuario.getPasswordHash())) {
             throw new RuntimeException("Usuario o contraseña incorrectos");
         }
-        String token = jwtService.generarTokenTenant(usuario.getTenantId(), usuario.getUsername(), usuario.getRol().name());
+        String token = jwtService.generarTokenTenant(usuario.getTenantId(), usuario.getUsername(), usuario.getRol().name(), usuario.getTokenVersion());
         return new ResultadoLogin(token, usuario.getRol().name(), usuario.getUsername(), usuario.getTenantId());
     }
 
@@ -220,6 +220,9 @@ public class AuthService {
         Usuario usuario = usuarioRepository.findById(tokenEntity.getUsuarioId())
             .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         usuario.setPasswordHash(passwordEncoder.encode(nuevaClave));
+        // Invalida cualquier token emitido antes de este cambio — ver el comentario en
+        // Usuario.tokenVersion y la verificación en TenantInterceptor.
+        usuario.setTokenVersion(usuario.getTokenVersion() + 1);
         usuarioRepository.save(usuario);
 
         tokenEntity.setUsado(true);

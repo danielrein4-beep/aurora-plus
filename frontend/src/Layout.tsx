@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Nav from "./Nav";
 import { AuroraGradientDef } from "./Icons";
 import SuperAdminPortal from "./components/SuperAdminPortal";
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
   
   // 5-Clicks Easter Egg Trigger para CEOs de Aurora
@@ -67,8 +68,13 @@ export default function Layout() {
           </div>
 
           <div className="flex flex-wrap justify-center gap-6 text-sm text-slate-500 dark:text-white/35">
-            {["Privacidad", "Términos", "Soporte", "Documentación", "Blog", "Contacto"].map((l) => (
-              <button key={l} className="hover:text-slate-900 dark:hover:text-white/80 transition-colors cursor-pointer">{l}</button>
+            {[
+              { label: "Privacidad", to: "/privacidad" },
+              { label: "Términos", to: "/terminos" },
+              { label: "Soporte", to: "/nosotros" },
+              { label: "Contacto", to: "/nosotros" },
+            ].map((l) => (
+              <button key={l.label} onClick={() => navigate(l.to)} className="hover:text-slate-900 dark:hover:text-white/80 transition-colors cursor-pointer">{l.label}</button>
             ))}
           </div>
           <p className="text-slate-400 dark:text-white/20 text-xs">© 2026 Aurora Plus. Todos los derechos reservados.</p>

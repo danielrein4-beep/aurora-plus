@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { IconChat, IconMail, IconInstagram, IconCheck } from "../Icons";
+import { enviarContacto } from "../api";
 
 const VALORES = [
   { title: "Simplicidad", desc: "La tecnología debe facilitar el trabajo, no complicarlo. Diseñamos cada pantalla pensando en el usuario final, no en el programador." },
@@ -28,10 +29,21 @@ export default function Nosotros() {
     mensaje: "",
   });
   const [enviado, setEnviado] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEnviado(true);
+    setError(null);
+    setEnviando(true);
+    try {
+      await enviarContacto(form);
+      setEnviado(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo enviar el mensaje. Intenta de nuevo.");
+    } finally {
+      setEnviando(false);
+    }
   };
 
   return (
@@ -155,11 +167,14 @@ export default function Nosotros() {
                   <div className="w-16 h-16 rounded-2xl g-aurora flex items-center justify-center mb-4 text-white shadow-lg"><IconCheck size={26} /></div>
                   <h3 className="font-['Outfit'] font-bold text-2xl text-slate-900 dark:text-white mb-2">Mensaje recibido</h3>
                   <p className="text-slate-500 dark:text-white/45 text-sm max-w-xs">
-                    Te contactaremos en menos de 24 horas hábiles.
+                    Te contactaremos pronto.
                   </p>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {error && (
+                    <p className="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">{error}</p>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-slate-700 dark:text-white/40 text-xs mb-1.5 block font-medium">Nombre completo</label>
@@ -197,9 +212,9 @@ export default function Nosotros() {
                       value={form.mensaje} onChange={(e) => setForm({ ...form, mensaje: e.target.value })}
                       className="w-full bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/20 focus:outline-none focus:border-teal-400 transition-colors resize-none" />
                   </div>
-                  <button type="submit"
-                    className="w-full g-aurora glow-teal text-white font-semibold py-3.5 rounded-xl text-sm hover:opacity-90 transition-opacity cursor-pointer shadow-md">
-                    Enviar mensaje
+                  <button type="submit" disabled={enviando}
+                    className="w-full g-aurora glow-teal text-white font-semibold py-3.5 rounded-xl text-sm hover:opacity-90 transition-opacity cursor-pointer shadow-md disabled:opacity-50">
+                    {enviando ? "Enviando…" : "Enviar mensaje"}
                   </button>
                 </form>
               )}

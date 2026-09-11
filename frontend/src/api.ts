@@ -86,6 +86,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+// Formulario público de "Contáctanos" (Nosotros.tsx) — antes solo hacía
+// setEnviado(true) sin llamar a ningún lado, así que "te contactaremos en
+// 24h" era falso.
+export async function enviarContacto(datos: {
+  nombre: string;
+  empresa?: string;
+  email: string;
+  industria?: string;
+  mensaje?: string;
+}): Promise<{ message: string }> {
+  return request<{ message: string }>("/api/public/contacto", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
 // Para endpoints que devuelven texto plano (ej. GET .../moneda-base responde
 // "USD" sin comillas, Content-Type text/plain) — request() con .json() falla
 // a parsear eso y el error queda silenciado por el try/catch del llamador.

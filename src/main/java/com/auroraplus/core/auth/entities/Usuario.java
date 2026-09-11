@@ -48,6 +48,13 @@ public class Usuario {
     @Column(nullable = false)
     private boolean activo = true;
 
+    /** Se incrementa cada vez que cambia la contraseña (ver AuthService.resetearClave) — el JWT
+     * lleva este mismo número como claim, así que un token emitido ANTES del cambio deja de ser
+     * válido de inmediato (ver TenantInterceptor) en vez de seguir sirviendo hasta su expiración
+     * natural. Sin esto, cambiar la clave no cerraba sesiones ya abiertas en otros dispositivos. */
+    @Column(name = "token_version", nullable = false)
+    private int tokenVersion = 0;
+
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();
 
@@ -65,6 +72,8 @@ public class Usuario {
     public void setNombreCompleto(String nombreCompleto) { this.nombreCompleto = nombreCompleto; }
     public boolean isActivo() { return activo; }
     public void setActivo(boolean activo) { this.activo = activo; }
+    public int getTokenVersion() { return tokenVersion; }
+    public void setTokenVersion(int tokenVersion) { this.tokenVersion = tokenVersion; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
 }
