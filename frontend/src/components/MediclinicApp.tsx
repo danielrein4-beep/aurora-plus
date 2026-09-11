@@ -4501,7 +4501,9 @@ function Procedimientos({
       setCotizaciones((prev) => prev.filter((c) => c.id !== id));
       dispararToast("Registro eliminado.");
       if (cot?.backendId) {
-        eliminarCotizacionApi(cot.backendId).catch(() => {});
+        eliminarCotizacionApi(cot.backendId).catch((err) => {
+          dispararToast(`⚠️ Se quitó de la lista, pero no se pudo eliminar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+        });
       }
     }
   };
@@ -5391,7 +5393,9 @@ function SalaEspera({
 
       // Backend sync
       if (admitirPacienteId && tenantId) {
-        registrarLlegadaSalaEspera(tenantId, Number(admitirPacienteId), admitirConsultorio).catch(() => {});
+        registrarLlegadaSalaEspera(tenantId, Number(admitirPacienteId), admitirConsultorio).catch((err) => {
+          dispararToast(`⚠️ El paciente quedó en la sala de espera local, pero no se pudo registrar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+        });
       }
 
       // Agregar al final (los nuevos van abajo, el primero queda arriba)
