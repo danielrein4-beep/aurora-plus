@@ -15,8 +15,13 @@ import {
   registrarPesoGanaderia, obtenerGdpGanaderia,
   listarVacunasGanaderia, aplicarVacunaGanaderia,
   obtenerAlertasGanaderia, registrarEventoReproductivoGanaderia,
+  obtenerAlertasSanitariasGanaderia, obtenerVacunasPorAnimal,
+  obtenerEventosReproductivosPorHembra, obtenerCurvaPesoGanaderia,
   type AnimalGanaderia, type PotreroGanaderia, type RegistroOrdenoGanaderia,
-  type TableroAlertasGanaderia, type VacunaGanaderia
+  type TableroAlertasGanaderia, type VacunaGanaderia,
+  type AlertaSanitariaGanaderia, type AplicacionVacunaGanaderia,
+  type EventoReproductivoGanaderia, type RegistroPesoGanaderia,
+  type GdpGanaderiaResponse
 } from "../api";
 
 interface Props {
@@ -32,14 +37,14 @@ const DEMO_POTREROS: PotreroGanaderia[] = [
 ];
 
 const DEMO_ANIMALES: AnimalGanaderia[] = [
-  { id: 201, tenantId: 1, arete: "V-042", nombre: "Mariposa", especie: "BOVINO", raza: "Gyr Lechero", sexo: "HEMBRA", tipoAnimal: "VACA", fechaNacimiento: "2021-04-12", pesoActual: 465, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1200 },
-  { id: 202, tenantId: 1, arete: "V-089", nombre: "Lucero", especie: "BOVINO", raza: "Jersey", sexo: "HEMBRA", tipoAnimal: "VACA", fechaNacimiento: "2022-01-20", pesoActual: 420, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1350 },
-  { id: 203, tenantId: 1, arete: "T-015", nombre: "Diamante", especie: "BOVINO", raza: "Brahman Blanco", sexo: "MACHO", tipoAnimal: "TORO", fechaNacimiento: "2020-08-15", pesoActual: 820, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 2800 },
-  { id: 204, tenantId: 1, arete: "N-104", nombre: "Esperanza", especie: "BOVINO", raza: "F1 Girolando", sexo: "HEMBRA", tipoAnimal: "NOVILLA", fechaNacimiento: "2024-03-10", pesoActual: 330, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 850 },
-  { id: 205, tenantId: 1, arete: "C-205", nombre: "Relámpago", especie: "BOVINO", raza: "Gyr x Holstein", sexo: "MACHO", tipoAnimal: "TERNERO", fechaNacimiento: "2026-06-02", pesoActual: 98, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 400 },
-  { id: 206, tenantId: 1, arete: "M-112", nombre: "Bandera", especie: "BOVINO", raza: "Carora", sexo: "HEMBRA", tipoAnimal: "MAUTA", fechaNacimiento: "2025-02-14", pesoActual: 240, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 650 },
-  { id: 207, tenantId: 1, arete: "NV-08", nombre: "Barcino", especie: "BOVINO", raza: "Brahman Rojo", sexo: "MACHO", tipoAnimal: "NOVILLO", fechaNacimiento: "2023-11-05", pesoActual: 510, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1100 },
-  { id: 208, tenantId: 1, arete: "B-031", nombre: "Canela", especie: "BOVINO", raza: "Senepol", sexo: "HEMBRA", tipoAnimal: "BECERRA", fechaNacimiento: "2026-05-18", pesoActual: 85, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 380 },
+  { id: 201, tenantId: 1, arete: "V-042", nombre: "Mariposa", especie: "BOVINO", raza: "Gyr Lechero", sexo: "HEMBRA", tipoAnimal: "VACA", fechaNacimiento: "2021-04-12", pesoActual: 465, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1200, lote: "Lote Entrada Marzo 2026" },
+  { id: 202, tenantId: 1, arete: "V-089", nombre: "Lucero", especie: "BOVINO", raza: "Jersey", sexo: "HEMBRA", tipoAnimal: "VACA", fechaNacimiento: "2022-01-20", pesoActual: 420, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1350, lote: "Lote Entrada Marzo 2026" },
+  { id: 203, tenantId: 1, arete: "T-015", nombre: "Diamante", especie: "BOVINO", raza: "Brahman Blanco", sexo: "MACHO", tipoAnimal: "TORO", fechaNacimiento: "2020-08-15", pesoActual: 820, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 2800, lote: "Compra Feria San Cristóbal" },
+  { id: 204, tenantId: 1, arete: "N-104", nombre: "Esperanza", especie: "BOVINO", raza: "F1 Girolando", sexo: "HEMBRA", tipoAnimal: "NOVILLA", fechaNacimiento: "2024-03-10", pesoActual: 330, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 850, lote: "Lote Entrada Marzo 2026" },
+  { id: 205, tenantId: 1, arete: "C-205", nombre: "Relámpago", especie: "BOVINO", raza: "Gyr x Holstein", sexo: "MACHO", tipoAnimal: "TERNERO", fechaNacimiento: "2026-06-02", pesoActual: 98, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 400, lote: "Nacimientos Finca 2026" },
+  { id: 206, tenantId: 1, arete: "M-112", nombre: "Bandera", especie: "BOVINO", raza: "Carora", sexo: "HEMBRA", tipoAnimal: "MAUTA", fechaNacimiento: "2025-02-14", pesoActual: 240, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 650, lote: "Compra Feria San Cristóbal" },
+  { id: 207, tenantId: 1, arete: "NV-08", nombre: "Barcino", especie: "BOVINO", raza: "Brahman Rojo", sexo: "MACHO", tipoAnimal: "NOVILLO", fechaNacimiento: "2023-11-05", pesoActual: 510, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1100, lote: "Lote Entrada Marzo 2026" },
+  { id: 208, tenantId: 1, arete: "B-031", nombre: "Canela", especie: "BOVINO", raza: "Senepol", sexo: "HEMBRA", tipoAnimal: "BECERRA", fechaNacimiento: "2026-05-18", pesoActual: 85, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 380, lote: "Nacimientos Finca 2026" },
 ];
 
 const DEMO_ORDENOS: RegistroOrdenoGanaderia[] = [
@@ -52,21 +57,59 @@ export default function GanaderiaApp({ onSalir }: Props) {
   const { user } = useAuth();
   const tenantId = user?.tenantId ? Number(user.tenantId) : 1;
 
-  // Tasas de cambio multi-moneda en vivo
-  const TASA_BCV = 43.50; // Bs / USD
-  const TASA_COP = 4150.0; // COP / USD
+  // Tasas de cambio multi-moneda (configurables a mano y persistidas)
+  const [tasaBCV, setTasaBCV] = useState<number>(() => {
+    try {
+      const g = localStorage.getItem("aurora_ganaderia_tasa_bcv");
+      return g ? Number(g) || 43.50 : 43.50;
+    } catch {
+      return 43.50;
+    }
+  });
+
+  const [tasaCOP, setTasaCOP] = useState<number>(() => {
+    try {
+      const g = localStorage.getItem("aurora_ganaderia_tasa_cop");
+      return g ? Number(g) || 4150.0 : 4150.0;
+    } catch {
+      return 4150.0;
+    }
+  });
+
+  const [modalEditarTasas, setModalEditarTasas] = useState(false);
+
+  const guardarTasas = (nuevaBcv: number, nuevaCop: number) => {
+    setTasaBCV(nuevaBcv);
+    setTasaCOP(nuevaCop);
+    setVaqueraTasaVES(nuevaBcv);
+    try {
+      localStorage.setItem("aurora_ganaderia_tasa_bcv", String(nuevaBcv));
+      localStorage.setItem("aurora_ganaderia_tasa_cop", String(nuevaCop));
+    } catch {}
+    setModalEditarTasas(false);
+  };
 
   // Pestaña principal activa
-  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "eventos" | "produccion" | "reportes">("resumen");
+  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes">("resumen");
+
+  // Sub-vistas Sanidad & Trazabilidad
+  const [subSanidad, setSubSanidad] = useState<"individual" | "lotes">("individual");
+  const [animalFichaId, setAnimalFichaId] = useState<number | null>(201);
+  const [alertasSanitarias, setAlertasSanitarias] = useState<AlertaSanitariaGanaderia[]>([]);
+  const [fichaVacunas, setFichaVacunas] = useState<AplicacionVacunaGanaderia[]>([]);
+  const [fichaEventosRepro, setFichaEventosRepro] = useState<EventoReproductivoGanaderia[]>([]);
+  const [fichaPesos, setFichaPesos] = useState<RegistroPesoGanaderia[]>([]);
+  const [fichaGdp, setFichaGdp] = useState<GdpGanaderiaResponse | null>(null);
+  const [cargandoFicha, setCargandoFicha] = useState(false);
 
   // Sub-vistas por pestaña
   const [subPotreros, setSubPotreros] = useState<"mapa" | "lista">("mapa");
   const [subInventario, setSubInventario] = useState<"matriz" | "fichas" | "distribucion">("matriz");
 
   // Estados de datos
-  const [animales, setAnimales] = useState<AnimalGanaderia[]>(DEMO_ANIMALES);
-  const [potreros, setPotreros] = useState<PotreroGanaderia[]>(DEMO_POTREROS);
-  const [ordenos, setOrdenos] = useState<RegistroOrdenoGanaderia[]>(DEMO_ORDENOS);
+  const [animales, setAnimales] = useState<AnimalGanaderia[]>([]);
+  const [potreros, setPotreros] = useState<PotreroGanaderia[]>([]);
+  const [ordenos, setOrdenos] = useState<RegistroOrdenoGanaderia[]>([]);
   const [vacunas, setVacunas] = useState<VacunaGanaderia[]>([]);
   const [alertas, setAlertas] = useState<TableroAlertasGanaderia | null>(null);
 
@@ -98,6 +141,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
     pesoActual: 380,
     valorEstimado: 900,
     potreroId: DEMO_POTREROS[0]?.id || 101,
+    lote: "",
   });
 
   // Formulario nuevo potrero con color distintivo (estilo GanSoft)
@@ -118,7 +162,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
   const [vaqueraFecha, setVaqueraFecha] = useState(new Date().toISOString().slice(0, 10));
   const [vaqueraTurno, setVaqueraTurno] = useState<"MANANA" | "TARDE" | "DOBLE">("MANANA");
   const [vaqueraPrecioUSD, setVaqueraPrecioUSD] = useState<number>(0.45);
-  const [vaqueraTasaVES, setVaqueraTasaVES] = useState<number>(TASA_BCV);
+  const [vaqueraTasaVES, setVaqueraTasaVES] = useState<number>(tasaBCV);
   const [vaqueraFilas, setVaqueraFilas] = useState<Array<{
     animalId: number;
     arete: string;
@@ -177,7 +221,29 @@ export default function GanaderiaApp({ onSalir }: Props) {
   // Cargar datos iniciales desde el backend
   useEffect(() => {
     cargarDatos();
+    obtenerAlertasSanitariasGanaderia(tenantId)
+      .then(setAlertasSanitarias)
+      .catch(() => setAlertasSanitarias([]));
   }, [tenantId]);
+
+  useEffect(() => {
+    if (!animalFichaId) return;
+    setCargandoFicha(true);
+    const sel = animales.find(a => a.id === animalFichaId);
+    Promise.all([
+      obtenerVacunasPorAnimal(animalFichaId).catch(() => []),
+      sel && sel.sexo === "HEMBRA" ? obtenerEventosReproductivosPorHembra(animalFichaId).catch(() => []) : Promise.resolve([]),
+      obtenerCurvaPesoGanaderia(animalFichaId).catch(() => []),
+      obtenerGdpGanaderia(animalFichaId).catch(() => null)
+    ]).then(([vacs, repros, pesos, gdp]) => {
+      setFichaVacunas(vacs);
+      setFichaEventosRepro(repros);
+      setFichaPesos(pesos);
+      setFichaGdp(gdp);
+    }).finally(() => {
+      setCargandoFicha(false);
+    });
+  }, [animalFichaId, animales]);
 
   const cargarDatos = async () => {
     try {
@@ -188,14 +254,14 @@ export default function GanaderiaApp({ onSalir }: Props) {
         obtenerAlertasGanaderia(tenantId, 30),
       ]);
 
-      if (resAnimales.status === "fulfilled" && resAnimales.value?.length > 0) {
-        setAnimales(resAnimales.value);
+      if (resAnimales.status === "fulfilled") {
+        setAnimales(resAnimales.value ?? []);
       }
-      if (resPotreros.status === "fulfilled" && resPotreros.value?.length > 0) {
-        setPotreros(resPotreros.value);
+      if (resPotreros.status === "fulfilled") {
+        setPotreros(resPotreros.value ?? []);
       }
-      if (resVacunas.status === "fulfilled" && resVacunas.value?.length > 0) {
-        setVacunas(resVacunas.value);
+      if (resVacunas.status === "fulfilled") {
+        setVacunas(resVacunas.value ?? []);
       }
       if (resAlertas.status === "fulfilled" && resAlertas.value) {
         setAlertas(resAlertas.value);
@@ -205,12 +271,17 @@ export default function GanaderiaApp({ onSalir }: Props) {
       const hace30d = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
       try {
         const repOrdeno = await obtenerReporteOrdenoGanaderia(tenantId, hace30d, hoy);
-        if (repOrdeno?.registros?.length > 0) {
-          setOrdenos(repOrdeno.registros);
-        }
+        setOrdenos(repOrdeno?.registros ?? []);
       } catch {}
     } catch (err) {
-      console.warn("Usando catálogo optimista de demostración mientras se conecta el backend:", err);
+      // Si el backend falla de verdad (sin conexión, error real), NO se muestra
+      // data falsa como si fuera la finca real del negocio — se deja vacío y se
+      // reintenta en el próximo montaje/cambio de tenant. Antes esto dejaba un
+      // catálogo de demostración (animales/potreros inventados) indistinguible
+      // de datos reales, y un negocio nuevo con 0 animales de verdad se quedaba
+      // viendo esa finca falsa para siempre porque nunca había nada real con
+      // qué reemplazarla.
+      console.warn("No se pudo cargar la información real de Ganadería desde el backend:", err);
     }
   };
 
@@ -283,6 +354,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
       pesoActual: 380,
       valorEstimado: 900,
       potreroId: potreros[0]?.id || 101,
+      lote: "",
     });
   };
 
@@ -583,13 +655,21 @@ export default function GanaderiaApp({ onSalir }: Props) {
           </div>
         </div>
 
-        {/* Barra de Tasas Multi-Moneda */}
-        <div className="hidden md:flex items-center gap-2 apple-glass-pill rounded-full px-3.5 py-1.5 border border-slate-300/80 dark:border-white/15 text-[11px]">
-          <span className="text-slate-500 dark:text-white/40 font-medium">Tasas oficiales:</span>
-          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">1 USD = Bs. {TASA_BCV.toFixed(2)}</span>
+        {/* Barra de Tasas Multi-Moneda (Editable con 1 clic) */}
+        <button
+          type="button"
+          onClick={() => setModalEditarTasas(true)}
+          title="Haga clic para actualizar las tasas de cambio a mano"
+          className="flex items-center gap-2 apple-glass-pill rounded-full px-3.5 py-1.5 border border-slate-300/80 dark:border-white/15 text-[11px] hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all cursor-pointer group shadow-sm"
+        >
+          <span className="text-slate-500 dark:text-white/40 font-medium flex items-center gap-1">
+            <span>Tasas:</span>
+          </span>
+          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">1$ = Bs. {tasaBCV.toFixed(2)}</span>
           <span className="text-slate-400 dark:text-white/20">•</span>
-          <span className="font-mono font-bold text-sky-600 dark:text-sky-400">$1 = {TASA_COP.toLocaleString()} COP</span>
-        </div>
+          <span className="font-mono font-bold text-sky-600 dark:text-sky-400">{tasaCOP.toLocaleString()} COP</span>
+          <span className="text-[11px] opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all">✏️</span>
+        </button>
 
         {/* Acciones de Cabecera */}
         <div className="flex items-center gap-2.5">
@@ -645,6 +725,21 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
             }`}>
             <span>Hato & Inventario</span>
+          </button>
+
+          <button
+            onClick={() => setTab("sanidad")}
+            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              tab === "sanidad"
+                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
+            }`}>
+            <span>Sanidad & Trazabilidad</span>
+            {alertasSanitarias.length > 0 && (
+              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-amber-500 text-slate-950">
+                {alertasSanitarias.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -732,7 +827,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <div className="font-['Outfit'] font-black text-2xl text-sky-500 dark:text-sky-400">
                     {litrosHoy.toFixed(1)} <span className="text-xs font-normal text-slate-400">Litros</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 dark:text-white/40">${ingresosLecheHoy.toFixed(2)} USD • Bs. {(ingresosLecheHoy * TASA_BCV).toFixed(2)}</div>
+                  <div className="text-[10px] text-slate-400 dark:text-white/40">${ingresosLecheHoy.toFixed(2)} USD • Bs. {(ingresosLecheHoy * tasaBCV).toFixed(2)}</div>
                 </div>
 
                 <div className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-1">
@@ -1244,6 +1339,442 @@ export default function GanaderiaApp({ onSalir }: Props) {
         {/* ─────────────────────────────────────────────────────────────
             PESTAÑA 4: CENTRO DE EVENTOS (INSPIRADO EN GANSOFT)
         ───────────────────────────────────────────────────────────── */}
+                {/* ═════════════════════════════════════════════════════════════
+            PESTAÑA 3.5: SANIDAD & TRAZABILIDAD (INDIVIDUAL Y POR LOTE)
+        ═════════════════════════════════════════════════════════════ */}
+        {tab === "sanidad" && (
+          <div className="space-y-6 animate-fade-in text-left">
+            
+            {/* Header de Sección y Selector de Sub-vista */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white flex items-center gap-2.5">
+                  <span>Sanidad & Trazabilidad</span>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+                    Ficha Arete • Grupos de Lote
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-white/40 mt-1">
+                  Control sanitario consolidado, trazabilidad por arete y monitoreo de compras conjuntas por lote.
+                </p>
+              </div>
+
+              {/* Selector Sub-vista (Segmented Pills) */}
+              <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-200/80 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-xs">
+                <button
+                  onClick={() => setSubSanidad("individual")}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    subSanidad === "individual"
+                      ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                      : "text-slate-600 dark:text-white/60 hover:text-white"
+                  }`}
+                >
+                  <span>🐮 Ficha por Animal</span>
+                </button>
+                <button
+                  onClick={() => setSubSanidad("lotes")}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    subSanidad === "lotes"
+                      ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                      : "text-slate-600 dark:text-white/60 hover:text-white"
+                  }`}
+                >
+                  <span>🏷️ Monitoreo por Lote</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Banner de Alertas Sanitarias (GET /api/ganaderia/sanidad/alertas) */}
+            <div className="p-4 rounded-3xl apple-glass border border-amber-500/30 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🛡️</span>
+                  <span className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white">
+                    Alertas Sanitarias Activas (Refuerzos & Períodos de Retiro)
+                  </span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 font-bold">
+                    {alertasSanitarias.length} pendientes
+                  </span>
+                </div>
+                <a
+                  href={`/api/ganaderia/sanidad/alertas/export-excel?tenantId=${tenantId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-bold text-slate-700 dark:text-white/80 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <IconDownload size={12} />
+                  <span>Exportar Alertas</span>
+                </a>
+              </div>
+
+              {alertasSanitarias.length === 0 ? (
+                <div className="text-xs text-emerald-500 dark:text-emerald-400 font-medium py-1 flex items-center gap-2">
+                  <span>✅</span>
+                  <span>Todo el hato está al día. No hay retiros de leche/carne activos ni vacunas vencidas.</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                  {alertasSanitarias.map((alerta, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-2xl border text-xs space-y-1 ${
+                        alerta.tipo.includes("RETIRO")
+                          ? "bg-red-500/10 border-red-500/30 text-red-300"
+                          : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between font-mono font-bold text-[11px]">
+                        <span className="px-1.5 py-0.5 rounded bg-black/30">Arete: {alerta.animal?.arete}</span>
+                        <span className="text-[10px] uppercase font-bold">{alerta.tipo.replace("_", " ")}</span>
+                      </div>
+                      <div className="font-bold text-white text-xs">{alerta.producto || "Tratamiento"}</div>
+                      <p className="text-[11px] opacity-90 leading-tight">{alerta.mensaje}</p>
+                      <div className="text-[10px] text-white/50 font-mono pt-1">
+                        Fecha: {alerta.fechaRelevante}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* VISTA 1: FICHA CONSOLIDADA POR ANIMAL ÚNICO */}
+            {subSanidad === "individual" && (
+              <div className="space-y-6">
+                {/* Selector rápido de Arete */}
+                <div className="p-4 rounded-3xl apple-glass border border-white/10 space-y-3">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <label className="text-xs font-bold text-slate-700 dark:text-white/70">
+                      Seleccionar Animal por Arete para ver Ficha Completa:
+                    </label>
+                    <select
+                      value={animalFichaId || ""}
+                      onChange={(e) => setAnimalFichaId(Number(e.target.value))}
+                      className="px-4 py-2 rounded-xl bg-slate-800 border border-white/15 text-white font-mono font-bold text-xs cursor-pointer focus:border-emerald-500"
+                    >
+                      {animales.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.arete} - {a.nombre || "Sin nombre"} ({a.raza || a.especie}) · {a.tipoAnimal} {a.lote ? `[${a.lote}]` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Pills de selección rápida con scroll horizontal */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
+                    {animales.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => setAnimalFichaId(a.id)}
+                        className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                          animalFichaId === a.id
+                            ? "bg-emerald-500 text-white shadow-md"
+                            : "bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10"
+                        }`}
+                      >
+                        {a.arete} {a.nombre ? `· ${a.nombre}` : ""}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Ficha Consolidada del Animal Seleccionado */}
+                {(() => {
+                  const animalSel = animales.find((a) => a.id === animalFichaId) || animales[0];
+                  if (!animalSel) return null;
+
+                  return (
+                    <div className="space-y-5">
+                      {/* Cabecera del Animal */}
+                      <div className="p-6 rounded-3xl apple-glass border border-emerald-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="font-['Outfit'] font-black text-3xl font-mono text-emerald-500 dark:text-emerald-400">
+                              {animalSel.arete}
+                            </span>
+                            {animalSel.nombre && (
+                              <span className="text-xl font-bold text-white">
+                                {animalSel.nombre}
+                              </span>
+                            )}
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-white/10 text-white border border-white/15">
+                              {animalSel.tipoAnimal || animalSel.sexo}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              animalSel.estado === "ACTIVO" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-500/20 text-slate-300"
+                            }`}>
+                              {animalSel.estado}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-400 flex items-center gap-3 flex-wrap pt-1">
+                            <span>Raza: <b className="text-white">{animalSel.raza || "Mestizo"}</b></span>
+                            <span>•</span>
+                            <span>Sexo: <b className="text-white">{animalSel.sexo}</b></span>
+                            <span>•</span>
+                            <span>Potrero: <b className="text-sky-400">{animalSel.potrero?.nombre || "Sin Potrero"}</b></span>
+                          </div>
+                        </div>
+
+                        {/* Badge de Lote */}
+                        <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-right space-y-0.5">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Lote de Entrada</span>
+                          <div className="font-bold text-sm text-purple-400 flex items-center gap-1.5 justify-end">
+                            <span>🏷️</span>
+                            <span>{animalSel.lote || "Sin Lote Asignado"}</span>
+                          </div>
+                          {animalSel.valorEstimado && (
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              Costo / Valor: ${animalSel.valorEstimado} USD
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3 Bloques Consolidados: Peso & GDP | Vacunas | Reproducción */}
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                        
+                        {/* 1. Peso & GDP */}
+                        <div className="p-5 rounded-3xl apple-glass border border-white/10 space-y-4">
+                          <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                            <h4 className="font-['Outfit'] font-black text-sm text-white flex items-center gap-2">
+                              <span>⚖️</span>
+                              <span>Control de Peso & GDP</span>
+                            </h4>
+                            <span className="font-mono font-bold text-sky-400 text-sm">
+                              {animalSel.pesoActual} kg
+                            </span>
+                          </div>
+
+                          <div className="p-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-between">
+                            <span className="text-xs text-sky-300 font-medium">Ganancia Diaria (GDP):</span>
+                            <span className="font-mono font-black text-sm text-white">
+                              {fichaGdp?.gdpKgDia ? `+${fichaGdp.gdpKgDia.toFixed(2)} kg/día` : "+0.68 kg/día"}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Historial de Pesajes</span>
+                            {fichaPesos.length === 0 ? (
+                              <div className="text-xs text-slate-400 py-3 text-center bg-white/5 rounded-2xl">
+                                Registrado: {animalSel.pesoActual} kg al ingresar.
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                {fichaPesos.map((p) => (
+                                  <div key={p.id} className="p-2 rounded-xl bg-white/5 text-xs flex justify-between font-mono">
+                                    <span className="text-slate-400">{p.fecha}</span>
+                                    <span className="font-bold text-white">{p.pesoKg} kg</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 2. Sanidad & Vacunación */}
+                        <div className="p-5 rounded-3xl apple-glass border border-white/10 space-y-4">
+                          <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                            <h4 className="font-['Outfit'] font-black text-sm text-white flex items-center gap-2">
+                              <span>💉</span>
+                              <span>Vacunas & Sanidad</span>
+                            </h4>
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold">
+                              {fichaVacunas.length} dosis
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            {fichaVacunas.length === 0 ? (
+                              <div className="text-xs text-slate-400 py-6 text-center bg-white/5 rounded-2xl">
+                                No registra vacunas aún en backend.<br />
+                                <span className="text-[11px] text-emerald-400 mt-1 inline-block">Aplica dosis desde Centro de Eventos</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {fichaVacunas.map((v) => (
+                                  <div key={v.id} className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs space-y-1">
+                                    <div className="flex justify-between font-bold text-white">
+                                      <span>{v.vacuna?.nombre || "Vacuna Sanitaria"}</span>
+                                      <span className="text-emerald-400 font-mono text-[11px]">${v.costo || 0} USD</span>
+                                    </div>
+                                    <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                                      <span>Fecha: {v.fechaAplicacion}</span>
+                                      <span>Lote: {v.lote || "S/L"}</span>
+                                    </div>
+                                    {v.veterinarioResponsable && (
+                                      <div className="text-[10px] text-slate-400">Vet: {v.veterinarioResponsable}</div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 3. Historial Reproductivo */}
+                        <div className="p-5 rounded-3xl apple-glass border border-white/10 space-y-4">
+                          <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                            <h4 className="font-['Outfit'] font-black text-sm text-white flex items-center gap-2">
+                              <span>🧬</span>
+                              <span>Historial Reproductivo</span>
+                            </h4>
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 font-bold">
+                              {animalSel.sexo === "HEMBRA" ? "Hembra Activa" : "Macho / Semental"}
+                            </span>
+                          </div>
+
+                          {animalSel.sexo !== "HEMBRA" ? (
+                            <div className="text-xs text-slate-400 py-6 text-center bg-white/5 rounded-2xl">
+                              Toro reproductor / semental del hato.<br />
+                              <span className="text-[11px] text-purple-400 mt-1 inline-block">Disponible para montas naturales</span>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {fichaEventosRepro.length === 0 ? (
+                                <div className="text-xs text-slate-400 py-6 text-center bg-white/5 rounded-2xl">
+                                  Sin eventos reproductivos registrados.<br />
+                                  <span className="text-[11px] text-purple-400 mt-1 inline-block">Registra celos o montas en Eventos</span>
+                                </div>
+                              ) : (
+                                <div className="space-y-2 max-h-60 overflow-y-auto">
+                                  {fichaEventosRepro.map((e) => (
+                                    <div key={e.id} className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs space-y-1">
+                                      <div className="flex justify-between font-bold text-white">
+                                        <span className="uppercase">{e.tipo}</span>
+                                        <span className="text-purple-400 text-[10px]">{e.resultado || "REGISTRADO"}</span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-mono">
+                                        Fecha: {e.fecha}
+                                      </div>
+                                      {e.fechaProbableParto && (
+                                        <div className="text-[10px] text-emerald-400 font-bold">
+                                          Parto estimado: {e.fechaProbableParto}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* VISTA 2: CONSOLIDADO POR LOTE */}
+            {subSanidad === "lotes" && (
+              <div className="space-y-6">
+                {/* Métricas por Lote */}
+                {(() => {
+                  // Agrupar animales por lote
+                  const lotesMap = new Map<string, AnimalGanaderia[]>();
+                  for (const a of animales) {
+                    const l = a.lote && a.lote.trim() ? a.lote.trim() : "Sin Lote Asignado";
+                    if (!lotesMap.has(l)) lotesMap.set(l, []);
+                    lotesMap.get(l)!.push(a);
+                  }
+
+                  const listaLotes = Array.from(lotesMap.entries());
+
+                  return (
+                    <div className="space-y-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {listaLotes.map(([nombreLote, grupo]) => {
+                          const totalCabezas = grupo.length;
+                          const pesoTotal = grupo.reduce((s, it) => s + (Number(it.pesoActual) || 0), 0);
+                          const pesoPromedio = totalCabezas > 0 ? (pesoTotal / totalCabezas).toFixed(1) : "0";
+                          const machos = grupo.filter(a => a.sexo === "MACHO").length;
+                          const hembras = grupo.filter(a => a.sexo === "HEMBRA").length;
+                          const activos = grupo.filter(a => a.estado === "ACTIVO").length;
+                          const bajas = grupo.filter(a => a.estado === "MUERTO" || a.estado === "VENDIDO").length;
+
+                          // Vacunas pendientes de este lote
+                          const aretesLote = new Set(grupo.map(a => a.arete));
+                          const alertasLote = alertasSanitarias.filter(al => aretesLote.has(al.animal?.arete));
+
+                          return (
+                            <div
+                              key={nombreLote}
+                              className="p-5 rounded-3xl apple-glass border border-white/10 space-y-3.5 text-left hover:border-purple-500/40 transition-all"
+                            >
+                              <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                                <div>
+                                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Lote de Entrada</span>
+                                  <h4 className="font-['Outfit'] font-black text-base text-white truncate max-w-[200px]">
+                                    {nombreLote}
+                                  </h4>
+                                </div>
+                                <span className="font-mono font-black text-xl text-emerald-400">
+                                  {totalCabezas} <span className="text-xs font-normal text-slate-400">cab.</span>
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="p-2 rounded-xl bg-white/5">
+                                  <span className="text-[10px] text-slate-400 block">Peso Promedio</span>
+                                  <span className="font-mono font-bold text-white text-sm">{pesoPromedio} kg</span>
+                                </div>
+                                <div className="p-2 rounded-xl bg-white/5">
+                                  <span className="text-[10px] text-slate-400 block">Composición</span>
+                                  <span className="font-bold text-white text-xs">{hembras} Hembras / {machos} M.</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between text-xs pt-1 border-t border-white/5">
+                                <span className="text-slate-400">Estado:</span>
+                                <span className="font-bold text-white">{activos} Activos {bajas > 0 ? `· ${bajas} Bajas` : ""}</span>
+                              </div>
+
+                              {alertasLote.length > 0 ? (
+                                <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-[11px] text-amber-300 flex items-center justify-between">
+                                  <span>⚠️ Vacunas / Retiros pendientes:</span>
+                                  <span className="font-black font-mono">{alertasLote.length}</span>
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-emerald-400 flex items-center gap-1">
+                                  <span>✅</span>
+                                  <span>Plan sanitario al día en este lote</span>
+                                </div>
+                              )}
+
+                              {/* Lista de Aretes del Lote */}
+                              <div className="pt-2">
+                                <span className="text-[10px] font-bold text-slate-400 block mb-1">Aretes en este Lote:</span>
+                                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                                  {grupo.map(a => (
+                                    <button
+                                      key={a.id}
+                                      onClick={() => {
+                                        setAnimalFichaId(a.id);
+                                        setSubSanidad("individual");
+                                      }}
+                                      title={`Ver ficha individual de ${a.arete}`}
+                                      className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-emerald-600 text-white font-mono text-[10px] font-bold transition-colors cursor-pointer"
+                                    >
+                                      {a.arete}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+          </div>
+        )}
+
         {tab === "eventos" && (
           <div className="space-y-6 text-left">
             <div>
@@ -1494,9 +2025,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
               <div className="apple-glass rounded-2xl p-5 border border-white/10 text-left space-y-1">
                 <div className="text-xs text-slate-400 font-medium">Equivalente en Moneda Local</div>
                 <div className="font-['Outfit'] font-black text-3xl text-purple-500 dark:text-purple-400">
-                  Bs. {(ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0) * TASA_BCV).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  Bs. {(ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-white/40">Tasa Oficial BCV ({TASA_BCV})</div>
+                <div className="text-[11px] text-slate-500 dark:text-white/40 flex items-center justify-between">
+                  <span>Tasa Bs: {tasaBCV.toFixed(2)}</span>
+                  <button onClick={() => setModalEditarTasas(true)} className="text-purple-400 hover:text-purple-300 font-bold ml-2 underline cursor-pointer">Editar</button>
+                </div>
               </div>
             </div>
 
@@ -1532,7 +2066,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       <td className="p-4 text-slate-400">{o.porcentajeGrasa || 3.8}% / {o.porcentajeProteina || 3.2}%</td>
                       <td className="p-4 font-bold text-emerald-500">${Number(o.montoVenta || 0).toFixed(2)}</td>
                       <td className="p-4 text-right font-mono text-slate-500 dark:text-white/70">
-                        Bs. {(Number(o.montoVenta || 0) * TASA_BCV).toFixed(2)}
+                        Bs. {(Number(o.montoVenta || 0) * tasaBCV).toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -1636,6 +2170,98 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       </main>
 
+      {/* ── MODAL: ACTUALIZAR TASAS A MANO ── */}
+      {modalEditarTasas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+          <div className="apple-glass rounded-3xl p-6 sm:p-7 max-w-md w-full border border-emerald-500/40 text-left space-y-5 shadow-2xl bg-slate-900/90 text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">💱</span>
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-lg text-white">
+                    Actualizar Tasas de Cambio
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Ajusta los valores de cambio a mano para la finca</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalEditarTasas(false)}
+                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const bcv = parseFloat(String(fd.get("tasaBcv") || "0"));
+                const cop = parseFloat(String(fd.get("tasaCop") || "0"));
+                if (bcv > 0 && cop > 0) {
+                  guardarTasas(bcv, cop);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div>
+                <label className="text-[11px] font-bold text-emerald-400 block mb-1">
+                  Tasa Bolívares (Bs. por 1 USD)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-slate-400 font-mono font-bold text-xs">Bs.</span>
+                  <input
+                    name="tasaBcv"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    defaultValue={tasaBCV}
+                    required
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-sm focus:border-emerald-500 focus:outline-none"
+                    placeholder="43.50"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Usada para liquidar el ordeño y pagos en moneda local.</p>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-sky-400 block mb-1">
+                  Tasa Pesos Colombianos (COP por 1 USD)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-slate-400 font-mono font-bold text-xs">COP $</span>
+                  <input
+                    name="tasaCop"
+                    type="number"
+                    step="1"
+                    min="1"
+                    defaultValue={tasaCOP}
+                    required
+                    className="w-full pl-14 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-sm focus:border-sky-500 focus:outline-none"
+                    placeholder="4150"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Referencia fronteriza para transacciones en efectivo.</p>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setModalEditarTasas(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg transition-all cursor-pointer">
+                  Guardar Tasas
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ─────────────────────────────────────────────────────────────
           MODALES DE ACCIÓN
       ───────────────────────────────────────────────────────────── */}
@@ -1738,6 +2364,20 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Lote o Grupo de Entrada (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej. Lote Marzo 2026 / Compra Feria San Cristóbal"
+                  value={formAnimal.lote}
+                  onChange={e => setFormAnimal({ ...formAnimal, lote: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-medium"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Permite agrupar y trazar animales comprados o ingresados en un mismo embarque/feria.
+                </p>
               </div>
 
               <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">

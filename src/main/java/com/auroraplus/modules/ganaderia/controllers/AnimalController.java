@@ -68,6 +68,7 @@ public class AnimalController {
         public BigDecimal pesoActual;
         public BigDecimal valorEstimado; // opcional — valor de referencia contable para un animal que YA se tenía (no una compra real)
         public Long potreroId;
+        public String lote; // Grupo de entrada conjunta (ej. "Lote Marzo 2026", "Compra Subasta")
     }
 
     /**
@@ -102,6 +103,7 @@ public class AnimalController {
         animal.setFechaNacimiento(request.fechaNacimiento);
         animal.setPesoActual(request.pesoActual);
         animal.setCostoAdquisicion(request.valorEstimado);
+        animal.setLote(request.lote);
         animal.setEstado("ACTIVO");
 
         if (request.potreroId != null) {
@@ -186,6 +188,7 @@ public class AnimalController {
         animal.setRaza(datos.getRaza());
         animal.setTipoAnimal(datos.getTipoAnimal());
         animal.setPesoActual(datos.getPesoActual());
+        if (datos.getLote() != null) animal.setLote(datos.getLote());
         return ResponseEntity.ok(animalRepository.save(animal));
     }
 

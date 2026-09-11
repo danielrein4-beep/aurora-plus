@@ -82,6 +82,10 @@ public class Animal {
     @Column(name = "tipo_identificador", length = 10)
     private String tipoIdentificador = "ARETE";
 
+    // Grupo de entrada conjunta (ej: "Lote Marzo 2026", "Compra Feria San Cristóbal")
+    @Column(name = "lote", length = 255)
+    private String lote;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -116,6 +120,8 @@ public class Animal {
     public void setCostoAdquisicion(BigDecimal costoAdquisicion) { this.costoAdquisicion = costoAdquisicion; }
     public String getTipoIdentificador() { return tipoIdentificador; }
     public void setTipoIdentificador(String tipoIdentificador) { this.tipoIdentificador = tipoIdentificador; }
+    public String getLote() { return lote; }
+    public void setLote(String lote) { this.lote = lote; }
 
     /**
      * Clasificación automática por edad/sexo (Bovino, la más común — para otras
