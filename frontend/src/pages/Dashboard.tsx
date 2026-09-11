@@ -390,6 +390,23 @@ export default function Dashboard() {
             <IconCustomize size={14} />
             <span>Cambiar Rubro</span>
           </button>
+
+          {/* Teaser "Próximamente" de Análisis de KPI — NO ES UN LINK REAL, solo para que el
+              cliente sepa que viene. OJO al construirlo de verdad: los KPI que importan son
+              distintos por rubro (rotación de inventario en Ferretería no es lo mismo que
+              litros/vaca en Ganadería u ocupación de mesas en Horeca) — no hacer un dashboard
+              genérico único para las 5 verticales, cada una necesita sus propias métricas. */}
+          <button
+            type="button"
+            title="Próximamente: análisis de KPI hecho a la medida de tu rubro"
+            onClick={() => alert("🔒 Análisis de KPI — muy pronto vas a poder ver las métricas clave de tu negocio, hechas a la medida de tu rubro. ¡Ya viene en camino!")}
+            className="px-3.5 py-2 rounded-full font-medium transition-all duration-300 text-slate-400 dark:text-white/25 hover:text-slate-500 dark:hover:text-white/40 hover:bg-white/40 dark:hover:bg-white/8 flex items-center gap-1.5 text-xs opacity-70">
+            <span>🔒</span>
+            <span>Análisis de KPI</span>
+            <span className="text-[9px] font-black uppercase tracking-wider bg-violet-500/15 text-violet-500 dark:text-violet-300 px-1.5 py-0.5 rounded-full">
+              Próximamente
+            </span>
+          </button>
         </nav>
 
         {/* Derecha: Botón Directo a Mediclinic + Estado + Salir */}
