@@ -29,7 +29,7 @@ import {
 // ══════════════════════════════════════════════════════════════════════════
 // TIPOS Y MODELOS
 // ══════════════════════════════════════════════════════════════════════════
-export type PerfilComercio = "ferreteria" | "farmacia" | "retail";
+export type PerfilComercio = "ferreteria" | "farmacia" | "retail" | "repuestos";
 
 export interface ProductoComercio {
   id: string;
@@ -265,24 +265,16 @@ function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaA
 export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const { user } = useAuth();
 
-  // Rubro Activo: Ferretería, Farmacia o Retail (Cambiable con 1 clic)
-  const [perfilActivo, setPerfilActivo] = useState<PerfilComercio>(() => {
-    try {
-      const guardado = localStorage.getItem("aurora_perfil_comercio");
-      if (guardado === "farmacia" || guardado === "ferreteria" || guardado === "retail") return guardado;
-      if (user?.industry === "farmacia") return "farmacia";
-      if (user?.industry === "ferreteria") return "ferreteria";
-      if (user?.industry === "retail") return "retail";
-      return "ferreteria";
-    } catch {
-      return "ferreteria";
-    }
-  });
-
-  const cambiarPerfil = (nuevo: PerfilComercio) => {
-    setPerfilActivo(nuevo);
-    try { localStorage.setItem("aurora_perfil_comercio", nuevo); } catch {}
-  };
+  // Rubro Activo: fijo al que el tenant realmente contrató (user.industry), nunca
+  // elegible por el usuario — antes había un switcher de 3 pestañas que dejaba a
+  // CUALQUIER tenant saltar entre Ferretería/Farmacia/Retail viendo el mismo
+  // catálogo (tabla repuestos_items) solo con otra etiqueta encima. Cada rubro
+  // debe verse estrictamente separado, igual que MediClinic o Ganadería.
+  const perfilActivo: PerfilComercio =
+    user?.industry === "farmacia" ? "farmacia" :
+    user?.industry === "retail" ? "retail" :
+    user?.industry === "repuestos" ? "repuestos" :
+    "ferreteria";
 
   // Motor Multi-Tasa Fronterizo (USDT / BCV / COP / Propia)
   const [tipoTasaActiva, setTipoTasaActiva] = useState<"USDT" | "BCV" | "PERSONALIZADA">(() => {
@@ -695,16 +687,17 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const nombreLocal = user?.empresa || (
     perfilActivo === "ferreteria" ? "Ferretería & Repuestos El Tornillo" :
     perfilActivo === "farmacia" ? "Farmacia & Droguería San Cristóbal" :
+    perfilActivo === "repuestos" ? "Repuestos Automotrices El Motor" :
     "Comercio & Minimarket Express"
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-['Inter'] selection:bg-teal-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-['Inter'] selection:bg-teal-500 selection:text-white">
       
       {/* ── HEADER SUPERIOR COMERCIAL: GLASSMORPHISM & MULTI-TASA ── */}
-      <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-xl border-b border-slate-800 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+      <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 shadow-lg">
         
-        {/* Izquierda: Logo + Perfil Switcher */}
+        {/* Izquierda: Logo + Nombre del Negocio */}
         <div className="flex items-center gap-4">
           <button
             onClick={onSalir}
@@ -712,60 +705,33 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             title="Volver al Hub General"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-400 p-0.5 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+              <div className="w-full h-full bg-slate-50 dark:bg-slate-950 rounded-[10px] flex items-center justify-center">
                 {perfilActivo === "farmacia" ? <IconPrescription size={18} className="text-teal-400" /> :
-                 perfilActivo === "ferreteria" ? <IconHardware size={18} className="text-teal-400" /> :
+                 perfilActivo === "ferreteria" || perfilActivo === "repuestos" ? <IconHardware size={18} className="text-teal-400" /> :
                  <IconRetail size={18} className="text-teal-400" />}
               </div>
             </div>
             <div>
-              <div className="font-['Outfit'] font-black text-base text-white leading-tight flex items-center gap-1.5">
+              <div className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white leading-tight flex items-center gap-1.5">
                 <span>{nombreLocal}</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-400 border border-teal-500/30 font-mono">
                   {perfilActivo.toUpperCase()}
                 </span>
               </div>
-              <div className="text-[10px] text-slate-400 tracking-wider uppercase">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 tracking-wider uppercase">
                 Aurora Retail · Sistema de Mostrador
               </div>
             </div>
           </button>
 
-          {/* Switcher Rápido de Perfil Comercial */}
-          <div className="hidden md:flex items-center gap-1 p-1 bg-slate-800/80 rounded-xl border border-slate-700/60 text-xs">
-            <button
-              onClick={() => cambiarPerfil("ferreteria")}
-              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                perfilActivo === "ferreteria" ? "bg-teal-600 text-white shadow-md" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <span>🔨 Ferretería & Partes</span>
-            </button>
-            <button
-              onClick={() => cambiarPerfil("farmacia")}
-              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                perfilActivo === "farmacia" ? "bg-emerald-600 text-white shadow-md" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <span>💊 Farmacia & Lotes</span>
-            </button>
-            <button
-              onClick={() => cambiarPerfil("retail")}
-              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                perfilActivo === "retail" ? "bg-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <span>🛍️ Retail & Minimarket</span>
-            </button>
-          </div>
         </div>
 
         {/* Centro: Pestañas Principales */}
-        <nav className="flex items-center gap-1 bg-slate-800/60 p-1 rounded-full border border-slate-700/50 text-xs">
+        <nav className="flex items-center gap-1 bg-slate-100/70 dark:bg-slate-800/60 p-1 rounded-full border border-slate-300/60 dark:border-slate-700/50 text-xs">
           <button
             onClick={() => setTab("pos")}
             className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              tab === "pos" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
+              tab === "pos" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-500 dark:text-slate-400 hover:text-white"
             }`}
           >
             <span>🛒 POS Mostrador</span>
@@ -773,7 +739,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           <button
             onClick={() => setTab("inventario")}
             className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              tab === "inventario" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
+              tab === "inventario" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-500 dark:text-slate-400 hover:text-white"
             }`}
           >
             <span>📦 Inventario & Stock</span>
@@ -781,7 +747,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           <button
             onClick={() => setTab("clientes")}
             className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              tab === "clientes" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
+              tab === "clientes" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-500 dark:text-slate-400 hover:text-white"
             }`}
           >
             <span>👥 Clientes & Crédito</span>
@@ -789,7 +755,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           <button
             onClick={() => setTab("cierre")}
             className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              tab === "cierre" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
+              tab === "cierre" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-500 dark:text-slate-400 hover:text-white"
             }`}
           >
             <span>🔒 Cierre Z</span>
@@ -798,7 +764,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             type="button"
             title="Próximamente: tu catálogo público con precios y código QR para que tus clientes lo vean desde el celular"
             onClick={() => mostrarToast("🔒 Catálogo QR — muy pronto vas a poder compartir tus precios con un código QR. ¡Ya viene en camino!", "info")}
-            className="px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 hover:text-slate-300 opacity-70"
+            className="px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 opacity-70"
           >
             <span>🔒 Catálogo QR</span>
             <span className="text-[9px] font-black uppercase tracking-wider bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full">
@@ -813,60 +779,60 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           <div className="relative">
             <button
               onClick={() => setPopoverTasa((v) => !v)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800 border border-teal-500/30 text-xs font-mono font-bold hover:border-teal-400 transition-all cursor-pointer shadow-inner"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-teal-500/30 text-xs font-mono font-bold hover:border-teal-400 transition-all cursor-pointer shadow-inner"
               title="Cambiar tasa activa (USDT / BCV / COP)"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-teal-400">{tipoTasaActiva}: Bs. {tasaActivaBs.toFixed(2)}</span>
-              <span className="text-slate-400 text-[10px]">· COP {tasaCop.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
-              <span className="text-slate-500 text-[9px]">▼</span>
+              <span className="text-slate-500 dark:text-slate-400 text-[10px]">· COP {tasaCop.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+              <span className="text-slate-500 dark:text-slate-400 text-[9px]">▼</span>
             </button>
 
             {popoverTasa && (
-              <div className="absolute right-0 mt-2 z-50 w-72 bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                  <span className="text-xs font-bold text-white">Tasa Activa para Venta</span>
-                  <button onClick={() => setPopoverTasa(false)} className="text-slate-400 hover:text-white"><IconClose size={14} /></button>
+              <div className="absolute right-0 mt-2 z-50 w-72 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-300 dark:border-slate-700 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">Tasa Activa para Venta</span>
+                  <button onClick={() => setPopoverTasa(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white"><IconClose size={14} /></button>
                 </div>
 
-                <div className="grid grid-cols-3 gap-1 p-1 bg-slate-800 rounded-xl text-xs">
+                <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs">
                   <button
                     onClick={() => { setTipoTasaActiva("USDT"); try { localStorage.setItem("aurora_tipo_tasa_activa", "USDT"); } catch {} }}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "USDT" ? "bg-emerald-600 text-white" : "text-slate-400"}`}
+                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "USDT" ? "bg-emerald-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
                   >💎 USDT</button>
                   <button
                     onClick={() => { setTipoTasaActiva("BCV"); try { localStorage.setItem("aurora_tipo_tasa_activa", "BCV"); } catch {} }}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "BCV" ? "bg-teal-600 text-white" : "text-slate-400"}`}
+                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "BCV" ? "bg-teal-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
                   >🏛️ BCV</button>
                   <button
                     onClick={() => { setTipoTasaActiva("PERSONALIZADA"); try { localStorage.setItem("aurora_tipo_tasa_activa", "PERSONALIZADA"); } catch {} }}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "PERSONALIZADA" ? "bg-amber-600 text-white" : "text-slate-400"}`}
+                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "PERSONALIZADA" ? "bg-amber-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
                   >✏️ Propia</button>
                 </div>
 
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-400">Tasa USDT ($):</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Tasa USDT ($):</span>
                     <input
                       type="number" step="0.01" value={tasaUsdtVal}
                       onChange={(e) => { setTasaUsdtVal(e.target.value); try { localStorage.setItem("aurora_tasa_usdt_val", e.target.value); } catch {} }}
-                      className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-700 font-mono text-right text-xs"
+                      className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-right text-xs"
                     />
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-400">Tasa BCV ($):</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Tasa BCV ($):</span>
                     <input
                       type="number" step="0.01" value={tasaBcvVal}
                       onChange={(e) => setTasaBcvVal(e.target.value)}
-                      className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-700 font-mono text-right text-xs"
+                      className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-right text-xs"
                     />
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-400">Pesos COP:</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Pesos COP:</span>
                     <input
                       type="number" step="1" value={tasaCopVal}
                       onChange={(e) => setTasaCopVal(e.target.value)}
-                      className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-700 font-mono text-right text-xs"
+                      className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-right text-xs"
                     />
                   </div>
                   {tipoTasaActiva === "PERSONALIZADA" && (
@@ -875,7 +841,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       <input
                         type="number" step="0.01" placeholder="Ej. 66.50" value={tasaPersVal}
                         onChange={(e) => setTasaPersVal(e.target.value)}
-                        className="w-24 px-2 py-1 rounded bg-slate-800 border border-amber-500/40 font-mono text-right text-xs font-bold text-amber-300"
+                        className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-amber-500/40 font-mono text-right text-xs font-bold text-amber-300"
                       />
                     </div>
                   )}
@@ -892,7 +858,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
           <button
             onClick={onSalir}
-            className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+            className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
           >
             Salir al Hub
           </button>
@@ -909,11 +875,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-115px)]">
             
             {/* Columna Izquierda (7 cols): Catálogo, Buscador & Categorías */}
-            <div className="lg:col-span-7 xl:col-span-8 flex flex-col h-full bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-slate-800 overflow-hidden shadow-xl">
+            <div className="lg:col-span-7 xl:col-span-8 flex flex-col h-full bg-white/60 dark:bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl">
               
               {/* Barra de Búsqueda Reactiva */}
               <div className="relative mb-3 flex-shrink-0">
-                <IconSearch size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <IconSearch size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -926,16 +892,16 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       ? "🔍 Buscar por producto, código de parte (ej. TORN-38, Hilux), medida o código de barra..."
                       : "🔍 Buscar producto, marca o escanear código de barras..."
                   }
-                  className="w-full pl-10 pr-20 py-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 focus:border-teal-500 text-sm text-white placeholder-slate-400 focus:outline-none shadow-inner"
+                  className="w-full pl-10 pr-20 py-3 rounded-2xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700/80 focus:border-teal-500 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none shadow-inner"
                   autoFocus
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                   {busqueda && (
-                    <button onClick={() => setBusqueda("")} className="text-slate-400 hover:text-white mr-1 cursor-pointer">
+                    <button onClick={() => setBusqueda("")} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white mr-1 cursor-pointer">
                       <IconClose size={16} />
                     </button>
                   )}
-                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-700/80 border border-slate-600 text-[10px] font-mono text-slate-400 font-bold" title="Presiona F2 para buscar rápido">
+                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 text-[10px] font-mono text-slate-500 dark:text-slate-400 font-bold" title="Presiona F2 para buscar rápido">
                     F2
                   </kbd>
                 </div>
@@ -950,7 +916,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                       categoriaSel === cat
                         ? "bg-teal-500 text-slate-950 shadow-md"
-                        : "bg-slate-800/70 text-slate-400 hover:text-white hover:bg-slate-800"
+                        : "bg-slate-100/70 dark:bg-slate-800/70 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
                   >
                     {cat}
@@ -966,11 +932,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     <button
                       key={p.id}
                       onClick={() => agregarAlCarrito(p)}
-                      className="group bg-slate-800/40 hover:bg-slate-800/80 p-3 rounded-2xl border border-slate-700/50 hover:border-teal-500/50 transition-all text-left flex flex-col justify-between cursor-pointer hover:scale-[1.02] shadow-sm relative overflow-hidden"
+                      className="group bg-slate-100/60 dark:bg-slate-800/40 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 p-3 rounded-2xl border border-slate-300/60 dark:border-slate-700/50 hover:border-teal-500/50 transition-all text-left flex flex-col justify-between cursor-pointer hover:scale-[1.02] shadow-sm relative overflow-hidden"
                     >
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-[10px]">
-                          <span className="font-mono text-slate-400">{p.codigo}</span>
+                          <span className="font-mono text-slate-500 dark:text-slate-400">{p.codigo}</span>
                           <span className={`px-1.5 py-0.5 rounded font-bold ${
                             p.stock <= 0 ? "bg-red-500/20 text-red-400" :
                             bajoStock ? "bg-amber-500/20 text-amber-400" :
@@ -979,7 +945,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                             Stock: {p.stock} {p.unidadMedida || "und"}
                           </span>
                         </div>
-                        <div className="font-bold text-xs sm:text-sm text-white group-hover:text-teal-300 transition-colors line-clamp-2">
+                        <div className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white group-hover:text-teal-300 transition-colors line-clamp-2">
                           {p.nombre}
                         </div>
                         {p.principioActivo && (
@@ -998,23 +964,23 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                           </div>
                         )}
                         {p.lote && (
-                          <div className="text-[9px] text-slate-400 font-mono">
+                          <div className="text-[9px] text-slate-500 dark:text-slate-400 font-mono">
                             Lote: {p.lote} · Vence: {p.fechaVencimiento}
                           </div>
                         )}
                         {p.ubicacion && (
-                          <div className="text-[9px] text-slate-400 font-mono">
+                          <div className="text-[9px] text-slate-500 dark:text-slate-400 font-mono">
                             📍 {p.ubicacion}
                           </div>
                         )}
                       </div>
 
-                      <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-baseline justify-between">
+                      <div className="mt-3 pt-2 border-t border-slate-300/60 dark:border-slate-700/40 flex items-baseline justify-between">
                         <div>
                           <div className="font-mono font-black text-sm text-teal-400">
                             ${p.precio.toFixed(2)}
                           </div>
-                          <div className="text-[10px] font-mono text-slate-400">
+                          <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
                             ≈ Bs. {(p.precio * tasaActivaBs).toFixed(2)}
                           </div>
                         </div>
@@ -1029,16 +995,16 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             </div>
 
             {/* Columna Derecha (5 cols): Carrito de Venta & Cobro */}
-            <div className="lg:col-span-5 xl:col-span-4 flex flex-col h-full bg-slate-900 rounded-3xl border border-slate-800 p-4 sm:p-5 shadow-2xl overflow-hidden">
+            <div className="lg:col-span-5 xl:col-span-4 flex flex-col h-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl overflow-hidden">
               
               {/* Selector de Cliente */}
-              <div className="flex-shrink-0 pb-3 mb-3 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex-shrink-0 pb-3 mb-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cliente en Mostrador</label>
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Cliente en Mostrador</label>
                   <select
                     value={clienteSel.id}
                     onChange={(e) => setClienteSel(clientes.find((c) => c.id === e.target.value) || clientes[0])}
-                    className="bg-slate-800 text-xs font-bold text-white rounded-xl px-2.5 py-1.5 border border-slate-700 focus:outline-none mt-1"
+                    className="bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white rounded-xl px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 focus:outline-none mt-1"
                   >
                     {clientes.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -1058,19 +1024,19 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               {/* Lista de Ítems en Venta */}
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[140px]">
                 {carrito.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center p-4">
+                  <div className="h-full flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 text-center p-4">
                     <span className="text-3xl mb-2">🛒</span>
                     <p className="text-xs">El carrito está vacío.</p>
-                    <p className="text-[10px] text-slate-600 mt-0.5">Toca un producto del catálogo o escanea para vender.</p>
+                    <p className="text-[10px] text-slate-700 dark:text-slate-300 mt-0.5">Toca un producto del catálogo o escanea para vender.</p>
                   </div>
                 ) : (
                   carrito.map((l) => {
                     const lineKey = l.presentacionId ? `${l.productoId}-pres-${l.presentacionId}` : l.productoId;
                     return (
-                      <div key={lineKey} className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50 space-y-1.5">
+                      <div key={lineKey} className="p-2.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/60 dark:border-slate-700/50 space-y-1.5">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                            <div className="text-xs font-bold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
                               <span>{l.nombre}</span>
                               {l.esMayorista && (
                                 <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
@@ -1078,23 +1044,23 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                                 </span>
                               )}
                             </div>
-                            <div className="text-[10px] font-mono text-slate-400">
+                            <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
                               ${l.precio.toFixed(2)} c/u {l.esMayorista && <span className="text-emerald-400 font-semibold">(Escala Mayor)</span>}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <button onClick={() => cambiarCantidad(lineKey, -1)} className="w-6 h-6 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs cursor-pointer">−</button>
+                            <button onClick={() => cambiarCantidad(lineKey, -1)} className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white font-bold text-xs cursor-pointer">−</button>
                             <span className="w-5 text-center font-bold text-xs font-mono">{l.cantidad}</span>
-                            <button onClick={() => cambiarCantidad(lineKey, 1)} className="w-6 h-6 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs cursor-pointer">+</button>
+                            <button onClick={() => cambiarCantidad(lineKey, 1)} className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white font-bold text-xs cursor-pointer">+</button>
                             <button onClick={() => quitarDelCarrito(lineKey)} className="w-6 h-6 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center ml-1 cursor-pointer">
                               <IconTrash size={12} />
                             </button>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 pt-0.5">
                           {l.lote && <span className="font-mono text-emerald-400">Lote: {l.lote}</span>}
                           {l.unidadMedida && <span>Unidad: {l.unidadMedida}</span>}
-                          <span className="font-mono font-bold text-white ml-auto">${(l.precio * l.cantidad).toFixed(2)}</span>
+                          <span className="font-mono font-bold text-slate-900 dark:text-white ml-auto">${(l.precio * l.cantidad).toFixed(2)}</span>
                         </div>
                       </div>
                     );
@@ -1103,19 +1069,19 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               </div>
 
               {/* Totalizador & Acciones Comerciales */}
-              <div className="flex-shrink-0 pt-3 border-t border-slate-800 space-y-3">
-                <div className="space-y-1 bg-slate-800/40 p-3 rounded-2xl border border-slate-700/40">
+              <div className="flex-shrink-0 pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="space-y-1 bg-slate-100/60 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-300/60 dark:border-slate-700/40">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400 font-bold">TOTAL USD:</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">TOTAL USD:</span>
                     <span className="font-mono font-black text-xl text-teal-400">${totalUSD.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-slate-400">Total Bolívares (Bs):</span>
-                    <span className="text-slate-200 font-bold">Bs. {totalBs.toFixed(2)}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Total Bolívares (Bs):</span>
+                    <span className="text-slate-800 dark:text-slate-200 font-bold">Bs. {totalBs.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-slate-400">Total Pesos (COP):</span>
-                    <span className="text-slate-300 font-bold">COP ${totalCopCalculado.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Total Pesos (COP):</span>
+                    <span className="text-slate-600 dark:text-slate-300 font-bold">COP ${totalCopCalculado.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
                   </div>
                 </div>
 
@@ -1124,7 +1090,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   <button
                     onClick={generarCotizacion}
                     disabled={carrito.length === 0}
-                    className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
                     title="Descargar presupuesto formal para cliente"
                   >
                     <IconFileText size={14} />
@@ -1147,7 +1113,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-400 text-slate-950 font-black text-sm cursor-pointer hover:opacity-95 disabled:opacity-40 shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all flex items-center justify-center gap-2"
                 >
                   <span>💰 Cobrar en Mostrador (${totalUSD.toFixed(2)})</span>
-                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-950/25 text-[10px] font-mono text-slate-950 font-black">
+                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-950/25 text-[10px] font-mono text-slate-950 font-black">
                     F4
                   </kbd>
                 </button>
@@ -1161,23 +1127,23 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             TAB 2: INVENTARIO, LOTES & KARDEX
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "inventario" && (
-          <div className="flex-1 bg-slate-900/80 rounded-3xl border border-slate-800 p-5 flex flex-col space-y-4">
+          <div className="flex-1 bg-white/80 dark:bg-slate-900/80 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="font-['Outfit'] font-black text-lg text-white">Control de Inventario & Stock</h3>
-                <p className="text-xs text-slate-400">
-                  {perfilActivo === "ferreteria" 
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Control de Inventario & Stock</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {perfilActivo === "ferreteria" || perfilActivo === "repuestos" 
                     ? "Kárdex auditable, presentaciones fraccionadas, escala mayorista y compras a proveedores."
                     : "Catálogo de productos, existencias, lotes y precios de venta."}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {(perfilActivo === "ferreteria" || perfilActivo === "retail") && (
+                {(perfilActivo === "ferreteria" || perfilActivo === "repuestos" || perfilActivo === "retail") && (
                   <>
                     <button
                       onClick={() => cargarRepuestosBackend()}
                       disabled={cargandoBackend}
-                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs cursor-pointer border border-slate-700 flex items-center gap-1.5 transition-colors"
+                      className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs cursor-pointer border border-slate-300 dark:border-slate-700 flex items-center gap-1.5 transition-colors"
                       title="Sincronizar catálogo con base de datos"
                     >
                       <IconRefresh size={14} className={cargandoBackend ? "animate-spin" : ""} />
@@ -1195,42 +1161,42 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   onClick={() => setModalNuevoProducto(true)}
                   className="px-4 py-2 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400 shadow-md transition-colors"
                 >
-                  + Nuevo {perfilActivo === "ferreteria" ? "Repuesto / Artículo" : "Producto"}
+                  + Nuevo {perfilActivo === "ferreteria" || perfilActivo === "repuestos" ? "Repuesto / Artículo" : "Producto"}
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-800">
+            <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-800 text-slate-300 font-bold uppercase tracking-wider sticky top-0 text-[11px]">
+                <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider sticky top-0 text-[11px]">
                   <tr>
                     <th className="p-3">Código</th>
                     <th className="p-3">Producto</th>
                     <th className="p-3">Categoría</th>
                     {perfilActivo === "farmacia" && <th className="p-3">Principio Activo</th>}
                     {perfilActivo === "farmacia" && <th className="p-3">Lote / Vence</th>}
-                    {perfilActivo === "ferreteria" && <th className="p-3">Unidad / Ubicación</th>}
-                    {perfilActivo === "ferreteria" && <th className="p-3">Escala Mayorista</th>}
+                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3">Unidad / Ubicación</th>}
+                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3">Escala Mayorista</th>}
                     <th className="p-3 text-right">Stock</th>
-                    {perfilActivo === "ferreteria" && <th className="p-3 text-right">Último Costo</th>}
+                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3 text-right">Último Costo</th>}
                     <th className="p-3 text-right">Precio USD</th>
                     <th className="p-3 text-right">Precio Bs</th>
-                    {perfilActivo === "ferreteria" && <th className="p-3 text-center">Gestión</th>}
+                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3 text-center">Gestión</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800 font-mono">
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-mono">
                   {productos.filter((p) => p.rubro === perfilActivo).map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-800/40">
-                      <td className="p-3 text-slate-400">
+                    <tr key={p.id} className="hover:bg-slate-100/60 dark:hover:bg-slate-800/40">
+                      <td className="p-3 text-slate-500 dark:text-slate-400">
                         <div>{p.codigo}</div>
                         {p.codigoOem && <div className="text-[10px] text-cyan-400 font-mono">OEM: {p.codigoOem}</div>}
                       </td>
-                      <td className="p-3 font-sans font-bold text-white">{p.nombre}</td>
-                      <td className="p-3 font-sans text-slate-400">{p.categoria}</td>
+                      <td className="p-3 font-sans font-bold text-slate-900 dark:text-white">{p.nombre}</td>
+                      <td className="p-3 font-sans text-slate-500 dark:text-slate-400">{p.categoria}</td>
                       {perfilActivo === "farmacia" && <td className="p-3 text-emerald-400">{p.principioActivo || "—"}</td>}
-                      {perfilActivo === "farmacia" && <td className="p-3 text-slate-300">{p.lote || "—"} ({p.fechaVencimiento || "—"})</td>}
-                      {perfilActivo === "ferreteria" && <td className="p-3 text-slate-300">{p.unidadMedida || "Pza"} · {p.ubicacion || "Almacén"}</td>}
-                      {perfilActivo === "ferreteria" && (
+                      {perfilActivo === "farmacia" && <td className="p-3 text-slate-600 dark:text-slate-300">{p.lote || "—"} ({p.fechaVencimiento || "—"})</td>}
+                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <td className="p-3 text-slate-600 dark:text-slate-300">{p.unidadMedida || "Pza"} · {p.ubicacion || "Almacén"}</td>}
+                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
                         <td className="p-3 text-emerald-400 text-xs">
                           {p.precioMayorista && p.cantidadMinimaMayorista
                             ? `$${p.precioMayorista.toFixed(2)} (≥${p.cantidadMinimaMayorista} ${p.unidadMedida || 'u'})`
@@ -1240,25 +1206,25 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       <td className={`p-3 text-right font-bold ${p.stock <= p.stockMinimo ? "text-amber-400" : "text-teal-400"}`}>
                         {p.stock}
                       </td>
-                      {perfilActivo === "ferreteria" && (
-                        <td className="p-3 text-right text-slate-400 font-mono">
+                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
+                        <td className="p-3 text-right text-slate-500 dark:text-slate-400 font-mono">
                           ${p.costo.toFixed(2)}
                         </td>
                       )}
-                      <td className="p-3 text-right font-bold text-white">${p.precio.toFixed(2)}</td>
-                      <td className="p-3 text-right text-slate-300">Bs. {(p.precio * tasaActivaBs).toFixed(2)}</td>
-                      {perfilActivo === "ferreteria" && (
+                      <td className="p-3 text-right font-bold text-slate-900 dark:text-white">${p.precio.toFixed(2)}</td>
+                      <td className="p-3 text-right text-slate-600 dark:text-slate-300">Bs. {(p.precio * tasaActivaBs).toFixed(2)}</td>
+                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
                         <td className="p-3 text-center space-x-1.5 whitespace-nowrap">
                           <button
                             onClick={() => setKardexModalItem(p)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[10px] text-teal-300 font-bold border border-slate-700 cursor-pointer shadow-sm"
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-teal-300 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
                             title="Ver movimientos auditables en Kárdex"
                           >
                             📜 Kárdex
                           </button>
                           <button
                             onClick={() => setPresentacionesModalItem(p)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[10px] text-cyan-300 font-bold border border-slate-700 cursor-pointer shadow-sm"
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-cyan-300 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
                             title="Gestionar presentaciones fraccionadas (Cajas, Metros, etc.)"
                           >
                             🏷️ Presentaciones
@@ -1277,19 +1243,19 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             TAB 3: CLIENTES & CUENTAS POR COBRAR (CRÉDITOS)
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "clientes" && (
-          <div className="flex-1 bg-slate-900/80 rounded-3xl border border-slate-800 p-5 flex flex-col space-y-4">
+          <div className="flex-1 bg-white/80 dark:bg-slate-900/80 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-['Outfit'] font-black text-lg text-white">Directorio de Clientes & Créditos</h3>
-                <p className="text-xs text-slate-400">Gestión de cuentas por cobrar, límites de crédito y abonos.</p>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Directorio de Clientes & Créditos</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Gestión de cuentas por cobrar, límites de crédito y abonos.</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               {clientes.map((c) => (
-                <div key={c.id} className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 space-y-2">
+                <div key={c.id} className="p-4 rounded-2xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/70 dark:border-slate-700/60 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-slate-400">{c.documento}</span>
+                    <span className="text-xs font-mono text-slate-500 dark:text-slate-400">{c.documento}</span>
                     {c.saldoPendiente > 0 ? (
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300">
                         Deuda Activa
@@ -1300,11 +1266,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       </span>
                     )}
                   </div>
-                  <div className="font-bold text-sm text-white">{c.nombre}</div>
-                  <div className="text-xs text-slate-400">📞 {c.telefono}</div>
-                  <div className="pt-2 border-t border-slate-700/50 flex items-center justify-between">
+                  <div className="font-bold text-sm text-slate-900 dark:text-white">{c.nombre}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">📞 {c.telefono}</div>
+                  <div className="pt-2 border-t border-slate-300/60 dark:border-slate-700/50 flex items-center justify-between">
                     <div>
-                      <span className="text-[10px] text-slate-400 block">Saldo por Cobrar:</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Saldo por Cobrar:</span>
                       <span className="font-mono font-black text-base text-amber-300">${c.saldoPendiente.toFixed(2)}</span>
                     </div>
                     {c.saldoPendiente > 0 && (
@@ -1329,11 +1295,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             TAB 4: CIERRE DE CAJA (CIERRE Z) CON ARQUEO CIEGO
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "cierre" && (
-          <div className="max-w-2xl mx-auto w-full bg-slate-900 rounded-3xl border border-slate-800 p-6 space-y-5">
-            <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+          <div className="max-w-2xl mx-auto w-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 space-y-5">
+            <div className="border-b border-slate-200 dark:border-slate-800 pb-3 flex items-center justify-between">
               <div>
-                <h3 className="font-['Outfit'] font-black text-lg text-white">Cierre de Turno de Mostrador (Cierre Z)</h3>
-                <p className="text-xs text-slate-400">Arqueo ciego de caja: cuenta físicamente el dinero para auditar sobrantes o faltantes.</p>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Cierre de Turno de Mostrador (Cierre Z)</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Arqueo ciego de caja: cuenta físicamente el dinero para auditar sobrantes o faltantes.</p>
               </div>
               <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-bold font-mono">
                 Arqueo Ciego
@@ -1343,8 +1309,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             {cajaCerradaMsg ? (
               <div className="p-4 rounded-2xl bg-teal-500/15 border border-teal-500/30 text-center space-y-2">
                 <IconCheckCircle size={32} className="text-teal-400 mx-auto" />
-                <h4 className="font-bold text-white text-base">{cajaCerradaMsg}</h4>
-                <p className="text-xs text-slate-300">El turno ha sido cerrado y auditado. El reporte Z fue guardado.</p>
+                <h4 className="font-bold text-slate-900 dark:text-white text-base">{cajaCerradaMsg}</h4>
+                <p className="text-xs text-slate-600 dark:text-slate-300">El turno ha sido cerrado y auditado. El reporte Z fue guardado.</p>
                 <button
                   onClick={() => { setCajaCerradaMsg(null); setTab("pos"); }}
                   className="mt-3 px-5 py-2 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400"
@@ -1356,51 +1322,51 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">💵 Efectivo USD ($)</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💵 Efectivo USD ($)</label>
                     <input
                       type="number" step="0.01" placeholder="0.00" value={desgloseCaja.usd}
                       onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, usd: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">🇻🇪 Efectivo Bs</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇻🇪 Efectivo Bs</label>
                     <input
                       type="number" step="0.01" placeholder="0.00" value={desgloseCaja.ves}
                       onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, ves: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">💳 Punto de Venta (Bs)</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💳 Punto de Venta (Bs)</label>
                     <input
                       type="number" step="0.01" placeholder="0.00" value={desgloseCaja.punto}
                       onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, punto: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">📲 Pago Móvil (Bs)</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">📲 Pago Móvil (Bs)</label>
                     <input
                       type="number" step="0.01" placeholder="0.00" value={desgloseCaja.pagoMovil}
                       onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, pagoMovil: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">⚡ Zelle / USDT ($)</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">⚡ Zelle / USDT ($)</label>
                     <input
                       type="number" step="0.01" placeholder="0.00" value={desgloseCaja.zelle}
                       onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, zelle: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">🇨🇴 Pesos COP</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇨🇴 Pesos COP</label>
                     <input
                       type="number" step="1" placeholder="0" value={desgloseCaja.cop}
                       onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, cop: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
                     />
                   </div>
                 </div>
@@ -1427,29 +1393,29 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       {/* ── MODAL DE COBRO MIXTO DE MOSTRADOR ── */}
       {modalCobro && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-['Outfit'] font-black text-lg text-white">Cobro en Mostrador</h3>
-              <button onClick={() => setModalCobro(false)} className="text-slate-400 hover:text-white"><IconClose size={18} /></button>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Cobro en Mostrador</h3>
+              <button onClick={() => setModalCobro(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white"><IconClose size={18} /></button>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60 space-y-1">
-              <div className="flex justify-between items-center text-xs text-slate-400">
+            <div className="p-3.5 rounded-2xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/70 dark:border-slate-700/60 space-y-1">
+              <div className="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400">
                 <span>Total a Cobrar:</span>
                 <span className="font-mono text-xl font-black text-teal-400">${totalUSD.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between items-center text-xs font-mono text-slate-300">
+              <div className="flex justify-between items-center text-xs font-mono text-slate-600 dark:text-slate-300">
                 <span>En Bolívares (Bs):</span>
                 <span className="font-bold">Bs. {totalBs.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between items-center text-xs font-mono text-slate-400">
+              <div className="flex justify-between items-center text-xs font-mono text-slate-500 dark:text-slate-400">
                 <span>En Pesos (COP):</span>
                 <span>COP ${totalCopCalculado.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
               </div>
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">1. Método de Pago</label>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">1. Método de Pago</label>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 {[
                   ["EFECTIVO_USD", "💵 USD Efectivo", "USD"],
@@ -1471,7 +1437,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       else if (mon === "COP") setMontoRecibido(Math.round(totalCopCalculado).toString());
                     }}
                     className={`py-2 px-2 rounded-xl font-bold border transition-all text-center cursor-pointer ${
-                      metodoPagoSel === id ? "bg-teal-500/20 border-teal-400 text-white shadow-sm" : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                      metodoPagoSel === id ? "bg-teal-500/20 border-teal-400 text-white shadow-sm" : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-white"
                     }`}
                   >
                     {label}
@@ -1482,8 +1448,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">2. Moneda Recibida</label>
-                <div className="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-[10px]">
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">2. Moneda Recibida</label>
+                <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-300 dark:border-slate-700 text-[10px]">
                   {(["USD", "VES", "COP"] as const).map((m) => (
                     <button
                       key={m}
@@ -1495,7 +1461,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                         else if (m === "COP") setMontoRecibido(Math.round(totalCopCalculado).toString());
                       }}
                       className={`px-2 py-0.5 rounded font-bold transition-colors cursor-pointer ${
-                        monedaRecibida === m ? "bg-teal-500 text-slate-950" : "text-slate-400 hover:text-white"
+                        monedaRecibida === m ? "bg-teal-500 text-slate-950" : "text-slate-500 dark:text-slate-400 hover:text-white"
                       }`}
                     >
                       {m === "USD" ? "$ USD" : m === "VES" ? "Bs." : "COP"}
@@ -1509,13 +1475,13 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   type="number" step="any"
                   placeholder={`Ej. ${monedaRecibida === "USD" ? totalUSD.toFixed(2) : monedaRecibida === "VES" ? totalBs.toFixed(2) : Math.round(totalCopCalculado)}`}
                   value={montoRecibido} onChange={(e) => setMontoRecibido(e.target.value)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 font-mono text-white text-sm font-bold focus:border-teal-400 focus:outline-none"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm font-bold focus:border-teal-400 focus:outline-none"
                   autoFocus
                 />
                 <select
                   value={monedaVuelto}
                   onChange={(e) => setMonedaVuelto(e.target.value as any)}
-                  className="px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 focus:outline-none"
+                  className="px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none"
                   title="Moneda en la que se entregará el vuelto"
                 >
                   <option value="USD">Vuelto en USD ($)</option>
@@ -1542,7 +1508,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     key={b}
                     type="button"
                     onClick={() => setMontoRecibido(String(b))}
-                    className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[10px] border border-slate-700 cursor-pointer"
+                    className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-mono text-[10px] border border-slate-300 dark:border-slate-700 cursor-pointer"
                   >
                     ${b}
                   </button>
@@ -1552,7 +1518,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     key={b}
                     type="button"
                     onClick={() => setMontoRecibido(String(b))}
-                    className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[10px] border border-slate-700 cursor-pointer"
+                    className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-mono text-[10px] border border-slate-300 dark:border-slate-700 cursor-pointer"
                   >
                     Bs. {b}
                   </button>
@@ -1562,7 +1528,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     key={b}
                     type="button"
                     onClick={() => setMontoRecibido(String(b))}
-                    className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[10px] border border-slate-700 cursor-pointer"
+                    className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-mono text-[10px] border border-slate-300 dark:border-slate-700 cursor-pointer"
                   >
                     {b / 1000}k COP
                   </button>
@@ -1606,7 +1572,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             <div className="pt-2 flex gap-2">
               <button
                 onClick={() => setModalCobro(false)}
-                className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 cursor-pointer"
+                className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer"
               >
                 Cancelar
               </button>
@@ -1624,28 +1590,28 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       {/* ── MODAL RECIBO FINAL CON BOTÓN DE IMPRESIÓN TÉRMICA ── */}
       {ventaReciente && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 text-center">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 text-center">
             <div className="w-12 h-12 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center mx-auto">
               <IconCheckCircle size={28} />
             </div>
-            <h3 className="font-['Outfit'] font-black text-xl text-white">¡Venta Exitosa!</h3>
-            <p className="text-xs text-slate-400 font-mono">Comprobante N° {ventaReciente.numero}</p>
+            <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">¡Venta Exitosa!</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">Comprobante N° {ventaReciente.numero}</p>
 
-            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 text-xs space-y-1 font-mono text-left">
-              <div className="flex justify-between font-bold text-white">
+            <div className="p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/60 dark:border-slate-700/50 text-xs space-y-1 font-mono text-left">
+              <div className="flex justify-between font-bold text-slate-900 dark:text-white">
                 <span>Total Pagado:</span>
                 <span className="text-teal-400">${ventaReciente.total.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-slate-400">
+              <div className="flex justify-between text-slate-500 dark:text-slate-400">
                 <span>Bolívares:</span>
                 <span>Bs. {ventaReciente.totalBs.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-slate-400">
+              <div className="flex justify-between text-slate-500 dark:text-slate-400">
                 <span>Método:</span>
                 <span>{ventaReciente.metodoPago}</span>
               </div>
               {ventaReciente.vuelto != null && ventaReciente.vuelto > 0 && (
-                <div className="flex justify-between text-teal-300 font-bold border-t border-slate-700 pt-1">
+                <div className="flex justify-between text-teal-300 font-bold border-t border-slate-300 dark:border-slate-700 pt-1">
                   <span>Vuelto:</span>
                   <span>{ventaReciente.vuelto.toFixed(2)} {ventaReciente.monedaVuelto}</span>
                 </div>
@@ -1661,7 +1627,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               </button>
               <button
                 onClick={() => setVentaReciente(null)}
-                className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+                className="px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs cursor-pointer"
               >
                 Nueva Venta
               </button>
@@ -1673,10 +1639,10 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       {/* ── MODAL AGREGAR PRODUCTO AL INVENTARIO ── */}
       {modalNuevoProducto && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-['Outfit'] font-black text-lg text-white">Nuevo Producto ({perfilActivo.toUpperCase()})</h3>
-              <button onClick={() => setModalNuevoProducto(false)} className="text-slate-400 hover:text-white"><IconClose size={18} /></button>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Nuevo Producto ({perfilActivo.toUpperCase()})</h3>
+              <button onClick={() => setModalNuevoProducto(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white"><IconClose size={18} /></button>
             </div>
 
             <form
@@ -1722,7 +1688,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   codigo,
                   codigoOem,
                   nombre,
-                  categoria: String(fd.get("categoria") || (perfilActivo === "ferreteria" ? "Repuestos & Ferretería" : "General")),
+                  categoria: String(fd.get("categoria") || (perfilActivo === "ferreteria" || perfilActivo === "repuestos" ? "Repuestos & Ferretería" : "General")),
                   rubro: perfilActivo,
                   precio,
                   costo,
@@ -1741,41 +1707,41 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               className="space-y-3 text-xs"
             >
               <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1">Nombre del Producto / Artículo</label>
-                <input required name="nombre" placeholder="Ej. Martillo de Uña 16oz / Bujía Iridium FR7DC+" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white" />
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Nombre del Producto / Artículo</label>
+                <input required name="nombre" placeholder="Ej. Martillo de Uña 16oz / Bujía Iridium FR7DC+" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Código SKU / Referencia</label>
-                  <input name="codigo" placeholder="Ej. TORN-38 / MAR-16OZ" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono" />
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Código SKU / Referencia</label>
+                  <input name="codigo" placeholder="Ej. TORN-38 / MAR-16OZ" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Categoría</label>
-                  <input name="categoria" placeholder="Ej. Herramientas / Repuestos / Plomería" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white" />
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Categoría</label>
+                  <input name="categoria" placeholder="Ej. Herramientas / Repuestos / Plomería" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Precio Detal ($)</label>
-                  <input required name="precio" type="number" step="0.01" placeholder="0.00" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono" />
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Precio Detal ($)</label>
+                  <input required name="precio" type="number" step="0.01" placeholder="0.00" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Costo de Compra ($)</label>
-                  <input name="costo" type="number" step="0.01" placeholder="0.00" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono" />
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Costo de Compra ($)</label>
+                  <input name="costo" type="number" step="0.01" placeholder="0.00" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Stock Inicial</label>
-                  <input required name="stock" type="number" placeholder="10" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono" />
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Stock Inicial</label>
+                  <input required name="stock" type="number" placeholder="10" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                 </div>
               </div>
 
               {perfilActivo === "farmacia" && (
-                <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 space-y-2">
+                <div className="p-3 bg-slate-100/60 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 space-y-2">
                   <div>
                     <label className="text-[10px] font-bold text-emerald-400 block mb-1">Principio Activo</label>
-                    <input name="principioActivo" placeholder="Ej. Paracetamol 500mg" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs" />
+                    <input name="principioActivo" placeholder="Ej. Paracetamol 500mg" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs" />
                   </div>
                   <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center gap-1.5">
                     <span>ℹ️</span>
@@ -1784,12 +1750,12 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 </div>
               )}
 
-              {perfilActivo === "ferreteria" && (
-                <div className="space-y-3 p-3.5 bg-slate-800/50 rounded-2xl border border-slate-700">
+              {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
+                <div className="space-y-3 p-3.5 bg-slate-100/60 dark:bg-slate-800/50 rounded-2xl border border-slate-300 dark:border-slate-700">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[10px] font-bold text-teal-400 block mb-1">Unidad de Medida Base</label>
-                      <select name="unidadMedida" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white">
+                      <select name="unidadMedida" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white">
                         <option value="UNIDAD">Pieza / Unidad (UNIDAD)</option>
                         <option value="METRO">Metro (METRO)</option>
                         <option value="KILOGRAMO">Kilogramo (KILOGRAMO)</option>
@@ -1799,28 +1765,28 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-teal-400 block mb-1">Código OEM / Fabricante</label>
-                      <input name="codigoOem" placeholder="Ej. 04465-0K090" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono" />
+                      <input name="codigoOem" placeholder="Ej. 04465-0K090" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[10px] font-bold text-emerald-400 block mb-1">Precio Mayorista ($) (Opcional)</label>
-                      <input name="precioMayorista" type="number" step="0.01" placeholder="Ej. 1.80" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono" />
+                      <input name="precioMayorista" type="number" step="0.01" placeholder="Ej. 1.80" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-emerald-400 block mb-1">Cant. Mínima Mayorista</label>
-                      <input name="cantidadMinimaMayorista" type="number" step="1" placeholder="Ej. 10" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono" />
+                      <input name="cantidadMinimaMayorista" type="number" step="1" placeholder="Ej. 10" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                     </div>
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-teal-400 block mb-1">Ubicación en Almacén / Estante</label>
-                    <input name="ubicacion" placeholder="Ej. Pasillo 3 - Gaveta 4" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white" />
+                    <input name="ubicacion" placeholder="Ej. Pasillo 3 - Gaveta 4" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
                   </div>
                 </div>
               )}
 
               <div className="pt-3 flex gap-2">
-                <button type="button" onClick={() => setModalNuevoProducto(false)} className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-bold cursor-pointer">Cancelar</button>
+                <button type="button" onClick={() => setModalNuevoProducto(false)} className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold cursor-pointer">Cancelar</button>
                 <button type="submit" className="flex-1 py-2.5 rounded-xl bg-teal-500 text-slate-950 font-black cursor-pointer hover:bg-teal-400 shadow-md">Guardar Artículo</button>
               </div>
             </form>
@@ -1831,28 +1797,28 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       {/* ── MODAL REGISTRAR ABONO A CRÉDITO ── */}
       {clienteAbonoSel && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-['Outfit'] font-black text-lg text-white">Registrar Abono a Crédito</h3>
-              <button onClick={() => setClienteAbonoSel(null)} className="text-slate-400 hover:text-white cursor-pointer"><IconClose size={18} /></button>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Registrar Abono a Crédito</h3>
+              <button onClick={() => setClienteAbonoSel(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60 space-y-1">
-              <div className="text-sm font-bold text-white">{clienteAbonoSel.nombre}</div>
-              <div className="text-xs text-slate-400 font-mono">Doc: {clienteAbonoSel.documento}</div>
-              <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-700/50">
-                <span className="text-slate-400">Deuda Total:</span>
+            <div className="p-3.5 rounded-2xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/70 dark:border-slate-700/60 space-y-1">
+              <div className="text-sm font-bold text-slate-900 dark:text-white">{clienteAbonoSel.nombre}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">Doc: {clienteAbonoSel.documento}</div>
+              <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-300/60 dark:border-slate-700/50">
+                <span className="text-slate-500 dark:text-slate-400">Deuda Total:</span>
                 <span className="font-mono text-base font-black text-amber-300">${clienteAbonoSel.saldoPendiente.toFixed(2)} USD</span>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Monto a Abonar (USD)</label>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Monto a Abonar (USD)</label>
               <div className="flex gap-2">
                 <input
                   type="number" step="0.01" max={clienteAbonoSel.saldoPendiente}
                   value={montoAbono} onChange={(e) => setMontoAbono(e.target.value)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 font-mono text-white text-sm font-bold"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm font-bold"
                   autoFocus
                 />
                 <button
@@ -1863,17 +1829,17 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   Totalidad
                 </button>
               </div>
-              <div className="text-[10px] font-mono text-slate-400">
+              <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
                 ≈ Bs. {((Number(montoAbono) || 0) * tasaActivaBs).toFixed(2)} | COP ${((Number(montoAbono) || 0) * tasaCop).toLocaleString("en-US", { maximumFractionDigits: 0 })}
               </div>
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Forma de Pago del Abono</label>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">Forma de Pago del Abono</label>
               <select
                 value={metodoAbono}
                 onChange={(e) => setMetodoAbono(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-white focus:outline-none"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
               >
                 <option value="PAGO_MOVIL">Pago Móvil (Bolívares)</option>
                 <option value="EFECTIVO_USD">Efectivo Divisas (USD)</option>
@@ -1886,7 +1852,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             <div className="pt-2 flex gap-2">
               <button
                 onClick={() => setClienteAbonoSel(null)}
-                className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 cursor-pointer"
+                className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer"
               >
                 Cancelar
               </button>
@@ -1914,26 +1880,26 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       {/* ── MODAL KÁRDEX AUDITABLE DE FERRETERÍA / REPUESTOS ── */}
       {kardexModalItem && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold uppercase">Kárdex de Movimientos</span>
-                <h3 className="font-['Outfit'] font-black text-lg text-white mt-1">{kardexModalItem.nombre}</h3>
-                <p className="text-xs text-slate-400 font-mono">SKU: {kardexModalItem.codigo} · Stock Actual: {kardexModalItem.stock} {kardexModalItem.unidadMedida || 'und'}</p>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white mt-1">{kardexModalItem.nombre}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">SKU: {kardexModalItem.codigo} · Stock Actual: {kardexModalItem.stock} {kardexModalItem.unidadMedida || 'und'}</p>
               </div>
-              <button onClick={() => setKardexModalItem(null)} className="text-slate-400 hover:text-white cursor-pointer"><IconClose size={18} /></button>
+              <button onClick={() => setKardexModalItem(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
             </div>
 
             {kardexCargando ? (
-              <div className="py-8 text-center text-slate-400 text-xs">Cargando movimientos de Kárdex...</div>
+              <div className="py-8 text-center text-slate-500 dark:text-slate-400 text-xs">Cargando movimientos de Kárdex...</div>
             ) : kardexMovimientos.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">
+              <div className="py-8 text-center text-slate-500 dark:text-slate-400 text-xs">
                 No hay movimientos registrados en base de datos para este ítem todavía.
               </div>
             ) : (
-              <div className="max-h-80 overflow-y-auto rounded-2xl border border-slate-800">
+              <div className="max-h-80 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800">
                 <table className="w-full text-left text-xs font-mono">
-                  <thead className="bg-slate-800 text-slate-300 sticky top-0 uppercase text-[10px]">
+                  <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 sticky top-0 uppercase text-[10px]">
                     <tr>
                       <th className="p-2.5">Fecha</th>
                       <th className="p-2.5">Tipo</th>
@@ -1942,10 +1908,10 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       <th className="p-2.5">Motivo / Detalle</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 text-slate-300">
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-600 dark:text-slate-300">
                     {kardexMovimientos.map((m) => (
-                      <tr key={m.id} className="hover:bg-slate-800/40">
-                        <td className="p-2.5 text-[11px] text-slate-400">{new Date(m.fechaRegistro).toLocaleString()}</td>
+                      <tr key={m.id} className="hover:bg-slate-100/60 dark:hover:bg-slate-800/40">
+                        <td className="p-2.5 text-[11px] text-slate-500 dark:text-slate-400">{new Date(m.fechaRegistro).toLocaleString()}</td>
                         <td className="p-2.5">
                           <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
                             m.tipo === "VENTA" ? "bg-emerald-500/20 text-emerald-300" :
@@ -1955,9 +1921,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                             {m.tipo}
                           </span>
                         </td>
-                        <td className="p-2.5 text-right font-bold text-white">{m.cantidad}</td>
-                        <td className="p-2.5 text-right text-slate-400">{m.stockAnterior} ➔ <span className="text-teal-400 font-bold">{m.stockNuevo}</span></td>
-                        <td className="p-2.5 font-sans text-xs text-slate-400">{m.motivo || "—"}</td>
+                        <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">{m.cantidad}</td>
+                        <td className="p-2.5 text-right text-slate-500 dark:text-slate-400">{m.stockAnterior} ➔ <span className="text-teal-400 font-bold">{m.stockNuevo}</span></td>
+                        <td className="p-2.5 font-sans text-xs text-slate-500 dark:text-slate-400">{m.motivo || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1965,7 +1931,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               </div>
             )}
             <div className="pt-2 flex justify-end">
-              <button onClick={() => setKardexModalItem(null)} className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 cursor-pointer">
+              <button onClick={() => setKardexModalItem(null)} className="px-5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
                 Cerrar Kárdex
               </button>
             </div>
@@ -1976,32 +1942,32 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       {/* ── MODAL PRESENTACIONES FRACCIONADAS (CAJA, METRO, KILO, SACO) ── */}
       {presentacionesModalItem && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase">Presentaciones de Venta</span>
-                <h3 className="font-['Outfit'] font-black text-lg text-white mt-1">{presentacionesModalItem.nombre}</h3>
-                <p className="text-xs text-slate-400">Unidad Base: <strong className="text-teal-300">{presentacionesModalItem.unidadMedida || 'UNIDAD'}</strong> (Stock Base: {presentacionesModalItem.stock})</p>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white mt-1">{presentacionesModalItem.nombre}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Unidad Base: <strong className="text-teal-300">{presentacionesModalItem.unidadMedida || 'UNIDAD'}</strong> (Stock Base: {presentacionesModalItem.stock})</p>
               </div>
-              <button onClick={() => setPresentacionesModalItem(null)} className="text-slate-400 hover:text-white cursor-pointer"><IconClose size={18} /></button>
+              <button onClick={() => setPresentacionesModalItem(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
             </div>
 
             {/* Listado de presentaciones existentes */}
             <div className="space-y-2">
-              <div className="text-xs font-bold text-slate-300">Presentaciones Activas:</div>
+              <div className="text-xs font-bold text-slate-600 dark:text-slate-300">Presentaciones Activas:</div>
               {presentacionesCargando ? (
-                <div className="py-4 text-center text-slate-400 text-xs">Cargando presentaciones...</div>
+                <div className="py-4 text-center text-slate-500 dark:text-slate-400 text-xs">Cargando presentaciones...</div>
               ) : presentacionesLista.length === 0 ? (
-                <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/50 text-slate-400 text-xs">
+                <div className="p-3 rounded-xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/60 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 text-xs">
                   No hay presentaciones configuradas aún. Por defecto se vende en su unidad base.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {presentacionesLista.map((pres) => (
-                    <div key={pres.id} className="p-3 rounded-xl bg-slate-800/60 border border-slate-700 flex items-center justify-between">
+                    <div key={pres.id} className="p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700 flex items-center justify-between">
                       <div>
-                        <div className="font-bold text-xs text-white">📦 {pres.nombrePresentacion}</div>
-                        <div className="text-[10px] text-slate-400">Factor: {pres.factorConversion} {presentacionesModalItem.unidadMedida || 'u'} base</div>
+                        <div className="font-bold text-xs text-slate-900 dark:text-white">📦 {pres.nombrePresentacion}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Factor: {pres.factorConversion} {presentacionesModalItem.unidadMedida || 'u'} base</div>
                       </div>
                       <div className="text-right">
                         <div className="font-mono font-bold text-xs text-teal-400">${pres.precioVenta.toFixed(2)}</div>
@@ -2043,21 +2009,21 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   mostrarToast(err.message || "Error al crear presentación", "error");
                 }
               }}
-              className="p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/60 space-y-2 text-xs"
+              className="p-3.5 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/70 dark:border-slate-700/60 space-y-2 text-xs"
             >
-              <div className="font-bold text-slate-300 text-[11px]">Crear Nueva Presentación Fraccionada:</div>
+              <div className="font-bold text-slate-600 dark:text-slate-300 text-[11px]">Crear Nueva Presentación Fraccionada:</div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
-                  <label className="text-[9px] text-slate-400 block mb-0.5">Nombre (ej. Caja 100u, Rollo 50m)</label>
-                  <input required name="nombrePresentacion" placeholder="Caja 100u" className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs" />
+                  <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Nombre (ej. Caja 100u, Rollo 50m)</label>
+                  <input required name="nombrePresentacion" placeholder="Caja 100u" className="w-full px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs" />
                 </div>
                 <div>
-                  <label className="text-[9px] text-slate-400 block mb-0.5">Factor Conv. (u base)</label>
-                  <input required name="factorConversion" type="number" step="0.01" placeholder="100" className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white font-mono text-xs" />
+                  <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Factor Conv. (u base)</label>
+                  <input required name="factorConversion" type="number" step="0.01" placeholder="100" className="w-full px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-xs" />
                 </div>
                 <div>
-                  <label className="text-[9px] text-slate-400 block mb-0.5">Precio Venta ($)</label>
-                  <input required name="precioVenta" type="number" step="0.01" placeholder="18.50" className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white font-mono text-xs" />
+                  <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Precio Venta ($)</label>
+                  <input required name="precioVenta" type="number" step="0.01" placeholder="18.50" className="w-full px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-xs" />
                 </div>
               </div>
               <button type="submit" className="w-full py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs cursor-pointer shadow">
@@ -2090,7 +2056,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           <div className={`px-4 py-3 rounded-2xl shadow-2xl border text-xs font-bold flex items-center gap-2 ${
             toast.tipo === "success" ? "bg-teal-950/95 border-teal-500 text-teal-200" :
             toast.tipo === "error" ? "bg-red-950/95 border-red-500 text-red-200" :
-            "bg-slate-900/95 border-cyan-500 text-cyan-200"
+            "bg-white/95 dark:bg-slate-900/95 border-cyan-500 text-cyan-200"
           }`}>
             <span>{toast.tipo === "success" ? "✅" : toast.tipo === "error" ? "❌" : "ℹ️"}</span>
             <span>{toast.mensaje}</span>
@@ -2227,14 +2193,14 @@ function ModalCompraProveedorFerreteria({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div>
             <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase">Entrada de Almacén</span>
-            <h3 className="font-['Outfit'] font-black text-lg text-white mt-1">Factura de Compra a Proveedor</h3>
-            <p className="text-xs text-slate-400">Incrementa stock, actualiza costo unitario y deja asiento en Kárdex.</p>
+            <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white mt-1">Factura de Compra a Proveedor</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Incrementa stock, actualiza costo unitario y deja asiento en Kárdex.</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white cursor-pointer"><IconClose size={18} /></button>
+          <button onClick={onClose} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
         </div>
 
         {errorMsg && (
@@ -2247,7 +2213,7 @@ function ModalCompraProveedorFerreteria({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[10px] font-bold text-slate-400">Proveedor</label>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Proveedor</label>
               <button
                 type="button"
                 onClick={() => setNuevoProvModal(!nuevoProvModal)}
@@ -2257,18 +2223,18 @@ function ModalCompraProveedorFerreteria({
               </button>
             </div>
             {nuevoProvModal ? (
-              <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 space-y-2">
+              <div className="p-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 space-y-2">
                 <input
                   placeholder="Nombre de la Distribuidora / Proveedor"
                   value={nombreNuevoProv}
                   onChange={(e) => setNombreNuevoProv(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
                 />
                 <input
                   placeholder="RIF / Cédula (ej. J-12345678-0)"
                   value={rifNuevoProv}
                   onChange={(e) => setRifNuevoProv(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-mono"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono"
                 />
                 <div className="flex gap-2">
                   <button
@@ -2282,7 +2248,7 @@ function ModalCompraProveedorFerreteria({
                   <button
                     type="button"
                     onClick={() => setNuevoProvModal(false)}
-                    className="px-2.5 py-1 rounded-lg bg-slate-700 text-slate-300 text-xs cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs cursor-pointer"
                   >
                     Cancelar
                   </button>
@@ -2292,7 +2258,7 @@ function ModalCompraProveedorFerreteria({
               <select
                 value={proveedorSelId}
                 onChange={(e) => setProveedorSelId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold"
               >
                 {proveedores.length === 0 ? (
                   <option value="">(No hay proveedores registrados aún)</option>
@@ -2308,26 +2274,26 @@ function ModalCompraProveedorFerreteria({
           </div>
 
           <div>
-            <label className="text-[10px] font-bold text-slate-400 block mb-1">Nº Factura / Control</label>
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Nº Factura / Control</label>
             <input
               value={numeroFactura}
               onChange={(e) => setNumeroFactura(e.target.value)}
               placeholder="FAC-000123"
-              className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-mono font-bold"
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono font-bold"
             />
           </div>
         </div>
 
         {/* Agregar ítems a la factura */}
-        <div className="p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/60 space-y-2">
-          <div className="text-[11px] font-bold text-slate-300">Añadir Ítems de Repuesto / Ferretería:</div>
+        <div className="p-3.5 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/70 dark:border-slate-700/60 space-y-2">
+          <div className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Añadir Ítems de Repuesto / Ferretería:</div>
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
             <div className="sm:col-span-6">
-              <label className="text-[9px] text-slate-400 block mb-0.5">Artículo</label>
+              <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Artículo</label>
               <select
                 value={repuestoSelId}
                 onChange={(e) => setRepuestoSelId(e.target.value)}
-                className="w-full px-2.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs"
+                className="w-full px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
               >
                 {productos.map((p) => (
                   <option key={p.id} value={p.backendId || ""}>
@@ -2337,24 +2303,24 @@ function ModalCompraProveedorFerreteria({
               </select>
             </div>
             <div className="sm:col-span-2">
-              <label className="text-[9px] text-slate-400 block mb-0.5">Cantidad</label>
+              <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Cantidad</label>
               <input
                 type="number"
                 step="0.01"
                 value={cantidadInput}
                 onChange={(e) => setCantidadInput(e.target.value)}
-                className="w-full px-2.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-mono"
+                className="w-full px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="text-[9px] text-slate-400 block mb-0.5">Costo Unit. ($)</label>
+              <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Costo Unit. ($)</label>
               <input
                 type="number"
                 step="0.01"
                 placeholder="0.00"
                 value={costoInput}
                 onChange={(e) => setCostoInput(e.target.value)}
-                className="w-full px-2.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-mono"
+                className="w-full px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono"
               />
             </div>
             <div className="sm:col-span-2">
@@ -2370,9 +2336,9 @@ function ModalCompraProveedorFerreteria({
         </div>
 
         {/* Tabla de ítems agregados */}
-        <div className="max-h-48 overflow-y-auto rounded-2xl border border-slate-800">
+        <div className="max-h-48 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-slate-800 text-slate-300 uppercase text-[10px] sticky top-0">
+            <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase text-[10px] sticky top-0">
               <tr>
                 <th className="p-2.5">Ítem</th>
                 <th className="p-2.5 text-right">Cant.</th>
@@ -2381,20 +2347,20 @@ function ModalCompraProveedorFerreteria({
                 <th className="p-2.5 text-center"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 text-slate-300">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-600 dark:text-slate-300">
               {lineas.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-4 text-center text-slate-500 font-sans">
+                  <td colSpan={5} className="p-4 text-center text-slate-500 dark:text-slate-400 font-sans">
                     Añade al menos un producto para procesar la entrada de almacén.
                   </td>
                 </tr>
               ) : (
                 lineas.map((l, idx) => (
-                  <tr key={idx} className="hover:bg-slate-800/40">
-                    <td className="p-2.5 font-sans font-semibold text-white">{l.nombre}</td>
+                  <tr key={idx} className="hover:bg-slate-100/60 dark:hover:bg-slate-800/40">
+                    <td className="p-2.5 font-sans font-semibold text-slate-900 dark:text-white">{l.nombre}</td>
                     <td className="p-2.5 text-right font-bold text-teal-300">{l.cantidad}</td>
                     <td className="p-2.5 text-right">${Number(l.costoUnitario).toFixed(2)}</td>
-                    <td className="p-2.5 text-right font-bold text-white">${((Number(l.cantidad) || 0) * (Number(l.costoUnitario) || 0)).toFixed(2)}</td>
+                    <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">${((Number(l.cantidad) || 0) * (Number(l.costoUnitario) || 0)).toFixed(2)}</td>
                     <td className="p-2.5 text-center">
                       <button
                         onClick={() => setLineas((prev) => prev.filter((_, i) => i !== idx))}
@@ -2411,16 +2377,16 @@ function ModalCompraProveedorFerreteria({
         </div>
 
         {/* Resumen Total y Botón Procesar */}
-        <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+        <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div>
-            <span className="text-xs text-slate-400">Total Factura:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Total Factura:</span>
             <div className="font-mono font-black text-xl text-teal-400">${totalFactura.toFixed(2)} USD</div>
           </div>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer"
             >
               Cancelar
             </button>

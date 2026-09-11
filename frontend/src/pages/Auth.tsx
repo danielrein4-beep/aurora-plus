@@ -79,7 +79,8 @@ export default function Auth() {
     } else if (!form.email.trim()) {
       e.email = "Ingresa tu usuario o correo electrónico";
     }
-    if (form.password.length < 6) e.password = "Mínimo 6 caracteres";
+    if (mode === "register" && form.password.length < 6) e.password = "Mínimo 6 caracteres";
+    if (mode === "login" && !form.password) e.password = "Ingresa tu contraseña";
     if (mode === "register" && form.password !== form.confirmar) e.confirmar = "Las contraseñas no coinciden";
     if (mode === "register" && !form.terms) e.terms = "Debes aceptar los términos para continuar";
     return e;
@@ -102,10 +103,8 @@ export default function Auth() {
           metodoPagoPreferido: "Pago Móvil / Efectivo",
         });
 
-        // Conexión inmediata a la aplicación de su negocio
-        if (form.industry === "farmacia" || form.industry === "ferreteria" || form.industry === "retail") {
-          try { localStorage.setItem("aurora_perfil_comercio", form.industry); } catch {}
-        }
+        // Conexión inmediata a la aplicación de su negocio — el rubro ya queda
+        // fijo por user.industry (ver ComercioApp.tsx), no hace falta sembrar nada acá.
         navigate(rubroActual.ruta);
       } else {
         if (form.remember) {
