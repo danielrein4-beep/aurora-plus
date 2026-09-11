@@ -8,21 +8,31 @@ import {
   IconRestaurant, IconFarm,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
-import { listarPacientes, listarCitasDelDia, listarCobrosDelDia, type Paciente, type CitaMedica } from "../api";
+import {
+  listarPacientes,
+  listarCitasDelDia,
+  listarCobrosDelDia,
+  listarSalaEspera,
+  listarAnimalesGanaderia,
+  listarPotrerosGanaderia,
+  obtenerReporteOrdenoGanaderia,
+  obtenerAlertasGanaderia,
+  listarRepuestos,
+  listarComprasRepuesto,
+  mapaDeMesas,
+  obtenerTableroKds,
+  resumenPeriodoAbierto,
+  listarMovimientos,
+  alertasVencimiento,
+  type Paciente,
+  type CitaMedica,
+  type AnimalGanaderia,
+  type PotreroGanaderia,
+  type TableroAlertasGanaderia,
+  type RepuestoItem,
+  type MapaMesaEntrada,
+} from "../api";
 import MediclinicApp from "../components/MediclinicApp";
-
-// Segunda frase del hero, complementa vertical.desc — antes era un ternario
-// binario (restaurante vs "todo lo demás", con la frase de Clínica como
-// fallback) que le pegaba texto de historias clínicas a Ferretería/Farmacia/
-// Repuestos apenas se activaron como verticales reales.
-const VERTICAL_TAGLINE: Record<string, string> = {
-  clinica: "Administra consultas médicas, historias clínicas, agenda de especialistas, sala de espera reactiva y cotizaciones multi-moneda en tiempo real.",
-  veterinaria: "Administra fichas de mascotas, vacunación, cirugías y venta de farmacia veterinaria en tiempo real.",
-  restaurante: "Gestiona mesas, comandas y cocina en tiempo real desde un solo lugar.",
-  ferreteria: "Gestiona tu punto de venta, inventario fraccionado y compras a proveedor desde un solo lugar.",
-  farmacia: "Gestiona tu punto de venta, vencimientos por lote (FEFO) y ventas a crédito desde un solo lugar.",
-  repuestos: "Gestiona tu punto de venta, catálogo de cruce por vehículo y compras a proveedor desde un solo lugar.",
-};
 
 const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNode> = {
   clinica: IconClinic,
@@ -72,10 +82,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN CLÍNICA & SALUD",
     desc: "Historias clínicas digitales, agenda de especialistas, recetas y facturación.",
     stats: [
-      { label: "Pacientes Hoy", val: "28", change: "+4 vs ayer", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Consultas Pendientes", val: "6", change: "2 en triaje", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Ingresos del Día", val: "$840", change: "Multi-moneda (USD/VES)", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Stock Farmacia", val: "94%", change: "2 alertas de reorden", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Pacientes Registrados", val: "0", change: "Sin pacientes aún", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Citas de Hoy", val: "0", change: "Sin citas agendadas", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Ingresos del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Pacientes en Espera", val: "0", change: "Sin pacientes en espera", color: "text-amber-500 dark:text-amber-400" },
     ],
     actions: [
       { label: "Nueva Consulta", desc: "Abrir historia clínica y registrar diagnóstico" },
@@ -83,22 +93,17 @@ const VERTICAL_METADATA: Record<string, {
       { label: "Emitir Receta", desc: "Generar récipe digital con firma" },
       { label: "Cobrar Factura", desc: "Punto de venta multi-moneda" },
     ],
-    defaultPatients: [
-      { name: "Carlos Mendoza", age: "42 años", reason: "Control Cardiología", status: "En Espera", time: "09:30 AM" },
-      { name: "Elena Rostova", age: "29 años", reason: "Consulta Dermatología", status: "En Consulta", time: "10:00 AM" },
-      { name: "Santiago Pérez", age: "8 años", reason: "Chequeo Pediátrico", status: "Confirmado", time: "10:45 AM" },
-      { name: "Mariana Rivas", age: "35 años", reason: "Entrega de Laboratorio", status: "Finalizado", time: "08:45 AM" },
-    ],
+    defaultPatients: [],
   },
   farmacia: {
     name: "Farmacia & Droguería",
     badge: "EDICIÓN FARMACIA & DROGUERÍA",
     desc: "Dispensación de medicamentos, control de lotes y vencimientos, POS mostrador y alertas de stock.",
     stats: [
-      { label: "Ventas de Hoy", val: "$1,250", change: "86 recetas y tickets", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Stock Farmacia", val: "98%", change: "3 alertas de reorden", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Lotes por Vencer", val: "4", change: "Próximos 30 días", color: "text-amber-500 dark:text-amber-400" },
-      { label: "Caja del Día", val: "$920", change: "Multi-moneda (USD/VES/COP)", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Stock Farmacia", val: "0", change: "Sin medicamentos cargados", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Lotes por Vencer", val: "0", change: "Sin alertas activas", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Caja del Día", val: "$0.00", change: "Multi-moneda (USD/VES/COP)", color: "text-purple-500 dark:text-purple-400" },
     ],
     actions: [
       { label: "Cobrar Factura", desc: "Venta de medicamentos por mostrador" },
@@ -113,10 +118,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN VETERINARIA",
     desc: "Expedientes por mascota, plan de vacunas, cirugías e inventario veterinario.",
     stats: [
-      { label: "Mascotas Atendidas", val: "19", change: "+3 vs ayer", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Vacunaciones", val: "8", change: "Plan antirrábico", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Venta Farmacia Vet", val: "$560", change: "Alimentos y fármacos", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Hospitalizaciones", val: "2", change: "En recuperación", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Mascotas Atendidas", val: "0", change: "Sin mascotas registradas", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Vacunaciones", val: "0", change: "Sin vacunas hoy", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Venta Farmacia Vet", val: "$0.00", change: "Alimentos y fármacos", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Hospitalizaciones", val: "0", change: "Sin animales hospitalizados", color: "text-amber-500 dark:text-amber-400" },
     ],
     actions: [
       { label: "Ficha Mascota", desc: "Historial por paciente y tutor" },
@@ -124,21 +129,17 @@ const VERTICAL_METADATA: Record<string, {
       { label: "Venta PetShop", desc: "Cobro rápido por mostrador" },
       { label: "Cirugías", desc: "Registro pre y post operatorio" },
     ],
-    defaultPatients: [
-      { name: "Max (Golden Retriever)", age: "3 años", reason: "Vacuna Séxtuple", status: "En Espera", time: "09:15 AM" },
-      { name: "Luna (Gato Siamés)", age: "1 año", reason: "Esterilización", status: "En Quirófano", time: "10:00 AM" },
-      { name: "Rocky (Bulldog)", age: "5 años", reason: "Alergia cutánea", status: "Confirmado", time: "11:30 AM" },
-    ],
+    defaultPatients: [],
   },
   ferreteria: {
     name: "FerrePlus ERP",
     badge: "EDICIÓN FERRETERÍA & RETAIL",
     desc: "Kardex multi-unidad, lista de precios por volumen, compras y POS mostrador.",
     stats: [
-      { label: "Ventas de Hoy", val: "$3,420", change: "142 tickets", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Artículos en Stock", val: "6,210", change: "8 bajo mínimo", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Cuentas x Cobrar", val: "$1,890", change: "Créditos al día", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Órdenes de Compra", val: "4", change: "En despacho", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-amber-500 dark:text-amber-400" },
     ],
     actions: [
       { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
@@ -146,24 +147,21 @@ const VERTICAL_METADATA: Record<string, {
       { label: "Nueva Cotización", desc: "Presupuesto con validez temporal" },
       { label: "Cierre de Turno", desc: "Arqueo de caja y corte Z" },
     ],
-    defaultPatients: [
-      { name: "Constructora del Este", age: "Cliente VIP", reason: "50 Sacos Cemento + Cabillas", status: "Despachado", time: "08:30 AM" },
-      { name: "Taller Mecánico Ramos", age: "Crédito 15d", reason: "Tornillería y Discos de Corte", status: "Facturado", time: "09:45 AM" },
-    ],
+    defaultPatients: [],
   },
   repuestos: {
-    name: "Aurora Retail (Repuestos)",
-    badge: "EDICIÓN REPUESTOS AUTOMOTRICES",
-    desc: "POS con catálogo de cruce: busca por código OEM y muestra para qué otros vehículos sirve la pieza.",
+    name: "Aurora Repuestos & Autopartes",
+    badge: "EDICIÓN REPUESTOS & AUTOPARTES",
+    desc: "Catálogo OEM/SKU, ventas por volumen, presentaciones múltiples y compras a proveedores.",
     stats: [
-      { label: "Ventas de Hoy", val: "$2,180", change: "63 tickets", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Artículos en Stock", val: "3,940", change: "12 bajo mínimo", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Cuentas x Cobrar", val: "$980", change: "Créditos al día", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Órdenes de Compra", val: "2", change: "En despacho", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Artículos en Stock", val: "0", change: "Sin repuestos cargados", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Órdenes de Compra", val: "0", change: "Sin compras registradas", color: "text-amber-500 dark:text-amber-400" },
     ],
     actions: [
       { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
-      { label: "Consultar Kardex", desc: "Stock y catálogo de cruce por vehículo" },
+      { label: "Consultar Kardex", desc: "Stock por bodega y listas de precio" },
       { label: "Nueva Cotización", desc: "Presupuesto con validez temporal" },
       { label: "Cierre de Turno", desc: "Arqueo de caja y corte Z" },
     ],
@@ -174,10 +172,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN RESTAURANTES & HORECA",
     desc: "Mapa de mesas, comandas digitales, cocina en tiempo real (KDS) y escandallo de recetas.",
     stats: [
-      { label: "Mesas Ocupadas", val: "—", change: "Mapa en vivo", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Comandas Abiertas", val: "—", change: "Salón + delivery", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Ventas del Día", val: "—", change: "Multi-moneda (USD/VES)", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Platos en Cocina", val: "—", change: "Pendientes + en preparación", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Mesas Ocupadas", val: "0 / 0", change: "Sin mesas configuradas", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Comandas Abiertas", val: "0", change: "Sin comandas activas", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Ventas del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Platos en Cocina", val: "0", change: "Cocina al día", color: "text-amber-500 dark:text-amber-400" },
     ],
     actions: [
       { label: "Abrir Mesa / Comanda", desc: "Tomar pedido y enviar a cocina" },
@@ -192,10 +190,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN RETAIL & COMERCIO",
     desc: "Caja rápida mostrador, lector de código de barras, control de inventario y cuentas por cobrar.",
     stats: [
-      { label: "Ventas de Hoy", val: "$1,840", change: "112 tickets emitidos", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Artículos en Stock", val: "3,450", change: "12 bajo mínimo", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Cuentas x Cobrar", val: "$420", change: "Créditos clientes", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Caja del Día", val: "$1,380", change: "USD / VES / COP", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Caja del Día", val: "$0.00", change: "Multi-moneda (USD/VES/COP)", color: "text-amber-500 dark:text-amber-400" },
     ],
     actions: [
       { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
@@ -210,9 +208,9 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN FINCAS & GANADERÍA",
     desc: "Rotación agronómica de potreros, control de hato, producción lechera, GDP y trazabilidad.",
     stats: [
-      { label: "Cabezas en Hato", val: "148", change: "+6 este mes", color: "text-emerald-500 dark:text-emerald-400" },
-      { label: "Litros Ordeñados", val: "840 L", change: "Turno mañana + tarde", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Potreros Activos", val: "4 / 12", change: "8 en descanso", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Cabezas en Hato", val: "0", change: "Sin animales registrados", color: "text-emerald-500 dark:text-emerald-400" },
+      { label: "Litros Ordeñados", val: "0 L", change: "Sin registros hoy", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Potreros Activos", val: "0", change: "Sin potreros registrados", color: "text-purple-500 dark:text-purple-400" },
       { label: "Alertas Retiro", val: "0", change: "100% apto consumo", color: "text-teal-500 dark:text-teal-400" },
     ],
     actions: [
@@ -228,9 +226,9 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN FINCAS & GANADERÍA",
     desc: "Rotación agronómica de potreros, control de hato, producción lechera, GDP y trazabilidad.",
     stats: [
-      { label: "Cabezas en Hato", val: "148", change: "+6 este mes", color: "text-emerald-500 dark:text-emerald-400" },
-      { label: "Litros Ordeñados", val: "840 L", change: "Turno mañana + tarde", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Potreros Activos", val: "4 / 12", change: "8 en descanso", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Cabezas en Hato", val: "0", change: "Sin animales registrados", color: "text-emerald-500 dark:text-emerald-400" },
+      { label: "Litros Ordeñados", val: "0 L", change: "Sin registros hoy", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Potreros Activos", val: "0", change: "Sin potreros registrados", color: "text-purple-500 dark:text-purple-400" },
       { label: "Alertas Retiro", val: "0", change: "100% apto consumo", color: "text-teal-500 dark:text-teal-400" },
     ],
     actions: [
@@ -264,39 +262,387 @@ export default function Dashboard() {
   const isTrial = user?.planStatus !== "active";
   const daysLeft = isTrial ? trialDaysLeft : 30;
 
-  // Datos reales de Mediclinic Pro — solo hay backend conectado para "clinica"
-  // por ahora; el resto de verticales del onboarding siguen en demo estática
-  // (ver Onboarding.tsx: solo esta está marcada "100% disponible").
+  // Estados de datos reales conectados al backend multi-tenant
+  const [metricasEnVivo, setMetricasEnVivo] = useState<{ label: string; val: string; change: string; color: string }[] | null>(null);
   const [pacientesReales, setPacientesReales] = useState<Paciente[] | null>(null);
   const [citasReales, setCitasReales] = useState<CitaMedica[] | null>(null);
-  const [ingresosHoy, setIngresosHoy] = useState<number | null>(null);
-  const esClinicaReal = userIndustry === "clinica" && !!user?.tenantId;
+  const [animalesGanaderia, setAnimalesGanaderia] = useState<AnimalGanaderia[] | null>(null);
+  const [alertasGanaderia, setAlertasGanaderia] = useState<TableroAlertasGanaderia | null>(null);
+  const [repuestosReales, setRepuestosReales] = useState<RepuestoItem[] | null>(null);
+  const [mapaReales, setMapaReales] = useState<MapaMesaEntrada[] | null>(null);
+
+  const esClinicaReal = (userIndustry === "clinica" || userIndustry === "veterinaria") && !!user?.tenantId;
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
-  // Farmacia, Ferretería y Repuestos comparten el mismo motor (Aurora Retail,
-  // ver ComercioApp.tsx) — las tres entran a la misma ruta /comercio.
-  const esComercioReal = (userIndustry === "ferreteria" || userIndustry === "farmacia" || userIndustry === "repuestos" || userIndustry === "retail") && !!user?.tenantId;
+  const esComercioReal = (userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "farmacia" || userIndustry === "retail") && !!user?.tenantId;
   const esGanaderiaReal = (userIndustry === "finca" || userIndustry === "ganaderia") && !!user?.tenantId;
-  const RUTA_POR_INDUSTRIA: Record<string, string> = {
-    restaurante: "/restaurante",
-    farmacia: "/comercio",
-    ferreteria: "/comercio",
-    repuestos: "/comercio",
-    retail: "/comercio",
-    finca: "/ganaderia",
-    ganaderia: "/ganaderia",
-  };
-  const rutaVertical = RUTA_POR_INDUSTRIA[userIndustry] || "/mediclinic";
+  const rutaVertical = 
+    userIndustry === "restaurante" 
+      ? "/restaurante" 
+      : (userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "farmacia" || userIndustry === "retail")
+        ? "/comercio"
+        : (userIndustry === "finca" || userIndustry === "ganaderia")
+          ? "/ganaderia"
+          : "/mediclinic";
   const esVerticalReal = esClinicaReal || esRestauranteReal || esComercioReal || esGanaderiaReal;
 
   useEffect(() => {
-    if (!esClinicaReal || !user?.tenantId) return;
+    if (!user?.tenantId) return;
+    const tid = Number(user.tenantId);
     const hoy = new Date().toISOString().slice(0, 10);
-    listarPacientes(user.tenantId).then(setPacientesReales).catch(() => setPacientesReales([]));
-    listarCitasDelDia(user.tenantId, hoy).then(setCitasReales).catch(() => setCitasReales([]));
-    listarCobrosDelDia(`${hoy}T00:00:00`, `${hoy}T23:59:59`)
-      .then((cobros) => setIngresosHoy(cobros.reduce((sum, c) => sum + Number(c.montoTotal), 0)))
-      .catch(() => setIngresosHoy(0));
-  }, [esClinicaReal, user?.tenantId]);
+
+    if (userIndustry === "finca" || userIndustry === "ganaderia") {
+      // 1. Ganadería & Fincas: datos 100% reales
+      const hace30d = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      Promise.allSettled([
+        listarAnimalesGanaderia(),
+        listarPotrerosGanaderia(),
+        obtenerReporteOrdenoGanaderia(tid, hace30d, hoy),
+        obtenerAlertasGanaderia(tid, 15),
+      ]).then(([resAnim, resPot, resOrd, resAle]) => {
+        const animList = resAnim.status === "fulfilled" && Array.isArray(resAnim.value)
+          ? resAnim.value.filter(a => !a.tenantId || a.tenantId === tid)
+          : [];
+        setAnimalesGanaderia(animList);
+
+        const potList = resPot.status === "fulfilled" && Array.isArray(resPot.value)
+          ? resPot.value.filter(p => !p.tenantId || p.tenantId === tid)
+          : [];
+
+        const ordenos = resOrd.status === "fulfilled" && resOrd.value?.registros
+          ? resOrd.value.registros
+          : [];
+        const litrosHoy = ordenos
+          .filter(o => o.fecha === hoy)
+          .reduce((sum, o) => sum + (Number(o.cantidadLitros) || 0), 0);
+
+        const alertas = resAle.status === "fulfilled" ? resAle.value : null;
+        setAlertasGanaderia(alertas);
+        const retirosCount = alertas?.retirosSanitariosVigentes?.length || 0;
+
+        const potActivos = potList.filter(p => p.estado === "ACTIVO").length;
+        const potDescanso = potList.filter(p => p.estado === "EN_DESCANSO").length;
+
+        setMetricasEnVivo([
+          {
+            label: "Cabezas en Hato",
+            val: String(animList.length),
+            change: animList.length > 0
+              ? `${animList.filter(a => a.sexo === "HEMBRA").length} hembras · ${animList.filter(a => a.sexo === "MACHO").length} machos`
+              : "Sin animales registrados",
+            color: "text-emerald-400",
+          },
+          {
+            label: "Litros Ordeñados",
+            val: `${litrosHoy.toFixed(1)} L`,
+            change: litrosHoy > 0 ? "Ordeño registrado hoy" : "Sin ordeños hoy",
+            color: "text-sky-400",
+          },
+          {
+            label: "Potreros Activos",
+            val: potList.length > 0 ? `${potActivos} / ${potList.length}` : "0",
+            change: potList.length > 0 ? `${potDescanso} en descanso` : "Sin potreros registrados",
+            color: "text-purple-400",
+          },
+          {
+            label: "Alertas Retiro",
+            val: String(retirosCount),
+            change: retirosCount > 0 ? `${retirosCount} retiros activos` : "100% apto consumo",
+            color: "text-teal-400",
+          },
+        ]);
+      });
+    } else if (userIndustry === "ferreteria" || userIndustry === "repuestos") {
+      // 2. Ferretería & Repuestos: tesorería, stock y compras
+      Promise.allSettled([
+        resumenPeriodoAbierto(tid, "USD"),
+        listarRepuestos(),
+        listarMovimientos(tid, "CXC"),
+        listarComprasRepuesto(),
+      ]).then(([resTes, resRep, resCxc, resCom]) => {
+        const tes = resTes.status === "fulfilled" ? resTes.value : null;
+        const ventasVal = tes ? Number(tes.totalIngresos) || 0 : 0;
+        const cantMovs = tes ? Number(tes.cantidadMovimientos) || 0 : 0;
+
+        const repList = resRep.status === "fulfilled" && Array.isArray(resRep.value)
+          ? resRep.value.filter(r => r.tenantId === tid)
+          : [];
+        setRepuestosReales(repList);
+        const bajoMinimo = repList.filter(r => (r.stockActual || 0) <= 5).length;
+
+        const cxcList = resCxc.status === "fulfilled" && Array.isArray(resCxc.value)
+          ? resCxc.value.filter(m => m.estado === "PENDIENTE")
+          : [];
+        const cxcTotal = cxcList.reduce((sum, m) => sum + (Number(m.saldoPendiente ?? m.monto) || 0), 0);
+
+        const compList = resCom.status === "fulfilled" && Array.isArray(resCom.value)
+          ? resCom.value.filter(c => c.tenantId === tid)
+          : [];
+
+        setMetricasEnVivo([
+          {
+            label: "Ventas de Hoy",
+            val: `$${ventasVal.toFixed(2)}`,
+            change: cantMovs > 0 ? `${cantMovs} movimientos de caja` : "Sin ventas hoy",
+            color: "text-teal-400",
+          },
+          {
+            label: "Artículos en Stock",
+            val: String(repList.length),
+            change: repList.length > 0 ? `${bajoMinimo} bajo mínimo` : "Sin artículos cargados",
+            color: "text-sky-400",
+          },
+          {
+            label: "Cuentas x Cobrar",
+            val: `$${cxcTotal.toFixed(2)}`,
+            change: cxcList.length > 0 ? `${cxcList.length} créditos pendientes` : "Sin deudas pendientes",
+            color: "text-purple-400",
+          },
+          {
+            label: "Órdenes de Compra",
+            val: String(compList.length),
+            change: compList.length > 0 ? `${compList.length} compras registradas` : "Sin compras registradas",
+            color: "text-amber-400",
+          },
+        ]);
+      });
+    } else if (userIndustry === "retail") {
+      // 3. Retail & Comercio: ventas de caja, stock y CXC
+      Promise.allSettled([
+        resumenPeriodoAbierto(tid, "USD"),
+        listarRepuestos(),
+        listarMovimientos(tid, "CXC"),
+      ]).then(([resTes, resRep, resCxc]) => {
+        const tes = resTes.status === "fulfilled" ? resTes.value : null;
+        const ventasVal = tes ? Number(tes.totalIngresos) || 0 : 0;
+        const cajaVal = tes ? Number(tes.montoEsperadoEnCaja) || 0 : 0;
+        const cantMovs = tes ? Number(tes.cantidadMovimientos) || 0 : 0;
+
+        const repList = resRep.status === "fulfilled" && Array.isArray(resRep.value)
+          ? resRep.value.filter(r => r.tenantId === tid)
+          : [];
+        setRepuestosReales(repList);
+        const bajoMinimo = repList.filter(r => (r.stockActual || 0) <= 5).length;
+
+        const cxcList = resCxc.status === "fulfilled" && Array.isArray(resCxc.value)
+          ? resCxc.value.filter(m => m.estado === "PENDIENTE")
+          : [];
+        const cxcTotal = cxcList.reduce((sum, m) => sum + (Number(m.saldoPendiente ?? m.monto) || 0), 0);
+
+        setMetricasEnVivo([
+          {
+            label: "Ventas de Hoy",
+            val: `$${ventasVal.toFixed(2)}`,
+            change: cantMovs > 0 ? `${cantMovs} tickets emitidos` : "Sin ventas hoy",
+            color: "text-teal-400",
+          },
+          {
+            label: "Artículos en Stock",
+            val: String(repList.length),
+            change: repList.length > 0 ? `${bajoMinimo} bajo mínimo` : "Sin artículos cargados",
+            color: "text-sky-400",
+          },
+          {
+            label: "Cuentas x Cobrar",
+            val: `$${cxcTotal.toFixed(2)}`,
+            change: cxcList.length > 0 ? `${cxcList.length} créditos clientes` : "Al día (sin deudas)",
+            color: "text-purple-400",
+          },
+          {
+            label: "Caja del Día",
+            val: `$${cajaVal.toFixed(2)}`,
+            change: "Multi-moneda (USD/VES/COP)",
+            color: "text-amber-400",
+          },
+        ]);
+      });
+    } else if (userIndustry === "restaurante") {
+      // 4. Restaurante & Horeca: mesas, comandas, KDS y ventas
+      Promise.allSettled([
+        mapaDeMesas(),
+        resumenPeriodoAbierto(tid, "USD"),
+        obtenerTableroKds(tid, "COCINA"),
+      ]).then(([resMapa, resTes, resKds]) => {
+        const mapa = resMapa.status === "fulfilled" && Array.isArray(resMapa.value) ? resMapa.value : [];
+        setMapaReales(mapa);
+        const mesasOcupadas = mapa.filter(m => m.estado === "OCUPADA").length;
+        const comandasAbiertas = mapa.filter(m => m.comandaAbierta !== null).length;
+
+        const tes = resTes.status === "fulfilled" ? resTes.value : null;
+        const ventasVal = tes ? Number(tes.totalIngresos) || 0 : 0;
+
+        const kdsItems = resKds.status === "fulfilled" && Array.isArray(resKds.value) ? resKds.value : [];
+        const platosEnCocina = kdsItems.filter(i => i.estadoItem !== "ENTREGADO").length;
+
+        setMetricasEnVivo([
+          {
+            label: "Mesas Ocupadas",
+            val: mapa.length > 0 ? `${mesasOcupadas} / ${mapa.length}` : "0 / 0",
+            change: mapa.length > 0 ? "Mapa en vivo" : "Sin mesas configuradas",
+            color: "text-teal-400",
+          },
+          {
+            label: "Comandas Abiertas",
+            val: String(comandasAbiertas),
+            change: comandasAbiertas > 0 ? "Salón + delivery" : "Sin comandas activas",
+            color: "text-sky-400",
+          },
+          {
+            label: "Ventas del Día",
+            val: `$${ventasVal.toFixed(2)}`,
+            change: ventasVal > 0 ? "Cobros del día" : "Sin ventas hoy",
+            color: "text-purple-400",
+          },
+          {
+            label: "Platos en Cocina",
+            val: String(platosEnCocina),
+            change: platosEnCocina > 0 ? "Pendientes + en preparación" : "Cocina al día",
+            color: "text-amber-400",
+          },
+        ]);
+      });
+    } else if (userIndustry === "farmacia") {
+      // 5. Farmacia & Droguería: ventas de mostrador, lotes por vencer y stock
+      Promise.allSettled([
+        resumenPeriodoAbierto(tid, "USD"),
+        listarRepuestos(),
+        alertasVencimiento(tid, 30),
+      ]).then(([resTes, resRep, resVen]) => {
+        const tes = resTes.status === "fulfilled" ? resTes.value : null;
+        const ventasVal = tes ? Number(tes.totalIngresos) || 0 : 0;
+        const cajaVal = tes ? Number(tes.montoEsperadoEnCaja) || 0 : 0;
+        const cantMovs = tes ? Number(tes.cantidadMovimientos) || 0 : 0;
+
+        const repList = resRep.status === "fulfilled" && Array.isArray(resRep.value)
+          ? resRep.value.filter(r => r.tenantId === tid)
+          : [];
+        setRepuestosReales(repList);
+        const bajoMinimo = repList.filter(r => (r.stockActual || 0) <= 5).length;
+
+        const lotes = resVen.status === "fulfilled" && Array.isArray(resVen.value) ? resVen.value : [];
+
+        setMetricasEnVivo([
+          {
+            label: "Ventas de Hoy",
+            val: `$${ventasVal.toFixed(2)}`,
+            change: cantMovs > 0 ? `${cantMovs} tickets emitidos` : "Sin ventas hoy",
+            color: "text-teal-400",
+          },
+          {
+            label: "Stock Farmacia",
+            val: String(repList.length),
+            change: repList.length > 0 ? `${bajoMinimo} alertas de reorden` : "Sin medicamentos cargados",
+            color: "text-sky-400",
+          },
+          {
+            label: "Lotes por Vencer",
+            val: String(lotes.length),
+            change: lotes.length > 0 ? "Próximos 30 días" : "Sin alertas activas",
+            color: "text-amber-400",
+          },
+          {
+            label: "Caja del Día",
+            val: `$${cajaVal.toFixed(2)}`,
+            change: "Multi-moneda (USD/VES/COP)",
+            color: "text-purple-400",
+          },
+        ]);
+      });
+    } else if (userIndustry === "veterinaria") {
+      // 6. Mediclinic Vet: pacientes, citas, cobros y sala de atención
+      Promise.allSettled([
+        listarPacientes(tid),
+        listarCitasDelDia(tid, hoy),
+        listarCobrosDelDia(`${hoy}T00:00:00`, `${hoy}T23:59:59`),
+        listarSalaEspera(),
+      ]).then(([resPac, resCit, resCob, resSal]) => {
+        const pacientes = resPac.status === "fulfilled" && Array.isArray(resPac.value) ? resPac.value : [];
+        setPacientesReales(pacientes);
+
+        const citas = resCit.status === "fulfilled" && Array.isArray(resCit.value) ? resCit.value : [];
+        setCitasReales(citas);
+
+        const cobros = resCob.status === "fulfilled" && Array.isArray(resCob.value) ? resCob.value : [];
+        const ingVal = cobros.reduce((sum, c) => sum + (Number(c.montoTotal) || 0), 0);
+
+        const sala = resSal.status === "fulfilled" && Array.isArray(resSal.value) ? resSal.value : [];
+        const enEspera = sala.filter(s => s.estado === "EN_ESPERA").length;
+
+        setMetricasEnVivo([
+          {
+            label: "Mascotas Atendidas",
+            val: String(pacientes.length),
+            change: pacientes.length > 0 ? "Expedientes registrados" : "Sin mascotas registradas",
+            color: "text-teal-400",
+          },
+          {
+            label: "Citas de Hoy",
+            val: String(citas.length),
+            change: citas.length > 0 ? `${citas.filter(c => c.estado === "CONFIRMADA").length} confirmadas` : "Sin citas hoy",
+            color: "text-sky-400",
+          },
+          {
+            label: "Ingresos del Día",
+            val: `$${ingVal.toFixed(2)}`,
+            change: "Consultas y PetShop",
+            color: "text-purple-400",
+          },
+          {
+            label: "En Espera / Hospital",
+            val: String(enEspera),
+            change: enEspera > 0 ? "En atención activa" : "Sin pacientes en espera",
+            color: "text-amber-400",
+          },
+        ]);
+      });
+    } else {
+      // 7. Clínica & Salud (default): pacientes, citas, cobros y sala de espera
+      Promise.allSettled([
+        listarPacientes(tid),
+        listarCitasDelDia(tid, hoy),
+        listarCobrosDelDia(`${hoy}T00:00:00`, `${hoy}T23:59:59`),
+        listarSalaEspera(),
+      ]).then(([resPac, resCit, resCob, resSal]) => {
+        const pacientes = resPac.status === "fulfilled" && Array.isArray(resPac.value) ? resPac.value : [];
+        setPacientesReales(pacientes);
+
+        const citas = resCit.status === "fulfilled" && Array.isArray(resCit.value) ? resCit.value : [];
+        setCitasReales(citas);
+
+        const cobros = resCob.status === "fulfilled" && Array.isArray(resCob.value) ? resCob.value : [];
+        const ingVal = cobros.reduce((sum, c) => sum + (Number(c.montoTotal) || 0), 0);
+
+        const sala = resSal.status === "fulfilled" && Array.isArray(resSal.value) ? resSal.value : [];
+        const enEspera = sala.filter(s => s.estado === "EN_ESPERA").length;
+
+        setMetricasEnVivo([
+          {
+            label: "Pacientes Registrados",
+            val: String(pacientes.length),
+            change: pacientes.length > 0 ? "Total en consultorio" : "Sin pacientes aún",
+            color: "text-teal-400",
+          },
+          {
+            label: "Citas de Hoy",
+            val: String(citas.length),
+            change: citas.length > 0 ? `${citas.filter(c => c.estado === "CONFIRMADA").length} confirmadas` : "Sin citas agendadas",
+            color: "text-sky-400",
+          },
+          {
+            label: "Ingresos del Día",
+            val: `$${ingVal.toFixed(2)}`,
+            change: "Multi-moneda (USD/VES/COP)",
+            color: "text-purple-400",
+          },
+          {
+            label: "Sala de Espera",
+            val: String(enEspera),
+            change: enEspera > 0 ? "Pacientes en espera" : "Sin pacientes en espera",
+            color: "text-amber-400",
+          },
+        ]);
+      });
+    }
+  }, [user?.tenantId, userIndustry]);
 
   const handleReportPaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -342,7 +688,7 @@ export default function Dashboard() {
               </div>
               <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-medium flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                <span>{user?.empresa || "Mi Consultorio Médico"}</span>
+                <span>{user?.empresa || "Clínica & Consultorios Médicos"}</span>
               </div>
             </div>
           </button>
@@ -389,23 +735,6 @@ export default function Dashboard() {
             className="px-3.5 py-2 rounded-full font-medium transition-all duration-300 text-slate-500 dark:text-white/40 hover:text-teal-500 dark:hover:text-teal-300 hover:bg-white/40 dark:hover:bg-white/8 flex items-center gap-1.5 text-xs">
             <IconCustomize size={14} />
             <span>Cambiar Rubro</span>
-          </button>
-
-          {/* Teaser "Próximamente" de Análisis de KPI — NO ES UN LINK REAL, solo para que el
-              cliente sepa que viene. OJO al construirlo de verdad: los KPI que importan son
-              distintos por rubro (rotación de inventario en Ferretería no es lo mismo que
-              litros/vaca en Ganadería u ocupación de mesas en Horeca) — no hacer un dashboard
-              genérico único para las 5 verticales, cada una necesita sus propias métricas. */}
-          <button
-            type="button"
-            title="Próximamente: análisis de KPI hecho a la medida de tu rubro"
-            onClick={() => alert("🔒 Análisis de KPI — muy pronto vas a poder ver las métricas clave de tu negocio, hechas a la medida de tu rubro. ¡Ya viene en camino!")}
-            className="px-3.5 py-2 rounded-full font-medium transition-all duration-300 text-slate-400 dark:text-white/25 hover:text-slate-500 dark:hover:text-white/40 hover:bg-white/40 dark:hover:bg-white/8 flex items-center gap-1.5 text-xs opacity-70">
-            <span>🔒</span>
-            <span>Análisis de KPI</span>
-            <span className="text-[9px] font-black uppercase tracking-wider bg-violet-500/15 text-violet-500 dark:text-violet-300 px-1.5 py-0.5 rounded-full">
-              Próximamente
-            </span>
           </button>
         </nav>
 
@@ -458,7 +787,7 @@ export default function Dashboard() {
                   Estás disfrutando de tu prueba gratuita de {vertical.name}
                 </h4>
                 <p className="text-slate-500 dark:text-white/50 text-xs mt-0.5">
-                  Te quedan <strong className="text-teal-600 dark:text-teal-400 font-bold">{daysLeft} días</strong> de acceso completo. Tus datos se guardan permanentemente.
+                  Te quedan <strong className="text-teal-600 dark:text-teal-400 font-bold">{daysLeft} días</strong> de acceso completo. Tus datos e historias clínicas se guardan permanentemente.
                 </p>
               </div>
             </div>
@@ -474,7 +803,7 @@ export default function Dashboard() {
 
         {/* ── PESTAÑA 1: LAUNCHER & ENTORNO DE LA VERTICAL (MEDICLINIC PRO) ── */}
         {activeTab === "vertical" && (
-          <div key="vertical" className="animate-tab-enter space-y-8">
+          <div className="space-y-8">
             
             {/* HERO LAUNCHER CARD — DISEÑO REDONDEADO Y ELEGANTE ESTILO APPLE LIQUID GLASS */}
             <div className="relative apple-glass rounded-[32px] p-6 sm:p-9 overflow-hidden shadow-2xl border border-teal-500/30 bg-gradient-to-br from-slate-900/95 via-[#0c1424]/95 to-slate-900/95 backdrop-blur-2xl">
@@ -493,7 +822,10 @@ export default function Dashboard() {
                   </h2>
 
                   <p className="text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
-                    {vertical.desc} {VERTICAL_TAGLINE[userIndustry] || VERTICAL_TAGLINE.clinica}
+                    {vertical.desc}{" "}
+                    {userIndustry === "restaurante"
+                      ? "Gestiona mesas, comandas y cocina en tiempo real desde un solo lugar."
+                      : "Administra consultas médicas, historias clínicas, agenda de especialistas, sala de espera reactiva y cotizaciones multi-moneda en tiempo real."}
                   </p>
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -525,15 +857,7 @@ export default function Dashboard() {
 
                 {/* Lado Derecho: Métricas Reales en Grid 2x2 Estilo Glassmorphism */}
                 <div className="lg:col-span-5 grid grid-cols-2 gap-3.5">
-                  {(esClinicaReal
-                    ? [
-                        { label: "Pacientes Registrados", val: pacientesReales ? String(pacientesReales.length) : "0", change: "Total en el consultorio", color: "text-teal-400" },
-                        { label: "Citas de Hoy", val: citasReales ? String(citasReales.length) : "0", change: citasReales ? `${citasReales.filter(c => c.estado === "CONFIRMADA").length} confirmadas` : "0 confirmadas", color: "text-sky-400" },
-                        { label: "Ingresos del Día", val: ingresosHoy !== null ? `$${ingresosHoy.toFixed(2)}` : "$0.00", change: "Multi-moneda (USD/VES/COP)", color: "text-purple-400" },
-                        { label: "Módulo Farmacia", val: "Activo", change: "Control de insumos", color: "text-amber-400" },
-                      ]
-                    : vertical.stats
-                  ).map((s) => (
+                  {(metricasEnVivo || vertical.stats).map((s) => (
                     <div key={s.label} className="apple-glass rounded-2xl p-4 sm:p-5 text-left border border-white/10 shadow-md hover:border-teal-400/40 transition-all duration-300">
                       <div className="text-white/50 text-[11px] font-medium leading-tight">{s.label}</div>
                       <div className={`font-['Outfit'] font-black text-2xl sm:text-3xl mt-1.5 ${s.color}`}>{s.val}</div>
@@ -555,13 +879,19 @@ export default function Dashboard() {
                     <h3 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white">
                       {userIndustry === "restaurante" ? "Espacio Gastronómico & POS en Vivo" :
                        userIndustry === "farmacia" ? "Espacio de Farmacia & Droguería en Vivo" :
-                       userIndustry === "ferreteria" ? "Espacio de Ferretería & Retail en Vivo" :
+                       userIndustry === "ferreteria" || userIndustry === "repuestos" ? "Espacio de Ferretería & Repuestos en Vivo" :
+                       userIndustry === "retail" ? "Espacio de Retail & Mostrador POS en Vivo" :
+                       userIndustry === "finca" || userIndustry === "ganaderia" ? "Espacio Agropecuario & Ganadería en Vivo" :
+                       userIndustry === "veterinaria" ? "Espacio Veterinario & Mascotas en Vivo" :
                        "Espacio de Trabajo Clínico en Vivo"}
                     </h3>
                     <p className="text-slate-500 dark:text-white/40 text-xs">
                       {userIndustry === "restaurante" ? "Venta rápida, mapa de mesas, KDS de cocina y control de caja multi-moneda." :
                        userIndustry === "farmacia" ? "Dispensación de medicamentos, control de lotes y ventas por mostrador." :
-                       userIndustry === "ferreteria" ? "Kardex multi-unidad, mostrador POS, compras y cuentas por cobrar." :
+                       userIndustry === "ferreteria" || userIndustry === "repuestos" ? "Kardex multi-unidad, catálogo OEM/SKU, compras y cuentas por cobrar." :
+                       userIndustry === "retail" ? "Caja rápida mostrador, lector de código de barras, control de inventario y cuentas por cobrar." :
+                       userIndustry === "finca" || userIndustry === "ganaderia" ? "Rotación agronómica de potreros, control de hato, producción lechera y trazabilidad." :
+                       userIndustry === "veterinaria" ? "Expedientes por mascota, plan de vacunas, cirugías e inventario veterinario." :
                        "Base de datos PostgreSQL Multi-tenant sincronizada en tiempo real."}
                     </p>
                   </div>
@@ -581,14 +911,21 @@ export default function Dashboard() {
                     className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
                       workspaceTab === "patients" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
                     }`}>
-                    Expedientes & Triaje
+                    {userIndustry === "finca" || userIndustry === "ganaderia" ? "Hato & Animales" :
+                     userIndustry === "restaurante" ? "Mesas & Comandas" :
+                     userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "farmacia" ? "Kárdex & Stock" :
+                     userIndustry === "veterinaria" ? "Expedientes Mascotas" :
+                     "Expedientes & Triaje"}
                   </button>
                   <button
                     onClick={() => setWorkspaceTab("agenda")}
                     className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
                       workspaceTab === "agenda" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
                     }`}>
-                    Agenda de Citas
+                    {userIndustry === "finca" || userIndustry === "ganaderia" ? "Agenda Sanitaria" :
+                     userIndustry === "restaurante" ? "Reservas & Turnos" :
+                     userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "farmacia" ? "Recepciones & Pedidos" :
+                     "Agenda de Citas"}
                   </button>
                 </div>
               </div>
@@ -598,107 +935,245 @@ export default function Dashboard() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">
-                      Lista de Pacientes en Consulta / Triaje
+                      {userIndustry === "finca" || userIndustry === "ganaderia" ? "Inventario Reciente de Animales en el Hato" :
+                       userIndustry === "restaurante" ? "Mesas y Comandas en el Salón" :
+                       userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "farmacia" ? "Artículos en Catálogo & Kárdex" :
+                       userIndustry === "veterinaria" ? "Expedientes Veterinarios & Pacientes" :
+                       "Lista de Pacientes en Consulta / Triaje"}
                     </h4>
                     <button
-                      onClick={() => alert("Formulario de admisión médica abierto")}
+                      onClick={() => navigate(rutaVertical)}
                       className="btn-electric-blue text-xs font-semibold px-4 py-2 rounded-full cursor-pointer">
-                      + Ingresar Paciente
+                      {userIndustry === "finca" || userIndustry === "ganaderia" ? "+ Registrar Animal" :
+                       userIndustry === "restaurante" ? "+ Abrir Mesa" :
+                       userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "farmacia" ? "+ Nuevo Artículo" :
+                       "+ Ingresar Paciente"}
                     </button>
                   </div>
 
                   <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-white/10">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
-                        <tr>
-                          <th className="p-3.5">Paciente</th>
-                          <th className="p-3.5">Edad / Info</th>
-                          <th className="p-3.5">Motivo de Consulta</th>
-                          <th className="p-3.5">Hora</th>
-                          <th className="p-3.5">Estado</th>
-                          <th className="p-3.5 text-right">Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
-                        {esClinicaReal ? (
-                          citasReales === null ? (
-                            <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Cargando…</td></tr>
-                          ) : citasReales.length === 0 ? (
-                            <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">No hay citas registradas hoy.</td></tr>
-                          ) : citasReales.map((c) => (
-                            <tr key={c.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                              <td className="p-3.5 font-bold text-slate-900 dark:text-white">{c.paciente?.nombreCompleto || "—"}</td>
-                              <td className="p-3.5 text-slate-500 dark:text-white/60">{c.paciente?.edad ? `${c.paciente.edad} años` : "—"}</td>
-                              <td className="p-3.5 text-slate-700 dark:text-white/80">{c.motivo || c.especialidad || "—"}</td>
-                              <td className="p-3.5 text-slate-500 dark:text-white/50 font-mono">{c.horaInicio}</td>
-                              <td className="p-3.5">
-                                <span className="px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
-                                  {c.estado}
-                                </span>
-                              </td>
-                              <td className="p-3.5 text-right">
-                                <button
-                                  onClick={() => alert(`Abriendo historia clínica de ${c.paciente?.nombreCompleto}`)}
-                                  className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
-                                  Abrir Historia →
-                                </button>
-                              </td>
+                      {userIndustry === "finca" || userIndustry === "ganaderia" ? (
+                        <>
+                          <thead className="bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                            <tr>
+                              <th className="p-3.5">Arete / ID</th>
+                              <th className="p-3.5">Nombre</th>
+                              <th className="p-3.5">Raza / Especie</th>
+                              <th className="p-3.5">Categoría / Sexo</th>
+                              <th className="p-3.5">Peso</th>
+                              <th className="p-3.5">Estado</th>
+                              <th className="p-3.5 text-right">Acción</th>
                             </tr>
-                          ))
-                        ) : (
-                          vertical.defaultPatients.map((p) => (
-                          <tr key={p.name} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                            <td className="p-3.5 font-bold text-slate-900 dark:text-white">{p.name}</td>
-                            <td className="p-3.5 text-slate-500 dark:text-white/60">{p.age}</td>
-                            <td className="p-3.5 text-slate-700 dark:text-white/80">{p.reason}</td>
-                            <td className="p-3.5 text-slate-500 dark:text-white/50 font-mono">{p.time}</td>
-                            <td className="p-3.5">
-                              <span className="px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
-                                {p.status}
-                              </span>
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() => alert(`Abriendo historia clínica de ${p.name}`)}
-                                className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
-                                Abrir Historia →
-                              </button>
-                            </td>
-                          </tr>
-                          ))
-                        )}
-                      </tbody>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                            {animalesGanaderia === null ? (
+                              <tr><td colSpan={7} className="p-4 text-center text-slate-400 dark:text-white/30">Cargando datos del hato…</td></tr>
+                            ) : animalesGanaderia.length === 0 ? (
+                              <tr><td colSpan={7} className="p-4 text-center text-slate-400 dark:text-white/30">Sin animales registrados aún. Entra a Ganadería para registrar tu primer lote.</td></tr>
+                            ) : (
+                              animalesGanaderia.slice(0, 8).map((a) => (
+                                <tr key={a.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
+                                  <td className="p-3.5 font-bold font-mono text-emerald-600 dark:text-emerald-400">{a.arete}</td>
+                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{a.nombre || "—"}</td>
+                                  <td className="p-3.5 text-slate-600 dark:text-white/70">{a.raza || a.especie || "Bovino"}</td>
+                                  <td className="p-3.5 text-slate-700 dark:text-white/80">{a.tipoAnimal || "VACA"} · {a.sexo}</td>
+                                  <td className="p-3.5 text-slate-500 dark:text-white/50 font-mono">{a.pesoActual ? `${a.pesoActual} kg` : "—"}</td>
+                                  <td className="p-3.5">
+                                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-semibold text-[10px]">
+                                      {a.estado || "ACTIVO"}
+                                    </span>
+                                  </td>
+                                  <td className="p-3.5 text-right">
+                                    <button
+                                      onClick={() => navigate(rutaVertical)}
+                                      className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer">
+                                      Ver Ficha →
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </>
+                      ) : (userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "farmacia") ? (
+                        <>
+                          <thead className="bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                            <tr>
+                              <th className="p-3.5">SKU / Código</th>
+                              <th className="p-3.5">Descripción</th>
+                              <th className="p-3.5">Stock Actual</th>
+                              <th className="p-3.5">Unidad</th>
+                              <th className="p-3.5">Precio Venta</th>
+                              <th className="p-3.5 text-right">Acción</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                            {repuestosReales === null ? (
+                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Cargando catálogo…</td></tr>
+                            ) : repuestosReales.length === 0 ? (
+                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Sin artículos registrados aún en inventario.</td></tr>
+                            ) : (
+                              repuestosReales.slice(0, 8).map((r) => (
+                                <tr key={r.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
+                                  <td className="p-3.5 font-bold font-mono text-teal-600 dark:text-teal-400">{r.codigoSku}</td>
+                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{r.descripcion}</td>
+                                  <td className="p-3.5 text-slate-700 dark:text-white/80 font-mono">{r.stockActual}</td>
+                                  <td className="p-3.5 text-slate-500 dark:text-white/50">{r.unidadBase || "UNIDAD"}</td>
+                                  <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">${Number(r.precioVenta || 0).toFixed(2)}</td>
+                                  <td className="p-3.5 text-right">
+                                    <button
+                                      onClick={() => navigate(rutaVertical)}
+                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      Ver Kárdex →
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </>
+                      ) : userIndustry === "restaurante" ? (
+                        <>
+                          <thead className="bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                            <tr>
+                              <th className="p-3.5">Mesa</th>
+                              <th className="p-3.5">Zona / Capacidad</th>
+                              <th className="p-3.5">Estado</th>
+                              <th className="p-3.5">Comanda Abierta</th>
+                              <th className="p-3.5">Consumo</th>
+                              <th className="p-3.5 text-right">Acción</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                            {mapaReales === null ? (
+                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Cargando salón…</td></tr>
+                            ) : mapaReales.length === 0 ? (
+                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Sin mesas configuradas en el salón aún.</td></tr>
+                            ) : (
+                              mapaReales.slice(0, 8).map((m) => (
+                                <tr key={m.mesa.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
+                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">Mesa #{m.mesa.numero}</td>
+                                  <td className="p-3.5 text-slate-500 dark:text-white/60">{m.mesa.zona || "Principal"} · {m.mesa.capacidad || 4}p</td>
+                                  <td className="p-3.5">
+                                    <span className={`px-2.5 py-1 rounded-full font-semibold text-[10px] ${
+                                      m.estado === "OCUPADA"
+                                        ? "bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-300"
+                                        : "bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300"
+                                    }`}>
+                                      {m.estado}
+                                    </span>
+                                  </td>
+                                  <td className="p-3.5 text-slate-700 dark:text-white/80">{m.comandaAbierta ? `Comanda #${m.comandaAbierta.id} (${m.comandaAbierta.mesero})` : "Sin comanda"}</td>
+                                  <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">{m.comandaAbierta ? `$${Number(m.comandaAbierta.totalConsumo || 0).toFixed(2)}` : "—"}</td>
+                                  <td className="p-3.5 text-right">
+                                    <button
+                                      onClick={() => navigate(rutaVertical)}
+                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      Abrir Mesa →
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </>
+                      ) : (
+                        <>
+                          <thead className="bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                            <tr>
+                              <th className="p-3.5">Paciente</th>
+                              <th className="p-3.5">Edad / Info</th>
+                              <th className="p-3.5">Motivo de Consulta</th>
+                              <th className="p-3.5">Hora</th>
+                              <th className="p-3.5">Estado</th>
+                              <th className="p-3.5 text-right">Acción</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                            {citasReales === null ? (
+                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Cargando…</td></tr>
+                            ) : citasReales.length === 0 ? (
+                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">No hay citas registradas hoy.</td></tr>
+                            ) : (
+                              citasReales.map((c) => (
+                                <tr key={c.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
+                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{c.paciente?.nombreCompleto || "—"}</td>
+                                  <td className="p-3.5 text-slate-500 dark:text-white/60">{c.paciente?.edad ? `${c.paciente.edad} años` : "—"}</td>
+                                  <td className="p-3.5 text-slate-700 dark:text-white/80">{c.motivo || c.especialidad || "—"}</td>
+                                  <td className="p-3.5 text-slate-500 dark:text-white/50 font-mono">{c.horaInicio}</td>
+                                  <td className="p-3.5">
+                                    <span className="px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
+                                      {c.estado}
+                                    </span>
+                                  </td>
+                                  <td className="p-3.5 text-right">
+                                    <button
+                                      onClick={() => alert(`Abriendo historia clínica de ${c.paciente?.nombreCompleto}`)}
+                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      Abrir Historia →
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </>
+                      )}
                     </table>
                   </div>
                 </div>
               ) : workspaceTab === "agenda" ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {esClinicaReal ? (
+                  {userIndustry === "finca" || userIndustry === "ganaderia" ? (
+                    alertasGanaderia && ((alertasGanaderia.refuerzosVacunaPendientes && alertasGanaderia.refuerzosVacunaPendientes.length > 0) || (alertasGanaderia.partosProximos && alertasGanaderia.partosProximos.length > 0)) ? (
+                      [
+                        ...(alertasGanaderia.refuerzosVacunaPendientes || []).map((v) => ({
+                          titulo: `Vacuna: ${v.vacuna?.nombre || "Sanitaria"}`,
+                          sub: `Animal: ${v.animal?.arete || ""} · Refuerzo pendiente`,
+                          tag: "Sanidad",
+                        })),
+                        ...(alertasGanaderia.partosProximos || []).map((p) => ({
+                          titulo: `Parto Próximo: ${p.hembra?.arete || ""}`,
+                          sub: `Fecha prob: ${p.fechaProbableParto || "Próxima"}`,
+                          tag: "Reproducción",
+                        })),
+                      ].slice(0, 3).map((item, i) => (
+                        <div key={i} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-emerald-600 dark:text-emerald-400 text-xs font-mono font-bold">{item.tag}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">Pendiente</span>
+                          </div>
+                          <div className="font-bold text-sm text-slate-900 dark:text-white">{item.titulo}</div>
+                          <p className="text-slate-500 dark:text-white/40 text-xs">{item.sub}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-6">
+                        No hay tareas sanitarias ni partos próximos programados para hoy en el hato.
+                      </p>
+                    )
+                  ) : (userIndustry === "clinica" || userIndustry === "veterinaria") ? (
                     citasReales === null ? (
                       <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-4">Cargando…</p>
                     ) : citasReales.length === 0 ? (
                       <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-4">No hay citas agendadas para hoy.</p>
-                    ) : citasReales.map((c) => (
-                      <div key={c.id} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-teal-600 dark:text-teal-400 text-xs font-mono font-bold">{c.horaInicio} — {c.horaFin}</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-300">{c.estado}</span>
+                    ) : (
+                      citasReales.map((c) => (
+                        <div key={c.id} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-teal-600 dark:text-teal-400 text-xs font-mono font-bold">{c.horaInicio} — {c.horaFin}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-300">{c.estado}</span>
+                          </div>
+                          <div className="font-bold text-sm text-slate-900 dark:text-white">{c.paciente?.nombreCompleto} — {c.especialidad || c.motivo}</div>
+                          <p className="text-slate-500 dark:text-white/40 text-xs">{c.motivo}</p>
                         </div>
-                        <div className="font-bold text-sm text-slate-900 dark:text-white">{c.paciente?.nombreCompleto} — {c.especialidad || c.motivo}</div>
-                        <p className="text-slate-500 dark:text-white/40 text-xs">{c.motivo}</p>
-                      </div>
-                    ))
+                      ))
+                    )
                   ) : (
-                    ["09:00 AM - Dr. Carlos (Cardiología)", "10:30 AM - Dra. Soto (Pediatría)", "02:00 PM - Laboratorio / Tomas"].map((slot, i) => (
-                      <div key={i} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-teal-600 dark:text-teal-400 text-xs font-mono font-bold">Bloque Activo</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-300">Confirmado</span>
-                        </div>
-                        <div className="font-bold text-sm text-slate-900 dark:text-white">{slot}</div>
-                        <p className="text-slate-500 dark:text-white/40 text-xs">Recordatorio enviado vía WhatsApp SMS</p>
-                      </div>
-                    ))
+                    <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-6">
+                      Sin eventos o recepciones programadas para hoy.
+                    </p>
                   )}
                 </div>
               ) : (
@@ -709,7 +1184,7 @@ export default function Dashboard() {
                     return (
                     <div
                       key={act.label}
-                      onClick={() => alert(`Ejecutando acción: ${act.label}`)}
+                      onClick={() => navigate(rutaVertical)}
                       className="apple-glass rounded-2xl p-5 hover-card text-left cursor-pointer border border-white/10 shadow-sm space-y-2">
                       <div className="text-teal-600 dark:text-teal-300"><ActIcon size={22} /></div>
                       <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">{act.label}</h4>
@@ -726,7 +1201,7 @@ export default function Dashboard() {
 
         {/* ── PESTAÑA 2: BILLING, FACTURACIÓN Y PAGOS ── */}
         {activeTab === "billing" && (
-          <div key="billing" className="animate-tab-enter space-y-8">
+          <div className="space-y-8">
             <div className="apple-glass rounded-3xl p-6 sm:p-8 space-y-6 text-left">
               <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-300/60 dark:border-white/10">
                 <div>
@@ -753,7 +1228,7 @@ export default function Dashboard() {
                     {user?.plan || "Estándar"} ($35/mes)
                   </div>
                   <p className="text-xs text-slate-500 dark:text-white/40">
-                    Módulos ilimitados para tu negocio + versión offline y móvil.
+                    Módulos ilimitados para tu clínica + versión offline y móvil.
                   </p>
                 </div>
 
@@ -820,21 +1295,8 @@ export default function Dashboard() {
                         ))
                       ) : (
                         <tr>
-                          <td className="p-3.5 font-mono font-bold text-slate-900 dark:text-white">REC-001924</td>
-                          <td className="p-3.5 text-slate-600 dark:text-white/60">01/09/2026</td>
-                          <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">$35.00 USD</td>
-                          <td className="p-3.5 text-slate-600 dark:text-white/70">Pago Móvil Banesco · Ref: 489201</td>
-                          <td className="p-3.5">
-                            <span className="px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
-                              APROBADO
-                            </span>
-                          </td>
-                          <td className="p-3.5 text-right">
-                            <button
-                              onClick={() => alert("Descargando factura fiscal en PDF")}
-                              className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer inline-flex items-center gap-1">
-                              <IconFileText size={12} /> Descargar PDF
-                            </button>
+                          <td colSpan={6} className="p-6 text-center text-slate-400 dark:text-white/40">
+                            Sin pagos ni recibos registrados aún en esta cuenta. Usa &ldquo;Reportar Nuevo Pago&rdquo; para registrar tu comprobante.
                           </td>
                         </tr>
                       )}
@@ -848,36 +1310,47 @@ export default function Dashboard() {
 
         {/* ── PESTAÑA 3: EQUIPO Y ROLES ── */}
         {activeTab === "team" && (
-          <div key="team" className="animate-tab-enter apple-glass rounded-3xl p-6 sm:p-8 space-y-6 text-left shadow-xl">
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 space-y-6 text-left shadow-xl">
             <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-300/60 dark:border-white/10">
               <div>
                 <h3 className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
                   Equipo de Trabajo & Accesos
                 </h3>
                 <p className="text-slate-500 dark:text-white/45 text-sm mt-1">
-                  Administra los médicos, recepcionistas y administradores autorizados.
+                  Administra los colaboradores autorizados y sus niveles de permiso en la plataforma.
                 </p>
               </div>
               <button
-                onClick={() => alert("Enlace de invitación enviado al correo del colaborador")}
+                onClick={() => alert("Enlace de invitación generado y copiado al portapapeles")}
                 className="btn-electric-blue text-xs font-bold px-6 py-3 rounded-full cursor-pointer shadow-md">
                 + Invitar Colaborador
               </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                { name: user?.nombre || "Dr. Alejandro Ramos", role: "Director Médico / Admin", email: user?.email || "admin@clinica.com" },
-                { name: "Dra. Valentina Soto", role: "Especialista en Pediatría", email: "pediatria@clinica.com" },
-                { name: "Mariana Pérez", role: "Recepción & Caja", email: "recepcion@clinica.com" },
-              ].map((m) => (
-                <div key={m.email} className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
-                  <div className="text-teal-600 dark:text-teal-300"><IconUser size={26} /></div>
-                  <div className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">{m.name}</div>
-                  <div className="text-xs font-semibold text-teal-600 dark:text-teal-400">{m.role}</div>
-                  <div className="text-xs text-slate-500 dark:text-white/40 font-mono">{m.email}</div>
+              <div className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
+                <div className="text-teal-600 dark:text-teal-300"><IconUser size={26} /></div>
+                <div className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">
+                  {user?.nombre || "Usuario Administrador"}
                 </div>
-              ))}
+                <div className="text-xs font-semibold text-teal-600 dark:text-teal-400">
+                  {user?.rol || "Propietario / Admin"}
+                </div>
+                <div className="text-xs text-slate-500 dark:text-white/40 font-mono">
+                  {user?.email || "admin@auroraplus.com"}
+                </div>
+              </div>
+
+              <div className="apple-glass rounded-2xl p-6 border border-dashed border-slate-300 dark:border-white/20 flex flex-col justify-center items-center text-center col-span-1 md:col-span-2 space-y-2">
+                <p className="text-slate-500 dark:text-white/50 text-xs max-w-sm">
+                  Sin colaboradores adicionales registrados aún. Puedes invitar a encargados de almacén, cajeros, veterinarios o personal operativo según tu vertical.
+                </p>
+                <button
+                  onClick={() => alert("Enlace de invitación generado")}
+                  className="text-teal-600 dark:text-teal-400 font-bold text-xs hover:underline cursor-pointer">
+                  + Generar enlace de acceso para equipo
+                </button>
+              </div>
             </div>
           </div>
         )}
