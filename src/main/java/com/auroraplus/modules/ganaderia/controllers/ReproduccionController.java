@@ -62,6 +62,9 @@ public class ReproduccionController {
         if (request.sementalId != null) {
             Animal semental = animalRepository.findById(request.sementalId)
                 .orElseThrow(() -> new RuntimeException("Semental no encontrado"));
+            if (!semental.getTenantId().equals(tenantId)) {
+                throw new RuntimeException("Violación de seguridad: Semental no pertenece a este tenant");
+            }
             evento.setSemental(semental);
         }
 

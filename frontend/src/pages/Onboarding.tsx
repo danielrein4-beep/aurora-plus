@@ -94,8 +94,9 @@ const INDUSTRIES: IndustryItem[] = [
     label: "Control de Fincas & Ganado",
     Icon: IconFarm,
     desc: "Lotes de ganado, pesaje, potreros y vacunación",
-    badge: "Próximamente (Fase 2)",
-    isReady: false,
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Aurora Ganadería",
   },
   {
     id: "mineria",
@@ -181,6 +182,15 @@ const RETAIL_MODULES = [
   { id: "caja", label: "Caja & Moneda Base", desc: "Ingresos, gastos y tasas de cambio del negocio", defaultOn: true },
 ];
 
+const GANADERIA_MODULES = [
+  { id: "hato", label: "Registro de Hato & Aretes", desc: "Ficha por animal: raza, peso, categoría y trazabilidad", defaultOn: true },
+  { id: "potreros", label: "Potreros & Rotación de Pastoreo", desc: "Mapa satelital de potreros, capacidad y descanso mínimo", defaultOn: true },
+  { id: "ordeno", label: "Ordeño & Producción de Leche", desc: "Registro diario por vaca, jornadas en lote y modo vaquera rápida", defaultOn: true },
+  { id: "sanidad", label: "Sanidad & Vacunación", desc: "Esquema de vacunas, tratamientos y responsable veterinario", defaultOn: true },
+  { id: "reproduccion", label: "Reproducción & Genética", desc: "Servicios, preñez, partos y control de sementales", defaultOn: true },
+  { id: "ventas", label: "Ventas & Guías de Traslado", desc: "Venta de animales y documentación de movilización", defaultOn: true },
+];
+
 // Mapa de "clinica"/"restaurante"/etc. (id del onboarding) al moduloPrincipal
 // real que entiende el backend (ver TenantProvisioningService y
 // LicenciaService.VERTICALES_CONTROLADAS — farmacia/ferreteria/repuestos ya
@@ -194,6 +204,7 @@ const INDUSTRIA_A_MODULO: Record<string, string> = {
   repuestos: "repuestos",
   retail: "repuestos",
   veterinaria: "salud",
+  finca: "ganaderia",
   otro: "horeca",
 };
 
@@ -205,6 +216,7 @@ const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
   repuestos: RETAIL_MODULES,
   retail: RETAIL_MODULES,
   veterinaria: CLINIC_MODULES,
+  finca: GANADERIA_MODULES,
   otro: RESTAURANT_MODULES,
 };
 
@@ -216,6 +228,7 @@ const NOMBRE_POR_DEFECTO: Record<string, string> = {
   repuestos: "Mi Casa de Repuestos",
   retail: "Mi Tienda",
   veterinaria: "Mi Veterinaria",
+  finca: "Mi Finca",
   otro: "Mi Negocio",
 };
 
@@ -227,6 +240,7 @@ const VERTICAL_LABEL: Record<string, string> = {
   repuestos: "Aurora Retail (Repuestos Automotrices)",
   retail: "Retail POS (Comercio & Tiendas)",
   veterinaria: "Mediclinic Vet",
+  finca: "Aurora Ganadería (Control de Fincas & Ganado)",
   otro: "Aurora Suite Comercial",
 };
 
@@ -256,11 +270,12 @@ export default function Onboarding() {
 
   const modulosDisponibles = MODULOS_POR_INDUSTRIA[selectedIndustry] || CLINIC_MODULES;
   const esRetail = ["ferreteria", "farmacia", "repuestos"].includes(selectedIndustry);
+  const esGanaderia = selectedIndustry === "finca";
 
   const handleSelectIndustry = (ind: IndustryItem) => {
     if (!ind.isReady) {
       setLockedNotice(
-        `El rubro "${ind.label}" está en fase de desarrollo. Las verticales listas y operativas hoy son Mediclinic Pro (Clínica & Salud, incluye Mediclinic Vet), Aurora Horeca (Restaurante & Gastronomía) y Aurora Retail (Ferretería, Farmacia y Repuestos).`
+        `El rubro "${ind.label}" está en fase de desarrollo. Las verticales listas y operativas hoy son Mediclinic Pro (Clínica & Salud, incluye Mediclinic Vet), Aurora Horeca (Restaurante & Gastronomía), Aurora Retail (Ferretería, Farmacia y Repuestos) y Aurora Ganadería (Control de Fincas & Ganado).`
       );
       return;
     }
@@ -393,7 +408,7 @@ export default function Onboarding() {
                   ¿A qué rubro se dedica tu negocio?
                 </h2>
                 <p className="text-white/50 text-sm mt-1">
-                  Actualmente <strong className="text-teal-400">Mediclinic Pro</strong>, <strong className="text-teal-400">Aurora Horeca</strong> y <strong className="text-teal-400">Aurora Retail</strong> (Ferretería, Farmacia y Repuestos) están 100% habilitadas y listas para operar. Las demás verticales se encuentran en proceso de despliegue.
+                  Actualmente <strong className="text-teal-400">Mediclinic Pro</strong>, <strong className="text-teal-400">Aurora Horeca</strong>, <strong className="text-teal-400">Aurora Retail</strong> (Ferretería, Farmacia y Repuestos) y <strong className="text-teal-400">Aurora Ganadería</strong> están 100% habilitadas y listas para operar. Las demás verticales se encuentran en proceso de despliegue.
                 </p>
               </div>
 
@@ -525,16 +540,18 @@ export default function Onboarding() {
             <div className="space-y-6">
               <div>
                 <div className="inline-block px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[11px] font-mono uppercase tracking-wider mb-2">
-                  Paso 2 · {selectedIndustry === "restaurante" ? "Arquitectura del Local" : esRetail ? "Arquitectura del Negocio" : "Arquitectura Médica"}
+                  Paso 2 · {selectedIndustry === "restaurante" ? "Arquitectura del Local" : esRetail ? "Arquitectura del Negocio" : esGanaderia ? "Arquitectura de la Finca" : "Arquitectura Médica"}
                 </div>
                 <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white leading-tight">
-                  {selectedIndustry === "restaurante" ? "Personaliza tu Restaurante" : esRetail ? "Personaliza tu Negocio" : "Personaliza tu Clínica o Consultorio"}
+                  {selectedIndustry === "restaurante" ? "Personaliza tu Restaurante" : esRetail ? "Personaliza tu Negocio" : esGanaderia ? "Personaliza tu Finca" : "Personaliza tu Clínica o Consultorio"}
                 </h2>
                 <p className="text-white/50 text-sm mt-1">
                   {selectedIndustry === "restaurante"
                     ? "Indica el nombre de tu local y activa los módulos que utilizará tu equipo."
                     : esRetail
                     ? "Indica el nombre de tu negocio y activa los módulos que utilizará tu equipo."
+                    : esGanaderia
+                    ? "Indica el nombre de tu finca y activa los módulos que utilizará tu equipo de campo."
                     : "Indica el nombre de tu centro de salud y activa los módulos que utilizará tu equipo médico."}
                 </p>
               </div>
@@ -542,11 +559,11 @@ export default function Onboarding() {
               {/* Nombre del negocio */}
               <div>
                 <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1.5">
-                  {selectedIndustry === "restaurante" ? "Nombre del Restaurante / Local" : esRetail ? "Nombre del Negocio" : "Nombre de la Clínica / Consultorio / Doctor"}
+                  {selectedIndustry === "restaurante" ? "Nombre del Restaurante / Local" : esRetail ? "Nombre del Negocio" : esGanaderia ? "Nombre de la Finca" : "Nombre de la Clínica / Consultorio / Doctor"}
                 </label>
                 <input
                   type="text"
-                  placeholder={selectedIndustry === "restaurante" ? "Ej. Restaurante La Terraza" : esRetail ? "Ej. Ferretería El Tornillo Feliz" : "Ej. Centro Médico Especializado San Cristóbal"}
+                  placeholder={selectedIndustry === "restaurante" ? "Ej. Restaurante La Terraza" : esRetail ? "Ej. Ferretería El Tornillo Feliz" : esGanaderia ? "Ej. Finca Los Alpes" : "Ej. Centro Médico Especializado San Cristóbal"}
                   value={empresaNombre}
                   onChange={(e) => setEmpresaNombre(e.target.value)}
                   className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none transition-all shadow-inner"
@@ -703,7 +720,7 @@ export default function Onboarding() {
 
               <div>
                 <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white">
-                  {selectedIndustry === "restaurante" ? "¡Todo Listo para tu Restaurante!" : esRetail ? "¡Todo Listo para tu Negocio!" : "¡Todo Listo para tu Clínica!"}
+                  {selectedIndustry === "restaurante" ? "¡Todo Listo para tu Restaurante!" : esRetail ? "¡Todo Listo para tu Negocio!" : esGanaderia ? "¡Todo Listo para tu Finca!" : "¡Todo Listo para tu Clínica!"}
                 </h2>
                 <p className="text-white/50 text-sm mt-1 max-w-md mx-auto">
                   Tu entorno privado en <strong>Aurora Hub</strong> ha sido preparado con la vertical{" "}
