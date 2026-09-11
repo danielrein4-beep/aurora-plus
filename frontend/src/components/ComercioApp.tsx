@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import * as XLSX from "xlsx";
 import {
   IconHardware, IconPrescription, IconRetail, IconCard, IconSearch, IconTrash,
   IconCheck, IconWarning, IconClose, IconUsers, IconFileText, IconHourglass,
-  IconDownload, IconRefresh, IconCheckCircle, IconBank,
+  IconDownload, IconRefresh, IconCheckCircle, IconBank, IconChart, IconBolt,
+  IconPhone, IconPrinter,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
@@ -728,6 +730,187 @@ const CLIENTES_INICIALES: ClienteComercio[] = [
   { id: "c-4", nombre: "Dr. Marcos Peñaloza", documento: "V-14567890", telefono: "0412-6543210", saldoPendiente: 0, limiteCredito: 200 },
 ];
 
+const VENTAS_DEMO_INICIALES: VentaComercio[] = [
+  {
+    id: "v-demo-1",
+    numero: "TKT-841920",
+    cliente: CLIENTES_INICIALES[2],
+    lineas: [
+      {
+        productoId: "p-fer-1",
+        codigo: "FER-001",
+        nombre: "Cemento Gris Tipo I Portland 42.5kg",
+        precio: 8.50,
+        cantidad: 15,
+        unidadMedida: "Saco 42.5kg",
+        ubicacion: "Patio de Materiales",
+      },
+      {
+        productoId: "p-fer-4",
+        codigo: "FER-004",
+        nombre: "Bloques de Arcilla 15x20x30 cm",
+        precio: 0.65,
+        cantidad: 200,
+        unidadMedida: "Unidad",
+        ubicacion: "Patio Central",
+      },
+      {
+        productoId: "p-fer-6",
+        codigo: "FER-006",
+        nombre: "Arena Lavada de Río m³",
+        precio: 18.00,
+        cantidad: 2,
+        unidadMedida: "m³",
+        ubicacion: "Patio Tolva 2",
+      },
+    ],
+    fecha: new Date(Date.now() - 3600 * 1000 * 3.5).toLocaleString(),
+    total: 293.50,
+    totalBs: 19224.25,
+    totalCop: 1226830,
+    metodoPago: "PUNTO_VENTA",
+    esCredito: false,
+    recibido: 19224.25,
+    monedaRecibida: "VES",
+    vuelto: 0,
+    monedaVuelto: "VES",
+  },
+  {
+    id: "v-demo-2",
+    numero: "TKT-841921",
+    cliente: CLIENTES_INICIALES[0],
+    lineas: [
+      {
+        productoId: "p-ret-1",
+        codigo: "ZAP-001",
+        nombre: "Sneakers Air Pro Urban [Talla 38 - Blanco / Azul]",
+        precio: 55.00,
+        cantidad: 1,
+        unidadMedida: "Par",
+        tallaSeleccionada: "38",
+        colorSeleccionado: "Blanco / Azul",
+      },
+      {
+        productoId: "p-ret-10",
+        codigo: "MAQ-002",
+        nombre: "Labial Velvet Mate Larga Duración [Cherry Velvet]",
+        precio: 14.50,
+        cantidad: 1,
+        unidadMedida: "Unidad",
+        tonoSeleccionado: { nombre: "Cherry Velvet", hex: "#7A1C28" },
+      },
+    ],
+    fecha: new Date(Date.now() - 3600 * 1000 * 2.2).toLocaleString(),
+    total: 69.50,
+    totalBs: 4552.25,
+    totalCop: 290510,
+    metodoPago: "ZELLE",
+    esCredito: false,
+    recibido: 69.50,
+    monedaRecibida: "USD",
+    vuelto: 0,
+    monedaVuelto: "USD",
+    esTicketRegalo: true,
+    fechaLimiteCambio: new Date(Date.now() + 30 * 24 * 3600 * 1000).toLocaleDateString(),
+  },
+  {
+    id: "v-demo-3",
+    numero: "TKT-841922",
+    cliente: CLIENTES_INICIALES[3],
+    lineas: [
+      {
+        productoId: "p-ret-5",
+        codigo: "PER-001",
+        nombre: "Good Girl Eau de Parfum 80ml (Carolina Herrera)",
+        precio: 115.00,
+        cantidad: 1,
+        unidadMedida: "Frasco 80ml",
+      },
+    ],
+    fecha: new Date(Date.now() - 3600 * 1000 * 1.5).toLocaleString(),
+    total: 115.00,
+    totalBs: 7532.50,
+    totalCop: 480700,
+    metodoPago: "PAGO_MOVIL",
+    esCredito: false,
+    recibido: 7532.50,
+    monedaRecibida: "VES",
+    vuelto: 0,
+    monedaVuelto: "VES",
+    esTicketRegalo: true,
+    fechaLimiteCambio: new Date(Date.now() + 30 * 24 * 3600 * 1000).toLocaleDateString(),
+  },
+  {
+    id: "v-demo-4",
+    numero: "TKT-841923",
+    cliente: CLIENTES_INICIALES[1],
+    lineas: [
+      {
+        productoId: "p-fer-2",
+        codigo: "FER-002",
+        nombre: "Cable THW Calibre #12 100% Cobre (Metro)",
+        precio: 0.85,
+        cantidad: 50,
+        unidadMedida: "Metro",
+        ubicacion: "Pasillo 3 - Carrete Eléctrico",
+      },
+      {
+        productoId: "p-fer-3",
+        codigo: "FER-003",
+        nombre: "Tubo PVC Aguas Blancas 1/2 pulgada x 3m",
+        precio: 3.20,
+        cantidad: 6,
+        unidadMedida: "Tubo 3m",
+        ubicacion: "Racks Tuberías A",
+      },
+    ],
+    fecha: new Date(Date.now() - 3600 * 1000 * 0.9).toLocaleString(),
+    total: 61.70,
+    totalBs: 4041.35,
+    totalCop: 257906,
+    metodoPago: "EFECTIVO_USD",
+    esCredito: false,
+    recibido: 70.00,
+    monedaRecibida: "USD",
+    vuelto: 8.30,
+    monedaVuelto: "USD",
+  },
+  {
+    id: "v-demo-5",
+    numero: "TKT-841924",
+    cliente: CLIENTES_INICIALES[0],
+    lineas: [
+      {
+        productoId: "p-ret-9",
+        codigo: "MAQ-001",
+        nombre: "Base Líquida Flawless Coverage 30ml [Beige 120]",
+        precio: 22.00,
+        cantidad: 1,
+        unidadMedida: "Frasco 30ml",
+        tonoSeleccionado: { nombre: "Beige 120", hex: "#E8B288" },
+      },
+      {
+        productoId: "p-ret-11",
+        codigo: "MAQ-003",
+        nombre: "Polvo Translúcido Banana Touch 20g",
+        precio: 12.00,
+        cantidad: 1,
+        unidadMedida: "Estuche",
+      },
+    ],
+    fecha: new Date(Date.now() - 3600 * 1000 * 0.3).toLocaleString(),
+    total: 34.00,
+    totalBs: 2227.00,
+    totalCop: 142120,
+    metodoPago: "COP_EFECTIVO",
+    esCredito: false,
+    recibido: 150000,
+    monedaRecibida: "COP",
+    vuelto: 7880,
+    monedaVuelto: "COP",
+  },
+];
+
 // ══════════════════════════════════════════════════════════════════════════
 // IMPRESIÓN TÉRMICA UNIVERSAL PARA COMERCIO (80mm / 58mm)
 // ══════════════════════════════════════════════════════════════════════════
@@ -1037,6 +1220,23 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [monedaVuelto, setMonedaVuelto] = useState<"USD" | "VES" | "COP">("USD");
   const [emitirTicketRegaloCobro, setEmitirTicketRegaloCobro] = useState(false);
   const [ventaReciente, setVentaReciente] = useState<VentaComercio | null>(null);
+  const [ventas, setVentas] = useState<VentaComercio[]>(() => {
+    try {
+      const g = localStorage.getItem("aurora_comercio_ventas_v1");
+      return g ? JSON.parse(g) : VENTAS_DEMO_INICIALES;
+    } catch {
+      return VENTAS_DEMO_INICIALES;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("aurora_comercio_ventas_v1", JSON.stringify(ventas));
+    } catch {}
+  }, [ventas]);
+
+  const [filtroRubroReporte, setFiltroRubroReporte] = useState<string>("todos");
+  const [filtroMetodoReporte, setFiltroMetodoReporte] = useState<string>("todos");
   const [modalNuevoProducto, setModalNuevoProducto] = useState(false);
   const [clienteAbonoSel, setClienteAbonoSel] = useState<ClienteComercio | null>(null);
   const [montoAbono, setMontoAbono] = useState("");
@@ -1421,6 +1621,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     }
 
     setVentaReciente(nuevaVenta);
+    setVentas((prev) => [nuevaVenta, ...prev]);
     setCarrito([]);
     setModalCobro(false);
     setMontoRecibido("");
@@ -1558,11 +1759,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           <button
             onClick={() => setTab("cierre")}
             className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              tab === "cierre" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
+              tab === "cierre" ? "bg-teal-500 text-slate-950 shadow-md font-black" : "text-slate-400 hover:text-white"
             }`}
           >
-            <IconBank size={14} />
-            <span>Cierre Z</span>
+            <IconChart size={14} />
+            <span>Reportes & Cierre Z</span>
           </button>
         </nav>
 
@@ -2096,20 +2297,21 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   <button
                     onClick={generarCotizacion}
                     disabled={carrito.length === 0}
-                    className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                     title="Descargar presupuesto formal para cliente"
                   >
                     <IconFileText size={14} />
-                    <span>📄 Cotización</span>
+                    <span>Cotización</span>
                   </button>
 
                   <button
                     onClick={() => ejecutarCobro(true)}
                     disabled={carrito.length === 0 || clienteSel.id === "c-1"}
-                    className="py-2 px-3 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 disabled:opacity-40 text-xs font-bold text-amber-300 flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="py-2 px-3 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 disabled:opacity-40 text-xs font-bold text-amber-300 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                     title="Cargar a cuenta por cobrar (crédito)"
                   >
-                    <span>🤝 A Crédito</span>
+                    <IconUsers size={14} />
+                    <span>A Crédito</span>
                   </button>
                 </div>
 
@@ -2118,7 +2320,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   disabled={carrito.length === 0}
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-400 text-slate-950 font-black text-sm cursor-pointer hover:opacity-95 disabled:opacity-40 shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all flex items-center justify-center gap-2"
                 >
-                  <span>💰 Cobrar en Mostrador (${totalUSD.toFixed(2)})</span>
+                  <IconCard size={16} />
+                  <span>Cobrar en Mostrador (${totalUSD.toFixed(2)})</span>
                   <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-950/25 text-[10px] font-mono text-slate-950 font-black">
                     F4
                   </kbd>
@@ -2298,101 +2501,720 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════
-            TAB 4: CIERRE DE CAJA (CIERRE Z) CON ARQUEO CIEGO
+            TAB 4: CENTRO DE REPORTES DIARIOS, ESTADÍSTICAS & CIERRE Z
             ══════════════════════════════════════════════════════════════════ */}
-        {tab === "cierre" && (
-          <div className="max-w-2xl mx-auto w-full bg-slate-900 rounded-3xl border border-slate-800 p-6 space-y-5">
-            <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="font-['Outfit'] font-black text-lg text-white">Cierre de Turno de Mostrador (Cierre Z)</h3>
-                <p className="text-xs text-slate-400">Arqueo ciego de caja: cuenta físicamente el dinero para auditar sobrantes o faltantes.</p>
-              </div>
-              <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-bold font-mono">
-                Arqueo Ciego
-              </span>
-            </div>
+        {tab === "cierre" && (() => {
+          // Métricas de ventas
+          const totalVentasUSD = ventas.reduce((acc, v) => acc + v.total, 0);
+          const totalVentasBs = ventas.reduce((acc, v) => acc + v.totalBs, 0);
+          const totalVentasCop = ventas.reduce((acc, v) => acc + v.totalCop, 0);
+          const conteoTotal = ventas.length;
+          const conteoContado = ventas.filter((v) => !v.esCredito).length;
+          const conteoCredito = ventas.filter((v) => v.esCredito).length;
+          const ticketPromedio = conteoTotal > 0 ? totalVentasUSD / conteoTotal : 0;
 
-            {cajaCerradaMsg ? (
-              <div className="p-4 rounded-2xl bg-teal-500/15 border border-teal-500/30 text-center space-y-2">
-                <IconCheckCircle size={32} className="text-teal-400 mx-auto" />
-                <h4 className="font-bold text-white text-base">{cajaCerradaMsg}</h4>
-                <p className="text-xs text-slate-300">El turno ha sido cerrado y auditado. El reporte Z fue guardado.</p>
-                <button
-                  onClick={() => { setCajaCerradaMsg(null); setTab("pos"); }}
-                  className="mt-3 px-5 py-2 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400"
-                >
-                  Abrir Nuevo Turno
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">💵 Efectivo USD ($)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.usd}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, usd: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">🇻🇪 Efectivo Bs</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.ves}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, ves: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">💳 Punto de Venta (Bs)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.punto}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, punto: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">📲 Pago Móvil (Bs)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.pagoMovil}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, pagoMovil: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">⚡ Zelle / USDT ($)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.zelle}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, zelle: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">🇨🇴 Pesos COP</label>
-                    <input
-                      type="number" step="1" placeholder="0" value={desgloseCaja.cop}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, cop: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-sm text-white"
-                    />
+          // Desglose por método de pago
+          const porMetodo: Record<string, number> = {
+            EFECTIVO_USD: 0,
+            PUNTO_VENTA: 0,
+            PAGO_MOVIL: 0,
+            ZELLE: 0,
+            COP_EFECTIVO: 0,
+            EFECTIVO_BS: 0,
+          };
+          ventas.forEach((v) => {
+            if (!v.esCredito && v.metodoPago) {
+              porMetodo[v.metodoPago] = (porMetodo[v.metodoPago] || 0) + v.total;
+            }
+          });
+
+          // Desglose por vertical
+          const porVertical: Record<string, number> = {
+            "Ferretería & Construcción": 0,
+            "Calzado & Zapatos": 0,
+            "Perfumería & Fragancias": 0,
+            "Cosmética & Maquillaje": 0,
+            "Farmacia & Salud": 0,
+          };
+
+          const productoRanking: Record<string, { nombre: string; cantidad: number; total: number }> = {};
+
+          ventas.forEach((v) => {
+            v.lineas.forEach((l) => {
+              const subtotal = l.precio * l.cantidad;
+              const prod = productos.find((p) => p.id === l.productoId);
+              if (prod?.rubro === "ferreteria") porVertical["Ferretería & Construcción"] += subtotal;
+              else if (prod?.subrubro === "calzado") porVertical["Calzado & Zapatos"] += subtotal;
+              else if (prod?.subrubro === "perfumeria") porVertical["Perfumería & Fragancias"] += subtotal;
+              else if (prod?.subrubro === "maquillaje") porVertical["Cosmética & Maquillaje"] += subtotal;
+              else if (prod?.rubro === "farmacia") porVertical["Farmacia & Salud"] += subtotal;
+              else porVertical["Ferretería & Construcción"] += subtotal;
+
+              // Top ranking
+              if (!productoRanking[l.nombre]) {
+                productoRanking[l.nombre] = { nombre: l.nombre, cantidad: 0, total: 0 };
+              }
+              productoRanking[l.nombre].cantidad += l.cantidad;
+              productoRanking[l.nombre].total += subtotal;
+            });
+          });
+
+          const topProductos = Object.values(productoRanking)
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 5);
+
+          // Arqueo físico ingresado
+          const arqueoFisicoUSD =
+            (Number(desgloseCaja.usd) || 0) +
+            (Number(desgloseCaja.zelle) || 0) +
+            ((Number(desgloseCaja.ves) || 0) + (Number(desgloseCaja.punto) || 0) + (Number(desgloseCaja.pagoMovil) || 0)) / tasaActivaBs +
+            ((Number(desgloseCaja.cop) || 0) / tasaCop);
+
+          const diferenciaUSD = arqueoFisicoUSD - totalVentasUSD;
+
+          // Filtro de ventas en tabla
+          const ventasFiltradas = ventas.filter((v) => {
+            if (filtroRubroReporte !== "todos") {
+              const coincide = v.lineas.some((l) => {
+                const p = productos.find((it) => it.id === l.productoId);
+                if (filtroRubroReporte === "ferreteria") return p?.rubro === "ferreteria";
+                if (filtroRubroReporte === "calzado") return p?.subrubro === "calzado";
+                if (filtroRubroReporte === "perfumeria") return p?.subrubro === "perfumeria";
+                if (filtroRubroReporte === "maquillaje") return p?.subrubro === "maquillaje";
+                if (filtroRubroReporte === "farmacia") return p?.rubro === "farmacia";
+                return true;
+              });
+              if (!coincide) return false;
+            }
+            if (filtroMetodoReporte !== "todos" && v.metodoPago !== filtroMetodoReporte) {
+              return false;
+            }
+            return true;
+          });
+
+          // Función de descarga Excel (.xlsx)
+          const handleExportarExcel = () => {
+            const filas = ventasFiltradas.map((v) => ({
+              "Fecha y Hora": v.fecha,
+              "N° Ticket": v.numero,
+              "Cliente": v.cliente.nombre,
+              "Cédula / RIF": v.cliente.documento,
+              "Productos Vendidos": v.lineas.map((l) => `${l.cantidad}x ${l.nombre}`).join(" | "),
+              "Total Ítems": v.lineas.reduce((acc, it) => acc + it.cantidad, 0),
+              "Método de Pago": v.metodoPago.replace(/_/g, " "),
+              "Total USD ($)": Number(v.total.toFixed(2)),
+              "Total Bs": Number(v.totalBs.toFixed(2)),
+              "Total COP": Math.round(v.totalCop),
+              "Moneda Recibida": v.monedaRecibida || "USD",
+              "Monto Recibido": v.recibido ? Number(v.recibido.toFixed(2)) : Number(v.total.toFixed(2)),
+              "Vuelto": v.vuelto ? Number(v.vuelto.toFixed(2)) : 0,
+              "Moneda Vuelto": v.monedaVuelto || "-",
+              "Condición": v.esCredito ? "CRÉDITO" : "CONTADO",
+              "Garantía / Regalo": v.esTicketRegalo ? "TICKET REGALO 30D" : "NORMAL",
+            }));
+
+            const hoja = XLSX.utils.json_to_sheet(filas);
+            hoja["!cols"] = [
+              { wch: 20 }, { wch: 14 }, { wch: 24 }, { wch: 15 }, { wch: 45 },
+              { wch: 10 }, { wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
+              { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 18 },
+            ];
+            const libro = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(libro, hoja, "Ventas");
+            const hoyStr = new Date().toISOString().slice(0, 10);
+            XLSX.writeFile(libro, `Reporte_Diario_Ventas_Aurora_${hoyStr}.xlsx`);
+            mostrarToast("Reporte Excel (.xlsx) generado y descargado exitosamente", "success");
+          };
+
+          // Función de impresión Cierre Z
+          const handleImprimirZ = () => {
+            const ventana = window.open("", "_blank", "width=420,height=750");
+            if (!ventana) {
+              mostrarToast("Permita las ventanas emergentes para imprimir", "error");
+              return;
+            }
+
+            const hoyFecha = new Date().toLocaleDateString();
+            const hoyHora = new Date().toLocaleTimeString();
+            const numZ = `Z-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}-${Math.floor(100 + Math.random() * 900)}`;
+
+            const contenidoHtml = `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <meta charset="utf-8" />
+                <title>Cierre Z Oficial - ${numZ}</title>
+                <style>
+                  body { font-family: 'Courier New', monospace; font-size: 11px; margin: 0; padding: 12px; width: 78mm; color: #000; }
+                  .center { text-align: center; }
+                  .right { text-align: right; }
+                  .bold { font-weight: bold; }
+                  .border-b { border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 5px; }
+                  .row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+                  .title { font-size: 14px; font-weight: 900; }
+                  .badge { border: 1px solid #000; padding: 2px 4px; font-size: 9px; display: inline-block; margin: 4px 0; }
+                  .signatures { margin-top: 30px; border-top: 1px dotted #000; padding-top: 4px; display: flex; justify-content: space-between; font-size: 8px; }
+                  @media print { body { width: 100%; margin: 0; padding: 4px; } @page { margin: 0; } }
+                </style>
+              </head>
+              <body>
+                <div class="center border-b">
+                  <div class="title">${user?.empresa || "AURORA PLUS COMERCIAL"}</div>
+                  <div>SISTEMA POS & GESTIÓN MULTI-RUBRO</div>
+                  <div>RIF: J-50123984-7 · SAN CRISTÓBAL</div>
+                  <div class="badge">REPORTE OFICIAL DE CORTE Z</div>
+                  <div><b>COMPROBANTE CORTE: ${numZ}</b></div>
+                  <div>FECHA: ${hoyFecha}  HORA: ${hoyHora}</div>
+                  <div>OPERADOR: ${user?.name || "Cajero Principal"}</div>
+                </div>
+
+                <div class="border-b">
+                  <div class="bold center">RESUMEN DEL DÍA</div>
+                  <div class="row"><span>TOTAL VENTAS:</span><span class="bold">${conteoTotal} tickets</span></div>
+                  <div class="row"><span>OPERACIONES CONTADO:</span><span>${conteoContado}</span></div>
+                  <div class="row"><span>OPERACIONES CRÉDITO:</span><span>${conteoCredito}</span></div>
+                  <div class="row"><span>TASA ACTIVA BCV/USDT:</span><span class="bold">Bs. ${tasaActivaBs.toFixed(2)}</span></div>
+                  <div class="row"><span>TASA COP (Pesos):</span><span class="bold">$${tasaCop.toLocaleString()}</span></div>
+                </div>
+
+                <div class="border-b">
+                  <div class="bold center">TOTALES FACTURADOS</div>
+                  <div class="row bold" style="font-size: 13px;"><span>TOTAL FACTURADO USD:</span><span>$${totalVentasUSD.toFixed(2)}</span></div>
+                  <div class="row bold"><span>TOTAL EN BOLÍVARES:</span><span>Bs. ${totalVentasBs.toFixed(2)}</span></div>
+                  <div class="row bold"><span>TOTAL EN PESOS COP:</span><span>COP $${Math.round(totalVentasCop).toLocaleString()}</span></div>
+                </div>
+
+                <div class="border-b">
+                  <div class="bold center">DESGLOSE POR FORMA DE PAGO</div>
+                  <div class="row"><span>Efectivo USD:</span><span class="bold">$${porMetodo.EFECTIVO_USD.toFixed(2)}</span></div>
+                  <div class="row"><span>Punto de Venta (Bs):</span><span class="bold">$${porMetodo.PUNTO_VENTA.toFixed(2)}</span></div>
+                  <div class="row"><span>Pago Móvil (Bs):</span><span class="bold">$${porMetodo.PAGO_MOVIL.toFixed(2)}</span></div>
+                  <div class="row"><span>Zelle / USDT ($):</span><span class="bold">$${porMetodo.ZELLE.toFixed(2)}</span></div>
+                  <div class="row"><span>Pesos COP:</span><span class="bold">$${porMetodo.COP_EFECTIVO.toFixed(2)}</span></div>
+                  <div class="row"><span>Efectivo Bs:</span><span class="bold">$${porMetodo.EFECTIVO_BS.toFixed(2)}</span></div>
+                </div>
+
+                <div class="border-b">
+                  <div class="bold center">AUDITORÍA DE ARQUEO FÍSICO</div>
+                  <div class="row"><span>SISTEMA (TEÓRICO):</span><span>$${totalVentasUSD.toFixed(2)}</span></div>
+                  <div class="row"><span>CAJA FÍSICA CONTADA:</span><span>$${arqueoFisicoUSD.toFixed(2)}</span></div>
+                  <div class="row bold" style="font-size: 12px;">
+                    <span>ESTADO ARQUEO:</span>
+                    <span>${Math.abs(diferenciaUSD) < 0.05 ? "CUADRADO ($0.00)" : diferenciaUSD > 0 ? `SOBRANTE (+$${diferenciaUSD.toFixed(2)})` : `FALTANTE (-$${Math.abs(diferenciaUSD).toFixed(2)})`}</span>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    const totalUSDContado = (Number(desgloseCaja.usd) || 0) + (Number(desgloseCaja.zelle) || 0) +
-                      ((Number(desgloseCaja.ves) || 0) + (Number(desgloseCaja.punto) || 0) + (Number(desgloseCaja.pagoMovil) || 0)) / tasaActivaBs +
-                      ((Number(desgloseCaja.cop) || 0) / tasaCop);
+                <div class="center" style="font-size: 9px; margin-top: 8px;">
+                  SISTEMA DE CONTROL FISCAL Y AUDITORÍA AURORA PLUS.<br />
+                  CORTE DE CAJA VÁLIDO PARA CONCILIACIÓN BANCARIA.
+                </div>
 
-                    setCajaCerradaMsg(`Cierre Z Generado · Total Contado: $${totalUSDContado.toFixed(2)} USD`);
-                  }}
-                  className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm cursor-pointer shadow-lg"
-                >
-                  Cerrar Turno & Auditar Caja
-                </button>
+                <div class="signatures">
+                  <div class="center" style="width: 45%;">
+                    ____________________<br />
+                    ENTREGADO POR<br />
+                    ${user?.name || "CAJERO"}
+                  </div>
+                  <div class="center" style="width: 45%;">
+                    ____________________<br />
+                    RECIBIDO / AUDITADO<br />
+                    SUPERVISOR
+                  </div>
+                </div>
+              </body>
+              </html>
+            `;
+
+            ventana.document.write(contenidoHtml);
+            ventana.document.close();
+            setTimeout(() => {
+              ventana.focus();
+              ventana.print();
+            }, 300);
+          };
+
+          return (
+            <div className="flex-1 overflow-y-auto space-y-5 pr-1">
+              
+              {/* Cabecera Ejecutiva de Reportes */}
+              <div className="bg-slate-900/90 rounded-3xl border border-slate-800 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-bold uppercase tracking-wider">
+                      Business Intelligence & Auditoría
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">• Corte del Día: {new Date().toLocaleDateString()}</span>
+                  </div>
+                  <h3 className="font-['Outfit'] font-black text-xl text-white mt-1">
+                    Centro de Reportes Diarios, Estadísticas & Cierre Z
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Métricas de ingresos en tiempo real, desglose por forma de pago, exportación contable y arqueo fiscal auditado.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleExportarExcel}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-lg transition-all flex items-center gap-2"
+                    title="Exportar archivo Excel nativo (.xlsx) con todas las ventas del día"
+                  >
+                    <IconDownload size={16} />
+                    <span>Descargar Reporte Excel (.xlsx)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleImprimirZ}
+                    className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs cursor-pointer shadow-lg transition-all flex items-center gap-2"
+                    title="Imprimir comprobante formal de Cierre Z en rollo térmico de 80mm o guardar como PDF"
+                  >
+                    <IconPrinter size={16} />
+                    <span>Imprimir Cierre Z (PDF / 80mm)</span>
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
-        )}
+
+              {/* 4 Tarjetas KPI Clave */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                {/* KPI 1: Total Ingresos */}
+                <div className="bg-slate-900/80 p-4 rounded-3xl border border-slate-800 space-y-1 shadow-md">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span className="font-bold uppercase tracking-wider text-[10px]">Ingresos Totales del Día</span>
+                    <div className="w-7 h-7 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center">
+                      <IconBank size={15} />
+                    </div>
+                  </div>
+                  <div className="font-mono font-black text-2xl text-teal-400">
+                    ${totalVentasUSD.toFixed(2)} USD
+                  </div>
+                  <div className="text-[11px] font-mono text-slate-400 space-y-0.5">
+                    <div>Bs. {totalVentasBs.toFixed(2)}</div>
+                    <div>COP ${Math.round(totalVentasCop).toLocaleString()}</div>
+                  </div>
+                </div>
+
+                {/* KPI 2: Ventas y Tickets */}
+                <div className="bg-slate-900/80 p-4 rounded-3xl border border-slate-800 space-y-1 shadow-md">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span className="font-bold uppercase tracking-wider text-[10px]">Comprobantes Emitidos</span>
+                    <div className="w-7 h-7 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                      <IconFileText size={15} />
+                    </div>
+                  </div>
+                  <div className="font-mono font-black text-2xl text-white">
+                    {conteoTotal} <span className="text-xs font-sans text-slate-400">tickets</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 pt-1 flex items-center gap-2">
+                    <span className="text-emerald-400 font-bold">{conteoContado} Contado</span>
+                    <span>•</span>
+                    <span className="text-amber-400 font-bold">{conteoCredito} Crédito</span>
+                  </div>
+                </div>
+
+                {/* KPI 3: Ticket Promedio */}
+                <div className="bg-slate-900/80 p-4 rounded-3xl border border-slate-800 space-y-1 shadow-md">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span className="font-bold uppercase tracking-wider text-[10px]">Ticket Promedio</span>
+                    <div className="w-7 h-7 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                      <IconChart size={15} />
+                    </div>
+                  </div>
+                  <div className="font-mono font-black text-2xl text-purple-300">
+                    ${ticketPromedio.toFixed(2)} USD
+                  </div>
+                  <div className="text-[11px] text-slate-400 pt-1">
+                    Gasto promedio por transacción
+                  </div>
+                </div>
+
+                {/* KPI 4: Estado del Arqueo */}
+                <div className="bg-slate-900/80 p-4 rounded-3xl border border-slate-800 space-y-1 shadow-md">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span className="font-bold uppercase tracking-wider text-[10px]">Auditoría de Caja</span>
+                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${
+                      Math.abs(diferenciaUSD) < 0.05 ? "bg-emerald-500/20 text-emerald-400" :
+                      diferenciaUSD > 0 ? "bg-cyan-500/20 text-cyan-400" : "bg-red-500/20 text-red-400"
+                    }`}>
+                      <IconCheckCircle size={15} />
+                    </div>
+                  </div>
+                  <div className={`font-mono font-black text-xl ${
+                    Math.abs(diferenciaUSD) < 0.05 ? "text-emerald-400" :
+                    diferenciaUSD > 0 ? "text-cyan-400" : "text-red-400"
+                  }`}>
+                    {arqueoFisicoUSD === 0 ? "Pendiente Conteo" :
+                     Math.abs(diferenciaUSD) < 0.05 ? "Caja Cuadrada ($0.00)" :
+                     diferenciaUSD > 0 ? `Sobrante +$${diferenciaUSD.toFixed(2)}` :
+                     `Faltante -$${Math.abs(diferenciaUSD).toFixed(2)}`}
+                  </div>
+                  <div className="text-[11px] text-slate-400 pt-1">
+                    {arqueoFisicoUSD > 0 ? `Contado Físico: $${arqueoFisicoUSD.toFixed(2)}` : "Ingresa el arqueo ciego abajo"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Fila Central: Gráficos de Métodos de Pago, Verticales y Top Productos */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                {/* Columna 1 (6 cols): Ingresos por Forma de Pago & Verticales */}
+                <div className="lg:col-span-6 space-y-5">
+                  
+                  {/* Desglose por Método de Pago */}
+                  <div className="bg-slate-900/80 p-5 rounded-3xl border border-slate-800 space-y-3 shadow-md">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-['Outfit'] font-black text-sm text-white">Ingresos por Método de Pago</h4>
+                      <span className="text-[10px] text-slate-400">Total facturado: ${totalVentasUSD.toFixed(2)}</span>
+                    </div>
+
+                    <div className="space-y-2.5 text-xs">
+                      {[
+                        { id: "EFECTIVO_USD", label: "Dólares Efectivo ($)", color: "bg-emerald-500", icon: <IconBank size={14} className="text-emerald-400" /> },
+                        { id: "PUNTO_VENTA", label: "Punto de Venta Débito (Bs)", color: "bg-blue-500", icon: <IconCard size={14} className="text-blue-400" /> },
+                        { id: "PAGO_MOVIL", label: "Pago Móvil Interbancario (Bs)", color: "bg-cyan-500", icon: <IconPhone size={14} className="text-cyan-400" /> },
+                        { id: "ZELLE", label: "Zelle / Cripto USDT ($)", color: "bg-purple-500", icon: <IconBolt size={14} className="text-purple-400" /> },
+                        { id: "COP_EFECTIVO", label: "Pesos Colombianos (COP)", color: "bg-amber-500", icon: <IconBank size={14} className="text-amber-400" /> },
+                        { id: "EFECTIVO_BS", label: "Bolívares Efectivo (Bs)", color: "bg-teal-500", icon: <IconCard size={14} className="text-teal-400" /> },
+                      ].map((met) => {
+                        const monto = porMetodo[met.id] || 0;
+                        const pct = totalVentasUSD > 0 ? (monto / totalVentasUSD) * 100 : 0;
+                        return (
+                          <div key={met.id} className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+                                {met.icon}
+                                <span>{met.label}</span>
+                              </div>
+                              <div className="font-mono text-white font-bold">
+                                ${monto.toFixed(2)} <span className="text-[10px] text-slate-400 font-sans">({pct.toFixed(1)}%)</span>
+                              </div>
+                            </div>
+                            <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                              <div className={`h-full ${met.color} rounded-full transition-all duration-500`} style={{ width: `${Math.min(100, Math.max(pct, 0))}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Desglose por Vertical de Negocio */}
+                  <div className="bg-slate-900/80 p-5 rounded-3xl border border-slate-800 space-y-3 shadow-md">
+                    <h4 className="font-['Outfit'] font-black text-sm text-white">Ventas por Vertical Especializada</h4>
+                    <div className="space-y-2.5 text-xs">
+                      {Object.entries(porVertical).map(([vert, monto]) => {
+                        const pct = totalVentasUSD > 0 ? (monto / totalVentasUSD) * 100 : 0;
+                        return (
+                          <div key={vert} className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-300 font-medium">{vert}</span>
+                              <span className="font-mono text-teal-300 font-bold">
+                                ${monto.toFixed(2)} <span className="text-[10px] text-slate-400 font-sans">({pct.toFixed(1)}%)</span>
+                              </span>
+                            </div>
+                            <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-teal-500 to-cyan-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(pct, 0))}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Columna 2 (6 cols): Top 5 Productos y Arqueo de Caja */}
+                <div className="lg:col-span-6 space-y-5">
+                  
+                  {/* Top 5 Productos Más Vendidos */}
+                  <div className="bg-slate-900/80 p-5 rounded-3xl border border-slate-800 space-y-3 shadow-md">
+                    <h4 className="font-['Outfit'] font-black text-sm text-white">Top 5 Productos Más Vendidos del Día</h4>
+                    <div className="space-y-2">
+                      {topProductos.length === 0 ? (
+                        <p className="text-xs text-slate-500 text-center py-4">No hay productos registrados hoy.</p>
+                      ) : (
+                        topProductos.map((p, idx) => (
+                          <div key={p.nombre} className="p-2.5 rounded-2xl bg-slate-800/50 border border-slate-700/50 flex items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-xs font-mono shrink-0 ${
+                                idx === 0 ? "bg-amber-500 text-slate-950 shadow" :
+                                idx === 1 ? "bg-slate-400 text-slate-950" :
+                                idx === 2 ? "bg-amber-700 text-white" :
+                                "bg-slate-800 text-slate-400 border border-slate-700"
+                              }`}>
+                                {idx + 1}
+                              </span>
+                              <span className="font-bold text-white truncate">{p.nombre}</span>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="font-mono font-bold text-teal-300">${p.total.toFixed(2)}</div>
+                              <div className="text-[10px] text-slate-400">{p.cantidad} unidades</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Arqueo Ciego de Caja para Cierre Z */}
+                  <div className="bg-slate-900/80 p-5 rounded-3xl border border-slate-800 space-y-3 shadow-md">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <div>
+                        <h4 className="font-['Outfit'] font-black text-sm text-white">Arqueo Ciego & Conteo Físico</h4>
+                        <p className="text-[11px] text-slate-400">Cuenta físicamente el dinero en gaveta para auditar el cuadre de caja.</p>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold uppercase">
+                        Auditoría
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1 flex items-center gap-1">
+                          <IconBank size={12} className="text-emerald-400" />
+                          <span>Efectivo USD ($)</span>
+                        </label>
+                        <input
+                          type="number" step="0.01" placeholder="0.00" value={desgloseCaja.usd}
+                          onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, usd: e.target.value }))}
+                          className="w-full px-2.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 font-mono text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1 flex items-center gap-1">
+                          <IconCard size={12} className="text-blue-400" />
+                          <span>Punto Venta (Bs)</span>
+                        </label>
+                        <input
+                          type="number" step="0.01" placeholder="0.00" value={desgloseCaja.punto}
+                          onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, punto: e.target.value }))}
+                          className="w-full px-2.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 font-mono text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1 flex items-center gap-1">
+                          <IconPhone size={12} className="text-cyan-400" />
+                          <span>Pago Móvil (Bs)</span>
+                        </label>
+                        <input
+                          type="number" step="0.01" placeholder="0.00" value={desgloseCaja.pagoMovil}
+                          onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, pagoMovil: e.target.value }))}
+                          className="w-full px-2.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 font-mono text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1 flex items-center gap-1">
+                          <IconBolt size={12} className="text-purple-400" />
+                          <span>Zelle / USDT ($)</span>
+                        </label>
+                        <input
+                          type="number" step="0.01" placeholder="0.00" value={desgloseCaja.zelle}
+                          onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, zelle: e.target.value }))}
+                          className="w-full px-2.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 font-mono text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1 flex items-center gap-1">
+                          <IconBank size={12} className="text-amber-400" />
+                          <span>Pesos COP</span>
+                        </label>
+                        <input
+                          type="number" step="1" placeholder="0" value={desgloseCaja.cop}
+                          onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, cop: e.target.value }))}
+                          className="w-full px-2.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 font-mono text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1 flex items-center gap-1">
+                          <IconCard size={12} className="text-teal-400" />
+                          <span>Efectivo Bs</span>
+                        </label>
+                        <input
+                          type="number" step="0.01" placeholder="0.00" value={desgloseCaja.ves}
+                          onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, ves: e.target.value }))}
+                          className="w-full px-2.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 font-mono text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Total Físico Contado:</span>
+                        <span className="font-mono font-bold text-white text-sm">${arqueoFisicoUSD.toFixed(2)} USD</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block">Diferencia vs Sistema:</span>
+                        <span className={`font-mono font-black text-sm ${
+                          Math.abs(diferenciaUSD) < 0.05 ? "text-emerald-400" :
+                          diferenciaUSD > 0 ? "text-cyan-400" : "text-red-400"
+                        }`}>
+                          {Math.abs(diferenciaUSD) < 0.05 ? "Cuadrada ($0.00)" :
+                           diferenciaUSD > 0 ? `+$${diferenciaUSD.toFixed(2)} (Sobrante)` :
+                           `-$${Math.abs(diferenciaUSD).toFixed(2)} (Faltante)`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCajaCerradaMsg(`Cierre Z Auditado · Total Contado: $${arqueoFisicoUSD.toFixed(2)} USD`);
+                        handleImprimirZ();
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <IconCheckCircle size={15} />
+                      <span>Cerrar Turno Fiscal & Auditar Caja</span>
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Sábana / Registro Detallado de Ventas del Día */}
+              <div className="bg-slate-900/80 rounded-3xl border border-slate-800 p-5 space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-['Outfit'] font-black text-base text-white">
+                      Registro Detallado de Ventas de Hoy
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Visualiza los tickets emitidos, desglose de tallas/tonos, montos y reimpresión de comprobantes.
+                    </p>
+                  </div>
+
+                  {/* Filtros de Tabla */}
+                  <div className="flex items-center gap-2 flex-wrap text-xs">
+                    <select
+                      value={filtroRubroReporte}
+                      onChange={(e) => setFiltroRubroReporte(e.target.value)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-bold focus:outline-none"
+                    >
+                      <option value="todos">Todos los Rubros</option>
+                      <option value="ferreteria">Ferretería</option>
+                      <option value="calzado">Calzado</option>
+                      <option value="perfumeria">Perfumes</option>
+                      <option value="maquillaje">Maquillaje</option>
+                      <option value="farmacia">Farmacia</option>
+                    </select>
+
+                    <select
+                      value={filtroMetodoReporte}
+                      onChange={(e) => setFiltroMetodoReporte(e.target.value)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-bold focus:outline-none"
+                    >
+                      <option value="todos">Todos los Métodos</option>
+                      <option value="EFECTIVO_USD">Efectivo USD</option>
+                      <option value="PUNTO_VENTA">Punto Débito</option>
+                      <option value="PAGO_MOVIL">Pago Móvil</option>
+                      <option value="ZELLE">Zelle / USDT</option>
+                      <option value="COP_EFECTIVO">Pesos COP</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Tabla */}
+                <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-800/80 text-slate-300 uppercase text-[10px] tracking-wider font-mono">
+                      <tr>
+                        <th className="p-3">Hora</th>
+                        <th className="p-3">N° Ticket</th>
+                        <th className="p-3">Cliente</th>
+                        <th className="p-3">Detalle de Productos</th>
+                        <th className="p-3">Método de Pago</th>
+                        <th className="p-3 text-right">Total USD</th>
+                        <th className="p-3 text-right">Total Bs</th>
+                        <th className="p-3 text-center">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300">
+                      {ventasFiltradas.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-6 text-center text-slate-500">
+                            No se encontraron ventas para los filtros seleccionados.
+                          </td>
+                        </tr>
+                      ) : (
+                        ventasFiltradas.map((v) => (
+                          <tr key={v.id} className="hover:bg-slate-800/40 transition-colors">
+                            <td className="p-3 font-mono text-[11px] whitespace-nowrap text-slate-400">
+                              {v.fecha.split(",")[1] || v.fecha}
+                            </td>
+                            <td className="p-3 font-mono font-bold text-white whitespace-nowrap">
+                              {v.numero}
+                            </td>
+                            <td className="p-3">
+                              <div className="font-semibold text-white">{v.cliente.nombre}</div>
+                              <div className="font-mono text-[10px] text-slate-400">{v.cliente.documento}</div>
+                            </td>
+                            <td className="p-3 max-w-xs">
+                              <div className="space-y-1">
+                                {v.lineas.map((l, i) => (
+                                  <div key={i} className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                                    <span className="font-bold text-teal-300">{l.cantidad}x</span>
+                                    <span className="truncate">{l.nombre}</span>
+                                    {l.tallaSeleccionada && (
+                                      <span className="text-[9px] px-1 rounded bg-blue-500/20 text-blue-300 font-bold">
+                                        T{l.tallaSeleccionada}
+                                      </span>
+                                    )}
+                                    {l.tonoSeleccionado && (
+                                      <span className="text-[9px] px-1 rounded bg-pink-500/20 text-pink-300 font-bold inline-flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: l.tonoSeleccionado.hex }} />
+                                        {l.tonoSeleccionado.nombre}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="p-3 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-lg bg-slate-800 border border-slate-700 font-bold text-[10px] text-slate-300">
+                                {v.metodoPago.replace(/_/g, " ")}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right font-mono font-black text-teal-400 whitespace-nowrap">
+                              ${v.total.toFixed(2)}
+                            </td>
+                            <td className="p-3 text-right font-mono text-slate-400 whitespace-nowrap">
+                              Bs. {v.totalBs.toFixed(2)}
+                            </td>
+                            <td className="p-3 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => imprimirTicketComercio(v, nombreLocal, tasaActivaBs, tasaCop)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer transition-colors"
+                                  title="Reimprimir Ticket de Venta"
+                                >
+                                  <IconPrinter size={13} />
+                                </button>
+                                {v.esTicketRegalo && (
+                                  <button
+                                    type="button"
+                                    onClick={() => imprimirTicketRegalo(v, nombreLocal)}
+                                    className="p-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 cursor-pointer transition-colors"
+                                    title="Reimprimir Ticket de Regalo / Cambio (30 días)"
+                                  >
+                                    <IconGift size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          );
+        })()}
 
       </main>
 
