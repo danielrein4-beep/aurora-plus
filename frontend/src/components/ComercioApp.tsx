@@ -26,6 +26,69 @@ import {
   type ProveedorRepuesto,
 } from "../api";
 
+function IconShoppingCart({ size = 18, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="9" cy="21" r="1" />
+      <circle cx="20" cy="21" r="1" />
+      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+    </svg>
+  );
+}
+
+function IconShoe({ size = 18, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M2 18h20v2H2z" />
+      <path d="M4 18V9a3 3 0 0 1 3-3h2v4l5-2 6 2v8H4z" />
+    </svg>
+  );
+}
+
+function IconPerfume({ size = 18, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="5" y="8" width="14" height="13" rx="3" />
+      <path d="M9 8V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+      <line x1="12" y1="4" x2="12" y2="2" />
+      <circle cx="12" cy="14" r="2.5" />
+    </svg>
+  );
+}
+
+function IconLipstick({ size = 18, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M9 22h6V11H9z" />
+      <path d="M10 11V7l4-4v8" />
+      <line x1="9" y1="15" x2="15" y2="15" />
+    </svg>
+  );
+}
+
+function IconCalculator({ size = 18, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <line x1="8" y1="6" x2="16" y2="6" />
+      <line x1="16" y1="14" x2="16" y2="18" />
+      <path d="M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M8 18h.01M12 18h.01" />
+    </svg>
+  );
+}
+
+function IconGift({ size = 18, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <polyline points="20 12 20 22 4 22 4 12" />
+      <rect x="2" y="7" width="20" height="5" />
+      <line x1="12" y1="22" x2="12" y2="7" />
+      <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+      <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+    </svg>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 // TIPOS Y MODELOS
 // ══════════════════════════════════════════════════════════════════════════
@@ -54,8 +117,30 @@ export interface ProductoComercio {
   backendId?: number;
   codigoOem?: string;
   precioMayorista?: number;
+  precioContratista?: number;
   cantidadMinimaMayorista?: number;
   presentaciones?: PresentacionRepuesto[];
+  unidadesConversion?: Array<{ unidad: string; factor: number; precio: number }>;
+  ubicacionGalpon?: string;
+
+  // Específico Calzado & Moda
+  subrubro?: "calzado" | "perfumeria" | "maquillaje" | "alimentos" | "general" | string;
+  genero?: "CABALLERO" | "DAMA" | "UNISEX" | "INFANTIL";
+  variantesTalla?: Array<{ talla: string; stock: number; color?: string }>;
+  color?: string;
+  material?: string;
+
+  // Específico Perfumería & Fragancias
+  casaPerfume?: string;
+  concentracion?: "EDT" | "EDP" | "PARFUM" | "ELIXIR" | "BODY_MIST" | "DECANT" | string;
+  volumenMl?: number;
+  familiaOlfativa?: string;
+  esTester?: boolean;
+
+  // Específico Maquillaje & Cosmética
+  tonosCosmeticos?: Array<{ nombre: string; hex: string; stock: number }>;
+  acabadoMaquillaje?: string;
+  paoMeses?: number;
 }
 
 export interface LineaCarritoComercio {
@@ -76,6 +161,11 @@ export interface LineaCarritoComercio {
   presentacionId?: number;
   nombrePresentacion?: string;
   factorConversion?: number;
+  tallaSeleccionada?: string;
+  colorSeleccionado?: string;
+  tonoSeleccionado?: { nombre: string; hex: string };
+  esTester?: boolean;
+  ubicacion?: string;
 }
 
 export interface ClienteComercio {
@@ -103,6 +193,8 @@ export interface VentaComercio {
   monedaRecibida?: string;
   vuelto?: number;
   monedaVuelto?: string;
+  esTicketRegalo?: boolean;
+  fechaLimiteCambio?: string;
 }
 
 export interface CotizacionComercio {
@@ -121,17 +213,504 @@ export interface CotizacionComercio {
 // CATÁLOGO INICIAL OPTIMIZADO (FERRETERÍA, FARMACIA, RETAIL)
 // ══════════════════════════════════════════════════════════════════════════
 const PRODUCTOS_INICIALES: ProductoComercio[] = [
-  // Ferretería & Repuestos
-  { id: "f-1", codigo: "TORN-38", nombre: "Tornillo Drywall 6x1\" (Caja 100u)", categoria: "Tornillería", rubro: "ferreteria", precio: 2.80, costo: 1.50, stock: 45, stockMinimo: 10, unidadMedida: "Caja", ubicacion: "Pasillo 1 - Gaveta 4", codigoParte: "DW-61" },
-  { id: "f-2", codigo: "TAL-20V", nombre: "Taladro Percutor Inalámbrico 20V", categoria: "Herramientas", rubro: "ferreteria", precio: 68.00, costo: 45.00, stock: 8, stockMinimo: 3, unidadMedida: "Pza", ubicacion: "Vitrina Central", marca: "DeWalt / Ingco" },
-  { id: "f-3", codigo: "CAB-THW12", nombre: "Cable Eléctrico 7 Hilos THW #12 (Metro)", categoria: "Eléctrico", rubro: "ferreteria", precio: 0.95, costo: 0.60, stock: 320, stockMinimo: 50, unidadMedida: "Metro", ubicacion: "Bobina 3" },
-  { id: "f-4", codigo: "TUB-PVC4", nombre: "Tubo PVC Aguas Negras 4\" x 3 Mts", categoria: "Plomería", rubro: "ferreteria", precio: 9.50, costo: 6.50, stock: 24, stockMinimo: 5, unidadMedida: "Tubo", ubicacion: "Patio Trasero" },
-  { id: "f-5", codigo: "DISC-45", nombre: "Disco de Corte para Metal 4 1/2\"", categoria: "Herramientas", rubro: "ferreteria", precio: 1.25, costo: 0.70, stock: 110, stockMinimo: 20, unidadMedida: "Pza", ubicacion: "Pasillo 2" },
-  { id: "f-6", codigo: "CEM-T1", nombre: "Cemento Gris Tipo I 42.5kg", categoria: "Construcción", rubro: "ferreteria", precio: 9.00, costo: 7.20, stock: 65, stockMinimo: 15, unidadMedida: "Saco", ubicacion: "Bodega Principal" },
-  { id: "f-7", codigo: "PAS-HILUX", nombre: "Pastillas de Freno Delanteras Hilux / Fortuner", categoria: "Repuestos", rubro: "ferreteria", precio: 22.00, costo: 14.00, stock: 12, stockMinimo: 4, unidadMedida: "Juego", codigoParte: "04465-0K090", marca: "Bendix / Toyota" },
-  { id: "f-8", codigo: "BUJ-BOSH", nombre: "Bujía Iridium Doble Platino", categoria: "Repuestos", rubro: "ferreteria", precio: 5.50, costo: 3.20, stock: 38, stockMinimo: 8, unidadMedida: "Pza", codigoParte: "FR7DC+", marca: "Bosch" },
+  // ─────────────────────────────────────────────────────────────
+  // FERRETERÍA, CONSTRUCCIÓN & REPUESTOS (MULTI-UNIDADES & PRECIOS)
+  // ─────────────────────────────────────────────────────────────
+  { 
+    id: "f-1", 
+    codigo: "TORN-38", 
+    nombre: "Tornillo Drywall 6x1\" Rosca Fina", 
+    categoria: "Tornillería", 
+    rubro: "ferreteria", 
+    precio: 2.80, 
+    precioContratista: 2.38,
+    precioMayorista: 2.10,
+    cantidadMinimaMayorista: 10,
+    costo: 1.50, 
+    stock: 145, 
+    stockMinimo: 20, 
+    unidadMedida: "Caja", 
+    ubicacion: "Pasillo 1 - Gaveta 4", 
+    ubicacionGalpon: "Galpón Central - Sección Tornillos",
+    codigoParte: "DW-61",
+    unidadesConversion: [
+      { unidad: "Caja (100u)", factor: 1, precio: 2.80 },
+      { unidad: "Millar (1000u)", factor: 10, precio: 24.50 },
+    ]
+  },
+  { 
+    id: "f-2", 
+    codigo: "TAL-20V", 
+    nombre: "Taladro Percutor Inalámbrico 20V Brushless", 
+    categoria: "Herramientas", 
+    rubro: "ferreteria", 
+    precio: 68.00, 
+    precioContratista: 59.50,
+    precioMayorista: 53.00,
+    cantidadMinimaMayorista: 3,
+    costo: 45.00, 
+    stock: 14, 
+    stockMinimo: 3, 
+    unidadMedida: "Pza", 
+    ubicacion: "Vitrina Central A-1", 
+    ubicacionGalpon: "Showroom / Mostrador",
+    marca: "DeWalt / Ingco" 
+  },
+  { 
+    id: "f-3", 
+    codigo: "CAB-THW12", 
+    nombre: "Cable Eléctrico 7 Hilos THW #12 Cobre 100%", 
+    categoria: "Eléctrico", 
+    rubro: "ferreteria", 
+    precio: 0.95, 
+    precioContratista: 0.82,
+    precioMayorista: 0.72,
+    cantidadMinimaMayorista: 50,
+    costo: 0.60, 
+    stock: 650, 
+    stockMinimo: 80, 
+    unidadMedida: "Metro", 
+    ubicacion: "Bobina 3", 
+    ubicacionGalpon: "Patio Eléctrico - Bobinero Principal",
+    unidadesConversion: [
+      { unidad: "Metro", factor: 1, precio: 0.95 },
+      { unidad: "Rollo (100m)", factor: 100, precio: 82.00 },
+    ]
+  },
+  { 
+    id: "f-4", 
+    codigo: "TUB-PVC4", 
+    nombre: "Tubo PVC Aguas Negras 4\" x 3 Mts Reforzado", 
+    categoria: "Plomería", 
+    rubro: "ferreteria", 
+    precio: 9.50, 
+    precioContratista: 8.20,
+    precioMayorista: 7.40,
+    cantidadMinimaMayorista: 10,
+    costo: 6.50, 
+    stock: 48, 
+    stockMinimo: 10, 
+    unidadMedida: "Tubo", 
+    ubicacion: "Patio Trasero - Rack Tubos", 
+    ubicacionGalpon: "Galpón Abierto - Caballete 2",
+    unidadesConversion: [
+      { unidad: "Tubo 3m", factor: 1, precio: 9.50 },
+      { unidad: "Atado (10 tubos)", factor: 10, precio: 88.00 },
+    ]
+  },
+  { 
+    id: "f-5", 
+    codigo: "DISC-45", 
+    nombre: "Disco de Corte Ultra Fino para Metal 4 1/2\" x 1mm", 
+    categoria: "Herramientas", 
+    rubro: "ferreteria", 
+    precio: 1.25, 
+    precioContratista: 1.05,
+    precioMayorista: 0.92,
+    cantidadMinimaMayorista: 25,
+    costo: 0.70, 
+    stock: 180, 
+    stockMinimo: 30, 
+    unidadMedida: "Pza", 
+    ubicacion: "Pasillo 2 - Estante 1", 
+    ubicacionGalpon: "Bodega de Consumibles",
+    unidadesConversion: [
+      { unidad: "Pieza", factor: 1, precio: 1.25 },
+      { unidad: "Caja (25 unidades)", factor: 25, precio: 26.00 },
+    ]
+  },
+  { 
+    id: "f-6", 
+    codigo: "CEM-T1", 
+    nombre: "Cemento Gris Tipo I Portland 42.5kg", 
+    categoria: "Construcción", 
+    rubro: "ferreteria", 
+    precio: 9.00, 
+    precioContratista: 8.20,
+    precioMayorista: 7.60,
+    cantidadMinimaMayorista: 40,
+    costo: 7.20, 
+    stock: 240, 
+    stockMinimo: 40, 
+    unidadMedida: "Saco", 
+    ubicacion: "Bodega Patio Techado", 
+    ubicacionGalpon: "Galpón Cemento - Muelle de Carga 1",
+    unidadesConversion: [
+      { unidad: "Saco (42.5kg)", factor: 1, precio: 9.00 },
+      { unidad: "Paleta (40 sacos)", factor: 40, precio: 340.00 },
+    ]
+  },
+  { 
+    id: "f-7", 
+    codigo: "BLOQ-15", 
+    nombre: "Bloque de Arcilla Estructural 15x20x30 cm", 
+    categoria: "Construcción", 
+    rubro: "ferreteria", 
+    precio: 0.65, 
+    precioContratista: 0.58,
+    precioMayorista: 0.52,
+    cantidadMinimaMayorista: 250,
+    costo: 0.42, 
+    stock: 1800, 
+    stockMinimo: 300, 
+    unidadMedida: "Unidad", 
+    ubicacion: "Patio Abierto - Lote 1", 
+    ubicacionGalpon: "Patio Descubierto Entrada",
+    unidadesConversion: [
+      { unidad: "Unidad", factor: 1, precio: 0.65 },
+      { unidad: "Paleta (250u)", factor: 250, precio: 145.00 },
+    ]
+  },
+  { 
+    id: "f-8", 
+    codigo: "PIN-CAU5", 
+    nombre: "Pintura Caucho Clase A Blanco Puro Lavable", 
+    categoria: "Pinturas", 
+    rubro: "ferreteria", 
+    precio: 12.50, 
+    precioContratista: 10.80,
+    precioMayorista: 9.80,
+    cantidadMinimaMayorista: 4,
+    costo: 8.50, 
+    stock: 52, 
+    stockMinimo: 10, 
+    unidadMedida: "Galón", 
+    ubicacion: "Pasillo Pinturas - Módulo 3", 
+    ubicacionGalpon: "Almacén Pinturas y Solventes",
+    unidadesConversion: [
+      { unidad: "Galón (3.785 L)", factor: 1, precio: 12.50 },
+      { unidad: "Cuñete (5 Galones)", factor: 5, precio: 54.00 },
+    ]
+  },
+  { 
+    id: "f-9", 
+    codigo: "ARE-LAV", 
+    nombre: "Arena Lavada para Friso y Concreto", 
+    categoria: "Construcción", 
+    rubro: "ferreteria", 
+    precio: 25.00, 
+    precioContratista: 22.00,
+    precioMayorista: 19.50,
+    cantidadMinimaMayorista: 6,
+    costo: 16.00, 
+    stock: 35, 
+    stockMinimo: 8, 
+    unidadMedida: "Metro Cúbico (m³)", 
+    ubicacion: "Patio de Agregados - Tolva 1", 
+    ubicacionGalpon: "Patio Pesado Silo Arena",
+  },
+  { 
+    id: "f-10", 
+    codigo: "PAS-HILUX", 
+    nombre: "Pastillas de Freno Delanteras Hilux / Fortuner 2006-2022", 
+    categoria: "Repuestos", 
+    rubro: "ferreteria", 
+    precio: 22.00, 
+    precioContratista: 19.00,
+    precioMayorista: 17.00,
+    costo: 14.00, 
+    stock: 18, 
+    stockMinimo: 4, 
+    unidadMedida: "Juego", 
+    codigoParte: "04465-0K090", 
+    marca: "Bendix / Toyota OEM",
+    ubicacion: "Pasillo 4 - Estante Frenos",
+  },
+  { 
+    id: "f-11", 
+    codigo: "BUJ-BOSH", 
+    nombre: "Bujía Iridium Doble Platino FR7DC+", 
+    categoria: "Repuestos", 
+    rubro: "ferreteria", 
+    precio: 5.50, 
+    precioContratista: 4.80,
+    precioMayorista: 4.20,
+    costo: 3.20, 
+    stock: 46, 
+    stockMinimo: 8, 
+    unidadMedida: "Pza", 
+    codigoParte: "FR7DC+", 
+    marca: "Bosch",
+    ubicacion: "Gavetero Eléctrico 2",
+  },
 
-  // Farmacia & Droguería
+  // ─────────────────────────────────────────────────────────────
+  // RETAIL ESPECIALIZADO: CALZADO & ZAPATOS CON MATRIZ DE TALLAS
+  // ─────────────────────────────────────────────────────────────
+  {
+    id: "ret-c1",
+    codigo: "ZAP-AIRPRO",
+    nombre: "Sneaker Urbano Retro Air Pro Runner",
+    categoria: "Calzado",
+    rubro: "retail",
+    subrubro: "calzado",
+    genero: "CABALLERO",
+    material: "Malla transpirable y refuerzos TPU amortiguados",
+    color: "Blanco / Negro Shadow",
+    precio: 48.00,
+    costo: 26.00,
+    stock: 28,
+    stockMinimo: 6,
+    unidadMedida: "Par",
+    ubicacion: "Estante Calzado Deportivo A-2",
+    variantesTalla: [
+      { talla: "38", stock: 2 },
+      { talla: "39", stock: 4 },
+      { talla: "40", stock: 6 },
+      { talla: "41", stock: 8 },
+      { talla: "42", stock: 5 },
+      { talla: "43", stock: 2 },
+      { talla: "44", stock: 1 },
+    ],
+  },
+  {
+    id: "ret-c2",
+    codigo: "ZAP-OXFORD",
+    nombre: "Zapato Formal Oxford Cuero Vacuno Legítimo",
+    categoria: "Calzado",
+    rubro: "retail",
+    subrubro: "calzado",
+    genero: "CABALLERO",
+    material: "100% Cuero Genuino Glaseado, Forro Confort",
+    color: "Marrón Caramelo",
+    precio: 65.00,
+    costo: 38.00,
+    stock: 19,
+    stockMinimo: 4,
+    unidadMedida: "Par",
+    ubicacion: "Vitrina Calzado Ejecutivo",
+    variantesTalla: [
+      { talla: "39", stock: 3 },
+      { talla: "40", stock: 5 },
+      { talla: "41", stock: 6 },
+      { talla: "42", stock: 4 },
+      { talla: "43", stock: 1 },
+    ],
+  },
+  {
+    id: "ret-c3",
+    codigo: "ZAP-STIL",
+    nombre: "Tacón Stiletto Glamour Nude Punta Fina 9cm",
+    categoria: "Calzado",
+    rubro: "retail",
+    subrubro: "calzado",
+    genero: "DAMA",
+    material: "Gamuza aterciopelada y plantilla acolchada memory foam",
+    color: "Nude Piel / Rosa Palo",
+    precio: 42.00,
+    costo: 22.00,
+    stock: 22,
+    stockMinimo: 5,
+    unidadMedida: "Par",
+    ubicacion: "Exhibidor Dama Isla 1",
+    variantesTalla: [
+      { talla: "35", stock: 2 },
+      { talla: "36", stock: 5 },
+      { talla: "37", stock: 7 },
+      { talla: "38", stock: 5 },
+      { talla: "39", stock: 2 },
+      { talla: "40", stock: 1 },
+    ],
+  },
+  {
+    id: "ret-c4",
+    codigo: "ZAP-BOTA-IND",
+    nombre: "Bota de Seguridad Industrial Puntera de Acero Dieléctrica",
+    categoria: "Calzado",
+    rubro: "retail",
+    subrubro: "calzado",
+    genero: "UNISEX",
+    material: "Cuero Nobuk hidrofugado y suela PU bi-densidad antiresbalante",
+    color: "Negro Industrial",
+    precio: 52.00,
+    costo: 32.00,
+    stock: 25,
+    stockMinimo: 5,
+    unidadMedida: "Par",
+    ubicacion: "Rack Seguridad EPP",
+    variantesTalla: [
+      { talla: "38", stock: 3 },
+      { talla: "39", stock: 4 },
+      { talla: "40", stock: 6 },
+      { talla: "41", stock: 6 },
+      { talla: "42", stock: 3 },
+      { talla: "43", stock: 2 },
+      { talla: "44", stock: 1 },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // RETAIL ESPECIALIZADO: PERFUMERÍA & FRAGANCIAS DE LUJO
+  // ─────────────────────────────────────────────────────────────
+  {
+    id: "ret-p1",
+    codigo: "PERF-CHGG",
+    nombre: "Good Girl Eau de Parfum 80ml (Original)",
+    categoria: "Perfumería",
+    rubro: "retail",
+    subrubro: "perfumeria",
+    casaPerfume: "Carolina Herrera",
+    concentracion: "EDP",
+    volumenMl: 80,
+    familiaOlfativa: "Oriental Floral Gourmand (Jazmín Sambac, Haba Tonka)",
+    esTester: false,
+    precio: 115.00,
+    costo: 78.00,
+    stock: 9,
+    stockMinimo: 2,
+    unidadMedida: "Frasco",
+    ubicacion: "Vitrina de Alta Fragancia A-1",
+  },
+  {
+    id: "ret-p2",
+    codigo: "PERF-SAUV-TESTER",
+    nombre: "Sauvage Parfum 100ml (Probador / Tester Oficial)",
+    categoria: "Perfumería",
+    rubro: "retail",
+    subrubro: "perfumeria",
+    casaPerfume: "Dior",
+    concentracion: "PARFUM",
+    volumenMl: 100,
+    familiaOlfativa: "Fougère Ambarado (Bergamota de Reggio, Cedro, Vainilla)",
+    esTester: true,
+    precio: 85.00,
+    costo: 55.00,
+    stock: 4,
+    stockMinimo: 1,
+    unidadMedida: "Frasco Tester",
+    ubicacion: "Mostrador Probadores",
+  },
+  {
+    id: "ret-p3",
+    codigo: "PERF-CDN-INT",
+    nombre: "Club De Nuit Intense Man EDT 105ml",
+    categoria: "Perfumería",
+    rubro: "retail",
+    subrubro: "perfumeria",
+    casaPerfume: "Armaf",
+    concentracion: "EDT",
+    volumenMl: 105,
+    familiaOlfativa: "Amaderado Especiado (Limón, Grosella, Abedul ahumado)",
+    esTester: false,
+    precio: 38.00,
+    costo: 24.00,
+    stock: 16,
+    stockMinimo: 4,
+    unidadMedida: "Frasco",
+    ubicacion: "Vitrina Caballeros",
+  },
+  {
+    id: "ret-p4",
+    codigo: "PERF-BAC540-DEC",
+    nombre: "Baccarat Rouge 540 Extrait Decant 10ml",
+    categoria: "Perfumería",
+    rubro: "retail",
+    subrubro: "perfumeria",
+    casaPerfume: "Maison Francis Kurkdjian",
+    concentracion: "DECANT",
+    volumenMl: 10,
+    familiaOlfativa: "Ámbar Floral Amaderado (Azafrán, Almendra amarga, Gris ámbar)",
+    esTester: false,
+    precio: 28.00,
+    costo: 16.00,
+    stock: 25,
+    stockMinimo: 5,
+    unidadMedida: "Atomizador 10ml",
+    ubicacion: "Exhibidor Decants Nicho",
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // RETAIL ESPECIALIZADO: MAQUILLAJE & COSMÉTICA PROFESIONAL
+  // ─────────────────────────────────────────────────────────────
+  {
+    id: "ret-m1",
+    codigo: "MAQ-BASE-FLAW",
+    nombre: "Base Líquida Larga Duración Flawless Finish 30ml",
+    categoria: "Maquillaje",
+    rubro: "retail",
+    subrubro: "maquillaje",
+    acabadoMaquillaje: "Semi-Mate Natural HD",
+    paoMeses: 12,
+    precio: 14.50,
+    costo: 7.20,
+    stock: 45,
+    stockMinimo: 10,
+    unidadMedida: "Frasco",
+    ubicacion: "Isla Rostro & Maquillaje",
+    tonosCosmeticos: [
+      { nombre: "110 Porcelana Fría", hex: "#F8D9C0", stock: 8 },
+      { nombre: "120 Natural Cálido", hex: "#EAC098", stock: 12 },
+      { nombre: "130 Beige Dorado", hex: "#D6A172", stock: 14 },
+      { nombre: "140 Caramelo Honey", hex: "#B37B4D", stock: 7 },
+      { nombre: "150 Mocha Intenso", hex: "#734827", stock: 4 },
+    ],
+  },
+  {
+    id: "ret-m2",
+    codigo: "MAQ-LIP-MATE",
+    nombre: "Labial Líquido Velvet Mate Indeleble 24H",
+    categoria: "Maquillaje",
+    rubro: "retail",
+    subrubro: "maquillaje",
+    acabadoMaquillaje: "Mate Aterciopelado Sin Transferencia",
+    paoMeses: 18,
+    precio: 7.50,
+    costo: 3.50,
+    stock: 36,
+    stockMinimo: 8,
+    unidadMedida: "Pza",
+    ubicacion: "Torre Labiales",
+    tonosCosmeticos: [
+      { nombre: "01 Ruby Queen", hex: "#9B111E", stock: 12 },
+      { nombre: "04 Nude Elegance", hex: "#C47E7A", stock: 15 },
+      { nombre: "09 Berry Sunset", hex: "#5B1E31", stock: 9 },
+    ],
+  },
+  {
+    id: "ret-m3",
+    codigo: "MAQ-POLV-BAN",
+    nombre: "Polvo Translúcido Banana Touch Micro-pulverizado",
+    categoria: "Maquillaje",
+    rubro: "retail",
+    subrubro: "maquillaje",
+    acabadoMaquillaje: "Matificante Sellador Flash-Friendly",
+    paoMeses: 24,
+    precio: 9.00,
+    costo: 4.20,
+    stock: 28,
+    stockMinimo: 6,
+    unidadMedida: "Estuche",
+    ubicacion: "Isla Polvos y Fijadores",
+  },
+  {
+    id: "ret-m4",
+    codigo: "MAQ-PAL-SUNSET",
+    nombre: "Paleta de Sombras Sunset Glam 18 Tonos Ultra-Pigmentados",
+    categoria: "Maquillaje",
+    rubro: "retail",
+    subrubro: "maquillaje",
+    acabadoMaquillaje: "Mate, Shimmer y Glitter Prensado",
+    paoMeses: 24,
+    precio: 18.00,
+    costo: 9.50,
+    stock: 15,
+    stockMinimo: 3,
+    unidadMedida: "Paleta",
+    ubicacion: "Exhibidor Ojos & Sombras",
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // RETAIL / MINIMARKET CONVENIENCIA
+  // ─────────────────────────────────────────────────────────────
+  { id: "r-1", codigo: "HAR-PAN", nombre: "Harina de Maíz Blanco Precocida 1kg", categoria: "Alimentos", rubro: "retail", subrubro: "alimentos", precio: 1.15, costo: 0.88, stock: 140, stockMinimo: 30, unidadMedida: "Paquete" },
+  { id: "r-2", codigo: "ARR-PRIM", nombre: "Arroz Blanco Extra Grano Largo 1kg", categoria: "Alimentos", rubro: "retail", subrubro: "alimentos", precio: 1.30, costo: 0.95, stock: 95, stockMinimo: 20, unidadMedida: "Paquete" },
+  { id: "r-3", codigo: "ACE-SOYA", nombre: "Aceite Vegetal Comestible 1 Litro", categoria: "Alimentos", rubro: "retail", subrubro: "alimentos", precio: 2.50, costo: 1.85, stock: 48, stockMinimo: 15, unidadMedida: "Litro" },
+  { id: "r-4", codigo: "REF-COCA2", nombre: "Refresco Sabor Cola 2 Litros", categoria: "Bebidas", rubro: "retail", subrubro: "alimentos", precio: 2.20, costo: 1.60, stock: 36, stockMinimo: 12, unidadMedida: "Botella" },
+  { id: "r-5", codigo: "CAF-500G", nombre: "Café Molido Tostado Gourmet 500g", categoria: "Alimentos", rubro: "retail", subrubro: "alimentos", precio: 4.80, costo: 3.20, stock: 40, stockMinimo: 10, unidadMedida: "Bolsa" },
+
+  // ─────────────────────────────────────────────────────────────
+  // FARMACIA & DROGUERÍA
+  // ─────────────────────────────────────────────────────────────
   { id: "m-1", codigo: "ACT-500", nombre: "Acetaminofén / Paracetamol 500mg x 10 Tab", categoria: "Analgésicos", rubro: "farmacia", precio: 1.20, costo: 0.60, stock: 85, stockMinimo: 20, principioActivo: "Paracetamol", lote: "LT-8842", fechaVencimiento: "2027-10", laboratorio: "Genven / Calox" },
   { id: "m-2", codigo: "IBU-400", nombre: "Ibuprofeno 400mg x 10 Cápsulas Blandas", categoria: "Analgésicos", rubro: "farmacia", precio: 1.80, costo: 0.95, stock: 60, stockMinimo: 15, principioActivo: "Ibuprofeno", lote: "LT-9102", fechaVencimiento: "2026-05", laboratorio: "Elmor / Ibufen" },
   { id: "m-3", codigo: "AMX-500", nombre: "Amoxicilina 500mg x 12 Cápsulas", categoria: "Antibióticos", rubro: "farmacia", precio: 3.50, costo: 2.10, stock: 32, stockMinimo: 10, principioActivo: "Amoxicilina", lote: "LT-7740", fechaVencimiento: "2026-08", laboratorio: "Leti" },
@@ -140,14 +719,6 @@ const PRODUCTOS_INICIALES: ProductoComercio[] = [
   { id: "m-6", codigo: "ALC-70", nombre: "Alcohol Antiséptico 70% 500ml", categoria: "Insumos", rubro: "farmacia", precio: 1.60, costo: 0.90, stock: 75, stockMinimo: 15, principioActivo: "Alcohol Isopropílico", lote: "LT-3329", fechaVencimiento: "2028-01", laboratorio: "Bialcohol" },
   { id: "m-7", codigo: "GAS-3X3", nombre: "Gasas Estériles 3\" x 3\" (Sobre 10u)", categoria: "Insumos", rubro: "farmacia", precio: 0.85, costo: 0.40, stock: 120, stockMinimo: 25, lote: "LT-2210", fechaVencimiento: "2028-09", laboratorio: "MedSupply" },
   { id: "m-8", codigo: "CMP-B", nombre: "Complejo B B12 Inyectable x 3 Ampollas", categoria: "Vitaminas", rubro: "farmacia", precio: 5.80, costo: 3.50, stock: 18, stockMinimo: 6, principioActivo: "Vitaminas B1, B6, B12", lote: "LT-1194", fechaVencimiento: "2026-04", laboratorio: "Bayer / Neurobión" },
-
-  // Retail & Minimarket
-  { id: "r-1", codigo: "HAR-PAN", nombre: "Harina de Maíz Blanco Precocida 1kg", categoria: "Alimentos", rubro: "retail", precio: 1.15, costo: 0.88, stock: 140, stockMinimo: 30 },
-  { id: "r-2", codigo: "ARR-PRIM", nombre: "Arroz Blanco Extra 1kg", categoria: "Alimentos", rubro: "retail", precio: 1.30, costo: 0.95, stock: 95, stockMinimo: 20 },
-  { id: "r-3", codigo: "ACE-SOYA", nombre: "Aceite Vegetal Comestible 1 Litro", categoria: "Alimentos", rubro: "retail", precio: 2.50, costo: 1.85, stock: 48, stockMinimo: 15 },
-  { id: "r-4", codigo: "REF-COCA2", nombre: "Refresco Sabor Cola 2 Litros", categoria: "Bebidas", rubro: "retail", precio: 2.20, costo: 1.60, stock: 36, stockMinimo: 12 },
-  { id: "r-5", codigo: "DET-1KG", nombre: "Detergente Multiusos en Polvo 1kg", categoria: "Limpieza", rubro: "retail", precio: 2.10, costo: 1.45, stock: 40, stockMinimo: 10 },
-  { id: "r-6", codigo: "AGU-5L", nombre: "Botellón de Agua Mineral Purificada 5L", categoria: "Bebidas", rubro: "retail", precio: 1.50, costo: 0.90, stock: 28, stockMinimo: 8 },
 ];
 
 const CLIENTES_INICIALES: ClienteComercio[] = [
@@ -216,6 +787,8 @@ function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaA
             <span style="flex: 1;">${l.cantidad}x ${l.nombre}</span>
             <span class="right bold">$${(l.precio * l.cantidad).toFixed(2)}</span>
           </div>
+          ${l.tallaSeleccionada ? `<div class="item-sub">↳ Talla: ${l.tallaSeleccionada} ${l.colorSeleccionado ? `· Color: ${l.colorSeleccionado}` : ""}</div>` : ""}
+          ${l.tonoSeleccionado ? `<div class="item-sub">↳ Tono Cosmético: ${l.tonoSeleccionado.nombre}</div>` : ""}
           ${l.lote ? `<div class="item-sub">↳ Lote: ${l.lote} (Vence: ${l.fechaVencimiento || "N/A"})</div>` : ""}
           ${l.unidadMedida ? `<div class="item-sub">↳ Unidad: ${l.unidadMedida}</div>` : ""}
         `).join("")}
@@ -237,11 +810,107 @@ function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaA
           </div>
         ` : ""}
         <div class="divider"></div>
-        <div><strong>Método:</strong> ${venta.esCredito ? "VENTA A CRÉDITO 🤝" : venta.metodoPago.replace("_", " ")}</div>
+        <div><strong>Método:</strong> ${venta.esCredito ? "VENTA A CRÉDITO (CUENTA POR COBRAR)" : venta.metodoPago.replace("_", " ")}</div>
         ${venta.recibido != null && venta.recibido > 0 ? `<div><strong>Recibido:</strong> ${venta.monedaRecibida === "VES" ? "Bs. " : venta.monedaRecibida === "COP" ? "COP $" : "$"}${venta.recibido.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${venta.monedaRecibida || ""}</div>` : ""}
         ${venta.vuelto != null && venta.vuelto > 0.004 ? `<div class="bold">VUELTO: ${venta.monedaVuelto === "VES" ? "Bs. " : venta.monedaVuelto === "COP" ? "COP $" : "$"}${venta.vuelto.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${venta.monedaVuelto || "USD"}</div>` : ""}
         <div class="divider"></div>
         <div class="footer">¡Gracias por su compra!<br>Generado con Aurora Retail & Mostrador</div>
+      </body>
+    </html>
+  `;
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  setTimeout(() => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    setTimeout(() => {
+      try { document.body.removeChild(iframe); } catch {}
+    }, 3000);
+  }, 250);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// TICKET DE REGALO / TICKET DE CAMBIO (GIFT RECEIPT - SIN PRECIOS)
+// ══════════════════════════════════════════════════════════════════════════
+function imprimirTicketRegalo(venta: VentaComercio, nombreLocal: string) {
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (!doc) return;
+
+  const fechaLimite = new Date();
+  fechaLimite.setDate(fechaLimite.getDate() + 30);
+  const fechaLimiteStr = fechaLimite.toLocaleDateString();
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Ticket de Regalo ${venta.numero}</title>
+        <style>
+          @page { margin: 0; size: 80mm auto; }
+          body {
+            font-family: 'Courier New', Courier, monospace, sans-serif;
+            font-size: 12px;
+            color: #000;
+            background: #fff;
+            margin: 0;
+            padding: 8px 6px;
+            width: 76mm;
+            line-height: 1.3;
+          }
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .right { text-align: right; }
+          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          .item-row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 11px; }
+          .item-sub { font-size: 10px; color: #333; margin-left: 6px; }
+          .gift-box { border: 1.5px solid #000; padding: 6px; margin: 8px 0; text-align: center; border-radius: 4px; }
+          .footer { font-size: 9px; text-align: center; margin-top: 8px; line-height: 1.3; }
+          .barcode { font-family: monospace; letter-spacing: 4px; font-size: 16px; font-weight: bold; margin: 8px 0; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="center bold" style="font-size: 14px;">${nombreLocal}</div>
+        <div class="center bold" style="font-size: 11px; margin-top: 2px;">TICKET DE REGALO / COMPROBANTE DE CAMBIO</div>
+        <div class="divider"></div>
+        <div><strong>Recibo Ref:</strong> ${venta.numero}</div>
+        <div><strong>Fecha Emisión:</strong> ${venta.fecha}</div>
+        <div class="gift-box">
+          <div class="bold" style="font-size: 11px;">VALIDEZ PARA CAMBIO HASTA:</div>
+          <div class="bold" style="font-size: 15px; margin-top: 2px;">${fechaLimiteStr}</div>
+          <div style="font-size: 9px; margin-top: 2px;">(30 días continuos a partir de la emisión)</div>
+        </div>
+        <div class="divider"></div>
+        <div style="font-size: 10px;"><strong>CANT  DESCRIPCIÓN / VARIANTE SELECCIONADA</strong></div>
+        ${venta.lineas.map((l) => `
+          <div class="item-row">
+            <span style="flex: 1; font-weight: bold;">${l.cantidad}x ${l.nombre}</span>
+          </div>
+          ${l.tallaSeleccionada ? `<div class="item-sub">↳ Talla: <strong>${l.tallaSeleccionada}</strong> ${l.colorSeleccionado ? `· Color: ${l.colorSeleccionado}` : ""}</div>` : ""}
+          ${l.tonoSeleccionado ? `<div class="item-sub">↳ Tono Cosmético: <strong>${l.tonoSeleccionado.nombre}</strong></div>` : ""}
+        `).join("")}
+        <div class="divider"></div>
+        <div class="center barcode">*${venta.numero.replace(/[^A-Z0-9]/g, "")}*</div>
+        <div class="footer">
+          <strong>POLÍTICAS DE CAMBIO:</strong><br>
+          1. Indispensable presentar este ticket físico de regalo.<br>
+          2. Calzado debe conservar caja original, etiquetas y suela impecable.<br>
+          3. Perfumes y cosméticos solo aplican con precinto y empaque intacto.<br>
+          4. No se realizan reintegros de dinero en efectivo; solo cambio por mercancía.<br>
+          Generado con Aurora Retail POS
+        </div>
       </body>
     </html>
   `;
@@ -309,12 +978,18 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   // Estado del Catálogo y Clientes
   const [productos, setProductos] = useState<ProductoComercio[]>(() => {
     try {
-      const g = localStorage.getItem("aurora_comercio_productos");
+      const g = localStorage.getItem("aurora_comercio_productos_v4");
       return g ? JSON.parse(g) : PRODUCTOS_INICIALES;
     } catch {
       return PRODUCTOS_INICIALES;
     }
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("aurora_comercio_productos_v4", JSON.stringify(productos));
+    } catch {}
+  }, [productos]);
 
   const [clientes, setClientes] = useState<ClienteComercio[]>(() => {
     try {
@@ -332,12 +1007,35 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [busqueda, setBusqueda] = useState("");
   const [categoriaSel, setCategoriaSel] = useState("Todos");
 
-  // Modales
+  // Subrubro selector para Retail (Calzado, Perfumes, Maquillaje, Minimarket)
+  const [subrubroRetailSel, setSubrubroRetailSel] = useState<string>("todos");
+
+  // Nivel de Precio para Ferretería (Detal, Contratista -15%, Mayorista -25%)
+  const [nivelPrecioFerreteria, setNivelPrecioFerreteria] = useState<"detal" | "contratista" | "mayorista">("detal");
+
+  // Modal Matriz de Tallas para Calzado
+  const [calzadoModalItem, setCalzadoModalItem] = useState<ProductoComercio | null>(null);
+  const [tallaModalSel, setTallaModalSel] = useState<string>("");
+  const [cantTallaModal, setCantTallaModal] = useState<number>(1);
+
+  // Modal Muestrario de Tonos de Maquillaje
+  const [maquillajeModalItem, setMaquillajeModalItem] = useState<ProductoComercio | null>(null);
+  const [tonoModalSel, setTonoModalSel] = useState<{ nombre: string; hex: string } | null>(null);
+  const [cantTonoModal, setCantTonoModal] = useState<number>(1);
+
+  // Modal Calculadora Ferretera de Materiales de Obra
+  const [modalCalculadora, setModalCalculadora] = useState(false);
+  const [calcTipoObra, setCalcTipoObra] = useState<"pared" | "friso" | "piso">("pared");
+  const [calcAreaM2, setCalcAreaM2] = useState<string>("30");
+  const [calcEspesorCm, setCalcEspesorCm] = useState<string>("10");
+
+  // Modales POS
   const [modalCobro, setModalCobro] = useState(false);
   const [metodoPagoSel, setMetodoPagoSel] = useState("EFECTIVO_USD");
   const [monedaRecibida, setMonedaRecibida] = useState<"USD" | "VES" | "COP">("USD");
   const [montoRecibido, setMontoRecibido] = useState("");
   const [monedaVuelto, setMonedaVuelto] = useState<"USD" | "VES" | "COP">("USD");
+  const [emitirTicketRegaloCobro, setEmitirTicketRegaloCobro] = useState(false);
   const [ventaReciente, setVentaReciente] = useState<VentaComercio | null>(null);
   const [modalNuevoProducto, setModalNuevoProducto] = useState(false);
   const [clienteAbonoSel, setClienteAbonoSel] = useState<ClienteComercio | null>(null);
@@ -445,6 +1143,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       } else if (e.key === "Escape") {
         if (modalCobro) setModalCobro(false);
         else if (modalNuevoProducto) setModalNuevoProducto(false);
+        else if (calzadoModalItem) setCalzadoModalItem(null);
+        else if (maquillajeModalItem) setMaquillajeModalItem(null);
+        else if (modalCalculadora) setModalCalculadora(false);
         else if (kardexModalItem) setKardexModalItem(null);
         else if (presentacionesModalItem) setPresentacionesModalItem(null);
         else if (modalCompraProveedor) setModalCompraProveedor(false);
@@ -454,35 +1155,54 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [carrito.length, modalCobro, modalNuevoProducto, kardexModalItem, presentacionesModalItem, modalCompraProveedor, ventaReciente, busqueda]);
+  }, [carrito.length, modalCobro, modalNuevoProducto, calzadoModalItem, maquillajeModalItem, modalCalculadora, kardexModalItem, presentacionesModalItem, modalCompraProveedor, ventaReciente, busqueda]);
 
   // Arqueo Ciego
   const [desgloseCaja, setDesgloseCaja] = useState({ usd: "", ves: "", punto: "", pagoMovil: "", zelle: "", cop: "" });
   const [cajaCerradaMsg, setCajaCerradaMsg] = useState<string | null>(null);
 
-  // Filtro de productos según perfil y búsqueda
+  // Filtro de productos según perfil, subrubro y búsqueda
   const productosFiltrados = useMemo(() => {
     return productos.filter((p) => {
       const coincideRubro = p.rubro === perfilActivo;
+      const coincideSubrubro = perfilActivo !== "retail" || subrubroRetailSel === "todos" || p.subrubro === subrubroRetailSel;
       const coincideCat = categoriaSel === "Todos" || p.categoria === categoriaSel;
       const b = busqueda.toLowerCase().trim();
       const coincideBusqueda =
         !b ||
         p.nombre.toLowerCase().includes(b) ||
         p.codigo.toLowerCase().includes(b) ||
+        (p.casaPerfume && p.casaPerfume.toLowerCase().includes(b)) ||
+        (p.familiaOlfativa && p.familiaOlfativa.toLowerCase().includes(b)) ||
+        (p.color && p.color.toLowerCase().includes(b)) ||
+        (p.material && p.material.toLowerCase().includes(b)) ||
         (p.principioActivo && p.principioActivo.toLowerCase().includes(b)) ||
         (p.codigoParte && p.codigoParte.toLowerCase().includes(b)) ||
+        (p.codigoOem && p.codigoOem.toLowerCase().includes(b)) ||
+        (p.ubicacionGalpon && p.ubicacionGalpon.toLowerCase().includes(b)) ||
         (p.lote && p.lote.toLowerCase().includes(b));
 
-      return coincideRubro && coincideCat && coincideBusqueda;
+      return coincideRubro && coincideSubrubro && coincideCat && coincideBusqueda;
     });
-  }, [productos, perfilActivo, categoriaSel, busqueda]);
+  }, [productos, perfilActivo, subrubroRetailSel, categoriaSel, busqueda]);
 
   // Categorías según perfil
   const categoriasDisponibles = useMemo(() => {
     const cats = new Set(productos.filter((p) => p.rubro === perfilActivo).map((p) => p.categoria));
     return ["Todos", ...Array.from(cats)];
   }, [productos, perfilActivo]);
+
+  // Helper de clave única para líneas de carrito
+  const obtenerLineKey = (item: { productoId: string; presentacionId?: number; tallaSeleccionada?: string; tonoSeleccionado?: { nombre: string }; unidadMedida?: string }) => {
+    let k = item.productoId;
+    if (item.presentacionId) k += `-pres-${item.presentacionId}`;
+    if (item.tallaSeleccionada) k += `-talla-${item.tallaSeleccionada}`;
+    if (item.tonoSeleccionado) k += `-tono-${item.tonoSeleccionado.nombre.replace(/\s+/g, "_")}`;
+    if (item.unidadMedida && item.unidadMedida !== "Pza" && item.unidadMedida !== "Par" && item.unidadMedida !== "UNIDAD") {
+      k += `-uni-${item.unidadMedida.replace(/\s+/g, "_")}`;
+    }
+    return k;
+  };
 
   // Cálculos de Totales del Carrito
   const totalUSD = useMemo(() => {
@@ -492,33 +1212,57 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const totalBs = useMemo(() => totalUSD * tasaActivaBs, [totalUSD, tasaActivaBs]);
   const totalCopCalculado = useMemo(() => totalUSD * tasaCop, [totalUSD, tasaCop]);
 
-  // Agregar al carrito con soporte de presentaciones y precio mayorista dinámico
-  const agregarAlCarrito = (p: ProductoComercio, presentacion?: PresentacionRepuesto) => {
-    setCarrito((prev) => {
-      const lineId = presentacion ? `${p.id}-pres-${presentacion.id}` : p.id;
-      const idx = prev.findIndex((item) => (item.presentacionId ? `${item.productoId}-pres-${item.presentacionId}` : item.productoId) === lineId);
+  // Agregar al carrito con soporte de presentaciones, matriz de tallas, tonos y escala de precios
+  const agregarAlCarrito = (
+    p: ProductoComercio,
+    opciones?: {
+      presentacion?: PresentacionRepuesto;
+      talla?: string;
+      color?: string;
+      tono?: { nombre: string; hex: string };
+      unidadCustom?: string;
+      precioCustom?: number;
+      factorConversion?: number;
+      cantidad?: number;
+    }
+  ) => {
+    let precioUnitario = opciones?.precioCustom ?? (opciones?.presentacion ? opciones.presentacion.precioVenta : p.precio);
+    if (!opciones?.precioCustom && !opciones?.presentacion && perfilActivo === "ferreteria") {
+      if (nivelPrecioFerreteria === "contratista") {
+        precioUnitario = p.precioContratista || Number((p.precio * 0.85).toFixed(2));
+      } else if (nivelPrecioFerreteria === "mayorista") {
+        precioUnitario = p.precioMayorista || Number((p.precio * 0.75).toFixed(2));
+      }
+    }
 
-      const precioUnitario = presentacion ? presentacion.precioVenta : p.precio;
-      const unidadTxt = presentacion ? presentacion.nombrePresentacion : (p.unidadMedida || "Pza");
+    const unidadTxt = opciones?.unidadCustom || (opciones?.presentacion ? opciones.presentacion.nombrePresentacion : (p.unidadMedida || "Pza"));
+    const cantAgregar = opciones?.cantidad ?? 1;
+
+    let itemNombre = p.nombre;
+    if (opciones?.presentacion) itemNombre += ` (${opciones.presentacion.nombrePresentacion})`;
+    else if (opciones?.talla) itemNombre += ` [Talla ${opciones.talla}${opciones.color ? ` - ${opciones.color}` : ""}]`;
+    else if (opciones?.tono) itemNombre += ` [Tono: ${opciones.tono.nombre}]`;
+    else if (opciones?.unidadCustom && opciones.unidadCustom !== p.unidadMedida) itemNombre += ` [${opciones.unidadCustom}]`;
+
+    const targetKey = obtenerLineKey({
+      productoId: p.id,
+      presentacionId: opciones?.presentacion?.id,
+      tallaSeleccionada: opciones?.talla,
+      tonoSeleccionado: opciones?.tono,
+      unidadMedida: unidadTxt,
+    });
+
+    setCarrito((prev) => {
+      const idx = prev.findIndex((it) => obtenerLineKey(it) === targetKey);
 
       if (idx >= 0) {
         const copy = [...prev];
-        const nuevaCant = copy[idx].cantidad + 1;
+        const nuevaCant = copy[idx].cantidad + cantAgregar;
         copy[idx].cantidad = nuevaCant;
-        // Si no es presentación fraccionada y el repuesto tiene escala mayorista
-        if (!presentacion && p.precioMayorista && p.cantidadMinimaMayorista) {
-          if (nuevaCant >= p.cantidadMinimaMayorista) {
-            copy[idx].precio = p.precioMayorista;
-            copy[idx].esMayorista = true;
-          } else {
-            copy[idx].precio = copy[idx].precioOriginalDetal || p.precio;
-            copy[idx].esMayorista = false;
-          }
-        }
         return copy;
       }
 
-      const esMayoreo = !presentacion && !!p.precioMayorista && !!p.cantidadMinimaMayorista && 1 >= p.cantidadMinimaMayorista;
+      const esMayoreo = !opciones?.presentacion && !!p.precioMayorista && !!p.cantidadMinimaMayorista && cantAgregar >= p.cantidadMinimaMayorista;
 
       return [
         ...prev,
@@ -526,30 +1270,34 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           productoId: p.id,
           backendId: p.backendId,
           codigo: p.codigo,
-          nombre: presentacion ? `${p.nombre} (${presentacion.nombrePresentacion})` : p.nombre,
+          nombre: itemNombre,
           precio: esMayoreo ? (p.precioMayorista || precioUnitario) : precioUnitario,
-          precioOriginalDetal: precioUnitario,
+          precioOriginalDetal: p.precio,
           precioMayorista: p.precioMayorista,
           cantidadMinimaMayorista: p.cantidadMinimaMayorista,
-          esMayorista: esMayoreo,
-          cantidad: 1,
+          esMayorista: esMayoreo || nivelPrecioFerreteria === "mayorista",
+          cantidad: cantAgregar,
           unidadMedida: unidadTxt,
           lote: p.lote,
           fechaVencimiento: p.fechaVencimiento,
-          presentacionId: presentacion?.id,
-          nombrePresentacion: presentacion?.nombrePresentacion,
-          factorConversion: presentacion?.factorConversion,
+          presentacionId: opciones?.presentacion?.id,
+          nombrePresentacion: opciones?.presentacion?.nombrePresentacion,
+          factorConversion: opciones?.factorConversion ?? opciones?.presentacion?.factorConversion ?? 1,
+          tallaSeleccionada: opciones?.talla,
+          colorSeleccionado: opciones?.color,
+          tonoSeleccionado: opciones?.tono,
+          esTester: p.esTester,
+          ubicacion: p.ubicacionGalpon || p.ubicacion,
         },
       ];
     });
   };
 
-  const cambiarCantidad = (id: string, delta: number) => {
+  const cambiarCantidad = (key: string, delta: number) => {
     setCarrito((prev) =>
       prev
         .map((item) => {
-          const itemKey = item.presentacionId ? `${item.productoId}-pres-${item.presentacionId}` : item.productoId;
-          if (itemKey === id || item.productoId === id) {
+          if (obtenerLineKey(item) === key) {
             const nueva = item.cantidad + delta;
             if (nueva <= 0) return null;
             let precioFinal = item.precio;
@@ -571,8 +1319,27 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     );
   };
 
-  const quitarDelCarrito = (id: string) => {
-    setCarrito((prev) => prev.filter((item) => (item.presentacionId ? `${item.productoId}-pres-${item.presentacionId}` : item.productoId) !== id));
+  const quitarDelCarrito = (key: string) => {
+    setCarrito((prev) => prev.filter((item) => obtenerLineKey(item) !== key));
+  };
+
+  // Manejar Clic en Tarjeta de Producto del Catálogo
+  const manejarClickProducto = (p: ProductoComercio) => {
+    if (p.rubro === "retail" && p.subrubro === "calzado" && p.variantesTalla && p.variantesTalla.length > 0) {
+      setCalzadoModalItem(p);
+      const primeraTalla = p.variantesTalla.find((v) => v.stock > 0)?.talla || p.variantesTalla[0].talla;
+      setTallaModalSel(primeraTalla);
+      setCantTallaModal(1);
+      return;
+    }
+    if (p.rubro === "retail" && p.subrubro === "maquillaje" && p.tonosCosmeticos && p.tonosCosmeticos.length > 0) {
+      setMaquillajeModalItem(p);
+      const primerTono = p.tonosCosmeticos.find((t) => t.stock > 0) || p.tonosCosmeticos[0];
+      setTonoModalSel(primerTono);
+      setCantTonoModal(1);
+      return;
+    }
+    agregarAlCarrito(p);
   };
 
   // Finalizar Cobro
@@ -610,6 +1377,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       monedaRecibida: esCredito ? "USD" : monedaRecibida,
       vuelto: vueltoFinal,
       monedaVuelto,
+      esTicketRegalo: emitirTicketRegaloCobro,
+      fechaLimiteCambio: emitirTicketRegaloCobro ? new Date(Date.now() + 30 * 24 * 3600 * 1000).toLocaleDateString() : undefined,
     };
 
     // Registrar en backend Spring Boot para Ferretería & Repuestos si hay tenant activo
@@ -655,6 +1424,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     setCarrito([]);
     setModalCobro(false);
     setMontoRecibido("");
+    setEmitirTicketRegaloCobro(false);
   };
 
   // Generar Cotización PDF / Proforma
@@ -732,7 +1502,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 perfilActivo === "ferreteria" ? "bg-teal-600 text-white shadow-md" : "text-slate-400 hover:text-white"
               }`}
             >
-              <span>🔨 Ferretería & Partes</span>
+              <IconHardware size={14} />
+              <span>Ferretería & Repuestos</span>
             </button>
             <button
               onClick={() => cambiarPerfil("farmacia")}
@@ -740,7 +1511,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 perfilActivo === "farmacia" ? "bg-emerald-600 text-white shadow-md" : "text-slate-400 hover:text-white"
               }`}
             >
-              <span>💊 Farmacia & Lotes</span>
+              <IconPrescription size={14} />
+              <span>Farmacia & Lotes</span>
             </button>
             <button
               onClick={() => cambiarPerfil("retail")}
@@ -748,7 +1520,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 perfilActivo === "retail" ? "bg-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white"
               }`}
             >
-              <span>🛍️ Retail & Minimarket</span>
+              <IconRetail size={14} />
+              <span>Retail (Calzado, Fragancias, Belleza)</span>
             </button>
           </div>
         </div>
@@ -761,7 +1534,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               tab === "pos" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
             }`}
           >
-            <span>🛒 POS Mostrador</span>
+            <IconRetail size={14} />
+            <span>POS Mostrador</span>
           </button>
           <button
             onClick={() => setTab("inventario")}
@@ -769,7 +1543,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               tab === "inventario" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
             }`}
           >
-            <span>📦 Inventario & Stock</span>
+            <IconHardware size={14} />
+            <span>Inventario & Kárdex</span>
           </button>
           <button
             onClick={() => setTab("clientes")}
@@ -777,7 +1552,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               tab === "clientes" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
             }`}
           >
-            <span>👥 Clientes & Crédito</span>
+            <IconUsers size={14} />
+            <span>Clientes & Crédito</span>
           </button>
           <button
             onClick={() => setTab("cierre")}
@@ -785,7 +1561,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               tab === "cierre" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-400 hover:text-white"
             }`}
           >
-            <span>🔒 Cierre Z</span>
+            <IconBank size={14} />
+            <span>Cierre Z</span>
           </button>
         </nav>
 
@@ -808,22 +1585,22 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               <div className="absolute right-0 mt-2 z-50 w-72 bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700 space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                   <span className="text-xs font-bold text-white">Tasa Activa para Venta</span>
-                  <button onClick={() => setPopoverTasa(false)} className="text-slate-400 hover:text-white"><IconClose size={14} /></button>
+                  <button onClick={() => setPopoverTasa(false)} className="text-slate-400 hover:text-white cursor-pointer"><IconClose size={14} /></button>
                 </div>
 
                 <div className="grid grid-cols-3 gap-1 p-1 bg-slate-800 rounded-xl text-xs">
                   <button
                     onClick={() => { setTipoTasaActiva("USDT"); try { localStorage.setItem("aurora_tipo_tasa_activa", "USDT"); } catch {} }}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "USDT" ? "bg-emerald-600 text-white" : "text-slate-400"}`}
-                  >💎 USDT</button>
+                    className={`py-1 rounded-lg font-bold cursor-pointer ${tipoTasaActiva === "USDT" ? "bg-emerald-600 text-white" : "text-slate-400"}`}
+                  >USDT</button>
                   <button
                     onClick={() => { setTipoTasaActiva("BCV"); try { localStorage.setItem("aurora_tipo_tasa_activa", "BCV"); } catch {} }}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "BCV" ? "bg-teal-600 text-white" : "text-slate-400"}`}
-                  >🏛️ BCV</button>
+                    className={`py-1 rounded-lg font-bold cursor-pointer ${tipoTasaActiva === "BCV" ? "bg-teal-600 text-white" : "text-slate-400"}`}
+                  >BCV Oficial</button>
                   <button
                     onClick={() => { setTipoTasaActiva("PERSONALIZADA"); try { localStorage.setItem("aurora_tipo_tasa_activa", "PERSONALIZADA"); } catch {} }}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "PERSONALIZADA" ? "bg-amber-600 text-white" : "text-slate-400"}`}
-                  >✏️ Propia</button>
+                    className={`py-1 rounded-lg font-bold cursor-pointer ${tipoTasaActiva === "PERSONALIZADA" ? "bg-amber-600 text-white" : "text-slate-400"}`}
+                  >Propia</button>
                 </div>
 
                 <div className="space-y-2 text-xs">
@@ -903,10 +1680,10 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   onChange={(e) => setBusqueda(e.target.value)}
                   placeholder={
                     perfilActivo === "farmacia"
-                      ? "🔍 Buscar por medicamento, principio activo (ej. Acetaminofén), lote o escanear código..."
+                      ? "Buscar por medicamento, principio activo (ej. Paracetamol), lote o escanear código..."
                       : perfilActivo === "ferreteria"
-                      ? "🔍 Buscar por producto, código de parte (ej. TORN-38, Hilux), medida o código de barra..."
-                      : "🔍 Buscar producto, marca o escanear código de barras..."
+                      ? "Buscar por producto, medida, cable, cemento, código OEM, tornillo o ubicación..."
+                      : "Buscar zapato, sneaker, fragancia, marca (Dior, Carolina Herrera), tono de base o labial..."
                   }
                   className="w-full pl-10 pr-20 py-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 focus:border-teal-500 text-sm text-white placeholder-slate-400 focus:outline-none shadow-inner"
                   autoFocus
@@ -922,6 +1699,77 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   </kbd>
                 </div>
               </div>
+
+              {/* Barra de Especialización: Ferretería (Nivel de Precios + Calculadora) */}
+              {perfilActivo === "ferreteria" && (
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-800/80 rounded-2xl border border-slate-700/70 mb-3 flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Escala Precio:</span>
+                    <div className="inline-flex rounded-xl bg-slate-900 p-0.5 border border-slate-700/80 text-xs">
+                      <button
+                        onClick={() => setNivelPrecioFerreteria("detal")}
+                        className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                          nivelPrecioFerreteria === "detal" ? "bg-teal-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        Detal (PVP)
+                      </button>
+                      <button
+                        onClick={() => setNivelPrecioFerreteria("contratista")}
+                        className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                          nivelPrecioFerreteria === "contratista" ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        Contratista (-15%)
+                      </button>
+                      <button
+                        onClick={() => setNivelPrecioFerreteria("mayorista")}
+                        className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                          nivelPrecioFerreteria === "mayorista" ? "bg-emerald-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        Mayorista (-25%)
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setModalCalculadora(true)}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-teal-500/20 to-cyan-500/20 hover:from-teal-500/30 hover:to-cyan-500/30 border border-teal-500/40 text-teal-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                    title="Calcular cantidades de bloques, cemento y arena para paredes, pisos o frisos"
+                  >
+                    <IconCalculator size={15} />
+                    <span>Calculadora de Obra</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Barra de Especialización: Retail Sub-líneas (Calzado, Perfumes, Maquillaje, Minimarket) */}
+              {perfilActivo === "retail" && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-3 flex-shrink-0 scrollbar-none">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 pl-1">Línea:</span>
+                  {[
+                    { id: "todos", label: "Todo el Catálogo", icon: null },
+                    { id: "calzado", label: "Calzado & Zapatos", icon: <IconShoe size={14} /> },
+                    { id: "perfumeria", label: "Perfumes & Fragancias", icon: <IconPerfume size={14} /> },
+                    { id: "maquillaje", label: "Cosmética & Maquillaje", icon: <IconLipstick size={14} /> },
+                    { id: "alimentos", label: "Minimarket & Víveres", icon: <IconRetail size={14} /> },
+                  ].map((sub) => (
+                    <button
+                      key={sub.id}
+                      onClick={() => setSubrubroRetailSel(sub.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                        subrubroRetailSel === sub.id
+                          ? "bg-gradient-to-r from-teal-500 to-cyan-400 text-slate-950 shadow-md font-black"
+                          : "bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700/60"
+                      }`}
+                    >
+                      {sub.icon}
+                      <span>{sub.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Categorías Rápidas */}
               <div className="flex gap-2 overflow-x-auto pb-2 mb-3 flex-shrink-0 scrollbar-none">
@@ -940,17 +1788,30 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 ))}
               </div>
 
-              {/* Grid de Productos */}
+              {/* Grid de Productos Especializados */}
               <div className="flex-1 overflow-y-auto pr-1 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 content-start">
                 {productosFiltrados.map((p) => {
                   const bajoStock = p.stock <= p.stockMinimo;
+                  
+                  // Precio efectivo según nivel seleccionado en ferretería
+                  let precioEfectivo = p.precio;
+                  if (perfilActivo === "ferreteria") {
+                    if (nivelPrecioFerreteria === "contratista") precioEfectivo = p.precioContratista || Number((p.precio * 0.85).toFixed(2));
+                    else if (nivelPrecioFerreteria === "mayorista") precioEfectivo = p.precioMayorista || Number((p.precio * 0.75).toFixed(2));
+                  }
+
+                  const esCalzado = p.rubro === "retail" && p.subrubro === "calzado";
+                  const esPerfume = p.rubro === "retail" && p.subrubro === "perfumeria";
+                  const esMaquillaje = p.rubro === "retail" && p.subrubro === "maquillaje";
+                  const esFerreteria = p.rubro === "ferreteria";
+
                   return (
-                    <button
+                    <div
                       key={p.id}
-                      onClick={() => agregarAlCarrito(p)}
-                      className="group bg-slate-800/40 hover:bg-slate-800/80 p-3 rounded-2xl border border-slate-700/50 hover:border-teal-500/50 transition-all text-left flex flex-col justify-between cursor-pointer hover:scale-[1.02] shadow-sm relative overflow-hidden"
+                      className="group bg-slate-800/40 hover:bg-slate-800/80 p-3 rounded-2xl border border-slate-700/50 hover:border-teal-500/50 transition-all text-left flex flex-col justify-between shadow-sm relative overflow-hidden"
                     >
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
+                        {/* Cabecera de la Tarjeta */}
                         <div className="flex items-center justify-between text-[10px]">
                           <span className="font-mono text-slate-400">{p.codigo}</span>
                           <span className={`px-1.5 py-0.5 rounded font-bold ${
@@ -961,50 +1822,158 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                             Stock: {p.stock} {p.unidadMedida || "und"}
                           </span>
                         </div>
+
+                        {/* Nombre del Producto */}
                         <div className="font-bold text-xs sm:text-sm text-white group-hover:text-teal-300 transition-colors line-clamp-2">
                           {p.nombre}
                         </div>
+
+                        {/* Detalle Especializado: Calzado */}
+                        {esCalzado && (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 text-[10px] text-teal-300">
+                              <IconShoe size={12} />
+                              <span className="font-bold">{p.genero}</span>
+                              {p.color && <span className="text-slate-400">· {p.color}</span>}
+                            </div>
+                            {p.variantesTalla && (
+                              <div className="text-[9px] text-slate-300 bg-slate-900/60 px-2 py-1 rounded-lg border border-slate-700/60 flex items-center justify-between">
+                                <span>Tallas {p.variantesTalla[0].talla}-{p.variantesTalla[p.variantesTalla.length - 1].talla}</span>
+                                <span className="text-teal-400 font-bold">{p.variantesTalla.reduce((s, v) => s + v.stock, 0)} pares</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Detalle Especializado: Perfumería */}
+                        {esPerfume && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="font-bold text-cyan-300">{p.casaPerfume}</span>
+                              <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[9px] font-mono font-bold">
+                                {p.concentracion} · {p.volumenMl}ml
+                              </span>
+                            </div>
+                            {p.esTester ? (
+                              <div className="text-[9px] text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30 font-bold">
+                                PROBADOR / TESTER OFICIAL
+                              </div>
+                            ) : p.familiaOlfativa ? (
+                              <div className="text-[9px] text-slate-400 truncate">
+                                {p.familiaOlfativa}
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+
+                        {/* Detalle Especializado: Maquillaje */}
+                        {esMaquillaje && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[10px] text-purple-300 font-semibold">
+                              <span>{p.acabadoMaquillaje || "Acabado HD"}</span>
+                              {p.paoMeses && <span className="text-[9px] font-mono text-slate-400">{p.paoMeses}M PAO</span>}
+                            </div>
+                            {p.tonosCosmeticos && (
+                              <div className="flex items-center gap-1.5 pt-0.5">
+                                {p.tonosCosmeticos.slice(0, 5).map((t, idx) => (
+                                  <span
+                                    key={idx}
+                                    title={`${t.nombre} (Stock: ${t.stock})`}
+                                    style={{ backgroundColor: t.hex }}
+                                    className="w-4 h-4 rounded-full border border-white/30 shadow-inner inline-block"
+                                  />
+                                ))}
+                                {p.tonosCosmeticos.length > 5 && (
+                                  <span className="text-[9px] text-slate-400 font-bold">+{p.tonosCosmeticos.length - 5}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Detalle Especializado: Ferretería & Repuestos */}
+                        {esFerreteria && (
+                          <div className="space-y-1">
+                            {p.ubicacionGalpon ? (
+                              <div className="text-[9px] text-slate-300 truncate">
+                                📍 {p.ubicacionGalpon}
+                              </div>
+                            ) : p.ubicacion ? (
+                              <div className="text-[9px] text-slate-400 truncate">
+                                📍 {p.ubicacion}
+                              </div>
+                            ) : null}
+
+                            {p.codigoOem && (
+                              <div className="text-[9px] text-cyan-400 font-mono truncate">
+                                OEM: {p.codigoOem}
+                              </div>
+                            )}
+
+                            {/* Botones de Conversión Rápida (Metro vs Rollo, Saco vs Paleta) */}
+                            {p.unidadesConversion && p.unidadesConversion.length > 1 && (
+                              <div className="flex flex-wrap gap-1 pt-0.5">
+                                {p.unidadesConversion.map((conv, cIdx) => (
+                                  <button
+                                    key={cIdx}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      agregarAlCarrito(p, {
+                                        unidadCustom: conv.unidad,
+                                        factorConversion: conv.factor,
+                                        precioCustom: conv.precio,
+                                        cantidad: 1,
+                                      });
+                                      mostrarToast(`Agregado: ${conv.unidad} (${p.nombre})`, "success");
+                                    }}
+                                    className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[9px] font-bold cursor-pointer transition-colors"
+                                    title={`Vender en ${conv.unidad} a $${conv.precio.toFixed(2)}`}
+                                  >
+                                    {conv.unidad.split(" ")[0]}: ${conv.precio.toFixed(2)}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Detalle Especializado: Farmacia */}
                         {p.principioActivo && (
                           <div className="text-[10px] text-emerald-400 font-semibold truncate">
-                            🌿 {p.principioActivo}
-                          </div>
-                        )}
-                        {p.codigoOem && (
-                          <div className="text-[9px] text-cyan-400 font-mono truncate">
-                            OEM: {p.codigoOem}
-                          </div>
-                        )}
-                        {p.precioMayorista && p.cantidadMinimaMayorista && (
-                          <div className="text-[9px] text-emerald-400 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 truncate">
-                            🏷️ Mayoreo: ${p.precioMayorista.toFixed(2)} (≥{p.cantidadMinimaMayorista} {p.unidadMedida || "u"})
-                          </div>
-                        )}
-                        {p.lote && (
-                          <div className="text-[9px] text-slate-400 font-mono">
-                            Lote: {p.lote} · Vence: {p.fechaVencimiento}
-                          </div>
-                        )}
-                        {p.ubicacion && (
-                          <div className="text-[9px] text-slate-400 font-mono">
-                            📍 {p.ubicacion}
+                            {p.principioActivo}
                           </div>
                         )}
                       </div>
 
-                      <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-baseline justify-between">
+                      {/* Pie de la Tarjeta con Precio y Botón de Acción */}
+                      <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-baseline justify-between gap-2">
                         <div>
-                          <div className="font-mono font-black text-sm text-teal-400">
-                            ${p.precio.toFixed(2)}
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="font-mono font-black text-sm text-teal-400">
+                              ${precioEfectivo.toFixed(2)}
+                            </span>
+                            {precioEfectivo !== p.precio && (
+                              <span className="text-[9px] font-mono line-through text-slate-500">
+                                ${p.precio.toFixed(2)}
+                              </span>
+                            )}
                           </div>
                           <div className="text-[10px] font-mono text-slate-400">
-                            ≈ Bs. {(p.precio * tasaActivaBs).toFixed(2)}
+                            ≈ Bs. {(precioEfectivo * tasaActivaBs).toFixed(2)}
                           </div>
                         </div>
-                        <span className="w-6 h-6 rounded-full bg-teal-500/10 text-teal-400 flex items-center justify-center text-xs font-black group-hover:bg-teal-500 group-hover:text-slate-950 transition-colors">
-                          +
-                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => manejarClickProducto(p)}
+                          className="px-2.5 py-1.5 rounded-xl bg-teal-500/15 hover:bg-teal-500 text-teal-300 hover:text-slate-950 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-sm"
+                          title={esCalzado ? "Abrir matriz de tallas" : esMaquillaje ? "Elegir tono cosmético" : "Agregar al carrito"}
+                        >
+                          {esCalzado ? <span>Talla</span> : esMaquillaje ? <span>Tono</span> : <span>+ Vender</span>}
+                        </button>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1041,42 +2010,63 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[140px]">
                 {carrito.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center p-4">
-                    <span className="text-3xl mb-2">🛒</span>
-                    <p className="text-xs">El carrito está vacío.</p>
+                    <IconShoppingCart size={36} className="text-slate-600 mb-2 opacity-60" />
+                    <p className="text-xs font-semibold text-slate-400">El carrito está vacío</p>
                     <p className="text-[10px] text-slate-600 mt-0.5">Toca un producto del catálogo o escanea para vender.</p>
                   </div>
                 ) : (
                   carrito.map((l) => {
-                    const lineKey = l.presentacionId ? `${l.productoId}-pres-${l.presentacionId}` : l.productoId;
+                    const lineKey = obtenerLineKey(l);
                     return (
-                      <div key={lineKey} className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50 space-y-1.5">
+                      <div key={lineKey} className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50 space-y-1.5 hover:border-slate-600 transition-colors">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                            <div className="text-xs font-bold text-white truncate flex items-center gap-1.5 flex-wrap">
                               <span>{l.nombre}</span>
+                              {l.tallaSeleccionada && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+                                  Talla {l.tallaSeleccionada}
+                                </span>
+                              )}
+                              {l.tonoSeleccionado && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-pink-500/20 text-pink-300 font-bold border border-pink-500/30 inline-flex items-center gap-1">
+                                  <span
+                                    className="w-2 h-2 rounded-full border border-white/50 shrink-0 inline-block"
+                                    style={{ backgroundColor: l.tonoSeleccionado.hex }}
+                                  />
+                                  {l.tonoSeleccionado.nombre}
+                                </span>
+                              )}
+                              {l.esTester && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                                  TESTER
+                                </span>
+                              )}
                               {l.esMayorista && (
                                 <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
                                   MAYORISTA
                                 </span>
                               )}
                             </div>
-                            <div className="text-[10px] font-mono text-slate-400">
-                              ${l.precio.toFixed(2)} c/u {l.esMayorista && <span className="text-emerald-400 font-semibold">(Escala Mayor)</span>}
+                            <div className="text-[10px] font-mono text-slate-400 flex items-center gap-2">
+                              <span>${l.precio.toFixed(2)} c/u</span>
+                              {l.esMayorista && <span className="text-emerald-400 font-semibold">(Escala Mayor)</span>}
+                              {l.ubicacion && <span className="text-slate-500 text-[9px]">Ubic: {l.ubicacion}</span>}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => cambiarCantidad(lineKey, -1)} className="w-6 h-6 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs cursor-pointer">−</button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button onClick={() => cambiarCantidad(lineKey, -1)} className="w-6 h-6 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs cursor-pointer flex items-center justify-center">−</button>
                             <span className="w-5 text-center font-bold text-xs font-mono">{l.cantidad}</span>
-                            <button onClick={() => cambiarCantidad(lineKey, 1)} className="w-6 h-6 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs cursor-pointer">+</button>
+                            <button onClick={() => cambiarCantidad(lineKey, 1)} className="w-6 h-6 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs cursor-pointer flex items-center justify-center">+</button>
                             <button onClick={() => quitarDelCarrito(lineKey)} className="w-6 h-6 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center ml-1 cursor-pointer">
                               <IconTrash size={12} />
                             </button>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5 border-t border-slate-800/60">
                           {l.lote && <span className="font-mono text-emerald-400">Lote: {l.lote}</span>}
                           {l.unidadMedida && <span>Unidad: {l.unidadMedida}</span>}
-                          <span className="font-mono font-bold text-white ml-auto">${(l.precio * l.cantidad).toFixed(2)}</span>
+                          <span className="font-mono font-bold text-teal-300 ml-auto">${(l.precio * l.cantidad).toFixed(2)}</span>
                         </div>
                       </div>
                     );
@@ -1434,12 +2424,12 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">1. Método de Pago</label>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 {[
-                  ["EFECTIVO_USD", "💵 USD Efectivo", "USD"],
-                  ["EFECTIVO_BS", "🇻🇪 Bs Efectivo", "VES"],
-                  ["PAGO_MOVIL", "📲 Pago Móvil", "VES"],
-                  ["PUNTO_VENTA", "💳 Punto Débito", "VES"],
-                  ["ZELLE", "⚡ Zelle / USDT", "USD"],
-                  ["COP_EFECTIVO", "🇨🇴 Pesos COP", "COP"],
+                  ["EFECTIVO_USD", "USD Efectivo", "USD"],
+                  ["EFECTIVO_BS", "Bs. Efectivo", "VES"],
+                  ["PAGO_MOVIL", "Pago Móvil", "VES"],
+                  ["PUNTO_VENTA", "Punto Débito", "VES"],
+                  ["ZELLE", "Zelle / USDT", "USD"],
+                  ["COP_EFECTIVO", "Pesos COP", "COP"],
                 ].map(([id, label, mon]) => (
                   <button
                     key={id}
@@ -1453,7 +2443,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       else if (mon === "COP") setMontoRecibido(Math.round(totalCopCalculado).toString());
                     }}
                     className={`py-2 px-2 rounded-xl font-bold border transition-all text-center cursor-pointer ${
-                      metodoPagoSel === id ? "bg-teal-500/20 border-teal-400 text-white shadow-sm" : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                      metodoPagoSel === id ? "bg-teal-500/20 border-teal-400 text-white shadow-sm font-black" : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
                     }`}
                   >
                     {label}
@@ -1517,7 +2507,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   }}
                   className="px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 font-bold text-[10px] border border-teal-500/30 cursor-pointer"
                 >
-                  ⚡ Exacto
+                  Monto Exacto
                 </button>
                 {monedaRecibida === "USD" && [10, 20, 50, 100].map((b) => (
                   <button
@@ -1585,6 +2575,25 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               })()}
             </div>
 
+            {/* Opción Ticket de Regalo / Cambio */}
+            <div className="p-3 rounded-2xl bg-slate-800/70 border border-slate-700 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center">
+                  <IconGift size={16} />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">Emitir Ticket de Regalo / Cambio</div>
+                  <div className="text-[10px] text-slate-400">Imprime comprobante térmico sin montos de dinero para obsequios (30 días de garantía)</div>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={emitirTicketRegaloCobro}
+                onChange={(e) => setEmitirTicketRegaloCobro(e.target.checked)}
+                className="w-5 h-5 rounded accent-teal-500 cursor-pointer"
+              />
+            </div>
+
             <div className="pt-2 flex gap-2">
               <button
                 onClick={() => setModalCobro(false)}
@@ -1634,12 +2643,21 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               )}
             </div>
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
               <button
                 onClick={() => imprimirTicketComercio(ventaReciente, nombreLocal, tasaActivaBs, tasaCop)}
-                className="flex-1 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
+                className="flex-1 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg flex items-center justify-center gap-1.5"
               >
-                🖨️ Imprimir Ticket 80mm
+                <IconFileText size={15} />
+                <span>Ticket Venta 80mm</span>
+              </button>
+              <button
+                onClick={() => imprimirTicketRegalo(ventaReciente, nombreLocal)}
+                className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs cursor-pointer shadow-lg flex items-center justify-center gap-1.5"
+                title="Imprimir comprobante sin precios para regalo con 30 días de garantía"
+              >
+                <IconGift size={15} />
+                <span>Ticket Regalo (30d)</span>
               </button>
               <button
                 onClick={() => setVentaReciente(null)}
@@ -2054,6 +3072,599 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           </div>
         </div>
       )}
+
+      {/* ── MODAL MATRIZ DE TALLAS PARA CALZADO ── */}
+      {calzadoModalItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                  <IconShoe size={22} />
+                </div>
+                <div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold uppercase tracking-wider">
+                    Curva de Tallas & Stock
+                  </span>
+                  <h3 className="font-['Outfit'] font-black text-lg text-white mt-0.5 leading-tight">
+                    {calzadoModalItem.nombre}
+                  </h3>
+                  <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                    <span className="font-mono text-slate-500">{calzadoModalItem.codigo}</span>
+                    {calzadoModalItem.color && <span>• Color: {calzadoModalItem.color}</span>}
+                    {calzadoModalItem.genero && <span className="capitalize">• {calzadoModalItem.genero}</span>}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setCalzadoModalItem(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer transition-colors"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            {/* Matriz de Tallas */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300">Selecciona la Talla Deseada:</label>
+                <span className="text-[10px] text-slate-400">
+                  Total disponible: {calzadoModalItem.stock} pares
+                </span>
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                {calzadoModalItem.variantesTalla?.map((v) => {
+                  const esAgotada = v.stock <= 0;
+                  const esSeleccionada = tallaModalSel === v.talla;
+                  return (
+                    <button
+                      key={v.talla}
+                      type="button"
+                      disabled={esAgotada}
+                      onClick={() => {
+                        setTallaModalSel(v.talla);
+                        if (cantTallaModal > v.stock) setCantTallaModal(1);
+                      }}
+                      className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-center cursor-pointer ${
+                        esAgotada
+                          ? "bg-slate-800/30 border-slate-800 text-slate-600 opacity-40 cursor-not-allowed"
+                          : esSeleccionada
+                          ? "bg-blue-500 text-slate-950 font-black border-blue-400 shadow-lg shadow-blue-500/25 scale-105"
+                          : "bg-slate-800/80 border-slate-700/70 text-slate-200 hover:border-blue-500/50 hover:bg-slate-800"
+                      }`}
+                    >
+                      <span className="text-sm font-black font-mono leading-none">{v.talla}</span>
+                      <span className={`text-[9px] mt-1 font-bold ${
+                        esSeleccionada
+                          ? "text-slate-950 font-extrabold"
+                          : esAgotada
+                          ? "text-slate-600"
+                          : v.stock <= 2
+                          ? "text-amber-400"
+                          : "text-slate-400"
+                      }`}>
+                        {esAgotada ? "Agotado" : `${v.stock} par${v.stock > 1 ? "es" : ""}`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Selector de Cantidad y Resumen */}
+            {(() => {
+              const varianteSel = calzadoModalItem.variantesTalla?.find((v) => v.talla === tallaModalSel);
+              const maxStock = varianteSel?.stock || 0;
+              const subtotal = calzadoModalItem.precio * cantTallaModal;
+
+              return (
+                <div className="p-3.5 rounded-2xl bg-slate-800/50 border border-slate-700/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Talla Seleccionada</span>
+                      <div className="text-sm font-black text-white flex items-center gap-1.5">
+                        <span>Talla {tallaModalSel || "Ninguna"}</span>
+                        {varianteSel && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                            varianteSel.stock <= 2 ? "bg-amber-500/20 text-amber-300" : "bg-emerald-500/20 text-emerald-300"
+                          }`}>
+                            {varianteSel.stock} en inventario
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Precio Unitario</span>
+                      <div className="text-base font-black font-mono text-blue-400">
+                        ${calzadoModalItem.precio.toFixed(2)} USD
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cantidad Stepper */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                    <span className="text-xs text-slate-300 font-bold">Cantidad de pares:</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCantTallaModal(Math.max(1, cantTallaModal - 1))}
+                        disabled={cantTallaModal <= 1}
+                        className="w-8 h-8 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-white font-bold text-sm cursor-pointer flex items-center justify-center transition-colors"
+                      >
+                        −
+                      </button>
+                      <span className="w-8 text-center font-mono font-bold text-sm text-white">{cantTallaModal}</span>
+                      <button
+                        type="button"
+                        onClick={() => setCantTallaModal(Math.min(maxStock, cantTallaModal + 1))}
+                        disabled={cantTallaModal >= maxStock}
+                        className="w-8 h-8 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-white font-bold text-sm cursor-pointer flex items-center justify-center transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                    <span className="text-xs font-bold text-slate-300">Subtotal:</span>
+                    <span className="font-mono font-black text-lg text-emerald-400">
+                      ${subtotal.toFixed(2)} USD
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Acciones */}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setCalzadoModalItem(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!tallaModalSel}
+                onClick={() => {
+                  if (!tallaModalSel) return;
+                  agregarAlCarrito(calzadoModalItem, {
+                    talla: tallaModalSel,
+                    color: calzadoModalItem.color,
+                    cantidad: cantTallaModal,
+                  });
+                  mostrarToast(`Añadido: ${calzadoModalItem.nombre} [Talla ${tallaModalSel}] x${cantTallaModal}`, "success");
+                  setCalzadoModalItem(null);
+                }}
+                className="flex-2 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 disabled:opacity-40 text-slate-950 font-black text-xs cursor-pointer shadow-lg transition-all flex items-center justify-center gap-1.5"
+              >
+                <span>Añadir al Carrito (Talla {tallaModalSel || "—"})</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL MUESTRARIO DE TONOS DE MAQUILLAJE ── */}
+      {maquillajeModalItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-pink-500/20 border border-pink-500/30 flex items-center justify-center text-pink-400">
+                  <IconLipstick size={22} />
+                </div>
+                <div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-pink-500/20 text-pink-300 font-bold uppercase tracking-wider">
+                    Muestrario Cosmético
+                  </span>
+                  <h3 className="font-['Outfit'] font-black text-lg text-white mt-0.5 leading-tight">
+                    {maquillajeModalItem.nombre}
+                  </h3>
+                  <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                    <span className="font-mono text-slate-500">{maquillajeModalItem.codigo}</span>
+                    {maquillajeModalItem.acabadoMaquillaje && <span>• Acabado: {maquillajeModalItem.acabadoMaquillaje}</span>}
+                    {maquillajeModalItem.paoMeses && <span>• PAO: {maquillajeModalItem.paoMeses}M</span>}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setMaquillajeModalItem(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer transition-colors"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            {/* Muestrario de Swatches */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300">Selecciona el Tono / Swatch:</label>
+                <span className="text-[10px] text-slate-400">
+                  {maquillajeModalItem.tonosCosmeticos?.length || 0} tonos disponibles
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                {maquillajeModalItem.tonosCosmeticos?.map((t) => {
+                  const esAgotado = t.stock <= 0;
+                  const esSeleccionado = tonoModalSel?.nombre === t.nombre;
+                  return (
+                    <button
+                      key={t.nombre}
+                      type="button"
+                      disabled={esAgotado}
+                      onClick={() => {
+                        setTonoModalSel({ nombre: t.nombre, hex: t.hex });
+                        if (cantTonoModal > t.stock) setCantTonoModal(1);
+                      }}
+                      className={`p-2.5 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                        esAgotado
+                          ? "bg-slate-800/30 border-slate-800 text-slate-600 opacity-40 cursor-not-allowed"
+                          : esSeleccionado
+                          ? "bg-pink-500/10 border-pink-400 ring-2 ring-pink-500/50 shadow-lg shadow-pink-500/10"
+                          : "bg-slate-800/80 border-slate-700/70 hover:border-pink-500/40 hover:bg-slate-800"
+                      }`}
+                    >
+                      <div
+                        className={`w-9 h-9 rounded-full border-2 shrink-0 shadow-md transition-transform ${
+                          esSeleccionado ? "border-white scale-110 ring-2 ring-pink-400" : "border-slate-600"
+                        }`}
+                        style={{ backgroundColor: t.hex }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold text-white truncate flex items-center justify-between">
+                          <span>{t.nombre}</span>
+                          <span className="font-mono text-[10px] text-slate-400">{t.hex}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                          <span className={esAgotado ? "text-red-400 font-bold" : t.stock <= 2 ? "text-amber-400 font-bold" : "text-emerald-400 font-bold"}>
+                            {esAgotado ? "Agotado" : `${t.stock} disponibles`}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Selector de Cantidad y Resumen */}
+            {(() => {
+              const tonoObj = maquillajeModalItem.tonosCosmeticos?.find((t) => t.nombre === tonoModalSel?.nombre);
+              const maxStock = tonoObj?.stock || 0;
+              const subtotal = maquillajeModalItem.precio * cantTonoModal;
+
+              return (
+                <div className="p-3.5 rounded-2xl bg-slate-800/50 border border-slate-700/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tono Seleccionado</span>
+                      <div className="text-sm font-black text-white flex items-center gap-2 mt-0.5">
+                        {tonoModalSel && (
+                          <div
+                            className="w-4 h-4 rounded-full border border-white/60 inline-block shadow-sm"
+                            style={{ backgroundColor: tonoModalSel.hex }}
+                          />
+                        )}
+                        <span>{tonoModalSel?.nombre || "Ninguno"}</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Precio Unitario</span>
+                      <div className="text-base font-black font-mono text-pink-400">
+                        ${maquillajeModalItem.precio.toFixed(2)} USD
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cantidad Stepper */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                    <span className="text-xs text-slate-300 font-bold">Cantidad de unidades:</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCantTonoModal(Math.max(1, cantTonoModal - 1))}
+                        disabled={cantTonoModal <= 1}
+                        className="w-8 h-8 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-white font-bold text-sm cursor-pointer flex items-center justify-center transition-colors"
+                      >
+                        −
+                      </button>
+                      <span className="w-8 text-center font-mono font-bold text-sm text-white">{cantTonoModal}</span>
+                      <button
+                        type="button"
+                        onClick={() => setCantTonoModal(Math.min(maxStock, cantTonoModal + 1))}
+                        disabled={cantTonoModal >= maxStock}
+                        className="w-8 h-8 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-white font-bold text-sm cursor-pointer flex items-center justify-center transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                    <span className="text-xs font-bold text-slate-300">Subtotal:</span>
+                    <span className="font-mono font-black text-lg text-emerald-400">
+                      ${subtotal.toFixed(2)} USD
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Acciones */}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setMaquillajeModalItem(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!tonoModalSel}
+                onClick={() => {
+                  if (!tonoModalSel) return;
+                  agregarAlCarrito(maquillajeModalItem, {
+                    tono: tonoModalSel,
+                    cantidad: cantTonoModal,
+                  });
+                  mostrarToast(`Añadido: ${maquillajeModalItem.nombre} [${tonoModalSel.nombre}] x${cantTonoModal}`, "success");
+                  setMaquillajeModalItem(null);
+                }}
+                className="flex-2 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 disabled:opacity-40 text-slate-950 font-black text-xs cursor-pointer shadow-lg transition-all flex items-center justify-center gap-1.5"
+              >
+                <span>Añadir al Carrito ({tonoModalSel?.nombre || "—"})</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL CALCULADORA FERRETERA DE MATERIALES DE OBRA ── */}
+      {modalCalculadora && (() => {
+        const areaNum = Math.max(0.1, Number(calcAreaM2) || 0);
+        const espesorNum = Math.max(1, Number(calcEspesorCm) || 10);
+
+        // Cálculos según tipo de obra
+        let bloquesRequeridos = 0;
+        let sacosCemento = 0;
+        let m3Arena = 0;
+        let m3Piedra = 0;
+
+        if (calcTipoObra === "pared") {
+          // Pared de bloques 15x20x30 cm: 12.5 bloques/m2 + 5% desperdicio = ~13 bloques/m2
+          bloquesRequeridos = Math.ceil(areaNum * 13);
+          // ~0.35 sacos de cemento por m2 de pared
+          sacosCemento = Math.ceil(areaNum * 0.35);
+          // ~0.03 m3 arena lavada por m2
+          m3Arena = Number((areaNum * 0.03).toFixed(2));
+        } else if (calcTipoObra === "friso") {
+          // Friso/revoque (2 caras de 1.5cm promedio): ~0.25 sacos cemento/m2, 0.035 m3 arena/m2
+          sacosCemento = Math.ceil(areaNum * 0.25);
+          m3Arena = Number((areaNum * 0.035).toFixed(2));
+        } else if (calcTipoObra === "piso") {
+          // Losa de concreto vaciada: V = m2 * (espesor / 100) m3
+          const volumenM3 = areaNum * (espesorNum / 100);
+          // Concreto 210 kg/cm2: ~7.5 sacos cemento/m3, 0.55 m3 arena/m3, 0.85 m3 piedra/m3
+          sacosCemento = Math.ceil(volumenM3 * 7.5);
+          m3Arena = Number((volumenM3 * 0.55).toFixed(2));
+          m3Piedra = Number((volumenM3 * 0.85).toFixed(2));
+        }
+
+        // Búsqueda de productos del catálogo de ferretería
+        const prodCemento = productos.find((p) => p.codigo === "FER-001" || p.nombre.toLowerCase().includes("cemento"));
+        const prodBloque = productos.find((p) => p.codigo === "FER-004" || p.nombre.toLowerCase().includes("bloque"));
+        const prodArena = productos.find((p) => p.codigo === "FER-006" || p.nombre.toLowerCase().includes("arena"));
+
+        const precioCemento = prodCemento?.precio || 8.5;
+        const precioBloque = prodBloque?.precio || 0.65;
+        const precioArena = prodArena?.precio || 18.0;
+
+        const costoCemento = sacosCemento * precioCemento;
+        const costoBloques = bloquesRequeridos * precioBloque;
+        const costoArena = m3Arena * precioArena;
+        const totalEstimadoUSD = costoCemento + costoBloques + costoArena;
+        const totalEstimadoBs = totalEstimadoUSD * tasaActivaBs;
+
+        const volcarAlCarrito = () => {
+          let count = 0;
+          if (bloquesRequeridos > 0 && prodBloque) {
+            agregarAlCarrito(prodBloque, { cantidad: bloquesRequeridos });
+            count++;
+          }
+          if (sacosCemento > 0 && prodCemento) {
+            agregarAlCarrito(prodCemento, { cantidad: sacosCemento });
+            count++;
+          }
+          if (m3Arena > 0 && prodArena) {
+            agregarAlCarrito(prodArena, { cantidad: Math.ceil(m3Arena) });
+            count++;
+          }
+          mostrarToast(`Calculadora de Obra: ${count} materiales volcados al carrito exitosamente`, "success");
+          setModalCalculadora(false);
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                    <IconCalculator size={22} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold uppercase tracking-wider">
+                      Cálculo de Materiales de Construcción
+                    </span>
+                    <h3 className="font-['Outfit'] font-black text-lg text-white mt-0.5 leading-tight">
+                      Calculadora de Obra para Ferretería
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Estima en segundos los insumos de obra y agrégalos en 1 clic al carrito de venta.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setModalCalculadora(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer transition-colors"
+                >
+                  <IconClose size={18} />
+                </button>
+              </div>
+
+              {/* Selector de Tipo de Obra */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "pared", label: "Pared de Bloques", desc: "15x20x30 cm" },
+                  { id: "friso", label: "Friso / Revoque", desc: "Acabado Muros" },
+                  { id: "piso", label: "Losa / Vaciado Piso", desc: "Concreto 210kg" },
+                ].map((tipo) => (
+                  <button
+                    key={tipo.id}
+                    type="button"
+                    onClick={() => setCalcTipoObra(tipo.id as any)}
+                    className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer ${
+                      calcTipoObra === tipo.id
+                        ? "bg-teal-500 text-slate-950 font-black border-teal-400 shadow-md"
+                        : "bg-slate-800/70 border-slate-700/60 text-slate-300 hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="text-xs font-bold leading-tight">{tipo.label}</div>
+                    <div className={`text-[10px] mt-0.5 ${calcTipoObra === tipo.id ? "text-slate-950 font-semibold" : "text-slate-400"}`}>
+                      {tipo.desc}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Dimensiones / Entradas */}
+              <div className="p-3.5 rounded-2xl bg-slate-800/50 border border-slate-700/60 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-300 block mb-1">
+                    Superficie a Construir (m²):
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.5"
+                    value={calcAreaM2}
+                    onChange={(e) => setCalcAreaM2(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono font-bold text-sm focus:border-teal-500 focus:outline-none"
+                    placeholder="30"
+                  />
+                  <span className="text-[9px] text-slate-400 mt-0.5 block">Ejemplo: 30 m² de pared o losa</span>
+                </div>
+
+                {calcTipoObra === "piso" && (
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-300 block mb-1">
+                      Espesor de Losa (cm):
+                    </label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="40"
+                      value={calcEspesorCm}
+                      onChange={(e) => setCalcEspesorCm(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono font-bold text-sm focus:border-teal-500 focus:outline-none"
+                      placeholder="10"
+                    />
+                    <span className="text-[9px] text-slate-400 mt-0.5 block">Estándar residencial: 10 a 15 cm</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Insumos Estimados */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300">Materiales Necesarios Estimados:</span>
+                  <span className="text-[10px] text-slate-400">Incluye 5% de desperdicio técnico</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {bloquesRequeridos > 0 && (
+                    <div className="p-3 rounded-2xl bg-slate-800/70 border border-slate-700/60 flex flex-col justify-between">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Bloques de Arcilla</div>
+                      <div className="text-xl font-black font-mono text-amber-300 my-1">
+                        {bloquesRequeridos} <span className="text-xs font-sans text-slate-400">unidades</span>
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-400">
+                        ${precioBloque.toFixed(2)} c/u ≈ ${(bloquesRequeridos * precioBloque).toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                  {sacosCemento > 0 && (
+                    <div className="p-3 rounded-2xl bg-slate-800/70 border border-slate-700/60 flex flex-col justify-between">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Cemento Gris</div>
+                      <div className="text-xl font-black font-mono text-teal-300 my-1">
+                        {sacosCemento} <span className="text-xs font-sans text-slate-400">sacos</span>
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-400">
+                        ${precioCemento.toFixed(2)} c/u ≈ ${(sacosCemento * precioCemento).toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                  {m3Arena > 0 && (
+                    <div className="p-3 rounded-2xl bg-slate-800/70 border border-slate-700/60 flex flex-col justify-between">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Arena Lavada</div>
+                      <div className="text-xl font-black font-mono text-cyan-300 my-1">
+                        {m3Arena} <span className="text-xs font-sans text-slate-400">m³</span>
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-400">
+                        ${precioArena.toFixed(2)} /m³ ≈ ${(m3Arena * precioArena).toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                  {m3Piedra > 0 && (
+                    <div className="p-3 rounded-2xl bg-slate-800/70 border border-slate-700/60 flex flex-col justify-between">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Piedra Picada</div>
+                      <div className="text-xl font-black font-mono text-indigo-300 my-1">
+                        {m3Piedra} <span className="text-xs font-sans text-slate-400">m³</span>
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-400">
+                        Insumo de vaciado
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Total Presupuestado */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-slate-800 to-slate-800/80 border border-teal-500/30 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-teal-300 uppercase font-bold tracking-wider">Presupuesto Estimado</span>
+                  <div className="font-mono font-black text-xl text-white">
+                    ${totalEstimadoUSD.toFixed(2)} USD
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-400">
+                    ≈ Bs. {totalEstimadoBs.toFixed(2)} (Tasa activa)
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={volcarAlCarrito}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-400 hover:from-teal-400 hover:to-cyan-300 text-slate-950 font-black text-xs cursor-pointer shadow-lg transition-all flex items-center gap-1.5"
+                >
+                  <IconShoppingCart size={16} />
+                  <span>Volcar Materiales al Carrito</span>
+                </button>
+              </div>
+
+              {/* Botón Cerrar */}
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => setModalCalculadora(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── MODAL REGISTRO DE FACTURA DE COMPRA A PROVEEDOR ── */}
       {modalCompraProveedor && (
