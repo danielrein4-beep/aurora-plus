@@ -62,7 +62,7 @@ export default function App() {
             <Route path="/mediclinic" element={<ProtectedRoute><MediclinicPage /></ProtectedRoute>} />
             <Route path="/restaurante" element={<ProtectedRoute><RestaurantePage /></ProtectedRoute>} />
             <Route path="/comercio"   element={<ProtectedRoute><ComercioPage /></ProtectedRoute>} />
-            <Route path="/ganaderia"  element={<ProtectedRoute><GanaderiaPage /></ProtectedRoute>} />
+            <Route path="/ganaderia"  element={<GanaderiaPage />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
