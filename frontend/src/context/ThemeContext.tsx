@@ -14,7 +14,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem("aurora-theme");
     if (saved === "light" || saved === "dark") return saved;
-    return "dark"; // default to dark
+    return "light"; // default to light — elegant white first impression
   });
 
   useEffect(() => {
