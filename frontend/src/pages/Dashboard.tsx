@@ -342,7 +342,7 @@ export default function Dashboard() {
               </div>
               <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-medium flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                <span>{user?.empresa || "Clínica & Consultorios Médicos"}</span>
+                <span>{user?.empresa || "Mi Consultorio Médico"}</span>
               </div>
             </div>
           </button>
@@ -736,7 +736,7 @@ export default function Dashboard() {
                     {user?.plan || "Estándar"} ($35/mes)
                   </div>
                   <p className="text-xs text-slate-500 dark:text-white/40">
-                    Módulos ilimitados para tu clínica + versión offline y móvil.
+                    Módulos ilimitados para tu negocio + versión offline y móvil.
                   </p>
                 </div>
 
