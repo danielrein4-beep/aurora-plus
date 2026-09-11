@@ -382,8 +382,75 @@ export function construirDocInformeConsulta(data: ConsultaReportData): jsPDF {
   return doc;
 }
 
-export function generarPdfInformeConsulta(data: ConsultaReportData) {
+/**
+ * Página 2 del informe: el QR fijo del consultorio para que el paciente suba
+ * sus resultados de laboratorio en cuanto el laboratorio se los entregue (ver
+ * PortalLaboratorioPacienteService en el backend — el mismo QR sirve para
+ * TODOS los informes de este médico, no se genera uno nuevo por consulta).
+ * qrDataUrl viene de api.ts::obtenerQrPortalLaboratorioDataUrl().
+ */
+function agregarPaginaQrPortalLaboratorio(doc: jsPDF, qrDataUrl: string, clinicaNombre: string) {
+  doc.addPage();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  doc.setFillColor(13, 148, 136); // Teal Medical Header, igual que la página 1
+  doc.rect(0, 0, pageWidth, 30, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(255, 255, 255);
+  doc.text("ENVÍO DE RESULTADOS DE LABORATORIO", pageWidth / 2, 17, { align: "center" });
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text(
+    "Cuando reciba sus resultados del laboratorio,",
+    pageWidth / 2,
+    50,
+    { align: "center" }
+  );
+  doc.text(
+    "escanee este código con la cámara de su teléfono",
+    pageWidth / 2,
+    57,
+    { align: "center" }
+  );
+  doc.text("para enviarlos directamente a su médico:", pageWidth / 2, 64, { align: "center" });
+
+  const qrSize = 80;
+  const qrX = (pageWidth - qrSize) / 2;
+  const qrY = 80;
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(qrX - 6, qrY - 6, qrSize + 12, qrSize + 12, 3, 3, "S");
+  doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(71, 85, 105);
+  const instrucciones = [
+    "1. Abra la cámara de su teléfono y apunte al código QR.",
+    "2. Se abrirá una página para subir sus resultados (foto o PDF).",
+    "3. Ingrese su número de cédula — así sabemos que son sus resultados.",
+    "4. Adjunte todos los archivos que necesite (no hay límite de cantidad).",
+    "5. Presione \"Enviar\" y listo — su médico los recibirá al instante.",
+  ];
+  let y = qrY + qrSize + 24;
+  instrucciones.forEach((linea) => {
+    doc.text(linea, pageWidth / 2, y, { align: "center", maxWidth: pageWidth - 40 });
+    y += 7;
+  });
+
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text(clinicaNombre || "Su consultorio médico", pageWidth / 2, pageHeight - 14, { align: "center" });
+}
+
+export function generarPdfInformeConsulta(data: ConsultaReportData, qrDataUrl?: string) {
   const doc = construirDocInformeConsulta(data);
+  if (qrDataUrl) {
+    agregarPaginaQrPortalLaboratorio(doc, qrDataUrl, data.clinicaNombre);
+  }
   const safeName = (data.paciente.nombreCompleto || "Paciente").replace(/\s+/g, "_");
   const ts = Date.now() % 100000;
   const fileName = `Informe_${data.paciente.expediente}_${safeName}_${ts}.pdf`;
@@ -807,12 +874,14 @@ export function abrirWhatsAppDirecto(telefono: string, texto: string, codigoPais
 
 export function obtenerArchivoPdfDocumento(
   tipo: "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION",
-  data: any
+  data: any,
+  qrDataUrl?: string
 ): File {
   let doc: jsPDF;
   let nombreArchivo = "Documento.pdf";
   if (tipo === "INFORME_MEDICO") {
     doc = construirDocInformeConsulta(data as ConsultaReportData);
+    if (qrDataUrl) agregarPaginaQrPortalLaboratorio(doc, qrDataUrl, (data as ConsultaReportData).clinicaNombre);
     const nombrePaciente = (data as ConsultaReportData).paciente?.nombreCompleto?.replace(/[^a-zA-Z0-9_-]/g, "_") || "Paciente";
     const expediente = (data as ConsultaReportData).paciente?.expediente || "HC";
     nombreArchivo = `Informe_${expediente}_${nombrePaciente}.pdf`;
@@ -857,12 +926,14 @@ export async function compartirNativoConArchivo(
 
 export function obtenerBase64PdfDocumento(
   tipo: "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION",
-  data: any
+  data: any,
+  qrDataUrl?: string
 ): { base64: string; nombreArchivo: string } {
   let doc: jsPDF;
   let nombreArchivo = "Documento.pdf";
   if (tipo === "INFORME_MEDICO") {
     doc = construirDocInformeConsulta(data as ConsultaReportData);
+    if (qrDataUrl) agregarPaginaQrPortalLaboratorio(doc, qrDataUrl, (data as ConsultaReportData).clinicaNombre);
     const nombrePaciente = (data as ConsultaReportData).paciente?.nombreCompleto?.replace(/[^a-zA-Z0-9_-]/g, "_") || "Paciente";
     const expediente = (data as ConsultaReportData).paciente?.expediente || "HC";
     nombreArchivo = `Informe_${expediente}_${nombrePaciente}.pdf`;

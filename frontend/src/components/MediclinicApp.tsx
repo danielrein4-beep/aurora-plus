@@ -1,5 +1,4 @@
 import InboxLaboratorioMedico from "./laboratorio/InboxLaboratorioMedico";
-import ModalNuevaOrdenLab from "./laboratorio/ModalNuevaOrdenLab";
 import {
   useState, useEffect, useMemo } from "react";
 import {
@@ -15,7 +14,7 @@ import Cie10Buscador from "./Cie10Buscador";
 import HistorialImportacionesSalud from "./HistorialImportacionesSalud";
 import { useAuth } from "../context/AuthContext";
 import {
-  contadorInboxLaboratorio, listarOrdenesLaboratorioPaciente, type OrdenLaboratorio,
+  contadorInboxExamenesRecibidos, listarExamenesRecibidosPorPaciente, type ExamenRecibidoPaciente,
   listarPacientes, crearPaciente, eliminarPaciente, buscarPacientePorIdentificacion,
   listarCitasDelDia, listarCitasPorRango, agendarCita, actualizarEstadoCita, reprogramarCita, listarCobrosDelDia,
   listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera, procesarCobro,
@@ -459,7 +458,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [inboxLabPendientes, setInboxLabPendientes] = useState(0);
 
   const cargarContadorLab = () => {
-    contadorInboxLaboratorio(tenantId)
+    contadorInboxExamenesRecibidos(tenantId)
       .then((res: { pendientes: number }) => setInboxLabPendientes(res.pendientes))
       .catch(() => {});
   };
@@ -1046,8 +1045,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             {pagina === "laboratorio" && (
             <InboxLaboratorioMedico
               tenantId={tenantId}
-              medicoNombre={configPerfil.doctorNombre}
+              pacientes={pacientes}
               onActualizarContador={cargarContadorLab}
+              onVerHistoriaPaciente={(id) => {
+                setPacienteSeleccionadoId(id);
+                setPagina("historias");
+              }}
             />
           )}
           {pagina === "laboratorio" && (
@@ -2396,6 +2399,73 @@ function GestionPacientes({
 // ══════════════════════════════════════════════════════════════════════════
 // HISTORIAS CLÍNICAS & GENERACIÓN DE INFORME PDF + WHATSAPP + GMAIL
 // ══════════════════════════════════════════════════════════════════════════
+/** Exámenes que el paciente subió por sí mismo desde el portal QR (ver InboxLaboratorioMedico) —
+ * se muestran de solo lectura aquí, dentro de su expediente, con fecha/hora de recepción. */
+function LaboratoriosRecibidosPaciente({ tenantId, pacienteId }: { tenantId: number; pacienteId: number }) {
+  const [examenes, setExamenes] = useState<ExamenRecibidoPaciente[] | null>(null);
+  const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pacienteId) return;
+    setExamenes(null);
+    listarExamenesRecibidosPorPaciente(tenantId, pacienteId)
+      .then(setExamenes)
+      .catch(() => setExamenes([]));
+  }, [tenantId, pacienteId]);
+
+  if (!examenes || examenes.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/60 dark:bg-black/20 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h5 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
+          <span>🔬</span> Laboratorios Recibidos
+        </h5>
+        <span className="text-[11px] text-slate-500 dark:text-white/50 font-mono font-bold">{examenes.length}</span>
+      </div>
+      <div className="space-y-2">
+        {examenes.map((ex) => (
+          <div key={ex.id} className="rounded-xl border border-slate-200/60 dark:border-white/10 p-3 text-xs">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-bold text-slate-700 dark:text-slate-200">
+                {new Date(ex.fechaHoraRecepcion).toLocaleString("es-VE")}
+              </span>
+              <span className="text-slate-400">{ex.archivos.length} archivo{ex.archivos.length !== 1 ? "s" : ""}</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {ex.archivos.map((adj, idx) => {
+                const esImagen = adj.tipoMime.startsWith("image/") || adj.contenidoBase64.startsWith("data:image");
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      if (esImagen) setFotoAmpliada(adj.contenidoBase64);
+                      else {
+                        const win = window.open();
+                        win?.document.write(`<iframe src="${adj.contenidoBase64}" frameborder="0" style="border:0; width:100%; height:100%;" allowfullscreen></iframe>`);
+                      }
+                    }}
+                    className="px-2 py-1 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 font-semibold hover:bg-teal-500/20 transition-all"
+                  >
+                    {esImagen ? "📷" : "📄"} {adj.nombreArchivo}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {fotoAmpliada && (
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-[60] cursor-pointer" onClick={() => setFotoAmpliada(null)}>
+          <img src={fotoAmpliada} alt="Archivo ampliado" className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HistoriasClinicas({
   tenantId,
   pacientes,
@@ -3308,6 +3378,9 @@ function HistoriasClinicas({
                 </tbody>
               </table>
             </div>
+
+            {/* ── LABORATORIOS RECIBIDOS (ver InboxLaboratorioMedico — subidos por el paciente vía QR) ── */}
+            <LaboratoriosRecibidosPaciente tenantId={tenantId} pacienteId={Number(pacienteSeleccionado.id)} />
           </div>
 
           {/* ── COLUMNA DERECHA: FICHA DE CONSULTA SELECCIONADA + REGISTRAR NUEVA CONSULTA ── */}

@@ -118,7 +118,8 @@ export default function Precios() {
 
           <button
             onClick={() => navigate("/onboarding")}
-            className="w-full max-w-xs py-3.5 rounded-xl text-sm font-semibold transition-all cursor-pointer g-aurora text-white hover:opacity-90 shadow-md">
+            className="w-full max-w-xs py-3.5 rounded-xl text-sm font-semibold transition-all cursor-pointer g-aurora text-white hover:opacity-90 shadow-md"
+          >
             Comenzar ahora
           </button>
         </div>
