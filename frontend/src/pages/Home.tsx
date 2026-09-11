@@ -3,21 +3,19 @@ import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import { useAuth } from "../context/AuthContext";
 import {
-  IconVet, IconClinic, IconHardware, IconMining,
-  IconRestaurant, IconFarm, IconEducation, IconRetail,
+  IconClinic, IconHardware, IconMining,
+  IconRestaurant, IconFarm, IconRetail,
   IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile,
   IconLaptop, IconPhone, IconPlane, IconBoutique, IconFactory,
-  IconCard, IconBox, IconBolt, IconShield, IconStar, IconCheck,
+  IconCard, IconBox, IconBolt, IconShield, IconCheck,
 } from "../Icons";
 
 const INDUSTRIES = [
-  { Icon: IconVet,        name: "Veterinaria",        desc: "Historial clínico, citas, vacunas, inventario de medicamentos y facturación en un solo módulo." },
   { Icon: IconClinic,     name: "Clínicas Médicas",   desc: "Expedientes digitales, agenda de consultas, laboratorio, farmacia y cobranza integrada." },
   { Icon: IconHardware,   name: "Ferretería",          desc: "Control de stock, proveedores, ventas por mostrador, cotizaciones y reportes de rotación." },
   { Icon: IconMining,     name: "Minería",             desc: "Gestión de maquinaria, turnos, órdenes de trabajo, seguridad e informes regulatorios." },
   { Icon: IconRestaurant, name: "Restaurantes",        desc: "Comandas digitales, mesas, cocina en tiempo real, inventario y cierres de caja automáticos." },
   { Icon: IconFarm,       name: "Control de Fincas",   desc: "Gestión integral de ganadería, rotación de potreros, registro sanitario, vacunación y trazabilidad animal por lote." },
-  { Icon: IconEducation,  name: "Educación",           desc: "Matrícula, horarios, calificaciones, comunicación padres-escuela y nómina docente." },
   { Icon: IconRetail,     name: "Retail",              desc: "POS multitienda, e-commerce, fidelización de clientes y análisis de ventas por categoría." },
 ];
 
@@ -32,19 +30,9 @@ const FEATURES = [
 
 const PLANS = [
   {
-    name: "Básico",    price: "$25", period: "/mes", desc: "Para negocios que están comenzando",
-    features: ["Acceso web + versión móvil", "3 módulos esenciales", "1 sucursal", "Hasta 3 usuarios", "Reportes básicos", "Soporte por correo"],
-    cta: "Comenzar ahora", highlight: false, badge: "",
-  },
-  {
-    name: "Estándar",  price: "$35", period: "/mes", desc: "Para negocios en crecimiento",
-    features: ["Acceso web + versión móvil", "6 módulos a elegir", "Hasta 3 sucursales", "Hasta 10 usuarios", "Reportes avanzados", "Facturación electrónica", "Soporte prioritario"],
-    cta: "Empezar ahora", highlight: true, badge: "MÁS POPULAR",
-  },
-  {
-    name: "Full",      price: "$60", period: "/mes", desc: "Para operaciones de gran escala",
-    features: ["Acceso web + versión móvil", "Módulos ilimitados", "Sucursales ilimitadas", "Usuarios ilimitados", "BI y analítica avanzada", "Integraciones contables", "Capacitación incluida", "Soporte 24/7"],
-    cta: "Solicitar demo", highlight: false, badge: "",
+    name: "Aurora Plus", price: "$25", period: "/mes", desc: "Un solo plan, acceso completo — sin niveles ni funciones bloqueadas",
+    features: ["Acceso a TODOS los módulos, sin excepción", "Acceso web + versión móvil", "Sin costo extra por usuario adicional", "Multi-moneda (USD · VES · COP)", "Reportes y BI avanzado"],
+    cta: "Ver planes y precios", highlight: true, badge: "",
   },
   {
     name: "Página Web", price: "Cotizable", period: "", desc: "Presencia digital profesional",
@@ -53,20 +41,14 @@ const PLANS = [
   },
 ];
 
-const TESTIMONIALS = [
-  { name: "Dr. Andrés Molina",  role: "Director, Clínica VetSur",             avatar: "AM", text: "Antes llevábamos todo en papel. Con Aurora Plus digitalizamos expedientes, citas y farmacia en 2 semanas. Ahora atendemos 40% más pacientes.", color: "from-teal-500 to-cyan-400" },
-  { name: "Carla Mendoza",      role: "Gerente, Ferretería El Constructor",   avatar: "CM", text: "El control de inventario era nuestro punto débil. Hoy sabemos exactamente qué tenemos en bodega, cuándo reordenar y qué nos da más margen.",  color: "from-blue-500 to-violet-400" },
-  { name: "Ing. Roberto Salas", role: "Ops Manager, MinPetrol S.A.",          avatar: "RS", text: "Gestionamos 3 faenas con Aurora Plus. La trazabilidad de equipos y los reportes de seguridad nos ahorraron más de 80 horas mensuales de papeleo.", color: "from-violet-500 to-purple-400" },
-];
-
 const STATS = [
-  { value: "1,200+",  label: "Empresas activas" },
-  { value: "18",      label: "Industrias cubiertas" },
-  { value: "99.9%",   label: "Uptime garantizado" },
-  { value: "< 2 sem", label: "Tiempo de implementación" },
+  { value: "3",       label: "Verticales con producto real" },
+  { value: "100%",    label: "Offline-first en punto de venta" },
+  { value: "3",       label: "Monedas: USD · VES · COP" },
+  { value: "< 2 sem", label: "Tiempo de implementación esperado" },
 ];
 
-const MODULES = ["Ventas & POS", "Inventario", "RRHH & Nómina", "Contabilidad", "CRM", "Compras", "Producción", "Proyectos", "Reportes BI", "Facturación Electrónica"];
+const MODULES = ["Ventas & POS", "Inventario", "RRHH & Nómina", "Contabilidad", "CRM", "Compras", "Producción", "Proyectos", "Reportes BI"];
 
 const previewData: Record<string, { metric: string; value: string; sub: string; color: string }[]> = {
   "Ferretería": [
@@ -314,7 +296,7 @@ export default function Home() {
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" /> Multi-Moneda (USD · VES · COP)
                 </span>
                 <span className="hidden sm:inline-flex px-3.5 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/25 text-xs text-purple-600 dark:text-purple-300 font-medium flex items-center gap-1.5 shadow-sm">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400" /> 7 Verticales Nativas
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400" /> 6 Verticales Nativas
                 </span>
               </div>
             </div>
@@ -346,7 +328,7 @@ export default function Home() {
               {/* Bloque de Métricas Estilo Monumental */}
               <div className="grid grid-cols-3 gap-4 sm:gap-6 border-b border-slate-200/60 dark:border-white/10 pb-6 transition-colors duration-500">
                 <div>
-                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-slate-900 dark:text-white">7+</div>
+                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-slate-900 dark:text-white">6</div>
                   <div className="text-slate-500 dark:text-white/40 text-xs mt-1 font-medium leading-snug">Industrias nativas</div>
                 </div>
                 <div>
@@ -458,7 +440,7 @@ export default function Home() {
           <h2 className="font-['Outfit'] font-bold text-4xl sm:text-5xl text-slate-900 dark:text-white">
             Un sistema que entiende<br /><span className="text-aurora">cómo funciona tu negocio</span>
           </h2>
-          <p className="text-slate-500 dark:text-white/40 text-base mt-4 max-w-xl mx-auto">Más de 18 verticales con módulos preconfigurados y flujos adaptados a cada operación.</p>
+          <p className="text-slate-500 dark:text-white/40 text-base mt-4 max-w-xl mx-auto">Módulos preconfigurados y flujos adaptados a cada operación.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {INDUSTRIES.map((ind) => (
@@ -681,7 +663,7 @@ export default function Home() {
             Inversión que escala<br /><span className="text-aurora">con tu empresa</span>
           </h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
           {PLANS.map((plan) => (
             <div key={plan.name}
               className={`relative rounded-2xl p-6 transition-all duration-300 flex flex-col ${
@@ -726,29 +708,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ── */}
-      <section className="py-24 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="text-center mb-14">
-          <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase mb-3">Casos de éxito</p>
-          <h2 className="font-['Outfit'] font-bold text-4xl sm:text-5xl text-slate-900 dark:text-white">
-            Empresas reales,<br /><span className="text-aurora">resultados reales</span>
-          </h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {TESTIMONIALS.map((t) => (
-            <div key={t.name} className="apple-glass rounded-2xl p-6 card-shadow hover-card">
-              <div className="flex gap-1 mb-4 text-amber-500">{[1,2,3,4,5].map((s) => <IconStar key={s} size={13} />)}</div>
-              <p className="text-slate-600 dark:text-white/65 text-sm leading-relaxed mb-6 italic">"{t.text}"</p>
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${t.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-sm`}>{t.avatar}</div>
-                <div>
-                  <div className="text-slate-900 dark:text-white text-sm font-semibold">{t.name}</div>
-                  <div className="text-slate-400 dark:text-white/35 text-xs">{t.role}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* ── QUIÉNES SOMOS ── */}
+      <section className="py-24 px-4 sm:px-6 max-w-4xl mx-auto text-center">
+        <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase mb-3">Quiénes construyen esto</p>
+        <h2 className="font-['Outfit'] font-bold text-4xl sm:text-5xl text-slate-900 dark:text-white mb-6">
+          Negocio real, ingeniería real
+        </h2>
+        <p className="text-slate-500 dark:text-white/45 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
+          Aurora Plus lo construye un equipo con formación en <span className="text-slate-800 dark:text-white/80 font-medium">Administración de Empresas</span> e <span className="text-slate-800 dark:text-white/80 font-medium">Ingeniería Informática</span> — estamos en fase de piloto con negocios de confianza, ajustando el sistema con uso real antes de abrirlo al público.
+        </p>
       </section>
 
       {/* ── CTA FINAL ── */}
