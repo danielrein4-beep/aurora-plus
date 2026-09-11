@@ -3587,31 +3587,49 @@ function HistoriasClinicas({
               />
             </div>
 
-            {/* 4. Diagnóstico Clínico (Dx) — buscador sobre el catálogo CIE-10 completo */}
+            {/* 4. Diagnóstico Clínico (Dx) — dos formas independientes de llenarlo:
+                buscar en el catálogo CIE-10 (14,000+ códigos, incluye dermatología
+                completa L00-L99) o escribir el diagnóstico directo a mano, sin
+                código. El código CIE-10 es opcional: solo se guarda si el médico
+                elige uno de la lista — el texto libre siempre se guarda igual. */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 dark:text-white/90">
                 Diagnóstico Clínico (Dx) *
               </label>
-              <Cie10Buscador
-                valorCodigo={form.diagnosticoPrincipalCIE10}
-                valorDescripcion={form.descripcionDiagnostico}
-                onSeleccionar={(d) =>
-                  setForm({ ...form, diagnosticoPrincipalCIE10: d.codigo, descripcionDiagnostico: d.descripcion })
-                }
-              />
+              <p className="text-[10px] text-slate-500 dark:text-white/50">
+                Opción 1: busca el código CIE-10 abajo. Opción 2: si prefieres, escribe el diagnóstico
+                directamente en el segundo campo, sin necesidad de código.
+              </p>
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wide">
+                  Opción 1 — Buscar código CIE-10
+                </span>
+                <Cie10Buscador
+                  valorCodigo={form.diagnosticoPrincipalCIE10}
+                  valorDescripcion={form.descripcionDiagnostico}
+                  onSeleccionar={(d) =>
+                    setForm({ ...form, diagnosticoPrincipalCIE10: d.codigo, descripcionDiagnostico: d.descripcion })
+                  }
+                />
+              </div>
               {form.diagnosticoPrincipalCIE10 && (
                 <p className="text-[10px] text-teal-600 dark:text-teal-400">
                   Código CIE-10 seleccionado: <span className="font-bold">{form.diagnosticoPrincipalCIE10}</span> — se usará para el Canal Endémico.
                 </p>
               )}
-              <input
-                type="text"
-                required
-                placeholder="Puedes ajustar el texto del diagnóstico aquí (ej. agregar severidad, lateralidad, etc.)"
-                value={form.descripcionDiagnostico}
-                onChange={(e) => setForm({ ...form, descripcionDiagnostico: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
-              />
+              <div className="space-y-0.5 pt-1">
+                <span className="text-[10px] font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wide">
+                  Opción 2 — Diagnóstico manual (sin código)
+                </span>
+                <input
+                  type="text"
+                  required
+                  placeholder="Escribe el diagnóstico directamente (ej. agregar severidad, lateralidad, etc.)"
+                  value={form.descripcionDiagnostico}
+                  onChange={(e) => setForm({ ...form, descripcionDiagnostico: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
+                />
+              </div>
             </div>
 
             {/* 5. Prescripción Farmacológica / Récipe (Rx) */}
