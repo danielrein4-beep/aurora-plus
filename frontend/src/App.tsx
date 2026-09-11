@@ -16,6 +16,8 @@ import Dashboard from "./pages/Dashboard";
 import MediclinicApp from "./components/MediclinicApp";
 import RestauranteApp from "./components/RestauranteApp";
 import RetailApp from "./components/RetailApp";
+import ComercioApp from "./components/ComercioApp";
+import GanaderiaApp from "./components/GanaderiaApp";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -37,6 +39,16 @@ function RestaurantePage() {
 function RetailPage() {
   const navigate = useNavigate();
   return <RetailApp onSalir={() => navigate("/dashboard")} />;
+}
+
+function ComercioPage() {
+  const navigate = useNavigate();
+  return <ComercioApp onSalir={() => navigate("/dashboard")} />;
+}
+
+function GanaderiaPage() {
+  const navigate = useNavigate();
+  return <GanaderiaApp onSalir={() => navigate("/dashboard")} />;
 }
 
 export default function App() {
@@ -68,6 +80,8 @@ export default function App() {
             <Route path="/mediclinic" element={<ProtectedRoute><AnimatedRoute><MediclinicPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/restaurante" element={<ProtectedRoute><AnimatedRoute><RestaurantePage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/retail" element={<ProtectedRoute><AnimatedRoute><RetailPage /></AnimatedRoute></ProtectedRoute>} />
+            <Route path="/comercio"   element={<ProtectedRoute><AnimatedRoute><ComercioPage /></AnimatedRoute></ProtectedRoute>} />
+            <Route path="/ganaderia"  element={<ProtectedRoute><AnimatedRoute><GanaderiaPage /></AnimatedRoute></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

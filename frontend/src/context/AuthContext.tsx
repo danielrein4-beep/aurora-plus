@@ -132,11 +132,13 @@ function marcarTenantVisitado(tenantId: number) {
 // abajo y RetailApp.tsx.
 const MODULO_A_INDUSTRIA: Record<string, string> = {
   salud: "clinica",
+  farmacia: "farmacia",
   horeca: "restaurante",
+  restaurante: "restaurante",
   ganaderia: "finca",
   moda: "ferreteria",
   minero: "mineria",
-  "tamanaco-comercial": "mineria",
+  "tamanaco-comercial": "ferreteria",
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -227,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // una cuenta con este correo") se muestra tal cual; una falla de conexión real avisa que no
     // hay conexión — nunca se finge que se creó una cuenta que en realidad no existe en el backend.
     let sesion: SesionAurora;
+    const rolAsignado = datos.moduloPrincipal === "salud" ? "MEDICO" : "DUENO_ADMIN";
     try {
       sesion = await registrarNegocio(datos);
     } catch (err) {
@@ -242,11 +245,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: datos.emailContacto || datos.username,
       password: datos.password,
       nombre: nombreUsuario,
-      empresa: datos.nombreEmpresa || "Clínica & Consultorios Médicos",
+      empresa: datos.nombreEmpresa || "Mi Empresa",
       industry,
-      moduloPrincipal: datos.moduloPrincipal || "salud",
+      moduloPrincipal: datos.moduloPrincipal || "horeca",
       tenantId: sesion.tenantId,
-      rol: sesion.rol || "MEDICO",
+      rol: sesion.rol || rolAsignado,
       modules: datos.modules || [],
       metodoPagoPreferido: datos.metodoPagoPreferido,
       fechaRegistro: new Date().toISOString(),

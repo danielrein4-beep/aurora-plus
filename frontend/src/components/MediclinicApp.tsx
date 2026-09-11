@@ -695,7 +695,11 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       });
   };
 
-  useEffect(() => { recargarTodo(); }, [tenantId]);
+  useEffect(() => {
+    recargarTodo();
+    const interval = setInterval(cargarContadorLab, 30000);
+    return () => clearInterval(interval);
+  }, [tenantId]);
 
   // Si no hay perfil activo seleccionado, renderizar la pantalla estilo Netflix
   if (perfilActivo === null) {
@@ -774,16 +778,18 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   <n.Icon size={16} />
                   <span className="truncate">{n.label}</span>
                 </div>
-                {n.id === "laboratorio" && inboxLabPendientes > 0 && (
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
+                  {n.id === "laboratorio" && inboxLabPendientes > 0 && (
                     <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[10px] font-black animate-pulse">
                       {inboxLabPendientes}
                     </span>
                   )}
                   {esProtegida && (
-                  <span title="Requiere clave del Doctor" className="p-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 flex-shrink-0 ml-1 border border-amber-500/20">
-                    <IconLock size={12} />
-                  </span>
-                )}
+                    <span title="Requiere clave del Doctor" className="p-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      <IconLock size={12} />
+                    </span>
+                  )}
+                </div>
               </button>
             );
           })}
@@ -881,6 +887,18 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   <span>Secretaria</span>
                 </button>
               </div>
+            )}
+
+            {inboxLabPendientes > 0 && (
+              <button
+                type="button"
+                onClick={() => intentarNavegar("laboratorio")}
+                className="px-3.5 py-1.5 rounded-2xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-600 dark:text-red-400 text-xs font-black flex items-center gap-1.5 animate-pulse cursor-pointer shadow-xs transition-all"
+                title="Exámenes de laboratorio pendientes de revisión médica"
+              >
+                <span>🔬</span>
+                <span>Inbox: {inboxLabPendientes} {inboxLabPendientes === 1 ? "examen" : "exámenes"}</span>
+              </button>
             )}
 
             <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/70 dark:bg-white/5 border border-slate-300/60 dark:border-white/15 shadow-sm text-xs">
@@ -2961,6 +2979,7 @@ function HistoriasClinicas({
                 <span>Tel: {pacienteSeleccionado.telefono || "No registrado"}</span>
               </div>
             </div>
+
           </div>
         </div>
       ) : (
@@ -3819,6 +3838,7 @@ function HistoriasClinicas({
           </div>
         </div>
       )}
+
     </div>
   );
 }

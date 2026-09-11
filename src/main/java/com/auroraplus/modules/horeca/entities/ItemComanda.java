@@ -70,6 +70,10 @@ public class ItemComanda {
     @Column(name = "costo_unitario", precision = 18, scale = 4)
     private BigDecimal costoUnitario;
 
+    // Notas o instrucciones especiales para cocina ("Sin cebolla", "Término 3/4", etc.)
+    @Column(name = "notas", length = 255)
+    private String notas;
+
     // Para el temporizador visual del KDS (verde/amarillo/rojo según minutos
     // esperando) — antes no existía ningún registro de cuándo entró el plato.
     // columnDefinition con default: sin esto, el ALTER TABLE sobre una tabla
@@ -103,6 +107,8 @@ public class ItemComanda {
     public void setFastBarTrago(FastBarTrago fastBarTrago) { this.fastBarTrago = fastBarTrago; }
     public BigDecimal getCostoUnitario() { return costoUnitario; }
     public void setCostoUnitario(BigDecimal costoUnitario) { this.costoUnitario = costoUnitario; }
+    public String getNotas() { return notas; }
+    public void setNotas(String notas) { this.notas = notas; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
 }

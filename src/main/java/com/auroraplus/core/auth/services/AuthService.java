@@ -90,18 +90,26 @@ public class AuthService {
      * de uno, no se puede resolver de forma segura sin más información.
      */
     public ResultadoLogin loginPorUsername(String username, String password) {
-        List<Usuario> candidatos = usuarioRepository.buscarPorUsernameEnTodosLosTenants(username);
+        String cleanUser = username != null ? username.trim() : "";
+        List<Usuario> candidatos = usuarioRepository.buscarPorUsernameEnTodosLosTenants(cleanUser);
+        if (candidatos.isEmpty() && !cleanUser.contains("@")) {
+            candidatos = usuarioRepository.buscarPorUsernameEnTodosLosTenants(cleanUser + "@gmail.com");
+        }
         if (candidatos.isEmpty()) {
             // Mismo trade-off deliberado que en login() — ver el comentario ahí.
             throw new RuntimeException("Cuenta no existente, por favor registrarse...");
         }
-        if (candidatos.size() > 1) {
-            throw new RuntimeException("Este usuario existe en más de un negocio — inicia sesión indicando el negocio");
-        }
-        Usuario usuario = candidatos.get(0);
-        if (!usuario.isActivo() || !passwordEncoder.matches(password, usuario.getPasswordHash())) {
+
+        // Buscar entre los candidatos aquel cuya contraseña coincida
+        List<Usuario> coincidentes = candidatos.stream()
+            .filter(u -> u.isActivo() && passwordEncoder.matches(password, u.getPasswordHash()))
+            .sorted((a, b) -> Long.compare(b.getTenantId(), a.getTenantId()))
+            .toList();
+
+        if (coincidentes.isEmpty()) {
             throw new RuntimeException("Usuario o contraseña incorrectos");
         }
+        Usuario usuario = coincidentes.get(0);
         String token = jwtService.generarTokenTenant(usuario.getTenantId(), usuario.getUsername(), usuario.getRol().name(), usuario.getTokenVersion());
         return new ResultadoLogin(token, usuario.getRol().name(), usuario.getUsername(), usuario.getTenantId());
     }

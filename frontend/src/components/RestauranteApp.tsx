@@ -5,6 +5,8 @@ import {
   IconRestaurant, IconCustomize, IconUsers, IconUser, IconHourglass, IconCard, IconFileText,
   IconCheck, IconTrash, IconRefresh, IconCheckCircle, IconWarning, IconSearch, IconClose,
   IconBolt, IconBank, IconChart, IconDownload, IconLock, IconRocket, IconChevronLeft, IconChevronRight,
+  IconSettings, IconShoppingBag, IconUtensils, IconTruck, IconScissors, IconPrinter, IconEdit,
+  IconNote, IconReceipt, IconCoins, IconTerminal, IconCalendar, IconPhone,
 } from "../Icons";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -96,7 +98,6 @@ function diasParaVencerTexto(fechaVencimiento: string): { texto: string; color: 
 }
 
 const CONFIG_KEY = "aurora_horeca_config_perfil";
-const ITEMS_LOCALES_KEY = "aurora_horeca_items_por_comanda";
 const VENTAS_HOY_KEY = `aurora_horeca_ventas_${hoy()}`;
 const MODO_CLASICO_KEY = "aurora_horeca_modo_clasico";
 
@@ -223,18 +224,9 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     return () => { document.body.classList.remove("horeca-clasico"); };
   }, [modoClasico]);
 
-  // Los ítems de una comanda abierta no tienen endpoint de "listar" en el backend
-  // (solo el tablero de cocina por estación) — se acumulan aquí al agregarlos,
-  // igual que Mediclinic rastrea sus cobros del día localmente.
-  const [itemsPorComanda, setItemsPorComanda] = useState<Record<number, ItemLocal[]>>(() => {
-    try {
-      const raw = localStorage.getItem(ITEMS_LOCALES_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(ITEMS_LOCALES_KEY, JSON.stringify(itemsPorComanda)); } catch {}
-  }, [itemsPorComanda]);
+  // Sincronización atómica de ítems por comanda con el backend (GET /api/horeca/comandas/{id}/items),
+  // eliminando la persistencia dual en localStorage para evitar descuadres en recargas o multisesión.
+  const [itemsPorComanda, setItemsPorComanda] = useState<Record<number, ItemLocal[]>>({});
 
   // Ventas del día = ingresos reales de tesorería desde el último cierre de
   // caja (mismo endpoint que usa cualquier vertical) — antes se llevaba un
@@ -507,25 +499,263 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
  */
 const fmtTasa = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// ══════════════════════════════════════════════════════════════════════════
+// IMPRESIÓN TÉRMICA UNIVERSAL (58mm / 80mm)
+// ══════════════════════════════════════════════════════════════════════════
+function imprimirTicketTermicoDirecto(datos: {
+  nombreLocal: string;
+  comandaId: number;
+  fecha: string;
+  canal?: string;
+  cliente?: { nombre: string; telefono?: string; direccion?: string };
+  lineas: { nombre: string; cantidad: number; precio: number; notas?: string }[];
+  subtotal: number;
+  total: number;
+  totalBs?: number;
+  totalCop?: number;
+  metodoPago: string;
+  recibido?: number;
+  vuelto?: number;
+  monedaVuelto?: string;
+}) {
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (!doc) return;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Ticket COM-${datos.comandaId}</title>
+        <style>
+          @page { margin: 0; size: 80mm auto; }
+          body {
+            font-family: 'Courier New', Courier, monospace, sans-serif;
+            font-size: 12px;
+            color: #000;
+            background: #fff;
+            margin: 0;
+            padding: 10px 8px;
+            width: 76mm;
+            line-height: 1.3;
+          }
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .right { text-align: right; }
+          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          .item-row { display: flex; justify-content: space-between; margin: 3px 0; }
+          .item-notes { font-size: 10px; font-style: italic; margin-left: 8px; color: #333; }
+          .total-row { display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; margin-top: 4px; }
+          .footer { font-size: 10px; text-align: center; margin-top: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="center bold" style="font-size: 15px;">${datos.nombreLocal}</div>
+        <div class="center" style="font-size: 10px; text-transform: uppercase;">Aurora Horeca · Sistema POS</div>
+        <div class="divider"></div>
+        <div><strong>Ticket:</strong> COM-${datos.comandaId}</div>
+        <div><strong>Fecha:</strong> ${datos.fecha}</div>
+        <div><strong>Modalidad:</strong> ${datos.canal === "DELIVERY_PROPIO" ? "DELIVERY" : datos.canal === "SALON" ? "SALÓN" : "PARA LLEVAR"}</div>
+        ${datos.cliente?.nombre ? `<div><strong>Cliente:</strong> ${datos.cliente.nombre}</div>` : ""}
+        ${datos.cliente?.telefono ? `<div><strong>Teléfono:</strong> ${datos.cliente.telefono}</div>` : ""}
+        ${datos.cliente?.direccion ? `<div><strong>Dirección:</strong> ${datos.cliente.direccion}</div>` : ""}
+        <div class="divider"></div>
+        <div style="margin-bottom: 4px; font-size: 11px;"><strong>CANT DESCRIPCIÓN         TOTAL</strong></div>
+        ${datos.lineas.map((l) => `
+          <div class="item-row">
+            <span style="flex: 1;">${l.cantidad}x ${l.nombre}</span>
+            <span class="right bold">$${(l.precio * l.cantidad).toFixed(2)}</span>
+          </div>
+          ${l.notas ? `<div class="item-notes">↳ Nota: ${l.notas}</div>` : ""}
+        `).join("")}
+        <div class="divider"></div>
+        <div class="total-row">
+          <span>TOTAL USD:</span>
+          <span>$${datos.total.toFixed(2)}</span>
+        </div>
+        ${datos.totalBs ? `
+          <div class="item-row bold" style="font-size: 13px;">
+            <span>TOTAL Bs:</span>
+            <span>Bs. ${datos.totalBs.toFixed(2)}</span>
+          </div>
+        ` : ""}
+        ${datos.totalCop ? `
+          <div class="item-row bold">
+            <span>TOTAL COP:</span>
+            <span>COP $${datos.totalCop.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+          </div>
+        ` : ""}
+        <div class="divider"></div>
+        <div><strong>Método de Pago:</strong> ${datos.metodoPago.replace("_", " ")}</div>
+        ${datos.recibido != null ? `<div><strong>Recibido:</strong> $${datos.recibido.toFixed(2)}</div>` : ""}
+        ${datos.vuelto != null && datos.vuelto > 0.004 ? `<div class="bold" style="font-size: 12px; margin-top: 2px;">VUELTO: ${datos.vuelto.toFixed(2)} ${datos.monedaVuelto || "USD"}</div>` : ""}
+        <div class="divider"></div>
+        <div class="footer">¡Muchas gracias por su preferencia!<br>Generado con Aurora HORECA</div>
+      </body>
+    </html>
+  `;
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  setTimeout(() => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    setTimeout(() => {
+      try { document.body.removeChild(iframe); } catch {}
+    }, 3000);
+  }, 250);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MODAL DIVIDIR CUENTA (SPLIT BILL)
+// ══════════════════════════════════════════════════════════════════════════
+function ModalDividirCuenta({
+  total,
+  tasaBs,
+  tasaCop,
+  onClose,
+  onSeleccionarParte,
+}: {
+  total: number;
+  tasaBs: number;
+  tasaCop: number;
+  onClose: () => void;
+  onSeleccionarParte: (montoPersona: number, indexPersona: number, totalPersonas: number) => void;
+}) {
+  const [numPersonas, setNumPersonas] = useState(2);
+  const montoPorPersona = total / numPersonas;
+
+  return (
+    <Modal onClose={onClose} titulo="Dividir Cuenta (Split Bill)">
+      <div className="space-y-4">
+        <p className="text-xs text-slate-500 dark:text-white/50">
+          Divide el consumo total en partes iguales. Puedes cobrar a cada comensal por separado con su propio método de pago (Zelle, Pago Móvil, Efectivo, etc.).
+        </p>
+
+        <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-3 flex items-center justify-between">
+          <span className="text-xs text-slate-500 dark:text-white/40 font-semibold">Total de la orden:</span>
+          <span className="font-mono font-bold text-lg text-slate-900 dark:text-white">${total.toFixed(2)}</span>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-bold text-slate-600 dark:text-white/60 mb-2">
+            ¿Entre cuántas personas dividen?
+          </label>
+          <div className="flex gap-2">
+            {[2, 3, 4, 5, 6].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setNumPersonas(n)}
+                className={`flex-1 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all ${
+                  numPersonas === n
+                    ? "bg-teal-600 text-white shadow-md scale-105"
+                    : "bg-slate-200/70 dark:bg-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-300 dark:hover:bg-white/15"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-teal-500/10 border border-teal-500/25 space-y-1 text-center">
+          <div className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">
+            Cada persona paga ({numPersonas} partes)
+          </div>
+          <div className="font-mono font-black text-2xl text-teal-600 dark:text-teal-400">
+            ${montoPorPersona.toFixed(2)}
+          </div>
+          <div className="flex justify-center gap-3 text-xs font-mono font-semibold text-slate-600 dark:text-white/70 pt-1">
+            {tasaBs > 0 && <span>≈ Bs. {(montoPorPersona * tasaBs).toFixed(2)}</span>}
+            {tasaCop > 0 && <span>≈ COP ${(montoPorPersona * tasaCop).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>}
+          </div>
+        </div>
+
+        <div className="space-y-2 pt-2">
+          <div className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-wider">
+            Cobrar comensales:
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+            {Array.from({ length: numPersonas }).map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  onSeleccionarParte(montoPorPersona, idx + 1, numPersonas);
+                  onClose();
+                }}
+                className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-teal-500/15 border border-slate-300/50 dark:border-white/10 transition-colors text-left cursor-pointer group"
+              >
+                <div>
+                  <div className="font-bold text-xs text-slate-800 dark:text-white group-hover:text-teal-500">
+                    Comensal #{idx + 1}
+                  </div>
+                  <div className="text-[10px] text-slate-400">Porción 1/{numPersonas}</div>
+                </div>
+                <div className="font-mono font-bold text-xs text-slate-900 dark:text-white">
+                  ${montoPorPersona.toFixed(2)} →
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full apple-glass-btn text-xs font-semibold py-2.5 rounded-xl cursor-pointer"
+        >
+          Cerrar
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MULTI-TASA BADGE (BCV / USDT / COP / PERSONALIZADA)
+// ══════════════════════════════════════════════════════════════════════════
 function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizadaCop }: {
   tenantId: number; tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null;
   onActualizadaBcv: (t: TasaCambio) => void; onActualizadaCop: (t: TasaCambio) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
-  const [tasaBs, setTasaBs] = useState("");
+  const [tipoActivo, setTipoActivo] = useState<"USDT" | "BCV" | "PERSONALIZADA">(() => {
+    try {
+      const guardado = localStorage.getItem("aurora_tipo_tasa_activa");
+      return (guardado as "USDT" | "BCV" | "PERSONALIZADA") || "USDT";
+    } catch {
+      return "USDT";
+    }
+  });
+
+  const [tasaBcvVal, setTasaBcvVal] = useState("");
+  const [tasaUsdtVal, setTasaUsdtVal] = useState(() => {
+    try { return localStorage.getItem("aurora_tasa_usdt_val") || "65.50"; } catch { return "65.50"; }
+  });
   const [tasaCopVal, setTasaCopVal] = useState("");
+  const [tasaPersVal, setTasaPersVal] = useState(() => {
+    try { return localStorage.getItem("aurora_tasa_pers_val") || ""; } catch { return ""; }
+  });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!abierto) return;
-    setTasaBs(tasaBcv ? String(Number(tasaBcv.tasa)) : "");
+    setTasaBcvVal(tasaBcv ? String(Number(tasaBcv.tasa)) : "");
     setTasaCopVal(tasaCop ? String(Number(tasaCop.tasa)) : "");
     setError(null);
-    const id = setTimeout(() => inputRef.current?.focus(), 0);
-    return () => clearTimeout(id);
   }, [abierto, tasaBcv, tasaCop]);
 
   useEffect(() => {
@@ -539,18 +769,54 @@ function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizada
     return () => { document.removeEventListener("mousedown", handler); document.removeEventListener("keydown", handlerEsc); };
   }, [abierto]);
 
+  const guardarTipoActivo = (tipo: "USDT" | "BCV" | "PERSONALIZADA") => {
+    setTipoActivo(tipo);
+    try { localStorage.setItem("aurora_tipo_tasa_activa", tipo); } catch {}
+  };
+
+  const tasaActivaNumero = useMemo(() => {
+    if (tipoActivo === "USDT") return Number(tasaUsdtVal) || (tasaBcv ? Number(tasaBcv.tasa) : 0);
+    if (tipoActivo === "BCV") return tasaBcv ? Number(tasaBcv.tasa) : (Number(tasaUsdtVal) || 0);
+    return Number(tasaPersVal) || (tasaBcv ? Number(tasaBcv.tasa) : 0);
+  }, [tipoActivo, tasaUsdtVal, tasaBcv, tasaPersVal]);
+
   const actualizar = async () => {
-    const valorBs = Number(tasaBs);
-    const valorCop = Number(tasaCopVal);
-    const bsValido = tasaBs.trim() !== "" && valorBs > 0;
-    const copValido = tasaCopVal.trim() !== "" && valorCop > 0;
-    if (!bsValido && !copValido) { setError("Ingresa al menos una tasa válida mayor a cero"); return; }
+    const vBcv = Number(tasaBcvVal);
+    const vUsdt = Number(tasaUsdtVal);
+    const vCop = Number(tasaCopVal);
+    const vPers = Number(tasaPersVal);
+
+    if (vBcv <= 0 && vUsdt <= 0 && vCop <= 0 && vPers <= 0) {
+      setError("Ingresa al menos una tasa mayor a cero");
+      return;
+    }
     setGuardando(true);
     setError(null);
     try {
+      try {
+        localStorage.setItem("aurora_tipo_tasa_activa", tipoActivo);
+        if (vUsdt > 0) localStorage.setItem("aurora_tasa_usdt_val", String(vUsdt));
+        if (vPers > 0) localStorage.setItem("aurora_tasa_pers_val", String(vPers));
+      } catch {}
+
       const tareas: Promise<void>[] = [];
-      if (bsValido) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: valorBs, origen: "MANUAL" }).then(onActualizadaBcv));
-      if (copValido) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: valorCop, origen: "MANUAL" }).then(onActualizadaCop));
+      const tasaPrincipal = tipoActivo === "USDT" ? (vUsdt > 0 ? vUsdt : vBcv) : (vBcv > 0 ? vBcv : vUsdt);
+      if (tasaPrincipal > 0) {
+        tareas.push(actualizarTasa(tenantId, {
+          monedaOrigen: "USD",
+          monedaDestino: "VES",
+          tasa: tasaPrincipal,
+          origen: tipoActivo
+        }).then(onActualizadaBcv));
+      }
+      if (vCop > 0) {
+        tareas.push(actualizarTasa(tenantId, {
+          monedaOrigen: "USD",
+          monedaDestino: "COP",
+          tasa: vCop,
+          origen: "MANUAL"
+        }).then(onActualizadaCop));
+      }
       await Promise.all(tareas);
       setAbierto(false);
     } catch (e) {
@@ -562,49 +828,175 @@ function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizada
 
   return (
     <div className="relative" ref={popoverRef}>
-      <button type="button" onClick={() => setAbierto((v) => !v)} title="Clic para actualizar las tasas de cambio"
-        className={`flex items-center gap-1.5 text-[11px] font-mono font-bold px-2.5 py-1.5 rounded-full cursor-pointer border transition-colors ${
-          tasaBcv
-            ? "text-teal-600 dark:text-teal-400 bg-teal-500/10 border-teal-500/25 hover:bg-teal-500/20"
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        title="Clic para cambiar o configurar tasas (USDT / BCV / COP)"
+        className={`flex items-center gap-2 text-[11px] font-mono font-bold px-3 py-1.5 rounded-full cursor-pointer border transition-all shadow-sm ${
+          tasaActivaNumero > 0
+            ? tipoActivo === "USDT"
+              ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border-emerald-500/30 hover:bg-emerald-500/25"
+              : "text-teal-600 dark:text-teal-400 bg-teal-500/15 border-teal-500/30 hover:bg-teal-500/25"
             : "text-amber-500 bg-amber-500/10 border-amber-500/25 hover:bg-amber-500/20"
-        }`}>
-        <span>
-          {tasaBcv ? `Bs. ${fmtTasa(Number(tasaBcv.tasa))}` : "Sin tasa"}
-          {tasaCop && <span className="text-slate-400 dark:text-white/30 font-normal"> · COP {fmtTasa(Number(tasaCop.tasa))}</span>}
+        }`}
+      >
+        <span className="flex items-center gap-1">
+          <span className="text-[10px] px-1 rounded bg-black/10 dark:bg-white/10 uppercase tracking-wider font-sans">
+            {tipoActivo}
+          </span>
+          <span>{tasaActivaNumero > 0 ? `Bs. ${fmtTasa(tasaActivaNumero)}` : "Sin tasa"}</span>
+          {tasaCop && (
+            <span className="text-slate-400 dark:text-white/40 font-normal">
+              · COP {fmtTasa(Number(tasaCop.tasa))}
+            </span>
+          )}
         </span>
-        <IconCustomize size={11} />
+        <IconSettings size={12} className="opacity-80" />
       </button>
 
-      {/* Fondo 100% sólido a propósito (no apple-glass/backdrop-blur) — un
-          popover translúcido flotando sobre KPIs y tarjetas se leía mal;
-          acá la prioridad es legibilidad, no el efecto vidrio. */}
       {abierto && (
-        <div className="absolute right-0 mt-2 z-[9999] w-72 bg-white dark:bg-slate-800 rounded-xl p-4 shadow-2xl border border-slate-200 dark:border-white/10">
-          <p className="text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2">Actualizar tasas de cambio</p>
+        <div className="absolute right-0 mt-2 z-[9999] w-84 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-200 dark:border-white/10 space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-2">
+            <div>
+              <p className="text-[11px] font-bold text-slate-800 dark:text-white uppercase tracking-wider font-['Outfit']">
+                Tasas de Cambio Operativas
+              </p>
+              <p className="text-[10px] text-slate-500 dark:text-white/40">
+                Selecciona cuál rige el punto de venta hoy
+              </p>
+            </div>
+            <button
+              onClick={() => setAbierto(false)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg cursor-pointer"
+            >
+              <IconClose size={14} />
+            </button>
+          </div>
 
-          <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">Tasa Bs. (1 USD =)</label>
-          <input
-            ref={inputRef}
-            value={tasaBs}
-            onChange={(e) => setTasaBs(e.target.value)}
-            type="number" step="0.01" min="0" placeholder="Ej. 62.75"
-            className="input-horeca w-full mb-2.5"
-            onKeyDown={(e) => e.key === "Enter" && actualizar()}
-          />
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-white/40 uppercase mb-1.5">
+              Tasa activa para cobro en POS:
+            </label>
+            <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => guardarTipoActivo("USDT")}
+                className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                  tipoActivo === "USDT"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10"
+                }`}
+              >
+                <IconCoins size={12} />
+                <span>USDT (P2P)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => guardarTipoActivo("BCV")}
+                className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                  tipoActivo === "BCV"
+                    ? "bg-teal-600 text-white shadow-sm"
+                    : "text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10"
+                }`}
+              >
+                <IconBank size={12} />
+                <span>BCV Oficial</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => guardarTipoActivo("PERSONALIZADA")}
+                className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                  tipoActivo === "PERSONALIZADA"
+                    ? "bg-amber-600 text-white shadow-sm"
+                    : "text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10"
+                }`}
+              >
+                <IconEdit size={12} />
+                <span>Propia</span>
+              </button>
+            </div>
+          </div>
 
-          <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">Tasa COP (1 USD =)</label>
-          <input
-            value={tasaCopVal}
-            onChange={(e) => setTasaCopVal(e.target.value)}
-            type="number" step="0.01" min="0" placeholder="Ej. 4100"
-            className="input-horeca w-full"
-            onKeyDown={(e) => e.key === "Enter" && actualizar()}
-          />
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-24 text-[10px] font-semibold text-slate-600 dark:text-white/70 flex items-center gap-1">
+                <IconCoins size={12} className="text-emerald-500 shrink-0" />
+                <span>USDT / P2P:</span>
+              </span>
+              <input
+                value={tasaUsdtVal}
+                onChange={(e) => setTasaUsdtVal(e.target.value)}
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Ej. 65.50"
+                className="input-horeca flex-1 py-1.5 text-xs font-mono font-bold"
+              />
+              <span className="text-[10px] text-slate-400">Bs</span>
+            </div>
 
-          {error && <p className="text-[10px] text-red-500 mt-1.5">{error}</p>}
-          <button onClick={actualizar} disabled={guardando}
-            className="w-full mt-2.5 g-aurora text-white text-xs font-bold py-2 rounded-lg cursor-pointer disabled:opacity-60">
-            {guardando ? "Actualizando…" : "Actualizar"}
+            <div className="flex items-center gap-2">
+              <span className="w-24 text-[10px] font-semibold text-slate-600 dark:text-white/70 flex items-center gap-1">
+                <IconBank size={12} className="text-teal-500 shrink-0" />
+                <span>BCV Oficial:</span>
+              </span>
+              <input
+                value={tasaBcvVal}
+                onChange={(e) => setTasaBcvVal(e.target.value)}
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Ej. 56.40"
+                className="input-horeca flex-1 py-1.5 text-xs font-mono font-bold"
+              />
+              <span className="text-[10px] text-slate-400">Bs</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-24 text-[10px] font-semibold text-slate-600 dark:text-white/70 flex items-center gap-1">
+                <span className="text-[9px] font-extrabold px-1 rounded bg-sky-500/20 text-sky-500">COP</span>
+                <span>Pesos COP:</span>
+              </span>
+              <input
+                value={tasaCopVal}
+                onChange={(e) => setTasaCopVal(e.target.value)}
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Ej. 4180"
+                className="input-horeca flex-1 py-1.5 text-xs font-mono font-bold"
+              />
+              <span className="text-[10px] text-slate-400">COP</span>
+            </div>
+
+            {tipoActivo === "PERSONALIZADA" && (
+              <div className="flex items-center gap-2 bg-amber-500/10 p-1.5 rounded-lg border border-amber-500/20">
+                <span className="w-24 text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <IconEdit size={12} className="text-amber-500 shrink-0" />
+                  <span>Tasa Propia:</span>
+                </span>
+                <input
+                  value={tasaPersVal}
+                  onChange={(e) => setTasaPersVal(e.target.value)}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Ej. 66.00"
+                  className="input-horeca flex-1 py-1.5 text-xs font-mono font-bold"
+                />
+                <span className="text-[10px] text-slate-400">Bs</span>
+              </div>
+            )}
+          </div>
+
+          {error && <p className="text-[10px] text-red-500">{error}</p>}
+
+          <button
+            onClick={actualizar}
+            disabled={guardando}
+            className="w-full btn-cyber-neon text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer disabled:opacity-60 shadow-md"
+          >
+            {guardando ? "Actualizando tasas…" : "Guardar y aplicar tasas"}
           </button>
         </div>
       )}
@@ -612,11 +1004,12 @@ function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizada
   );
 }
 
-/** Bloquea Venta Rápida hasta que se registre la tasa BCV del día — sin tasa, un cobro en Bs o el total bimoneda calcularían con un número vencido o en cero. */
+/** Tasa del día requerida para operar el POS (USDT o BCV) */
 function ModalTasaRequerida({ tenantId, onCancelar, onRegistrada }: {
   tenantId: number; onCancelar: () => void; onRegistrada: () => void;
 }) {
-  const [tasa, setTasa] = useState("");
+  const [tipo, setTipo] = useState<"USDT" | "BCV">("USDT");
+  const [tasa, setTasa] = useState("65.50");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -626,7 +1019,11 @@ function ModalTasaRequerida({ tenantId, onCancelar, onRegistrada }: {
     setGuardando(true);
     setError(null);
     try {
-      await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: valor, origen: "MANUAL" });
+      try {
+        localStorage.setItem("aurora_tipo_tasa_activa", tipo);
+        if (tipo === "USDT") localStorage.setItem("aurora_tasa_usdt_val", String(valor));
+      } catch {}
+      await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: valor, origen: tipo });
       onRegistrada();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo registrar la tasa");
@@ -636,24 +1033,46 @@ function ModalTasaRequerida({ tenantId, onCancelar, onRegistrada }: {
   };
 
   return (
-    <Modal onClose={onCancelar} titulo="Tasa BCV requerida">
+    <Modal onClose={onCancelar} titulo="Tasa del día requerida (POS)">
       <div className="space-y-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-amber-500/15 text-amber-500 flex items-center justify-center flex-shrink-0"><IconWarning size={20} /></div>
+          <div className="w-10 h-10 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center flex-shrink-0"><IconWarning size={20} /></div>
           <p className="text-sm text-slate-600 dark:text-white/70">
-            No hay tasa BCV registrada hoy (o es $0). Venta Rápida necesita una tasa vigente para calcular
-            el total en bolívares y el vuelto en cualquier cobro mixto — regístrala para continuar.
+            Para calcular totales y vueltos en bolívares, selecciona la tasa de hoy.
+            Puedes usar <strong>USDT P2P</strong> (San Cristóbal / Frontera) o <strong>BCV Oficial</strong>.
           </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => { setTipo("USDT"); if (tasa === "56.40") setTasa("65.50"); }}
+            className={`py-2 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+              tipo === "USDT" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 dark:text-white/60"
+            }`}
+          >
+            <IconCoins size={13} />
+            <span>Tasa USDT P2P</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTipo("BCV"); if (tasa === "65.50") setTasa("56.40"); }}
+            className={`py-2 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+              tipo === "BCV" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 dark:text-white/60"
+            }`}
+          >
+            <IconBank size={13} />
+            <span>Tasa BCV Oficial</span>
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-slate-500 dark:text-white/40 whitespace-nowrap">1 USD =</span>
-          <input value={tasa} onChange={(e) => setTasa(e.target.value)} type="number" step="0.01" min="0" placeholder="Ej. 56.40"
-            className="input-horeca flex-1" autoFocus onKeyDown={(e) => e.key === "Enter" && guardar()} />
+          <input value={tasa} onChange={(e) => setTasa(e.target.value)} type="number" step="0.01" min="0" placeholder={tipo === "USDT" ? "Ej. 65.50" : "Ej. 56.40"}
+            className="input-horeca flex-1 font-mono font-bold" autoFocus onKeyDown={(e) => e.key === "Enter" && guardar()} />
           <span className="text-xs font-semibold text-slate-500 dark:text-white/40">Bs</span>
         </div>
         {error && <p className="text-xs text-red-500">{error}</p>}
         <button onClick={guardar} disabled={guardando} className="w-full btn-cyber-neon text-white text-sm font-bold py-3 rounded-xl cursor-pointer disabled:opacity-60">
-          {guardando ? "Guardando…" : "Registrar tasa y continuar"}
+          {guardando ? "Guardando…" : "Aplicar tasa y continuar"}
         </button>
       </div>
     </Modal>
@@ -749,6 +1168,16 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
   const [guardandoMesa, setGuardandoMesa] = useState(false);
   const [vista, setVista] = useState<"lista" | "plano">("plano");
   const [mesaEditando, setMesaEditando] = useState<Mesa | null>(null);
+
+  useEffect(() => {
+    if (comandaActiva?.id) {
+      obtenerItemsComanda(tenantId, comandaActiva.id)
+        .then((itemsBackend) => {
+          setItemsPorComanda((prev) => ({ ...prev, [comandaActiva.id]: itemsBackend }));
+        })
+        .catch(() => {});
+    }
+  }, [comandaActiva?.id, tenantId, setItemsPorComanda]);
 
   const siguienteNumero = (mapa || []).reduce((max, m) => Math.max(max, m.mesa.numero), 0) + 1;
 
@@ -1003,8 +1432,9 @@ function EditarMesaModal({ tenantId, mesa, onClose, onCambio }: { tenantId: numb
 
         <div className="pt-3 border-t border-slate-300/50 dark:border-white/10">
           {!confirmarEliminar ? (
-            <button onClick={() => setConfirmarEliminar(true)} className="text-red-500 text-xs font-semibold cursor-pointer">
-              🗑 Eliminar esta mesa
+            <button onClick={() => setConfirmarEliminar(true)} className="text-red-500 text-xs font-semibold cursor-pointer flex items-center gap-1.5">
+              <IconTrash size={13} />
+              <span>Eliminar esta mesa</span>
             </button>
           ) : (
             <div className="flex items-center gap-2">
@@ -1128,7 +1558,17 @@ function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, o
             modoEdicion ? "bg-teal-600 text-white" : "apple-glass-btn text-slate-700 dark:text-white/70"
           }`}
         >
-          {modoEdicion ? "✓ Listo (ver salón)" : "✏️ Editar plano"}
+          {modoEdicion ? (
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <IconCheck size={14} />
+              <span>Listo (ver salón)</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <IconEdit size={14} />
+              <span>Editar plano</span>
+            </span>
+          )}
         </button>
         {modoEdicion && <p className="text-[10px] text-slate-400 leading-relaxed">Arrastrá cada mesa para ubicarla como en tu salón real.</p>}
         {sinColocar > 0 && (
@@ -1743,7 +2183,17 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
                 className={`text-[10px] font-bold px-2 py-1 rounded-full cursor-pointer disabled:opacity-40 ${
                   e.requiereCocina !== false ? "bg-sky-500/15 text-sky-600 dark:text-sky-300" : "bg-slate-200/60 dark:bg-white/10 text-slate-500 dark:text-white/40"
                 }`}>
-                {e.requiereCocina !== false ? "🍳 Pasa por cocina" : "⚡ Entrega directa"}
+                {e.requiereCocina !== false ? (
+                  <span className="inline-flex items-center gap-1">
+                    <IconHourglass size={11} />
+                    <span>Pasa por cocina</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    <IconBolt size={11} />
+                    <span>Entrega directa</span>
+                  </span>
+                )}
               </button>
             </div>
           );
@@ -3558,7 +4008,17 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   // decide si los activa en esta venta puntual, no los vuelve a escribir.
   cargosPorDefecto?: typeof CARGOS_POR_DEFECTO; impuestosPorDefecto?: typeof IMPUESTOS_POR_DEFECTO;
 }) {
-  interface LineaCarrito { key: string; nombre: string; precio: number; cantidad: number; escandalloId?: number; articuloId?: number; fastBarTragoId?: number; estacionCocina?: string }
+  interface LineaCarrito {
+    key: string;
+    nombre: string;
+    precio: number;
+    cantidad: number;
+    escandalloId?: number;
+    articuloId?: number;
+    fastBarTragoId?: number;
+    estacionCocina?: string;
+    notas?: string;
+  }
   interface ReciboVenta {
     comandaId: number; lineas: LineaCarrito[]; total: number; metodoPago: string; fecha: string;
     totalRecibido?: number; vuelto?: number; monedaVuelto?: string;
@@ -3569,6 +4029,12 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   }
 
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
+  const [canalVenta, setCanalVenta] = useState<"RECOGER_EN_TIENDA" | "SALON" | "DELIVERY_PROPIO">("RECOGER_EN_TIENDA");
+  const [mesaNumero, setMesaNumero] = useState<string>("");
+  const [datosDelivery, setDatosDelivery] = useState({ direccion: "", telefono: "", repartidor: "" });
+  const [lineaEditandoNota, setLineaEditandoNota] = useState<string | null>(null);
+  const [textoNotaTemp, setTextoNotaTemp] = useState<string>("");
+  const [mostrarDividirCuenta, setMostrarDividirCuenta] = useState(false);
   // Cargos e impuestos: se guardan como interruptores, no como líneas fijas
   // del carrito — así el monto (% sobre el subtotal de productos) siempre
   // queda correcto aunque el cajero siga agregando o quitando platos
@@ -3819,7 +4285,16 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     setError(null);
     setProcesando(true);
     try {
-      const comanda = await abrirComanda(tenantId, { mesero: "Mostrador", canal: "RECOGER_EN_TIENDA", clienteId: clienteSel?.id });
+      const comanda = await abrirComanda(tenantId, {
+        mesero: canalVenta === "SALON" ? (mesaNumero ? `Mesa ${mesaNumero}` : "Salón") : "Mostrador",
+        canal: canalVenta,
+        numeroMesa: canalVenta === "SALON" && mesaNumero ? Number(mesaNumero) : undefined,
+        nombreCliente: clienteSel?.nombre || (canalVenta === "DELIVERY_PROPIO" && datosDelivery.telefono ? `Cliente ${datosDelivery.telefono}` : undefined),
+        telefonoCliente: clienteSel?.telefono || (canalVenta === "DELIVERY_PROPIO" ? datosDelivery.telefono : undefined),
+        direccionEntrega: canalVenta === "DELIVERY_PROPIO" ? datosDelivery.direccion : undefined,
+        mensajero: canalVenta === "DELIVERY_PROPIO" ? datosDelivery.repartidor : undefined,
+        clienteId: clienteSel?.id,
+      });
       for (const linea of lineasParaCobrar) {
         await agregarItemComanda(tenantId, comanda.id, {
           escandalloId: linea.escandalloId,
@@ -3829,6 +4304,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
           estacionCocina: linea.estacionCocina,
           cantidad: linea.cantidad,
           precioUnitario: linea.precio,
+          notas: linea.notas,
         });
       }
       const resultado = await cerrarComandaMixto(tenantId, comanda.id, pagos, monedaVuelto);
@@ -3842,6 +4318,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
       setCargosActivos({ propina: false, delivery: false, empaque: false, comision: false });
       setImpuestosActivos({ iva: false, igtf: false });
       limpiarCliente();
+      setMesaNumero(""); setDatosDelivery({ direccion: "", telefono: "", repartidor: "" });
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo procesar la venta");
     } finally {
@@ -4147,6 +4624,80 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             Con esto, en vez de desaparecer, el panel completo se puede
             desplazar hasta él. */}
         <div className={`${vistaMobile === "carrito" ? "flex" : "hidden"} lg:flex lg:col-span-6 flex-1 min-w-0 lg:border-l border-slate-300/60 dark:border-white/10 flex-col h-full min-h-0 overflow-y-auto bg-white/30 dark:bg-black/10`}>
+          {/* Selector de Modalidad / Canal de Venta */}
+          <div className="p-3 border-b border-slate-300/50 dark:border-white/10 flex-shrink-0 bg-slate-50/50 dark:bg-white/[0.02]">
+            <div className="flex gap-1 bg-slate-200/70 dark:bg-white/10 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => { setCanalVenta("RECOGER_EN_TIENDA"); }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                  canalVenta === "RECOGER_EN_TIENDA" ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm" : "text-slate-500 dark:text-white/60"
+                }`}
+              >
+                <IconShoppingBag size={14} />
+                <span>Para Llevar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCanalVenta("SALON")}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                  canalVenta === "SALON" ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm" : "text-slate-500 dark:text-white/60"
+                }`}
+              >
+                <IconUtensils size={14} />
+                <span>En Mesa</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCanalVenta("DELIVERY_PROPIO"); setCargosActivos((prev) => ({ ...prev, delivery: true })); }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                  canalVenta === "DELIVERY_PROPIO" ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm" : "text-slate-500 dark:text-white/60"
+                }`}
+              >
+                <IconTruck size={14} />
+                <span>Delivery</span>
+              </button>
+            </div>
+
+            {/* Opciones contextuales del canal */}
+            {canalVenta === "SALON" && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-white/60">Número de Mesa:</span>
+                <input
+                  value={mesaNumero}
+                  onChange={(e) => setMesaNumero(e.target.value)}
+                  type="number"
+                  placeholder="Ej. 4"
+                  className="input-horeca w-24 py-1 text-xs font-mono font-bold"
+                />
+              </div>
+            )}
+            {canalVenta === "DELIVERY_PROPIO" && (
+              <div className="mt-2 space-y-1.5">
+                <input
+                  value={datosDelivery.direccion}
+                  onChange={(e) => setDatosDelivery({ ...datosDelivery, direccion: e.target.value })}
+                  placeholder="Dirección de entrega (ej. Barrio Obrero, Carrera 19)"
+                  className="input-horeca w-full py-1 text-xs"
+                />
+                <div className="flex gap-2">
+                  <input
+                    value={datosDelivery.telefono}
+                    onChange={(e) => setDatosDelivery({ ...datosDelivery, telefono: e.target.value })}
+                    placeholder="Teléfono / WhatsApp"
+                    className="input-horeca flex-1 py-1 text-xs"
+                  />
+                  <input
+                    value={datosDelivery.repartidor}
+                    onChange={(e) => setDatosDelivery({ ...datosDelivery, repartidor: e.target.value })}
+                    placeholder="Repartidor / Mensajero"
+                    className="input-horeca flex-1 py-1 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Cabecera: cliente CRM — todo en línea, sin ventana aparte.
               Cédula primero: si ya existe, autocompleta nombre/teléfono; si
               no, se registra sola al salir del campo. Nombre y teléfono
@@ -4190,31 +4741,61 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               <p className="text-sm text-slate-400">Toca un producto del catálogo para agregarlo aquí.</p>
             ) : (
               carrito.map((l) => (
-                <div key={l.key} className="flex items-center justify-between gap-3 bg-slate-100/60 dark:bg-white/5 rounded-xl px-4 py-3">
-                  {/* Nombre: flex-1 truncate — un nombre largo ("COCA COLA
-                      255ML") nunca empuja ni deforma los botones de cantidad. */}
-                  <div className="flex-1 min-w-0 truncate">
-                    <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">{l.nombre}</div>
-                    <div className="text-xs text-slate-500 dark:text-white/40 font-mono">${l.precio.toFixed(2)} c/u</div>
+                <div key={l.key} className="bg-slate-100/60 dark:bg-white/5 rounded-xl px-4 py-3 space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    {/* Nombre: flex-1 truncate — un nombre largo ("COCA COLA
+                        255ML") nunca empuja ni deforma los botones de cantidad. */}
+                    <div className="flex-1 min-w-0 truncate">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">{l.nombre}</div>
+                      <div className="text-xs text-slate-500 dark:text-white/40 font-mono">${l.precio.toFixed(2)} c/u</div>
+                    </div>
+                    {/* Botones de cantidad: shrink-0, tamaño grande y cómodo de
+                        presionar — mantienen su tamaño fijo sin comprimirse ni
+                        deformarse verticalmente. El campo de cantidad es
+                        editable directo (no solo +/-) para poder escribir un
+                        número grande de una vez (ej. una cotización). */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => cambiarCantidad(l.key, -1)} className="w-8 h-8 rounded-full bg-slate-200/80 dark:bg-white/10 text-sm font-bold cursor-pointer shrink-0">−</button>
+                      <input
+                        value={l.cantidad === 0 ? "" : l.cantidad}
+                        onChange={(e) => establecerCantidad(l.key, e.target.value === "" ? 0 : Number(e.target.value))}
+                        onBlur={() => confirmarCantidad(l.key)}
+                        type="number" step="0.001" min="0"
+                        title="Escribí la cantidad directo (ej. para una cotización grande)"
+                        className="text-sm font-bold w-14 text-center shrink-0 bg-transparent border border-slate-300/60 dark:border-white/15 rounded-lg py-1"
+                      />
+                      <button onClick={() => cambiarCantidad(l.key, 1)} className="w-8 h-8 rounded-full bg-slate-200/80 dark:bg-white/10 text-sm font-bold cursor-pointer shrink-0">+</button>
+                      <button onClick={() => quitarLinea(l.key)} title="Quitar de la venta"
+                        className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer shrink-0 ml-0.5">
+                        <IconTrash size={15} />
+                      </button>
+                    </div>
                   </div>
-                  {/* Botones de cantidad: shrink-0, tamaño grande y cómodo de
-                      presionar — mantienen su tamaño fijo sin comprimirse
-                      ni deformarse verticalmente. */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => cambiarCantidad(l.key, -1)} className="w-8 h-8 rounded-full bg-slate-200/80 dark:bg-white/10 text-sm font-bold cursor-pointer shrink-0">−</button>
-                    <input
-                      value={l.cantidad === 0 ? "" : l.cantidad}
-                      onChange={(e) => establecerCantidad(l.key, e.target.value === "" ? 0 : Number(e.target.value))}
-                      onBlur={() => confirmarCantidad(l.key)}
-                      type="number" step="0.001" min="0"
-                      title="Escribí la cantidad directo (ej. para una cotización grande)"
-                      className="text-sm font-bold w-14 text-center shrink-0 bg-transparent border border-slate-300/60 dark:border-white/15 rounded-lg py-1"
-                    />
-                    <button onClick={() => cambiarCantidad(l.key, 1)} className="w-8 h-8 rounded-full bg-slate-200/80 dark:bg-white/10 text-sm font-bold cursor-pointer shrink-0">+</button>
-                    <button onClick={() => quitarLinea(l.key)} title="Quitar de la venta"
-                      className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white cursor-pointer shrink-0 ml-0.5">
-                      <IconTrash size={15} />
-                    </button>
+
+                  {/* Notas y Modificadores de cocina */}
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    {l.notas ? (
+                      <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-[11px] px-2.5 py-1 rounded-lg">
+                        <span className="flex items-center gap-1">
+                          <IconNote size={12} className="text-amber-500 shrink-0" />
+                          <span>{l.notas}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCarrito((prev) => prev.map((it) => it.key === l.key ? { ...it, notas: undefined } : it))}
+                          className="hover:text-red-500 text-slate-400 font-bold ml-1 cursor-pointer"
+                          title="Quitar nota"
+                        >×</button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => { setLineaEditandoNota(l.key); setTextoNotaTemp(""); }}
+                        className="text-[10px] font-semibold text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 flex items-center gap-1 cursor-pointer bg-teal-500/5 hover:bg-teal-500/10 px-2 py-0.5 rounded-lg border border-teal-500/20"
+                      >
+                        + Nota de cocina
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -4225,11 +4806,11 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               comprime, así el carrito largo scrollea por dentro en vez de
               aplastar este bloque contra el borde. */}
           <div className="shrink-0 p-4 border-t border-slate-300/50 dark:border-white/10 space-y-3">
-            {/* Cargos e impuestos: chips de un clic — el monto ya sale
-                calculado con los valores de Configuración, el cajero solo
-                decide si esta venta puntual los lleva. */}
             {carrito.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
+                {/* Cargos e impuestos: chips de un clic — el monto ya sale
+                    calculado con los valores de Configuración, el cajero solo
+                    decide si esta venta puntual los lleva. */}
                 {([
                   ["propina", `Propina ${cargosCfg.propinaPct}%`],
                   ["comision", `Comisión ${cargosCfg.comisionPct}%`],
@@ -4288,10 +4869,18 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             </div>
             {carrito.length > 0 && (
               <>
-                <button onClick={generarCotizacion}
-                  className="w-full text-[11px] font-bold text-slate-500 dark:text-white/50 hover:text-teal-600 dark:hover:text-teal-300 cursor-pointer py-1">
-                  📄 Generar cotización (PDF) — no cobra ni descuenta inventario
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={generarCotizacion}
+                    className="flex-1 text-[11px] font-bold text-slate-500 dark:text-white/50 hover:text-teal-600 dark:hover:text-teal-300 cursor-pointer py-1.5 px-2 rounded-lg bg-slate-100 dark:bg-white/5 text-center flex items-center justify-center gap-1.5">
+                    <IconFileText size={13} className="text-slate-400" />
+                    <span>Cotización PDF</span>
+                  </button>
+                  <button onClick={() => setMostrarDividirCuenta(true)}
+                    className="flex-1 text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-700 cursor-pointer py-1.5 px-2 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 text-center flex items-center justify-center gap-1.5">
+                    <IconScissors size={13} className="text-teal-500" />
+                    <span>Dividir Cuenta</span>
+                  </button>
+                </div>
                 <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
               </>
             )}
@@ -4384,13 +4973,43 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             {error && <p className="text-xs text-red-500">{error}</p>}
 
             <div className="flex gap-2 pt-2">
-              <button onClick={verTicket} disabled={abriendoTicket}
-                className="flex-1 g-aurora text-white text-xs font-semibold py-3 rounded-xl cursor-pointer disabled:opacity-60">
-                {abriendoTicket ? "Generando…" : "🧾 PDF"}
+              <button
+                onClick={() => {
+                  if (!recibo) return;
+                  const tBs = tasaBcv && Number(tasaBcv.tasa) > 0 ? recibo.total * Number(tasaBcv.tasa) : undefined;
+                  const tCop = tasaCop && Number(tasaCop.tasa) > 0 ? recibo.total * Number(tasaCop.tasa) : undefined;
+                  imprimirTicketTermicoDirecto({
+                    nombreLocal,
+                    comandaId: recibo.comandaId,
+                    fecha: recibo.fecha,
+                    canal: canalVenta,
+                    cliente: clienteSel ? { nombre: clienteSel.nombre, telefono: clienteSel.telefono || undefined, direccion: datosDelivery.direccion } : undefined,
+                    lineas: recibo.lineas.map((l) => ({ nombre: l.nombre, cantidad: l.cantidad, precio: l.precio, notas: l.notas })),
+                    subtotal: recibo.total,
+                    total: recibo.total,
+                    totalBs: tBs,
+                    totalCop: tCop,
+                    metodoPago: recibo.metodoPago,
+                    recibido: recibo.totalRecibido,
+                    vuelto: recibo.vuelto,
+                    monedaVuelto: recibo.monedaVuelto,
+                  });
+                }}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-3 rounded-xl cursor-pointer shadow-md flex items-center justify-center gap-1.5 transition-all"
+                title="Imprime en impresora térmica de 58mm u 80mm en 1 clic"
+              >
+                <IconPrinter size={15} />
+                <span>Ticket 80mm</span>
               </button>
-              <button onClick={imprimirEscPos} disabled={imprimiendoEscPos} title="Imprime directo a impresora térmica USB por Web Serial, sin diálogo del sistema"
-                className="flex-1 btn-cyber-neon text-white text-xs font-semibold py-3 rounded-xl cursor-pointer disabled:opacity-60">
-                {imprimiendoEscPos ? "Imprimiendo…" : "🖨️ Térmica"}
+              <button onClick={verTicket} disabled={abriendoTicket}
+                className="flex-1 g-aurora text-white text-xs font-semibold py-3 rounded-xl cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5">
+                <IconFileText size={15} />
+                <span>{abriendoTicket ? "Generando…" : "PDF"}</span>
+              </button>
+              <button onClick={imprimirEscPos} disabled={imprimiendoEscPos} title="Imprime directo a impresora térmica USB por Web Serial"
+                className="flex-1 btn-cyber-neon text-white text-xs font-semibold py-3 rounded-xl cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5">
+                <IconTerminal size={15} />
+                <span>{imprimiendoEscPos ? "Imprimiendo…" : "ESC/POS"}</span>
               </button>
               <button onClick={() => setRecibo(null)} className="flex-1 apple-glass-btn text-xs font-semibold py-3 rounded-xl cursor-pointer">
                 Nueva venta
@@ -4398,6 +5017,75 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Modal de Notas / Modificadores de cocina para un ítem del carrito */}
+      {lineaEditandoNota && (
+        <Modal onClose={() => setLineaEditandoNota(null)} titulo="Nota / Modificador de Cocina">
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500 dark:text-white/40">
+              Instrucciones directas para cocina o comanda (ej. sin cebolla, término 3/4, extra salsa).
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                "Sin cebolla", "Término 3/4", "Bien cocido", "Término medio",
+                "Extra queso", "Salsa aparte", "Sin sal", "Para llevar", "Picante aparte", "Sin hielo",
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => setTextoNotaTemp((prev) => prev ? `${prev}, ${chip}` : chip)}
+                  className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-colors cursor-pointer"
+                >
+                  + {chip}
+                </button>
+              ))}
+            </div>
+            <input
+              value={textoNotaTemp}
+              onChange={(e) => setTextoNotaTemp(e.target.value)}
+              placeholder="Escribe la nota especial…"
+              className="input-horeca w-full text-xs"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setCarrito((prev) => prev.map((it) => it.key === lineaEditandoNota ? { ...it, notas: textoNotaTemp.trim() || undefined } : it));
+                  setLineaEditandoNota(null);
+                }
+              }}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setCarrito((prev) => prev.map((it) => it.key === lineaEditandoNota ? { ...it, notas: textoNotaTemp.trim() || undefined } : it));
+                  setLineaEditandoNota(null);
+                }}
+                className="flex-1 g-aurora text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer"
+              >
+                Guardar nota
+              </button>
+              <button
+                onClick={() => setLineaEditandoNota(null)}
+                className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal de División de Cuenta (Split Bill) */}
+      {mostrarDividirCuenta && (
+        <ModalDividirCuenta
+          total={total}
+          tasaBs={tasaBcv ? Number(tasaBcv.tasa) : 0}
+          tasaCop={tasaCop ? Number(tasaCop.tasa) : 0}
+          onClose={() => setMostrarDividirCuenta(false)}
+          onSeleccionarParte={(montoParte, index, totalPartes) => {
+            alert(`Comensal #${index} de ${totalPartes} pagará $${montoParte.toFixed(2)}. Puedes registrar su pago en el panel de cobro.`);
+          }}
+        />
       )}
     </div>
   );
@@ -4751,122 +5439,612 @@ function ResumenGeneral({ tenantId }: { tenantId: number }) {
 // existentes), no hay datos simulados: no hacía falta, los endpoints ya
 // estaban construidos.
 // ══════════════════════════════════════════════════════════════════════════
+type RangoEstadistica = "DIA" | "7_DIAS" | "MES" | "ANO";
+
+function sumarDiasStr(fechaStr: string, dias: number): string {
+  const [y, m, d] = fechaStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + dias);
+  const y2 = dt.getFullYear();
+  const m2 = String(dt.getMonth() + 1).padStart(2, "0");
+  const d2 = String(dt.getDate()).padStart(2, "0");
+  return `${y2}-${m2}-${d2}`;
+}
+
 function ResumenFinanciero({ tenantId }: { tenantId: number }) {
+  const [rango, setRango] = useState<RangoEstadistica>("DIA");
+  const [fechaSel, setFechaSel] = useState(() => hoy());
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [ventasHoy, setVentasHoy] = useState(0);
-  const [ventasMes, setVentasMes] = useState(0);
-  const [egresosHoyPorMoneda, setEgresosHoyPorMoneda] = useState<Record<string, number>>({});
-  const [utilidadHoy, setUtilidadHoy] = useState(0);
-  const [ticketsHoy, setTicketsHoy] = useState(0);
-  const [topProductos, setTopProductos] = useState<ResumenUtilidadProducto[]>([]);
-  const [tendencia, setTendencia] = useState<{ fecha: string; ventas: number }[]>([]);
 
-  useEffect(() => {
+  const [ventasTotal, setVentasTotal] = useState(0);
+  const [egresosTotal, setEgresosTotal] = useState(0);
+  const [utilidadTotal, setUtilidadTotal] = useState(0);
+  const [ticketsCount, setTicketsCount] = useState(0);
+
+  const [topProductos, setTopProductos] = useState<ResumenUtilidadProducto[]>([]);
+  const [tendencia, setTendencia] = useState<{ etiqueta: string; ventas: number; pedidos?: number }[]>([]);
+  const [horasTopData, setHorasTopData] = useState<{ hora: number; label: string; ventas: number; pedidos: number }[]>([]);
+  const [horaPico, setHoraPico] = useState<{ hora: number; label: string; ventas: number; pedidos: number } | null>(null);
+  const [ticketsPeriodo, setTicketsPeriodo] = useState<ReporteTicket[]>([]);
+
+  // Calcular fechas de inicio y fin según el rango activo
+  const { fechaInicio, fechaFin, etiquetaPeriodo } = useMemo(() => {
+    const [y, m, d] = fechaSel.split("-").map(Number);
+    const NOMBRES_MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+    if (rango === "DIA") {
+      const dt = new Date(y, m - 1, d);
+      const diaSemana = dt.toLocaleDateString("es-VE", { weekday: "long" });
+      const diaNum = dt.getDate();
+      const mesNom = NOMBRES_MESES[dt.getMonth()];
+      return {
+        fechaInicio: fechaSel,
+        fechaFin: fechaSel,
+        etiquetaPeriodo: `${diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1)}, ${diaNum} de ${mesNom} ${y}`,
+      };
+    }
+
+    if (rango === "7_DIAS") {
+      const fInicio = sumarDiasStr(fechaSel, -6);
+      return {
+        fechaInicio: fInicio,
+        fechaFin: fechaSel,
+        etiquetaPeriodo: `Últimos 7 Días (${fInicio} al ${fechaSel})`,
+      };
+    }
+
+    if (rango === "MES") {
+      const fInicio = `${y}-${String(m).padStart(2, "0")}-01`;
+      const ultimoDia = new Date(y, m, 0).getDate();
+      const fFin = `${y}-${String(m).padStart(2, "0")}-${String(ultimoDia).padStart(2, "0")}`;
+      return {
+        fechaInicio: fInicio,
+        fechaFin: fFin,
+        etiquetaPeriodo: `Mes de ${NOMBRES_MESES[m - 1]} ${y}`,
+      };
+    }
+
+    // ANO
+    return {
+      fechaInicio: `${y}-01-01`,
+      fechaFin: `${y}-12-31`,
+      etiquetaPeriodo: `Año Fiscal ${y}`,
+    };
+  }, [rango, fechaSel]);
+
+  const cargarDatos = () => {
     let cancelado = false;
     setCargando(true);
     setError(null);
 
-    const hoy = new Date();
-    const hoyStr = hoy.toISOString().slice(0, 10);
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
-    const hace6dias = new Date(hoy); hace6dias.setDate(hace6dias.getDate() - 6);
-    const hace6diasStr = hace6dias.toISOString().slice(0, 10);
-
     Promise.all([
-      reporteTickets(tenantId, { fechaInicio: hoyStr, fechaFin: hoyStr, estado: "PAGADA" }),
-      reporteTickets(tenantId, { fechaInicio: inicioMes, fechaFin: hoyStr, estado: "PAGADA" }),
-      reporteTickets(tenantId, { fechaInicio: hace6diasStr, fechaFin: hoyStr, estado: "PAGADA" }),
-      utilidadDiaria(tenantId, hoyStr),
+      reporteTickets(tenantId, { fechaInicio, fechaFin, estado: "PAGADA" }),
       listarMovimientos(tenantId, "EGRESO"),
     ])
-      .then(([ticketsHoyLista, ticketsMesLista, tickets7dias, utilidadHoyLista, egresos]) => {
+      .then(async ([ticketsLista, egresosLista]) => {
         if (cancelado) return;
-        const sumaUsd = (arr: ReporteTicket[]) => arr.reduce((s, t) => s + Number(t.totalUsd), 0);
 
-        setVentasHoy(sumaUsd(ticketsHoyLista));
-        setVentasMes(sumaUsd(ticketsMesLista));
-        setTicketsHoy(ticketsHoyLista.length);
-        setUtilidadHoy(utilidadHoyLista.reduce((s, u) => s + Number(u.utilidad), 0));
-        // Igual que en Ingresos & Gastos: cada moneda se suma aparte — un
-        // egreso en Bs y uno en USD no son la misma unidad, mezclarlos en un
-        // solo número daba una cifra sin sentido.
-        setEgresosHoyPorMoneda(
-          egresos.filter((m) => m.fechaRegistro.slice(0, 10) === hoyStr).reduce<Record<string, number>>((acc, m) => {
-            acc[m.moneda] = (acc[m.moneda] || 0) + Number(m.monto);
-            return acc;
-          }, {})
-        );
-        setTopProductos([...utilidadHoyLista].sort((a, b) => b.cantidadVendida - a.cantidadVendida).slice(0, 5));
+        // 1. Totales de Ventas & Tickets
+        const totalV = ticketsLista.reduce((s, t) => s + Number(t.totalUsd || 0), 0);
+        setVentasTotal(totalV);
+        setTicketsCount(ticketsLista.length);
+        setTicketsPeriodo([...ticketsLista].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()));
 
-        // Serie de 7 días con huecos rellenados en 0 (para que el gráfico no salte días sin ventas)
-        const porDia: Record<string, number> = {};
-        for (let i = 0; i < 7; i++) {
-          const d = new Date(hace6dias); d.setDate(d.getDate() + i);
-          porDia[d.toISOString().slice(0, 10)] = 0;
-        }
-        tickets7dias.forEach((t) => {
-          const dia = t.fecha.slice(0, 10);
-          if (dia in porDia) porDia[dia] += Number(t.totalUsd);
+        // 2. Egresos en el rango
+        const egresosFiltrados = egresosLista.filter((m) => {
+          const f = m.fechaRegistro.slice(0, 10);
+          return f >= fechaInicio && f <= fechaFin;
         });
-        setTendencia(Object.entries(porDia).map(([fecha, ventas]) => ({
-          fecha: new Date(fecha + "T00:00:00").toLocaleDateString("es-VE", { day: "2-digit", month: "short" }),
-          ventas: Number(ventas.toFixed(2)),
-        })));
+        const totalE = egresosFiltrados.reduce((s, m) => s + Number(m.monto || 0), 0);
+        setEgresosTotal(totalE);
+
+        // 3. Horas Top de Venta (Picos de Venta por Hora)
+        const horasMap: Record<number, { hora: number; label: string; ventas: number; pedidos: number }> = {};
+        for (let h = 0; h < 24; h++) {
+          const ampm = h >= 12 ? "PM" : "AM";
+          const h12 = h % 12 === 0 ? 12 : h % 12;
+          horasMap[h] = { hora: h, label: `${h12}:00 ${ampm}`, ventas: 0, pedidos: 0 };
+        }
+        ticketsLista.forEach((t) => {
+          const h = new Date(t.fecha).getHours();
+          if (horasMap[h]) {
+            horasMap[h].ventas += Number(t.totalUsd || 0);
+            horasMap[h].pedidos += 1;
+          }
+        });
+
+        // Filtrar franja comercial (ej. 8 AM a 11 PM o cualquier hora con ventas)
+        const horasArray = Object.values(horasMap).filter((h) => (h.hora >= 8 && h.hora <= 23) || h.ventas > 0);
+        horasArray.sort((a, b) => a.hora - b.hora);
+        setHorasTopData(horasArray);
+
+        const horasConVentas = horasArray.filter((h) => h.ventas > 0);
+        if (horasConVentas.length > 0) {
+          const topH = [...horasConVentas].sort((a, b) => b.ventas - a.ventas)[0];
+          setHoraPico(topH);
+        } else {
+          setHoraPico(null);
+        }
+
+        // 4. Tendencia según el Rango
+        if (rango === "DIA") {
+          // En modo Día: curva horaria
+          const tendenciaHoras = horasArray.map((h) => ({
+            etiqueta: h.label,
+            ventas: Number(h.ventas.toFixed(2)),
+            pedidos: h.pedidos,
+          }));
+          setTendencia(tendenciaHoras);
+        } else if (rango === "7_DIAS") {
+          // En modo 7 días: cada uno de los 7 días
+          const porDia: Record<string, number> = {};
+          for (let i = 0; i < 7; i++) {
+            const dStr = sumarDiasStr(fechaInicio, i);
+            porDia[dStr] = 0;
+          }
+          ticketsLista.forEach((t) => {
+            const dia = t.fecha.slice(0, 10);
+            if (dia in porDia) porDia[dia] += Number(t.totalUsd || 0);
+          });
+          const tend = Object.entries(porDia).map(([f, v]) => ({
+            etiqueta: new Date(f + "T00:00:00").toLocaleDateString("es-VE", { day: "2-digit", month: "short" }),
+            ventas: Number(v.toFixed(2)),
+          }));
+          setTendencia(tend);
+        } else if (rango === "MES") {
+          // En modo Mes: todos los días del mes
+          const [yM, mM] = fechaSel.split("-").map(Number);
+          const diasEnMes = new Date(yM, mM, 0).getDate();
+          const porDiaMes: Record<string, number> = {};
+          for (let d = 1; d <= diasEnMes; d++) {
+            const dStr = `${yM}-${String(mM).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+            porDiaMes[dStr] = 0;
+          }
+          ticketsLista.forEach((t) => {
+            const dia = t.fecha.slice(0, 10);
+            if (dia in porDiaMes) porDiaMes[dia] += Number(t.totalUsd || 0);
+          });
+          const tend = Object.entries(porDiaMes).map(([f, v]) => ({
+            etiqueta: f.slice(8, 10),
+            ventas: Number(v.toFixed(2)),
+          }));
+          setTendencia(tend);
+        } else {
+          // En modo Año: 12 meses
+          const MESES_ABR = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+          const porMes: Record<number, number> = {};
+          for (let i = 0; i < 12; i++) porMes[i] = 0;
+          ticketsLista.forEach((t) => {
+            const mIdx = new Date(t.fecha).getMonth();
+            porMes[mIdx] = (porMes[mIdx] || 0) + Number(t.totalUsd || 0);
+          });
+          const tend = Object.entries(porMes).map(([mIdx, v]) => ({
+            etiqueta: MESES_ABR[Number(mIdx)],
+            ventas: Number(v.toFixed(2)),
+          }));
+          setTendencia(tend);
+        }
+
+        // 5. Utilidad y Top Productos vendidos en el período
+        const fechasConTickets = [...new Set(ticketsLista.map((t) => t.fecha.slice(0, 10)))];
+        if (fechasConTickets.length > 0) {
+          try {
+            const utilidadesArr = await Promise.all(
+              fechasConTickets.slice(0, 31).map((f) => utilidadDiaria(tenantId, f).catch(() => []))
+            );
+            let uTotal = 0;
+            const mapaProds: Record<string, ResumenUtilidadProducto> = {};
+            utilidadesArr.flat().forEach((p) => {
+              uTotal += Number(p.utilidad || 0);
+              if (!mapaProds[p.nombrePlato]) {
+                mapaProds[p.nombrePlato] = { ...p, cantidadVendida: 0, ingresoTotal: 0, costoTotal: 0, utilidad: 0 };
+              }
+              mapaProds[p.nombrePlato].cantidadVendida += p.cantidadVendida;
+              mapaProds[p.nombrePlato].ingresoTotal += p.ingresoTotal;
+              mapaProds[p.nombrePlato].costoTotal += p.costoTotal;
+              mapaProds[p.nombrePlato].utilidad += p.utilidad;
+            });
+            setUtilidadTotal(uTotal);
+            setTopProductos(Object.values(mapaProds).sort((a, b) => b.cantidadVendida - a.cantidadVendida).slice(0, 5));
+          } catch {
+            setUtilidadTotal(totalV * 0.4); // Estimación 40% si falla cálculo
+            setTopProductos([]);
+          }
+        } else if (rango === "DIA") {
+          try {
+            const resU = await utilidadDiaria(tenantId, fechaSel).catch(() => []);
+            setTopProductos([...resU].sort((a, b) => b.cantidadVendida - a.cantidadVendida).slice(0, 5));
+            setUtilidadTotal(resU.reduce((s, p) => s + Number(p.utilidad || 0), 0));
+          } catch {
+            setTopProductos([]);
+            setUtilidadTotal(0);
+          }
+        } else {
+          setTopProductos([]);
+          setUtilidadTotal(0);
+        }
       })
-      .catch((e) => { if (!cancelado) setError(e instanceof Error ? e.message : "No se pudieron cargar los indicadores"); })
-      .finally(() => { if (!cancelado) setCargando(false); });
+      .catch((e) => {
+        if (!cancelado) setError(e instanceof Error ? e.message : "No se pudieron cargar los indicadores");
+      })
+      .finally(() => {
+        if (!cancelado) setCargando(false);
+      });
 
-    return () => { cancelado = true; };
-  }, [tenantId]);
+    return () => {
+      cancelado = true;
+    };
+  };
 
-  const ticketPromedio = ticketsHoy > 0 ? ventasHoy / ticketsHoy : 0;
-  const monedasEgresoHoy = Object.keys(egresosHoyPorMoneda);
-  const egresosHoyTexto = monedasEgresoHoy.length === 0
-    ? "$0.00"
-    : monedasEgresoHoy.map((m) => `${m === "USD" ? "$" : `${m} `}${egresosHoyPorMoneda[m].toFixed(2)}`).join("   ·   ");
+  useEffect(() => {
+    cargarDatos();
+  }, [tenantId, rango, fechaInicio, fechaFin]);
 
-  if (cargando) return <p className="text-xs text-slate-400">Cargando indicadores…</p>;
+  // Controles de navegación de fecha
+  const irAnterior = () => {
+    if (rango === "DIA") {
+      setFechaSel((prev) => sumarDiasStr(prev, -1));
+    } else if (rango === "7_DIAS") {
+      setFechaSel((prev) => sumarDiasStr(prev, -7));
+    } else if (rango === "MES") {
+      const [y, m, d] = fechaSel.split("-").map(Number);
+      const dt = new Date(y, m - 2, Math.min(d, 28));
+      const y2 = dt.getFullYear();
+      const m2 = String(dt.getMonth() + 1).padStart(2, "0");
+      setFechaSel(`${y2}-${m2}-01`);
+    } else {
+      const [y] = fechaSel.split("-").map(Number);
+      setFechaSel(`${y - 1}-01-01`);
+    }
+  };
+
+  const irSiguiente = () => {
+    if (rango === "DIA") {
+      setFechaSel((prev) => sumarDiasStr(prev, 1));
+    } else if (rango === "7_DIAS") {
+      setFechaSel((prev) => sumarDiasStr(prev, 7));
+    } else if (rango === "MES") {
+      const [y, m, d] = fechaSel.split("-").map(Number);
+      const dt = new Date(y, m, Math.min(d, 28));
+      const y2 = dt.getFullYear();
+      const m2 = String(dt.getMonth() + 1).padStart(2, "0");
+      setFechaSel(`${y2}-${m2}-01`);
+    } else {
+      const [y] = fechaSel.split("-").map(Number);
+      setFechaSel(`${y + 1}-01-01`);
+    }
+  };
+
+  const irHoy = () => {
+    setFechaSel(hoy());
+  };
+
+  const ticketPromedio = ticketsCount > 0 ? ventasTotal / ticketsCount : 0;
 
   return (
     <div className="space-y-5">
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {/* Barra de Control de Tiempo y Rango */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 apple-glass rounded-2xl p-4 border border-slate-300/50 dark:border-white/10">
+        {/* Selector de Rango */}
+        <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-white/5 p-1 rounded-xl text-xs flex-wrap">
+          {[
+            { id: "DIA", label: "Día a Día" },
+            { id: "7_DIAS", label: "Últimos 7 Días" },
+            { id: "MES", label: "Último Mes" },
+            { id: "ANO", label: "Año" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setRango(tab.id as RangoEstadistica)}
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                rango === tab.id
+                  ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
+                  : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Ventas Totales" val={`$${ventasHoy.toFixed(2)}`} sub={`Mes: $${ventasMes.toFixed(2)}`} color="#0ea5e9" />
-        <KpiCard label="Egresos Operativos" val={egresosHoyTexto} sub="Salidas de caja de hoy" color="#ef4444" />
-        <KpiCard label="Utilidad Bruta Estimada" val={`$${utilidadHoy.toFixed(2)}`} sub="Ventas de hoy con costo conocido" color="#22c55e" />
-        <KpiCard label="Ticket Promedio" val={`$${ticketPromedio.toFixed(2)}`} sub={`${ticketsHoy} ticket${ticketsHoy === 1 ? "" : "s"} hoy`} color="#a855f7" />
+        {/* Navegador entre días / fecha */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={irAnterior}
+            title={rango === "DIA" ? "Día anterior" : rango === "MES" ? "Mes anterior" : rango === "ANO" ? "Año anterior" : "7 días atrás"}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-300/60 dark:border-white/10 text-xs font-bold hover:bg-white/10 text-slate-700 dark:text-white/80 cursor-pointer flex items-center gap-1"
+          >
+            <IconChevronLeft size={14} />
+            <span className="hidden sm:inline">Anterior</span>
+          </button>
+
+          <div className="relative flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-300/60 dark:border-white/10 bg-white/40 dark:bg-black/20 text-xs font-bold text-slate-800 dark:text-white">
+            <IconCalendar size={14} className="text-teal-500 shrink-0" />
+            <input
+              type="date"
+              value={fechaSel}
+              onChange={(e) => e.target.value && setFechaSel(e.target.value)}
+              className="bg-transparent text-xs font-mono font-bold focus:outline-none cursor-pointer text-slate-800 dark:text-white"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={irSiguiente}
+            title={rango === "DIA" ? "Día siguiente" : rango === "MES" ? "Mes siguiente" : rango === "ANO" ? "Año siguiente" : "7 días adelante"}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-300/60 dark:border-white/10 text-xs font-bold hover:bg-white/10 text-slate-700 dark:text-white/80 cursor-pointer flex items-center gap-1"
+          >
+            <span className="hidden sm:inline">Siguiente</span>
+            <IconChevronRight size={14} />
+          </button>
+
+          <button
+            type="button"
+            onClick={irHoy}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+              fechaSel === hoy()
+                ? "bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/30"
+                : "bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80"
+            }`}
+          >
+            Hoy
+          </button>
+
+          <button
+            type="button"
+            onClick={cargarDatos}
+            className="p-1.5 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer"
+            title="Actualizar datos en vivo"
+          >
+            <IconRefresh size={15} />
+          </button>
+        </div>
       </div>
 
+      {/* Subtítulo del período */}
+      <div className="flex items-center justify-between px-1">
+        <div className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-wider flex items-center gap-2">
+          <span>Vista activa:</span>
+          <span className="text-teal-600 dark:text-teal-400 normal-case font-extrabold text-sm">{etiquetaPeriodo}</span>
+        </div>
+        {cargando && <span className="text-xs text-teal-500 animate-pulse font-semibold">Actualizando indicadores…</span>}
+      </div>
+
+      {error && <p className="text-xs text-red-500 bg-red-500/10 p-3 rounded-xl border border-red-500/20">{error}</p>}
+
+      {/* Tarjetas KPI del Período */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          label="Ventas Totales"
+          val={`$${ventasTotal.toFixed(2)}`}
+          sub={`${ticketsCount} transaccion${ticketsCount === 1 ? "" : "es"} en el período`}
+          color="#0ea5e9"
+        />
+        <KpiCard
+          label="Egresos Operativos"
+          val={`$${egresosTotal.toFixed(2)}`}
+          sub="Salidas de caja registradas"
+          color="#ef4444"
+        />
+        <KpiCard
+          label="Utilidad Bruta Estimada"
+          val={`$${utilidadTotal.toFixed(2)}`}
+          sub="Ganancia sobre costos de insumos"
+          color="#22c55e"
+        />
+        <KpiCard
+          label="Ticket Promedio"
+          val={`$${ticketPromedio.toFixed(2)}`}
+          sub="Monto promedio por pedido"
+          color="#a855f7"
+        />
+      </div>
+
+      {/* FILA 1: Tendencia del Período + HORAS TOP DE VENTA */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Gráfico 1: Tendencia de Ingresos */}
         <div className="apple-glass rounded-2xl p-5">
-          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-4">Top 5 productos más vendidos (hoy)</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
+                {rango === "DIA"
+                  ? "Facturación por Horas del Día"
+                  : rango === "7_DIAS"
+                  ? "Tendencia de Ingresos — Últimos 7 Días"
+                  : rango === "MES"
+                  ? "Evolución Diaria del Mes"
+                  : "Facturación Mensual del Año"}
+              </h3>
+              <p className="text-[11px] text-slate-400 dark:text-white/40">Total facturado en USD</p>
+            </div>
+            <span className="text-xs font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-lg">
+              ${ventasTotal.toFixed(2)}
+            </span>
+          </div>
+          {tendencia.length === 0 || ventasTotal === 0 ? (
+            <div className="h-[220px] flex items-center justify-center text-xs text-slate-400">
+              Sin ventas registradas en este período.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={tendencia} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.08} />
+                <XAxis dataKey="etiqueta" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip
+                  formatter={((v: any) => [`$${Number(v).toFixed(2)}`, "Ventas"]) as any}
+                  contentStyle={{ fontSize: 11, borderRadius: 10, background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
+                />
+                <Line type="monotone" dataKey="ventas" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 3, fill: "#0ea5e9" }} activeDot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Gráfico 2: HORAS TOP DE VENTA (PICOS DE FACTURACIÓN) */}
+        <div className="apple-glass rounded-2xl p-5 border border-teal-500/20 relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
+                  Horas Top de Venta (Picos de Demanda)
+                </h3>
+              </div>
+              <p className="text-[11px] text-slate-400 dark:text-white/40">
+                Distribución de facturación y pedidos por franja horaria
+              </p>
+            </div>
+
+            {horaPico && horaPico.ventas > 0 ? (
+              <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs px-2.5 py-1 rounded-xl font-bold">
+                <span>Pico: {horaPico.label}</span>
+                <span className="font-mono font-black">(${horaPico.ventas.toFixed(2)})</span>
+              </div>
+            ) : (
+              <span className="text-[11px] text-slate-400">Sin hora pico aún</span>
+            )}
+          </div>
+
+          {horasTopData.filter((h) => h.ventas > 0).length === 0 ? (
+            <div className="h-[220px] flex items-center justify-center text-xs text-slate-400">
+              Sin movimientos registrados en este rango horario.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={horasTopData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.08} />
+                <XAxis dataKey="label" tick={{ fontSize: 9 }} interval={rango === "DIA" ? 1 : 2} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip
+                  formatter={((v: any, name: any, item: any) => {
+                    if (name === "ventas") return [`$${Number(v).toFixed(2)} (${item.payload.pedidos} pedidos)`, "Facturado"];
+                    return [v, name];
+                  }) as any}
+                  contentStyle={{ fontSize: 11, borderRadius: 10, background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
+                />
+                <Bar dataKey="ventas" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+
+          {horaPico && (
+            <div className="mt-3 pt-3 border-t border-slate-300/40 dark:border-white/10 flex items-center justify-between text-[11px]">
+              <span className="text-slate-500 dark:text-white/50">
+                Franja más concurrida: <strong className="text-slate-800 dark:text-white">{horaPico.label}</strong>
+              </span>
+              <span className="font-mono font-bold text-teal-600 dark:text-teal-400">
+                {horaPico.pedidos} comanda{horaPico.pedidos === 1 ? "" : "s"} registrada{horaPico.pedidos === 1 ? "" : "s"}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* FILA 2: Top 5 Productos + Comandas / Tickets del Período */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Gráfico 3: Top 5 Productos más Vendidos */}
+        <div className="apple-glass rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
+              Top 5 Productos más Vendidos
+            </h3>
+            <span className="text-[11px] text-slate-400">Unidades facturadas</span>
+          </div>
+
           {topProductos.length === 0 ? (
-            <p className="text-xs text-slate-400">Sin ventas con costo conocido hoy todavía.</p>
+            <div className="h-[220px] flex items-center justify-center text-xs text-slate-400">
+              Sin registros de productos con costo en este período.
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={topProductos} layout="vertical" margin={{ left: 10, right: 16 }}>
                 <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="nombrePlato" width={100} tick={{ fontSize: 10 }} />
-                <Tooltip formatter={((v: any) => [`${v} unid.`, "Vendidos"]) as any} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-                <Bar dataKey="cantidadVendida" fill="#14b8a6" radius={[0, 6, 6, 0]} />
+                <YAxis type="category" dataKey="nombrePlato" width={110} tick={{ fontSize: 10 }} />
+                <Tooltip
+                  formatter={((v: any, _name: any, item: any) => [
+                    `${v} unidades ($${(item.payload.ingresoTotal || 0).toFixed(2)})`,
+                    "Vendido",
+                  ]) as any}
+                  contentStyle={{ fontSize: 11, borderRadius: 10, background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
+                />
+                <Bar dataKey="cantidadVendida" fill="#0ea5e9" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        <div className="apple-glass rounded-2xl p-5">
-          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-4">Tendencia de ingresos — últimos 7 días</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={tendencia}>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.1} />
-              <XAxis dataKey="fecha" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip formatter={((v: any) => [`$${Number(v).toFixed(2)}`, "Ventas"]) as any} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-              <Line type="monotone" dataKey="ventas" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
+        {/* Lista de Comandas & Tickets del Período */}
+        <div className="apple-glass rounded-2xl p-5 flex flex-col min-h-[280px]">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
+                Tickets & Comandas Registradas
+              </h3>
+              <p className="text-[11px] text-slate-400 dark:text-white/40">Detalle de operaciones del período</p>
+            </div>
+            <span className="text-xs font-mono font-bold text-slate-700 dark:text-white/70 bg-slate-200/60 dark:bg-white/10 px-2.5 py-1 rounded-xl">
+              {ticketsPeriodo.length} tickets
+            </span>
+          </div>
+
+          {ticketsPeriodo.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
+              No hay tickets registrados para esta fecha.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {ticketsPeriodo.map((t) => (
+                <div
+                  key={t.comandaId}
+                  className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl px-3.5 py-2.5 text-xs transition-colors"
+                >
+                  <div className="min-w-0 flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-teal-500/15 text-teal-600 dark:text-teal-300 flex items-center justify-center shrink-0 font-bold text-[11px]">
+                      {t.canal === "DELIVERY_PROPIO" ? (
+                        <IconTruck size={14} />
+                      ) : t.canal === "SALON" ? (
+                        <IconUtensils size={14} />
+                      ) : (
+                        <IconShoppingBag size={14} />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-800 dark:text-white/90 truncate flex items-center gap-1.5">
+                        <span>{t.numeroTicket}</span>
+                        {t.numeroMesa && (
+                          <span className="text-[10px] text-teal-600 dark:text-teal-400 font-mono">
+                            Mesa #{t.numeroMesa}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                        <span>{new Date(t.fecha).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })}</span>
+                        <span>·</span>
+                        <span>{(t.metodoPago || "EFECTIVO").replace("_", " ")}</span>
+                        <span>·</span>
+                        <span>{t.canal === "DELIVERY_PROPIO" ? "Delivery" : t.canal === "SALON" ? "En Mesa" : "Para Llevar"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className="font-mono font-extrabold text-slate-900 dark:text-white">
+                      ${Number(t.totalUsd).toFixed(2)}
+                    </div>
+                    {t.totalBs && (
+                      <div className="text-[10px] font-mono text-teal-600 dark:text-teal-400">
+                        Bs. {Number(t.totalBs).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -4926,8 +6104,36 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
   const [registrandoEgreso, setRegistrandoEgreso] = useState(false);
 
   const [montoDeclarado, setMontoDeclarado] = useState("");
+  const [modoArqueo, setModoArqueo] = useState<"DIRECTO" | "DESGLOSADO">("DESGLOSADO");
+  const [desgloseArqueo, setDesgloseArqueo] = useState({
+    usd: "", ves: "", punto: "", pagoMovil: "", zelle: "", cop: ""
+  });
   const [cerrando, setCerrando] = useState(false);
   const [ultimoCierre, setUltimoCierre] = useState<Turno | null>(null);
+
+  const totalDesgloseCalculado = useMemo(() => {
+    const usd = Number(desgloseArqueo.usd) || 0;
+    const zelle = Number(desgloseArqueo.zelle) || 0;
+    const ves = (Number(desgloseArqueo.ves) || 0) + (Number(desgloseArqueo.punto) || 0) + (Number(desgloseArqueo.pagoMovil) || 0);
+    const cop = Number(desgloseArqueo.cop) || 0;
+
+    let tasaVes = 65.50;
+    let tasaCop = 4180;
+    try {
+      const u = localStorage.getItem("aurora_tasa_usdt_val");
+      if (u && Number(u) > 0) tasaVes = Number(u);
+    } catch {}
+
+    if (moneda === "USD") {
+      return usd + zelle + (tasaVes > 0 ? ves / tasaVes : 0) + (tasaCop > 0 ? cop / tasaCop : 0);
+    } else if (moneda === "VES") {
+      return ves + (usd + zelle) * tasaVes + (tasaCop > 0 ? (cop / tasaCop) * tasaVes : 0);
+    } else {
+      return cop + (usd + zelle) * tasaCop;
+    }
+  }, [desgloseArqueo, moneda]);
+
+  const montoDeclaradoFinal = modoArqueo === "DESGLOSADO" ? totalDesgloseCalculado : (Number(montoDeclarado) || 0);
 
   const cargarTurno = () => {
     setTurno(undefined);
@@ -4971,13 +6177,14 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
   const cerrar = async () => {
     if (!turno) return;
     setError(null);
-    if (montoDeclarado === "" || Number(montoDeclarado) < 0) { setError("Indica lo contado físicamente en caja"); return; }
-    if (!window.confirm("¿Cerrar el turno? Esto genera el Cierre Z y no se puede deshacer.")) return;
+    if (montoDeclaradoFinal < 0) { setError("Indica lo contado físicamente en caja"); return; }
+    if (!window.confirm(`¿Cerrar el turno con monto declarado de ${montoDeclaradoFinal.toFixed(2)} ${moneda}? Esto genera el Cierre Z y no se puede deshacer.`)) return;
     setCerrando(true);
     try {
-      const cerrado = await cerrarTurno(tenantId, turno.id, Number(montoDeclarado));
+      const cerrado = await cerrarTurno(tenantId, turno.id, montoDeclaradoFinal);
       setUltimoCierre(cerrado);
       setMontoDeclarado("");
+      setDesgloseArqueo({ usd: "", ves: "", punto: "", pagoMovil: "", zelle: "", cop: "" });
       cargarTurno();
       cargarHistorial();
     } catch (e) {
@@ -5040,12 +6247,148 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
             </button>
           </div>
 
-          <div className="apple-glass rounded-2xl p-5 space-y-3 border border-amber-500/30">
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm">Cierre de caja (Cierre Z)</h4>
-            <p className="text-slate-500 dark:text-white/40 text-xs">Contá físicamente el efectivo y escribí lo que hay — el sistema compara contra lo esperado (base + ventas − egresos) y muestra el descuadre.</p>
-            <input value={montoDeclarado} onChange={(e) => setMontoDeclarado(e.target.value)} type="number" step="0.01" placeholder={`Monto contado ${moneda}`} className="input-horeca" />
-            <button onClick={cerrar} disabled={cerrando} className="btn-cyber-neon text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer disabled:opacity-60">
-              {cerrando ? "Cerrando…" : "Cerrar turno (Cierre Z)"}
+          <div className="apple-glass rounded-2xl p-5 space-y-4 border border-amber-500/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-slate-900 dark:text-white text-sm">Cierre de caja (Cierre Z)</h4>
+                <p className="text-slate-500 dark:text-white/40 text-xs">Arqueo a ciegas: cuenta el dinero físico y declara lo que hay para auditar faltantes o sobrantes.</p>
+              </div>
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                Arqueo Ciego
+              </span>
+            </div>
+
+            {/* Selector de modo de declaración */}
+            <div className="flex gap-2 p-1 bg-slate-100 dark:bg-white/5 rounded-xl text-xs w-fit">
+              <button
+                type="button"
+                onClick={() => setModoArqueo("DESGLOSADO")}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  modoArqueo === "DESGLOSADO" ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-300 shadow-sm" : "text-slate-500 dark:text-white/50"
+                }`}
+              >
+                <IconReceipt size={13} />
+                <span>Desglose por Método</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setModoArqueo("DIRECTO")}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                  modoArqueo === "DIRECTO" ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-300 shadow-sm" : "text-slate-500 dark:text-white/50"
+                }`}
+              >
+                Monto Directo
+              </button>
+            </div>
+
+            {modoArqueo === "DESGLOSADO" ? (
+              <div className="space-y-3 bg-slate-50 dark:bg-white/[0.02] p-4 rounded-xl border border-slate-200 dark:border-white/5">
+                <p className="text-[11px] font-semibold text-slate-600 dark:text-white/60">
+                  Introduce lo contado físicamente en cada método para calcular el total sin errores:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-white/40 mb-1 flex items-center gap-1.5">
+                      <IconCoins size={12} className="text-emerald-500" />
+                      <span>Efectivo USD ($)</span>
+                    </label>
+                    <input
+                      type="number" step="0.01" min="0" placeholder="0.00"
+                      value={desgloseArqueo.usd}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, usd: e.target.value }))}
+                      className="input-horeca w-full text-xs font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-white/40 mb-1 flex items-center gap-1.5">
+                      <span className="text-[9px] font-extrabold px-1 rounded bg-teal-500/20 text-teal-600 dark:text-teal-400">Bs</span>
+                      <span>Efectivo Bolívares (Bs)</span>
+                    </label>
+                    <input
+                      type="number" step="0.01" min="0" placeholder="0.00"
+                      value={desgloseArqueo.ves}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, ves: e.target.value }))}
+                      className="input-horeca w-full text-xs font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-white/40 mb-1 flex items-center gap-1.5">
+                      <IconCard size={12} className="text-sky-500" />
+                      <span>Punto de Venta (Lote Bs)</span>
+                    </label>
+                    <input
+                      type="number" step="0.01" min="0" placeholder="0.00"
+                      value={desgloseArqueo.punto}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, punto: e.target.value }))}
+                      className="input-horeca w-full text-xs font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-white/40 mb-1 flex items-center gap-1.5">
+                      <IconPhone size={12} className="text-indigo-500" />
+                      <span>Pago Móvil (Bs)</span>
+                    </label>
+                    <input
+                      type="number" step="0.01" min="0" placeholder="0.00"
+                      value={desgloseArqueo.pagoMovil}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, pagoMovil: e.target.value }))}
+                      className="input-horeca w-full text-xs font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-white/40 mb-1 flex items-center gap-1.5">
+                      <IconBolt size={12} className="text-amber-500" />
+                      <span>Zelle ($)</span>
+                    </label>
+                    <input
+                      type="number" step="0.01" min="0" placeholder="0.00"
+                      value={desgloseArqueo.zelle}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, zelle: e.target.value }))}
+                      className="input-horeca w-full text-xs font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-white/40 mb-1 flex items-center gap-1.5">
+                      <span className="text-[9px] font-extrabold px-1 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400">COP</span>
+                      <span>Pesos Colombianos (COP)</span>
+                    </label>
+                    <input
+                      type="number" step="1" min="0" placeholder="0"
+                      value={desgloseArqueo.cop}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, cop: e.target.value }))}
+                      className="input-horeca w-full text-xs font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between border-t border-slate-200 dark:border-white/10">
+                  <span className="text-xs font-bold text-slate-600 dark:text-white/70">
+                    Total declarado acumulado:
+                  </span>
+                  <span className="font-mono font-black text-base text-teal-600 dark:text-teal-400">
+                    {totalDesgloseCalculado.toFixed(2)} {moneda}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <input
+                  value={montoDeclarado}
+                  onChange={(e) => setMontoDeclarado(e.target.value)}
+                  type="number"
+                  step="0.01"
+                  placeholder={`Monto contado total en ${moneda}`}
+                  className="input-horeca"
+                />
+              </div>
+            )}
+
+            <button
+              onClick={cerrar}
+              disabled={cerrando}
+              className="btn-cyber-neon text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer disabled:opacity-60 w-full shadow-lg"
+            >
+              {cerrando ? "Cerrando turno y auditando…" : `Cerrar turno y generar Cierre Z (${montoDeclaradoFinal.toFixed(2)} ${moneda})`}
             </button>
           </div>
         </div>

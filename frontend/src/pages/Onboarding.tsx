@@ -27,6 +27,33 @@ interface IndustryItem {
 
 const INDUSTRIES: IndustryItem[] = [
   {
+    id: "restaurante",
+    label: "Restaurante & Gastronomía",
+    Icon: IconRestaurant,
+    desc: "Mapa de mesas, comandas digitales, cocina en tiempo real y escandallo de recetas",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Aurora Horeca",
+  },
+  {
+    id: "farmacia",
+    label: "Farmacia & Droguería",
+    Icon: IconPrescription,
+    desc: "Dispensación de medicamentos, control de lotes, alertas de vencimiento y POS mostrador",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Farmacia & Insumos",
+  },
+  {
+    id: "ferreteria",
+    label: "Ferretería & Materiales",
+    Icon: IconHardware,
+    desc: "Control de stock, POS mostrador, compras a proveedores y cuentas por cobrar",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: FerrePlus ERP",
+  },
+  {
     id: "clinica",
     label: "Clínica & Salud",
     Icon: IconClinic,
@@ -36,30 +63,22 @@ const INDUSTRIES: IndustryItem[] = [
     tagline: "Vertical Insignia: Mediclinic Pro",
   },
   {
+    id: "retail",
+    label: "Retail & Comercio",
+    Icon: IconRetail,
+    desc: "Punto de venta multi-caja, inventario en tiempo real y catálogo de productos",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Retail POS",
+  },
+  {
     id: "veterinaria",
     label: "Veterinaria & Mascotas",
     Icon: IconVet,
     desc: "Consultas, vacunas, hospitalización y control de peso",
-    badge: "Próximamente (Fase 2)",
-    isReady: false,
-  },
-  {
-    id: "ferreteria",
-    label: "Ferretería & Materiales",
-    Icon: IconHardware,
-    desc: "POS mostrador, venta fraccionada (metros/kilos), precio por volumen, compras y créditos",
     badge: "100% DISPONIBLE (Listo)",
     isReady: true,
-    tagline: "Vertical Insignia: Aurora Retail",
-  },
-  {
-    id: "farmacia",
-    label: "Farmacia & Droguería",
-    Icon: IconPrescription,
-    desc: "POS mostrador con FEFO obligatorio (primero vence, primero sale) y sugerencia de genéricos por principio activo",
-    badge: "100% DISPONIBLE (Listo)",
-    isReady: true,
-    tagline: "Vertical Insignia: Aurora Retail",
+    tagline: "Vertical: Mediclinic Vet",
   },
   {
     id: "repuestos",
@@ -69,15 +88,6 @@ const INDUSTRIES: IndustryItem[] = [
     badge: "100% DISPONIBLE (Listo)",
     isReady: true,
     tagline: "Vertical Insignia: Aurora Retail",
-  },
-  {
-    id: "restaurante",
-    label: "Restaurante & Gastronomía",
-    Icon: IconRestaurant,
-    desc: "Mapa de mesas, comandas digitales, cocina en tiempo real y escandallo de recetas",
-    badge: "100% DISPONIBLE (Listo)",
-    isReady: true,
-    tagline: "Vertical Insignia: Aurora Horeca",
   },
   {
     id: "finca",
@@ -104,14 +114,6 @@ const INDUSTRIES: IndustryItem[] = [
     isReady: false,
   },
   {
-    id: "retail",
-    label: "Retail & Comercio",
-    Icon: IconRetail,
-    desc: "Punto de venta multi-caja y fidelización",
-    badge: "Próximamente (Fase 2)",
-    isReady: false,
-  },
-  {
     id: "construccion",
     label: "Construcción & Obras",
     Icon: IconConstruction,
@@ -124,8 +126,8 @@ const INDUSTRIES: IndustryItem[] = [
     label: "Otro Rubro Comercial",
     Icon: IconCustomize,
     desc: "Arquitectura modular para industrias a medida",
-    badge: "Lista de Espera",
-    isReady: false,
+    badge: "Disponible",
+    isReady: true,
   },
 ];
 
@@ -135,6 +137,22 @@ const CLINIC_MODULES = [
   { id: "farmacia", label: "Farmacia & Control de Insumos", desc: "Dispensación de medicamentos, stock mínimo y alertas", defaultOn: true },
   { id: "factura", label: "Facturación & Cierres Multi-Moneda", desc: "Cobros en USD/VES a tasa oficial BCV, recibos y caja diaria", defaultOn: true },
   { id: "reportes", label: "Generador de Informes Médicos PDF", desc: "Descarga de reportes clínicos con membrete y firma digital", defaultOn: true },
+];
+
+const PHARMACY_MODULES = [
+  { id: "dispensacion", label: "Dispensación & Venta Mostrador", desc: "Cobro rápido de fármacos con o sin récipe médico", defaultOn: true },
+  { id: "lotes", label: "Control de Lotes & Vencimientos", desc: "Trazabilidad por lote y alertas automáticas de caducidad", defaultOn: true },
+  { id: "stock", label: "Stock Mínimo & Reposición", desc: "Alertas de reorden y pedidos automáticos a droguerías", defaultOn: true },
+  { id: "caja", label: "Caja Multi-Moneda (USD / Bs / COP)", desc: "Cobros en efectivo, punto de venta y pago móvil a tasa del día", defaultOn: true },
+  { id: "proveedores", label: "Proveedores & Facturas de Compra", desc: "Recepción de mercancía y cuentas por pagar", defaultOn: true },
+];
+
+const HARDWARE_MODULES = [
+  { id: "pos", label: "Punto de Venta Mostrador (POS)", desc: "Búsqueda rápida de códigos, tornillos y materiales", defaultOn: true },
+  { id: "kardex", label: "Kardex Multi-Unidad & Stock", desc: "Metros, kilos, bultos y unidades sueltas con costo promedio", defaultOn: true },
+  { id: "cotizaciones", label: "Cotizaciones & Presupuestos", desc: "Generación de proformas con vigencia temporal", defaultOn: true },
+  { id: "creditos", label: "Cuentas por Cobrar & Créditos", desc: "Gestión de clientes de confianza y límites de saldo", defaultOn: true },
+  { id: "compras", label: "Órdenes de Compra & Proveedores", desc: "Control de insumos de construcción y repuestos", defaultOn: true },
 ];
 
 const RESTAURANT_MODULES = [
@@ -150,11 +168,11 @@ const RESTAURANT_MODULES = [
   { id: "compras", label: "Compras, Proveedores & Vencimientos", desc: "Registro de facturas de insumos con alertas de caducidad", defaultOn: true },
 ];
 
-// Ferretería/Farmacia/Repuestos comparten el mismo motor (Aurora Retail) y
-// por lo tanto el mismo set de módulos — lo que las distingue no es un
-// módulo opcional más, es comportamiento automático de la vertical (FEFO en
-// Farmacia, catálogo de cruce en Repuestos, fraccionado en Ferretería), no
-// algo que el dueño prenda/apague acá.
+// Ferretería/Farmacia/Repuestos/Retail comparten el mismo motor (Aurora
+// Retail) y por lo tanto el mismo set de módulos — lo que las distingue no
+// es un módulo opcional más, es comportamiento automático de la vertical
+// (FEFO en Farmacia, catálogo de cruce en Repuestos, fraccionado en
+// Ferretería), no algo que el dueño prenda/apague acá.
 const RETAIL_MODULES = [
   { id: "pos", label: "Punto de Venta & Código de Barras", desc: "Venta de mostrador rápida, escaneo de productos y cobro multi-moneda", defaultOn: true },
   { id: "inventario", label: "Inventario & Kárdex", desc: "Stock por artículo, lotes y alertas de reposición", defaultOn: true },
@@ -166,37 +184,50 @@ const RETAIL_MODULES = [
 // Mapa de "clinica"/"restaurante"/etc. (id del onboarding) al moduloPrincipal
 // real que entiende el backend (ver TenantProvisioningService y
 // LicenciaService.VERTICALES_CONTROLADAS — farmacia/ferreteria/repuestos ya
-// están dadas de alta ahí con ese mismo nombre exacto).
+// están dadas de alta ahí con ese mismo nombre exacto; "retail" no existe
+// como vertical propia en el backend y cae en "repuestos" como motor base).
 const INDUSTRIA_A_MODULO: Record<string, string> = {
   clinica: "salud",
+  farmacia: "farmacia",
   restaurante: "horeca",
   ferreteria: "ferreteria",
-  farmacia: "farmacia",
   repuestos: "repuestos",
+  retail: "repuestos",
+  veterinaria: "salud",
+  otro: "horeca",
 };
 
 const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
   clinica: CLINIC_MODULES,
+  farmacia: PHARMACY_MODULES,
   restaurante: RESTAURANT_MODULES,
   ferreteria: RETAIL_MODULES,
-  farmacia: RETAIL_MODULES,
   repuestos: RETAIL_MODULES,
+  retail: RETAIL_MODULES,
+  veterinaria: CLINIC_MODULES,
+  otro: RESTAURANT_MODULES,
 };
 
 const NOMBRE_POR_DEFECTO: Record<string, string> = {
   clinica: "Clínica & Consultorios Médicos",
+  farmacia: "Mi Farmacia",
   restaurante: "Mi Restaurante",
   ferreteria: "Mi Ferretería",
-  farmacia: "Mi Farmacia",
   repuestos: "Mi Casa de Repuestos",
+  retail: "Mi Tienda",
+  veterinaria: "Mi Veterinaria",
+  otro: "Mi Negocio",
 };
 
 const VERTICAL_LABEL: Record<string, string> = {
   clinica: "Mediclinic Pro (Clínica & Salud)",
+  farmacia: "Aurora Retail (Farmacia & Droguería)",
   restaurante: "Aurora Horeca (Restaurante & Gastronomía)",
   ferreteria: "Aurora Retail (Ferretería & Materiales)",
-  farmacia: "Aurora Retail (Farmacia & Droguería)",
   repuestos: "Aurora Retail (Repuestos Automotrices)",
+  retail: "Retail POS (Comercio & Tiendas)",
+  veterinaria: "Mediclinic Vet",
+  otro: "Aurora Suite Comercial",
 };
 
 export default function Onboarding() {
@@ -207,12 +238,17 @@ export default function Onboarding() {
   // Datos básicos recogidos en Auth.tsx (registro) — si no hay sesión activa
   // ni datos pendientes de un registro recién iniciado, no hay nada que
   // configurar aquí todavía.
-  const pendingSignup = location.state as { nombre: string; email: string; password: string } | undefined;
+  const pendingSignup = location.state as { nombre: string; email: string; password: string; empresa?: string; industry?: string } | undefined;
 
+  const initialIndustry = pendingSignup?.industry || user?.industry || "restaurante";
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [selectedIndustry, setSelectedIndustry] = useState<string>("clinica");
-  const [empresaNombre, setEmpresaNombre] = useState<string>(user?.empresa || NOMBRE_POR_DEFECTO.clinica);
-  const [modules, setModules] = useState<string[]>(CLINIC_MODULES.map((m) => m.id));
+  const [selectedIndustry, setSelectedIndustry] = useState<string>(initialIndustry);
+  const [empresaNombre, setEmpresaNombre] = useState<string>(
+    pendingSignup?.empresa || user?.empresa || NOMBRE_POR_DEFECTO[initialIndustry] || "Mi Negocio"
+  );
+  const [modules, setModules] = useState<string[]>(
+    (MODULOS_POR_INDUSTRIA[initialIndustry] || RESTAURANT_MODULES).map((m) => m.id)
+  );
   const [lockedNotice, setLockedNotice] = useState<string | null>(null);
   const [metodoPago, setMetodoPago] = useState<string>(METODOS_PAGO[0].id);
   const [activando, setActivando] = useState(false);
@@ -224,7 +260,7 @@ export default function Onboarding() {
   const handleSelectIndustry = (ind: IndustryItem) => {
     if (!ind.isReady) {
       setLockedNotice(
-        `El rubro "${ind.label}" está en fase de desarrollo. Las verticales listas y operativas hoy son Mediclinic Pro (Clínica & Salud), Aurora Horeca (Restaurante & Gastronomía) y Aurora Retail (Ferretería, Farmacia y Repuestos).`
+        `El rubro "${ind.label}" está en fase de desarrollo. Las verticales listas y operativas hoy son Mediclinic Pro (Clínica & Salud, incluye Mediclinic Vet), Aurora Horeca (Restaurante & Gastronomía) y Aurora Retail (Ferretería, Farmacia y Repuestos).`
       );
       return;
     }
@@ -232,7 +268,7 @@ export default function Onboarding() {
     setSelectedIndustry(ind.id);
     setModules((MODULOS_POR_INDUSTRIA[ind.id] || CLINIC_MODULES).filter((m: any) => m.disponible !== false).map((m) => m.id));
     if (!user?.empresa) {
-      setEmpresaNombre(NOMBRE_POR_DEFECTO[ind.id] || NOMBRE_POR_DEFECTO.clinica);
+      setEmpresaNombre(NOMBRE_POR_DEFECTO[ind.id] || NOMBRE_POR_DEFECTO.restaurante);
     }
   };
 
@@ -245,8 +281,15 @@ export default function Onboarding() {
   const handleActivate = async () => {
     setErrorActivacion(null);
     setActivando(true);
-    const nombrePorDefecto = NOMBRE_POR_DEFECTO[selectedIndustry] || NOMBRE_POR_DEFECTO.clinica;
+    const nombrePorDefecto = NOMBRE_POR_DEFECTO[selectedIndustry] || NOMBRE_POR_DEFECTO.restaurante;
     const modulosPorDefecto = modulosDisponibles.map((m) => m.id);
+    const rutaDestino =
+      selectedIndustry === "restaurante"
+        ? "/restaurante"
+        : selectedIndustry === "clinica" || selectedIndustry === "farmacia" || selectedIndustry === "veterinaria"
+        ? "/mediclinic"
+        : "/dashboard";
+
     try {
       if (pendingSignup) {
         // Registro real de un negocio nuevo — DEBE crear el tenant de verdad en el backend. Si
@@ -255,7 +298,7 @@ export default function Onboarding() {
         // cuenta real, lo cual dejaba a la persona pensando que se registró cuando no pasó nada.
         await completarRegistro({
           nombreEmpresa: empresaNombre.trim() || nombrePorDefecto,
-          moduloPrincipal: INDUSTRIA_A_MODULO[selectedIndustry] || "salud",
+          moduloPrincipal: INDUSTRIA_A_MODULO[selectedIndustry] || "horeca",
           emailContacto: pendingSignup.email,
           username: pendingSignup.email,
           password: pendingSignup.password,
@@ -272,7 +315,7 @@ export default function Onboarding() {
           hasCompletedOnboarding: true,
         });
       }
-      navigate("/dashboard");
+      navigate(rutaDestino);
     } catch (err) {
       setErrorActivacion(err instanceof Error ? err.message : "No se pudo completar el registro. Intenta de nuevo.");
     } finally {
