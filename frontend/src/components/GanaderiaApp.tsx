@@ -18,6 +18,7 @@ import {
   obtenerAlertasGanaderia, registrarEventoReproductivoGanaderia,
   obtenerAlertasSanitariasGanaderia, obtenerVacunasPorAnimal,
   obtenerEventosReproductivosPorHembra, obtenerCurvaPesoGanaderia,
+  registrarMastitisGanaderia,
   type AnimalGanaderia, type PotreroGanaderia, type RegistroOrdenoGanaderia,
   type TableroAlertasGanaderia, type VacunaGanaderia,
   type AlertaSanitariaGanaderia, type AplicacionVacunaGanaderia,
@@ -126,10 +127,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
   const [modalPesaje, setModalPesaje] = useState<AnimalGanaderia | null>(null);
   const [modalVacuna, setModalVacuna] = useState(false);
   const [modalReproduccion, setModalReproduccion] = useState(false);
+  const [modalCelo, setModalCelo] = useState(false);
+  const [modalMastitis, setModalMastitis] = useState(false);
   const [modalFichaAnimal, setModalFichaAnimal] = useState<AnimalGanaderia | null>(null);
   const [modalVentaAnimal, setModalVentaAnimal] = useState(false);
 
-  // Formulario nuevo animal con soporte de Origen (Nacimiento / Compra)
+  // Formulario nuevo animal con soporte de Origen (Nacimiento / Compra) y Estados Reproductivo/Productivo
   const [formAnimal, setFormAnimal] = useState({
     arete: "",
     tipoIdentificador: "ARETE",
@@ -148,6 +151,30 @@ export default function GanaderiaApp({ onSalir }: Props) {
     proveedor: "",
     costoCompra: 0,
     fechaCompra: new Date().toISOString().slice(0, 10),
+    estadoReproductivo: "VACIA" as "VACIA" | "PREÑADA" | "EN_ESPERA",
+    estadoProductivo: "SECA" as "CRIANDO" | "ORDEÑO" | "SECA",
+  });
+
+  // Formulario de Celos (Evento Reproductivo dedicado)
+  const [formCelo, setFormCelo] = useState({
+    hembraId: DEMO_ANIMALES.find(a => a.sexo === "HEMBRA")?.id || 201,
+    fecha: new Date().toISOString().slice(0, 10),
+    tipoCelo: "NATURAL",
+    sintomasCelo: "Acepta monta, moco cristalino abundante, hiperactividad",
+    horaOptimaIA: "AM/PM: Inseminar 12 horas después de observado el celo",
+  });
+
+  // Formulario de Mastitis (Sanidad dedicada con retiro de leche)
+  const [formMastitis, setFormMastitis] = useState({
+    animalId: DEMO_ANIMALES.find(a => a.sexo === "HEMBRA")?.id || 201,
+    fecha: new Date().toISOString().slice(0, 10),
+    cuartoAfectado: "PD",
+    gradoCmt: "GRADO_2",
+    farmacoAplicado: "Cefalexina + Gentamicina Intramamaria",
+    diasRetiroLeche: 4,
+    veterinario: "Dr. Médico Veterinario",
+    costo: 12.0,
+    notas: "Cuarto posterior derecho caliente y reactivo al reactivo California Mastitis Test (CMT).",
   });
 
   // Formulario de Venta / Beneficio
@@ -373,6 +400,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
         costoAdquisicion: formAnimal.origen === "COMPRA" ? Number(formAnimal.costoCompra) : undefined,
         madreId: (formAnimal.origen === "NACIMIENTO" && formAnimal.madreId) ? Number(formAnimal.madreId) : undefined,
         valorEstimado: formAnimal.origen === "COMPRA" ? Number(formAnimal.costoCompra) : Number(formAnimal.valorEstimado),
+        estadoReproductivo: formAnimal.estadoReproductivo,
+        estadoProductivo: formAnimal.estadoProductivo,
       };
 
       if (formAnimal.origen === "COMPRA" && formAnimal.proveedor.trim()) {
@@ -411,6 +440,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
       proveedor: "",
       costoCompra: 0,
       fechaCompra: new Date().toISOString().slice(0, 10),
+      estadoReproductivo: "VACIA",
+      estadoProductivo: "SECA",
     });
   };
 
@@ -455,6 +486,52 @@ export default function GanaderiaApp({ onSalir }: Props) {
       pesoSalida: 0,
       motivo: "BENEFICIO",
     });
+  };
+
+  // Manejador: Registrar Celo (Evento Reproductivo dedicado)
+  const handleGuardarCelo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await registrarEventoReproductivoGanaderia(tenantId, {
+        hembraId: Number(formCelo.hembraId),
+        tipo: "CELO",
+        fecha: formCelo.fecha,
+        tipoCelo: formCelo.tipoCelo,
+        sintomasCelo: formCelo.sintomasCelo,
+        horaOptimaIA: formCelo.horaOptimaIA,
+      });
+      setAnimales(prev => prev.map(a => a.id === Number(formCelo.hembraId) ? { ...a, estadoReproductivo: "EN_ESPERA" } : a));
+      const hembra = animales.find(a => a.id === Number(formCelo.hembraId));
+      notificar(`🔥 Celo registrado para hembra ${hembra?.arete || ''}. Estado reproductivo actualizado a 'EN_ESPERA' (programada para IA).`);
+    } catch {
+      notificar("⚠️ No se pudo registrar el evento de celo — revisa tu conexión.");
+      return;
+    }
+    setModalCelo(false);
+  };
+
+  // Manejador: Registrar Mastitis (Sanidad dedicada con retiro de leche)
+  const handleGuardarMastitis = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await registrarMastitisGanaderia(tenantId, {
+        animalId: Number(formMastitis.animalId),
+        fecha: formMastitis.fecha,
+        cuartoAfectado: formMastitis.cuartoAfectado,
+        gradoCmt: formMastitis.gradoCmt,
+        farmacoAplicado: formMastitis.farmacoAplicado,
+        diasRetiroLeche: Number(formMastitis.diasRetiroLeche),
+        veterinario: formMastitis.veterinario,
+        costo: Number(formMastitis.costo),
+        notas: formMastitis.notas,
+      });
+      const vaca = animales.find(a => a.id === Number(formMastitis.animalId));
+      notificar(`🚨 Alerta sanitaria: Mastitis registrada en ${vaca?.arete || 'vaca'}. Cuarto ${formMastitis.cuartoAfectado} en tratamiento. Bloqueo de leche activo por ${formMastitis.diasRetiroLeche} días.`);
+    } catch {
+      notificar("⚠️ No se pudo registrar el tratamiento de mastitis — revisa tu conexión.");
+      return;
+    }
+    setModalMastitis(false);
   };
 
   // Manejador: Crear nuevo potrero con color
@@ -882,6 +959,147 @@ export default function GanaderiaApp({ onSalir }: Props) {
         ───────────────────────────────────────────────────────────── */}
         {tab === "resumen" && (
           <div className="space-y-6">
+
+            {/* Checklist de Primeros Pasos (Onboarding de Finca Vacía) */}
+            {(() => {
+              const fincaUbicada = typeof window !== "undefined" && !!localStorage.getItem(`aurora_finca_config_${tenantId}`);
+              const tienePotreros = potreros.length > 0;
+              const tieneAnimales = animales.length > 0;
+              const pasosCompletados = (fincaUbicada ? 1 : 0) + (tienePotreros ? 1 : 0) + (tieneAnimales ? 1 : 0);
+
+              return (
+                <div className="apple-glass rounded-3xl p-6 border border-emerald-500/30 bg-gradient-to-r from-slate-900/90 via-emerald-950/20 to-slate-900/90 shadow-xl space-y-4 text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🚀</span>
+                        <h3 className="font-['Outfit'] font-black text-lg text-white">
+                          Checklist de Primeros Pasos para tu Finca
+                        </h3>
+                        <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                          {pasosCompletados} de 3 completados
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        {pasosCompletados === 3 
+                          ? "¡Felicidades! Has completado la configuración esencial de tu predio." 
+                          : "Configura tu predio en 3 pasos clave para desbloquear el control agronómico completo:"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Paso 1: Fijar Ubicación */}
+                    <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                      fincaUbicada 
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
+                        : "bg-white/5 border-white/10 hover:border-emerald-500/40"
+                    }`}>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-400">Paso 1</span>
+                          {fincaUbicada ? (
+                            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">✓ Listo</span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
+                          )}
+                        </div>
+                        <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
+                          <span>📍</span> Fijar Ubicación Real
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          {fincaUbicada 
+                            ? "Coordenadas fijadas en el satélite." 
+                            : "Busca tu predio en el mapa y fija las coordenadas de tu finca."}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => { setTab("potreros"); setSubPotreros("mapa"); }}
+                        className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          fincaUbicada
+                            ? "bg-white/10 text-white hover:bg-white/20"
+                            : "btn-cyber-neon text-white shadow-md"
+                        }`}
+                      >
+                        {fincaUbicada ? "Ver en Mapa →" : "Ubicar en Mapa →"}
+                      </button>
+                    </div>
+
+                    {/* Paso 2: Crear Primer Potrero */}
+                    <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                      tienePotreros 
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
+                        : "bg-white/5 border-white/10 hover:border-emerald-500/40"
+                    }`}>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-400">Paso 2</span>
+                          {tienePotreros ? (
+                            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">✓ Listo ({potreros.length})</span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
+                          )}
+                        </div>
+                        <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
+                          <span>🌾</span> Crear Primer Potrero
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          {tienePotreros 
+                            ? `${potreros.length} potreros registrados.` 
+                            : "Delimita un potrero para asignar pastos, área y carga animal."}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setModalNuevoPotrero(true)}
+                        className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          tienePotreros
+                            ? "bg-white/10 text-white hover:bg-white/20"
+                            : "btn-cyber-neon text-white shadow-md"
+                        }`}
+                      >
+                        {tienePotreros ? "+ Nuevo Potrero" : "+ Crear Potrero"}
+                      </button>
+                    </div>
+
+                    {/* Paso 3: Dar de Alta Primer Animal */}
+                    <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                      tieneAnimales 
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
+                        : "bg-white/5 border-white/10 hover:border-emerald-500/40"
+                    }`}>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-400">Paso 3</span>
+                          {tieneAnimales ? (
+                            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">✓ Listo ({animales.length})</span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
+                          )}
+                        </div>
+                        <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
+                          <span>🐮</span> Dar de Alta Primer Animal
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          {tieneAnimales 
+                            ? `${animales.length} cabezas en el hato.` 
+                            : "Registra tu primer animal por nacimiento o compra con su arete."}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setModalNuevoAnimal(true)}
+                        className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          tieneAnimales
+                            ? "bg-white/10 text-white hover:bg-white/20"
+                            : "btn-cyber-neon text-white shadow-md"
+                        }`}
+                      >
+                        {tieneAnimales ? "+ Nuevo Animal" : "+ Dar de Alta"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             
             {/* Banner Superior con KPIs Vivos */}
             <div className="apple-glass rounded-3xl p-6 sm:p-8 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-[#0a1818]/60 to-slate-900/60 shadow-xl space-y-4">
@@ -1626,6 +1844,28 @@ export default function GanaderiaApp({ onSalir }: Props) {
                             }`}>
                               {animalSel.estado}
                             </span>
+                            {animalSel.estadoReproductivo && (
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                                animalSel.estadoReproductivo === "PREÑADA"
+                                  ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                  : animalSel.estadoReproductivo === "EN_ESPERA"
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                  : "bg-slate-500/20 text-slate-300 border-white/10"
+                              }`}>
+                                Repro: {animalSel.estadoReproductivo}
+                              </span>
+                            )}
+                            {animalSel.estadoProductivo && (
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                                animalSel.estadoProductivo === "ORDEÑO"
+                                  ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                                  : animalSel.estadoProductivo === "CRIANDO"
+                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                  : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                              }`}>
+                                Prod: {animalSel.estadoProductivo}
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-slate-400 flex items-center gap-3 flex-wrap pt-1">
                             <span>Raza: <b className="text-white">{animalSel.raza || "Mestizo"}</b></span>
@@ -1953,13 +2193,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
-                    onClick={() => {
-                      setModalReproduccion(true);
-                      setFormRepro({ ...formRepro, tipo: "SERVICIO", sementalReferenciaExterna: "Celo detectado - Programado para IA" });
-                    }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Celos & Sincronización</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
+                    onClick={() => setModalCelo(true)}
+                    className="w-full text-left p-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold cursor-pointer flex items-center justify-between border border-purple-500/20">
+                    <span>• Celos & Detección para IA</span>
+                    <span className="text-[10px] text-purple-300">Registrar →</span>
                   </button>
                 </div>
               </div>
@@ -2046,17 +2283,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Aplicar →</span>
                   </button>
                   <button
-                    onClick={() => {
-                      setModalVacuna(true);
-                      setFormVacuna(prev => ({
-                        ...prev,
-                        nombreVacuna: "Tratamiento Mastitis / Antibiótico Intramamario",
-                        costo: 8.5,
-                      }));
-                    }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Mastitis / Prueba CMT & Tratamiento</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
+                    onClick={() => setModalMastitis(true)}
+                    className="w-full text-left p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold cursor-pointer flex items-center justify-between border border-rose-500/20">
+                    <span>• Mastitis (Prueba CMT & Retiro Leche)</span>
+                    <span className="text-[10px] text-rose-300">Registrar →</span>
                   </button>
                   <button
                     onClick={() => setModalVacuna(true)}
@@ -2659,6 +2889,32 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 </p>
               </div>
 
+              {/* Estados Reproductivo & Productivo */}
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+                <div>
+                  <label className="text-slate-400 block mb-1">Estado Reproductivo</label>
+                  <select
+                    value={formAnimal.estadoReproductivo}
+                    onChange={e => setFormAnimal({ ...formAnimal, estadoReproductivo: e.target.value as any })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs">
+                    <option value="VACIA">Vacía</option>
+                    <option value="PREÑADA">Preñada</option>
+                    <option value="EN_ESPERA">En Espera (Celo / IA)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Estado Productivo</label>
+                  <select
+                    value={formAnimal.estadoProductivo}
+                    onChange={e => setFormAnimal({ ...formAnimal, estadoProductivo: e.target.value as any })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs">
+                    <option value="SECA">Seca</option>
+                    <option value="ORDEÑO">En Ordeño</option>
+                    <option value="CRIANDO">Criando / Amamantando</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -3181,6 +3437,254 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   type="submit"
                   className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer">
                   Guardar Evento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EVENTO DEDICADO DE CELO & SINCRONIZACIÓN */}
+      {modalCelo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-purple-500/40 text-left space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🔥</span>
+                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
+                  Detección de Celo
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalCelo(false)}
+                className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarCelo} className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-400 block mb-1">Hembra en Celo *</label>
+                <select
+                  required
+                  value={formCelo.hembraId}
+                  onChange={e => setFormCelo({ ...formCelo, hembraId: Number(e.target.value) })}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
+                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Fecha de Detección</label>
+                  <input
+                    type="date"
+                    required
+                    value={formCelo.fecha}
+                    onChange={e => setFormCelo({ ...formCelo, fecha: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Tipo de Celo</label>
+                  <select
+                    value={formCelo.tipoCelo}
+                    onChange={e => setFormCelo({ ...formCelo, tipoCelo: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white">
+                    <option value="NATURAL">Celo Natural</option>
+                    <option value="SINCRONIZADO">Sincronizado (IATF / Protocolo)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Signos Clínicos y Síntomas Observados</label>
+                <input
+                  type="text"
+                  value={formCelo.sintomasCelo}
+                  onChange={e => setFormCelo({ ...formCelo, sintomasCelo: e.target.value })}
+                  placeholder="Ej. Acepta monta, moco cristalino filante, vulva edematosa"
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Hora Óptima de Inseminación (Regla AM/PM)</label>
+                <input
+                  type="text"
+                  value={formCelo.horaOptimaIA}
+                  onChange={e => setFormCelo({ ...formCelo, horaOptimaIA: e.target.value })}
+                  placeholder="Ej. Detectado AM → Inseminar PM (12 horas después)"
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-[11px]"
+                />
+                <p className="text-[10px] text-purple-400 mt-1">
+                  💡 Al guardar, el estado reproductivo de la hembra cambiará automáticamente a <strong>EN_ESPERA</strong>.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModalCelo(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer shadow-lg shadow-purple-500/20">
+                  Registrar Celo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EVENTO DEDICADO DE MASTITIS (SANIDAD & RETIRO DE LECHE) */}
+      {modalMastitis && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-rose-500/40 text-left space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🚨</span>
+                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
+                  Diagnóstico y Tratamiento de Mastitis
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalMastitis(false)}
+                className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarMastitis} className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-400 block mb-1">Vaca Afectada *</label>
+                <select
+                  required
+                  value={formMastitis.animalId}
+                  onChange={e => setFormMastitis({ ...formMastitis, animalId: Number(e.target.value) })}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
+                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"}) · Potrero: {a.potrero?.nombre || "Sin Potrero"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Cuarto Mamario Afectado *</label>
+                  <select
+                    value={formMastitis.cuartoAfectado}
+                    onChange={e => setFormMastitis({ ...formMastitis, cuartoAfectado: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
+                    <option value="AD">AD (Anterior Derecho)</option>
+                    <option value="AI">AI (Anterior Izquierdo)</option>
+                    <option value="PD">PD (Posterior Derecho)</option>
+                    <option value="PI">PI (Posterior Izquierdo)</option>
+                    <option value="MULTIPLES">Múltiples Cuartos</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Severidad / Prueba CMT</label>
+                  <select
+                    value={formMastitis.gradoCmt}
+                    onChange={e => setFormMastitis({ ...formMastitis, gradoCmt: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
+                    <option value="TRAZAS">Trazas (Subclínica leve)</option>
+                    <option value="GRADO_1">Grado 1 (Gel ligero sin grumos)</option>
+                    <option value="GRADO_2">Grado 2 (Gel espeso marcado)</option>
+                    <option value="GRADO_3">Grado 3 (Clínica aguda / Cuajo)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Fármaco Intramamario / Antibiótico</label>
+                  <input
+                    type="text"
+                    required
+                    value={formMastitis.farmacoAplicado}
+                    onChange={e => setFormMastitis({ ...formMastitis, farmacoAplicado: e.target.value })}
+                    placeholder="Ej. Cefalexina Intramamaria"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-rose-400 block mb-1 font-bold">Días de Retiro de Leche *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="30"
+                    required
+                    value={formMastitis.diasRetiroLeche}
+                    onChange={e => setFormMastitis({ ...formMastitis, diasRetiroLeche: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-rose-300 font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Veterinario / Técnico</label>
+                  <input
+                    type="text"
+                    value={formMastitis.veterinario}
+                    onChange={e => setFormMastitis({ ...formMastitis, veterinario: e.target.value })}
+                    placeholder="Ej. Dr. González"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Costo Estimado Tratamiento (USD)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={formMastitis.costo}
+                    onChange={e => setFormMastitis({ ...formMastitis, costo: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Notas Clínicas</label>
+                <textarea
+                  rows={2}
+                  value={formMastitis.notas}
+                  onChange={e => setFormMastitis({ ...formMastitis, notas: e.target.value })}
+                  placeholder="Detalles de síntomas o respuesta al tratamiento..."
+                  className="w-full p-2 rounded-xl bg-slate-900 border border-white/15 text-white text-xs"
+                />
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-300 flex items-center gap-2">
+                <span>⛔</span>
+                <span>La leche de esta vaca quedará bloqueada en las alertas sanitarias y en el modo de ordeño diario durante el período de retiro.</span>
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModalMastitis(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer transition-colors shadow-lg shadow-rose-600/30">
+                  Registrar Tratamiento & Alerta
                 </button>
               </div>
             </form>

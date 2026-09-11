@@ -71,6 +71,8 @@ public class AnimalController {
         public String lote; // Grupo de entrada conjunta o proveedor
         public Long madreId; // opcional: vínculo con la madre para trazabilidad genealógica / nacimiento
         public BigDecimal costoAdquisicion; // precio real de compra o costo inicial
+        public String estadoReproductivo; // VACIA, PREÑADA, EN_ESPERA
+        public String estadoProductivo; // CRIANDO, ORDEÑO, SECA
     }
 
     /**
@@ -102,6 +104,12 @@ public class AnimalController {
             animal.setCostoAdquisicion(request.costoAdquisicion);
         } else {
             animal.setCostoAdquisicion(request.valorEstimado);
+        }
+        if (request.estadoReproductivo != null && !request.estadoReproductivo.isBlank()) {
+            animal.setEstadoReproductivo(request.estadoReproductivo);
+        }
+        if (request.estadoProductivo != null && !request.estadoProductivo.isBlank()) {
+            animal.setEstadoProductivo(request.estadoProductivo);
         }
         animal.setEstado("ACTIVO");
 
@@ -195,6 +203,8 @@ public class AnimalController {
         if (datos.getPesoActual() != null) animal.setPesoActual(datos.getPesoActual());
         if (datos.getEstado() != null) animal.setEstado(datos.getEstado());
         if (datos.getLote() != null) animal.setLote(datos.getLote());
+        if (datos.getEstadoReproductivo() != null) animal.setEstadoReproductivo(datos.getEstadoReproductivo());
+        if (datos.getEstadoProductivo() != null) animal.setEstadoProductivo(datos.getEstadoProductivo());
         return ResponseEntity.ok(animalRepository.save(animal));
     }
 

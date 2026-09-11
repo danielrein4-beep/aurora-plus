@@ -2302,6 +2302,8 @@ export interface AnimalGanaderia {
   valorEstimado?: number;
   codigoQr?: string;
   lote?: string;
+  estadoReproductivo?: "VACIA" | "PREÑADA" | "EN_ESPERA" | string;
+  estadoProductivo?: "CRIANDO" | "ORDEÑO" | "SECA" | string;
 }
 
 export interface RegistroOrdenoGanaderia {
@@ -2381,12 +2383,15 @@ export interface EventoReproductivoGanaderia {
   id: number;
   tenantId: number;
   hembra: AnimalGanaderia;
-  tipo: "SERVICIO" | "DIAGNOSTICO_PRENEZ" | "PARTO" | string;
+  tipo: "SERVICIO" | "DIAGNOSTICO_PRENEZ" | "PARTO" | "CELO" | string;
   fecha: string;
   semental?: AnimalGanaderia;
   sementalReferenciaExterna?: string;
   resultado?: string;
   fechaProbableParto?: string;
+  tipoCelo?: string;
+  sintomasCelo?: string;
+  horaOptimaIA?: string;
 }
 
 export interface TableroAlertasGanaderia {
@@ -2427,6 +2432,8 @@ export function crearAnimalGanaderia(tenantId: number, datos: {
   lote?: string;
   madreId?: number;
   costoAdquisicion?: number;
+  estadoReproductivo?: string;
+  estadoProductivo?: string;
 }): Promise<AnimalGanaderia> {
   return request(`/api/ganaderia/animales?tenantId=${tenantId}`, {
     method: "POST",
@@ -2569,8 +2576,28 @@ export function registrarEventoReproductivoGanaderia(tenantId: number, datos: {
   areteCria?: string;
   sexoCria?: string;
   pesoCria?: number;
+  tipoCelo?: string;
+  sintomasCelo?: string;
+  horaOptimaIA?: string;
 }): Promise<EventoReproductivoGanaderia> {
   return request(`/api/ganaderia/reproduccion?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function registrarMastitisGanaderia(tenantId: number, datos: {
+  animalId: number;
+  fecha?: string;
+  cuartoAfectado?: string;
+  gradoCmt?: string;
+  farmacoAplicado?: string;
+  diasRetiroLeche?: number;
+  veterinario?: string;
+  costo?: number;
+  notas?: string;
+}): Promise<any> {
+  return request(`/api/ganaderia/sanidad/mastitis?tenantId=${tenantId}`, {
     method: "POST",
     body: JSON.stringify(datos),
   });
@@ -2579,4 +2606,5 @@ export function registrarEventoReproductivoGanaderia(tenantId: number, datos: {
 export function obtenerFinanzasGanaderia(tenantId: number, desde: string, hasta: string): Promise<ResumenFinancieroGanaderia> {
   return request(`/api/ganaderia/finanzas/resumen-periodo?tenantId=${tenantId}&desde=${desde}&hasta=${hasta}`);
 }
+
 

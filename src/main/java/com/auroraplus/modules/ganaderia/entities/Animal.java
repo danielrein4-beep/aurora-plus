@@ -86,6 +86,14 @@ public class Animal {
     @Column(name = "lote", length = 255)
     private String lote;
 
+    // Estado reproductivo: VACIA, PREÑADA, EN_ESPERA
+    @Column(name = "estado_reproductivo", length = 30)
+    private String estadoReproductivo = "VACIA";
+
+    // Estado productivo: CRIANDO, ORDEÑO, SECA
+    @Column(name = "estado_productivo", length = 30)
+    private String estadoProductivo = "SECA";
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -122,6 +130,10 @@ public class Animal {
     public void setTipoIdentificador(String tipoIdentificador) { this.tipoIdentificador = tipoIdentificador; }
     public String getLote() { return lote; }
     public void setLote(String lote) { this.lote = lote; }
+    public String getEstadoReproductivo() { return estadoReproductivo; }
+    public void setEstadoReproductivo(String estadoReproductivo) { this.estadoReproductivo = estadoReproductivo; }
+    public String getEstadoProductivo() { return estadoProductivo; }
+    public void setEstadoProductivo(String estadoProductivo) { this.estadoProductivo = estadoProductivo; }
 
     /**
      * Clasificación automática por edad/sexo (Bovino, la más común — para otras
