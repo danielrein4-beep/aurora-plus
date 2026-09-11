@@ -2135,12 +2135,12 @@ export function actualizarRepuesto(id: number, datos: Partial<RepuestoItem>): Pr
   });
 }
 
-export function eliminarRepuesto(id: number): Promise<void> {
-  return request(`/api/repuestos/items/${id}`, { method: "DELETE" });
+export function eliminarRepuesto(id: number, tenantId: number): Promise<void> {
+  return request(`/api/repuestos/items/${id}?tenantId=${tenantId}`, { method: "DELETE" });
 }
 
-export function historialMovimientosRepuesto(id: number): Promise<MovimientoRepuesto[]> {
-  return request(`/api/repuestos/items/${id}/movimientos`);
+export function historialMovimientosRepuesto(id: number, tenantId: number): Promise<MovimientoRepuesto[]> {
+  return request(`/api/repuestos/items/${id}/movimientos?tenantId=${tenantId}`);
 }
 
 export function venderRepuestoPorVolumen(

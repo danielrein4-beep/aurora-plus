@@ -411,12 +411,13 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   useEffect(() => {
     if (kardexModalItem?.backendId) {
       setKardexCargando(true);
-      historialMovimientosRepuesto(kardexModalItem.backendId)
+      const tid = user?.tenantId || 1;
+      historialMovimientosRepuesto(kardexModalItem.backendId, tid)
         .then(setKardexMovimientos)
         .catch(() => setKardexMovimientos([]))
         .finally(() => setKardexCargando(false));
     }
-  }, [kardexModalItem]);
+  }, [kardexModalItem, user?.tenantId]);
 
   useEffect(() => {
     if (presentacionesModalItem?.backendId && user?.tenantId) {
