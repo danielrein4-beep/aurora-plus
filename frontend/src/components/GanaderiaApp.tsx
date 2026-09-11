@@ -52,9 +52,37 @@ export default function GanaderiaApp({ onSalir }: Props) {
   const { user } = useAuth();
   const tenantId = user?.tenantId ? Number(user.tenantId) : 1;
 
-  // Tasas de cambio multi-moneda en vivo
-  const TASA_BCV = 43.50; // Bs / USD
-  const TASA_COP = 4150.0; // COP / USD
+  // Tasas de cambio multi-moneda (configurables a mano y persistidas)
+  const [tasaBCV, setTasaBCV] = useState<number>(() => {
+    try {
+      const g = localStorage.getItem("aurora_ganaderia_tasa_bcv");
+      return g ? Number(g) || 43.50 : 43.50;
+    } catch {
+      return 43.50;
+    }
+  });
+
+  const [tasaCOP, setTasaCOP] = useState<number>(() => {
+    try {
+      const g = localStorage.getItem("aurora_ganaderia_tasa_cop");
+      return g ? Number(g) || 4150.0 : 4150.0;
+    } catch {
+      return 4150.0;
+    }
+  });
+
+  const [modalEditarTasas, setModalEditarTasas] = useState(false);
+
+  const guardarTasas = (nuevaBcv: number, nuevaCop: number) => {
+    setTasaBCV(nuevaBcv);
+    setTasaCOP(nuevaCop);
+    setVaqueraTasaVES(nuevaBcv);
+    try {
+      localStorage.setItem("aurora_ganaderia_tasa_bcv", String(nuevaBcv));
+      localStorage.setItem("aurora_ganaderia_tasa_cop", String(nuevaCop));
+    } catch {}
+    setModalEditarTasas(false);
+  };
 
   // Pestaña principal activa
   const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "eventos" | "produccion" | "reportes">("resumen");
@@ -118,7 +146,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
   const [vaqueraFecha, setVaqueraFecha] = useState(new Date().toISOString().slice(0, 10));
   const [vaqueraTurno, setVaqueraTurno] = useState<"MANANA" | "TARDE" | "DOBLE">("MANANA");
   const [vaqueraPrecioUSD, setVaqueraPrecioUSD] = useState<number>(0.45);
-  const [vaqueraTasaVES, setVaqueraTasaVES] = useState<number>(TASA_BCV);
+  const [vaqueraTasaVES, setVaqueraTasaVES] = useState<number>(tasaBCV);
   const [vaqueraFilas, setVaqueraFilas] = useState<Array<{
     animalId: number;
     arete: string;
@@ -583,13 +611,21 @@ export default function GanaderiaApp({ onSalir }: Props) {
           </div>
         </div>
 
-        {/* Barra de Tasas Multi-Moneda */}
-        <div className="hidden md:flex items-center gap-2 apple-glass-pill rounded-full px-3.5 py-1.5 border border-slate-300/80 dark:border-white/15 text-[11px]">
-          <span className="text-slate-500 dark:text-white/40 font-medium">Tasas oficiales:</span>
-          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">1 USD = Bs. {TASA_BCV.toFixed(2)}</span>
+        {/* Barra de Tasas Multi-Moneda (Editable con 1 clic) */}
+        <button
+          type="button"
+          onClick={() => setModalEditarTasas(true)}
+          title="Haga clic para actualizar las tasas de cambio a mano"
+          className="flex items-center gap-2 apple-glass-pill rounded-full px-3.5 py-1.5 border border-slate-300/80 dark:border-white/15 text-[11px] hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all cursor-pointer group shadow-sm"
+        >
+          <span className="text-slate-500 dark:text-white/40 font-medium flex items-center gap-1">
+            <span>Tasas:</span>
+          </span>
+          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">1$ = Bs. {tasaBCV.toFixed(2)}</span>
           <span className="text-slate-400 dark:text-white/20">•</span>
-          <span className="font-mono font-bold text-sky-600 dark:text-sky-400">$1 = {TASA_COP.toLocaleString()} COP</span>
-        </div>
+          <span className="font-mono font-bold text-sky-600 dark:text-sky-400">{tasaCOP.toLocaleString()} COP</span>
+          <span className="text-[11px] opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all">✏️</span>
+        </button>
 
         {/* Acciones de Cabecera */}
         <div className="flex items-center gap-2.5">
@@ -732,7 +768,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <div className="font-['Outfit'] font-black text-2xl text-sky-500 dark:text-sky-400">
                     {litrosHoy.toFixed(1)} <span className="text-xs font-normal text-slate-400">Litros</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 dark:text-white/40">${ingresosLecheHoy.toFixed(2)} USD • Bs. {(ingresosLecheHoy * TASA_BCV).toFixed(2)}</div>
+                  <div className="text-[10px] text-slate-400 dark:text-white/40">${ingresosLecheHoy.toFixed(2)} USD • Bs. {(ingresosLecheHoy * tasaBCV).toFixed(2)}</div>
                 </div>
 
                 <div className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-1">
@@ -1494,9 +1530,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
               <div className="apple-glass rounded-2xl p-5 border border-white/10 text-left space-y-1">
                 <div className="text-xs text-slate-400 font-medium">Equivalente en Moneda Local</div>
                 <div className="font-['Outfit'] font-black text-3xl text-purple-500 dark:text-purple-400">
-                  Bs. {(ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0) * TASA_BCV).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  Bs. {(ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-white/40">Tasa Oficial BCV ({TASA_BCV})</div>
+                <div className="text-[11px] text-slate-500 dark:text-white/40 flex items-center justify-between">
+                  <span>Tasa Bs: {tasaBCV.toFixed(2)}</span>
+                  <button onClick={() => setModalEditarTasas(true)} className="text-purple-400 hover:text-purple-300 font-bold ml-2 underline cursor-pointer">Editar</button>
+                </div>
               </div>
             </div>
 
@@ -1532,7 +1571,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       <td className="p-4 text-slate-400">{o.porcentajeGrasa || 3.8}% / {o.porcentajeProteina || 3.2}%</td>
                       <td className="p-4 font-bold text-emerald-500">${Number(o.montoVenta || 0).toFixed(2)}</td>
                       <td className="p-4 text-right font-mono text-slate-500 dark:text-white/70">
-                        Bs. {(Number(o.montoVenta || 0) * TASA_BCV).toFixed(2)}
+                        Bs. {(Number(o.montoVenta || 0) * tasaBCV).toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -1635,6 +1674,98 @@ export default function GanaderiaApp({ onSalir }: Props) {
         )}
 
       </main>
+
+      {/* ── MODAL: ACTUALIZAR TASAS A MANO ── */}
+      {modalEditarTasas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+          <div className="apple-glass rounded-3xl p-6 sm:p-7 max-w-md w-full border border-emerald-500/40 text-left space-y-5 shadow-2xl bg-slate-900/90 text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">💱</span>
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-lg text-white">
+                    Actualizar Tasas de Cambio
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Ajusta los valores de cambio a mano para la finca</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalEditarTasas(false)}
+                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const bcv = parseFloat(String(fd.get("tasaBcv") || "0"));
+                const cop = parseFloat(String(fd.get("tasaCop") || "0"));
+                if (bcv > 0 && cop > 0) {
+                  guardarTasas(bcv, cop);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div>
+                <label className="text-[11px] font-bold text-emerald-400 block mb-1">
+                  Tasa Bolívares (Bs. por 1 USD)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-slate-400 font-mono font-bold text-xs">Bs.</span>
+                  <input
+                    name="tasaBcv"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    defaultValue={tasaBCV}
+                    required
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-sm focus:border-emerald-500 focus:outline-none"
+                    placeholder="43.50"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Usada para liquidar el ordeño y pagos en moneda local.</p>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-sky-400 block mb-1">
+                  Tasa Pesos Colombianos (COP por 1 USD)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-slate-400 font-mono font-bold text-xs">COP $</span>
+                  <input
+                    name="tasaCop"
+                    type="number"
+                    step="1"
+                    min="1"
+                    defaultValue={tasaCOP}
+                    required
+                    className="w-full pl-14 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-sm focus:border-sky-500 focus:outline-none"
+                    placeholder="4150"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Referencia fronteriza para transacciones en efectivo.</p>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setModalEditarTasas(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg transition-all cursor-pointer">
+                  Guardar Tasas
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           MODALES DE ACCIÓN
