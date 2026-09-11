@@ -1,19 +1,10 @@
 import { useState } from "react";
 import {
-  IconVet, IconClinic, IconHardware, IconMining,
-  IconRestaurant, IconFarm, IconEducation, IconRetail, IconCheck,
+  IconClinic, IconHardware, IconMining,
+  IconRestaurant, IconFarm, IconRetail, IconCheck,
 } from "../Icons";
 
 const INDUSTRIES = [
-  {
-    Icon: IconVet,
-    name: "Veterinaria",
-    color: "from-teal-400 to-cyan-500",
-    tagline: "Tu clínica, completamente digital",
-    desc: "Gestiona tu veterinaria de principio a fin: desde la agenda de citas hasta el control de medicamentos y la historia clínica de cada paciente.",
-    modulos: ["Expediente clínico por paciente", "Agenda de citas y cirugías", "Inventario de medicamentos", "Facturación y cobros", "Recordatorios automáticos de vacunas", "Historial de tratamientos"],
-    caso: { empresa: "Clínica VetSur", resultado: "40% más pacientes atendidos al mes tras digitalizar expedientes y agenda." },
-  },
   {
     Icon: IconClinic,
     name: "Clínicas Médicas",
@@ -21,7 +12,6 @@ const INDUSTRIES = [
     tagline: "Atención al paciente sin papeles",
     desc: "Expedientes digitales, agenda médica, gestión de laboratorio, farmacia interna y cobranza integrada en una sola plataforma.",
     modulos: ["Historia clínica digital", "Agenda por especialista", "Módulo de laboratorio", "Farmacia interna", "Cobranza y seguros", "Reportes de productividad médica"],
-    caso: { empresa: "Centro Médico Integral", resultado: "Reducción del 60% en errores de prescripción con expedientes digitales." },
   },
   {
     Icon: IconHardware,
@@ -30,7 +20,6 @@ const INDUSTRIES = [
     tagline: "Tu bodega bajo control total",
     desc: "Control de inventario en tiempo real, punto de venta por mostrador, gestión de proveedores y cotizaciones rápidas para tus clientes.",
     modulos: ["POS por mostrador", "Inventario con alertas de stock", "Gestión de proveedores", "Cotizaciones y órdenes de compra", "Cuentas por cobrar", "Reportes de rotación de productos"],
-    caso: { empresa: "Ferretería El Constructor", resultado: "Eliminaron 3 horas diarias de conteo manual con alertas automáticas de inventario." },
   },
   {
     Icon: IconMining,
@@ -39,7 +28,6 @@ const INDUSTRIES = [
     tagline: "Operaciones a gran escala, bajo control",
     desc: "Trazabilidad de maquinaria, gestión de turnos, órdenes de trabajo, control de seguridad e informes regulatorios desde una sola plataforma.",
     modulos: ["Control de maquinaria y equipos", "Gestión de turnos y personal", "Órdenes de trabajo y mantención", "Reportes de seguridad e incidentes", "Control de materiales y explosivos", "Cumplimiento regulatorio"],
-    caso: { empresa: "MinPetrol S.A.", resultado: "80 horas mensuales ahorradas en papeleo de seguridad y trazabilidad." },
   },
   {
     Icon: IconRestaurant,
@@ -48,7 +36,6 @@ const INDUSTRIES = [
     tagline: "Del pedido a la mesa sin errores",
     desc: "Comandas digitales, gestión de mesas, comunicación directa con cocina, control de inventario y cierres de caja automáticos.",
     modulos: ["Comandas digitales por mesa", "Pantalla en cocina en tiempo real", "Control de inventario de insumos", "Cierres de caja automáticos", "Gestión de reservas", "Reportes de platos más vendidos"],
-    caso: { empresa: "Restaurante La Terraza", resultado: "Tiempo de entrega reducido en 35% con comandas digitales y pantalla de cocina." },
   },
   {
     Icon: IconFarm,
@@ -57,16 +44,6 @@ const INDUSTRIES = [
     tagline: "Tu ganado y tus potreros, organizados",
     desc: "Registro sanitario por animal, vacunación, rotación de potreros, control de inventario ganadero y trazabilidad completa desde nacimiento.",
     modulos: ["Registro individual por animal", "Calendario de vacunación", "Rotación y control de potreros", "Inventario de insumos agrícolas", "Trazabilidad de lotes", "Reportes de producción ganadera"],
-    caso: { empresa: "Finca Los Alamos", resultado: "Tasa de vacunación al 100% del hato con recordatorios automáticos por lote." },
-  },
-  {
-    Icon: IconEducation,
-    name: "Educación",
-    color: "from-indigo-400 to-violet-500",
-    tagline: "Administra tu institución sin estrés",
-    desc: "Matrícula digital, gestión de horarios, calificaciones, comunicación con padres, nómina docente y pagos de mensualidades en un solo lugar.",
-    modulos: ["Matrícula y expediente estudiantil", "Gestión de horarios y aulas", "Calificaciones y boletines digitales", "Portal de comunicación padres-escuela", "Nómina y asistencia docente", "Cobro de mensualidades"],
-    caso: { empresa: "Colegio Bilingüe Horizonte", resultado: "Morosidad reducida en 45% con cobros automáticos y notificaciones a padres." },
   },
   {
     Icon: IconRetail,
@@ -75,7 +52,6 @@ const INDUSTRIES = [
     tagline: "Vende más, gestiona menos",
     desc: "POS para tiendas físicas, control de inventario multitienda, programa de fidelización de clientes y analítica de ventas por categoría.",
     modulos: ["Punto de venta multitienda", "Inventario en tiempo real", "Programa de puntos y fidelización", "Gestión de devoluciones", "Reportes por categoría y temporada", "Integración con e-commerce"],
-    caso: { empresa: "Tiendas Moda Express", resultado: "Inventario sincronizado entre 4 tiendas eliminó el sobrestock en un 30%." },
   },
 ];
 
@@ -90,7 +66,7 @@ export default function Industrias() {
       <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-16">
         <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-4 py-1.5 text-xs text-teal-600 dark:text-teal-300 mb-6 font-medium">
           <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-          18+ industrias cubiertas
+          6 industrias con módulos propios
         </div>
         <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 dark:text-white mb-5">
           Hecho para tu industria,<br />
@@ -152,17 +128,6 @@ export default function Industrias() {
                         <span className="text-slate-700 dark:text-white/65 text-sm font-medium">{m}</span>
                       </div>
                     ))}
-                  </div>
-                </div>
-
-                {/* Case study */}
-                <div className="bg-slate-50/90 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/8 rounded-2xl p-5 flex items-start gap-4">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${ind.color} flex items-center justify-center flex-shrink-0 text-white font-bold text-xs shadow-sm`}>
-                    {ind.caso.empresa.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="text-slate-400 dark:text-white/35 text-xs mb-1 font-medium">{ind.caso.empresa}</div>
-                    <div className="text-slate-700 dark:text-white/70 text-sm leading-relaxed italic">"{ind.caso.resultado}"</div>
                   </div>
                 </div>
               </div>
