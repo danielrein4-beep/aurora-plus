@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import {
-  IconFarm, IconCustomize, IconClose, IconCheckCircle,
-  IconRocket, IconHourglass
-} from "../Icons";
 import type { PotreroGanaderia, AnimalGanaderia } from "../api";
 
 interface Props {
@@ -12,12 +8,16 @@ interface Props {
   animales: AnimalGanaderia[];
   onRotarHato: (potrero: PotreroGanaderia) => void;
   onCrearPotrero: () => void;
+  onGuardarPotreroTrazado?: (datos: {
+    poligono: [number, number][];
+    hectareas: number;
+  }) => void;
 }
 
 // Coordenadas base de demostración para la finca (Llanos / Región Ganadera)
 const FINCA_CENTRO: [number, number] = [8.5520, -70.3650];
 
-// Georreferenciación de polígonos para cada potrero alrededor del centro de la finca
+// Georreferenciación base de polígonos para cada potrero alrededor del centro de la finca
 const POLIGONOS_POTREROS: Record<number, [number, number][]> = {
   101: [
     [8.5540, -70.3680],
@@ -52,39 +52,74 @@ const PUNTOS_INTERES: Array<{ id: string; nombre: string; coords: [number, numbe
   { id: "tanque", nombre: "Tanque Australiano & Molino", coords: [8.5530, -70.3655], tipo: "AGUA" },
 ];
 
-export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrearPotrero }: Props) {
+// Cálculo geodésico exacto del área de un polígono en hectáreas sobre la superficie terrestre (WGS84)
+export function calcularHectareasPoligono(coords: [number, number][]): number {
+  if (coords.length < 3) return 0;
+  const R = 6378137; // Radio terrestre medio en metros
+  let areaM2 = 0;
+  for (let i = 0; i < coords.length; i++) {
+    const j = (i + 1) % coords.length;
+    const p1 = coords[i];
+    const p2 = coords[j];
+    const lat1 = (p1[0] * Math.PI) / 180;
+    const lat2 = (p2[0] * Math.PI) / 180;
+    const lng1 = (p1[1] * Math.PI) / 180;
+    const lng2 = (p2[1] * Math.PI) / 180;
+    areaM2 += (lng2 - lng1) * (2 + Math.sin(lat1) + Math.sin(lat2));
+  }
+  areaM2 = Math.abs((areaM2 * R * R) / 2.0);
+  const hectareas = areaM2 / 10000;
+  return Number(hectareas.toFixed(2));
+}
+
+export default function GanaderiaMapa({
+  potreros,
+  animales,
+  onRotarHato,
+  onCrearPotrero,
+  onGuardarPotreroTrazado,
+}: Props) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const polygonsLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const drawingLayerGroupRef = useRef<L.LayerGroup | null>(null);
 
   const [capaActiva, setCapaActiva] = useState<"satelital" | "terreno" | "calles">("satelital");
   const [potreroSeleccionado, setPotreroSeleccionado] = useState<PotreroGanaderia | null>(null);
   const [busquedaLugar, setBusquedaLugar] = useState("");
 
-  // Inicializar mapa de Leaflet
+  // Estado del Modo Trazar Potrero interactivo
+  const [modoTrazar, setModoTrazar] = useState(false);
+  const [verticesTrazado, setVerticesTrazado] = useState<[number, number][]>([]);
+
+  const hectareasTrazadas = calcularHectareasPoligono(verticesTrazado);
+
+  // Inicializar mapa Leaflet
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    // Crear mapa Leaflet
     const map = L.map(mapContainerRef.current, {
       center: FINCA_CENTRO,
       zoom: 16,
       zoomControl: false,
     });
 
-    // Capa base satelital inicial de Esri World Imagery (exactamente la de GanSoft)
     const esriSatellite = L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       {
-        attribution: "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+        attribution: "Esri World Imagery",
         maxZoom: 19,
       }
     ).addTo(map);
 
     (map as any)._currentBaseLayer = esriSatellite;
 
-    const layerGroup = L.layerGroup().addTo(map);
-    polygonsLayerGroupRef.current = layerGroup;
+    const polyGroup = L.layerGroup().addTo(map);
+    polygonsLayerGroupRef.current = polyGroup;
+
+    const drawGroup = L.layerGroup().addTo(map);
+    drawingLayerGroupRef.current = drawGroup;
+
     mapInstanceRef.current = map;
 
     return () => {
@@ -125,7 +160,93 @@ export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrear
     (map as any)._currentBaseLayer = newLayer;
   }, [capaActiva]);
 
-  // Dibujar potreros y puntos de interés sobre el mapa
+  // Manejar clics en el mapa durante el Modo Trazar
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (modoTrazar) {
+      map.getContainer().style.cursor = "crosshair";
+
+      const handleMapClick = (e: L.LeafletMouseEvent) => {
+        const nuevaCoord: [number, number] = [Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6))];
+        setVerticesTrazado(prev => [...prev, nuevaCoord]);
+      };
+
+      map.on("click", handleMapClick);
+
+      return () => {
+        map.off("click", handleMapClick);
+        map.getContainer().style.cursor = "";
+      };
+    } else {
+      map.getContainer().style.cursor = "";
+    }
+  }, [modoTrazar]);
+
+  // Renderizar vértices y polígono interactivo mientras se dibuja
+  useEffect(() => {
+    const group = drawingLayerGroupRef.current;
+    if (!group) return;
+
+    group.clearLayers();
+
+    if (!modoTrazar || verticesTrazado.length === 0) return;
+
+    // Marcador para cada vértice (poste de cerca)
+    verticesTrazado.forEach((coord, idx) => {
+      const isFirst = idx === 0;
+      const markerIcon = L.divIcon({
+        className: "bg-transparent border-0",
+        html: `
+          <div style="
+            transform: translate(-50%, -50%);
+            width: ${isFirst ? "22px" : "18px"};
+            height: ${isFirst ? "22px" : "18px"};
+            border-radius: 9999px;
+            background: ${isFirst ? "#00FFC2" : "#38BDF8"};
+            border: 2px solid #ffffff;
+            box-shadow: 0 0 10px ${isFirst ? "rgba(0,255,194,0.9)" : "rgba(56,189,248,0.8)"};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #03101E;
+            font-size: 10px;
+            font-weight: 900;
+            cursor: pointer;
+          ">
+            ${idx + 1}
+          </div>
+        `,
+      });
+
+      const marker = L.marker(coord, { icon: markerIcon });
+      group.addLayer(marker);
+    });
+
+    // Líneas entre vértices
+    if (verticesTrazado.length >= 2) {
+      const polyline = L.polyline(verticesTrazado, {
+        color: "#00FFC2",
+        weight: 3,
+        dashArray: "6, 6",
+      });
+      group.addLayer(polyline);
+    }
+
+    // Polígono cerrado preliminar cuando hay 3 o más puntos
+    if (verticesTrazado.length >= 3) {
+      const polygonPreview = L.polygon(verticesTrazado, {
+        color: "#00FFC2",
+        weight: 2,
+        fillColor: "#00FFC2",
+        fillOpacity: 0.25,
+      });
+      group.addLayer(polygonPreview);
+    }
+  }, [modoTrazar, verticesTrazado]);
+
+  // Dibujar potreros guardados y puntos de interés sobre el mapa
   useEffect(() => {
     const map = mapInstanceRef.current;
     const group = polygonsLayerGroupRef.current;
@@ -135,19 +256,20 @@ export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrear
 
     // Dibujar cada potrero como polígono georreferenciado
     potreros.forEach((pot, idx) => {
-      // Coordenadas del potrero o fallback alrededor del centro
-      const coords = POLIGONOS_POTREROS[pot.id] || [
-        [FINCA_CENTRO[0] + (idx * 0.003), FINCA_CENTRO[1] + (idx * 0.003)],
-        [FINCA_CENTRO[0] + (idx * 0.003), FINCA_CENTRO[1] + 0.003 + (idx * 0.003)],
-        [FINCA_CENTRO[0] - 0.002 + (idx * 0.003), FINCA_CENTRO[1] + 0.003 + (idx * 0.003)],
-        [FINCA_CENTRO[0] - 0.002 + (idx * 0.003), FINCA_CENTRO[1] + (idx * 0.003)],
-      ];
+      // Coordenadas personalizadas si fueron trazadas, o base fija
+      const coords = (pot.poligono && pot.poligono.length >= 3)
+        ? pot.poligono
+        : (POLIGONOS_POTREROS[pot.id] || [
+            [FINCA_CENTRO[0] + (idx * 0.003), FINCA_CENTRO[1] + (idx * 0.003)],
+            [FINCA_CENTRO[0] + (idx * 0.003), FINCA_CENTRO[1] + 0.003 + (idx * 0.003)],
+            [FINCA_CENTRO[0] - 0.002 + (idx * 0.003), FINCA_CENTRO[1] + 0.003 + (idx * 0.003)],
+            [FINCA_CENTRO[0] - 0.002 + (idx * 0.003), FINCA_CENTRO[1] + (idx * 0.003)],
+          ]);
 
       const enDescanso = pot.estado === "EN_DESCANSO";
       const colorBorde = pot.color || (enDescanso ? "#F59E0B" : "#00FFC2");
       const colorRelleno = pot.color || (enDescanso ? "#F59E0B" : "#00C9A7");
 
-      // Polígono del potrero
       const polygon = L.polygon(coords, {
         color: colorBorde,
         weight: 2.5,
@@ -158,18 +280,19 @@ export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrear
       });
 
       polygon.on("click", () => {
-        setPotreroSeleccionado(pot);
+        if (!modoTrazar) {
+          setPotreroSeleccionado(pot);
+        }
       });
 
       polygon.addTo(group);
 
-      // Calcular centroide para etiqueta flotante
+      // Centroide para etiqueta flotante
       const latPromedio = coords.reduce((sum, c) => sum + c[0], 0) / coords.length;
       const lngPromedio = coords.reduce((sum, c) => sum + c[1], 0) / coords.length;
 
       const animalesEnPotrero = animales.filter(a => a.potrero?.id === pot.id);
 
-      // Etiqueta flotante con estilo minimalista de Aurora
       const labelIcon = L.divIcon({
         className: "bg-transparent border-0",
         html: `
@@ -199,11 +322,15 @@ export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrear
       });
 
       const marker = L.marker([latPromedio, lngPromedio], { icon: labelIcon });
-      marker.on("click", () => setPotreroSeleccionado(pot));
+      marker.on("click", () => {
+        if (!modoTrazar) {
+          setPotreroSeleccionado(pot);
+        }
+      });
       marker.addTo(group);
     });
 
-    // Dibujar puntos de interés (Vaquera, mangas, corrales)
+    // Puntos de interés (Vaquera, mangas, corrales)
     PUNTOS_INTERES.forEach(pt => {
       const pinIcon = L.divIcon({
         className: "bg-transparent border-0",
@@ -227,7 +354,7 @@ export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrear
 
       L.marker(pt.coords, { icon: pinIcon }).addTo(group);
     });
-  }, [potreros, animales]);
+  }, [potreros, animales, modoTrazar]);
 
   // Manejador de zoom
   const handleZoom = (delta: number) => {
@@ -243,7 +370,30 @@ export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrear
     map.flyTo(FINCA_CENTRO, 16, { duration: 1.2 });
   };
 
-  // Animales en el potrero seleccionado actualmente
+  // Deshacer último vértice del trazado
+  const handleDeshacerVertice = () => {
+    setVerticesTrazado(prev => prev.slice(0, -1));
+  };
+
+  // Cancelar trazado
+  const handleCancelarTrazado = () => {
+    setVerticesTrazado([]);
+    setModoTrazar(false);
+  };
+
+  // Finalizar trazado y guardar potrero
+  const handleFinalizarTrazado = () => {
+    if (verticesTrazado.length < 3) return;
+    if (onGuardarPotreroTrazado) {
+      onGuardarPotreroTrazado({
+        poligono: verticesTrazado,
+        hectareas: hectareasTrazadas,
+      });
+    }
+    setVerticesTrazado([]);
+    setModoTrazar(false);
+  };
+
   const animalesSeleccionados = potreroSeleccionado
     ? animales.filter(a => a.potrero?.id === potreroSeleccionado.id)
     : [];
@@ -251,7 +401,7 @@ export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrear
   return (
     <div className="relative w-full h-[680px] rounded-3xl overflow-hidden border border-slate-300/60 dark:border-white/10 shadow-2xl flex flex-col font-['Inter']">
       
-      {/* ── BARRA DE HERRAMIENTAS SUPERIOR DEL MAPA (ESTILO GANSOFT & APPLE GLASS) ── */}
+      {/* ── BARRA DE HERRAMIENTAS SUPERIOR DEL MAPA ── */}
       <div className="absolute top-4 left-4 right-4 z-[500] flex flex-wrap items-center justify-between gap-3 pointer-events-none">
         
         {/* Izquierda: Buscador & Centrar */}
@@ -278,7 +428,7 @@ export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrear
           </div>
         </div>
 
-        {/* Derecha: Selector de Capas & Botón Agregar Potrero */}
+        {/* Derecha: Selector de Capas, Modo Trazar & Agregar Potrero */}
         <div className="flex items-center gap-2 pointer-events-auto">
           <div className="apple-glass rounded-2xl p-1 border border-white/15 shadow-lg flex items-center gap-1 bg-slate-900/80 backdrop-blur-xl text-xs font-semibold">
             <button
@@ -310,6 +460,24 @@ export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrear
             </button>
           </div>
 
+          {/* Botón Trazar Potrero Interactivo */}
+          <button
+            onClick={() => {
+              if (modoTrazar) {
+                handleCancelarTrazado();
+              } else {
+                setModoTrazar(true);
+                setPotreroSeleccionado(null);
+              }
+            }}
+            className={`text-xs font-bold px-3.5 py-2 rounded-2xl shadow-lg cursor-pointer transition-all border ${
+              modoTrazar
+                ? "bg-amber-500 text-slate-950 border-amber-300 font-extrabold scale-105"
+                : "bg-slate-900/80 text-emerald-400 border-emerald-400/50 hover:bg-emerald-500/20"
+            }`}>
+            {modoTrazar ? "Cancelar Trazado" : "Trazar en Mapa"}
+          </button>
+
           <button
             onClick={onCrearPotrero}
             className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-2xl shadow-lg cursor-pointer hover:scale-105 transition-all">
@@ -318,7 +486,52 @@ export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrear
         </div>
       </div>
 
-      {/* ── CONTROLES DE ZOOM LATERALES (ESTILO MINIMALISTA) ── */}
+      {/* ── BANNER ASISTENTE FLOTANTE DURANTE MODO TRAZAR ── */}
+      {modoTrazar && (
+        <div className="absolute top-18 left-1/2 -translate-x-1/2 z-[600] apple-glass rounded-2xl px-5 py-2.5 border border-emerald-400 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex items-center gap-4 text-xs pointer-events-auto animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+            <span className="font-['Outfit'] font-bold text-white text-sm">
+              Trazador de Potrero Activo
+            </span>
+          </div>
+
+          <div className="h-4 w-px bg-white/20" />
+
+          <div className="text-slate-300">
+            {verticesTrazado.length === 0 ? (
+              <span>Haz clic en el mapa satelital para marcar el primer poste de la cerca.</span>
+            ) : verticesTrazado.length < 3 ? (
+              <span>
+                <strong>{verticesTrazado.length}</strong> {verticesTrazado.length === 1 ? "vértice" : "vértices"} marcados (mínimo 3 requeridos).
+              </span>
+            ) : (
+              <span className="text-emerald-400 font-bold">
+                {verticesTrazado.length} vértices • Superficie calculada: {hectareasTrazadas} ha
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 ml-2">
+            {verticesTrazado.length > 0 && (
+              <button
+                onClick={handleDeshacerVertice}
+                className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-medium cursor-pointer transition-all">
+                Deshacer
+              </button>
+            )}
+
+            <button
+              onClick={handleFinalizarTrazado}
+              disabled={verticesTrazado.length < 3}
+              className="px-3 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-black cursor-pointer shadow-md transition-all">
+              Guardar Potrero ({hectareasTrazadas} ha)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── CONTROLES DE ZOOM LATERALES ── */}
       <div className="absolute top-20 left-4 z-[500] flex flex-col gap-1.5 pointer-events-auto">
         <button
           onClick={() => handleZoom(1)}
@@ -354,7 +567,7 @@ export default function GanaderiaMapa({ potreros, animales, onRotarHato, onCrear
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
       {/* ── PANEL LATERAL FLOTANTE: DETALLE DEL POTRERO SELECCIONADO ── */}
-      {potreroSeleccionado && (
+      {potreroSeleccionado && !modoTrazar && (
         <div className="absolute top-20 right-4 bottom-4 w-80 sm:w-96 z-[500] apple-glass rounded-3xl p-5 border border-emerald-500/40 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex flex-col justify-between text-left pointer-events-auto animate-fade-in">
           
           <div className="space-y-4">

@@ -1612,7 +1612,7 @@ export interface PotreroGanaderia {
   posY?: number;
   ancho?: number;
   alto?: number;
-  forma?: string;
+  poligono?: [number, number][];
   fechaInicioDescanso?: string;
   fechaInicioUso?: string;
 }
