@@ -200,10 +200,14 @@ export default function DocumentoPreviewModal({
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
               }
+              .print-page-break {
+                break-before: page !important;
+                page-break-before: always !important;
+              }
             }
           `}</style>
           <div className="print-content-sheet max-w-3xl mx-auto">
-            <DocumentoContenidoImpreso tipo={payload.tipo} docData={docData} />
+            <DocumentoContenidoImpreso tipo={payload.tipo} docData={docData} qrDataUrl={qrLaboratorioDataUrl} />
           </div>
         </div>,
         document.body
@@ -567,7 +571,7 @@ export default function DocumentoPreviewModal({
             ) : (
               /* ══════════ VISTA PREVIA EN PANTALLA ══════════ */
               <div className="bg-white text-slate-900 rounded-2xl shadow-xl border border-slate-200 p-6 sm:p-10 max-w-3xl mx-auto font-sans text-xs">
-                <DocumentoContenidoImpreso tipo={payload.tipo} docData={docData} />
+                <DocumentoContenidoImpreso tipo={payload.tipo} docData={docData} qrDataUrl={qrLaboratorioDataUrl} />
               </div>
             )}
           </div>
@@ -759,9 +763,11 @@ export default function DocumentoPreviewModal({
 function DocumentoContenidoImpreso({
   tipo,
   docData,
+  qrDataUrl,
 }: {
   tipo: TipoDocumento;
   docData: any;
+  qrDataUrl?: string;
 }) {
   return (
     <div className="w-full space-y-4 text-slate-900 font-sans text-xs">
@@ -851,6 +857,34 @@ function DocumentoContenidoImpreso({
               </p>
             </div>
           </div>
+
+          {/* ── PÁGINA 2: QR fijo del consultorio para que el paciente suba sus
+              resultados de laboratorio (ver PortalLaboratorioPacienteService en
+              el backend) — misma página que ya se agrega al PDF descargado en
+              pdfReports.ts, replicada aquí en HTML para que "Imprimir" (que
+              imprime esta vista, no el PDF) también la incluya. */}
+          {qrDataUrl && (
+            <div className="print-page-break pt-10 flex flex-col items-center text-center space-y-4">
+              <div className="w-full border-b-2 border-teal-700 pb-3">
+                <h3 className="font-extrabold text-sm tracking-wide uppercase text-teal-800">
+                  Envío de Resultados de Laboratorio
+                </h3>
+              </div>
+              <p className="text-xs text-slate-700 max-w-sm leading-relaxed">
+                Cuando reciba sus resultados del laboratorio, escanee este código con la cámara de su teléfono para
+                enviarlos directamente a su médico:
+              </p>
+              <img src={qrDataUrl} alt="Código QR de recepción de laboratorio" className="w-44 h-44 border border-slate-300 rounded-lg p-1.5" />
+              <div className="text-[11px] text-slate-600 max-w-xs space-y-1 text-left mx-auto">
+                <p>1. Abra la cámara de su teléfono y apunte al código QR.</p>
+                <p>2. Se abrirá una página para subir sus resultados (foto o PDF).</p>
+                <p>3. Ingrese su número de cédula — así sabemos que son sus resultados.</p>
+                <p>4. Adjunte todos los archivos que necesite (no hay límite de cantidad).</p>
+                <p>5. Presione "Enviar" y listo — su médico los recibirá al instante.</p>
+              </div>
+              <p className="text-[10px] text-slate-400 pt-6">{docData.clinicaNombre || "Su consultorio médico"}</p>
+            </div>
+          )}
         </div>
       )}
 
