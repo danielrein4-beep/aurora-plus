@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.core.reportes.ExcelExportService;
 import com.auroraplus.modules.ganaderia.entities.Animal;
@@ -164,7 +165,10 @@ public class AnimalController {
 
     @GetMapping("/{id}")
     public Animal obtener(@PathVariable Long id) {
-        return animalRepository.findById(id).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        return animalRepository.findById(id)
+            .filter(a -> tenantId != null && tenantId.equals(a.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
     }
 
     @GetMapping("/arete/{arete}")
@@ -174,7 +178,10 @@ public class AnimalController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Animal> actualizar(@PathVariable Long id, @RequestBody Animal datos) {
-        Animal animal = animalRepository.findById(id).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        Animal animal = animalRepository.findById(id)
+            .filter(a -> tenantId != null && tenantId.equals(a.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         animal.setNombre(datos.getNombre());
         animal.setRaza(datos.getRaza());
         animal.setTipoAnimal(datos.getTipoAnimal());
@@ -200,7 +207,10 @@ public class AnimalController {
     /** Ficha con código QR del animal, para identificación rápida en el campo con el celular — estampa el hierro de la finca si está configurado. */
     @GetMapping(value = "/{id}/qr", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> fichaQr(@PathVariable Long id, @RequestParam Long tenantId) throws Exception {
-        Animal animal = animalRepository.findById(id).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
+        Long tenantActual = TenantContext.getCurrentTenant();
+        Animal animal = animalRepository.findById(id)
+            .filter(a -> tenantActual != null && tenantActual.equals(a.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         String hierroBase64 = licenciaTenantRepository.findByTenantId(tenantId).map(l -> l.getHierroBase64()).orElse(null);
         byte[] pdf = animalQrService.generarFichaQr(animal, hierroBase64);
         return ResponseEntity.ok()

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.Empleado;
 import com.auroraplus.modules.tamanacocomercial.entities.Gasto;
 import com.auroraplus.modules.tamanacocomercial.repositories.EmpleadoRepository;
@@ -65,7 +66,10 @@ public class EmpleadoController {
 
     @PutMapping("/{id}")
     public Empleado actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Empleado detalles) {
-        Empleado emp = empleadoRepository.findById(id).orElseThrow();
+        Long tenantActual = TenantContext.getCurrentTenant();
+        Empleado emp = empleadoRepository.findById(id)
+                .filter(e -> tenantActual != null && tenantActual.equals(e.getTenantId()))
+                .orElseThrow();
         emp.setNombre(detalles.getNombre());
         emp.setCedula(detalles.getCedula());
         emp.setCargo(detalles.getCargo());
@@ -81,7 +85,10 @@ public class EmpleadoController {
 
     @PostMapping("/{id}/pagar")
     public Gasto pagarNomina(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Map<String, Object> payload) {
-        Empleado emp = empleadoRepository.findById(id).orElseThrow();
+        Long tenantActual = TenantContext.getCurrentTenant();
+        Empleado emp = empleadoRepository.findById(id)
+                .filter(e -> tenantActual != null && tenantActual.equals(e.getTenantId()))
+                .orElseThrow();
 
         BigDecimal monto = new BigDecimal(payload.get("monto").toString());
         String fecha = payload.get("fecha").toString();

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.repositories.MovimientoCajaRepository;
 import com.auroraplus.modules.ganaderia.entities.Animal;
@@ -43,7 +44,10 @@ public class CostosGanaderiaController {
 
     @GetMapping("/costos/animal/{animalId}")
     public Map<String, Object> costoAnimal(@PathVariable Long animalId) {
-        Animal animal = animalRepository.findById(animalId).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        Animal animal = animalRepository.findById(animalId)
+            .filter(a -> tenantId != null && tenantId.equals(a.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
 
         BigDecimal costoAdquisicion = animal.getCostoAdquisicion() != null ? animal.getCostoAdquisicion() : BigDecimal.ZERO;
 

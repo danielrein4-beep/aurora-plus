@@ -16,7 +16,7 @@ export default function Auth() {
     try {
       email = localStorage.getItem(REMEMBERED_EMAIL_KEY) || "";
     } catch {}
-    return { nombre: "", email, password: "", confirmar: "", remember: true, terms: true };
+    return { nombre: "", email, password: "", confirmar: "", remember: true, terms: false };
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [enviando, setEnviando] = useState(false);
@@ -40,6 +40,7 @@ export default function Auth() {
     if (!form.email.includes("@")) e.email = "Ingresa un correo electrónico válido";
     if (form.password.length < 6) e.password = "Mínimo 6 caracteres";
     if (mode === "register" && form.password !== form.confirmar) e.confirmar = "Las contraseñas no coinciden";
+    if (mode === "register" && !form.terms) e.terms = "Debes aceptar los términos para continuar";
     return e;
   };
 
@@ -231,7 +232,7 @@ export default function Auth() {
                 {/* Indicador sutil de seguridad */}
                 {form.password.length > 0 && (
                   <div className="flex items-center gap-1.5 mt-2">
-                    <div className="h-1 flex-1 rounded-full bg-teal-400" />
+                    <div className={`h-1 flex-1 rounded-full ${form.password.length >= 1 ? "bg-teal-400" : "bg-white/10"}`} />
                     <div className={`h-1 flex-1 rounded-full ${form.password.length >= 6 ? "bg-teal-400" : "bg-white/10"}`} />
                     <div className={`h-1 flex-1 rounded-full ${form.password.length >= 10 ? "bg-teal-400" : "bg-white/10"}`} />
                     <span className="text-[10px] text-white/40 font-mono ml-1">
@@ -267,7 +268,20 @@ export default function Auth() {
                     className="w-4 h-4 rounded border-white/20 bg-white/5 text-teal-400 focus:ring-0 focus:outline-none"
                   />
                   <span className="text-xs text-white/60 hover:text-white/80 transition-colors">
-                    {mode === "login" ? "Mantener sesión activa" : "Acepto los términos y condiciones"}
+                    {mode === "login" ? (
+                      "Mantener sesión activa"
+                    ) : (
+                      <>
+                        Acepto los{" "}
+                        <a href="/terminos" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 underline" onClick={(e) => e.stopPropagation()}>
+                          términos
+                        </a>{" "}
+                        y la{" "}
+                        <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 underline" onClick={(e) => e.stopPropagation()}>
+                          política de privacidad
+                        </a>
+                      </>
+                    )}
                   </span>
                 </label>
 
@@ -281,6 +295,7 @@ export default function Auth() {
                   </button>
                 )}
               </div>
+              {errors.terms && <p className="text-[#ff3b80] text-xs -mt-2">{errors.terms}</p>}
 
               {errors.submit && (
                 <p className="text-[#ff3b80] text-xs text-center -mb-1">{errors.submit}</p>
@@ -312,7 +327,7 @@ export default function Auth() {
               <div className="mt-6 pt-5 border-t border-white/10 space-y-2 text-xs text-white/50">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                  <span>7 Verticales Nativas en la misma sesión</span>
+                  <span>5 Verticales listas hoy — Salud, Restaurante, Ferretería, Farmacia y Repuestos</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
@@ -329,7 +344,7 @@ export default function Auth() {
             <div className="flex justify-end">
               <div className="apple-glass-pill rounded-full px-4 py-2 flex items-center gap-2 text-xs text-white/70 shadow-lg">
                 <IconLock size={14} />
-                <span className="font-medium text-[11px] tracking-wide">Cifrado de Extremo a Extremo (AES-256)</span>
+                <span className="font-medium text-[11px] tracking-wide">Conexión cifrada (HTTPS) · Contraseñas nunca en texto plano</span>
               </div>
             </div>
           </div>

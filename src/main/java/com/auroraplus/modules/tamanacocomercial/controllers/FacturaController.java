@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.Factura;
 import com.auroraplus.modules.tamanacocomercial.entities.Retencion;
 import com.auroraplus.modules.tamanacocomercial.repositories.FacturaRepository;
@@ -76,14 +77,18 @@ public class FacturaController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Factura> obtenerPorId(@PathVariable Long id) {
+        Long tenantActual = TenantContext.getCurrentTenant();
         return facturaRepository.findById(id)
+                .filter(f -> tenantActual != null && tenantActual.equals(f.getTenantId()))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping("/{id}/retencion")
     public ResponseEntity<?> aplicarRetencion(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Retencion retencion) {
-        Optional<Factura> facturaOpt = facturaRepository.findById(id);
+        Long tenantActual = TenantContext.getCurrentTenant();
+        Optional<Factura> facturaOpt = facturaRepository.findById(id)
+                .filter(f -> tenantActual != null && tenantActual.equals(f.getTenantId()));
         if (facturaOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }

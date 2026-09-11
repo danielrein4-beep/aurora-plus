@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.DespachoComercial;
 import com.auroraplus.modules.tamanacocomercial.entities.Gasto;
 import com.auroraplus.modules.tamanacocomercial.entities.HistorialProveedor;
@@ -66,7 +67,9 @@ public class ProveedorController {
 
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Proveedor datos) {
+        Long tenantActual = TenantContext.getCurrentTenant();
         return proveedorRepository.findById(id)
+            .filter(p -> tenantActual != null && tenantActual.equals(p.getTenantId()))
             .map(p -> {
                 p.setNombre(datos.getNombre());
                 p.setTelefono(datos.getTelefono());
@@ -91,7 +94,9 @@ public class ProveedorController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> desactivar(@PathVariable Long id, @RequestParam Long tenantId) {
+        Long tenantActual = TenantContext.getCurrentTenant();
         return proveedorRepository.findById(id)
+            .filter(p -> tenantActual != null && tenantActual.equals(p.getTenantId()))
             .map(p -> {
                 p.setActivo(!Boolean.TRUE.equals(p.getActivo()));
                 proveedorRepository.save(p);
@@ -110,7 +115,9 @@ public class ProveedorController {
 
     @GetMapping("/{id}/historial")
     public ResponseEntity<?> obtenerHistorialCompleto(@PathVariable Long id) {
-        Optional<Proveedor> provOpt = proveedorRepository.findById(id);
+        Long tenantActual = TenantContext.getCurrentTenant();
+        Optional<Proveedor> provOpt = proveedorRepository.findById(id)
+            .filter(p -> tenantActual != null && tenantActual.equals(p.getTenantId()));
         if (provOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }

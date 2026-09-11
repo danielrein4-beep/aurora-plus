@@ -1,5 +1,6 @@
 package com.auroraplus.core.inventario.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.inventario.entities.ConteoFisico;
 import com.auroraplus.core.inventario.entities.DetalleConteoFisico;
 import com.auroraplus.core.inventario.repositories.ConteoFisicoRepository;
@@ -33,7 +34,10 @@ public class ConteoFisicoController {
 
     @GetMapping("/{id}")
     public ConteoFisico obtener(@PathVariable Long id) {
-        return conteoFisicoRepository.findById(id).orElseThrow(() -> new RuntimeException("Conteo no encontrado"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        return conteoFisicoRepository.findById(id)
+            .filter(c -> tenantId != null && tenantId.equals(c.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Conteo no encontrado"));
     }
 
     @PostMapping("/iniciar")

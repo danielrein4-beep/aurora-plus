@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.Gasto;
 import com.auroraplus.modules.tamanacocomercial.repositories.GastoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +36,9 @@ public class GastoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Gasto> actualizar(@PathVariable Long id, @RequestBody Gasto detalles) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return gastoRepository.findById(id)
+            .filter(gasto -> tenantId != null && tenantId.equals(gasto.getTenantId()))
             .map(gasto -> {
                 gasto.setFecha(detalles.getFecha());
                 gasto.setCategoria(detalles.getCategoria());
@@ -57,7 +60,9 @@ public class GastoController {
 
     @PatchMapping("/{id}/toggle-descontado")
     public ResponseEntity<Gasto> toggleDescontado(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return gastoRepository.findById(id)
+            .filter(gasto -> tenantId != null && tenantId.equals(gasto.getTenantId()))
             .map(gasto -> {
                 gasto.setDescontado(!Boolean.TRUE.equals(gasto.getDescontado()));
                 return ResponseEntity.ok(gastoRepository.save(gasto));
@@ -76,8 +81,9 @@ public class GastoController {
 
     @PostMapping("/{id}/upload-recibo")
     public ResponseEntity<Gasto> subirRecibo(@PathVariable Long id, @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        Long tenantId = TenantContext.getCurrentTenant();
         Gasto gasto = gastoRepository.findById(id).orElse(null);
-        if (gasto == null) return ResponseEntity.notFound().build();
+        if (gasto == null || tenantId == null || !tenantId.equals(gasto.getTenantId())) return ResponseEntity.notFound().build();
 
         java.nio.file.Path uploadDir = java.nio.file.Paths.get("uploads/recibos");
         if (!java.nio.file.Files.exists(uploadDir)) {

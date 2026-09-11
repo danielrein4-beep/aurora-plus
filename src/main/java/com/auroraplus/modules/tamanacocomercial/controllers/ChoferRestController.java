@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.Chofer;
 import com.auroraplus.modules.tamanacocomercial.repositories.ChoferRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.DespachoComercialRepository;
@@ -66,7 +67,9 @@ public class ChoferRestController {
 
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizar(@PathVariable Long id, @RequestBody Chofer datos) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return choferRepository.findById(id)
+                .filter(c -> tenantId != null && tenantId.equals(c.getTenantId()))
                 .map(c -> {
                     if (datos.getNombreCompleto() != null) c.setNombreCompleto(datos.getNombreCompleto());
                     if (datos.getCedula() != null) c.setCedula(datos.getCedula());

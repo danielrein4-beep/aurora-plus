@@ -1,5 +1,6 @@
 package com.auroraplus.modules.moda.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.moda.entities.ClienteModa;
 import com.auroraplus.modules.moda.repositories.ClienteModaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +23,10 @@ public class ClienteModaController {
 
     @GetMapping("/{id}")
     public ClienteModa obtener(@PathVariable Long id) {
-        return clienteModaRepository.findById(id).orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        return clienteModaRepository.findById(id)
+            .filter(c -> tenantId != null && tenantId.equals(c.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
     }
 
     @PostMapping

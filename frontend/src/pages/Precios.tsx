@@ -158,7 +158,9 @@ export default function Precios() {
                   </li>
                 ))}
               </ul>
-              <button className="bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm shadow-md cursor-pointer">
+              <button
+                onClick={() => navigate("/nosotros")}
+                className="bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm shadow-md cursor-pointer">
                 Cotizar mi página web →
               </button>
             </div>

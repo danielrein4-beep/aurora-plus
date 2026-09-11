@@ -1,5 +1,6 @@
 package com.auroraplus.core.rrhh.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.rrhh.entities.Empleado;
 import com.auroraplus.core.rrhh.repositories.EmpleadoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +47,10 @@ public class EmpleadoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Empleado> actualizar(@PathVariable Long id, @RequestBody Empleado datos) {
-        Empleado empleado = empleadoRepository.findById(id).orElseThrow(() -> new RuntimeException("Empleado no encontrado"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        Empleado empleado = empleadoRepository.findById(id)
+            .filter(e -> tenantId != null && tenantId.equals(e.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));
         empleado.setNombre(datos.getNombre());
         empleado.setCedula(datos.getCedula());
         empleado.setCargo(datos.getCargo());

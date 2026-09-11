@@ -44,7 +44,9 @@ public class LaboratorioService {
     public AnalisisLaboratorio guardarAnalisis(Long tenantId, AnalisisLaboratorioDTO dto) {
         AnalisisLaboratorio entidad = new AnalisisLaboratorio();
         if (dto.getId() != null) {
-            entidad = analisisRepository.findById(dto.getId()).orElse(new AnalisisLaboratorio());
+            entidad = analisisRepository.findById(dto.getId())
+                    .filter(a -> tenantId != null && tenantId.equals(a.getTenantId()))
+                    .orElse(new AnalisisLaboratorio());
         } else if (dto.getMina() != null && !dto.getMina().isBlank()) {
             LocalDate targetFecha = null;
             if (dto.getFechaAnalisis() != null) {
@@ -113,10 +115,12 @@ public class LaboratorioService {
     }
 
     public void eliminarAnalisis(Long tenantId, Long id) {
-        analisisRepository.findById(id).ifPresent(a -> {
-            analisisRepository.delete(a);
-            auditoriaService.registrar(tenantId, "ELIMINAR", "LABORATORIO", "Eliminó análisis ID " + id + " de " + a.getMina());
-        });
+        analisisRepository.findById(id)
+            .filter(a -> tenantId != null && tenantId.equals(a.getTenantId()))
+            .ifPresent(a -> {
+                analisisRepository.delete(a);
+                auditoriaService.registrar(tenantId, "ELIMINAR", "LABORATORIO", "Eliminó análisis ID " + id + " de " + a.getMina());
+            });
     }
 
     public Map<String, Object> obtenerCalidadPonderadaSemanal(LocalDate fechaInicio, LocalDate fechaFin) {

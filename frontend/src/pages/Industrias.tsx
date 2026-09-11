@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   IconClinic, IconHardware, IconMining,
   IconRestaurant, IconFarm, IconRetail, IconCheck,
@@ -56,6 +57,7 @@ const INDUSTRIES = [
 ];
 
 export default function Industrias() {
+  const navigate = useNavigate();
   const [active, setActive] = useState(INDUSTRIES[0].name);
   const ind = INDUSTRIES.find((i) => i.name === active)!;
 
@@ -135,10 +137,14 @@ export default function Industrias() {
 
             {/* CTA */}
             <div className="mt-5 flex flex-col sm:flex-row gap-3">
-              <button className="g-aurora glow-teal text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm shadow-md cursor-pointer">
+              <button
+                onClick={() => navigate("/onboarding")}
+                className="g-aurora glow-teal text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm shadow-md cursor-pointer">
                 Quiero una demo para {ind.name}
               </button>
-              <button className="bg-white/70 dark:bg-transparent border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white/55 hover:border-slate-400 dark:hover:border-white/25 hover:text-black dark:hover:text-white px-6 py-3.5 rounded-xl text-sm font-semibold transition-all cursor-pointer">
+              <button
+                onClick={() => navigate("/precios")}
+                className="bg-white/70 dark:bg-transparent border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white/55 hover:border-slate-400 dark:hover:border-white/25 hover:text-black dark:hover:text-white px-6 py-3.5 rounded-xl text-sm font-semibold transition-all cursor-pointer">
                 Ver precios →
               </button>
             </div>

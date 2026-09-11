@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.DetalleGuiaTraslado;
 import com.auroraplus.modules.ganaderia.entities.GuiaTraslado;
@@ -82,7 +83,10 @@ public class GuiaTrasladoController {
 
     @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> pdf(@PathVariable Long id) throws Exception {
-        GuiaTraslado guia = guiaTrasladoRepository.findById(id).orElseThrow(() -> new RuntimeException("Guía no encontrada"));
+        Long tenantId = TenantContext.getCurrentTenant();
+        GuiaTraslado guia = guiaTrasladoRepository.findById(id)
+            .filter(g -> tenantId != null && tenantId.equals(g.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Guía no encontrada"));
         byte[] pdf = guiaTrasladoPdfService.generarGuiaPdf(guia);
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"guia-" + guia.getNumeroGuia() + ".pdf\"")

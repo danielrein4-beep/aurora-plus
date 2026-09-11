@@ -1,5 +1,6 @@
 package com.auroraplus.modules.repuestos.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.repuestos.entities.MovimientoRepuesto;
 import com.auroraplus.modules.repuestos.entities.RepuestoItem;
 import com.auroraplus.modules.repuestos.repositories.MovimientoRepuestoRepository;
@@ -59,7 +60,9 @@ public class RepuestoItemController {
 
     @PutMapping("/{id}")
     public ResponseEntity<RepuestoItem> actualizar(@PathVariable Long id, @RequestBody RepuestoItem datos) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return repuestoItemRepository.findById(id)
+            .filter(item -> tenantId != null && tenantId.equals(item.getTenantId()))
             .map(item -> {
                 if (datos.getDescripcion() != null) item.setDescripcion(datos.getDescripcion());
                 if (datos.getCodigoOriginalOem() != null) item.setCodigoOriginalOem(datos.getCodigoOriginalOem());

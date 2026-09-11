@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.MovimientoStock;
 import com.auroraplus.modules.tamanacocomercial.entities.ProductoComercial;
 import com.auroraplus.modules.tamanacocomercial.repositories.MovimientoStockRepository;
@@ -40,7 +41,10 @@ public class InventarioController {
 
     @PutMapping("/productos/{id}")
     public ResponseEntity<?> actualizarProducto(@PathVariable Long id, @RequestBody ProductoComercial update) {
-        return productoRepository.findById(id).map(p -> {
+        Long tenantId = TenantContext.getCurrentTenant();
+        return productoRepository.findById(id)
+            .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))
+            .map(p -> {
             if (update.getCodigo() != null) p.setCodigo(update.getCodigo());
             if (update.getNombre() != null) p.setNombre(update.getNombre());
             if (update.getDescripcion() != null) p.setDescripcion(update.getDescripcion());
@@ -79,8 +83,9 @@ public class InventarioController {
             return ResponseEntity.badRequest().body(Map.of("error", "Tipo de movimiento inválido"));
         }
 
+        Long tenantActual = TenantContext.getCurrentTenant();
         ProductoComercial p = productoRepository.findById(movimiento.getProducto().getId()).orElse(null);
-        if (p == null) {
+        if (p == null || tenantActual == null || !tenantActual.equals(p.getTenantId())) {
             return ResponseEntity.badRequest().body(Map.of("error", "El producto no existe"));
         }
 
