@@ -1518,7 +1518,7 @@ function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, o
     const soltarMouse = () => {
       if (seMovioRef.current) {
         const pos = posiciones[arrastrando];
-        if (pos) actualizarPosicionMesa(tenantId, arrastrando, { posX: Math.round(pos.x), posY: Math.round(pos.y), ancho: ANCHO_DEFECTO, alto: ANCHO_DEFECTO }).catch(() => {});
+        if (pos) actualizarPosicionMesa(tenantId, arrastrando, { posX: Math.round(pos.x), posY: Math.round(pos.y), ancho: ANCHO_DEFECTO, alto: ANCHO_DEFECTO }).catch(() => alert("No se pudo guardar la nueva posición de la mesa — al recargar la página volverá a su lugar anterior."));
       }
       setArrastrando(null);
     };
@@ -4723,11 +4723,11 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 {(buscandoCliente || guardandoCliente) && !clienteSel && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">…</span>}
               </div>
               <input value={telefonoClienteInline} onChange={(e) => setTelefonoClienteInline(e.target.value)}
-                onBlur={() => { if (clienteSel) editarCliente(tenantId, clienteSel.id, { telefono: telefonoClienteInline.trim() || undefined }).then(setClienteSel).catch(() => {}); }}
+                onBlur={() => { if (clienteSel) editarCliente(tenantId, clienteSel.id, { telefono: telefonoClienteInline.trim() || undefined }).then(setClienteSel).catch(() => alert("No se pudo guardar el teléfono del cliente — revisa tu conexión e inténtalo de nuevo.")); }}
                 placeholder="Teléfono (opcional)" className="input-horeca w-full text-xs" />
             </div>
             <input value={nombreClienteInline} onChange={(e) => setNombreClienteInline(e.target.value)}
-              onBlur={() => { if (clienteSel && nombreClienteInline.trim()) editarCliente(tenantId, clienteSel.id, { nombre: nombreClienteInline.trim() }).then(setClienteSel).catch(() => {}); }}
+              onBlur={() => { if (clienteSel && nombreClienteInline.trim()) editarCliente(tenantId, clienteSel.id, { nombre: nombreClienteInline.trim() }).then(setClienteSel).catch(() => alert("No se pudo guardar el nombre del cliente — revisa tu conexión e inténtalo de nuevo.")); }}
               placeholder="Nombre y apellido (opcional)" className="input-horeca w-full text-xs" />
           </div>
 
