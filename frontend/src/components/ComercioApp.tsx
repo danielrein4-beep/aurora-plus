@@ -1718,8 +1718,6 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   stock,
                   stockMinimo: Number(fd.get("stockMinimo")) || 5,
                   principioActivo: String(fd.get("principioActivo") || "") || undefined,
-                  lote: String(fd.get("lote") || "") || undefined,
-                  fechaVencimiento: String(fd.get("fechaVencimiento") || "") || undefined,
                   unidadMedida,
                   ubicacion: String(fd.get("ubicacion") || "") || undefined,
                   precioMayorista,
@@ -1763,17 +1761,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               </div>
 
               {perfilActivo === "farmacia" && (
-                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-800/50 rounded-xl border border-slate-700">
+                <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 space-y-2">
                   <div>
                     <label className="text-[10px] font-bold text-emerald-400 block mb-1">Principio Activo</label>
-                    <input name="principioActivo" placeholder="Ej. Paracetamol" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white" />
+                    <input name="principioActivo" placeholder="Ej. Paracetamol 500mg" className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs" />
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-emerald-400 block mb-1">Lote / Vencimiento</label>
-                    <div className="flex gap-1">
-                      <input name="lote" placeholder="Lote" className="w-1/2 px-2 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-mono" />
-                      <input name="fechaVencimiento" placeholder="MM/AAAA" className="w-1/2 px-2 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-mono" />
-                    </div>
+                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center gap-1.5">
+                    <span>ℹ️</span>
+                    <span>Trazabilidad de Lote y Vencimiento (FEFO) se gestionará en el módulo especializado de Farmacia.</span>
                   </div>
                 </div>
               )}
