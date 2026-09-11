@@ -15,7 +15,7 @@ import HistorialImportacionesSalud from "./HistorialImportacionesSalud";
 import { useAuth } from "../context/AuthContext";
 import {
   contadorInboxExamenesRecibidos, listarExamenesRecibidosPorPaciente, type ExamenRecibidoPaciente,
-  listarPacientes, crearPaciente, eliminarPaciente, buscarPacientePorIdentificacion,
+  listarPacientes, crearPaciente, actualizarPaciente, eliminarPaciente, buscarPacientePorIdentificacion,
   listarCitasDelDia, listarCitasPorRango, agendarCita, actualizarEstadoCita, reprogramarCita, listarCobrosDelDia,
   listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera, procesarCobro,
   listarCierresCaja, registrarCierreCaja,
@@ -454,6 +454,110 @@ function ModalClaveDoctor({
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// MODAL DE PRIMERA VEZ: EL MÉDICO ELIGE SU PROPIO PIN DE 4 DÍGITOS
+// (en vez de heredar "1234" en silencio — ver claveDoctorPersonalizada)
+// ══════════════════════════════════════════════════════════════════════════
+function ModalConfigurarClavePrimeraVez({
+  doctorNombre,
+  onConfigurado,
+}: {
+  doctorNombre: string;
+  onConfigurado: (nuevoPin: string) => void;
+}) {
+  const [pin, setPin] = useState("");
+  const [confirmar, setConfirmar] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const soloDigitos = (v: string) => v.replace(/\D/g, "").slice(0, 4);
+
+  const validar = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pin.length !== 4) {
+      setError("El PIN debe tener exactamente 4 dígitos.");
+      return;
+    }
+    if (pin !== confirmar) {
+      setError("Los dos PIN no coinciden — revísalos e intenta de nuevo.");
+      return;
+    }
+    onConfigurado(pin);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/75 backdrop-blur-md animate-fade-smooth">
+      <div className="relative w-full max-w-md rounded-3xl p-6 sm:p-7 bg-white dark:bg-[#071a2e] border border-teal-500/40 text-slate-900 dark:text-white space-y-5 shadow-2xl transition-colors duration-300 animate-modal-enter">
+        <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-white/10">
+          <div className="w-12 h-12 rounded-2xl bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-[#00FFC2] flex items-center justify-center border border-teal-500/20 dark:border-teal-500/30">
+            <IconLock size={22} />
+          </div>
+          <div>
+            <h3 className="font-['Outfit'] font-black text-lg leading-tight text-slate-900 dark:text-white">
+              Elige tu PIN de acceso
+            </h3>
+            <p className="text-[11px] text-teal-600 dark:text-teal-300/70">{doctorNombre}</p>
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+          Es la primera vez que entras al panel médico. Antes de seguir, elige un PIN de <strong>4 dígitos</strong> propio
+          — protege el expediente clínico de tus pacientes. Podrás cambiarlo después en Configuración &amp; Perfil.
+        </p>
+
+        <form onSubmit={validar} className="space-y-4">
+          {error && (
+            <div className="p-3 rounded-xl bg-red-500/10 dark:bg-red-500/15 border border-red-500/30 dark:border-red-500/40 text-red-600 dark:text-red-300 text-xs font-bold flex items-center gap-2">
+              <IconWarning size={16} className="text-red-500 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase">
+              Nuevo PIN (4 dígitos) *
+            </label>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoFocus
+              required
+              maxLength={4}
+              placeholder="••••"
+              value={pin}
+              onChange={(e) => setPin(soloDigitos(e.target.value))}
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 text-slate-900 dark:border-white/15 dark:bg-black/40 dark:text-white font-mono text-lg tracking-[0.5em] text-center focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase">
+              Confirma tu PIN *
+            </label>
+            <input
+              type="password"
+              inputMode="numeric"
+              required
+              maxLength={4}
+              placeholder="••••"
+              value={confirmar}
+              onChange={(e) => setConfirmar(soloDigitos(e.target.value))}
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 text-slate-900 dark:border-white/15 dark:bg-black/40 dark:text-white font-mono text-lg tracking-[0.5em] text-center focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full btn-electric-blue text-xs font-bold px-6 py-3 rounded-xl cursor-pointer shadow-lg flex items-center justify-center gap-2 text-white"
+          >
+            <IconCheck size={16} />
+            <span>Guardar mi PIN y entrar al Panel Médico</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [inboxLabPendientes, setInboxLabPendientes] = useState(0);
 
@@ -486,6 +590,11 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     tasaBCV: 56.40,
     tasaCOP: 4200,
     claveDoctor: "1234",
+    // false hasta que el médico elige su propio PIN por primera vez (ver
+    // ModalConfigurarClavePrimeraVez) — mientras esté en false, en vez de pedir
+    // el PIN de fábrica se le pide que elija el suyo, para que "1234" nunca
+    // quede como clave real de nadie sin que el médico lo haya decidido así.
+    claveDoctorPersonalizada: false,
   });
 
   const [configPerfil, setConfigPerfil] = useState(() => {
@@ -712,7 +821,20 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           onSeleccionarSecretaria={seleccionarSecretaria}
           onSalir={handleSalirAlHub}
         />
-        {modalClaveDoctor && (
+        {modalClaveDoctor && !configPerfil.claveDoctorPersonalizada && (
+          <ModalConfigurarClavePrimeraVez
+            doctorNombre={configPerfil.doctorNombre}
+            onConfigurado={(nuevoPin) => {
+              guardarConfigPerfil({ ...configPerfil, claveDoctor: nuevoPin, claveDoctorPersonalizada: true });
+              setModalClaveDoctor(false);
+              if (accionPendienteDoctor) {
+                accionPendienteDoctor();
+                setAccionPendienteDoctor(null);
+              }
+            }}
+          />
+        )}
+        {modalClaveDoctor && configPerfil.claveDoctorPersonalizada && (
           <ModalClaveDoctor
             doctorNombre={configPerfil.doctorNombre}
             claveCorrecta={configPerfil.claveDoctor || "1234"}
@@ -952,7 +1074,20 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         )}
 
         {/* MODAL DE AUTENTICACIÓN MÉDICA PARA SECCIONES RESTRINGIDAS */}
-        {modalClaveDoctor && (
+        {modalClaveDoctor && !configPerfil.claveDoctorPersonalizada && (
+          <ModalConfigurarClavePrimeraVez
+            doctorNombre={configPerfil.doctorNombre}
+            onConfigurado={(nuevoPin) => {
+              guardarConfigPerfil({ ...configPerfil, claveDoctor: nuevoPin, claveDoctorPersonalizada: true });
+              setModalClaveDoctor(false);
+              if (accionPendienteDoctor) {
+                accionPendienteDoctor();
+                setAccionPendienteDoctor(null);
+              }
+            }}
+          />
+        )}
+        {modalClaveDoctor && configPerfil.claveDoctorPersonalizada && (
           <ModalClaveDoctor
             doctorNombre={configPerfil.doctorNombre}
             claveCorrecta={configPerfil.claveDoctor || "1234"}
@@ -1842,7 +1977,7 @@ function GestionPacientes({
   const [pacienteAEliminar, setPacienteAEliminar] = useState<Paciente | null>(null);
   const [eliminando, setEliminando] = useState(false);
 
-  const [form, setForm] = useState({
+  const formVacio = {
     identificacion: "",
     nombres: "",
     apellidos: "",
@@ -1853,9 +1988,44 @@ function GestionPacientes({
     genero: "M",
     tipoOrigen: "Local",
     ciudadOrigen: "San Cristóbal",
-  });
+    grupoSanguineo: "",
+    alergias: "",
+    antecedentesPatologicos: "",
+    antecedentesQuirurgicos: "",
+    antecedentesFamiliares: "",
+    contactoEmergenciaNombre: "",
+    contactoEmergenciaTelefono: "",
+  };
+  const [form, setForm] = useState(formVacio);
+  // null = registrando paciente nuevo; con id = editando un paciente existente
+  // (ver botón "Editar" en la ficha) — mismo formulario para ambos casos.
+  const [pacienteEditandoId, setPacienteEditandoId] = useState<number | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const abrirEdicion = (p: Paciente) => {
+    setForm({
+      identificacion: p.identificacion || "",
+      nombres: p.nombres || "",
+      apellidos: p.apellidos || "",
+      telefono: p.telefono || "",
+      email: p.email || "",
+      fechaNacimiento: p.fechaNacimiento || "",
+      direccion: p.direccion || "",
+      genero: p.genero || "M",
+      tipoOrigen: p.tipoOrigen || "Local",
+      ciudadOrigen: p.ciudadOrigen || "San Cristóbal",
+      grupoSanguineo: p.grupoSanguineo || "",
+      alergias: p.alergias || "",
+      antecedentesPatologicos: p.antecedentesPatologicos || "",
+      antecedentesQuirurgicos: p.antecedentesQuirurgicos || "",
+      antecedentesFamiliares: p.antecedentesFamiliares || "",
+      contactoEmergenciaNombre: p.contactoEmergenciaNombre || "",
+      contactoEmergenciaTelefono: p.contactoEmergenciaTelefono || "",
+    });
+    setPacienteEditandoId(p.id);
+    setMostrarForm(true);
+  };
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim();
@@ -1878,7 +2048,7 @@ function GestionPacientes({
     setError(null);
     setGuardando(true);
     try {
-      const nuevo = await crearPaciente(tenantId, {
+      const datos = {
         identificacion: form.identificacion.trim(),
         nombres: form.nombres.trim(),
         apellidos: form.apellidos.trim(),
@@ -1889,26 +2059,26 @@ function GestionPacientes({
         genero: form.genero,
         tipoOrigen: form.tipoOrigen,
         ciudadOrigen: form.ciudadOrigen,
-      });
-      setForm({
-        identificacion: "",
-        nombres: "",
-        apellidos: "",
-        telefono: "",
-        email: "",
-        fechaNacimiento: "",
-        direccion: "",
-        genero: "M",
-        tipoOrigen: "Local",
-        ciudadOrigen: "San Cristóbal",
-      });
+        grupoSanguineo: form.grupoSanguineo || undefined,
+        alergias: form.alergias.trim() || undefined,
+        antecedentesPatologicos: form.antecedentesPatologicos.trim() || undefined,
+        antecedentesQuirurgicos: form.antecedentesQuirurgicos.trim() || undefined,
+        antecedentesFamiliares: form.antecedentesFamiliares.trim() || undefined,
+        contactoEmergenciaNombre: form.contactoEmergenciaNombre.trim() || undefined,
+        contactoEmergenciaTelefono: form.contactoEmergenciaTelefono.trim() || undefined,
+      };
+      const guardado = pacienteEditandoId
+        ? await actualizarPaciente(tenantId, pacienteEditandoId, datos)
+        : await crearPaciente(tenantId, datos);
+      setForm(formVacio);
+      setPacienteEditandoId(null);
       setMostrarForm(false);
       onCambio();
-      if (nuevo?.id) {
-        setPacienteSeleccionadoId(nuevo.id);
+      if (guardado?.id) {
+        setPacienteSeleccionadoId(guardado.id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al registrar paciente");
+      setError(err instanceof Error ? err.message : "Error al guardar paciente");
     } finally {
       setGuardando(false);
     }
@@ -1957,7 +2127,17 @@ function GestionPacientes({
 
         <button
           type="button"
-          onClick={() => setMostrarForm(!mostrarForm)}
+          onClick={() => {
+            if (mostrarForm) {
+              setMostrarForm(false);
+              setPacienteEditandoId(null);
+              setForm(formVacio);
+            } else {
+              setPacienteEditandoId(null);
+              setForm(formVacio);
+              setMostrarForm(true);
+            }
+          }}
           className="btn-electric-blue text-xs sm:text-sm font-bold px-5 py-3 rounded-2xl flex items-center gap-2 cursor-pointer shadow-md flex-shrink-0 transition-all"
         >
           <span className="text-base leading-none">{mostrarForm ? "✕" : "+"}</span>
@@ -1965,7 +2145,7 @@ function GestionPacientes({
         </button>
       </div>
 
-      {/* FORMULARIO DE REGISTRO */}
+      {/* FORMULARIO DE REGISTRO / EDICIÓN */}
       {mostrarForm && (
         <form onSubmit={guardar} className="apple-glass rounded-3xl p-6 sm:p-7 space-y-5 border border-teal-500/40 shadow-xl bg-white/95 dark:bg-[#06182c]/95">
           <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
@@ -1974,13 +2154,21 @@ function GestionPacientes({
                 <IconUser size={20} />
               </div>
               <div>
-                <h4 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">Registrar Nuevo Paciente</h4>
-                <p className="text-[11px] text-slate-500 dark:text-white/50">Completa los datos para apertura de historia clínica</p>
+                <h4 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">
+                  {pacienteEditandoId ? "Editar Paciente" : "Registrar Nuevo Paciente"}
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-white/50">
+                  {pacienteEditandoId ? "Actualiza los datos del expediente clínico" : "Completa los datos para apertura de historia clínica"}
+                </p>
               </div>
             </div>
             <button
               type="button"
-              onClick={() => setMostrarForm(false)}
+              onClick={() => {
+                setMostrarForm(false);
+                setPacienteEditandoId(null);
+                setForm(formVacio);
+              }}
               className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 cursor-pointer"
             >
               <IconClose size={18} />
@@ -2083,10 +2271,100 @@ function GestionPacientes({
             </div>
           </div>
 
+          {/* DATOS CLÍNICOS — seguridad del paciente */}
+          <div className="pt-2 border-t border-slate-200 dark:border-white/10 space-y-4">
+            <div className="flex items-center gap-2 pt-3">
+              <IconPrescription size={15} className="text-red-500" />
+              <h5 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white">Datos Clínicos</h5>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-3">
+                <label className="text-[10px] text-red-600 dark:text-red-400 uppercase font-mono font-bold flex items-center gap-1.5">
+                  ⚠ Alergias Conocidas
+                </label>
+                <textarea
+                  placeholder="Ej. Penicilina, sulfas, mariscos... (dejar en blanco si no tiene ninguna conocida)"
+                  value={form.alergias}
+                  onChange={(e) => setForm({ ...form, alergias: e.target.value })}
+                  rows={2}
+                  className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-red-300 dark:border-red-500/30 bg-red-50/60 dark:bg-red-950/20 text-xs text-slate-900 dark:text-white placeholder:text-red-400/70 focus:outline-none focus:ring-2 focus:ring-red-500/30"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Grupo Sanguíneo</label>
+                <select
+                  value={form.grupoSanguineo}
+                  onChange={(e) => setForm({ ...form, grupoSanguineo: e.target.value })}
+                  className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+                >
+                  <option value="">No especificado</option>
+                  {["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"].map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Contacto de Emergencia — Nombre</label>
+                <input
+                  placeholder="Ej. María Gómez (madre)"
+                  value={form.contactoEmergenciaNombre}
+                  onChange={(e) => setForm({ ...form, contactoEmergenciaNombre: e.target.value })}
+                  className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Contacto de Emergencia — Teléfono</label>
+                <input
+                  placeholder="0414-7654321"
+                  value={form.contactoEmergenciaTelefono}
+                  onChange={(e) => setForm({ ...form, contactoEmergenciaTelefono: e.target.value })}
+                  className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="sm:col-span-3">
+                <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Antecedentes Patológicos</label>
+                <textarea
+                  placeholder="Ej. Hipertensión, diabetes tipo 2..."
+                  value={form.antecedentesPatologicos}
+                  onChange={(e) => setForm({ ...form, antecedentesPatologicos: e.target.value })}
+                  rows={2}
+                  className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="sm:col-span-3">
+                <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Antecedentes Quirúrgicos</label>
+                <textarea
+                  placeholder="Ej. Apendicectomía (2018)..."
+                  value={form.antecedentesQuirurgicos}
+                  onChange={(e) => setForm({ ...form, antecedentesQuirurgicos: e.target.value })}
+                  rows={2}
+                  className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="sm:col-span-3">
+                <label className="text-[10px] text-slate-500 dark:text-white/40 uppercase font-mono font-bold">Antecedentes Familiares</label>
+                <textarea
+                  placeholder="Ej. Padre con diabetes, madre con hipertensión..."
+                  value={form.antecedentesFamiliares}
+                  onChange={(e) => setForm({ ...form, antecedentesFamiliares: e.target.value })}
+                  rows={2}
+                  className="w-full mt-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
-              onClick={() => setMostrarForm(false)}
+              onClick={() => {
+                setMostrarForm(false);
+                setPacienteEditandoId(null);
+                setForm(formVacio);
+              }}
               className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 text-xs font-bold hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer text-slate-600 dark:text-white/70"
             >
               Cancelar
@@ -2096,7 +2374,7 @@ function GestionPacientes({
               disabled={guardando}
               className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl disabled:opacity-50 cursor-pointer shadow-md"
             >
-              {guardando ? "Guardando…" : "Guardar Paciente"}
+              {guardando ? "Guardando…" : pacienteEditandoId ? "Guardar Cambios" : "Guardar Paciente"}
             </button>
           </div>
         </form>
@@ -2237,6 +2515,16 @@ function GestionPacientes({
                 </div>
               </div>
 
+              {pacienteActivo.alergias && pacienteActivo.alergias.trim() && (
+                <div className="rounded-xl border border-red-400/60 bg-red-500/10 px-3.5 py-2.5 flex items-start gap-2">
+                  <span className="text-red-500 text-base leading-none mt-0.5">⚠</span>
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-wider text-red-600 dark:text-red-400">Alergias Conocidas</div>
+                    <div className="text-xs font-bold text-red-700 dark:text-red-300 mt-0.5">{pacienteActivo.alergias}</div>
+                  </div>
+                </div>
+              )}
+
               <div className="border-t border-slate-200/80 dark:border-white/10" />
 
               {/* Lista de Detalles del Paciente */}
@@ -2297,6 +2585,44 @@ function GestionPacientes({
                     {pacienteActivo.direccion || "Barrio Blanco, Cúcuta"}
                   </span>
                 </div>
+
+                {pacienteActivo.grupoSanguineo && (
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-slate-500 dark:text-white/50 font-bold">Grupo Sanguíneo:</span>
+                    <span className="font-mono font-extrabold text-slate-900 dark:text-white">{pacienteActivo.grupoSanguineo}</span>
+                  </div>
+                )}
+
+                {(pacienteActivo.contactoEmergenciaNombre || pacienteActivo.contactoEmergenciaTelefono) && (
+                  <div className="flex flex-col py-1 space-y-1">
+                    <span className="text-slate-500 dark:text-white/50 font-bold">Contacto de Emergencia:</span>
+                    <span className="text-slate-800 dark:text-white/90">
+                      {pacienteActivo.contactoEmergenciaNombre || "—"}
+                      {pacienteActivo.contactoEmergenciaTelefono ? ` · ${pacienteActivo.contactoEmergenciaTelefono}` : ""}
+                    </span>
+                  </div>
+                )}
+
+                {pacienteActivo.antecedentesPatologicos && (
+                  <div className="flex flex-col py-1 space-y-1">
+                    <span className="text-slate-500 dark:text-white/50 font-bold">Antecedentes Patológicos:</span>
+                    <span className="text-slate-800 dark:text-white/90">{pacienteActivo.antecedentesPatologicos}</span>
+                  </div>
+                )}
+
+                {pacienteActivo.antecedentesQuirurgicos && (
+                  <div className="flex flex-col py-1 space-y-1">
+                    <span className="text-slate-500 dark:text-white/50 font-bold">Antecedentes Quirúrgicos:</span>
+                    <span className="text-slate-800 dark:text-white/90">{pacienteActivo.antecedentesQuirurgicos}</span>
+                  </div>
+                )}
+
+                {pacienteActivo.antecedentesFamiliares && (
+                  <div className="flex flex-col py-1 space-y-1">
+                    <span className="text-slate-500 dark:text-white/50 font-bold">Antecedentes Familiares:</span>
+                    <span className="text-slate-800 dark:text-white/90">{pacienteActivo.antecedentesFamiliares}</span>
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-slate-200/80 dark:border-white/10" />
@@ -2323,6 +2649,15 @@ function GestionPacientes({
                 >
                   <IconPrescription size={15} className="text-teal-600 dark:text-teal-400" />
                   <span>Cotizar Procedimiento</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => abrirEdicion(pacienteActivo)}
+                  className="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-white/15 bg-slate-50/50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-800 dark:text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+                >
+                  <IconUser size={15} className="text-sky-600 dark:text-sky-400" />
+                  <span>Editar Datos del Paciente</span>
                 </button>
 
                 <button
@@ -7337,18 +7672,19 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
 
   const guardarClave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!claveForm.nueva) {
-      setMensaje("⚠️ La nueva clave no puede estar vacía.");
+    const nueva = claveForm.nueva.trim();
+    if (!/^\d{4}$/.test(nueva)) {
+      setMensaje("⚠️ El PIN debe ser de exactamente 4 dígitos numéricos.");
       return;
     }
-    if (claveForm.nueva !== claveForm.confirmar) {
-      setMensaje("❌ Las contraseñas no coinciden.");
+    if (nueva !== claveForm.confirmar.trim()) {
+      setMensaje("❌ Los dos PIN no coinciden.");
       return;
     }
-    const configActualizada = { ...form, claveDoctor: claveForm.nueva.trim() };
+    const configActualizada = { ...form, claveDoctor: nueva, claveDoctorPersonalizada: true };
     onGuardar(configActualizada);
     setForm(configActualizada);
-    setMensaje("✓ PIN / Contraseña del Doctor actualizada exitosamente.");
+    setMensaje("✓ PIN del Doctor actualizado exitosamente.");
     setClaveForm({ actual: "", nueva: "", confirmar: "" });
     setTimeout(() => setMensaje(null), 3500);
   };
@@ -7425,25 +7761,29 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Nuevo PIN / Contraseña *</label>
+            <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Nuevo PIN (4 dígitos) *</label>
             <input
               type="password"
+              inputMode="numeric"
               required
-              placeholder="Ej. 1234"
+              maxLength={4}
+              placeholder="••••"
               value={claveForm.nueva}
-              onChange={(e) => setClaveForm({ ...claveForm, nueva: e.target.value })}
-              className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono"
+              onChange={(e) => setClaveForm({ ...claveForm, nueva: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+              className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono tracking-[0.3em] text-center"
             />
           </div>
           <div>
             <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Confirmar PIN *</label>
             <input
               type="password"
+              inputMode="numeric"
               required
-              placeholder="Repite el PIN"
+              maxLength={4}
+              placeholder="••••"
               value={claveForm.confirmar}
-              onChange={(e) => setClaveForm({ ...claveForm, confirmar: e.target.value })}
-              className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono"
+              onChange={(e) => setClaveForm({ ...claveForm, confirmar: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+              className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono tracking-[0.3em] text-center"
             />
           </div>
         </div>

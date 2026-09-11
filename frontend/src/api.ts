@@ -210,6 +210,13 @@ export interface Paciente {
   tipoOrigen?: string | null;
   origen?: string | null;
   ciudadOrigen?: string | null;
+  grupoSanguineo?: string | null;
+  alergias?: string | null;
+  antecedentesPatologicos?: string | null;
+  antecedentesQuirurgicos?: string | null;
+  antecedentesFamiliares?: string | null;
+  contactoEmergenciaNombre?: string | null;
+  contactoEmergenciaTelefono?: string | null;
 }
 
 export async function listarPacientes(tenantId: number): Promise<Paciente[]> {
@@ -228,11 +235,25 @@ export interface NuevoPaciente {
   tipoOrigen?: string;
   origen?: string;
   ciudadOrigen?: string;
+  grupoSanguineo?: string;
+  alergias?: string;
+  antecedentesPatologicos?: string;
+  antecedentesQuirurgicos?: string;
+  antecedentesFamiliares?: string;
+  contactoEmergenciaNombre?: string;
+  contactoEmergenciaTelefono?: string;
 }
 
 export async function crearPaciente(tenantId: number, datos: NuevoPaciente): Promise<Paciente> {
   return request<Paciente>(`/api/salud/pacientes?tenantId=${tenantId}`, {
     method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function actualizarPaciente(tenantId: number, id: number, datos: NuevoPaciente): Promise<Paciente> {
+  return request<Paciente>(`/api/salud/pacientes/${id}?tenantId=${tenantId}`, {
+    method: "PUT",
     body: JSON.stringify(datos),
   });
 }
