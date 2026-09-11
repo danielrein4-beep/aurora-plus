@@ -10,6 +10,7 @@ import { useAuth } from "../context/AuthContext";
 import * as XLSX from "xlsx";
 import {
   listarAnimalesGanaderia, crearAnimalGanaderia, actualizarAnimalGanaderia,
+  registrarVentaGanaderia,
   listarPotrerosGanaderia, crearPotreroGanaderia, rotarPotreroGanaderia,
   registrarOrdenoGanaderia, obtenerReporteOrdenoGanaderia,
   registrarPesoGanaderia, obtenerGdpGanaderia,
@@ -413,17 +414,36 @@ export default function GanaderiaApp({ onSalir }: Props) {
     });
   };
 
-  // Manejador: Despacho por Venta / Beneficio
+  // Manejador: Despacho por Venta / Beneficio (POST /api/ganaderia/ventas a través de VentaAnimalController)
   const handleRegistrarVentaAnimal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formVenta.animalId) return;
+    if (!formVenta.animalId || !formVenta.comprador.trim() || !formVenta.precioUSD) return;
 
     try {
-      await actualizarAnimalGanaderia(formVenta.animalId, tenantId, { estado: "VENDIDO" });
-      setAnimales(prev => prev.map(a => a.id === formVenta.animalId ? { ...a, estado: "VENDIDO" } : a));
-      notificar("Animal despachado por venta/beneficio exitosamente. Marcado como VENDIDO.");
-    } catch {
-      notificar("⚠️ No se pudo procesar la salida por venta — revisa tu conexión e inténtalo de nuevo.");
+      // 1. Si se registró nuevo peso en báscula antes del despacho, actualizar peso del animal
+      if (formVenta.pesoSalida && Number(formVenta.pesoSalida) > 0) {
+        await actualizarAnimalGanaderia(formVenta.animalId, tenantId, { pesoActual: Number(formVenta.pesoSalida) });
+      }
+
+      // 2. Registrar la venta oficial en el backend con VentaAnimalController (guarda comprador, precio, ticket y marca el animal como VENDIDO en servicio transaccional)
+      const ticket = `VTA-${Date.now().toString().slice(-6)}`;
+      await registrarVentaGanaderia(tenantId, {
+        numeroTicket: ticket,
+        comprador: `${formVenta.comprador.trim()} [${formVenta.motivo}]`,
+        items: [
+          {
+            animalId: Number(formVenta.animalId),
+            precioVenta: Number(formVenta.precioUSD),
+          },
+        ],
+      });
+
+      // 3. Reflejar inmediatamente en el estado local: animal marcado como VENDIDO y sin potrero asignado
+      setAnimales(prev => prev.map(a => a.id === formVenta.animalId ? { ...a, estado: "VENDIDO", potrero: undefined } : a));
+      notificar(`Venta registrada exitosamente (Ticket ${ticket}). Animal despachado y liquidado.`);
+    } catch (err: any) {
+      const msg = err?.message || "Revisa tu conexión e inténtalo de nuevo";
+      notificar(`⚠️ No se pudo procesar la venta: ${msg}`);
       return;
     }
 

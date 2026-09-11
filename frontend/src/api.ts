@@ -2441,6 +2441,23 @@ export function actualizarAnimalGanaderia(id: number, tenantId: number, datos: P
   });
 }
 
+export function registrarVentaGanaderia(tenantId: number, datos: {
+  numeroTicket?: string;
+  comprador: string;
+  items: Array<{
+    animalId: number;
+    precioVenta: number;
+  }>;
+  monedaPago?: string;
+  montoRecibido?: number;
+  claveIdempotencia?: string;
+}): Promise<any> {
+  return request(`/api/ganaderia/ventas?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
 export function listarPotrerosGanaderia(): Promise<PotreroGanaderia[]> {
   return request(`/api/ganaderia/potreros`);
 }
