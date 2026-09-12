@@ -2472,6 +2472,13 @@ export function actualizarAnimalGanaderia(id: number, tenantId: number, datos: P
   });
 }
 
+export function moverAnimalGanaderia(id: number, tenantId: number, potreroDestinoId: number, motivo?: string) {
+  return request(`/api/ganaderia/animales/${id}/mover?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ potreroDestinoId, motivo }),
+  });
+}
+
 export function registrarVentaGanaderia(tenantId: number, datos: {
   numeroTicket?: string;
   comprador: string;

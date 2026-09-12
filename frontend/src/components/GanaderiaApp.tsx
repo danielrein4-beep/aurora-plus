@@ -14,7 +14,7 @@ import GanaderiaMapa from "./GanaderiaMapa";
 import { useAuth } from "../context/AuthContext";
 import * as XLSX from "xlsx";
 import {
-  listarAnimalesGanaderia, crearAnimalGanaderia, actualizarAnimalGanaderia,
+  listarAnimalesGanaderia, crearAnimalGanaderia, actualizarAnimalGanaderia, moverAnimalGanaderia,
   registrarVentaGanaderia,
   listarPotrerosGanaderia, crearPotreroGanaderia, actualizarPotreroGanaderia, rotarPotreroGanaderia,
   registrarOrdenoGanaderia, obtenerReporteOrdenoGanaderia,
@@ -253,6 +253,17 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [modalMastitis, setModalMastitis] = useState(false);
   const [modalFichaAnimal, setModalFichaAnimal] = useState<AnimalGanaderia | null>(null);
   const [modalVentaAnimal, setModalVentaAnimal] = useState(false);
+  const [modalEditarAnimal, setModalEditarAnimal] = useState<AnimalGanaderia | null>(null);
+  const [formEditarAnimal, setFormEditarAnimal] = useState({
+    nombre: "",
+    raza: "",
+    tipoAnimal: "VACA",
+    pesoActual: 0,
+    lote: "",
+    potreroId: 0,
+    estadoReproductivo: "VACIA" as "VACIA" | "PREÑADA" | "EN_ESPERA",
+    estadoProductivo: "SECA" as "CRIANDO" | "ORDEÑO" | "SECA",
+  });
 
   // Formulario nuevo animal con soporte de Origen (Nacimiento / Compra) y Estados Reproductivo/Productivo
   const [formAnimal, setFormAnimal] = useState({
@@ -661,6 +672,57 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       estadoReproductivo: "VACIA",
       estadoProductivo: "SECA",
     });
+  };
+
+  // Abre el modal de edición precargado con los datos reales del animal
+  const abrirEditarAnimal = (animal: AnimalGanaderia) => {
+    setModalEditarAnimal(animal);
+    setFormEditarAnimal({
+      nombre: animal.nombre || "",
+      raza: animal.raza || "",
+      tipoAnimal: animal.tipoAnimal || "VACA",
+      pesoActual: Number(animal.pesoActual) || 0,
+      lote: animal.lote || "",
+      potreroId: animal.potrero?.id || 0,
+      estadoReproductivo: (animal.estadoReproductivo as any) || "VACIA",
+      estadoProductivo: (animal.estadoProductivo as any) || "SECA",
+    });
+  };
+
+  // Guarda los cambios del animal (PUT) y, si cambió de potrero, lo mueve por separado
+  // (POST /mover) para que quede el kardex de ubicación correcto.
+  const handleGuardarEdicionAnimal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modalEditarAnimal) return;
+
+    try {
+      const datos: any = {
+        nombre: formEditarAnimal.nombre.trim() || undefined,
+        raza: formEditarAnimal.raza.trim() || undefined,
+        tipoAnimal: formEditarAnimal.tipoAnimal,
+        pesoActual: Number(formEditarAnimal.pesoActual) || undefined,
+        lote: formEditarAnimal.lote.trim() || undefined,
+      };
+      if (modalEditarAnimal.sexo === "HEMBRA") {
+        datos.estadoReproductivo = formEditarAnimal.estadoReproductivo;
+        datos.estadoProductivo = formEditarAnimal.estadoProductivo;
+      }
+
+      const actualizado = await actualizarAnimalGanaderia(modalEditarAnimal.id, tenantId, datos);
+
+      const potreroCambio = formEditarAnimal.potreroId && formEditarAnimal.potreroId !== modalEditarAnimal.potrero?.id;
+      if (potreroCambio) {
+        await moverAnimalGanaderia(modalEditarAnimal.id, tenantId, Number(formEditarAnimal.potreroId), "Edición de ficha del animal");
+        const potreroNuevo = potreros.find(p => p.id === Number(formEditarAnimal.potreroId));
+        actualizado.potrero = potreroNuevo;
+      }
+
+      setAnimales(prev => prev.map(a => a.id === modalEditarAnimal.id ? { ...a, ...actualizado } : a));
+      notificar(`Animal arete ${modalEditarAnimal.arete} actualizado.`);
+      setModalEditarAnimal(null);
+    } catch {
+      notificar(`No se pudo actualizar el animal arete ${modalEditarAnimal.arete} — revisa tu conexión e inténtalo de nuevo.`);
+    }
   };
 
   // Manejador: Despacho por Venta / Beneficio (POST /api/ganaderia/ventas a través de VentaAnimalController)
@@ -2145,6 +2207,12 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                           Pesar
                         </button>
                         <button
+                          onClick={() => abrirEditarAnimal(animal)}
+                          title="Editar animal"
+                          className="text-slate-500 dark:text-white/60 hover:text-emerald-500 dark:hover:text-emerald-400 cursor-pointer">
+                          <IconEdit size={14} />
+                        </button>
+                        <button
                           onClick={() => setModalFichaAnimal(animal)}
                           className="apple-glass-btn px-3 py-1 rounded-xl text-[11px] font-semibold text-slate-700 dark:text-white/80 cursor-pointer">
                           Ficha & QR →
@@ -2442,18 +2510,27 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                           </div>
                         </div>
 
-                        {/* Badge de Lote */}
-                        <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-right space-y-0.5">
-                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Lote de Entrada</span>
-                          <div className="font-bold text-sm text-purple-400 flex items-center gap-1.5 justify-end">
-                            <IconTag size={14} />
-                            <span>{animalSel.lote || "Sin Lote Asignado"}</span>
-                          </div>
-                          {animalSel.valorEstimado && (
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              Costo / Valor: ${animalSel.valorEstimado} USD
+                        <div className="flex items-start gap-2">
+                          {/* Badge de Lote */}
+                          <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-right space-y-0.5">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Lote de Entrada</span>
+                            <div className="font-bold text-sm text-purple-400 flex items-center gap-1.5 justify-end">
+                              <IconTag size={14} />
+                              <span>{animalSel.lote || "Sin Lote Asignado"}</span>
                             </div>
-                          )}
+                            {animalSel.valorEstimado && (
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                Costo / Valor: ${animalSel.valorEstimado} USD
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => abrirEditarAnimal(animalSel)}
+                            title="Editar animal"
+                            className="p-2.5 rounded-2xl bg-white/5 border border-white/10 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 cursor-pointer transition-colors">
+                            <IconEdit size={16} />
+                          </button>
                         </div>
                       </div>
 
@@ -4808,6 +4885,143 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       )}
 
       {/* MODAL: REGISTRAR PESAJE & GDP */}
+      {/* MODAL: EDITAR ANIMAL */}
+      {modalEditarAnimal && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/30 text-left space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
+                  <IconEdit size={18} />
+                  <span>Editar Animal</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-white/60 mt-1">
+                  Arete: <strong className="text-emerald-400">{modalEditarAnimal.arete}</strong> (no editable — es la identidad del animal)
+                </p>
+              </div>
+              <button
+                onClick={() => setModalEditarAnimal(null)}
+                className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarEdicionAnimal} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Nombre</label>
+                  <input
+                    type="text"
+                    value={formEditarAnimal.nombre}
+                    onChange={e => setFormEditarAnimal({ ...formEditarAnimal, nombre: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Raza</label>
+                  <input
+                    type="text"
+                    list="razas-bovinas-catalogo"
+                    value={formEditarAnimal.raza}
+                    onChange={e => setFormEditarAnimal({ ...formEditarAnimal, raza: e.target.value })}
+                    onFocus={e => e.target.select()}
+                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Categoría</label>
+                  <select
+                    value={formEditarAnimal.tipoAnimal}
+                    onChange={e => setFormEditarAnimal({ ...formEditarAnimal, tipoAnimal: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
+                    {(modalEditarAnimal.sexo === "HEMBRA"
+                      ? ["VACA", "NOVILLA", "MAUTA", "BECERRA"]
+                      : ["TORO", "NOVILLO", "MAUTE", "TERNERO"]
+                    ).map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Peso Actual (kg)</label>
+                  <input
+                    type="number"
+                    onFocus={e => e.target.select()}
+                    value={formEditarAnimal.pesoActual}
+                    onChange={e => setFormEditarAnimal({ ...formEditarAnimal, pesoActual: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Potrero Asignado</label>
+                  <select
+                    value={formEditarAnimal.potreroId}
+                    onChange={e => setFormEditarAnimal({ ...formEditarAnimal, potreroId: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
+                    <option value={0}>Sin potrero</option>
+                    {potreros.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Lote</label>
+                  <input
+                    type="text"
+                    value={formEditarAnimal.lote}
+                    onChange={e => setFormEditarAnimal({ ...formEditarAnimal, lote: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              {modalEditarAnimal.sexo === "HEMBRA" && (
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+                  <div>
+                    <label className="text-slate-400 block mb-1">Estado Reproductivo</label>
+                    <select
+                      value={formEditarAnimal.estadoReproductivo}
+                      onChange={e => setFormEditarAnimal({ ...formEditarAnimal, estadoReproductivo: e.target.value as any })}
+                      className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
+                      <option value="VACIA">Vacía</option>
+                      <option value="PREÑADA">Preñada</option>
+                      <option value="EN_ESPERA">En Espera (Celo / IA)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Estado Productivo</label>
+                    <select
+                      value={formEditarAnimal.estadoProductivo}
+                      onChange={e => setFormEditarAnimal({ ...formEditarAnimal, estadoProductivo: e.target.value as any })}
+                      className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
+                      <option value="SECA">Seca</option>
+                      <option value="ORDEÑO">En Ordeño</option>
+                      <option value="CRIANDO">Criando / Amamantando</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModalEditarAnimal(null)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-cyber-neon text-white font-bold px-6 py-2.5 rounded-xl cursor-pointer">
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {modalPesaje && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-emerald-500/30 text-left space-y-4">
