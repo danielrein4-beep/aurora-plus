@@ -208,6 +208,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Estados de datos
   const [animales, setAnimales] = useState<AnimalGanaderia[]>([]);
+  // Animales activos en el hato (excluye vendidos/muertos) — usado en conteos y selectores operativos
+  const animalesActivos = animales.filter(a => a.estado === "ACTIVO" || !a.estado);
   const [potreros, setPotreros] = useState<PotreroGanaderia[]>([]);
   const [ordenos, setOrdenos] = useState<RegistroOrdenoGanaderia[]>([]);
   const [vacunas, setVacunas] = useState<VacunaGanaderia[]>(DEFAULT_VACUNAS_CATALOGO);
@@ -413,13 +415,13 @@ export default function GanaderiaApp({ onSalir }: Props) {
   // selección: en cuanto la lista real de animales carga, si el animal
   // seleccionado no existe de verdad, se corrige al primero real disponible.
   useEffect(() => {
-    if (animales.length === 0) return;
-    const hembras = animales.filter(a => a.sexo === "HEMBRA");
-    if (!animales.some(a => a.id === formOrdeno.animalId)) {
-      setFormOrdeno(prev => ({ ...prev, animalId: animales[0].id }));
+    if (animalesActivos.length === 0) return;
+    const hembras = animalesActivos.filter(a => a.sexo === "HEMBRA");
+    if (!animalesActivos.some(a => a.id === formOrdeno.animalId)) {
+      setFormOrdeno(prev => ({ ...prev, animalId: animalesActivos[0].id }));
     }
-    if (!animales.some(a => a.id === formVacuna.animalId)) {
-      setFormVacuna(prev => ({ ...prev, animalId: animales[0].id }));
+    if (!animalesActivos.some(a => a.id === formVacuna.animalId)) {
+      setFormVacuna(prev => ({ ...prev, animalId: animalesActivos[0].id }));
     }
     if (hembras.length > 0) {
       if (!hembras.some(a => a.id === formRepro.hembraId)) {
@@ -432,7 +434,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
         setFormMastitis(prev => ({ ...prev, animalId: hembras[0].id }));
       }
     }
-  }, [animales]);
+  }, [animalesActivos]);
 
   // Igual para la vacuna seleccionada en el formulario de aplicación.
   useEffect(() => {
@@ -518,8 +520,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
   };
 
   // Métricas calculadas
-  const totalAnimales = animales.length;
-  const vacasOrdeno = animales.filter(a => a.tipoAnimal === "VACA" && a.sexo === "HEMBRA").length;
+  const totalAnimales = animalesActivos.length;
+  const vacasOrdeno = animalesActivos.filter(a => a.tipoAnimal === "VACA" && a.sexo === "HEMBRA").length;
   const totalHectareas = potreros.reduce((sum, p) => sum + (Number(p.areaHectareas) || 0), 0);
   const cargaAnimalHa = totalHectareas > 0 ? (totalAnimales / totalHectareas).toFixed(2) : "0.00";
   const litrosHoy = ordenos
@@ -542,10 +544,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
   // Conteo por categoría
   const matrizConteos = categoriasHato.map(cat => ({
     ...cat,
-    count: animales.filter(cat.filter).length,
+    count: animalesActivos.filter(cat.filter).length,
     pesoPromedio: Math.round(
-      animales.filter(cat.filter).reduce((sum, a) => sum + (a.pesoActual || 0), 0) /
-      Math.max(1, animales.filter(cat.filter).length)
+      animalesActivos.filter(cat.filter).reduce((sum, a) => sum + (a.pesoActual || 0), 0) /
+      Math.max(1, animalesActivos.filter(cat.filter).length)
     ),
   }));
 
@@ -776,7 +778,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Abrir Modo Vaquera Rápida (Bulk Entry de Ordeño)
   const abrirVaqueraRapida = () => {
-    const vacas = animales.filter(a => a.sexo === "HEMBRA" && (a.tipoAnimal === "VACA" || a.tipoAnimal === "NOVILLA"));
+    const vacas = animalesActivos.filter(a => a.sexo === "HEMBRA" && (a.tipoAnimal === "VACA" || a.tipoAnimal === "NOVILLA"));
     if (vacas.length === 0) {
       notificar("⚠️ No hay vacas u novillas registradas en el hato todavía. Da de alta tus animales antes de usar Vaquera Rápida.");
       return;
@@ -4131,7 +4133,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         onChange={e => setFormAnimal({ ...formAnimal, madreId: e.target.value ? Number(e.target.value) : null })}
                         className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white text-xs">
                         <option value="">Sin madre vinculada</option>
-                        {animales.filter(a => a.sexo === "HEMBRA").map(h => (
+                        {animalesActivos.filter(a => a.sexo === "HEMBRA").map(h => (
                           <option key={h.id} value={h.id}>
                             {h.arete} - {h.nombre || h.tipoAnimal} ({h.raza || "Brahman"})
                           </option>
@@ -4521,7 +4523,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   value={formOrdeno.animalId}
                   onChange={e => setFormOrdeno({ ...formOrdeno, animalId: Number(e.target.value) })}
                   className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
-                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
                     <option key={a.id} value={a.id}>{a.arete} - {a.nombre || "Sin nombre"}</option>
                   ))}
                 </select>
@@ -4811,7 +4813,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         onChange={e => setFormVacuna({ ...formVacuna, animalId: Number(e.target.value) })}
                         className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs"
                       >
-                        {animales.map(a => (
+                        {animalesActivos.map(a => (
                           <option key={a.id} value={a.id}>
                             {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"}) {a.lote ? `[${a.lote}]` : ""}
                           </option>
@@ -4823,10 +4825,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       <div className="flex flex-wrap items-center gap-1.5 pt-1">
                         <button
                           type="button"
-                          onClick={() => setAnimalesVacunaSeleccionados(animales.map(a => a.id))}
+                          onClick={() => setAnimalesVacunaSeleccionados(animalesActivos.map(a => a.id))}
                           className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold hover:bg-emerald-500/30 cursor-pointer"
                         >
-                          ✓ Todos ({animales.length})
+                          ✓ Todos ({animalesActivos.length})
                         </button>
                         <button
                           type="button"
@@ -4842,7 +4844,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                             key={loteNombre}
                             type="button"
                             onClick={() => {
-                              const idsLote = animales.filter(a => a.lote === loteNombre).map(a => a.id);
+                              const idsLote = animalesActivos.filter(a => a.lote === loteNombre).map(a => a.id);
                               setAnimalesVacunaSeleccionados(prev => Array.from(new Set([...prev, ...idsLote])));
                             }}
                             className="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-bold hover:bg-purple-500/30 cursor-pointer"
@@ -4857,7 +4859,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                             key={pot.id}
                             type="button"
                             onClick={() => {
-                              const idsPot = animales.filter(a => a.potrero?.id === pot.id).map(a => a.id);
+                              const idsPot = animalesActivos.filter(a => a.potrero?.id === pot.id).map(a => a.id);
                               setAnimalesVacunaSeleccionados(prev => Array.from(new Set([...prev, ...idsPot])));
                             }}
                             className="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-bold hover:bg-sky-500/30 cursor-pointer"
@@ -4869,7 +4871,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
                       {/* Lista scrolleable de animales seleccionables */}
                       <div className="max-h-36 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/70 p-2 space-y-1">
-                        {animales.map(a => {
+                        {animalesActivos.map(a => {
                           const isSel = animalesVacunaSeleccionados.includes(a.id);
                           return (
                             <label
@@ -4900,7 +4902,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         })}
                       </div>
                       <div className="text-[11px] text-right font-bold text-emerald-400">
-                        {animalesVacunaSeleccionados.length} de {animales.length} animales seleccionados
+                        {animalesVacunaSeleccionados.length} de {animalesActivos.length} animales seleccionados
                       </div>
                     </div>
                   )}
@@ -5109,7 +5111,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   value={formRepro.hembraId}
                   onChange={e => setFormRepro({ ...formRepro, hembraId: Number(e.target.value) })}
                   className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
-                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
                     <option key={a.id} value={a.id}>{a.arete} - {a.nombre || a.tipoAnimal}</option>
                   ))}
                 </select>
@@ -5192,7 +5194,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   value={formCelo.hembraId}
                   onChange={e => setFormCelo({ ...formCelo, hembraId: Number(e.target.value) })}
                   className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
-                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
                     <option key={a.id} value={a.id}>
                       {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"})
                     </option>
@@ -5293,7 +5295,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   value={formMastitis.animalId}
                   onChange={e => setFormMastitis({ ...formMastitis, animalId: Number(e.target.value) })}
                   className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
-                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
                     <option key={a.id} value={a.id}>
                       {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"}) · Potrero: {a.potrero?.nombre || "Sin Potrero"}
                     </option>
