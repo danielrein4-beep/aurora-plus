@@ -31,7 +31,7 @@ export default function Layout() {
   };
 
   return (
-    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 overflow-x-hidden">
+    <div className="min-h-full bg-[#050d10] text-[var(--text-primary)] transition-colors duration-500 overflow-x-hidden">
       <AuroraGradientDef />
 
       {/* Ambient blobs */}
