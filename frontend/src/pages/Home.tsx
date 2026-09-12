@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import AuroraLogo from "../AuroraLogo";
+import MagneticButton from "../components/MagneticButton";
 import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware, IconMining,
@@ -50,6 +52,17 @@ const STATS = [
 
 const MODULES = ["Ventas & POS", "Inventario", "RRHH & Nómina", "Contabilidad", "CRM", "Compras", "Producción", "Proyectos", "Reportes BI"];
 
+// Revelado escalonado del hero al cargar la página: cada bloque aparece un
+// poco después del anterior en vez de todos de golpe.
+const heroContainer = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
+};
+const heroItem = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
+};
+
 const previewData: Record<string, { metric: string; value: string; sub: string; color: string }[]> = {
   "Ferretería": [
     { metric: "Ventas hoy",         value: "$14,820", sub: "+9% vs ayer",           color: "text-teal-500 dark:text-teal-400" },
@@ -73,29 +86,50 @@ export default function Home() {
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
 
+  // Parallax sutil: la foto de fondo se desplaza unos pocos píxeles según la
+  // posición del mouse dentro del hero, dando sensación de profundidad.
+  const heroRef = useRef<HTMLElement>(null);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const photoX = useSpring(useTransform(mouseX, [-1, 1], [-14, 14]), { stiffness: 60, damping: 20 });
+  const photoY = useSpring(useTransform(mouseY, [-1, 1], [-14, 14]), { stiffness: 60, damping: 20 });
+  const handleHeroMouseMove = (e: React.MouseEvent<HTMLElement>) => {
+    const rect = heroRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    mouseX.set(((e.clientX - rect.left) / rect.width) * 2 - 1);
+    mouseY.set(((e.clientY - rect.top) / rect.height) * 2 - 1);
+  };
+
   return (
     <main className="aurora-public-page relative overflow-hidden bg-transparent transition-colors duration-500">
       {/* ── HERO: composición editorial sobre una fotografía real ── */}
-      <section className="aurora-home-hero relative min-h-[1080px] lg:min-h-[1160px] flex flex-col pt-28 sm:pt-36 pb-0 px-5 sm:px-10 max-w-[1536px] mx-auto overflow-hidden">
+      <section
+        ref={heroRef}
+        onMouseMove={handleHeroMouseMove}
+        className="aurora-home-hero relative min-h-[1080px] lg:min-h-[1160px] flex flex-col pt-28 sm:pt-36 pb-0 px-5 sm:px-10 max-w-[1536px] mx-auto overflow-hidden">
 
         <div className="absolute inset-0 -z-10 overflow-hidden">
-          <div className="home-hero-photo" />
+          <motion.div className="home-hero-photo" style={{ x: photoX, y: photoY }} />
         </div>
 
-        <div className="relative z-10 w-full max-w-5xl mx-auto pt-28 sm:pt-36">
-          <p className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · seis rubros · tres monedas</p>
-          <h1 className="mt-5 max-w-3xl font-['IBM_Plex_Sans'] text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-[-0.055em] text-[#f8f6ef]">
+        <motion.div
+          variants={heroContainer}
+          initial="hidden"
+          animate="show"
+          className="relative z-10 w-full max-w-5xl mx-auto pt-28 sm:pt-36">
+          <motion.p variants={heroItem} className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · seis rubros · tres monedas</motion.p>
+          <motion.h1 variants={heroItem} className="mt-5 max-w-3xl font-['IBM_Plex_Sans'] text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-[-0.055em] text-[#f8f6ef]">
             Del lápiz y el papel<br />a la <span className="text-[#35d7c3]">automatización</span>
-          </h1>
-          <p className="mt-8 max-w-xl text-base leading-7 text-[#e5e1d5]/90">
+          </motion.h1>
+          <motion.p variants={heroItem} className="mt-8 max-w-xl text-base leading-7 text-[#e5e1d5]/90">
             De la libreta y la hoja de Excel a medianoche, a la comodidad de tu teléfono y tu computadora. Aurora Plus corre la caja, el inventario y la sanidad regulatoria de clínicas, restaurantes, minas, talleres, boutiques y fincas venezolanas.
-          </p>
-          <div className="mt-10 flex flex-wrap gap-3">
-            <button onClick={() => navigate("/onboarding")} className="aurora-solid-button px-6 py-3 text-sm font-semibold cursor-pointer">Solicitar demo</button>
+          </motion.p>
+          <motion.div variants={heroItem} className="mt-10 flex flex-wrap gap-3">
+            <MagneticButton onClick={() => navigate("/onboarding")} className="aurora-solid-button px-6 py-3 text-sm font-semibold cursor-pointer">Solicitar demo</MagneticButton>
             <button onClick={() => navigate("/industrias")} className="aurora-outline-button px-6 py-3 text-sm font-semibold cursor-pointer">Ver los 6 rubros ↓</button>
-          </div>
+          </motion.div>
 
-          <div className="mt-16 grid max-w-4xl grid-cols-2 gap-x-7 gap-y-8 border-t border-white/15 pt-8 sm:grid-cols-4">
+          <motion.div variants={heroItem} className="mt-16 grid max-w-4xl grid-cols-2 gap-x-7 gap-y-8 border-t border-white/15 pt-8 sm:grid-cols-4">
             {[
               ["6", "industrias nativas"],
               ["100%", "caja offline-first"],
@@ -107,7 +141,7 @@ export default function Home() {
                 <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/85">{label}</div>
               </div>
             ))}
-          </div>
+          </motion.div>
 
           <div className="aurora-rate-card mt-16 w-full max-w-md p-7 sm:p-8">
             <div className="flex items-center justify-between border-b border-white/10 pb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[#d9d8ce]/80">
@@ -122,7 +156,7 @@ export default function Home() {
               ))}
             </div>
             <p className="mt-4 pt-4 border-t border-white/10 text-sm text-[#e9e7df]/85 leading-relaxed">
-              Tú defines la tasa del día en segundos. Si el bolívar sube 15% de la mañana a la tarde, tu caja lo refleja al instante — sin hoja de cálculo, sin esperar a nadie.
+              Tú defines la tasa del día en segundos. Si el bolívar se mueve de la mañana a la tarde, tu caja lo refleja al instante — sin hoja de cálculo, sin esperar a nadie.
             </p>
             <p className="mt-4 pt-4 border-t border-white/10 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/65">Sin tasa fija · tú la actualizas cuando quieras</p>
           </div>
@@ -191,7 +225,7 @@ export default function Home() {
               ))}
             </div>
           </div>
-        </div>
+        </motion.div>
 
       </section>
 

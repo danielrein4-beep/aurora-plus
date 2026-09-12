@@ -429,7 +429,7 @@ export default function Auth() {
               <div className="line-aurora absolute top-0 left-0 right-0" />
               
               <p className="text-sm sm:text-base text-white/80 leading-relaxed italic mb-4 font-light">
-                "El bolívar sube 15% de la mañana a la tarde y tu caja lo refleja al instante — tú fijas la tasa, no una hoja de cálculo desactualizada."
+                "El bolívar se mueve de la mañana a la tarde y tu caja lo refleja al instante — tú fijas la tasa, no una hoja de cálculo desactualizada."
               </p>
 
               <div className="text-xs font-mono text-teal-400 font-semibold tracking-wider">
