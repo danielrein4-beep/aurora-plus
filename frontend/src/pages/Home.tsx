@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
+import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware, IconMining,
   IconRestaurant, IconFarm, IconRetail,
   IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile,
   IconLaptop, IconPhone, IconPlane, IconCheck,
+  IconCard, IconBox, IconBolt, IconShield,
 } from "../Icons";
 
 const INDUSTRIES = [
@@ -69,6 +71,7 @@ const previewData: Record<string, { metric: string; value: string; sub: string; 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("Ferretería");
   const navigate = useNavigate();
+  const { isLoggedIn, user } = useAuth();
 
   return (
     <main className="aurora-public-page relative overflow-hidden bg-transparent transition-colors duration-500">
@@ -116,6 +119,71 @@ export default function Home() {
               <div className="flex items-baseline justify-between border-t border-white/10 pt-4"><span className="text-xs">Ejemplo · venta de 380 kg</span><strong className="text-xl">$1.045,00</strong></div>
             </div>
             <p className="mt-5 border-t border-white/10 pt-4 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/65">Actualiza cada cobro · sin hoja de cálculo</p>
+          </div>
+
+          {/* ── ACCESO DIRECTO PARA USUARIOS EN SESIÓN ── */}
+          {isLoggedIn && (
+            <div className="mt-8 w-full max-w-2xl rounded-2xl p-6 sm:p-7 border border-[#35d7c3]/25 bg-[#030c0f]/80">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4 text-left">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#35d7c3", color: "#062323" }}>
+                    <IconClinic size={26} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#35d7c3]/15 text-[#35d7c3] border border-[#35d7c3]/25 tracking-wider uppercase font-mono">
+                        Tu sistema asignado &amp; activo
+                      </span>
+                      <span className="text-xs text-white/45">• {user?.empresa || "Clínica & Consultorios"}</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-[#f8f6ef] font-['IBM_Plex_Sans'] mt-1">
+                      Mediclinic Pro — Espacio Clínico de {user?.nombre || user?.email?.split("@")[0]}
+                    </h3>
+                    <p className="text-xs text-white/55 mt-0.5">
+                      Historias clínicas digitales, agenda médica, sala de espera reactiva, cotizador y caja diaria.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate("/mediclinic")}
+                  className="aurora-solid-button px-6 py-3 text-sm font-semibold cursor-pointer whitespace-nowrap flex items-center gap-2">
+                  <span>Abrir Mediclinic Pro</span>
+                  <span>→</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── AURORA ENGINE CORE ── */}
+          <div className="mt-8 w-full max-w-2xl rounded-2xl p-6 sm:p-7 border border-white/12 bg-[#030c0f]/70">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-white/10">
+              <div className="flex items-center gap-3.5">
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                  <AuroraLogo size={32} animated={false} />
+                </div>
+                <div className="text-left">
+                  <div className="font-['IBM_Plex_Sans'] font-bold text-sm text-[#f8f6ef] flex items-center gap-2">
+                    Aurora Engine Core
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-[#35d7c3]/15 text-[#35d7c3] font-mono border border-[#35d7c3]/25">ONLINE v2.4</span>
+                  </div>
+                  <div className="text-white/45 text-xs font-mono">Arquitectura Multi-Tenant · PostgreSQL · Offline Sync</div>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5">
+              {[
+                { label: "Caja Central", val: "Sincronizada", Icon: IconCard },
+                { label: "Kardex e Insumos", val: "Auto-Descuento", Icon: IconBox },
+                { label: "Offline POS", val: "100% Idempotente", Icon: IconBolt },
+                { label: "Roles & Privacidad", val: "RBAC Estricto", Icon: IconShield },
+              ].map((n) => (
+                <div key={n.label} className="bg-white/[0.03] hover:bg-white/[0.06] rounded-xl p-3.5 border border-white/5 hover:border-[#35d7c3]/30 transition-all duration-300 cursor-default">
+                  <div className="mb-1.5 text-[#35d7c3]"><n.Icon size={18} /></div>
+                  <div className="text-[#f8f6ef] font-semibold text-[11px] tracking-tight">{n.label}</div>
+                  <div className="text-[10px] font-mono mt-0.5 text-[#35d7c3]/80">{n.val}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

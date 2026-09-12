@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import AuroraLogo from "./AuroraLogo";
 import { useAuth } from "./context/AuthContext";
-import ThemeToggle from "./components/ThemeToggle";
 
 const LINKS = [
   { label: "Inicio",      path: "/" },
@@ -101,10 +100,9 @@ export default function Nav() {
           )}
         </div>
 
-        {/* Mobile controls (Theme Toggle + Menu trigger) */}
+        {/* Mobile controls (Menu trigger) */}
         <div className="flex md:hidden items-center gap-2">
-          <ThemeToggle className="scale-90" />
-          <button className="p-2 text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white cursor-pointer" onClick={() => setMobileOpen(!mobileOpen)}>
+          <button className="p-2 text-white/70 hover:text-white cursor-pointer" onClick={() => setMobileOpen(!mobileOpen)}>
             <div className="w-5 space-y-1.5">
               <span className={`block h-0.5 bg-current transition-all origin-center ${mobileOpen ? "rotate-45 translate-y-2" : ""}`} />
               <span className={`block h-0.5 bg-current transition-all ${mobileOpen ? "opacity-0 scale-x-0" : ""}`} />
