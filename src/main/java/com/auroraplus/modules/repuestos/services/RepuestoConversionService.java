@@ -138,7 +138,10 @@ public class RepuestoConversionService {
             throw new RuntimeException("Violación de seguridad: Presentación no pertenece a este tenant");
         }
 
-        RepuestoItem repuesto = presentacion.getRepuesto();
+        // Bloqueo pesimista sobre el RepuestoItem real (no el que trae la asociación lazy de
+        // la presentación) — es la fila cuyo stockActual se va a leer, validar y descontar.
+        RepuestoItem repuesto = repuestoItemRepository.buscarConBloqueoPesimista(presentacion.getRepuesto().getId())
+            .orElseThrow(() -> new RuntimeException("Repuesto no encontrado"));
 
         BigDecimal cantidadEnUnidadBase = calcularEquivalenciaEnUnidadBase(presentacion, cantidadVendida);
 
@@ -204,7 +207,10 @@ public class RepuestoConversionService {
             throw new RuntimeException("La cantidad debe ser mayor a cero");
         }
 
-        RepuestoItem repuesto = repuestoItemRepository.findById(repuestoId)
+        // Bloqueo pesimista: si dos ventas del mismo repuesto llegan al mismo tiempo, la
+        // segunda transacción espera a que la primera confirme antes de leer stockActual —
+        // sin esto, ambas podían leer el mismo stock, pasar la validación y sobrevender.
+        RepuestoItem repuesto = repuestoItemRepository.buscarConBloqueoPesimista(repuestoId)
             .orElseThrow(() -> new RuntimeException("Repuesto no encontrado"));
 
         if (!repuesto.getTenantId().equals(tenantId)) {
