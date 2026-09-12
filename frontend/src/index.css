@@ -612,6 +612,48 @@ html.light .input-horeca:hover { background: #ffffff; }
   animation: float 5s ease-in-out infinite;
 }
 
+/* Hero del Home: foto real de aurora boreal con paneo lentísimo (Ken Burns) +
+   un respiro de color muy sutil encima. Reemplaza las cortinas SVG sintéticas
+   que había antes — nombres con prefijo home- para no chocar con nada más. */
+.home-hero-photo {
+  position: absolute;
+  inset: -6%;
+  background-image: url('/aurora-hero.jpg');
+  background-size: cover;
+  background-position: center 55%;
+  animation: home-aurora-pan 34s ease-in-out infinite alternate;
+}
+.home-hero-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(5,10,9,.55) 0%, rgba(5,10,9,.25) 35%, rgba(5,10,9,.55) 78%, rgba(5,10,9,.92) 100%),
+    linear-gradient(90deg, rgba(5,10,9,.35) 0%, transparent 40%, transparent 60%, rgba(5,10,9,.35) 100%);
+}
+.home-hero-photo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 201, 167, .12);
+  mix-blend-mode: overlay;
+  animation: home-aurora-breathe 8s ease-in-out infinite alternate;
+}
+@keyframes home-aurora-pan {
+  from { transform: scale(1.06) translate(0, 0); }
+  to   { transform: scale(1.14) translate(-1.5%, -1%); }
+}
+@keyframes home-aurora-breathe {
+  from { opacity: .55; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-photo,
+  .home-hero-photo::before {
+    animation: none;
+  }
+}
+
 /* Ticker de módulos en Home.tsx: se renderiza 3 veces la misma lista seguida, así que
    desplazar exactamente 1/3 del ancho hace que el loop sea perfectamente continuo (invisible
    al ojo dónde "empieza de nuevo"). */
