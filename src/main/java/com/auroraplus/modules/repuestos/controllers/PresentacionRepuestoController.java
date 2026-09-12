@@ -44,8 +44,9 @@ public class PresentacionRepuestoController {
                                                  @RequestParam BigDecimal cantidad,
                                                  @RequestParam(required = false) String monedaPago,
                                                  @RequestParam(required = false) BigDecimal montoRecibido,
-                                                 @RequestParam(required = false) String claveIdempotencia) {
-        BigDecimal total = repuestoConversionService.despacharPorPresentacion(presentacionId, tenantId, cantidad, monedaPago, montoRecibido, claveIdempotencia);
+                                                 @RequestParam(required = false) String claveIdempotencia,
+                                                 @RequestParam(required = false) Long clienteId) {
+        BigDecimal total = repuestoConversionService.despacharPorPresentacion(presentacionId, tenantId, cantidad, monedaPago, montoRecibido, claveIdempotencia, clienteId);
         return ResponseEntity.ok(total);
     }
 }

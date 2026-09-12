@@ -1,6 +1,7 @@
 package com.auroraplus.core.config.entities;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 // UNIQUE en tenant_id (ver migración V2__...sql) — candado de base de datos
@@ -60,6 +61,13 @@ public class LicenciaTenant {
     @Column(name = "hierro_base64", columnDefinition = "TEXT")
     private String hierroBase64;
 
+    // Auditoría antifraude en Cierre Z: si |descuadre| supera este margen, el
+    // cierre igual se procesa (no bloquea al cajero) pero queda una
+    // AlertaAdmin silenciosa para el dueño (ver TesoreriaService). Cada
+    // negocio tolera un margen distinto según su volumen de caja diario.
+    @Column(name = "margen_tolerancia_descuadre", nullable = false, precision = 18, scale = 2)
+    private BigDecimal margenToleranciaDescuadre = new BigDecimal("2.00");
+
     public enum TipoLicencia { BASICA, COMERCIAL, INDUSTRIAL }
 
     public Long getId() { return id; }
@@ -88,4 +96,6 @@ public class LicenciaTenant {
     public void setLogoBase64(String logoBase64) { this.logoBase64 = logoBase64; }
     public String getHierroBase64() { return hierroBase64; }
     public void setHierroBase64(String hierroBase64) { this.hierroBase64 = hierroBase64; }
+    public BigDecimal getMargenToleranciaDescuadre() { return margenToleranciaDescuadre; }
+    public void setMargenToleranciaDescuadre(BigDecimal margenToleranciaDescuadre) { this.margenToleranciaDescuadre = margenToleranciaDescuadre; }
 }

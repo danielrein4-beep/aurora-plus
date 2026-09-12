@@ -3,6 +3,7 @@ package com.auroraplus.core.financiero.entities;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 /**
@@ -53,4 +54,26 @@ public class TasaCambio {
     public void setFechaActualizacion(LocalDateTime fechaActualizacion) { this.fechaActualizacion = fechaActualizacion; }
     public String getOrigenApi() { return origenApi; }
     public void setOrigenApi(String origenApi) { this.origenApi = origenApi; }
+
+    private static final long HORAS_LIMITE_SIN_ACTUALIZAR = 24;
+
+    // Fijación dinámica de precios: si el POS sigue vendiendo con una tasa de
+    // hace más de 24h en un contexto de fluctuación diaria (Bs/COP), cada
+    // venta corre el riesgo de cobrar por debajo del costo real en USD. Estos
+    // dos campos van calculados (no persistidos) para que el frontend sepa,
+    // con cada respuesta de "tasa vigente", si debe alertar al cajero.
+    @Transient
+    public boolean isObsoleta() {
+        return fechaActualizacion == null || horasSinActualizar() > HORAS_LIMITE_SIN_ACTUALIZAR;
+    }
+
+    @Transient
+    public long getHorasSinActualizar() {
+        return horasSinActualizar();
+    }
+
+    private long horasSinActualizar() {
+        if (fechaActualizacion == null) return Long.MAX_VALUE;
+        return Duration.between(fechaActualizacion, LocalDateTime.now()).toHours();
+    }
 }

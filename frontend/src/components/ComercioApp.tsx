@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import {
   IconHardware, IconPrescription, IconRetail, IconCard, IconSearch, IconTrash,
   IconCheck, IconWarning, IconClose, IconUsers, IconFileText, IconHourglass,
-  IconDownload, IconRefresh, IconCheckCircle, IconBank, IconChart,
+  IconDownload, IconRefresh, IconCheckCircle, IconBank, IconChart, IconBox, IconLock,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
@@ -350,7 +350,10 @@ function DashboardGeneralComercio({ productos, ingresosCaja, onIrAInventario }: 
           </button>
         </div>
         {productosBajoStock.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400">✅ Todo el inventario está por encima del mínimo configurado.</div>
+          <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+            <IconCheckCircle size={14} className="text-emerald-500" />
+            Todo el inventario está por encima del mínimo configurado.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -765,7 +768,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       } catch (err: any) {
         console.error("Fallo al sincronizar venta en backend:", err);
         cargarRepuestosBackend(); // refresca el stock real por si otra venta concurrente ya lo cambió
-        alert(`❌ No se pudo completar la venta: ${err instanceof Error ? err.message : "error desconocido"}\n\nEl carrito NO se vació — ajusta la cantidad o cancela.`);
+        alert(`No se pudo completar la venta: ${err instanceof Error ? err.message : "error desconocido"}\n\nEl carrito NO se vació — ajusta la cantidad o cancela.`);
         return;
       }
     }
@@ -862,11 +865,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         {/* Navegación principal */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {([
-            { id: "general" as const, icono: "📊", etiqueta: "Vista General" },
-            { id: "pos" as const, icono: "🛒", etiqueta: "POS Mostrador" },
-            { id: "inventario" as const, icono: "📦", etiqueta: "Inventario & Stock" },
-            { id: "clientes" as const, icono: "👥", etiqueta: "Clientes & Crédito" },
-            { id: "cierre" as const, icono: "🔒", etiqueta: "Cierres & Reportes" },
+            { id: "general" as const, Icon: IconChart, etiqueta: "Vista General" },
+            { id: "pos" as const, Icon: IconCard, etiqueta: "POS Mostrador" },
+            { id: "inventario" as const, Icon: IconBox, etiqueta: "Inventario & Stock" },
+            { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
+            { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
           ]).map((item) => (
             <button
               key={item.id}
@@ -877,7 +880,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <span>{item.icono}</span>
+              <item.Icon size={16} />
               <span>{item.etiqueta}</span>
             </button>
           ))}
@@ -886,10 +889,10 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             <button
               type="button"
               title="Próximamente: tu catálogo público con precios y código QR para que tus clientes lo vean desde el celular"
-              onClick={() => mostrarToast("🔒 Catálogo QR — muy pronto vas a poder compartir tus precios con un código QR. ¡Ya viene en camino!", "info")}
+              onClick={() => mostrarToast("Catálogo QR — muy pronto vas a poder compartir tus precios con un código QR.", "info")}
               className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 opacity-70"
             >
-              <span>🔒</span>
+              <IconLock size={16} />
               <span className="flex-1 text-left">Catálogo QR</span>
               <span className="text-[8px] font-black uppercase tracking-wider bg-violet-500/20 text-violet-500 dark:text-violet-300 px-1.5 py-0.5 rounded-full">
                 Pronto
@@ -1167,7 +1170,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[140px]">
                 {carrito.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 text-center p-4">
-                    <span className="text-3xl mb-2">🛒</span>
+                    <IconCard size={28} className="mb-2 text-slate-300 dark:text-slate-600" />
                     <p className="text-xs">El carrito está vacío.</p>
                     <p className="text-[10px] text-slate-700 dark:text-slate-300 mt-0.5">Toca un producto del catálogo o escanea para vender.</p>
                   </div>
@@ -1295,7 +1298,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       onClick={() => setModalCompraProveedor(true)}
                       className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs cursor-pointer shadow-md flex items-center gap-1.5 transition-colors"
                     >
-                      <span>📦 Registrar Compra (Proveedor)</span>
+                      <IconBox size={14} />
+                      <span>Registrar Compra (Proveedor)</span>
                     </button>
                   </>
                 )}
@@ -1887,7 +1891,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     <input name="principioActivo" placeholder="Ej. Paracetamol 500mg" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs" />
                   </div>
                   <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center gap-1.5">
-                    <span>ℹ️</span>
+                    <IconWarning size={12} className="flex-shrink-0" />
                     <span>Trazabilidad de Lote y Vencimiento (FEFO) se gestionará en el módulo especializado de Farmacia.</span>
                   </div>
                 </div>
@@ -2109,7 +2113,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   {presentacionesLista.map((pres) => (
                     <div key={pres.id} className="p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700 flex items-center justify-between">
                       <div>
-                        <div className="font-bold text-xs text-slate-900 dark:text-white">📦 {pres.nombrePresentacion}</div>
+                        <div className="font-bold text-xs text-slate-900 dark:text-white">{pres.nombrePresentacion}</div>
                         <div className="text-[10px] text-slate-500 dark:text-slate-400">Factor: {pres.factorConversion} {presentacionesModalItem.unidadMedida || 'u'} base</div>
                       </div>
                       <div className="text-right">
@@ -2201,7 +2205,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             toast.tipo === "error" ? "bg-red-950/95 border-red-500 text-red-200" :
             "bg-white/95 dark:bg-slate-900/95 border-cyan-500 text-cyan-200"
           }`}>
-            <span>{toast.tipo === "success" ? "✅" : toast.tipo === "error" ? "❌" : "ℹ️"}</span>
+            {toast.tipo === "success" ? <IconCheckCircle size={15} className="flex-shrink-0" /> :
+             toast.tipo === "error" ? <IconClose size={15} className="flex-shrink-0" /> :
+             <IconWarning size={15} className="flex-shrink-0" />}
             <span>{toast.mensaje}</span>
           </div>
         </div>
@@ -2347,8 +2353,8 @@ function ModalCompraProveedorFerreteria({
         </div>
 
         {errorMsg && (
-          <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-semibold">
-            ⚠️ {errorMsg}
+          <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-semibold flex items-center gap-1.5">
+            <IconWarning size={13} className="flex-shrink-0" /> {errorMsg}
           </div>
         )}
 

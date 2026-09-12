@@ -1,5 +1,7 @@
 package com.auroraplus.modules.repuestos.services;
 
+import com.auroraplus.core.crm.entities.Cliente;
+import com.auroraplus.core.crm.repositories.ClienteRepository;
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.services.MotorFinancieroService;
 import com.auroraplus.core.sync.IdempotenciaService;
@@ -40,6 +42,14 @@ public class RepuestoConversionService {
     @Autowired
     private IdempotenciaService idempotenciaService;
 
+    @Autowired
+    private OrdenCompraSugeridaService ordenCompraSugeridaService;
+
+    @Autowired
+    private ClienteRepository clienteRepository;
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RepuestoConversionService.class);
+
     // Repuestos no tiene una entidad "VentaRepuesto" persistida (a diferencia de
     // las demás verticales) — solo queda el MovimientoRepuesto (Kardex) y el
     // MovimientoCaja. Por eso, si una clave de idempotencia ya se usó, NO se
@@ -58,7 +68,8 @@ public class RepuestoConversionService {
     // moneda base del tenant (LicenciaTenant.monedaBase). El cliente puede
     // pagar en otra moneda — ver registrarIngresoCaja/MotorFinancieroService.
 
-    private MovimientoRepuesto registrarMovimientoVenta(RepuestoItem repuesto, BigDecimal cantidad, BigDecimal stockAnterior, BigDecimal stockNuevo, String motivo) {
+    private MovimientoRepuesto registrarMovimientoVenta(RepuestoItem repuesto, BigDecimal cantidad, BigDecimal stockAnterior,
+                                                         BigDecimal stockNuevo, String motivo, Long clienteId, BigDecimal total) {
         MovimientoRepuesto movimiento = new MovimientoRepuesto();
         movimiento.setTenantId(repuesto.getTenantId());
         movimiento.setRepuesto(repuesto);
@@ -67,7 +78,21 @@ public class RepuestoConversionService {
         movimiento.setStockAnterior(stockAnterior);
         movimiento.setStockNuevo(stockNuevo);
         movimiento.setMotivo(motivo);
+        movimiento.setClienteId(clienteId);
+        movimiento.setTotal(total);
         return movimientoRepuestoRepository.save(movimiento);
+    }
+
+    // Smart Restocking: se llama después de CADA venta que descuenta stock. Un
+    // fallo acá (ej. proveedor principal borrado a mano en otra pestaña) jamás
+    // debe tumbar una venta ya cobrada — por eso queda aislado en su propio
+    // try/catch en vez de dejar que la excepción suba y revierta la transacción.
+    private void intentarGenerarBorrador(RepuestoItem repuesto) {
+        try {
+            ordenCompraSugeridaService.generarBorradorSiAplica(repuesto);
+        } catch (Exception e) {
+            log.error("No se pudo evaluar Smart Restocking para el repuesto {}: {}", repuesto.getId(), e.getMessage(), e);
+        }
     }
 
     /** Registra el ingreso real en caja (core.financiero), convirtiendo si el cliente paga en otra moneda que la base del tenant. */
@@ -114,17 +139,23 @@ public class RepuestoConversionService {
      */
     @Transactional
     public BigDecimal despacharPorPresentacion(Long presentacionId, Long tenantId, BigDecimal cantidadVendida) {
-        return despacharPorPresentacion(presentacionId, tenantId, cantidadVendida, null, null, null);
+        return despacharPorPresentacion(presentacionId, tenantId, cantidadVendida, null, null, null, null);
     }
 
     @Transactional
     public BigDecimal despacharPorPresentacion(Long presentacionId, Long tenantId, BigDecimal cantidadVendida, String monedaPago, BigDecimal montoRecibido) {
-        return despacharPorPresentacion(presentacionId, tenantId, cantidadVendida, monedaPago, montoRecibido, null);
+        return despacharPorPresentacion(presentacionId, tenantId, cantidadVendida, monedaPago, montoRecibido, null, null);
     }
 
     @Transactional
     public BigDecimal despacharPorPresentacion(Long presentacionId, Long tenantId, BigDecimal cantidadVendida, String monedaPago,
                                                 BigDecimal montoRecibido, String claveIdempotencia) {
+        return despacharPorPresentacion(presentacionId, tenantId, cantidadVendida, monedaPago, montoRecibido, claveIdempotencia, null);
+    }
+
+    @Transactional
+    public BigDecimal despacharPorPresentacion(Long presentacionId, Long tenantId, BigDecimal cantidadVendida, String monedaPago,
+                                                BigDecimal montoRecibido, String claveIdempotencia, Long clienteId) {
         verificarNoDuplicada(tenantId, claveIdempotencia);
 
         if (cantidadVendida == null || cantidadVendida.compareTo(BigDecimal.ZERO) <= 0) {
@@ -155,14 +186,18 @@ public class RepuestoConversionService {
         repuesto.setStockActual(stockNuevo);
         repuestoItemRepository.save(repuesto);
 
-        MovimientoRepuesto movimiento = registrarMovimientoVenta(repuesto, cantidadEnUnidadBase, stockAnterior, stockNuevo,
-            "Venta " + cantidadVendida + " " + presentacion.getNombrePresentacion());
+        BigDecimal precioUnitarioPresentacion = aplicarDescuentoClienteMayorista(presentacion.getPrecioVenta(), clienteId, tenantId);
+        BigDecimal totalVenta = cantidadVendida.multiply(precioUnitarioPresentacion).setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal totalVenta = cantidadVendida.multiply(presentacion.getPrecioVenta()).setScale(2, RoundingMode.HALF_UP);
+        MovimientoRepuesto movimiento = registrarMovimientoVenta(repuesto, cantidadEnUnidadBase, stockAnterior, stockNuevo,
+            "Venta " + cantidadVendida + " " + presentacion.getNombrePresentacion(), clienteId, totalVenta);
+
         registrarIngresoCaja(tenantId, totalVenta, monedaPago, montoRecibido,
             "Venta repuesto " + repuesto.getCodigoSku() + " (" + cantidadVendida + " " + presentacion.getNombrePresentacion() + ")");
 
         idempotenciaService.registrar(tenantId, claveIdempotencia, "venta_repuestos_presentacion", movimiento.getId());
+
+        intentarGenerarBorrador(repuesto);
 
         return totalVenta;
     }
@@ -184,23 +219,47 @@ public class RepuestoConversionService {
     }
 
     /**
+     * Regla ABC (clasificación automática, ver ClasificacionClientesJob): un
+     * cliente MAYORISTA lleva su descuento aplicado sin que el cajero tenga
+     * que acordarse de teclearlo — se aplica sobre el precio YA resuelto
+     * (Detal o Mayorista por volumen), nunca lo reemplaza.
+     */
+    private BigDecimal aplicarDescuentoClienteMayorista(BigDecimal precioUnitario, Long clienteId, Long tenantId) {
+        if (clienteId == null) return precioUnitario;
+        return clienteRepository.findById(clienteId)
+            .filter(c -> tenantId.equals(c.getTenantId()))
+            .filter(c -> c.getClasificacion() == Cliente.Clasificacion.MAYORISTA)
+            .map(Cliente::getDescuentoAutomaticoPorcentaje)
+            .filter(pct -> pct != null && pct.compareTo(BigDecimal.ZERO) > 0)
+            .map(pct -> precioUnitario.multiply(BigDecimal.ONE.subtract(pct.divide(new BigDecimal("100"))))
+                .setScale(2, RoundingMode.HALF_UP))
+            .orElse(precioUnitario);
+    }
+
+    /**
      * Venta directa de un repuesto en su unidad base (sin pasar por una
      * presentación fraccionada), aplicando automáticamente el precio Mayorista
      * o Detal según el volumen. Descuenta stock y devuelve el desglose.
      */
     @Transactional
     public ResultadoVenta venderPorVolumen(Long repuestoId, Long tenantId, BigDecimal cantidad) {
-        return venderPorVolumen(repuestoId, tenantId, cantidad, null, null, null);
+        return venderPorVolumen(repuestoId, tenantId, cantidad, null, null, null, null);
     }
 
     @Transactional
     public ResultadoVenta venderPorVolumen(Long repuestoId, Long tenantId, BigDecimal cantidad, String monedaPago, BigDecimal montoRecibido) {
-        return venderPorVolumen(repuestoId, tenantId, cantidad, monedaPago, montoRecibido, null);
+        return venderPorVolumen(repuestoId, tenantId, cantidad, monedaPago, montoRecibido, null, null);
     }
 
     @Transactional
     public ResultadoVenta venderPorVolumen(Long repuestoId, Long tenantId, BigDecimal cantidad, String monedaPago,
                                             BigDecimal montoRecibido, String claveIdempotencia) {
+        return venderPorVolumen(repuestoId, tenantId, cantidad, monedaPago, montoRecibido, claveIdempotencia, null);
+    }
+
+    @Transactional
+    public ResultadoVenta venderPorVolumen(Long repuestoId, Long tenantId, BigDecimal cantidad, String monedaPago,
+                                            BigDecimal montoRecibido, String claveIdempotencia, Long clienteId) {
         verificarNoDuplicada(tenantId, claveIdempotencia);
 
         if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) {
@@ -223,6 +282,7 @@ public class RepuestoConversionService {
         }
 
         BigDecimal precioUnitarioAplicado = calcularPrecioUnitarioPorVolumen(repuesto, cantidad);
+        precioUnitarioAplicado = aplicarDescuentoClienteMayorista(precioUnitarioAplicado, clienteId, tenantId);
         boolean esMayorista = precioUnitarioAplicado.compareTo(repuesto.getPrecioVenta()) != 0;
         BigDecimal total = cantidad.multiply(precioUnitarioAplicado).setScale(2, RoundingMode.HALF_UP);
 
@@ -232,12 +292,14 @@ public class RepuestoConversionService {
         repuestoItemRepository.save(repuesto);
 
         MovimientoRepuesto movimiento = registrarMovimientoVenta(repuesto, cantidad, stockAnterior, stockNuevo,
-            "Venta directa" + (esMayorista ? " (tarifa Mayorista)" : " (tarifa Detal)"));
+            "Venta directa" + (esMayorista ? " (tarifa Mayorista)" : " (tarifa Detal)"), clienteId, total);
 
         registrarIngresoCaja(tenantId, total, monedaPago, montoRecibido, "Venta repuesto " + repuesto.getCodigoSku()
             + " x" + cantidad + (esMayorista ? " (Mayorista)" : " (Detal)"));
 
         idempotenciaService.registrar(tenantId, claveIdempotencia, "venta_repuestos_volumen", movimiento.getId());
+
+        intentarGenerarBorrador(repuesto);
 
         return new ResultadoVenta(precioUnitarioAplicado, total, esMayorista);
     }

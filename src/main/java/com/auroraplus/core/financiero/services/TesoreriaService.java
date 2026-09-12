@@ -1,9 +1,15 @@
 package com.auroraplus.core.financiero.services;
 
+import com.auroraplus.core.config.entities.LicenciaTenant;
+import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.core.financiero.entities.ArqueoCaja;
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.repositories.ArqueoCajaRepository;
 import com.auroraplus.core.financiero.repositories.MovimientoCajaRepository;
+import com.auroraplus.core.notificaciones.entities.AlertaAdmin;
+import com.auroraplus.core.notificaciones.repositories.AlertaAdminRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
@@ -13,11 +19,19 @@ import java.util.Optional;
 @Service
 public class TesoreriaService {
 
+    private static final Logger log = LoggerFactory.getLogger(TesoreriaService.class);
+
     @Autowired
     private MovimientoCajaRepository movimientoCajaRepository;
 
     @Autowired
     private ArqueoCajaRepository arqueoCajaRepository;
+
+    @Autowired
+    private LicenciaTenantRepository licenciaTenantRepository;
+
+    @Autowired
+    private AlertaAdminRepository alertaAdminRepository;
 
     /**
      * Cierre de caja real: cada arqueo solo cuenta los movimientos ocurridos
@@ -53,6 +67,35 @@ public class TesoreriaService {
         arqueo.setFechaArqueo(ahora);
 
         // 4. Guardar arqueo en base de datos (marca el fin de este período de caja)
-        return arqueoCajaRepository.save(arqueo);
+        ArqueoCaja guardado = arqueoCajaRepository.save(arqueo);
+
+        // 5. Auditoría antifraude: el cierre se procesa igual aunque el descuadre
+        // exceda el margen de tolerancia del tenant — nunca bloquea al cajero —
+        // pero queda una alerta silenciosa para que el dueño la revise después,
+        // con el timestamp exacto de cuándo ocurrió.
+        generarAlertaSiExcedeMargen(guardado);
+
+        return guardado;
+    }
+
+    private void generarAlertaSiExcedeMargen(ArqueoCaja arqueo) {
+        try {
+            BigDecimal margen = licenciaTenantRepository.findByTenantId(arqueo.getTenantId())
+                .map(LicenciaTenant::getMargenToleranciaDescuadre)
+                .orElse(new BigDecimal("2.00"));
+            if (arqueo.getDescuadre().abs().compareTo(margen) <= 0) return;
+
+            AlertaAdmin alerta = new AlertaAdmin();
+            alerta.setTenantId(arqueo.getTenantId());
+            alerta.setTipo(AlertaAdmin.Tipo.DESCUADRE_CAJA);
+            alerta.setMensaje(String.format(
+                "Descuadre de %s %s en el cierre de %s (declarado %s, sistema %s) — supera el margen de tolerancia de %s %s.",
+                arqueo.getDescuadre(), arqueo.getMoneda(), arqueo.getIdCajero(),
+                arqueo.getMontoDeclarado(), arqueo.getMontoSistema(), margen, arqueo.getMoneda()));
+            alertaAdminRepository.save(alerta);
+        } catch (Exception e) {
+            // Una alerta que falla NUNCA debe tumbar un cierre de caja ya confirmado.
+            log.error("No se pudo generar la alerta de descuadre para el arqueo {}: {}", arqueo.getId(), e.getMessage(), e);
+        }
     }
 }
