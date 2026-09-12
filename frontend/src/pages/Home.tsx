@@ -73,26 +73,26 @@ export default function Home() {
   return (
     <main className="aurora-public-page relative overflow-hidden bg-transparent transition-colors duration-500">
       {/* ── HERO: composición editorial sobre una fotografía real ── */}
-      <section className="aurora-home-hero relative min-h-[920px] flex flex-col pt-24 pb-0 px-5 sm:px-10 max-w-[1536px] mx-auto overflow-hidden">
+      <section className="aurora-home-hero relative min-h-[1080px] lg:min-h-[1160px] flex flex-col pt-28 sm:pt-36 pb-0 px-5 sm:px-10 max-w-[1536px] mx-auto overflow-hidden">
 
         <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="home-hero-photo" />
         </div>
 
-        <div className="relative z-10 w-full max-w-5xl mx-auto pt-24 sm:pt-28">
+        <div className="relative z-10 w-full max-w-5xl mx-auto pt-28 sm:pt-36">
           <p className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · seis rubros · tres monedas</p>
           <h1 className="mt-5 max-w-3xl font-['IBM_Plex_Sans'] text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-[-0.055em] text-[#f8f6ef]">
             Del lápiz y el papel<br />a la <span className="text-[#35d7c3]">automatización</span>
           </h1>
-          <p className="mt-6 max-w-xl text-base leading-7 text-[#e5e1d5]/90">
+          <p className="mt-8 max-w-xl text-base leading-7 text-[#e5e1d5]/90">
             De la libreta y la hoja de Excel a medianoche, a la comodidad de tu teléfono y tu computadora. Aurora Plus corre la caja, el inventario y la sanidad regulatoria de clínicas, restaurantes, minas, talleres, boutiques y fincas venezolanas.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-10 flex flex-wrap gap-3">
             <button onClick={() => navigate("/onboarding")} className="aurora-solid-button px-6 py-3 text-sm font-semibold cursor-pointer">Solicitar demo</button>
             <button onClick={() => navigate("/industrias")} className="aurora-outline-button px-6 py-3 text-sm font-semibold cursor-pointer">Ver los 6 rubros ↓</button>
           </div>
 
-          <div className="mt-12 grid max-w-4xl grid-cols-2 gap-x-7 gap-y-6 border-t border-white/15 pt-6 sm:grid-cols-4">
+          <div className="mt-16 grid max-w-4xl grid-cols-2 gap-x-7 gap-y-8 border-t border-white/15 pt-8 sm:grid-cols-4">
             {[
               ["6", "industrias nativas"],
               ["100%", "caja offline-first"],
@@ -106,7 +106,7 @@ export default function Home() {
             ))}
           </div>
 
-          <div className="aurora-rate-card mt-12 w-full max-w-md p-6 sm:p-7">
+          <div className="aurora-rate-card mt-16 w-full max-w-md p-7 sm:p-8">
             <div className="flex items-center justify-between border-b border-white/10 pb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[#d9d8ce]/80">
               <span>Tasa del día · motor Aurora</span><span className="text-[#3fe0ce]">● en vivo</span>
             </div>

@@ -840,12 +840,127 @@ html.light .aurora-public-footer {
 }
 .aurora-public-footer .text-slate-400,
 .aurora-public-footer .text-slate-500 { color: rgba(217, 216, 206, .58) !important; }
+
+/* Acceso y activación: la misma atmósfera de la landing sin tocar la lógica
+   de formularios, registro ni recuperación de contraseña. */
+.aurora-access-page {
+  isolation: isolate;
+  min-height: 100vh;
+  font-family: 'IBM Plex Sans', sans-serif;
+  color: #f8f6ef;
+  background: #050d10;
+}
+.aurora-access-page::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: -7%;
+  pointer-events: none;
+  background: url('/aurora-hero.jpg') center / cover no-repeat;
+  filter: brightness(.42) saturate(.82);
+  animation: public-aurora-drift 42s ease-in-out infinite alternate;
+}
+.aurora-access-page::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(3, 11, 14, .66);
+}
+/* Elimina las cintas, retículas y focos rosa/púrpura de la versión anterior. */
+.aurora-access-page > .absolute.inset-0 { display: none; }
+.aurora-access-page h1,
+.aurora-access-page h2,
+.aurora-access-page h3,
+.aurora-access-page h4 {
+  font-family: 'IBM Plex Sans', sans-serif !important;
+  color: #f8f6ef !important;
+  letter-spacing: -.025em;
+}
+.aurora-access-page .font-mono,
+.aurora-access-page label {
+  font-family: 'IBM Plex Mono', monospace;
+}
+.aurora-access-page .text-aurora,
+html.light .aurora-access-page .text-aurora {
+  background: none !important;
+  color: #35d7c3 !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+.aurora-access-page .apple-glass,
+.aurora-access-card,
+html.light .aurora-access-page .apple-glass {
+  background: rgba(5, 17, 20, .93) !important;
+  border: 1px solid rgba(53, 215, 195, .22) !important;
+  box-shadow: 0 20px 52px rgba(0, 0, 0, .38) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.aurora-access-page .apple-glass-pill,
+html.light .aurora-access-page .apple-glass-pill {
+  background: rgba(5, 17, 20, .9) !important;
+  border-color: rgba(53, 215, 195, .22) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.aurora-access-page .apple-glass-pill .bg-white,
+html.light .aurora-access-page .apple-glass-pill .bg-white {
+  background: #35d7c3 !important;
+  color: #062323 !important;
+  box-shadow: none !important;
+}
+.aurora-access-page input,
+.aurora-access-page select,
+.aurora-access-page textarea,
+html.light .aurora-access-page input,
+html.light .aurora-access-page select,
+html.light .aurora-access-page textarea {
+  background: #071518 !important;
+  border-color: rgba(53, 215, 195, .25) !important;
+  color: #f8f6ef !important;
+  box-shadow: none !important;
+}
+.aurora-access-page input::placeholder,
+.aurora-access-page textarea::placeholder { color: rgba(217, 216, 206, .44) !important; }
+.aurora-access-page input:focus,
+.aurora-access-page select:focus,
+.aurora-access-page textarea:focus {
+  border-color: #35d7c3 !important;
+  box-shadow: 0 0 0 3px rgba(53, 215, 195, .14) !important;
+}
+.aurora-access-page .btn-cyber-neon,
+.aurora-access-page [class*="bg-gradient-to-"],
+.aurora-access-primary {
+  background: #35d7c3 !important;
+  color: #062323 !important;
+  box-shadow: none !important;
+}
+.aurora-access-page .line-aurora { background: #35d7c3 !important; }
+.aurora-access-page .bg-purple-400,
+.aurora-access-page .bg-sky-400,
+.aurora-access-page .bg-cyan-400 { background-color: #35d7c3 !important; }
+.aurora-access-page .text-purple-400,
+.aurora-access-page .text-sky-400,
+.aurora-access-page .text-cyan-400 { color: #35d7c3 !important; }
+.aurora-access-page [class*="border-white"],
+.aurora-access-page [class*="border-slate"] { border-color: rgba(53, 215, 195, .16) !important; }
+html.light .aurora-access-page .text-white,
+html.light .aurora-access-page .text-white\/90,
+html.light .aurora-access-page .text-white\/80,
+html.light .aurora-access-page .text-white\/70,
+html.light .aurora-access-page .text-white\/60,
+html.light .aurora-access-page .text-white\/50,
+html.light .aurora-access-page .text-white\/40 { color: rgba(248, 246, 239, .82) !important; }
+html.light .aurora-access-page .text-white { color: #f8f6ef !important; }
 @media (prefers-reduced-motion: reduce) {
   .aurora-public-page::before { animation: none; }
+  .aurora-access-page::before { animation: none; }
   .aurora-nav-link::after { transition: none; }
 }
 @media (max-width: 640px) {
-  .aurora-home-hero { min-height: 980px; }
+  .aurora-home-hero { min-height: 1140px; }
   .home-hero-photo { background-position: 58% center; }
 }
 
