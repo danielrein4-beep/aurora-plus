@@ -9,14 +9,16 @@ import GanaderiaMapa from "./GanaderiaMapa";
 import { useAuth } from "../context/AuthContext";
 import * as XLSX from "xlsx";
 import {
-  listarAnimalesGanaderia, crearAnimalGanaderia,
+  listarAnimalesGanaderia, crearAnimalGanaderia, actualizarAnimalGanaderia,
+  registrarVentaGanaderia,
   listarPotrerosGanaderia, crearPotreroGanaderia, rotarPotreroGanaderia,
   registrarOrdenoGanaderia, obtenerReporteOrdenoGanaderia,
   registrarPesoGanaderia, obtenerGdpGanaderia,
-  listarVacunasGanaderia, aplicarVacunaGanaderia,
+  listarVacunasGanaderia, crearVacunaGanaderia, aplicarVacunaGanaderia, aplicarVacunaLoteGanaderia,
   obtenerAlertasGanaderia, registrarEventoReproductivoGanaderia,
   obtenerAlertasSanitariasGanaderia, obtenerVacunasPorAnimal,
   obtenerEventosReproductivosPorHembra, obtenerCurvaPesoGanaderia,
+  registrarMastitisGanaderia,
   type AnimalGanaderia, type PotreroGanaderia, type RegistroOrdenoGanaderia,
   type TableroAlertasGanaderia, type VacunaGanaderia,
   type AlertaSanitariaGanaderia, type AplicacionVacunaGanaderia,
@@ -51,6 +53,13 @@ const DEMO_ORDENOS: RegistroOrdenoGanaderia[] = [
   { id: 301, tenantId: 1, animal: DEMO_ANIMALES[0], fecha: "2026-09-11", turno: "MANANA", cantidadLitros: 14.5, precioVentaLitro: 0.55, montoVenta: 7.97, porcentajeGrasa: 3.8, porcentajeProteina: 3.2 },
   { id: 302, tenantId: 1, animal: DEMO_ANIMALES[1], fecha: "2026-09-11", turno: "MANANA", cantidadLitros: 16.2, precioVentaLitro: 0.55, montoVenta: 8.91, porcentajeGrasa: 4.4, porcentajeProteina: 3.5 },
   { id: 303, tenantId: 1, animal: DEMO_ANIMALES[0], fecha: "2026-09-10", turno: "TARDE", cantidadLitros: 9.8, precioVentaLitro: 0.55, montoVenta: 5.39, porcentajeGrasa: 3.9, porcentajeProteina: 3.1 },
+];
+
+const DEFAULT_VACUNAS_CATALOGO: VacunaGanaderia[] = [
+  { id: 1, tenantId: 1, nombre: "Aftosa Bivalente (A+O)", diasParaRefuerzo: 180, diasRetiroLeche: 0, diasRetiroCarne: 0 },
+  { id: 2, tenantId: 1, nombre: "Rabia Paralítica Bovina", diasParaRefuerzo: 365, diasRetiroLeche: 0, diasRetiroCarne: 0 },
+  { id: 3, tenantId: 1, nombre: "Triple Bovina (Clostridiosis)", diasParaRefuerzo: 365, diasRetiroLeche: 0, diasRetiroCarne: 21 },
+  { id: 4, tenantId: 1, nombre: "Ivermectina 1% Endectocida", diasParaRefuerzo: 90, diasRetiroLeche: 28, diasRetiroCarne: 35 },
 ];
 
 export default function GanaderiaApp({ onSalir }: Props) {
@@ -94,7 +103,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Sub-vistas Sanidad & Trazabilidad
   const [subSanidad, setSubSanidad] = useState<"individual" | "lotes">("individual");
-  const [animalFichaId, setAnimalFichaId] = useState<number | null>(201);
+  const [animalFichaId, setAnimalFichaId] = useState<number | null>(null);
   const [alertasSanitarias, setAlertasSanitarias] = useState<AlertaSanitariaGanaderia[]>([]);
   const [fichaVacunas, setFichaVacunas] = useState<AplicacionVacunaGanaderia[]>([]);
   const [fichaEventosRepro, setFichaEventosRepro] = useState<EventoReproductivoGanaderia[]>([]);
@@ -110,7 +119,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
   const [animales, setAnimales] = useState<AnimalGanaderia[]>([]);
   const [potreros, setPotreros] = useState<PotreroGanaderia[]>([]);
   const [ordenos, setOrdenos] = useState<RegistroOrdenoGanaderia[]>([]);
-  const [vacunas, setVacunas] = useState<VacunaGanaderia[]>([]);
+  const [vacunas, setVacunas] = useState<VacunaGanaderia[]>(DEFAULT_VACUNAS_CATALOGO);
   const [alertas, setAlertas] = useState<TableroAlertasGanaderia | null>(null);
 
   // Filtros
@@ -125,10 +134,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
   const [modalPesaje, setModalPesaje] = useState<AnimalGanaderia | null>(null);
   const [modalVacuna, setModalVacuna] = useState(false);
   const [modalReproduccion, setModalReproduccion] = useState(false);
+  const [modalCelo, setModalCelo] = useState(false);
+  const [modalMastitis, setModalMastitis] = useState(false);
   const [modalFichaAnimal, setModalFichaAnimal] = useState<AnimalGanaderia | null>(null);
-  const [modalEventoGenerico, setModalEventoGenerico] = useState<{ tipo: string; titulo: string; descripcion: string } | null>(null);
+  const [modalVentaAnimal, setModalVentaAnimal] = useState(false);
 
-  // Formulario nuevo animal
+  // Formulario nuevo animal con soporte de Origen (Nacimiento / Compra) y Estados Reproductivo/Productivo
   const [formAnimal, setFormAnimal] = useState({
     arete: "",
     tipoIdentificador: "ARETE",
@@ -142,6 +153,44 @@ export default function GanaderiaApp({ onSalir }: Props) {
     valorEstimado: 900,
     potreroId: DEMO_POTREROS[0]?.id || 101,
     lote: "",
+    origen: "NACIMIENTO" as "NACIMIENTO" | "COMPRA",
+    madreId: null as number | null,
+    proveedor: "",
+    costoCompra: 0,
+    fechaCompra: new Date().toISOString().slice(0, 10),
+    estadoReproductivo: "VACIA" as "VACIA" | "PREÑADA" | "EN_ESPERA",
+    estadoProductivo: "SECA" as "CRIANDO" | "ORDEÑO" | "SECA",
+  });
+
+  // Formulario de Celos (Evento Reproductivo dedicado)
+  const [formCelo, setFormCelo] = useState({
+    hembraId: DEMO_ANIMALES.find(a => a.sexo === "HEMBRA")?.id || 201,
+    fecha: new Date().toISOString().slice(0, 10),
+    tipoCelo: "NATURAL",
+    sintomasCelo: "Acepta monta, moco cristalino abundante, hiperactividad",
+    horaOptimaIA: "AM/PM: Inseminar 12 horas después de observado el celo",
+  });
+
+  // Formulario de Mastitis (Sanidad dedicada con retiro de leche)
+  const [formMastitis, setFormMastitis] = useState({
+    animalId: DEMO_ANIMALES.find(a => a.sexo === "HEMBRA")?.id || 201,
+    fecha: new Date().toISOString().slice(0, 10),
+    cuartoAfectado: "PD",
+    gradoCmt: "GRADO_2",
+    farmacoAplicado: "Cefalexina + Gentamicina Intramamaria",
+    diasRetiroLeche: 4,
+    veterinario: "Dr. Médico Veterinario",
+    costo: 12.0,
+    notas: "Cuarto posterior derecho caliente y reactivo al reactivo California Mastitis Test (CMT).",
+  });
+
+  // Formulario de Venta / Beneficio
+  const [formVenta, setFormVenta] = useState({
+    animalId: 0,
+    comprador: "",
+    precioUSD: 0,
+    pesoSalida: 0,
+    motivo: "BENEFICIO",
   });
 
   // Formulario nuevo potrero con color distintivo (estilo GanSoft)
@@ -190,14 +239,23 @@ export default function GanaderiaApp({ onSalir }: Props) {
   const [pesoNuevo, setPesoNuevo] = useState<number>(400);
   const [gdpData, setGdpData] = useState<any>(null);
 
-  // Formulario vacunación
+  // Formulario vacunación (soporte de catálogo real, días de retiro fidedignos y aplicación masiva)
   const [formVacuna, setFormVacuna] = useState({
     animalId: DEMO_ANIMALES[0]?.id || 201,
-    vacunaId: 1,
-    nombreVacuna: "Fiebre Aftosa / Rabia",
+    vacunaId: DEFAULT_VACUNAS_CATALOGO[0]?.id || 1,
     lote: "L-2026-98",
-    veterinario: "Dr. Mendoza MV",
+    veterinario: "Dr. Médico Veterinario",
     costo: 3.5,
+  });
+  const [vacunacionModo, setVacunacionModo] = useState<"INDIVIDUAL" | "MULTIPLE">("INDIVIDUAL");
+  const [animalesVacunaSeleccionados, setAnimalesVacunaSeleccionados] = useState<number[]>([]);
+  const [mostrarCrearVacuna, setMostrarCrearVacuna] = useState(false);
+  const [nuevaVacunaForm, setNuevaVacunaForm] = useState({
+    nombre: "",
+    enfermedadPrevenida: "",
+    diasRetiroLeche: 0,
+    diasRetiroCarne: 0,
+    diasParaRefuerzo: 180,
   });
 
   // Formulario reproducción
@@ -225,6 +283,17 @@ export default function GanaderiaApp({ onSalir }: Props) {
       .then(setAlertasSanitarias)
       .catch(() => setAlertasSanitarias([]));
   }, [tenantId]);
+
+  // Auto-seleccionar primer animal real para Ficha Sanitaria si no hay ninguno seleccionado
+  useEffect(() => {
+    if (animales.length > 0) {
+      if (!animalFichaId || !animales.some(a => a.id === animalFichaId)) {
+        setAnimalFichaId(animales[0].id);
+      }
+    } else {
+      setAnimalFichaId(null);
+    }
+  }, [animales, animalFichaId]);
 
   useEffect(() => {
     if (!animalFichaId) return;
@@ -327,15 +396,42 @@ export default function GanaderiaApp({ onSalir }: Props) {
     return coincideCat && coincideBusqueda;
   });
 
-  // Manejador: Crear nuevo animal
+  // Manejador: Crear nuevo animal (Nacimiento en Finca o Ingreso por Compra)
   const handleGuardarAnimal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAnimal.arete.trim()) return;
 
     try {
-      const nuevo = await crearAnimalGanaderia(tenantId, formAnimal);
+      const payload: any = {
+        arete: formAnimal.arete.trim(),
+        tipoIdentificador: formAnimal.tipoIdentificador,
+        nombre: formAnimal.nombre.trim() || undefined,
+        especie: formAnimal.especie,
+        raza: formAnimal.raza,
+        sexo: formAnimal.sexo,
+        tipoAnimal: formAnimal.tipoAnimal,
+        fechaNacimiento: formAnimal.fechaNacimiento,
+        pesoActual: Number(formAnimal.pesoActual) || 0,
+        potreroId: formAnimal.potreroId ? Number(formAnimal.potreroId) : undefined,
+        costoAdquisicion: formAnimal.origen === "COMPRA" ? Number(formAnimal.costoCompra) : undefined,
+        madreId: (formAnimal.origen === "NACIMIENTO" && formAnimal.madreId) ? Number(formAnimal.madreId) : undefined,
+        valorEstimado: formAnimal.origen === "COMPRA" ? Number(formAnimal.costoCompra) : Number(formAnimal.valorEstimado),
+        estadoReproductivo: formAnimal.estadoReproductivo,
+        estadoProductivo: formAnimal.estadoProductivo,
+      };
+
+      if (formAnimal.origen === "COMPRA" && formAnimal.proveedor.trim()) {
+        payload.lote = formAnimal.lote.trim()
+          ? `${formAnimal.lote} (Proveedor: ${formAnimal.proveedor.trim()})`
+          : `Compra: ${formAnimal.proveedor.trim()}`;
+      } else if (formAnimal.lote.trim()) {
+        payload.lote = formAnimal.lote.trim();
+      }
+
+      const nuevo = await crearAnimalGanaderia(tenantId, payload);
       setAnimales(prev => [nuevo, ...prev]);
-      notificar(`Animal arete ${nuevo.arete} registrado con éxito en el hato.`);
+      setAnimalFichaId(nuevo.id);
+      notificar(`Animal arete ${nuevo.arete} (${formAnimal.origen === "COMPRA" ? "Compra" : "Nacimiento en Finca"}) registrado con éxito en el hato.`);
     } catch {
       notificar(`⚠️ No se pudo registrar el animal arete ${formAnimal.arete} — revisa tu conexión e inténtalo de nuevo.`);
       return;
@@ -355,7 +451,103 @@ export default function GanaderiaApp({ onSalir }: Props) {
       valorEstimado: 900,
       potreroId: potreros[0]?.id || 101,
       lote: "",
+      origen: "NACIMIENTO",
+      madreId: null,
+      proveedor: "",
+      costoCompra: 0,
+      fechaCompra: new Date().toISOString().slice(0, 10),
+      estadoReproductivo: "VACIA",
+      estadoProductivo: "SECA",
     });
+  };
+
+  // Manejador: Despacho por Venta / Beneficio (POST /api/ganaderia/ventas a través de VentaAnimalController)
+  const handleRegistrarVentaAnimal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formVenta.animalId || !formVenta.comprador.trim() || !formVenta.precioUSD) return;
+
+    try {
+      // 1. Si se registró nuevo peso en báscula antes del despacho, actualizar peso del animal
+      if (formVenta.pesoSalida && Number(formVenta.pesoSalida) > 0) {
+        await actualizarAnimalGanaderia(formVenta.animalId, tenantId, { pesoActual: Number(formVenta.pesoSalida) });
+      }
+
+      // 2. Registrar la venta oficial en el backend con VentaAnimalController (guarda comprador, precio, ticket y marca el animal como VENDIDO en servicio transaccional)
+      const ticket = `VTA-${Date.now().toString().slice(-6)}`;
+      await registrarVentaGanaderia(tenantId, {
+        numeroTicket: ticket,
+        comprador: `${formVenta.comprador.trim()} [${formVenta.motivo}]`,
+        items: [
+          {
+            animalId: Number(formVenta.animalId),
+            precioVenta: Number(formVenta.precioUSD),
+          },
+        ],
+      });
+
+      // 3. Reflejar inmediatamente en el estado local: animal marcado como VENDIDO y sin potrero asignado
+      setAnimales(prev => prev.map(a => a.id === formVenta.animalId ? { ...a, estado: "VENDIDO", potrero: undefined } : a));
+      notificar(`Venta registrada exitosamente (Ticket ${ticket}). Animal despachado y liquidado.`);
+    } catch (err: any) {
+      const msg = err?.message || "Revisa tu conexión e inténtalo de nuevo";
+      notificar(`⚠️ No se pudo procesar la venta: ${msg}`);
+      return;
+    }
+
+    setModalVentaAnimal(false);
+    setFormVenta({
+      animalId: 0,
+      comprador: "",
+      precioUSD: 0,
+      pesoSalida: 0,
+      motivo: "BENEFICIO",
+    });
+  };
+
+  // Manejador: Registrar Celo (Evento Reproductivo dedicado)
+  const handleGuardarCelo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await registrarEventoReproductivoGanaderia(tenantId, {
+        hembraId: Number(formCelo.hembraId),
+        tipo: "CELO",
+        fecha: formCelo.fecha,
+        tipoCelo: formCelo.tipoCelo,
+        sintomasCelo: formCelo.sintomasCelo,
+        horaOptimaIA: formCelo.horaOptimaIA,
+      });
+      setAnimales(prev => prev.map(a => a.id === Number(formCelo.hembraId) ? { ...a, estadoReproductivo: "EN_ESPERA" } : a));
+      const hembra = animales.find(a => a.id === Number(formCelo.hembraId));
+      notificar(`🔥 Celo registrado para hembra ${hembra?.arete || ''}. Estado reproductivo actualizado a 'EN_ESPERA' (programada para IA).`);
+    } catch {
+      notificar("⚠️ No se pudo registrar el evento de celo — revisa tu conexión.");
+      return;
+    }
+    setModalCelo(false);
+  };
+
+  // Manejador: Registrar Mastitis (Sanidad dedicada con retiro de leche)
+  const handleGuardarMastitis = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await registrarMastitisGanaderia(tenantId, {
+        animalId: Number(formMastitis.animalId),
+        fecha: formMastitis.fecha,
+        cuartoAfectado: formMastitis.cuartoAfectado,
+        gradoCmt: formMastitis.gradoCmt,
+        farmacoAplicado: formMastitis.farmacoAplicado,
+        diasRetiroLeche: Number(formMastitis.diasRetiroLeche),
+        veterinario: formMastitis.veterinario,
+        costo: Number(formMastitis.costo),
+        notas: formMastitis.notas,
+      });
+      const vaca = animales.find(a => a.id === Number(formMastitis.animalId));
+      notificar(`🚨 Alerta sanitaria: Mastitis registrada en ${vaca?.arete || 'vaca'}. Cuarto ${formMastitis.cuartoAfectado} en tratamiento. Bloqueo de leche activo por ${formMastitis.diasRetiroLeche} días.`);
+    } catch {
+      notificar("⚠️ No se pudo registrar el tratamiento de mastitis — revisa tu conexión.");
+      return;
+    }
+    setModalMastitis(false);
   };
 
   // Manejador: Crear nuevo potrero con color
@@ -564,24 +756,82 @@ export default function GanaderiaApp({ onSalir }: Props) {
     }, 1500);
   };
 
-  // Manejador: Aplicar vacuna
+  // Manejador: Aplicar vacuna (Soporte individual y masivo con verificación de catálogo y tiempos de retiro)
   const handleGuardarVacuna = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const idsParaAplicar = vacunacionModo === "INDIVIDUAL"
+      ? (formVacuna.animalId ? [Number(formVacuna.animalId)] : [])
+      : animalesVacunaSeleccionados;
+
+    if (idsParaAplicar.length === 0) {
+      notificar("⚠️ Debes seleccionar al menos un animal para aplicar el tratamiento sanitario.");
+      return;
+    }
+
+    const vacunaSeleccionada = vacunas.find(v => v.id === Number(formVacuna.vacunaId)) || DEFAULT_VACUNAS_CATALOGO[0];
+
     try {
-      await aplicarVacunaGanaderia(tenantId, {
-        animalId: Number(formVacuna.animalId),
+      await aplicarVacunaLoteGanaderia(tenantId, {
+        animalIds: idsParaAplicar,
         vacunaId: Number(formVacuna.vacunaId),
         fechaAplicacion: new Date().toISOString().slice(0, 10),
         lote: formVacuna.lote,
         veterinarioResponsable: formVacuna.veterinario,
         costo: Number(formVacuna.costo),
       });
-    } catch {
-      notificar(`⚠️ No se pudo registrar el tratamiento sanitario — revisa tu conexión e inténtalo de nuevo.`);
+
+      const retiroMsg = [];
+      if (vacunaSeleccionada.diasRetiroLeche && vacunaSeleccionada.diasRetiroLeche > 0) {
+        retiroMsg.push(`Retiro leche: ${vacunaSeleccionada.diasRetiroLeche}d`);
+      }
+      if (vacunaSeleccionada.diasRetiroCarne && vacunaSeleccionada.diasRetiroCarne > 0) {
+        retiroMsg.push(`Retiro carne: ${vacunaSeleccionada.diasRetiroCarne}d`);
+      }
+      const detalleRetiro = retiroMsg.length > 0 ? ` (${retiroMsg.join(" • ")})` : " (Sin tiempo de retiro obligatorio)";
+
+      notificar(`✅ Vacuna '${vacunaSeleccionada.nombre}' aplicada a ${idsParaAplicar.length} animal(es)${detalleRetiro}. Alertas sanitarias actualizadas.`);
+
+      // Recargar alertas sanitarias para reflejar inmediatamente los bloqueos de leche y carne
+      obtenerAlertasSanitariasGanaderia(tenantId).then(setAlertasSanitarias).catch(() => {});
+    } catch (err: any) {
+      const msg = err?.message || "Revisa tu conexión e inténtalo de nuevo";
+      notificar(`⚠️ No se pudo registrar el tratamiento sanitario: ${msg}`);
       return;
     }
-    notificar(`Tratamiento sanitario aplicado con éxito.`);
+
     setModalVacuna(false);
+    setAnimalesVacunaSeleccionados([]);
+  };
+
+  // Manejador: Crear nueva vacuna en catálogo in-situ
+  const handleCrearNuevaVacunaInSitu = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nuevaVacunaForm.nombre.trim()) return;
+
+    try {
+      const creada = await crearVacunaGanaderia(tenantId, {
+        nombre: nuevaVacunaForm.nombre.trim(),
+        enfermedadPrevenida: nuevaVacunaForm.enfermedadPrevenida.trim() || undefined,
+        diasRetiroLeche: Number(nuevaVacunaForm.diasRetiroLeche) || 0,
+        diasRetiroCarne: Number(nuevaVacunaForm.diasRetiroCarne) || 0,
+        diasParaRefuerzo: Number(nuevaVacunaForm.diasParaRefuerzo) || 0,
+      });
+
+      setVacunas(prev => [...prev, creada]);
+      setFormVacuna(prev => ({ ...prev, vacunaId: creada.id }));
+      setMostrarCrearVacuna(false);
+      setNuevaVacunaForm({
+        nombre: "",
+        enfermedadPrevenida: "",
+        diasRetiroLeche: 0,
+        diasRetiroCarne: 0,
+        diasParaRefuerzo: 180,
+      });
+      notificar(`Vacuna '${creada.nombre}' guardada en el catálogo oficial.`);
+    } catch {
+      notificar("⚠️ No se pudo registrar la nueva vacuna en el catálogo.");
+    }
   };
 
   // Manejador: Registrar evento reproductivo
@@ -783,6 +1033,147 @@ export default function GanaderiaApp({ onSalir }: Props) {
         ───────────────────────────────────────────────────────────── */}
         {tab === "resumen" && (
           <div className="space-y-6">
+
+            {/* Checklist de Primeros Pasos (Onboarding de Finca Vacía) */}
+            {(() => {
+              const fincaUbicada = typeof window !== "undefined" && !!localStorage.getItem(`aurora_finca_config_${tenantId}`);
+              const tienePotreros = potreros.length > 0;
+              const tieneAnimales = animales.length > 0;
+              const pasosCompletados = (fincaUbicada ? 1 : 0) + (tienePotreros ? 1 : 0) + (tieneAnimales ? 1 : 0);
+
+              return (
+                <div className="apple-glass rounded-3xl p-6 border border-emerald-500/30 bg-gradient-to-r from-slate-900/90 via-emerald-950/20 to-slate-900/90 shadow-xl space-y-4 text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🚀</span>
+                        <h3 className="font-['Outfit'] font-black text-lg text-white">
+                          Checklist de Primeros Pasos para tu Finca
+                        </h3>
+                        <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                          {pasosCompletados} de 3 completados
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        {pasosCompletados === 3 
+                          ? "¡Felicidades! Has completado la configuración esencial de tu predio." 
+                          : "Configura tu predio en 3 pasos clave para desbloquear el control agronómico completo:"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Paso 1: Fijar Ubicación */}
+                    <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                      fincaUbicada 
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
+                        : "bg-white/5 border-white/10 hover:border-emerald-500/40"
+                    }`}>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-400">Paso 1</span>
+                          {fincaUbicada ? (
+                            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">✓ Listo</span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
+                          )}
+                        </div>
+                        <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
+                          <span>📍</span> Fijar Ubicación Real
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          {fincaUbicada 
+                            ? "Coordenadas fijadas en el satélite." 
+                            : "Busca tu predio en el mapa y fija las coordenadas de tu finca."}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => { setTab("potreros"); setSubPotreros("mapa"); }}
+                        className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          fincaUbicada
+                            ? "bg-white/10 text-white hover:bg-white/20"
+                            : "btn-cyber-neon text-white shadow-md"
+                        }`}
+                      >
+                        {fincaUbicada ? "Ver en Mapa →" : "Ubicar en Mapa →"}
+                      </button>
+                    </div>
+
+                    {/* Paso 2: Crear Primer Potrero */}
+                    <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                      tienePotreros 
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
+                        : "bg-white/5 border-white/10 hover:border-emerald-500/40"
+                    }`}>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-400">Paso 2</span>
+                          {tienePotreros ? (
+                            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">✓ Listo ({potreros.length})</span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
+                          )}
+                        </div>
+                        <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
+                          <span>🌾</span> Crear Primer Potrero
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          {tienePotreros 
+                            ? `${potreros.length} potreros registrados.` 
+                            : "Delimita un potrero para asignar pastos, área y carga animal."}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setModalNuevoPotrero(true)}
+                        className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          tienePotreros
+                            ? "bg-white/10 text-white hover:bg-white/20"
+                            : "btn-cyber-neon text-white shadow-md"
+                        }`}
+                      >
+                        {tienePotreros ? "+ Nuevo Potrero" : "+ Crear Potrero"}
+                      </button>
+                    </div>
+
+                    {/* Paso 3: Dar de Alta Primer Animal */}
+                    <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                      tieneAnimales 
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
+                        : "bg-white/5 border-white/10 hover:border-emerald-500/40"
+                    }`}>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-400">Paso 3</span>
+                          {tieneAnimales ? (
+                            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">✓ Listo ({animales.length})</span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
+                          )}
+                        </div>
+                        <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
+                          <span>🐮</span> Dar de Alta Primer Animal
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          {tieneAnimales 
+                            ? `${animales.length} cabezas en el hato.` 
+                            : "Registra tu primer animal por nacimiento o compra con su arete."}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setModalNuevoAnimal(true)}
+                        className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          tieneAnimales
+                            ? "bg-white/10 text-white hover:bg-white/20"
+                            : "btn-cyber-neon text-white shadow-md"
+                        }`}
+                      >
+                        {tieneAnimales ? "+ Nuevo Animal" : "+ Dar de Alta"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             
             {/* Banner Superior con KPIs Vivos */}
             <div className="apple-glass rounded-3xl p-6 sm:p-8 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-[#0a1818]/60 to-slate-900/60 shadow-xl space-y-4">
@@ -1440,7 +1831,28 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
             {/* VISTA 1: FICHA CONSOLIDADA POR ANIMAL ÚNICO */}
             {subSanidad === "individual" && (
-              <div className="space-y-6">
+              animales.length === 0 ? (
+                <div className="p-12 text-center rounded-3xl apple-glass border border-white/10 space-y-4 max-w-md mx-auto my-8">
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-3xl mx-auto">
+                    💉
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Ficha Sanitaria por Animal</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Registra tu primer animal para ver su ficha sanitaria aquí.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormAnimal(prev => ({ ...prev, origen: "NACIMIENTO" }));
+                      setModalNuevoAnimal(true);
+                    }}
+                    className="btn-cyber-neon text-white font-bold px-5 py-2.5 rounded-xl cursor-pointer text-xs"
+                  >
+                    + Registrar Primer Animal
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6">
                 {/* Selector rápido de Arete */}
                 <div className="p-4 rounded-3xl apple-glass border border-white/10 space-y-3">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1506,6 +1918,28 @@ export default function GanaderiaApp({ onSalir }: Props) {
                             }`}>
                               {animalSel.estado}
                             </span>
+                            {animalSel.estadoReproductivo && (
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                                animalSel.estadoReproductivo === "PREÑADA"
+                                  ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                  : animalSel.estadoReproductivo === "EN_ESPERA"
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                  : "bg-slate-500/20 text-slate-300 border-white/10"
+                              }`}>
+                                Repro: {animalSel.estadoReproductivo}
+                              </span>
+                            )}
+                            {animalSel.estadoProductivo && (
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                                animalSel.estadoProductivo === "ORDEÑO"
+                                  ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                                  : animalSel.estadoProductivo === "CRIANDO"
+                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                  : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                              }`}>
+                                Prod: {animalSel.estadoProductivo}
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-slate-400 flex items-center gap-3 flex-wrap pt-1">
                             <span>Raza: <b className="text-white">{animalSel.raza || "Mestizo"}</b></span>
@@ -1664,7 +2098,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     </div>
                   );
                 })()}
-              </div>
+                </div>
+              )
             )}
 
             {/* VISTA 2: CONSOLIDADO POR LOTE */}
@@ -1809,22 +2244,33 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
-                    onClick={() => { setModalReproduccion(true); setFormRepro({ ...formRepro, tipo: "PARTO" }); }}
+                    onClick={() => {
+                      setFormAnimal(prev => ({
+                        ...prev,
+                        origen: "NACIMIENTO",
+                        tipoAnimal: "BECERRA",
+                        fechaNacimiento: new Date().toISOString().slice(0, 10),
+                      }));
+                      setModalNuevoAnimal(true);
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Partos (Alta Cría)</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
+                    <span>• Partos / Alta de Cría en Finca</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">Dar de alta →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "ABORTO", titulo: "Registro de Aborto / Pérdida", descripcion: "Registra la pérdida gestacional y pasa la hembra a descanso reproductivo." })}
+                    onClick={() => {
+                      setModalReproduccion(true);
+                      setFormRepro({ ...formRepro, tipo: "DIAGNOSTICO_PRENEZ", resultado: "ABORTO_NO_GESTANTE" });
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Abortos & Pérdidas</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "CELO", titulo: "Detección de Celo", descripcion: "Registra el celo natural o inducido para programar inseminación en 12 horas." })}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Celos & Sincronización</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
+                    onClick={() => setModalCelo(true)}
+                    className="w-full text-left p-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold cursor-pointer flex items-center justify-between border border-purple-500/20">
+                    <span>• Celos & Detección para IA</span>
+                    <span className="text-[10px] text-purple-300">Registrar →</span>
                   </button>
                 </div>
               </div>
@@ -1849,7 +2295,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "SECADO", titulo: "Secado de Vaca", descripcion: "Pasa la hembra a período seco 60 días antes del parto para recuperación de ubre." })}
+                    onClick={() => {
+                      setModalReproduccion(true);
+                      setFormRepro({ ...formRepro, tipo: "DIAGNOSTICO_PRENEZ", resultado: "SECADO_PREVIO_PARTO" });
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Secados</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
@@ -1883,9 +2332,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Ejecutar →</span>
                   </button>
                   <button
-                    onClick={() => setModalNuevoAnimal(true)}
+                    onClick={() => {
+                      setFormAnimal(prev => ({ ...prev, origen: "NACIMIENTO" }));
+                      setModalNuevoAnimal(true);
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Alta de Animales</span>
+                    <span>• Alta de Animales (Nacimiento / Compra)</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                 </div>
@@ -1905,10 +2357,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Aplicar →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "MASTITIS", titulo: "Control de Mastitis", descripcion: "Registro de prueba de California Mastitis Test (CMT) y tratamiento antibiótico intramamario." })}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Mastitis / Prueba CMT</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
+                    onClick={() => setModalMastitis(true)}
+                    className="w-full text-left p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold cursor-pointer flex items-center justify-between border border-rose-500/20">
+                    <span>• Mastitis (Prueba CMT & Retiro Leche)</span>
+                    <span className="text-[10px] text-rose-300">Registrar →</span>
                   </button>
                   <button
                     onClick={() => setModalVacuna(true)}
@@ -1939,9 +2391,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Rotar →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "AFORO", titulo: "Aforo de Pastura", descripcion: "Pesaje de metro cuadrado de forraje verde para calcular disponibilidad de materia seca." })}
+                    onClick={() => {
+                      setTab("potreros");
+                      notificar("Selecciona un potrero para calcular y registrar el aforo de forraje.");
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Aforos & Planificación</span>
+                    <span>• Aforos & Planificación de Pastoreo</span>
                     <span className="text-[10px] text-slate-400">Calcular →</span>
                   </button>
                 </div>
@@ -1955,16 +2410,36 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 </div>
                 <div className="space-y-1 text-xs">
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "COMPRA", titulo: "Ingreso por Compra", descripcion: "Registro de lote adquirido en subasta o compra directa con guía de traslado." })}
+                    onClick={() => {
+                      setFormAnimal(prev => ({
+                        ...prev,
+                        origen: "COMPRA",
+                        proveedor: "",
+                        costoCompra: 0,
+                        lote: prev.lote || "Lote Compra",
+                      }));
+                      setModalNuevoAnimal(true);
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Compras de Ganado</span>
-                    <span className="text-[10px] text-slate-400">Ingresar →</span>
+                    <span>• Compras de Ganado (Ingreso Real)</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">Ingresar →</span>
                   </button>
                   <button
-                    onClick={() => setModalEventoGenerico({ tipo: "VENTA", titulo: "Despacho por Venta", descripcion: "Salida de ganado para beneficio o cría con liquidación en báscula." })}
+                    onClick={() => {
+                      if (animales.length > 0) {
+                        setFormVenta({
+                          animalId: animales[0].id,
+                          comprador: "",
+                          precioUSD: 0,
+                          pesoSalida: animales[0].pesoActual || 0,
+                          motivo: "BENEFICIO",
+                        });
+                      }
+                      setModalVentaAnimal(true);
+                    }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Venta / Beneficio</span>
-                    <span className="text-[10px] text-slate-400">Despachar →</span>
+                    <span>• Venta / Beneficio (Salida Real)</span>
+                    <span className="text-[10px] text-rose-400 font-bold">Despachar →</span>
                   </button>
                 </div>
               </div>
@@ -2282,6 +2757,114 @@ export default function GanaderiaApp({ onSalir }: Props) {
             </div>
 
             <form onSubmit={handleGuardarAnimal} className="space-y-4 text-xs">
+              {/* Selector de Origen: Nacimiento vs Compra */}
+              <div>
+                <label className="text-slate-400 block mb-1.5 font-bold">Origen del Animal *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormAnimal({ ...formAnimal, origen: "NACIMIENTO", tipoAnimal: formAnimal.tipoAnimal === "VACA" ? "BECERRA" : formAnimal.tipoAnimal })}
+                    className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer border ${
+                      formAnimal.origen === "NACIMIENTO"
+                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-md"
+                        : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <span>🐣</span>
+                    <span>Nacimiento en Finca</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormAnimal({ ...formAnimal, origen: "COMPRA" })}
+                    className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer border ${
+                      formAnimal.origen === "COMPRA"
+                        ? "bg-sky-500/20 border-sky-500 text-sky-400 shadow-md"
+                        : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <span>🛒</span>
+                    <span>Ingreso por Compra</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Campos específicos según Origen */}
+              {formAnimal.origen === "NACIMIENTO" ? (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-3">
+                  <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
+                    <span>🌱</span>
+                    <span>Datos de Nacimiento & Trazabilidad Maternal</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-400 block mb-1">Madre (Opcional - Genealogía)</label>
+                      <select
+                        value={formAnimal.madreId || ""}
+                        onChange={e => setFormAnimal({ ...formAnimal, madreId: e.target.value ? Number(e.target.value) : null })}
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white text-xs">
+                        <option value="">Sin madre vinculada</option>
+                        {animales.filter(a => a.sexo === "HEMBRA").map(h => (
+                          <option key={h.id} value={h.id}>
+                            {h.arete} - {h.nombre || h.tipoAnimal} ({h.raza || "Brahman"})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-slate-400 block mb-1">Fecha de Nacimiento</label>
+                      <input
+                        type="date"
+                        value={formAnimal.fechaNacimiento}
+                        onChange={e => setFormAnimal({ ...formAnimal, fechaNacimiento: e.target.value })}
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 space-y-3">
+                  <div className="text-[11px] font-bold text-sky-400 flex items-center gap-1.5">
+                    <span>💵</span>
+                    <span>Datos de Adquisición & Proveedor</span>
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Proveedor / Subasta / Vendedor *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Subasta Barinas / Agropecuaria El Samán"
+                      value={formAnimal.proveedor}
+                      onChange={e => setFormAnimal({ ...formAnimal, proveedor: e.target.value })}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-400 block mb-1">Precio de Compra (USD) *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        placeholder="Ej. 850"
+                        value={formAnimal.costoCompra}
+                        onChange={e => setFormAnimal({ ...formAnimal, costoCompra: Number(e.target.value) })}
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 block mb-1">Fecha de Compra / Entrada</label>
+                      <input
+                        type="date"
+                        value={formAnimal.fechaCompra}
+                        onChange={e => setFormAnimal({ ...formAnimal, fechaCompra: e.target.value })}
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-400 block mb-1">Número de Arete / Chapeta *</label>
@@ -2376,8 +2959,34 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-medium"
                 />
                 <p className="text-[10px] text-slate-500 mt-1">
-                  Permite agrupar y trazar animales comprados o ingresados en un mismo embarque/feria.
+                  Permite agrupar y trazar animales nacidos o comprados en un mismo embarque/feria.
                 </p>
+              </div>
+
+              {/* Estados Reproductivo & Productivo */}
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+                <div>
+                  <label className="text-slate-400 block mb-1">Estado Reproductivo</label>
+                  <select
+                    value={formAnimal.estadoReproductivo}
+                    onChange={e => setFormAnimal({ ...formAnimal, estadoReproductivo: e.target.value as any })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs">
+                    <option value="VACIA">Vacía</option>
+                    <option value="PREÑADA">Preñada</option>
+                    <option value="EN_ESPERA">En Espera (Celo / IA)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Estado Productivo</label>
+                  <select
+                    value={formAnimal.estadoProductivo}
+                    onChange={e => setFormAnimal({ ...formAnimal, estadoProductivo: e.target.value as any })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs">
+                    <option value="SECA">Seca</option>
+                    <option value="ORDEÑO">En Ordeño</option>
+                    <option value="CRIANDO">Criando / Amamantando</option>
+                  </select>
+                </div>
               </div>
 
               <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
@@ -2759,85 +3368,364 @@ export default function GanaderiaApp({ onSalir }: Props) {
         </div>
       )}
 
-      {/* MODAL: VACUNACIÓN */}
-      {modalVacuna && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-emerald-500/30 text-left space-y-4">
-            <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-              Aplicar Tratamiento Sanitario
-            </h3>
-            <form onSubmit={handleGuardarVacuna} className="space-y-3 text-xs">
-              <div>
-                <label className="text-slate-400 block mb-1">Animal</label>
-                <select
-                  value={formVacuna.animalId}
-                  onChange={e => setFormVacuna({ ...formVacuna, animalId: Number(e.target.value) })}
-                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
-                  {animales.map(a => (
-                    <option key={a.id} value={a.id}>{a.arete} - {a.nombre || a.tipoAnimal}</option>
-                  ))}
-                </select>
-              </div>
+      {/* MODAL: VACUNACIÓN & TRATAMIENTOS SANITARIOS */}
+      {modalVacuna && (() => {
+        const vacunaSel = vacunas.find(v => v.id === Number(formVacuna.vacunaId)) || DEFAULT_VACUNAS_CATALOGO[0];
+        const lotesUnicos = Array.from(new Set(animales.map(a => a.lote).filter(Boolean))) as string[];
+        const totalSeleccionados = vacunacionModo === "INDIVIDUAL"
+          ? (formVacuna.animalId ? 1 : 0)
+          : animalesVacunaSeleccionados.length;
 
-              <div>
-                <label className="text-slate-400 block mb-1">Fármaco / Biológico</label>
-                <input
-                  type="text"
-                  value={formVacuna.nombreVacuna}
-                  onChange={e => setFormVacuna({ ...formVacuna, nombreVacuna: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-bold"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Número de Lote</label>
-                  <input
-                    type="text"
-                    value={formVacuna.lote}
-                    onChange={e => setFormVacuna({ ...formVacuna, lote: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
-                  />
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md overflow-y-auto">
+            <div className="apple-glass rounded-3xl p-5 sm:p-7 max-w-xl w-full border border-emerald-500/40 text-left space-y-4 my-auto max-h-[92vh] flex flex-col font-['Inter']">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">💉</span>
+                  <div>
+                    <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
+                      Aplicar Tratamiento Sanitario / Biológico
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Cálculo estricto de tiempos de retiro y registro individual o en lote.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Costo (USD)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={formVacuna.costo}
-                    onChange={e => setFormVacuna({ ...formVacuna, costo: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Médico Veterinario</label>
-                <input
-                  type="text"
-                  value={formVacuna.veterinario}
-                  onChange={e => setFormVacuna({ ...formVacuna, veterinario: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setModalVacuna(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer">
-                  Guardar Registro
+                  className="text-slate-400 hover:text-white cursor-pointer text-base">
+                  ✕
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleGuardarVacuna} className="space-y-4 text-xs overflow-y-auto pr-1">
+                {/* 1. SELECCIÓN DE ANIMAL(ES): INDIVIDUAL VS LOTE */}
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-300">Modo de Aplicación</label>
+                    <div className="inline-flex rounded-xl bg-slate-900 p-1 border border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => setVacunacionModo("INDIVIDUAL")}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          vacunacionModo === "INDIVIDUAL"
+                            ? "bg-emerald-500 text-white shadow"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        Individual (1 animal)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVacunacionModo("MULTIPLE");
+                          if (animalesVacunaSeleccionados.length === 0 && formVacuna.animalId) {
+                            setAnimalesVacunaSeleccionados([Number(formVacuna.animalId)]);
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          vacunacionModo === "MULTIPLE"
+                            ? "bg-emerald-500 text-white shadow"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        Múltiple / Lote ({animalesVacunaSeleccionados.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {vacunacionModo === "INDIVIDUAL" ? (
+                    <div>
+                      <label className="text-slate-400 block mb-1 font-medium">Animal a Tratar *</label>
+                      <select
+                        value={formVacuna.animalId}
+                        onChange={e => setFormVacuna({ ...formVacuna, animalId: Number(e.target.value) })}
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs"
+                      >
+                        {animales.map(a => (
+                          <option key={a.id} value={a.id}>
+                            {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"}) {a.lote ? `[${a.lote}]` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setAnimalesVacunaSeleccionados(animales.map(a => a.id))}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold hover:bg-emerald-500/30 cursor-pointer"
+                        >
+                          ✓ Todos ({animales.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAnimalesVacunaSeleccionados([])}
+                          className="px-2.5 py-1 rounded-lg bg-white/5 text-slate-400 border border-white/10 text-[11px] hover:text-white cursor-pointer"
+                        >
+                          Desmarcar
+                        </button>
+
+                        {/* Filtros rápidos por Lote */}
+                        {lotesUnicos.map(loteNombre => (
+                          <button
+                            key={loteNombre}
+                            type="button"
+                            onClick={() => {
+                              const idsLote = animales.filter(a => a.lote === loteNombre).map(a => a.id);
+                              setAnimalesVacunaSeleccionados(prev => Array.from(new Set([...prev, ...idsLote])));
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-bold hover:bg-purple-500/30 cursor-pointer"
+                          >
+                            + Lote: {loteNombre}
+                          </button>
+                        ))}
+
+                        {/* Filtros rápidos por Potrero */}
+                        {potreros.slice(0, 3).map(pot => (
+                          <button
+                            key={pot.id}
+                            type="button"
+                            onClick={() => {
+                              const idsPot = animales.filter(a => a.potrero?.id === pot.id).map(a => a.id);
+                              setAnimalesVacunaSeleccionados(prev => Array.from(new Set([...prev, ...idsPot])));
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-bold hover:bg-sky-500/30 cursor-pointer"
+                          >
+                            + Potrero: {pot.nombre}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Lista scrolleable de animales seleccionables */}
+                      <div className="max-h-36 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/70 p-2 space-y-1">
+                        {animales.map(a => {
+                          const isSel = animalesVacunaSeleccionados.includes(a.id);
+                          return (
+                            <label
+                              key={a.id}
+                              className={`flex items-center justify-between p-1.5 rounded-lg text-[11px] cursor-pointer transition-colors ${
+                                isSel ? "bg-emerald-500/20 text-white font-bold" : "hover:bg-white/5 text-slate-300"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isSel}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setAnimalesVacunaSeleccionados(prev => [...prev, a.id]);
+                                    } else {
+                                      setAnimalesVacunaSeleccionados(prev => prev.filter(id => id !== a.id));
+                                    }
+                                  }}
+                                  className="rounded text-emerald-500 focus:ring-0"
+                                />
+                                <span className="font-mono text-emerald-400">{a.arete}</span>
+                                <span>{a.nombre || a.tipoAnimal}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-400">{a.lote || a.potrero?.nombre || ""}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <div className="text-[11px] text-right font-bold text-emerald-400">
+                        {animalesVacunaSeleccionados.length} de {animales.length} animales seleccionados
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. CATÁLOGO DE VACUNAS CON DÍAS DE RETIRO REALES */}
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-300 block">Fármaco / Biológico del Catálogo *</label>
+                    <button
+                      type="button"
+                      onClick={() => setMostrarCrearVacuna(!mostrarCrearVacuna)}
+                      className="text-xs font-bold text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                    >
+                      {mostrarCrearVacuna ? "✕ Cerrar creación" : "+ Nueva Vacuna en Catálogo"}
+                    </button>
+                  </div>
+
+                  {/* Sub-formulario in-situ para crear vacuna nueva */}
+                  {mostrarCrearVacuna ? (
+                    <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 space-y-2.5">
+                      <div className="text-[11px] font-bold text-emerald-300">Registrar Nuevo Biológico en Catálogo</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-slate-400 block mb-1 text-[10px]">Nombre Comercial / Biológico *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ej. Cydectin / Vacuna Antirrábica"
+                            value={nuevaVacunaForm.nombre}
+                            onChange={e => setNuevaVacunaForm({ ...nuevaVacunaForm, nombre: e.target.value })}
+                            className="w-full p-2 rounded-lg bg-slate-900 border border-white/15 text-white text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-400 block mb-1 text-[10px]">Enfermedad Prevenida</label>
+                          <input
+                            type="text"
+                            placeholder="Ej. Rabia, Aftosa, Parásitos"
+                            value={nuevaVacunaForm.enfermedadPrevenida}
+                            onChange={e => setNuevaVacunaForm({ ...nuevaVacunaForm, enfermedadPrevenida: e.target.value })}
+                            className="w-full p-2 rounded-lg bg-slate-900 border border-white/15 text-white text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-rose-400 block mb-1 text-[10px] font-bold">Retiro Leche (días)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={nuevaVacunaForm.diasRetiroLeche}
+                            onChange={e => setNuevaVacunaForm({ ...nuevaVacunaForm, diasRetiroLeche: Number(e.target.value) })}
+                            className="w-full p-2 rounded-lg bg-slate-900 border border-rose-500/30 text-rose-300 font-mono font-bold text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-amber-400 block mb-1 text-[10px] font-bold">Retiro Carne (días)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={nuevaVacunaForm.diasRetiroCarne}
+                            onChange={e => setNuevaVacunaForm({ ...nuevaVacunaForm, diasRetiroCarne: Number(e.target.value) })}
+                            className="w-full p-2 rounded-lg bg-slate-900 border border-amber-500/30 text-amber-300 font-mono font-bold text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sky-400 block mb-1 text-[10px] font-bold">Refuerzo (días)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={nuevaVacunaForm.diasParaRefuerzo}
+                            onChange={e => setNuevaVacunaForm({ ...nuevaVacunaForm, diasParaRefuerzo: Number(e.target.value) })}
+                            className="w-full p-2 rounded-lg bg-slate-900 border border-sky-500/30 text-sky-300 font-mono font-bold text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end pt-1">
+                        <button
+                          type="button"
+                          onClick={handleCrearNuevaVacunaInSitu}
+                          className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow"
+                        >
+                          Guardar y Seleccionar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <select
+                        value={formVacuna.vacunaId}
+                        onChange={e => setFormVacuna({ ...formVacuna, vacunaId: Number(e.target.value) })}
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/30 text-white font-bold text-xs"
+                      >
+                        {vacunas.map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.nombre} — [Retiro Leche: {v.diasRetiroLeche ?? 0}d | Carne: {v.diasRetiroCarne ?? 0}d | Refuerzo: {v.diasParaRefuerzo ?? 0}d]
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Ficha técnica de seguridad de la vacuna seleccionada */}
+                  {vacunaSel && (
+                    <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
+                      <div className={`p-2 rounded-xl border text-center ${
+                        (vacunaSel.diasRetiroLeche && vacunaSel.diasRetiroLeche > 0)
+                          ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                          : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                      }`}>
+                        <span className="block text-[10px] text-slate-400">🥛 Retiro Leche</span>
+                        <span className="font-bold font-mono text-xs">{vacunaSel.diasRetiroLeche ?? 0} días</span>
+                      </div>
+
+                      <div className={`p-2 rounded-xl border text-center ${
+                        (vacunaSel.diasRetiroCarne && vacunaSel.diasRetiroCarne > 0)
+                          ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                          : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                      }`}>
+                        <span className="block text-[10px] text-slate-400">🥩 Retiro Carne</span>
+                        <span className="font-bold font-mono text-xs">{vacunaSel.diasRetiroCarne ?? 0} días</span>
+                      </div>
+
+                      <div className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-300 text-center">
+                        <span className="block text-[10px] text-slate-400">🔄 Próx. Refuerzo</span>
+                        <span className="font-bold font-mono text-xs">{vacunaSel.diasParaRefuerzo ?? 0} días</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. DATOS DE LOTE, COSTO Y RESPONSABLE */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-400 block mb-1">Número de Lote del Biológico</label>
+                    <input
+                      type="text"
+                      value={formVacuna.lote}
+                      onChange={e => setFormVacuna({ ...formVacuna, lote: e.target.value })}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                      placeholder="Ej. B-2026-09"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Costo Total Estimado (USD)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={formVacuna.costo}
+                      onChange={e => setFormVacuna({ ...formVacuna, costo: Number(e.target.value) })}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-400 block mb-1">Médico Veterinario / Técnico Responsable</label>
+                  <input
+                    type="text"
+                    value={formVacuna.veterinario}
+                    onChange={e => setFormVacuna({ ...formVacuna, veterinario: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
+                    placeholder="Ej. Dr. Carlos Mendoza MV"
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                  <span className="text-[11px] text-slate-400">
+                    Se aplicará a <strong>{totalSeleccionados}</strong> animal(es).
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setModalVacuna(false)}
+                      className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer shadow-lg shadow-emerald-500/20">
+                      Aplicar a {totalSeleccionados} Animal(es)
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL: REPRODUCCIÓN */}
       {modalReproduccion && (
@@ -2909,53 +3797,369 @@ export default function GanaderiaApp({ onSalir }: Props) {
         </div>
       )}
 
-      {/* MODAL: EVENTO GENÉRICO DE CAMPO */}
-      {modalEventoGenerico && (
+      {/* MODAL: EVENTO DEDICADO DE CELO & SINCRONIZACIÓN */}
+      {modalCelo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-emerald-500/30 text-left space-y-4">
-            <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-              {modalEventoGenerico.titulo}
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-white/60">
-              {modalEventoGenerico.descripcion}
-            </p>
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-purple-500/40 text-left space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🔥</span>
+                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
+                  Detección de Celo
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalCelo(false)}
+                className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
+            </div>
 
-            <div className="space-y-3 text-xs">
+            <form onSubmit={handleGuardarCelo} className="space-y-3 text-xs">
               <div>
-                <label className="text-slate-400 block mb-1">Animal o Lote Afectado</label>
-                <select className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
-                  <option value="">Todo el Lote en Potrero Activo</option>
-                  {animales.map(a => (
-                    <option key={a.id} value={a.id}>{a.arete} - {a.nombre || a.tipoAnimal}</option>
+                <label className="text-slate-400 block mb-1">Hembra en Celo *</label>
+                <select
+                  required
+                  value={formCelo.hembraId}
+                  onChange={e => setFormCelo({ ...formCelo, hembraId: Number(e.target.value) })}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
+                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Fecha de Detección</label>
+                  <input
+                    type="date"
+                    required
+                    value={formCelo.fecha}
+                    onChange={e => setFormCelo({ ...formCelo, fecha: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Tipo de Celo</label>
+                  <select
+                    value={formCelo.tipoCelo}
+                    onChange={e => setFormCelo({ ...formCelo, tipoCelo: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white">
+                    <option value="NATURAL">Celo Natural</option>
+                    <option value="SINCRONIZADO">Sincronizado (IATF / Protocolo)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Signos Clínicos y Síntomas Observados</label>
+                <input
+                  type="text"
+                  value={formCelo.sintomasCelo}
+                  onChange={e => setFormCelo({ ...formCelo, sintomasCelo: e.target.value })}
+                  placeholder="Ej. Acepta monta, moco cristalino filante, vulva edematosa"
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Hora Óptima de Inseminación (Regla AM/PM)</label>
+                <input
+                  type="text"
+                  value={formCelo.horaOptimaIA}
+                  onChange={e => setFormCelo({ ...formCelo, horaOptimaIA: e.target.value })}
+                  placeholder="Ej. Detectado AM → Inseminar PM (12 horas después)"
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-[11px]"
+                />
+                <p className="text-[10px] text-purple-400 mt-1">
+                  💡 Al guardar, el estado reproductivo de la hembra cambiará automáticamente a <strong>EN_ESPERA</strong>.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModalCelo(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer shadow-lg shadow-purple-500/20">
+                  Registrar Celo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EVENTO DEDICADO DE MASTITIS (SANIDAD & RETIRO DE LECHE) */}
+      {modalMastitis && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-rose-500/40 text-left space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🚨</span>
+                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
+                  Diagnóstico y Tratamiento de Mastitis
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalMastitis(false)}
+                className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarMastitis} className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-400 block mb-1">Vaca Afectada *</label>
+                <select
+                  required
+                  value={formMastitis.animalId}
+                  onChange={e => setFormMastitis({ ...formMastitis, animalId: Number(e.target.value) })}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
+                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"}) · Potrero: {a.potrero?.nombre || "Sin Potrero"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Cuarto Mamario Afectado *</label>
+                  <select
+                    value={formMastitis.cuartoAfectado}
+                    onChange={e => setFormMastitis({ ...formMastitis, cuartoAfectado: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
+                    <option value="AD">AD (Anterior Derecho)</option>
+                    <option value="AI">AI (Anterior Izquierdo)</option>
+                    <option value="PD">PD (Posterior Derecho)</option>
+                    <option value="PI">PI (Posterior Izquierdo)</option>
+                    <option value="MULTIPLES">Múltiples Cuartos</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Severidad / Prueba CMT</label>
+                  <select
+                    value={formMastitis.gradoCmt}
+                    onChange={e => setFormMastitis({ ...formMastitis, gradoCmt: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
+                    <option value="TRAZAS">Trazas (Subclínica leve)</option>
+                    <option value="GRADO_1">Grado 1 (Gel ligero sin grumos)</option>
+                    <option value="GRADO_2">Grado 2 (Gel espeso marcado)</option>
+                    <option value="GRADO_3">Grado 3 (Clínica aguda / Cuajo)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Fármaco Intramamario / Antibiótico</label>
+                  <input
+                    type="text"
+                    required
+                    value={formMastitis.farmacoAplicado}
+                    onChange={e => setFormMastitis({ ...formMastitis, farmacoAplicado: e.target.value })}
+                    placeholder="Ej. Cefalexina Intramamaria"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-rose-400 block mb-1 font-bold">Días de Retiro de Leche *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="30"
+                    required
+                    value={formMastitis.diasRetiroLeche}
+                    onChange={e => setFormMastitis({ ...formMastitis, diasRetiroLeche: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-rose-300 font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Veterinario / Técnico</label>
+                  <input
+                    type="text"
+                    value={formMastitis.veterinario}
+                    onChange={e => setFormMastitis({ ...formMastitis, veterinario: e.target.value })}
+                    placeholder="Ej. Dr. González"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Costo Estimado Tratamiento (USD)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={formMastitis.costo}
+                    onChange={e => setFormMastitis({ ...formMastitis, costo: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Notas Clínicas</label>
+                <textarea
+                  rows={2}
+                  value={formMastitis.notas}
+                  onChange={e => setFormMastitis({ ...formMastitis, notas: e.target.value })}
+                  placeholder="Detalles de síntomas o respuesta al tratamiento..."
+                  className="w-full p-2 rounded-xl bg-slate-900 border border-white/15 text-white text-xs"
+                />
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-300 flex items-center gap-2">
+                <span>⛔</span>
+                <span>La leche de esta vaca quedará bloqueada en las alertas sanitarias y en el modo de ordeño diario durante el período de retiro.</span>
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModalMastitis(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer transition-colors shadow-lg shadow-rose-600/30">
+                  Registrar Tratamiento & Alerta
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: REGISTRO DE VENTA / DESPACHO DE ANIMAL */}
+      {modalVentaAnimal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-rose-500/30 text-left space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>🏷️</span>
+                  <span>Despacho por Venta / Beneficio</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-white/60 mt-1">
+                  Registra la salida formal del animal y márcalo como vendido en el hato.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalVentaAnimal(false)}
+                className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleRegistrarVentaAnimal} className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-400 block mb-1">Animal a Despachar *</label>
+                <select
+                  required
+                  value={formVenta.animalId}
+                  onChange={e => {
+                    const selId = Number(e.target.value);
+                    const animalObj = animales.find(a => a.id === selId);
+                    setFormVenta({
+                      ...formVenta,
+                      animalId: selId,
+                      pesoSalida: animalObj?.pesoActual || formVenta.pesoSalida,
+                    });
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold"
+                >
+                  <option value="">Selecciona un animal activo...</option>
+                  {animales.filter(a => a.estado === "ACTIVO").map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.arete} - {a.nombre || a.tipoAnimal} ({a.pesoActual || 0} kg)
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Notas Técnicas / Diagnóstico</label>
-                <textarea
-                  rows={3}
-                  placeholder="Detalles de la labor o tratamiento aplicado..."
-                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white resize-none"
+                <label className="text-slate-400 block mb-1">Comprador / Frigorífico / Destino *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Matadero Frigorífico Central / Ganadería La Gloria"
+                  value={formVenta.comprador}
+                  onChange={e => setFormVenta({ ...formVenta, comprador: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-medium"
                 />
               </div>
-            </div>
 
-            <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setModalEventoGenerico(null)}
-                className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  notificar(`Evento ${modalEventoGenerico.titulo} guardado exitosamente.`);
-                  setModalEventoGenerico(null);
-                }}
-                className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer">
-                Registrar Novedad
-              </button>
-            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Peso en Báscula (kg)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="Ej. 480"
+                    value={formVenta.pesoSalida || ""}
+                    onChange={e => setFormVenta({ ...formVenta, pesoSalida: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Precio Total (USD) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    placeholder="Ej. 1100"
+                    value={formVenta.precioUSD || ""}
+                    onChange={e => setFormVenta({ ...formVenta, precioUSD: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Motivo / Tipo de Salida</label>
+                <select
+                  value={formVenta.motivo}
+                  onChange={e => setFormVenta({ ...formVenta, motivo: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
+                >
+                  <option value="BENEFICIO">Venta para Beneficio / Matadero (Carne)</option>
+                  <option value="CRIA">Venta para Cría / Hato Comercial</option>
+                  <option value="SUBASTA">Subasta Ganadera</option>
+                </select>
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModalVentaAnimal(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer transition-colors shadow-lg">
+                  Confirmar Salida por Venta
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

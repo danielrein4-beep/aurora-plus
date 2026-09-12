@@ -26,7 +26,7 @@ public class ReproduccionController {
 
     public static class EventoRequest {
         public Long hembraId;
-        public String tipo; // SERVICIO, DIAGNOSTICO_PRENEZ, PARTO
+        public String tipo; // SERVICIO, DIAGNOSTICO_PRENEZ, PARTO, CELO
         public LocalDate fecha;
         public Long sementalId;
         public String sementalReferenciaExterna;
@@ -36,6 +36,10 @@ public class ReproduccionController {
         public String areteCria;
         public String sexoCria;
         public BigDecimal pesoCria;
+        // Si tipo=CELO
+        public String tipoCelo; // NATURAL, INDUCIDO_IATF
+        public String sintomasCelo; // REFLEJO_INMOVILIDAD, MOCO_CRISTALINO, BRAMIDO
+        public String horaOptimaIA; // sugerencia de inseminación AM/PM
     }
 
     @PostMapping
@@ -54,7 +58,7 @@ public class ReproduccionController {
         evento.setTenantId(tenantId);
         evento.setHembra(hembra);
         evento.setTipo(request.tipo);
-        evento.setFecha(request.fecha);
+        evento.setFecha(request.fecha != null ? request.fecha : LocalDate.now());
         evento.setResultado(request.resultado);
         evento.setFechaProbableParto(request.fechaProbableParto);
         evento.setSementalReferenciaExterna(request.sementalReferenciaExterna);
@@ -68,7 +72,28 @@ public class ReproduccionController {
             evento.setSemental(semental);
         }
 
-        if ("PARTO".equals(request.tipo)) {
+        if ("CELO".equalsIgnoreCase(request.tipo)) {
+            String descCelo = (request.tipoCelo != null ? request.tipoCelo : "CELO NATURAL")
+                + (request.sintomasCelo != null ? " (" + request.sintomasCelo + ")" : "")
+                + (request.horaOptimaIA != null ? " - IA Óptima: " + request.horaOptimaIA : "");
+            evento.setResultado(descCelo);
+            hembra.setEstadoReproductivo("EN_ESPERA");
+            animalRepository.save(hembra);
+        } else if ("SERVICIO".equalsIgnoreCase(request.tipo)) {
+            hembra.setEstadoReproductivo("EN_ESPERA");
+            animalRepository.save(hembra);
+        } else if ("DIAGNOSTICO_PRENEZ".equalsIgnoreCase(request.tipo)) {
+            if (request.resultado != null) {
+                String resUpper = request.resultado.toUpperCase();
+                if (resUpper.contains("PREÑADA") || resUpper.contains("POSITIV")) {
+                    hembra.setEstadoReproductivo("PREÑADA");
+                    animalRepository.save(hembra);
+                } else if (resUpper.contains("VACIA") || resUpper.contains("NEGATIV") || resUpper.contains("ABORTO")) {
+                    hembra.setEstadoReproductivo("VACIA");
+                    animalRepository.save(hembra);
+                }
+            }
+        } else if ("PARTO".equalsIgnoreCase(request.tipo)) {
             if (request.areteCria == null || request.areteCria.isBlank()) {
                 throw new RuntimeException("El arete de la cría es obligatorio al registrar un parto");
             }
@@ -81,15 +106,21 @@ public class ReproduccionController {
             cria.setArete(request.areteCria);
             cria.setEspecie(hembra.getEspecie());
             cria.setSexo(request.sexoCria);
-            cria.setTipoAnimal("TERNERO".equals(request.sexoCria) ? "TERNERO" : "CRIA");
-            cria.setFechaNacimiento(request.fecha);
+            cria.setTipoAnimal("TERNERO".equalsIgnoreCase(request.sexoCria) ? "TERNERO" : "CRIA");
+            cria.setFechaNacimiento(request.fecha != null ? request.fecha : LocalDate.now());
             cria.setPesoActual(request.pesoCria);
             cria.setPotrero(hembra.getPotrero());
             cria.setMadre(hembra);
             cria.setEstado("ACTIVO");
+            cria.setEstadoReproductivo("VACIA");
+            cria.setEstadoProductivo("CRIANDO");
             animalRepository.save(cria);
 
             evento.setCria(cria);
+
+            hembra.setEstadoReproductivo("VACIA");
+            hembra.setEstadoProductivo("CRIANDO");
+            animalRepository.save(hembra);
         }
 
         return ResponseEntity.ok(eventoReproductivoRepository.save(evento));

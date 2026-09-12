@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { PotreroGanaderia, AnimalGanaderia } from "../api";
+import { useAuth } from "../context/AuthContext";
 
 interface Props {
   potreros: PotreroGanaderia[];
@@ -12,45 +13,24 @@ interface Props {
     poligono: [number, number][];
     hectareas: number;
   }) => void;
+  tenantId?: number;
 }
 
-// Coordenadas base de demostración para la finca (Llanos / Región Ganadera)
-const FINCA_CENTRO: [number, number] = [8.5520, -70.3650];
+export interface FincaConfig {
+  nombre: string;
+  coords: [number, number];
+  guardada: boolean;
+}
 
-// Georreferenciación base de polígonos para cada potrero alrededor del centro de la finca
-const POLIGONOS_POTREROS: Record<number, [number, number][]> = {
-  101: [
-    [8.5540, -70.3680],
-    [8.5545, -70.3640],
-    [8.5515, -70.3635],
-    [8.5510, -70.3675],
-  ],
-  102: [
-    [8.5545, -70.3640],
-    [8.5550, -70.3600],
-    [8.5520, -70.3595],
-    [8.5515, -70.3635],
-  ],
-  103: [
-    [8.5510, -70.3675],
-    [8.5515, -70.3635],
-    [8.5485, -70.3630],
-    [8.5480, -70.3670],
-  ],
-  104: [
-    [8.5515, -70.3635],
-    [8.5520, -70.3595],
-    [8.5490, -70.3590],
-    [8.5485, -70.3630],
-  ],
-};
+export interface PuntoInteresFinca {
+  id: string;
+  nombre: string;
+  coords: [number, number];
+  tipo: "ORDENO" | "MANGA" | "AGUA" | "SILO" | "CASA" | "OTRO";
+}
 
-// Puntos de interés fijos de la finca
-const PUNTOS_INTERES: Array<{ id: string; nombre: string; coords: [number, number]; tipo: string }> = [
-  { id: "vaquera", nombre: "Vaquera & Sala de Ordeño", coords: [8.5516, -70.3636], tipo: "ORDEÑO" },
-  { id: "corral", nombre: "Corral de Maternidad & Manga", coords: [8.5505, -70.3620], tipo: "MANGA" },
-  { id: "tanque", nombre: "Tanque Australiano & Molino", coords: [8.5530, -70.3655], tipo: "AGUA" },
-];
+// Vista neutra de panorama inicial regional (sin inventar finca en un punto falso)
+const PANORAMA_INICIAL: [number, number] = [8.5379, -66.9036];
 
 // Cálculo geodésico exacto del área de un polígono en hectáreas sobre la superficie terrestre (WGS84)
 export function calcularHectareasPoligono(coords: [number, number][]): number {
@@ -78,15 +58,67 @@ export default function GanaderiaMapa({
   onRotarHato,
   onCrearPotrero,
   onGuardarPotreroTrazado,
+  tenantId: propTenantId,
 }: Props) {
+  const { user } = useAuth();
+  const effectiveTenantId = propTenantId || (user?.tenantId ? Number(user.tenantId) : 1);
+
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const polygonsLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const drawingLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const pointsLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const fincaMarkerRef = useRef<L.Marker | null>(null);
+  const referenceLayerRef = useRef<L.TileLayer | null>(null);
 
   const [capaActiva, setCapaActiva] = useState<"satelital" | "terreno" | "calles">("satelital");
   const [potreroSeleccionado, setPotreroSeleccionado] = useState<PotreroGanaderia | null>(null);
   const [busquedaLugar, setBusquedaLugar] = useState("");
+  const [busquedaError, setBusquedaError] = useState<string | null>(null);
+
+  // ── ESTADO DE CONFIGURACIÓN REAL DE LA FINCA (PERSISTIDA POR TENANT) ──
+  const [fincaConfig, setFincaConfig] = useState<FincaConfig>(() => {
+    try {
+      const raw = localStorage.getItem(`aurora_finca_config_${effectiveTenantId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.coords && parsed.nombre) {
+          return { nombre: parsed.nombre, coords: parsed.coords, guardada: true };
+        }
+      }
+    } catch {}
+    return { nombre: "", coords: PANORAMA_INICIAL, guardada: false };
+  });
+
+  // ── PUNTOS DE REFERENCIA / INSTALACIONES (CREADOS POR EL USUARIO) ──
+  const [puntosInteres, setPuntosInteres] = useState<PuntoInteresFinca[]>(() => {
+    try {
+      const raw = localStorage.getItem(`aurora_finca_puntos_${effectiveTenantId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  // Modos interactivos
+  const [modoFijarFinca, setModoFijarFinca] = useState(false);
+  const [modalGuardarFinca, setModalGuardarFinca] = useState(false);
+  const [nombreFincaInput, setNombreFincaInput] = useState(fincaConfig.nombre || "");
+  const [coordsTempFinca, setCoordsTempFinca] = useState<[number, number] | null>(null);
+
+  const [modoAgregarPunto, setModoAgregarPunto] = useState(false);
+  const [modalNuevoPunto, setModalNuevoPunto] = useState(false);
+  const [nuevoPuntoForm, setNuevoPuntoForm] = useState<{
+    nombre: string;
+    tipo: PuntoInteresFinca["tipo"];
+    coords: [number, number] | null;
+  }>({
+    nombre: "",
+    tipo: "ORDENO",
+    coords: null,
+  });
 
   // Estado del Modo Trazar Potrero interactivo
   const [modoTrazar, setModoTrazar] = useState(false);
@@ -98,9 +130,12 @@ export default function GanaderiaMapa({
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
+    const initialCenter = fincaConfig.guardada ? fincaConfig.coords : PANORAMA_INICIAL;
+    const initialZoom = fincaConfig.guardada ? 15 : 6;
+
     const map = L.map(mapContainerRef.current, {
-      center: FINCA_CENTRO,
-      zoom: 16,
+      center: initialCenter,
+      zoom: initialZoom,
       zoomControl: false,
     });
 
@@ -114,11 +149,24 @@ export default function GanaderiaMapa({
 
     (map as any)._currentBaseLayer = esriSatellite;
 
+    // Capa de referencia (ciudades, carreteras, fronteras) sobre la foto satelital —
+    // sin esto, la imagen satelital pura no tiene ningún texto ni punto de
+    // orientación, especialmente notorio en la vista panorámica inicial sin
+    // finca fijada todavía (zoom alejado).
+    const referenceLayer = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19, attribution: "Esri Reference" }
+    ).addTo(map);
+    referenceLayerRef.current = referenceLayer;
+
     const polyGroup = L.layerGroup().addTo(map);
     polygonsLayerGroupRef.current = polyGroup;
 
     const drawGroup = L.layerGroup().addTo(map);
     drawingLayerGroupRef.current = drawGroup;
+
+    const ptsGroup = L.layerGroup().addTo(map);
+    pointsLayerGroupRef.current = ptsGroup;
 
     mapInstanceRef.current = map;
 
@@ -157,20 +205,47 @@ export default function GanaderiaMapa({
     }
 
     newLayer.addTo(map);
+
+    // La capa de referencia (ciudades/carreteras) solo hace falta sobre la foto
+    // satelital pura — Terreno y Calles ya traen sus propias etiquetas.
+    const ref = referenceLayerRef.current;
+    if (ref) {
+      if (capaActiva === "satelital") {
+        if (!map.hasLayer(ref)) ref.addTo(map);
+        ref.bringToFront();
+      } else if (map.hasLayer(ref)) {
+        map.removeLayer(ref);
+      }
+    }
+
     (map as any)._currentBaseLayer = newLayer;
   }, [capaActiva]);
 
-  // Manejar clics en el mapa durante el Modo Trazar
+  // Manejar clics en el mapa según el modo activo
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    if (modoTrazar) {
+    if (modoTrazar || modoFijarFinca || modoAgregarPunto) {
       map.getContainer().style.cursor = "crosshair";
 
       const handleMapClick = (e: L.LeafletMouseEvent) => {
-        const nuevaCoord: [number, number] = [Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6))];
-        setVerticesTrazado(prev => [...prev, nuevaCoord]);
+        const nuevaCoord: [number, number] = [
+          Number(e.latlng.lat.toFixed(6)),
+          Number(e.latlng.lng.toFixed(6)),
+        ];
+
+        if (modoTrazar) {
+          setVerticesTrazado(prev => [...prev, nuevaCoord]);
+        } else if (modoFijarFinca) {
+          setCoordsTempFinca(nuevaCoord);
+          setModalGuardarFinca(true);
+          setModoFijarFinca(false);
+        } else if (modoAgregarPunto) {
+          setNuevoPuntoForm(prev => ({ ...prev, coords: nuevaCoord }));
+          setModalNuevoPunto(true);
+          setModoAgregarPunto(false);
+        }
       };
 
       map.on("click", handleMapClick);
@@ -182,9 +257,9 @@ export default function GanaderiaMapa({
     } else {
       map.getContainer().style.cursor = "";
     }
-  }, [modoTrazar]);
+  }, [modoTrazar, modoFijarFinca, modoAgregarPunto]);
 
-  // Renderizar vértices y polígono interactivo mientras se dibuja
+  // Renderizar vértices y polígono interactivo mientras se dibuja potrero
   useEffect(() => {
     const group = drawingLayerGroupRef.current;
     if (!group) return;
@@ -193,7 +268,6 @@ export default function GanaderiaMapa({
 
     if (!modoTrazar || verticesTrazado.length === 0) return;
 
-    // Marcador para cada vértice (poste de cerca)
     verticesTrazado.forEach((coord, idx) => {
       const isFirst = idx === 0;
       const markerIcon = L.divIcon({
@@ -224,7 +298,6 @@ export default function GanaderiaMapa({
       group.addLayer(marker);
     });
 
-    // Líneas entre vértices
     if (verticesTrazado.length >= 2) {
       const polyline = L.polyline(verticesTrazado, {
         color: "#00FFC2",
@@ -234,7 +307,6 @@ export default function GanaderiaMapa({
       group.addLayer(polyline);
     }
 
-    // Polígono cerrado preliminar cuando hay 3 o más puntos
     if (verticesTrazado.length >= 3) {
       const polygonPreview = L.polygon(verticesTrazado, {
         color: "#00FFC2",
@@ -246,7 +318,7 @@ export default function GanaderiaMapa({
     }
   }, [modoTrazar, verticesTrazado]);
 
-  // Dibujar potreros guardados y puntos de interés sobre el mapa
+  // Renderizar potreros guardados y marcador del centro de finca
   useEffect(() => {
     const map = mapInstanceRef.current;
     const group = polygonsLayerGroupRef.current;
@@ -254,17 +326,52 @@ export default function GanaderiaMapa({
 
     group.clearLayers();
 
-    // Dibujar cada potrero como polígono georreferenciado
+    // Marcador central de la finca si está guardada
+    if (fincaConfig.guardada) {
+      const fincaIcon = L.divIcon({
+        className: "bg-transparent border-0",
+        html: `
+          <div style="
+            transform: translate(-50%, -100%);
+            background: linear-gradient(135deg, #10B981, #047857);
+            border: 2px solid #ffffff;
+            border-radius: 12px;
+            padding: 4px 10px;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 800;
+            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+          ">
+            <span>🏡</span>
+            <span>${fincaConfig.nombre}</span>
+          </div>
+        `,
+      });
+      const fincaMarker = L.marker(fincaConfig.coords, { icon: fincaIcon }).addTo(group);
+      fincaMarkerRef.current = fincaMarker;
+    }
+
+    // Dibujar cada potrero que tenga polígono trazado (o alrededor de la finca si está ubicada)
     potreros.forEach((pot, idx) => {
-      // Coordenadas personalizadas si fueron trazadas, o base fija
-      const coords = (pot.poligono && pot.poligono.length >= 3)
-        ? pot.poligono
-        : (POLIGONOS_POTREROS[pot.id] || [
-            [FINCA_CENTRO[0] + (idx * 0.003), FINCA_CENTRO[1] + (idx * 0.003)],
-            [FINCA_CENTRO[0] + (idx * 0.003), FINCA_CENTRO[1] + 0.003 + (idx * 0.003)],
-            [FINCA_CENTRO[0] - 0.002 + (idx * 0.003), FINCA_CENTRO[1] + 0.003 + (idx * 0.003)],
-            [FINCA_CENTRO[0] - 0.002 + (idx * 0.003), FINCA_CENTRO[1] + (idx * 0.003)],
-          ]);
+      let coords: [number, number][] | undefined = undefined;
+
+      if (pot.poligono && pot.poligono.length >= 3) {
+        coords = pot.poligono;
+      } else if (fincaConfig.guardada) {
+        const base = fincaConfig.coords;
+        coords = [
+          [base[0] + (idx * 0.002) + 0.001, base[1] + (idx * 0.002) - 0.001],
+          [base[0] + (idx * 0.002) + 0.001, base[1] + (idx * 0.002) + 0.002],
+          [base[0] + (idx * 0.002) - 0.0015, base[1] + (idx * 0.002) + 0.002],
+          [base[0] + (idx * 0.002) - 0.0015, base[1] + (idx * 0.002) - 0.001],
+        ];
+      }
+
+      if (!coords) return;
 
       const enDescanso = pot.estado === "EN_DESCANSO";
       const colorBorde = pot.color || (enDescanso ? "#F59E0B" : "#00FFC2");
@@ -280,14 +387,13 @@ export default function GanaderiaMapa({
       });
 
       polygon.on("click", () => {
-        if (!modoTrazar) {
+        if (!modoTrazar && !modoFijarFinca && !modoAgregarPunto) {
           setPotreroSeleccionado(pot);
         }
       });
 
       polygon.addTo(group);
 
-      // Centroide para etiqueta flotante
       const latPromedio = coords.reduce((sum, c) => sum + c[0], 0) / coords.length;
       const lngPromedio = coords.reduce((sum, c) => sum + c[1], 0) / coords.length;
 
@@ -323,38 +429,86 @@ export default function GanaderiaMapa({
 
       const marker = L.marker([latPromedio, lngPromedio], { icon: labelIcon });
       marker.on("click", () => {
-        if (!modoTrazar) {
+        if (!modoTrazar && !modoFijarFinca && !modoAgregarPunto) {
           setPotreroSeleccionado(pot);
         }
       });
       marker.addTo(group);
     });
+  }, [potreros, animales, modoTrazar, modoFijarFinca, modoAgregarPunto, fincaConfig]);
 
-    // Puntos de interés (Vaquera, mangas, corrales)
-    PUNTOS_INTERES.forEach(pt => {
+  // Renderizar puntos de interés / instalaciones reales del usuario
+  useEffect(() => {
+    const group = pointsLayerGroupRef.current;
+    if (!group) return;
+
+    group.clearLayers();
+
+    puntosInteres.forEach(pt => {
+      const getIconEmoji = (tipo: string) => {
+        switch (tipo) {
+          case "ORDENO": return "🥛";
+          case "MANGA": return "🚪";
+          case "AGUA": return "💧";
+          case "SILO": return "🌾";
+          case "CASA": return "🏠";
+          default: return "📍";
+        }
+      };
+
       const pinIcon = L.divIcon({
         className: "bg-transparent border-0",
         html: `
           <div style="
             transform: translate(-50%, -50%);
-            background: rgba(11, 61, 145, 0.9);
-            border: 1px solid #38BDF8;
-            border-radius: 8px;
-            padding: 2px 8px;
+            background: rgba(11, 61, 145, 0.92);
+            border: 1.5px solid #38BDF8;
+            border-radius: 10px;
+            padding: 3px 8px;
             color: #E0F2FE;
             font-size: 10px;
-            font-weight: 600;
+            font-weight: 700;
             white-space: nowrap;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
           ">
-            ${pt.nombre}
+            <span>${getIconEmoji(pt.tipo)}</span>
+            <span>${pt.nombre}</span>
           </div>
         `,
       });
 
-      L.marker(pt.coords, { icon: pinIcon }).addTo(group);
+      const marker = L.marker(pt.coords, { icon: pinIcon });
+      marker.bindPopup(`
+        <div style="font-family: sans-serif; font-size: 12px; color: #1e293b; padding: 4px;">
+          <div style="font-weight: bold; margin-bottom: 4px;">${getIconEmoji(pt.tipo)} ${pt.nombre}</div>
+          <div style="color: #64748b; font-size: 10px; margin-bottom: 8px;">Coords: ${pt.coords[0].toFixed(5)}, ${pt.coords[1].toFixed(5)}</div>
+          <button id="btn-borrar-punto-${pt.id}" style="
+            background: #ef4444;
+            color: #ffffff;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: pointer;
+          ">Eliminar Instalación</button>
+        </div>
+      `);
+
+      marker.on("popupopen", () => {
+        const btn = document.getElementById(`btn-borrar-punto-${pt.id}`);
+        if (btn) {
+          btn.onclick = () => handleEliminarPunto(pt.id);
+        }
+      });
+
+      marker.addTo(group);
     });
-  }, [potreros, animales, modoTrazar]);
+  }, [puntosInteres]);
 
   // Manejador de zoom
   const handleZoom = (delta: number) => {
@@ -363,11 +517,131 @@ export default function GanaderiaMapa({
     map.setZoom(map.getZoom() + delta);
   };
 
-  // Centrar mapa en la finca
+  // Centrar mapa en la finca real
   const handleCentrarFinca = () => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    map.flyTo(FINCA_CENTRO, 16, { duration: 1.2 });
+    if (fincaConfig.guardada) {
+      map.flyTo(fincaConfig.coords, 15, { duration: 1.2 });
+    } else {
+      map.flyTo(PANORAMA_INICIAL, 6, { duration: 1.0 });
+    }
+  };
+
+  // Guardar ubicación y nombre de la finca para este tenant
+  const handleGuardarUbicacionFinca = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!coordsTempFinca) return;
+
+    const nombreLimpio = nombreFincaInput.trim() || "Mi Finca";
+    const nuevaConfig: FincaConfig = {
+      nombre: nombreLimpio,
+      coords: coordsTempFinca,
+      guardada: true,
+    };
+
+    setFincaConfig(nuevaConfig);
+    try {
+      localStorage.setItem(`aurora_finca_config_${effectiveTenantId}`, JSON.stringify(nuevaConfig));
+    } catch {}
+
+    setModalGuardarFinca(false);
+    setCoordsTempFinca(null);
+
+    const map = mapInstanceRef.current;
+    if (map) {
+      map.flyTo(nuevaConfig.coords, 15, { duration: 1.0 });
+    }
+  };
+
+  // Guardar un nuevo punto de referencia / instalación
+  const handleGuardarNuevoPunto = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nuevoPuntoForm.coords || !nuevoPuntoForm.nombre.trim()) return;
+
+    const nuevo: PuntoInteresFinca = {
+      id: `pt_${Date.now()}`,
+      nombre: nuevoPuntoForm.nombre.trim(),
+      tipo: nuevoPuntoForm.tipo,
+      coords: nuevoPuntoForm.coords,
+    };
+
+    const actualizados = [...puntosInteres, nuevo];
+    setPuntosInteres(actualizados);
+    try {
+      localStorage.setItem(`aurora_finca_puntos_${effectiveTenantId}`, JSON.stringify(actualizados));
+    } catch {}
+
+    setModalNuevoPunto(false);
+    setNuevoPuntoForm({ nombre: "", tipo: "ORDENO", coords: null });
+  };
+
+  // Eliminar un punto de referencia
+  const handleEliminarPunto = (id: string) => {
+    const filtrados = puntosInteres.filter(p => p.id !== id);
+    setPuntosInteres(filtrados);
+    try {
+      localStorage.setItem(`aurora_finca_puntos_${effectiveTenantId}`, JSON.stringify(filtrados));
+    } catch {}
+  };
+
+  // Buscador funcional: analiza coordenadas o busca potreros/localidades
+  const handleBuscar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusquedaError(null);
+    const query = busquedaLugar.trim();
+    if (!query) return;
+
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // 1. Verificar si son coordenadas numéricas directas "lat, lng" o "lat lng"
+    const coordRegex = /^\s*(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)\s*$/;
+    const matchCoord = query.match(coordRegex);
+    if (matchCoord) {
+      const lat = parseFloat(matchCoord[1]);
+      const lng = parseFloat(matchCoord[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        map.flyTo([lat, lng], 15, { duration: 1.2 });
+        setCoordsTempFinca([lat, lng]);
+        setNombreFincaInput(fincaConfig.nombre || "");
+        setModalGuardarFinca(true);
+        return;
+      }
+    }
+
+    // 2. Verificar si coincide con el nombre de un potrero ya registrado
+    const potMatch = potreros.find(p =>
+      p.nombre.toLowerCase().includes(query.toLowerCase()) ||
+      (p.codigo && p.codigo.toLowerCase().includes(query.toLowerCase()))
+    );
+    if (potMatch) {
+      if (potMatch.poligono && potMatch.poligono.length >= 3) {
+        const latAvg = potMatch.poligono.reduce((s, c) => s + c[0], 0) / potMatch.poligono.length;
+        const lngAvg = potMatch.poligono.reduce((s, c) => s + c[1], 0) / potMatch.poligono.length;
+        map.flyTo([latAvg, lngAvg], 16, { duration: 1.2 });
+      }
+      setPotreroSeleccionado(potMatch);
+      return;
+    }
+
+    // 3. Búsqueda geográfica vía Nominatim OpenStreetMap
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+        { headers: { "Accept-Language": "es" } }
+      );
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        map.flyTo([lat, lng], 14, { duration: 1.2 });
+        return;
+      }
+    } catch {}
+
+    setBusquedaError("No se encontró esa ubicación o potrero.");
+    setTimeout(() => setBusquedaError(null), 3000);
   };
 
   // Deshacer último vértice del trazado
@@ -408,27 +682,58 @@ export default function GanaderiaMapa({
         <div className="flex items-center gap-2 pointer-events-auto">
           <div className="apple-glass rounded-2xl px-3.5 py-2 border border-white/20 shadow-lg flex items-center gap-2 bg-slate-900/80 backdrop-blur-xl">
             <span className="text-slate-400 text-xs font-semibold">Finca:</span>
-            <span className="font-['Outfit'] font-bold text-xs text-white">Santa Elena • Llanos</span>
-            <button
-              onClick={handleCentrarFinca}
-              className="text-[11px] font-bold text-emerald-400 hover:underline ml-2 cursor-pointer"
-              title="Centrar en las coordenadas de la finca">
-              Centrar
-            </button>
+            <span className="font-['Outfit'] font-bold text-xs text-white">
+              {fincaConfig.guardada ? fincaConfig.nombre : "Sin ubicar"}
+            </span>
+
+            {fincaConfig.guardada ? (
+              <div className="flex items-center gap-1.5 ml-1">
+                <button
+                  onClick={handleCentrarFinca}
+                  className="text-[11px] font-bold text-emerald-400 hover:underline cursor-pointer"
+                  title="Centrar en las coordenadas de tu finca">
+                  Centrar
+                </button>
+                <button
+                  onClick={() => {
+                    setCoordsTempFinca(fincaConfig.coords);
+                    setNombreFincaInput(fincaConfig.nombre);
+                    setModalGuardarFinca(true);
+                  }}
+                  className="text-[10px] text-slate-400 hover:text-white cursor-pointer ml-1">
+                  ✎ Editar
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setModoFijarFinca(true);
+                  setModoTrazar(false);
+                  setModoAgregarPunto(false);
+                }}
+                className="text-[11px] font-bold text-amber-400 hover:underline ml-1 cursor-pointer">
+                + Ubicar Finca
+              </button>
+            )}
           </div>
 
-          <div className="hidden sm:flex apple-glass rounded-2xl px-3 py-1.5 border border-white/15 bg-slate-900/75 backdrop-blur-xl">
+          <form onSubmit={handleBuscar} className="hidden sm:flex apple-glass rounded-2xl px-3 py-1.5 border border-white/15 bg-slate-900/75 backdrop-blur-xl relative">
             <input
               type="text"
-              placeholder="Buscar potrero o coordenada..."
+              placeholder="Buscar potrero o coordenada (ej. 8.55, -70.36)..."
               value={busquedaLugar}
               onChange={e => setBusquedaLugar(e.target.value)}
-              className="bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none w-48"
+              className="bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none w-56"
             />
-          </div>
+            {busquedaError && (
+              <div className="absolute top-10 left-0 bg-rose-950/90 border border-rose-500/50 text-rose-300 text-[10px] px-2.5 py-1 rounded-xl shadow-lg whitespace-nowrap">
+                {busquedaError}
+              </div>
+            )}
+          </form>
         </div>
 
-        {/* Derecha: Selector de Capas, Modo Trazar & Agregar Potrero */}
+        {/* Derecha: Selector de Capas, Modo Trazar, Instalaciones & Agregar Potrero */}
         <div className="flex items-center gap-2 pointer-events-auto">
           <div className="apple-glass rounded-2xl p-1 border border-white/15 shadow-lg flex items-center gap-1 bg-slate-900/80 backdrop-blur-xl text-xs font-semibold">
             <button
@@ -460,6 +765,25 @@ export default function GanaderiaMapa({
             </button>
           </div>
 
+          {/* Botón Punto de Referencia / Instalación */}
+          <button
+            onClick={() => {
+              if (modoAgregarPunto) {
+                setModoAgregarPunto(false);
+              } else {
+                setModoAgregarPunto(true);
+                setModoTrazar(false);
+                setModoFijarFinca(false);
+              }
+            }}
+            className={`text-xs font-bold px-3 py-2 rounded-2xl shadow-lg cursor-pointer transition-all border ${
+              modoAgregarPunto
+                ? "bg-sky-500 text-slate-950 border-sky-300 font-extrabold scale-105"
+                : "bg-slate-900/80 text-sky-400 border-sky-400/50 hover:bg-sky-500/20"
+            }`}>
+            {modoAgregarPunto ? "Cancelar Punto" : "+ Instalación"}
+          </button>
+
           {/* Botón Trazar Potrero Interactivo */}
           <button
             onClick={() => {
@@ -467,6 +791,8 @@ export default function GanaderiaMapa({
                 handleCancelarTrazado();
               } else {
                 setModoTrazar(true);
+                setModoFijarFinca(false);
+                setModoAgregarPunto(false);
                 setPotreroSeleccionado(null);
               }
             }}
@@ -475,7 +801,7 @@ export default function GanaderiaMapa({
                 ? "bg-amber-500 text-slate-950 border-amber-300 font-extrabold scale-105"
                 : "bg-slate-900/80 text-emerald-400 border-emerald-400/50 hover:bg-emerald-500/20"
             }`}>
-            {modoTrazar ? "Cancelar Trazado" : "Trazar en Mapa"}
+            {modoTrazar ? "Cancelar Trazado" : "Trazar Potrero"}
           </button>
 
           <button
@@ -486,7 +812,62 @@ export default function GanaderiaMapa({
         </div>
       </div>
 
-      {/* ── BANNER ASISTENTE FLOTANTE DURANTE MODO TRAZAR ── */}
+      {/* ── BANNER HONESTO DE ESTADO VACÍO (SIN UBICACIÓN GUARDADA) ── */}
+      {!fincaConfig.guardada && !modoFijarFinca && (
+        <div className="absolute top-18 left-1/2 -translate-x-1/2 z-[550] apple-glass rounded-2xl px-5 py-2.5 border border-amber-400/60 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex flex-wrap items-center gap-3 text-xs pointer-events-auto animate-fade-in">
+          <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+          <span className="text-slate-200">
+            Aún no has ubicado tu finca — busca tu ubicación o haz clic en el mapa para marcarla.
+          </span>
+          <button
+            onClick={() => {
+              setModoFijarFinca(true);
+              setModoTrazar(false);
+              setModoAgregarPunto(false);
+            }}
+            className="px-3 py-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold cursor-pointer transition-all">
+            Fijar Ubicación con Clic →
+          </button>
+        </div>
+      )}
+
+      {/* ── BANNER ASISTENTE AL FIJAR FINCA ── */}
+      {modoFijarFinca && (
+        <div className="absolute top-18 left-1/2 -translate-x-1/2 z-[600] apple-glass rounded-2xl px-5 py-2.5 border border-amber-400 bg-slate-950/95 backdrop-blur-2xl shadow-2xl flex items-center gap-4 text-xs pointer-events-auto animate-fade-in">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+          <span className="font-['Outfit'] font-bold text-white text-sm">
+            Modo Ubicar Finca:
+          </span>
+          <span className="text-slate-200">
+            Haz clic exactamente sobre la sede o entrada de tu finca en el mapa satelital.
+          </span>
+          <button
+            onClick={() => setModoFijarFinca(false)}
+            className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-medium cursor-pointer">
+            Cancelar
+          </button>
+        </div>
+      )}
+
+      {/* ── BANNER ASISTENTE AL AGREGAR PUNTO DE REFERENCIA ── */}
+      {modoAgregarPunto && (
+        <div className="absolute top-18 left-1/2 -translate-x-1/2 z-[600] apple-glass rounded-2xl px-5 py-2.5 border border-sky-400 bg-slate-950/95 backdrop-blur-2xl shadow-2xl flex items-center gap-4 text-xs pointer-events-auto animate-fade-in">
+          <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping" />
+          <span className="font-['Outfit'] font-bold text-white text-sm">
+            Agregar Instalación:
+          </span>
+          <span className="text-slate-200">
+            Haz clic en el mapa donde se ubica tu vaquera, corral, manga o tanque.
+          </span>
+          <button
+            onClick={() => setModoAgregarPunto(false)}
+            className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-medium cursor-pointer">
+            Cancelar
+          </button>
+        </div>
+      )}
+
+      {/* ── BANNER ASISTENTE FLOTANTE DURANTE MODO TRAZAR POTRERO ── */}
       {modoTrazar && (
         <div className="absolute top-18 left-1/2 -translate-x-1/2 z-[600] apple-glass rounded-2xl px-5 py-2.5 border border-emerald-400 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex items-center gap-4 text-xs pointer-events-auto animate-fade-in">
           <div className="flex items-center gap-2">
@@ -551,7 +932,7 @@ export default function GanaderiaMapa({
       <div className="absolute bottom-4 left-4 z-[500] apple-glass rounded-2xl p-2.5 border border-white/15 bg-slate-900/85 backdrop-blur-xl shadow-lg text-[11px] text-slate-300 space-y-1.5 pointer-events-auto">
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-md bg-emerald-400/40 border border-emerald-400" />
-          <span>Potrero Activo (En Uso)</span>
+          <span>Potrero Activo (En Pastoreo)</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-md bg-amber-400/40 border border-amber-400 border-dashed" />
@@ -559,19 +940,139 @@ export default function GanaderiaMapa({
         </div>
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-md bg-sky-400/40 border border-sky-400" />
-          <span>Instalaciones (Ordeño / Corrales)</span>
+          <span>Instalaciones creadas ({puntosInteres.length})</span>
         </div>
       </div>
 
       {/* ── CONTENEDOR DEL MAPA LEAFLET ── */}
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
+      {/* ── MODAL: CONFIRMAR Y GUARDAR UBICACIÓN DE FINCA ── */}
+      {modalGuardarFinca && coordsTempFinca && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+          <div className="apple-glass rounded-3xl p-6 max-w-md w-full border border-white/20 shadow-2xl text-left space-y-4">
+            <h3 className="font-['Outfit'] font-bold text-lg text-white">
+              Guardar Ubicación de tu Finca
+            </h3>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Esta ubicación se guardará exclusivamente para tu cuenta y servirá como centro de tu hato, potreros e instalaciones.
+            </p>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Nombre de la Finca / Hato
+              </label>
+              <input
+                type="text"
+                required
+                autoFocus
+                placeholder="Ej. Hato El Cedro, Finca Santa Elena..."
+                value={nombreFincaInput}
+                onChange={e => setNombreFincaInput(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-xs focus:outline-none focus:border-emerald-400"
+              />
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-[11px] font-mono text-slate-300 space-y-1">
+              <div><strong>Latitud:</strong> {coordsTempFinca[0].toFixed(6)}</div>
+              <div><strong>Longitud:</strong> {coordsTempFinca[1].toFixed(6)}</div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalGuardarFinca(false);
+                  setCoordsTempFinca(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-medium cursor-pointer">
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGuardarUbicacionFinca()}
+                disabled={!nombreFincaInput.trim()}
+                className="btn-cyber-neon text-white text-xs font-bold px-5 py-2 rounded-xl cursor-pointer shadow-lg disabled:opacity-40">
+                Guardar Ubicación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: CREAR PUNTO DE REFERENCIA / INSTALACIÓN ── */}
+      {modalNuevoPunto && nuevoPuntoForm.coords && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+          <form onSubmit={handleGuardarNuevoPunto} className="apple-glass rounded-3xl p-6 max-w-md w-full border border-white/20 shadow-2xl text-left space-y-4">
+            <h3 className="font-['Outfit'] font-bold text-lg text-white">
+              Nueva Instalación / Punto de Referencia
+            </h3>
+            <p className="text-slate-400 text-xs">
+              Registra puntos clave como sala de ordeño, manga de vacunación, comederos o pozos de agua.
+            </p>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Nombre de la Instalación
+              </label>
+              <input
+                type="text"
+                required
+                autoFocus
+                placeholder="Ej. Vaquera Principal, Corral de Maternidad..."
+                value={nuevoPuntoForm.nombre}
+                onChange={e => setNuevoPuntoForm({ ...nuevoPuntoForm, nombre: e.target.value })}
+                className="w-full px-3.5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-xs focus:outline-none focus:border-sky-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Tipo de Instalación
+              </label>
+              <select
+                value={nuevoPuntoForm.tipo}
+                onChange={e => setNuevoPuntoForm({ ...nuevoPuntoForm, tipo: e.target.value as any })}
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/20 text-white text-xs focus:outline-none focus:border-sky-400">
+                <option value="ORDENO">🥛 Vaquera & Sala de Ordeño</option>
+                <option value="MANGA">🚪 Corral de Trabajo & Manga</option>
+                <option value="AGUA">💧 Tanque de Agua & Molino</option>
+                <option value="SILO">🌾 Silo & Depósito de Forraje</option>
+                <option value="CASA">🏠 Casa Principal / Galpón</option>
+                <option value="OTRO">📍 Otro Punto de Referencia</option>
+              </select>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-[11px] font-mono text-slate-300">
+              Coordenadas: {nuevoPuntoForm.coords[0].toFixed(6)}, {nuevoPuntoForm.coords[1].toFixed(6)}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalNuevoPunto(false);
+                  setNuevoPuntoForm({ nombre: "", tipo: "ORDENO", coords: null });
+                }}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-medium cursor-pointer">
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={!nuevoPuntoForm.nombre.trim()}
+                className="px-5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs cursor-pointer shadow-lg disabled:opacity-40">
+                Guardar Instalación
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* ── PANEL LATERAL FLOTANTE: DETALLE DEL POTRERO SELECCIONADO ── */}
-      {potreroSeleccionado && !modoTrazar && (
+      {potreroSeleccionado && !modoTrazar && !modoFijarFinca && !modoAgregarPunto && (
         <div className="absolute top-20 right-4 bottom-4 w-80 sm:w-96 z-[500] apple-glass rounded-3xl p-5 border border-emerald-500/40 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex flex-col justify-between text-left pointer-events-auto animate-fade-in">
           
           <div className="space-y-4">
-            {/* Cabecera del Panel */}
             <div className="flex items-start justify-between pb-3 border-b border-white/10">
               <div>
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
@@ -592,7 +1093,6 @@ export default function GanaderiaMapa({
               </button>
             </div>
 
-            {/* Métricas Agronómicas */}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
                 <span className="text-slate-400 text-[10px] block">Superficie</span>
@@ -604,7 +1104,6 @@ export default function GanaderiaMapa({
               </div>
             </div>
 
-            {/* Detalles del Forraje */}
             <div className="space-y-2 text-xs text-slate-300">
               <div className="flex justify-between py-1 border-b border-white/5">
                 <span className="text-slate-400">Pasto:</span>
@@ -620,7 +1119,6 @@ export default function GanaderiaMapa({
               </div>
             </div>
 
-            {/* Animales Presentes */}
             <div className="space-y-2">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                 Animales en este Lote ({animalesSeleccionados.length})
@@ -641,7 +1139,6 @@ export default function GanaderiaMapa({
             </div>
           </div>
 
-          {/* Botón de Acción de Rotación */}
           <div className="pt-3 border-t border-white/10 space-y-2">
             <button
               onClick={() => onRotarHato(potreroSeleccionado)}

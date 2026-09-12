@@ -68,19 +68,16 @@ public class AnimalController {
         public BigDecimal pesoActual;
         public BigDecimal valorEstimado; // opcional — valor de referencia contable para un animal que YA se tenía (no una compra real)
         public Long potreroId;
-        public String lote; // Grupo de entrada conjunta (ej. "Lote Marzo 2026", "Compra Subasta")
+        public String lote; // Grupo de entrada conjunta o proveedor
+        public Long madreId; // opcional: vínculo con la madre para trazabilidad genealógica / nacimiento
+        public BigDecimal costoAdquisicion; // precio real de compra o costo inicial
+        public String estadoReproductivo; // VACIA, PREÑADA, EN_ESPERA
+        public String estadoProductivo; // CRIANDO, ORDEÑO, SECA
     }
 
     /**
-     * Alta directa de un animal que el negocio YA POSEE — a diferencia de
-     * "/compras" (que registra una compra real, con proveedor y factura) o
-     * de un parto (que requiere todo un evento reproductivo), esta es la
-     * forma simple de meter al sistema un animal que el ganadero ya tenía
-     * antes de empezar a usarlo (ej. al cargar su hato completo la primera
-     * vez). El único dato obligatorio es el identificador único del animal
-     * (arete/chip/QN — cada finca reconoce a sus animales distinto, casi
-     * siempre por número) — todo lo demás es opcional y se puede completar
-     * después.
+     * Alta directa de un animal (Nacimiento en finca, Compra o animal preexistente).
+     * Soporta vinculación opcional con la madre y costo de adquisición.
      */
     @PostMapping
     public ResponseEntity<Animal> altaDirecta(@RequestParam Long tenantId, @RequestBody AltaAnimalRequest request) {
@@ -102,9 +99,25 @@ public class AnimalController {
         animal.setTipoAnimal(request.tipoAnimal);
         animal.setFechaNacimiento(request.fechaNacimiento);
         animal.setPesoActual(request.pesoActual);
-        animal.setCostoAdquisicion(request.valorEstimado);
         animal.setLote(request.lote);
+        if (request.costoAdquisicion != null) {
+            animal.setCostoAdquisicion(request.costoAdquisicion);
+        } else {
+            animal.setCostoAdquisicion(request.valorEstimado);
+        }
+        if (request.estadoReproductivo != null && !request.estadoReproductivo.isBlank()) {
+            animal.setEstadoReproductivo(request.estadoReproductivo);
+        }
+        if (request.estadoProductivo != null && !request.estadoProductivo.isBlank()) {
+            animal.setEstadoProductivo(request.estadoProductivo);
+        }
         animal.setEstado("ACTIVO");
+
+        if (request.madreId != null) {
+            animalRepository.findById(request.madreId)
+                .filter(m -> tenantId.equals(m.getTenantId()))
+                .ifPresent(animal::setMadre);
+        }
 
         if (request.potreroId != null) {
             Potrero potrero = potreroRepository.findById(request.potreroId)
@@ -184,11 +197,14 @@ public class AnimalController {
         Animal animal = animalRepository.findById(id)
             .filter(a -> tenantId != null && tenantId.equals(a.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        animal.setNombre(datos.getNombre());
-        animal.setRaza(datos.getRaza());
-        animal.setTipoAnimal(datos.getTipoAnimal());
-        animal.setPesoActual(datos.getPesoActual());
+        if (datos.getNombre() != null) animal.setNombre(datos.getNombre());
+        if (datos.getRaza() != null) animal.setRaza(datos.getRaza());
+        if (datos.getTipoAnimal() != null) animal.setTipoAnimal(datos.getTipoAnimal());
+        if (datos.getPesoActual() != null) animal.setPesoActual(datos.getPesoActual());
+        if (datos.getEstado() != null) animal.setEstado(datos.getEstado());
         if (datos.getLote() != null) animal.setLote(datos.getLote());
+        if (datos.getEstadoReproductivo() != null) animal.setEstadoReproductivo(datos.getEstadoReproductivo());
+        if (datos.getEstadoProductivo() != null) animal.setEstadoProductivo(datos.getEstadoProductivo());
         return ResponseEntity.ok(animalRepository.save(animal));
     }
 
