@@ -81,8 +81,11 @@ const previewData: Record<string, { metric: string; value: string; sub: string; 
   ],
 };
 
-// A small, local canvas follows the pointer instead of allocating a canvas as
-// tall as the landing page. It never captures input or creates a fixed layer.
+// Estela: cada movimiento del mouse deja un pequeño trazo de aurora que se
+// desvanece solo, en vez de un blob que persigue el cursor en tiempo real.
+// El canvas cubre el viewport (fixed) porque la estela puede cruzar zonas
+// amplias de la pantalla; sigue sin capturar input y sigue apagándose con
+// prefers-reduced-motion, touch, blur de pestaña, etc.
 function HomePointerAurora({ hostRef }: { hostRef: RefObject<HTMLElement | null> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -93,119 +96,88 @@ function HomePointerAurora({ hostRef }: { hostRef: RefObject<HTMLElement | null>
     if (!host || !canvas || !context) return;
 
     const motionAllowed = window.matchMedia("(prefers-reduced-motion: no-preference) and (any-hover: hover) and (any-pointer: fine)");
-    const width = 840;
-    const height = 480;
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
-    canvas.width = width * pixelRatio;
-    canvas.height = height * pixelRatio;
-    context.scale(pixelRatio, pixelRatio);
+    const colors = ["44, 134, 224", "48, 203, 132", "53, 215, 195"];
+    const trailDuration = 850; // ms que tarda cada trazo en desvanecerse por completo
+    const minDistance = 14; // px mínimos entre puntos para no saturar la estela
 
+    type Point = { x: number; y: number; born: number; hue: number };
+    let points: Point[] = [];
+    let lastX = -Infinity;
+    let lastY = -Infinity;
     let frame = 0;
-    let previousTime = 0;
-    let entered = false;
-    let visible = false;
-    let opacity = 0;
-    let clientX = 0;
-    let clientY = 0;
-    let targetX = 0;
-    let targetY = 0;
-    let x = 0;
-    let y = 0;
+    let pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
 
-    const render = (time: number) => {
-      frame = 0;
-      const delta = previousTime ? Math.min(time - previousTime, 64) : 16;
-      previousTime = time;
-      const follow = 1 - Math.exp(-delta / 150);
-      x += (targetX - x) * follow;
-      y += (targetY - y) * follow;
-      opacity += ((visible ? 1 : 0) - opacity) * (1 - Math.exp(-delta / 260));
-      canvas.style.transform = `translate3d(${x - width / 2}px, ${y - height / 2}px, 0)`;
-      canvas.style.opacity = String(opacity * 0.7);
-      context.clearRect(0, 0, width, height);
+    const resize = () => {
+      pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = window.innerWidth * pixelRatio;
+      canvas.height = window.innerHeight * pixelRatio;
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    };
+    resize();
 
-      // Many feathered rays form three flowing curtains, with a soft luminous
-      // lower edge and taller, diffuse folds like a real aurora.
-      const phase = time / 1800;
-      const colors = ["44, 134, 224", "48, 203, 132", "53, 215, 195"];
+    const drawWisp = (p: Point, age: number) => {
+      // age: 0 = recién nacido, 1 = totalmente desvanecido
+      const fade = Math.pow(1 - age, 1.6);
+      if (fade <= 0.01) return;
+      const color = colors[p.hue % colors.length];
+      const size = 34 + age * 18;
       context.globalCompositeOperation = "lighter";
-      colors.forEach((color, layer) => {
-        for (let ray = 0; ray < 116; ray++) {
-          const u = ray / 115;
-          const envelope = Math.sin(Math.PI * u) ** 1.4;
-          const rayX = 55 + u * 730;
-          const wave = Math.sin(u * 8 + phase + layer * 0.9) * 35
-            + Math.sin(u * 17 - phase * 0.6 + layer) * 12;
-          const bottom = 285 + wave + layer * 18;
-          const length = (100 + Math.sin(u * 11 + phase + layer) * 40) * envelope;
-          const glow = context.createLinearGradient(0, bottom - length, 0, bottom + 30);
-          glow.addColorStop(0, `rgba(${color}, 0)`);
-          glow.addColorStop(0.6, `rgba(${color}, ${0.11 * envelope})`);
-          glow.addColorStop(0.88, `rgba(${color}, ${0.38 * envelope})`);
-          glow.addColorStop(1, `rgba(${color}, 0)`);
-          context.fillStyle = glow;
-          context.fillRect(rayX, bottom - length, 9, length + 30);
-        }
-      });
-
-      if (visible || opacity > 0.01) frame = requestAnimationFrame(render);
-      else {
-        canvas.style.opacity = "0";
-        previousTime = 0;
+      for (let i = 0; i < 4; i++) {
+        const jitterX = (i - 1.5) * 6;
+        const rayHeight = size * (0.7 + 0.3 * Math.sin(i * 1.7 + p.born));
+        const glow = context.createLinearGradient(0, p.y - rayHeight, 0, p.y + rayHeight * 0.4);
+        glow.addColorStop(0, `rgba(${color}, 0)`);
+        glow.addColorStop(0.55, `rgba(${color}, ${0.16 * fade})`);
+        glow.addColorStop(0.85, `rgba(${color}, ${0.34 * fade})`);
+        glow.addColorStop(1, `rgba(${color}, 0)`);
+        context.fillStyle = glow;
+        context.fillRect(p.x + jitterX - 3, p.y - rayHeight, 6, rayHeight * 1.4);
       }
+    };
+
+    const render = (now: number) => {
+      frame = 0;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      points = points.filter((p) => now - p.born < trailDuration);
+      for (const p of points) drawWisp(p, (now - p.born) / trailDuration);
+      if (points.length > 0) frame = requestAnimationFrame(render);
     };
     const start = () => {
       if (!frame) frame = requestAnimationFrame(render);
     };
-    const updatePosition = () => {
-      const rect = host.getBoundingClientRect();
-      targetX = clientX - rect.left;
-      targetY = clientY - rect.top;
-      visible = entered && motionAllowed.matches && !document.hidden
-        && targetX >= 0 && targetX <= rect.width && targetY >= 0 && targetY <= rect.height;
+    const addPoint = (x: number, y: number) => {
+      const dx = x - lastX;
+      const dy = y - lastY;
+      if (dx * dx + dy * dy < minDistance * minDistance) return;
+      lastX = x;
+      lastY = y;
+      points.push({ x, y, born: performance.now(), hue: points.length });
+      if (points.length > 60) points.shift();
+      start();
     };
     const move = (event: PointerEvent) => {
       if (event.pointerType !== "mouse" || !motionAllowed.matches || document.hidden) return;
-      clientX = event.clientX;
-      clientY = event.clientY;
-      entered = true;
-      updatePosition();
-      if (opacity < 0.01) { x = targetX; y = targetY; }
-      start();
+      addPoint(event.clientX, event.clientY);
     };
-    const leave = () => { entered = false; visible = false; if (opacity > 0) start(); };
-    const scroll = () => {
-      if (!entered) return;
-      // Recompute page coordinates even if the mouse stays still while scrolling.
-      updatePosition();
-      x = targetX;
-      y = targetY;
-      start();
+    const clear = () => {
+      points = [];
+      lastX = lastY = -Infinity;
+      context.clearRect(0, 0, canvas.width, canvas.height);
     };
-    const stop = () => {
-      cancelAnimationFrame(frame);
-      frame = 0;
-      previousTime = 0;
-      entered = visible = false;
-      opacity = 0;
-      canvas.style.opacity = "0";
-    };
-    host.addEventListener("pointermove", move, { passive: true });
-    host.addEventListener("pointerleave", leave);
-    window.addEventListener("scroll", scroll, { passive: true });
-    window.addEventListener("resize", scroll, { passive: true });
-    window.addEventListener("blur", stop);
-    document.addEventListener("visibilitychange", stop);
-    motionAllowed.addEventListener("change", stop);
+    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("resize", resize);
+    window.addEventListener("blur", clear);
+    document.addEventListener("visibilitychange", clear);
+    motionAllowed.addEventListener("change", clear);
     return () => {
-      stop();
-      host.removeEventListener("pointermove", move);
-      host.removeEventListener("pointerleave", leave);
-      window.removeEventListener("scroll", scroll);
-      window.removeEventListener("resize", scroll);
-      window.removeEventListener("blur", stop);
-      document.removeEventListener("visibilitychange", stop);
-      motionAllowed.removeEventListener("change", stop);
+      cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("blur", clear);
+      document.removeEventListener("visibilitychange", clear);
+      motionAllowed.removeEventListener("change", clear);
     };
   }, [hostRef]);
 
