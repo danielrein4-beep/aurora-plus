@@ -45,6 +45,16 @@ public class MovimientoRepuesto {
     @Column(name = "fecha_registro", nullable = false)
     private LocalDateTime fechaRegistro = LocalDateTime.now();
 
+    // Clasificación ABC de clientes: antes el Kárdex sabía QUÉ se vendió pero
+    // nunca A QUIÉN, así que no había forma de calcular el historial de compra
+    // real de un cliente. Ambos campos son opcionales — una venta anónima
+    // (sin cliente seleccionado en el POS) sigue funcionando igual que antes.
+    @Column(name = "cliente_id")
+    private Long clienteId;
+
+    @Column(precision = 18, scale = 2)
+    private BigDecimal total;
+
     public enum TipoMovimiento { COMPRA, VENTA, AJUSTE }
 
     public Long getId() { return id; }
@@ -65,4 +75,8 @@ public class MovimientoRepuesto {
     public void setMotivo(String motivo) { this.motivo = motivo; }
     public LocalDateTime getFechaRegistro() { return fechaRegistro; }
     public void setFechaRegistro(LocalDateTime fechaRegistro) { this.fechaRegistro = fechaRegistro; }
+    public Long getClienteId() { return clienteId; }
+    public void setClienteId(Long clienteId) { this.clienteId = clienteId; }
+    public BigDecimal getTotal() { return total; }
+    public void setTotal(BigDecimal total) { this.total = total; }
 }

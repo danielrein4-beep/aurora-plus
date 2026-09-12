@@ -58,6 +58,18 @@ public class RepuestoItem {
     @Column(name = "costo_unitario", precision = 18, scale = 2)
     private BigDecimal costoUnitario = BigDecimal.ZERO;
 
+    // Smart Restocking: umbral por debajo del cual una venta dispara un borrador
+    // de orden de compra automático (ver OrdenCompraSugeridaService). Antes no
+    // existía en el backend — el frontend usaba un "5" fijo solo de adorno.
+    @Column(name = "stock_minimo", nullable = false, precision = 18, scale = 4)
+    private BigDecimal stockMinimo = new BigDecimal("5");
+
+    // Proveedor al que se le arma el borrador de reposición automática de este
+    // ítem. Se guarda solo el id (no una relación @ManyToOne) para no acoplar
+    // la lectura del catálogo completo a un join adicional en cada listado.
+    @Column(name = "proveedor_principal_id")
+    private Long proveedorPrincipalId;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -80,6 +92,10 @@ public class RepuestoItem {
     public void setCantidadMinimaMayorista(BigDecimal cantidadMinimaMayorista) { this.cantidadMinimaMayorista = cantidadMinimaMayorista; }
     public BigDecimal getCostoUnitario() { return costoUnitario; }
     public void setCostoUnitario(BigDecimal costoUnitario) { this.costoUnitario = costoUnitario; }
+    public BigDecimal getStockMinimo() { return stockMinimo; }
+    public void setStockMinimo(BigDecimal stockMinimo) { this.stockMinimo = stockMinimo; }
+    public Long getProveedorPrincipalId() { return proveedorPrincipalId; }
+    public void setProveedorPrincipalId(Long proveedorPrincipalId) { this.proveedorPrincipalId = proveedorPrincipalId; }
 
     // ── Utilidad calculada (no persistida): se recalcula sola en cada
     // lectura a partir de precio y costo actuales, para que el usuario vea

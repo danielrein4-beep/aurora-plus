@@ -2,6 +2,7 @@ package com.auroraplus.core.crm.entities;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -34,6 +35,19 @@ public class Cliente {
     @Column(name = "fecha_registro", nullable = false)
     private LocalDateTime fechaRegistro = LocalDateTime.now();
 
+    /** Regla ABC (ver ClasificacionClientesJob): recalculada cada madrugada según su
+     * historial de compras real — nunca se elige a mano desde el CRUD de clientes. */
+    public enum Clasificacion { NORMAL, FRECUENTE, MAYORISTA, EN_RIESGO }
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Clasificacion clasificacion = Clasificacion.NORMAL;
+
+    // Descuento que el POS aplica solo (sin que el cajero lo escriba) cuando
+    // este cliente está marcado MAYORISTA — null/0 para el resto de clasificaciones.
+    @Column(name = "descuento_automatico_porcentaje", precision = 5, scale = 2)
+    private BigDecimal descuentoAutomaticoPorcentaje;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -48,4 +62,8 @@ public class Cliente {
     public void setCorreo(String correo) { this.correo = correo; }
     public LocalDateTime getFechaRegistro() { return fechaRegistro; }
     public void setFechaRegistro(LocalDateTime fechaRegistro) { this.fechaRegistro = fechaRegistro; }
+    public Clasificacion getClasificacion() { return clasificacion; }
+    public void setClasificacion(Clasificacion clasificacion) { this.clasificacion = clasificacion; }
+    public BigDecimal getDescuentoAutomaticoPorcentaje() { return descuentoAutomaticoPorcentaje; }
+    public void setDescuentoAutomaticoPorcentaje(BigDecimal descuentoAutomaticoPorcentaje) { this.descuentoAutomaticoPorcentaje = descuentoAutomaticoPorcentaje; }
 }

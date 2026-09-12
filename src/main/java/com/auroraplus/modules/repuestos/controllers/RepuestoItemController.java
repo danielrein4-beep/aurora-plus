@@ -70,6 +70,8 @@ public class RepuestoItemController {
                 if (datos.getPrecioMayorista() != null) item.setPrecioMayorista(datos.getPrecioMayorista());
                 if (datos.getCantidadMinimaMayorista() != null) item.setCantidadMinimaMayorista(datos.getCantidadMinimaMayorista());
                 if (datos.getUnidadBase() != null) item.setUnidadBase(datos.getUnidadBase());
+                if (datos.getStockMinimo() != null) item.setStockMinimo(datos.getStockMinimo());
+                if (datos.getProveedorPrincipalId() != null) item.setProveedorPrincipalId(datos.getProveedorPrincipalId());
                 return ResponseEntity.ok(repuestoItemRepository.save(item));
             })
             .orElse(ResponseEntity.notFound().build());
@@ -103,8 +105,9 @@ public class RepuestoItemController {
                                                                   @RequestParam BigDecimal cantidad,
                                                                   @RequestParam(required = false) String monedaPago,
                                                                   @RequestParam(required = false) BigDecimal montoRecibido,
-                                                                  @RequestParam(required = false) String claveIdempotencia) {
-        RepuestoConversionService.ResultadoVenta resultado = repuestoConversionService.venderPorVolumen(id, tenantId, cantidad, monedaPago, montoRecibido, claveIdempotencia);
+                                                                  @RequestParam(required = false) String claveIdempotencia,
+                                                                  @RequestParam(required = false) Long clienteId) {
+        RepuestoConversionService.ResultadoVenta resultado = repuestoConversionService.venderPorVolumen(id, tenantId, cantidad, monedaPago, montoRecibido, claveIdempotencia, clienteId);
         return ResponseEntity.ok(Map.of(
             "precioUnitarioAplicado", resultado.getPrecioUnitarioAplicado(),
             "total", resultado.getTotal(),
