@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import AuroraLogo from "../AuroraLogo";
 import { AuroraGradientDef } from "../Icons";
+import ThemeToggle from "./ThemeToggle";
 import {
-  IconFarm, IconCheckCircle, IconClose, IconDownload, IconFileText,
+  IconCheckCircle, IconClose, IconDownload, IconFileText,
   IconCalendar, IconCard, IconCustomize, IconRocket, IconChart,
   IconPrescription, IconUsers, IconHourglass,
   IconWheat, IconSyringe, IconWrench, IconTractor, IconTruck, IconBolt, IconBox,
@@ -1377,8 +1378,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       {/* ── HEADER SUPERIOR DEL CENTRO AGROPECUARIO: APPLE GLASS ── */}
       <header className="nav-glass border-b border-slate-300/60 dark:border-white/10 px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-40 backdrop-blur-2xl">
         <div className="flex items-center gap-3.5">
-          <div className="p-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-            <IconFarm size={26} />
+          <div className="p-1.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+            <AuroraLogo size={26} />
           </div>
           <div className="text-left">
             <div className="font-['Outfit'] font-black text-lg sm:text-xl text-aurora leading-none flex items-center gap-2">
@@ -1447,6 +1448,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             className="apple-glass px-3.5 py-2 rounded-xl border border-white/20 text-slate-700 dark:text-white text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2 cursor-pointer">
             <span>+ Alta Animal</span>
           </button>
+
+          <ThemeToggle className="scale-[0.72] origin-right" />
 
           <button
             onClick={onSalir}
