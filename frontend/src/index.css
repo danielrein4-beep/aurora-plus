@@ -315,6 +315,18 @@ html.light .modal-siempre-oscuro input::placeholder,
 html.light .modal-siempre-oscuro textarea::placeholder {
   color: rgba(255, 255, 255, 0.4) !important;
 }
+/* Paneles/cajas internas translúcidas (bg-white/5, bg-white/10, etc.) usadas
+   como "sub-tarjetas" dentro de estos modales también quedaban forzadas a
+   fondo casi blanco por las reglas globales de esas utilidades en modo
+   claro, con texto claro pensado para fondo oscuro encima — ilegible. */
+html.light .modal-siempre-oscuro [class*="bg-white/"] {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: none !important;
+  color: inherit !important;
+}
+html.light .modal-siempre-oscuro [class*="border-white/"] {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
 html.light .modal-siempre-oscuro input:focus,
 html.light .modal-siempre-oscuro select:focus,
 html.light .modal-siempre-oscuro textarea:focus {
