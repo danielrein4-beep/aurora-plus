@@ -2,8 +2,12 @@ package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.RegistroOrdeno;
+import com.auroraplus.modules.ganaderia.entities.TanqueLeche;
+import com.auroraplus.modules.ganaderia.entities.VentaLecheTanque;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.RegistroOrdenoRepository;
+import com.auroraplus.modules.ganaderia.repositories.TanqueLecheRepository;
+import com.auroraplus.modules.ganaderia.repositories.VentaLecheTanqueRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +30,12 @@ public class RegistroOrdenoController {
     @Autowired
     private AnimalRepository animalRepository;
 
+    @Autowired
+    private TanqueLecheRepository tanqueLecheRepository;
+
+    @Autowired
+    private VentaLecheTanqueRepository ventaLecheTanqueRepository;
+
     public static class RegistroRequest {
         public Long animalId;
         public LocalDate fecha;
@@ -33,6 +44,7 @@ public class RegistroOrdenoController {
         public BigDecimal precioVentaLitro; // opcional — sin esto, el registro solo cuenta producción, no ingreso
         public BigDecimal porcentajeGrasa;
         public BigDecimal porcentajeProteina;
+        public String destino; // "TANQUE" (default) o "VENTA_DIRECTA"
     }
 
     @PostMapping
@@ -46,6 +58,10 @@ public class RegistroOrdenoController {
             throw new RuntimeException("La cantidad de litros debe ser mayor a cero");
         }
 
+        String dest = (request.destino != null && !request.destino.trim().isEmpty())
+            ? request.destino.trim().toUpperCase()
+            : "TANQUE";
+
         RegistroOrdeno registro = new RegistroOrdeno();
         registro.setTenantId(tenantId);
         registro.setAnimal(animal);
@@ -58,8 +74,27 @@ public class RegistroOrdenoController {
         registro.setPrecioVentaLitro(request.precioVentaLitro);
         registro.setPorcentajeGrasa(request.porcentajeGrasa);
         registro.setPorcentajeProteina(request.porcentajeProteina);
+        registro.setDestino(dest);
 
-        return ResponseEntity.ok(registroOrdenoRepository.save(registro));
+        RegistroOrdeno guardado = registroOrdenoRepository.save(registro);
+
+        // Si el destino es TANQUE, sumar litros al stock del tanque de leche de la finca
+        if ("TANQUE".equalsIgnoreCase(dest)) {
+            TanqueLeche tanque = tanqueLecheRepository.findByTenantId(tenantId)
+                .orElseGet(() -> {
+                    TanqueLeche nuevo = new TanqueLeche();
+                    nuevo.setTenantId(tenantId);
+                    nuevo.setStockActualLitros(BigDecimal.ZERO);
+                    nuevo.setCapacidadLitros(BigDecimal.valueOf(2000.00));
+                    nuevo.setTemperaturaCelsius(BigDecimal.valueOf(4.0));
+                    return nuevo;
+                });
+            tanque.setStockActualLitros(tanque.getStockActualLitros().add(request.cantidadLitros));
+            tanque.setUltimaActualizacion(LocalDateTime.now());
+            tanqueLecheRepository.save(tanque);
+        }
+
+        return ResponseEntity.ok(guardado);
     }
 
     @GetMapping("/animal/{animalId}")
@@ -130,5 +165,110 @@ public class RegistroOrdenoController {
             resultado.add(fila);
         }
         return resultado;
+    }
+
+    public static class DespachoTanqueRequest {
+        public LocalDate fecha;
+        public BigDecimal litrosVendidos;
+        public BigDecimal precioLitroUSD;
+        public String compradorOPlanta;
+        public String monedaPago; // opcional, default USD
+        public String notas;
+    }
+
+    public static class ConfigTanqueRequest {
+        public BigDecimal capacidadLitros;
+        public BigDecimal temperaturaCelsius;
+        public BigDecimal stockAjuste;
+    }
+
+    @GetMapping("/tanque")
+    public ResponseEntity<TanqueLeche> obtenerTanque(@RequestParam Long tenantId) {
+        TanqueLeche tanque = tanqueLecheRepository.findByTenantId(tenantId)
+            .orElseGet(() -> {
+                TanqueLeche nuevo = new TanqueLeche();
+                nuevo.setTenantId(tenantId);
+                nuevo.setStockActualLitros(BigDecimal.ZERO);
+                nuevo.setCapacidadLitros(BigDecimal.valueOf(2000.00));
+                nuevo.setTemperaturaCelsius(BigDecimal.valueOf(4.0));
+                nuevo.setUltimaActualizacion(LocalDateTime.now());
+                return tanqueLecheRepository.save(nuevo);
+            });
+        return ResponseEntity.ok(tanque);
+    }
+
+    @PostMapping("/tanque/despacho")
+    public ResponseEntity<?> despacharTanque(@RequestParam Long tenantId, @RequestBody DespachoTanqueRequest req) {
+        if (req.litrosVendidos == null || req.litrosVendidos.compareTo(BigDecimal.ZERO) <= 0) {
+            return ResponseEntity.badRequest().body("Los litros a despachar deben ser mayores a cero");
+        }
+        if (req.precioLitroUSD == null || req.precioLitroUSD.compareTo(BigDecimal.ZERO) < 0) {
+            return ResponseEntity.badRequest().body("El precio por litro no puede ser negativo");
+        }
+        if (req.compradorOPlanta == null || req.compradorOPlanta.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Debe indicar el comprador o planta receptora");
+        }
+
+        TanqueLeche tanque = tanqueLecheRepository.findByTenantId(tenantId)
+            .orElseGet(() -> {
+                TanqueLeche nuevo = new TanqueLeche();
+                nuevo.setTenantId(tenantId);
+                nuevo.setStockActualLitros(BigDecimal.ZERO);
+                return tanqueLecheRepository.save(nuevo);
+            });
+
+        if (tanque.getStockActualLitros().compareTo(req.litrosVendidos) < 0) {
+            return ResponseEntity.badRequest().body("Stock insuficiente en tanque. Stock actual: " + tanque.getStockActualLitros() + " L, intentando despachar: " + req.litrosVendidos + " L");
+        }
+
+        // Descontar del stock del tanque
+        tanque.setStockActualLitros(tanque.getStockActualLitros().subtract(req.litrosVendidos));
+        tanque.setUltimaActualizacion(LocalDateTime.now());
+        tanqueLecheRepository.save(tanque);
+
+        // Registrar la venta de leche
+        VentaLecheTanque venta = new VentaLecheTanque();
+        venta.setTenantId(tenantId);
+        venta.setFecha(req.fecha != null ? req.fecha : LocalDate.now());
+        venta.setLitrosVendidos(req.litrosVendidos);
+        venta.setPrecioLitroUSD(req.precioLitroUSD);
+        venta.setTotalUSD(req.litrosVendidos.multiply(req.precioLitroUSD).setScale(2, RoundingMode.HALF_UP));
+        venta.setCompradorOPlanta(req.compradorOPlanta.trim());
+        venta.setMonedaPago(req.monedaPago != null && !req.monedaPago.trim().isEmpty() ? req.monedaPago.trim().toUpperCase() : "USD");
+        venta.setNotas(req.notas);
+        ventaLecheTanqueRepository.save(venta);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("tanque", tanque);
+        resp.put("venta", venta);
+        resp.put("mensaje", "Despacho de leche registrado y stock descontado exitosamente");
+        return ResponseEntity.ok(resp);
+    }
+
+    @GetMapping("/tanque/ventas")
+    public List<VentaLecheTanque> listarVentasTanque(@RequestParam Long tenantId) {
+        return ventaLecheTanqueRepository.findByTenantIdOrderByFechaDesc(tenantId);
+    }
+
+    @PutMapping("/tanque/config")
+    public ResponseEntity<TanqueLeche> configurarTanque(@RequestParam Long tenantId, @RequestBody ConfigTanqueRequest req) {
+        TanqueLeche tanque = tanqueLecheRepository.findByTenantId(tenantId)
+            .orElseGet(() -> {
+                TanqueLeche nuevo = new TanqueLeche();
+                nuevo.setTenantId(tenantId);
+                nuevo.setStockActualLitros(BigDecimal.ZERO);
+                return nuevo;
+            });
+        if (req.capacidadLitros != null && req.capacidadLitros.compareTo(BigDecimal.ZERO) > 0) {
+            tanque.setCapacidadLitros(req.capacidadLitros);
+        }
+        if (req.temperaturaCelsius != null) {
+            tanque.setTemperaturaCelsius(req.temperaturaCelsius);
+        }
+        if (req.stockAjuste != null && req.stockAjuste.compareTo(BigDecimal.ZERO) >= 0) {
+            tanque.setStockActualLitros(req.stockAjuste);
+        }
+        tanque.setUltimaActualizacion(LocalDateTime.now());
+        return ResponseEntity.ok(tanqueLecheRepository.save(tanque));
     }
 }

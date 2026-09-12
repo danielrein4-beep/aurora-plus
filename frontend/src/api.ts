@@ -2317,6 +2317,29 @@ export interface RegistroOrdenoGanaderia {
   montoVenta?: number;
   porcentajeGrasa?: number;
   porcentajeProteina?: number;
+  destino?: "TANQUE" | "VENTA_DIRECTA";
+}
+
+export interface TanqueLeche {
+  id: number;
+  tenantId: number;
+  stockActualLitros: number;
+  capacidadLitros: number;
+  temperaturaCelsius: number;
+  ultimaActualizacion?: string;
+}
+
+export interface VentaLecheTanque {
+  id: number;
+  tenantId: number;
+  fecha: string;
+  litrosVendidos: number;
+  precioLitroUSD: number;
+  totalUSD: number;
+  compradorOPlanta: string;
+  monedaPago: string;
+  notas?: string;
+  createdAt?: string;
 }
 
 export interface ReporteOrdenoGanaderia {
@@ -2499,9 +2522,43 @@ export function registrarOrdenoGanaderia(tenantId: number, datos: {
   precioVentaLitro?: number;
   porcentajeGrasa?: number;
   porcentajeProteina?: number;
+  destino?: "TANQUE" | "VENTA_DIRECTA";
 }): Promise<RegistroOrdenoGanaderia> {
   return request(`/api/ganaderia/ordeno?tenantId=${tenantId}`, {
     method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function obtenerStockTanqueLeche(tenantId: number): Promise<TanqueLeche> {
+  return request(`/api/ganaderia/ordeno/tanque?tenantId=${tenantId}`);
+}
+
+export function registrarDespachoLecheTanque(tenantId: number, datos: {
+  fecha: string;
+  litrosVendidos: number;
+  precioLitroUSD: number;
+  compradorOPlanta: string;
+  monedaPago?: string;
+  notas?: string;
+}): Promise<{ tanque: TanqueLeche; venta: VentaLecheTanque; mensaje: string }> {
+  return request(`/api/ganaderia/ordeno/tanque/despacho?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function obtenerVentasLecheTanque(tenantId: number): Promise<VentaLecheTanque[]> {
+  return request(`/api/ganaderia/ordeno/tanque/ventas?tenantId=${tenantId}`);
+}
+
+export function configurarTanqueLeche(tenantId: number, datos: {
+  capacidadLitros?: number;
+  temperaturaCelsius?: number;
+  stockAjuste?: number;
+}): Promise<TanqueLeche> {
+  return request(`/api/ganaderia/ordeno/tanque/config?tenantId=${tenantId}`, {
+    method: "PUT",
     body: JSON.stringify(datos),
   });
 }
