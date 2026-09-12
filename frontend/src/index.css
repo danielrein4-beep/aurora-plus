@@ -322,7 +322,11 @@ html.light .modal-siempre-oscuro textarea::placeholder {
 html.light .modal-siempre-oscuro [class*="bg-white/"] {
   background-color: rgba(255, 255, 255, 0.06) !important;
   box-shadow: none !important;
-  color: inherit !important;
+}
+/* Texto sin una utilidad de color explícita (texto plano heredado) dentro de
+   estas cajitas: por defecto que sea claro, ya que el fondo sigue oscuro. */
+html.light .modal-siempre-oscuro [class*="bg-white/"]:not([class*="text-"]) {
+  color: #e2e8f0 !important;
 }
 html.light .modal-siempre-oscuro [class*="border-white/"] {
   border-color: rgba(255, 255, 255, 0.15) !important;
