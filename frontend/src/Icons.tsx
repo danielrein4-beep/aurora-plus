@@ -624,3 +624,169 @@ export function IconTerminal({ size = 24, className }: IconProps) {
     </svg>
   );
 }
+
+export function IconWheat({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 2v20" />
+      <path d="M12 5c-1.5 0-3 1-3 2.5S10.5 10 12 10" />
+      <path d="M12 5c1.5 0 3 1 3 2.5S13.5 10 12 10" />
+      <path d="M12 9c-1.5 0-3 1-3 2.5S10.5 14 12 14" />
+      <path d="M12 9c1.5 0 3 1 3 2.5S13.5 14 12 14" />
+      <path d="M12 13c-1.5 0-3 1-3 2.5S10.5 18 12 18" />
+      <path d="M12 13c1.5 0 3 1 3 2.5S13.5 18 12 18" />
+    </svg>
+  );
+}
+
+export function IconSyringe({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <line x1="21" y1="3" x2="17" y2="7" />
+      <path d="M18.5 5.5l-11 11-3 5 5-3 11-11z" />
+      <line x1="13" y1="9" x2="15" y2="11" />
+      <line x1="10" y1="12" x2="12" y2="14" />
+    </svg>
+  );
+}
+
+export function IconWrench({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.1-2.1z" />
+    </svg>
+  );
+}
+
+export function IconTractor({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="16" r="2" />
+      <path d="M6 15V7h6l3 5h3a2 2 0 0 1 2 2v2" />
+      <path d="M9 15h6" />
+      <path d="M3 11h3" />
+    </svg>
+  );
+}
+
+export function IconFire({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 2c1 3-3 4-3 8a3 3 0 0 0 6 0c1 1 2 2.5 2 4.5A5 5 0 0 1 7 15c0-4 3-6 3-9 0 0 2 1 2 3 0-3 0-5-0-7z" />
+    </svg>
+  );
+}
+
+export function IconMilk({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M9 2h6" />
+      <path d="M9 2v4l-3 4v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10l-3-4V2" />
+      <path d="M6 13h12" />
+    </svg>
+  );
+}
+
+export function IconPin({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 21s-7-6.4-7-11.5A7 7 0 0 1 19 9.5C19 14.6 12 21 12 21z" />
+      <circle cx="12" cy="9.5" r="2.5" />
+    </svg>
+  );
+}
+
+export function IconCow({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M4 10c0-2 1.5-3 3-3 1 0 1.5.5 2 1 .8-.6 1.9-1 3-1s2.2.4 3 1c.5-.5 1-1 2-1 1.5 0 3 1 3 3 0 1-.5 2-1.5 2.5V15a4 4 0 0 1-4 4H9.5a4 4 0 0 1-4-4v-2.5C4.5 12 4 11 4 10z" />
+      <circle cx="9.5" cy="12" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="14.5" cy="12" r="0.6" fill="currentColor" stroke="none" />
+      <path d="M3 8.5L4.5 10" />
+      <path d="M21 8.5L19.5 10" />
+    </svg>
+  );
+}
+
+export function IconSnowflake({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <line x1="12" y1="2" x2="12" y2="22" />
+      <line x1="4" y1="7" x2="20" y2="17" />
+      <line x1="4" y1="17" x2="20" y2="7" />
+    </svg>
+  );
+}
+
+export function IconTag({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M20 12.5L12.5 20a1.5 1.5 0 0 1-2.1 0l-6.4-6.4a1.5 1.5 0 0 1 0-2.1L11.5 4H19a1 1 0 0 1 1 1v7.5z" />
+      <circle cx="15.5" cy="8.5" r="1.2" />
+    </svg>
+  );
+}
+
+export function IconDna({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M6 3c0 6 12 12 12 18" />
+      <path d="M18 3c0 6-12 12-12 18" />
+      <line x1="7.5" y1="7" x2="16.5" y2="7" />
+      <line x1="7.5" y1="17" x2="16.5" y2="17" />
+      <line x1="9" y1="12" x2="15" y2="12" />
+    </svg>
+  );
+}
+
+export function IconScale({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <line x1="12" y1="3" x2="12" y2="21" />
+      <line x1="5" y1="7" x2="19" y2="7" />
+      <path d="M5 7l-3 6a3 3 0 0 0 6 0l-3-6z" />
+      <path d="M19 7l-3 6a3 3 0 0 0 6 0l-3-6z" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+    </svg>
+  );
+}
+
+export function IconSprout({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 22v-9" />
+      <path d="M12 13c0-4-3-6-7-6 0 4 3 6 7 6z" />
+      <path d="M12 10c0-3.5 2.5-5.5 6-5.5 0 3.5-2.5 5.5-6 5.5z" />
+    </svg>
+  );
+}
+
+export function IconCart({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="9" cy="20" r="1.2" />
+      <circle cx="18" cy="20" r="1.2" />
+      <path d="M2 3h2l2.4 12.4a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21 7H6" />
+    </svg>
+  );
+}
+
+export function IconMeat({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M14 3c4 0 7 3 7 7 0 3-2 5-4 6l-6 6-3-3c-1-2 0-4 1-5l2-2c-1.5-1-2-2.5-2-4 0-3 2.5-5 5-5z" />
+      <circle cx="8" cy="18" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function IconBulb({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M9 18h6" />
+      <path d="M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V17h5v-1.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z" />
+    </svg>
+  );
+}

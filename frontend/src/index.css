@@ -300,6 +300,28 @@ html.light .modal-siempre-oscuro.text-white,
 html.light .modal-siempre-oscuro .text-white {
   color: #ffffff !important;
 }
+/* Los <input>/<select>/<textarea> dentro de estos modales también quedaban
+   forzados a fondo blanco por la regla global de inputs en modo claro,
+   ilegibles sobre un modal que sigue oscuro. */
+html.light .modal-siempre-oscuro input,
+html.light .modal-siempre-oscuro select,
+html.light .modal-siempre-oscuro textarea {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+html.light .modal-siempre-oscuro input::placeholder,
+html.light .modal-siempre-oscuro textarea::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+html.light .modal-siempre-oscuro input:focus,
+html.light .modal-siempre-oscuro select:focus,
+html.light .modal-siempre-oscuro textarea:focus {
+  border-color: #00c9a7 !important;
+  box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.25) !important;
+  background-color: rgba(15, 23, 42, 0.95) !important;
+}
 
 * {
   scrollbar-width: thin;

@@ -3,7 +3,11 @@ import AuroraLogo from "../AuroraLogo";
 import {
   IconFarm, IconCheckCircle, IconClose, IconDownload, IconFileText,
   IconCalendar, IconCard, IconCustomize, IconRocket, IconChart,
-  IconPrescription, IconUsers, IconHourglass
+  IconPrescription, IconUsers, IconHourglass,
+  IconWheat, IconSyringe, IconWrench, IconTractor, IconTruck, IconBolt, IconBox,
+  IconWarning, IconFire, IconMilk, IconEdit, IconSettings, IconPin, IconCow,
+  IconSnowflake, IconTag, IconShield, IconDna, IconScale, IconSprout, IconCart,
+  IconMeat, IconRefresh, IconBulb, IconCoins
 } from "../Icons";
 import GanaderiaMapa from "./GanaderiaMapa";
 import { useAuth } from "../context/AuthContext";
@@ -59,6 +63,14 @@ const DEMO_ORDENOS: RegistroOrdenoGanaderia[] = [
   { id: 303, tenantId: 1, animal: DEMO_ANIMALES[0], fecha: "2026-09-10", turno: "TARDE", cantidadLitros: 9.8, precioVentaLitro: 0.55, montoVenta: 5.39, porcentajeGrasa: 3.9, porcentajeProteina: 3.1 },
 ];
 
+// Catálogo sugerido de razas bovinas — se ofrece como datalist (autocompletar)
+// pero el campo sigue siendo texto libre por si la raza real no está en la lista.
+const RAZAS_BOVINAS_COMUNES = [
+  "Brahman", "Gyr", "Gyrolando", "Pardo Suizo", "Holstein", "Jersey",
+  "Angus", "Brangus", "Simmental", "Charolais", "Nelore", "Senepol",
+  "Guzerat", "Criollo Limonero", "Carora", "Romosinuano", "Mestizo",
+];
+
 const DEFAULT_VACUNAS_CATALOGO: VacunaGanaderia[] = [
   { id: 1, tenantId: 1, nombre: "Aftosa Bivalente (A+O)", diasParaRefuerzo: 180, diasRetiroLeche: 0, diasRetiroCarne: 0 },
   { id: 2, tenantId: 1, nombre: "Rabia Paralítica Bovina", diasParaRefuerzo: 365, diasRetiroLeche: 0, diasRetiroCarne: 0 },
@@ -67,14 +79,14 @@ const DEFAULT_VACUNAS_CATALOGO: VacunaGanaderia[] = [
 ];
 
 const CATEGORIAS_GASTO_GANADERIA = [
-  { id: "ALIMENTACION", label: "Alimentación / Suplementos / Sal", icon: "🌾", colorBadge: "text-amber-400 bg-amber-500/10 border-amber-500/30" },
-  { id: "SANIDAD", label: "Sanidad / Vacunas / Fármacos", icon: "💉", colorBadge: "text-sky-400 bg-sky-500/10 border-sky-500/30" },
-  { id: "MANO_DE_OBRA", label: "Mano de Obra / Jornales / Nómina", icon: "🤠", colorBadge: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" },
-  { id: "MANTENIMIENTO", label: "Mantenimiento / Cercas / Potreros", icon: "🪵", colorBadge: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30" },
-  { id: "MAQUINARIA", label: "Maquinaria / Repuestos / Combustible", icon: "🚜", colorBadge: "text-purple-400 bg-purple-500/10 border-purple-500/30" },
-  { id: "TRANSPORTE", label: "Fletes / Transporte de Ganado", icon: "🚛", colorBadge: "text-blue-400 bg-blue-500/10 border-blue-500/30" },
-  { id: "SERVICIOS", label: "Servicios Básicos / Electricidad / Agua", icon: "⚡", colorBadge: "text-orange-400 bg-orange-500/10 border-orange-500/30" },
-  { id: "OTROS", label: "Otros Gastos Operativos", icon: "📦", colorBadge: "text-slate-300 bg-slate-500/10 border-slate-500/30" },
+  { id: "ALIMENTACION", label: "Alimentación / Suplementos / Sal", icon: IconWheat, colorBadge: "text-amber-400 bg-amber-500/10 border-amber-500/30" },
+  { id: "SANIDAD", label: "Sanidad / Vacunas / Fármacos", icon: IconSyringe, colorBadge: "text-sky-400 bg-sky-500/10 border-sky-500/30" },
+  { id: "MANO_DE_OBRA", label: "Mano de Obra / Jornales / Nómina", icon: IconUsers, colorBadge: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" },
+  { id: "MANTENIMIENTO", label: "Mantenimiento / Cercas / Potreros", icon: IconWrench, colorBadge: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30" },
+  { id: "MAQUINARIA", label: "Maquinaria / Repuestos / Combustible", icon: IconTractor, colorBadge: "text-purple-400 bg-purple-500/10 border-purple-500/30" },
+  { id: "TRANSPORTE", label: "Fletes / Transporte de Ganado", icon: IconTruck, colorBadge: "text-blue-400 bg-blue-500/10 border-blue-500/30" },
+  { id: "SERVICIOS", label: "Servicios Básicos / Electricidad / Agua", icon: IconBolt, colorBadge: "text-orange-400 bg-orange-500/10 border-orange-500/30" },
+  { id: "OTROS", label: "Otros Gastos Operativos", icon: IconBox, colorBadge: "text-slate-300 bg-slate-500/10 border-slate-500/30" },
 ];
 
 export default function GanaderiaApp({ onSalir }: Props) {
@@ -581,8 +593,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
         costoAdquisicion: formAnimal.origen === "COMPRA" ? Number(formAnimal.costoCompra) : undefined,
         madreId: (formAnimal.origen === "NACIMIENTO" && formAnimal.madreId) ? Number(formAnimal.madreId) : undefined,
         valorEstimado: formAnimal.origen === "COMPRA" ? Number(formAnimal.costoCompra) : Number(formAnimal.valorEstimado),
-        estadoReproductivo: formAnimal.estadoReproductivo,
-        estadoProductivo: formAnimal.estadoProductivo,
+        estadoReproductivo: formAnimal.sexo === "HEMBRA" ? formAnimal.estadoReproductivo : undefined,
+        estadoProductivo: formAnimal.sexo === "HEMBRA" ? formAnimal.estadoProductivo : undefined,
       };
 
       if (formAnimal.origen === "COMPRA" && formAnimal.proveedor.trim()) {
@@ -598,7 +610,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
       setAnimalFichaId(nuevo.id);
       notificar(`Animal arete ${nuevo.arete} (${formAnimal.origen === "COMPRA" ? "Compra" : "Nacimiento en Finca"}) registrado con éxito en el hato.`);
     } catch {
-      notificar(`⚠️ No se pudo registrar el animal arete ${formAnimal.arete} — revisa tu conexión e inténtalo de nuevo.`);
+      notificar(`No se pudo registrar el animal arete ${formAnimal.arete} — revisa tu conexión e inténtalo de nuevo.`);
       return;
     }
 
@@ -655,7 +667,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
       notificar(`Venta registrada exitosamente (Ticket ${ticket}). Animal despachado y liquidado.`);
     } catch (err: any) {
       const msg = err?.message || "Revisa tu conexión e inténtalo de nuevo";
-      notificar(`⚠️ No se pudo procesar la venta: ${msg}`);
+      notificar(`No se pudo procesar la venta: ${msg}`);
       return;
     }
 
@@ -683,9 +695,9 @@ export default function GanaderiaApp({ onSalir }: Props) {
       });
       setAnimales(prev => prev.map(a => a.id === Number(formCelo.hembraId) ? { ...a, estadoReproductivo: "EN_ESPERA" } : a));
       const hembra = animales.find(a => a.id === Number(formCelo.hembraId));
-      notificar(`🔥 Celo registrado para hembra ${hembra?.arete || ''}. Estado reproductivo actualizado a 'EN_ESPERA' (programada para IA).`);
+      notificar(`Celo registrado para hembra ${hembra?.arete || ''}. Estado reproductivo actualizado a 'EN_ESPERA' (programada para IA).`);
     } catch {
-      notificar("⚠️ No se pudo registrar el evento de celo — revisa tu conexión.");
+      notificar("No se pudo registrar el evento de celo — revisa tu conexión.");
       return;
     }
     setModalCelo(false);
@@ -707,9 +719,9 @@ export default function GanaderiaApp({ onSalir }: Props) {
         notas: formMastitis.notas,
       });
       const vaca = animales.find(a => a.id === Number(formMastitis.animalId));
-      notificar(`🚨 Alerta sanitaria: Mastitis registrada en ${vaca?.arete || 'vaca'}. Cuarto ${formMastitis.cuartoAfectado} en tratamiento. Bloqueo de leche activo por ${formMastitis.diasRetiroLeche} días.`);
+      notificar(`Alerta sanitaria: Mastitis registrada en ${vaca?.arete || 'vaca'}. Cuarto ${formMastitis.cuartoAfectado} en tratamiento. Bloqueo de leche activo por ${formMastitis.diasRetiroLeche} días.`);
     } catch {
-      notificar("⚠️ No se pudo registrar el tratamiento de mastitis — revisa tu conexión.");
+      notificar("No se pudo registrar el tratamiento de mastitis — revisa tu conexión.");
       return;
     }
     setModalMastitis(false);
@@ -739,7 +751,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
     try {
       await crearPotreroGanaderia(tenantId, nuevo);
     } catch {
-      notificar(`⚠️ No se pudo guardar el potrero ${nuevo.nombre} — revisa tu conexión e inténtalo de nuevo.`);
+      notificar(`No se pudo guardar el potrero ${nuevo.nombre} — revisa tu conexión e inténtalo de nuevo.`);
       return;
     }
 
@@ -780,7 +792,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
   const abrirVaqueraRapida = () => {
     const vacas = animalesActivos.filter(a => a.sexo === "HEMBRA" && (a.tipoAnimal === "VACA" || a.tipoAnimal === "NOVILLA"));
     if (vacas.length === 0) {
-      notificar("⚠️ No hay vacas u novillas registradas en el hato todavía. Da de alta tus animales antes de usar Vaquera Rápida.");
+      notificar("No hay vacas u novillas registradas en el hato todavía. Da de alta tus animales antes de usar Vaquera Rápida.");
       return;
     }
 
@@ -858,7 +870,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
     const destinoLabel = vaqueraDestino === "TANQUE" ? "almacenados en tanque" : "venta directa";
 
     if (fallidas.length > 0) {
-      notificar(`⚠️ Se guardaron ${nuevosOrdenos.length} de ${filasValidas.length} registros. No se pudo registrar: ${fallidas.join(", ")} — revisa tu conexión e inténtalo de nuevo con esas vacas.`);
+      notificar(`Se guardaron ${nuevosOrdenos.length} de ${filasValidas.length} registros. No se pudo registrar: ${fallidas.join(", ")} — revisa tu conexión e inténtalo de nuevo con esas vacas.`);
     } else if (mastitisCount > 0) {
       notificar(`Jornada guardada: ${litrosComercialesTotal.toFixed(1)} L comerciales (${destinoLabel}). ¡Atención! ${mastitisCount} vaca(s) aislada(s) con Mastitis.`);
     } else {
@@ -872,7 +884,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
     try {
       await rotarPotreroGanaderia(modalRotar.id, tenantId, potreroDestinoId);
     } catch {
-      notificar(`⚠️ No se pudo rotar el hato de ${modalRotar.nombre} — revisa tu conexión e inténtalo de nuevo.`);
+      notificar(`No se pudo rotar el hato de ${modalRotar.nombre} — revisa tu conexión e inténtalo de nuevo.`);
       return;
     }
 
@@ -917,7 +929,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
         });
       }
     } catch {
-      notificar(`⚠️ No se pudo registrar el ordeño de ${animalSeleccionado.nombre || animalSeleccionado.arete} — revisa tu conexión e inténtalo de nuevo.`);
+      notificar(`No se pudo registrar el ordeño de ${animalSeleccionado.nombre || animalSeleccionado.arete} — revisa tu conexión e inténtalo de nuevo.`);
       return;
     }
 
@@ -934,15 +946,15 @@ export default function GanaderiaApp({ onSalir }: Props) {
     const stockActual = Number(tanqueLeche?.stockActualLitros) || 0;
 
     if (litros <= 0) {
-      notificar("⚠️ La cantidad de litros a despachar debe ser mayor a cero.");
+      notificar("La cantidad de litros a despachar debe ser mayor a cero.");
       return;
     }
     if (litros > stockActual) {
-      notificar(`⚠️ Stock insuficiente en el tanque (${stockActual.toFixed(1)} L disponibles). No se pueden despachar ${litros} L.`);
+      notificar(`Stock insuficiente en el tanque (${stockActual.toFixed(1)} L disponibles). No se pueden despachar ${litros} L.`);
       return;
     }
     if (!formVentaLeche.compradorOPlanta.trim()) {
-      notificar("⚠️ Debe indicar el comprador o planta receptora.");
+      notificar("Debe indicar el comprador o planta receptora.");
       return;
     }
 
@@ -959,7 +971,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
       setTanqueLeche(res.tanque);
       setVentasLeche(prev => [res.venta, ...prev]);
       setModalVentaLeche(false);
-      notificar(`🚚 Despacho registrado: ${litros} L entregados a ${formVentaLeche.compradorOPlanta} por $${(litros * precio).toFixed(2)} USD.`);
+      notificar(`Despacho registrado: ${litros} L entregados a ${formVentaLeche.compradorOPlanta} por $${(litros * precio).toFixed(2)} USD.`);
       setFormVentaLeche({
         fecha: new Date().toISOString().slice(0, 10),
         litrosVendidos: Math.min(200, res.tanque.stockActualLitros),
@@ -969,7 +981,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
         notas: "",
       });
     } catch (err: any) {
-      notificar(`⚠️ Error al despachar leche: ${err.message || "revisa la conexión"}`);
+      notificar(`Error al despachar leche: ${err.message || "revisa la conexión"}`);
     }
   };
 
@@ -985,7 +997,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
       setModalAjusteTanque(false);
       notificar("Tanque de leche calibrado exitosamente.");
     } catch {
-      notificar("⚠️ No se pudo guardar la configuración del tanque.");
+      notificar("No se pudo guardar la configuración del tanque.");
     }
   };
 
@@ -994,11 +1006,11 @@ export default function GanaderiaApp({ onSalir }: Props) {
     e.preventDefault();
     const montoNum = Number(formGasto.monto);
     if (!formGasto.descripcion.trim()) {
-      notificar("⚠️ Ingrese una descripción detallada del gasto.");
+      notificar("Ingrese una descripción detallada del gasto.");
       return;
     }
     if (isNaN(montoNum) || montoNum <= 0) {
-      notificar("⚠️ El monto del gasto debe ser mayor a cero.");
+      notificar("El monto del gasto debe ser mayor a cero.");
       return;
     }
 
@@ -1020,9 +1032,9 @@ export default function GanaderiaApp({ onSalir }: Props) {
         monto: "",
         fecha: new Date().toISOString().slice(0, 10),
       });
-      notificar(`💸 Gasto registrado: $${montoNum.toFixed(2)} USD en ${catLabel}`);
+      notificar(`Gasto registrado: $${montoNum.toFixed(2)} USD en ${catLabel}`);
     } catch (err: any) {
-      notificar(`⚠️ Error al registrar gasto: ${err?.message || "revisa tu conexión e inténtalo de nuevo"}.`);
+      notificar(`Error al registrar gasto: ${err?.message || "revisa tu conexión e inténtalo de nuevo"}.`);
     }
   };
 
@@ -1036,7 +1048,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
       const resGdp = await obtenerGdpGanaderia(modalPesaje.id).catch(() => null);
       if (resGdp) setGdpData(resGdp);
     } catch {
-      notificar(`⚠️ No se pudo registrar el pesaje — revisa tu conexión e inténtalo de nuevo.`);
+      notificar(`No se pudo registrar el pesaje — revisa tu conexión e inténtalo de nuevo.`);
       return;
     }
 
@@ -1057,11 +1069,11 @@ export default function GanaderiaApp({ onSalir }: Props) {
       : animalesVacunaSeleccionados;
 
     if (idsParaAplicar.length === 0) {
-      notificar("⚠️ Debes seleccionar al menos un animal para aplicar el tratamiento sanitario.");
+      notificar("Debes seleccionar al menos un animal para aplicar el tratamiento sanitario.");
       return;
     }
     if (!formVacuna.vacunaId) {
-      notificar("⚠️ Selecciona o crea primero una vacuna del catálogo antes de aplicarla.");
+      notificar("Selecciona o crea primero una vacuna del catálogo antes de aplicarla.");
       return;
     }
 
@@ -1086,13 +1098,13 @@ export default function GanaderiaApp({ onSalir }: Props) {
       }
       const detalleRetiro = retiroMsg.length > 0 ? ` (${retiroMsg.join(" • ")})` : " (Sin tiempo de retiro obligatorio)";
 
-      notificar(`✅ Vacuna '${vacunaSeleccionada?.nombre || "aplicada"}' aplicada a ${idsParaAplicar.length} animal(es)${detalleRetiro}. Alertas sanitarias actualizadas.`);
+      notificar(`Vacuna '${vacunaSeleccionada?.nombre || "aplicada"}' aplicada a ${idsParaAplicar.length} animal(es)${detalleRetiro}. Alertas sanitarias actualizadas.`);
 
       // Recargar alertas sanitarias para reflejar inmediatamente los bloqueos de leche y carne
       obtenerAlertasSanitariasGanaderia(tenantId).then(setAlertasSanitarias).catch(() => {});
     } catch (err: any) {
       const msg = err?.message || "Revisa tu conexión e inténtalo de nuevo";
-      notificar(`⚠️ No se pudo registrar el tratamiento sanitario: ${msg}`);
+      notificar(`No se pudo registrar el tratamiento sanitario: ${msg}`);
       return;
     }
 
@@ -1126,7 +1138,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
       });
       notificar(`Vacuna '${creada.nombre}' guardada en el catálogo oficial.`);
     } catch {
-      notificar("⚠️ No se pudo registrar la nueva vacuna en el catálogo.");
+      notificar("No se pudo registrar la nueva vacuna en el catálogo.");
     }
   };
 
@@ -1143,7 +1155,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
         sementalReferenciaExterna: formRepro.sementalReferenciaExterna,
       });
     } catch {
-      notificar(`⚠️ No se pudo registrar el evento reproductivo — revisa tu conexión e inténtalo de nuevo.`);
+      notificar(`No se pudo registrar el evento reproductivo — revisa tu conexión e inténtalo de nuevo.`);
       return;
     }
     notificar(`Evento reproductivo registrado en el expediente.`);
@@ -1226,7 +1238,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <span className="font-mono font-bold text-sky-600 dark:text-sky-400">{tasaCOP.toLocaleString()} COP</span>
               </>
             )}
-            <span className="text-[11px] opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all">⚙️</span>
+            <span className="opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all"><IconSettings size={13} /></span>
           </button>
 
           {/* Precio Leche */}
@@ -1236,9 +1248,9 @@ export default function GanaderiaApp({ onSalir }: Props) {
             title="Precio centralizado de leche por litro — Haga clic para editar"
             className="flex items-center gap-1.5 apple-glass-pill rounded-full px-3 py-1.5 border border-sky-400/30 text-[11px] hover:border-sky-400/60 hover:bg-sky-500/10 transition-all cursor-pointer group shadow-sm"
           >
-            <span className="text-slate-500 dark:text-white/40 font-medium">🥛 Leche:</span>
+            <span className="text-slate-500 dark:text-white/40 font-medium inline-flex items-center gap-1"><IconMilk size={12} /> Leche:</span>
             <span className="font-mono font-bold text-sky-500 dark:text-sky-400">${precioLecheUSD.toFixed(2)}/L</span>
-            <span className="text-[10px] opacity-70 group-hover:opacity-100">✏️</span>
+            <span className="opacity-70 group-hover:opacity-100"><IconEdit size={12} /></span>
           </button>
         </div>
 
@@ -1367,7 +1379,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="text-base">🚀</span>
+                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-emerald-500/15 text-emerald-400"><IconRocket size={15} /></span>
                         <h3 className="font-['Outfit'] font-black text-lg text-white">
                           Checklist de Primeros Pasos para tu Finca
                         </h3>
@@ -1400,7 +1412,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                           )}
                         </div>
                         <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
-                          <span>📍</span> Fijar Ubicación Real
+                          <span className="text-rose-400"><IconPin size={14} /></span> Fijar Ubicación Real
                         </h4>
                         <p className="text-[11px] text-slate-400">
                           {fincaUbicada 
@@ -1436,7 +1448,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                           )}
                         </div>
                         <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
-                          <span>🌾</span> Crear Primer Potrero
+                          <span className="text-amber-400"><IconWheat size={14} /></span> Crear Primer Potrero
                         </h4>
                         <p className="text-[11px] text-slate-400">
                           {tienePotreros 
@@ -1472,7 +1484,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                           )}
                         </div>
                         <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
-                          <span>🐮</span> Dar de Alta Primer Animal
+                          <span className="text-emerald-400"><IconCow size={14} /></span> Dar de Alta Primer Animal
                         </h4>
                         <p className="text-[11px] text-slate-400">
                           {tieneAnimales 
@@ -1568,8 +1580,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
             <div className="apple-glass rounded-3xl p-6 border border-sky-500/30 bg-gradient-to-r from-sky-950/40 via-slate-900/70 to-slate-900/50 shadow-xl space-y-4 text-left">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-2xl shadow-inner">
-                    🥛
+                  <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 shadow-inner">
+                    <IconMilk size={22} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -1577,7 +1589,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         Tanque de Leche Frío
                       </h3>
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-500/20 text-sky-400 border border-sky-500/30">
-                        ❄️ {tanqueLeche?.temperaturaCelsius ?? 4.0}°C Óptima
+                        <span className="inline-flex items-center gap-1"><IconSnowflake size={11} /> {tanqueLeche?.temperaturaCelsius ?? 4.0}°C Óptima</span>
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 dark:text-white/50">
@@ -1591,13 +1603,13 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     type="button"
                     onClick={() => setModalAjusteTanque(true)}
                     className="px-3.5 py-2 rounded-xl apple-glass border border-white/15 text-slate-700 dark:text-white/80 hover:text-white text-xs font-semibold cursor-pointer transition-all">
-                    ⚙️ Calibrar
+                    <span className="inline-flex items-center gap-1.5"><IconSettings size={13} /> Calibrar</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setModalVentaLeche(true)}
                     className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg hover:scale-105 transition-all flex items-center gap-1.5 cursor-pointer">
-                    <span>🚚 Venta Cisterna / Planta</span>
+                    <span className="inline-flex items-center gap-1.5"><IconTruck size={14} /> Venta Cisterna / Planta</span>
                   </button>
                 </div>
               </div>
@@ -2171,7 +2183,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       : "text-slate-600 dark:text-white/60 hover:text-white"
                   }`}
                 >
-                  <span>🐮 Ficha por Animal</span>
+                  <span className="inline-flex items-center gap-1.5"><IconCow size={14} /> Ficha por Animal</span>
                 </button>
                 <button
                   onClick={() => setSubSanidad("lotes")}
@@ -2181,7 +2193,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       : "text-slate-600 dark:text-white/60 hover:text-white"
                   }`}
                 >
-                  <span>🏷️ Monitoreo por Lote</span>
+                  <span className="inline-flex items-center gap-1.5"><IconTag size={14} /> Monitoreo por Lote</span>
                 </button>
               </div>
             </div>
@@ -2190,7 +2202,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
             <div className="p-4 rounded-3xl apple-glass border border-amber-500/30 space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">🛡️</span>
+                  <span className="text-amber-400"><IconShield size={18} /></span>
                   <span className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white">
                     Alertas Sanitarias Activas (Refuerzos & Períodos de Retiro)
                   </span>
@@ -2211,7 +2223,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
               {alertasSanitarias.length === 0 ? (
                 <div className="text-xs text-emerald-500 dark:text-emerald-400 font-medium py-1 flex items-center gap-2">
-                  <span>✅</span>
+                  <IconCheckCircle size={14} />
                   <span>Todo el hato está al día. No hay retiros de leche/carne activos ni vacunas vencidas.</span>
                 </div>
               ) : (
@@ -2244,8 +2256,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
             {subSanidad === "individual" && (
               animales.length === 0 ? (
                 <div className="p-12 text-center rounded-3xl apple-glass border border-white/10 space-y-4 max-w-md mx-auto my-8">
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-3xl mx-auto">
-                    💉
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+                    <IconSyringe size={28} />
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white">Ficha Sanitaria por Animal</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -2365,7 +2377,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-right space-y-0.5">
                           <span className="text-[10px] uppercase font-bold text-slate-400 block">Lote de Entrada</span>
                           <div className="font-bold text-sm text-purple-400 flex items-center gap-1.5 justify-end">
-                            <span>🏷️</span>
+                            <IconTag size={14} />
                             <span>{animalSel.lote || "Sin Lote Asignado"}</span>
                           </div>
                           {animalSel.valorEstimado && (
@@ -2383,7 +2395,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         <div className="p-5 rounded-3xl apple-glass border border-white/10 space-y-4">
                           <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
                             <h4 className="font-['Outfit'] font-black text-sm text-white flex items-center gap-2">
-                              <span>⚖️</span>
+                              <span className="text-sky-400"><IconScale size={16} /></span>
                               <span>Control de Peso & GDP</span>
                             </h4>
                             <span className="font-mono font-bold text-sky-400 text-sm">
@@ -2421,7 +2433,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         <div className="p-5 rounded-3xl apple-glass border border-white/10 space-y-4">
                           <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
                             <h4 className="font-['Outfit'] font-black text-sm text-white flex items-center gap-2">
-                              <span>💉</span>
+                              <span className="text-emerald-400"><IconSyringe size={16} /></span>
                               <span>Vacunas & Sanidad</span>
                             </h4>
                             <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold">
@@ -2461,7 +2473,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         <div className="p-5 rounded-3xl apple-glass border border-white/10 space-y-4">
                           <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
                             <h4 className="font-['Outfit'] font-black text-sm text-white flex items-center gap-2">
-                              <span>🧬</span>
+                              <span className="text-purple-400"><IconDna size={16} /></span>
                               <span>Historial Reproductivo</span>
                             </h4>
                             <span className="text-[11px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 font-bold">
@@ -2579,12 +2591,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
                               {alertasLote.length > 0 ? (
                                 <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-[11px] text-amber-300 flex items-center justify-between">
-                                  <span>⚠️ Vacunas / Retiros pendientes:</span>
+                                  <span className="inline-flex items-center gap-1"><IconWarning size={12} /> Vacunas / Retiros pendientes:</span>
                                   <span className="font-black font-mono">{alertasLote.length}</span>
                                 </div>
                               ) : (
                                 <div className="text-[11px] text-emerald-400 flex items-center gap-1">
-                                  <span>✅</span>
+                                  <IconCheckCircle size={13} />
                                   <span>Plan sanitario al día en este lote</span>
                                 </div>
                               )}
@@ -2917,7 +2929,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     type="button"
                     onClick={() => setModalEditarPrecioLeche(true)}
                     className="text-sky-400 hover:text-sky-300 font-bold ml-1 underline cursor-pointer text-[10px]">
-                    ✏️ Editar Precio
+                    <span className="inline-flex items-center gap-1"><IconEdit size={11} /> Editar Precio</span>
                   </button>
                 </div>
               </div>
@@ -2938,7 +2950,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <div className="text-[11px] text-slate-500 dark:text-white/40 flex items-center justify-between">
                   <span>{monedasConfig.VES ? `Tasa Bs: ${tasaBCV.toFixed(2)}` : "Configuración de monedas"}</span>
                   <button onClick={() => setModalEditarTasas(true)} className="text-purple-400 hover:text-purple-300 font-bold ml-2 underline cursor-pointer">
-                    ⚙️ Monedas & Tasas
+                    <span className="inline-flex items-center gap-1"><IconSettings size={11} /> Monedas & Tasas</span>
                   </button>
                 </div>
               </div>
@@ -2947,7 +2959,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
             {/* Subsección: Tanque de Leche & Despacho a Cisterna */}
             <div className="apple-glass rounded-3xl p-5 border border-sky-500/20 bg-sky-950/20 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">🥛</span>
+                <span className="text-sky-400"><IconMilk size={26} /></span>
                 <div>
                   <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">
                     Tanque Frío: {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} L en Stock
@@ -2962,13 +2974,13 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   type="button"
                   onClick={() => setModalAjusteTanque(true)}
                   className="px-3 py-1.5 rounded-xl apple-glass border border-white/15 text-slate-700 dark:text-white text-xs font-semibold cursor-pointer">
-                  ⚙️ Calibrar Tanque
+                  <span className="inline-flex items-center gap-1.5"><IconSettings size={13} /> Calibrar</span> Tanque
                 </button>
                 <button
                   type="button"
                   onClick={() => setModalVentaLeche(true)}
                   className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer flex items-center gap-1.5">
-                  <span>🚚 Despachar / Venta Cisterna</span>
+                  <span className="inline-flex items-center gap-1.5"><IconTruck size={14} /> Despachar / Venta Cisterna</span>
                 </button>
               </div>
             </div>
@@ -3016,7 +3028,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                               ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
                               : "bg-sky-500/15 text-sky-400 border border-sky-500/30"
                           }`}>
-                            {o.destino === "VENTA_DIRECTA" ? "⚡ Venta Directa" : "🥛 Tanque"}
+                            {o.destino === "VENTA_DIRECTA" ? "Venta Directa" : "Tanque"}
                           </span>
                         </td>
                         <td className="p-4 font-bold text-sky-500 text-sm">{o.cantidadLitros} L</td>
@@ -3255,14 +3267,14 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     onClick={() => setModalGasto(true)}
                     className="btn-cyber-neon text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg hover:scale-105 transition-all cursor-pointer flex items-center gap-2"
                   >
-                    <span>💸</span>
+                    <IconCoins size={15} />
                     <span>+ Registrar Gasto</span>
                   </button>
                   <button
                     onClick={exportarInventarioXLSX}
                     className="apple-glass px-4 py-2.5 rounded-xl border border-white/20 text-slate-700 dark:text-white text-xs font-bold hover:bg-white/10 cursor-pointer flex items-center gap-1.5"
                   >
-                    <span>📊</span>
+                    <IconChart size={15} />
                     <span>Exportar XLSX</span>
                   </button>
                 </div>
@@ -3274,7 +3286,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <div className="apple-glass rounded-3xl p-6 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-slate-900/60 to-slate-900/80 text-left space-y-2 shadow-lg">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <span>📈</span> Ingresos Semanales
+                      <IconChart size={13} /> Ingresos Semanales
                     </span>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                       {semActual.weekKey}
@@ -3284,9 +3296,9 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     ${semActual.ingresosTotales.toFixed(2)} <span className="text-sm font-normal text-slate-400">USD</span>
                   </div>
                   <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span>🥛 Leche: ${semActual.ingresosLeche.toFixed(2)}</span>
+                    <span className="inline-flex items-center gap-1"><IconMilk size={11} /> Leche: ${semActual.ingresosLeche.toFixed(2)}</span>
                     <span>•</span>
-                    <span>🐮 Ganado: ${semActual.ingresosAnimales.toFixed(2)}</span>
+                    <span className="inline-flex items-center gap-1"><IconCow size={11} /> Ganado: ${semActual.ingresosAnimales.toFixed(2)}</span>
                   </div>
                   {(monedasConfig.VES || monedasConfig.COP) && (
                     <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300 flex flex-col gap-0.5">
@@ -3308,7 +3320,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <div className="apple-glass rounded-3xl p-6 border border-rose-500/30 bg-gradient-to-br from-rose-950/20 via-slate-900/60 to-slate-900/80 text-left space-y-2 shadow-lg">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <span>📉</span> Gastos Semanales
+                      <IconChart size={13} className="rotate-180" /> Gastos Semanales
                     </span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
                       {semActual.gastosCount} registro(s)
@@ -3344,7 +3356,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 }`}>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <span>⚖️</span> Neto de la Semana
+                      <IconScale size={13} /> Neto de la Semana
                     </span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                       semActual.neto >= 0 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
@@ -3380,7 +3392,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                      <span>💸</span> Gastos Operativos Recientes
+                      <IconCoins size={15} /> Gastos Operativos Recientes
                     </h4>
                     <p className="text-[11px] text-slate-500 dark:text-white/40">
                       Registro de egresos por categoría (alimentación, sanidad, jornales, repuestos)
@@ -3396,7 +3408,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
                 {listaGastos.length === 0 ? (
                   <div className="p-8 rounded-3xl border border-white/10 apple-glass text-center space-y-2">
-                    <span className="text-3xl block">📋</span>
+                    <span className="text-amber-400 flex justify-center"><IconFileText size={30} /></span>
                     <h5 className="font-bold text-sm text-white">Sin gastos operativos registrados aún</h5>
                     <p className="text-xs text-slate-400 max-w-md mx-auto">
                       Esta finca no tiene salidas de caja registradas. Presiona el botón "+ Registrar Gasto" para registrar alimentación, sanidad, insumos o jornales.
@@ -3423,7 +3435,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                               <td className="p-4 font-mono">{g.fecha}</td>
                               <td className="p-4">
                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${cat?.colorBadge || "text-slate-300 bg-white/10 border-white/20"}`}>
-                                  <span>{cat?.icon || "📌"}</span>
+                                  {cat ? <cat.icon size={12} /> : <IconTag size={12} />}
                                   <span>{cat ? cat.label.split("/")[0].trim() : g.categoria}</span>
                                 </span>
                               </td>
@@ -3453,7 +3465,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                      <span>📅</span> Flujo de Caja Semanal (Semanas ISO)
+                      <IconCalendar size={13} /> Flujo de Caja Semanal (Semanas ISO)
                     </h4>
                     <p className="text-[11px] text-slate-500 dark:text-white/40">
                       Balance neto: Ingresos (Leche en cisterna + ordeño + ganado) menos Gastos Operativos agrupados por semana ISO
@@ -3526,7 +3538,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
               <div className="space-y-3 pt-4">
                 <div>
                   <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>📑</span> Informes Consolidados & Exportaciones
+                    <IconFileText size={13} /> Informes Consolidados & Exportaciones
                   </h4>
                   <p className="text-[11px] text-slate-500 dark:text-white/40">
                     Informes ejecutivos y de gestión técnica para auditoría, registros sanitarios y fiscales
@@ -3610,7 +3622,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
           <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-md w-full border border-emerald-500/40 text-left space-y-5 shadow-2xl bg-slate-900/95 text-white">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
-                <span className="text-xl">💱</span>
+                <span className="text-emerald-400"><IconCoins size={20} /></span>
                 <div>
                   <h3 className="font-['Outfit'] font-black text-lg text-white">
                     Configuración de Monedas & Tasas
@@ -3690,6 +3702,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <input
                     name="tasaBcv"
                     type="number"
+                    onFocus={e => e.target.select()}
                     step="0.01"
                     min="0.01"
                     defaultValue={tasaBCV}
@@ -3710,6 +3723,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <input
                     name="tasaCop"
                     type="number"
+                    onFocus={e => e.target.select()}
                     step="1"
                     min="1"
                     defaultValue={tasaCOP}
@@ -3745,7 +3759,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
           <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-sm w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">🥛</span>
+                <span className="text-sky-400"><IconMilk size={26} /></span>
                 <div>
                   <h3 className="font-['Outfit'] font-black text-lg text-white">
                     Precio Base de la Leche
@@ -3781,6 +3795,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <input
                     name="precioLeche"
                     type="number"
+                    onFocus={e => e.target.select()}
                     step="0.01"
                     min="0.01"
                     defaultValue={precioLecheUSD}
@@ -3818,7 +3833,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
           <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white font-['Inter']">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">🚚</span>
+                <span className="text-sky-400"><IconTruck size={22} /></span>
                 <div>
                   <h3 className="font-['Outfit'] font-black text-lg text-white">
                     Despacho de Leche en Tanque
@@ -3873,8 +3888,9 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     min="1"
                     max={Number(tanqueLeche?.stockActualLitros) || 999999}
                     required
-                    value={formVentaLeche.litrosVendidos}
+                    value={formVentaLeche.litrosVendidos || ""}
                     onChange={e => setFormVentaLeche({ ...formVentaLeche, litrosVendidos: Number(e.target.value) })}
+                    onFocus={e => e.target.select()}
                     className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-sky-400 font-mono font-bold text-sm focus:border-sky-500 focus:outline-none"
                   />
                 </div>
@@ -3899,6 +3915,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="absolute left-3 top-2.5 text-emerald-400 font-bold">$</span>
                     <input
                       type="number"
+                      onFocus={e => e.target.select()}
                       step="0.0001"
                       min="0.0001"
                       required
@@ -3969,7 +3986,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <button
                   type="submit"
                   className="px-5 py-2.5 rounded-xl btn-cyber-neon text-white text-xs font-bold shadow-lg transition-all cursor-pointer flex items-center gap-1.5">
-                  <span>🚚 Confirmar Despacho & Descontar Stock</span>
+                  <span className="inline-flex items-center gap-1.5"><IconTruck size={14} /> Confirmar Despacho & Descontar Stock</span>
                 </button>
               </div>
             </form>
@@ -3983,7 +4000,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
           <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-md w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white font-['Inter']">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
-                <span className="text-xl">⚙️</span>
+                <span className="text-sky-400"><IconSettings size={20} /></span>
                 <div>
                   <h3 className="font-['Outfit'] font-black text-lg text-white">
                     Calibrar Tanque de Leche
@@ -4015,6 +4032,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <input
                   name="capacidad"
                   type="number"
+                  onFocus={e => e.target.select()}
                   step="50"
                   min="100"
                   defaultValue={tanqueLeche?.capacidadLitros ?? 2000}
@@ -4028,6 +4046,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <input
                   name="temperatura"
                   type="number"
+                  onFocus={e => e.target.select()}
                   step="0.1"
                   defaultValue={tanqueLeche?.temperaturaCelsius ?? 4.0}
                   required
@@ -4040,6 +4059,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <input
                   name="stock"
                   type="number"
+                  onFocus={e => e.target.select()}
                   step="0.5"
                   min="0"
                   defaultValue={tanqueLeche?.stockActualLitros ?? 0}
@@ -4100,7 +4120,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
                     }`}
                   >
-                    <span>🐣</span>
+                    <IconSprout size={15} />
                     <span>Nacimiento en Finca</span>
                   </button>
                   <button
@@ -4112,7 +4132,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
                     }`}
                   >
-                    <span>🛒</span>
+                    <IconCart size={15} />
                     <span>Ingreso por Compra</span>
                   </button>
                 </div>
@@ -4122,7 +4142,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
               {formAnimal.origen === "NACIMIENTO" ? (
                 <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-3">
                   <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
-                    <span>🌱</span>
+                    <IconSprout size={13} />
                     <span>Datos de Nacimiento & Trazabilidad Maternal</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -4154,7 +4174,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
               ) : (
                 <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 space-y-3">
                   <div className="text-[11px] font-bold text-sky-400 flex items-center gap-1.5">
-                    <span>💵</span>
+                    <IconCoins size={13} />
                     <span>Datos de Adquisición & Proveedor</span>
                   </div>
                   <div>
@@ -4173,6 +4193,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       <label className="text-slate-400 block mb-1">Precio de Compra (USD) *</label>
                       <input
                         type="number"
+                        onFocus={e => e.target.select()}
                         step="0.01"
                         min="0"
                         required
@@ -4224,10 +4245,16 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <label className="text-slate-400 block mb-1">Raza</label>
                   <input
                     type="text"
+                    list="razas-bovinas-catalogo"
                     value={formAnimal.raza}
                     onChange={e => setFormAnimal({ ...formAnimal, raza: e.target.value })}
+                    onFocus={e => e.target.select()}
+                    placeholder="Ej. Brahman"
                     className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
                   />
+                  <datalist id="razas-bovinas-catalogo">
+                    {RAZAS_BOVINAS_COMUNES.map(r => <option key={r} value={r} />)}
+                  </datalist>
                 </div>
                 <div>
                   <label className="text-slate-400 block mb-1">Sexo</label>
@@ -4261,6 +4288,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <label className="text-slate-400 block mb-1">Peso Inicial (kg)</label>
                   <input
                     type="number"
+                    onFocus={e => e.target.select()}
                     value={formAnimal.pesoActual}
                     onChange={e => setFormAnimal({ ...formAnimal, pesoActual: Number(e.target.value) })}
                     className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
@@ -4293,31 +4321,33 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 </p>
               </div>
 
-              {/* Estados Reproductivo & Productivo */}
-              <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
-                <div>
-                  <label className="text-slate-400 block mb-1">Estado Reproductivo</label>
-                  <select
-                    value={formAnimal.estadoReproductivo}
-                    onChange={e => setFormAnimal({ ...formAnimal, estadoReproductivo: e.target.value as any })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs">
-                    <option value="VACIA">Vacía</option>
-                    <option value="PREÑADA">Preñada</option>
-                    <option value="EN_ESPERA">En Espera (Celo / IA)</option>
-                  </select>
+              {/* Estados Reproductivo & Productivo — solo aplican a hembras */}
+              {formAnimal.sexo === "HEMBRA" && (
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+                  <div>
+                    <label className="text-slate-400 block mb-1">Estado Reproductivo</label>
+                    <select
+                      value={formAnimal.estadoReproductivo}
+                      onChange={e => setFormAnimal({ ...formAnimal, estadoReproductivo: e.target.value as any })}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs">
+                      <option value="VACIA">Vacía</option>
+                      <option value="PREÑADA">Preñada</option>
+                      <option value="EN_ESPERA">En Espera (Celo / IA)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Estado Productivo</label>
+                    <select
+                      value={formAnimal.estadoProductivo}
+                      onChange={e => setFormAnimal({ ...formAnimal, estadoProductivo: e.target.value as any })}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs">
+                      <option value="SECA">Seca</option>
+                      <option value="ORDEÑO">En Ordeño</option>
+                      <option value="CRIANDO">Criando / Amamantando</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Estado Productivo</label>
-                  <select
-                    value={formAnimal.estadoProductivo}
-                    onChange={e => setFormAnimal({ ...formAnimal, estadoProductivo: e.target.value as any })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs">
-                    <option value="SECA">Seca</option>
-                    <option value="ORDEÑO">En Ordeño</option>
-                    <option value="CRIANDO">Criando / Amamantando</option>
-                  </select>
-                </div>
-              </div>
+              )}
 
               <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
                 <button
@@ -4420,6 +4450,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <label className="text-slate-400 block mb-1">Superficie (Hectáreas) *</label>
                   <input
                     type="number"
+                    onFocus={e => e.target.select()}
                     step="0.1"
                     required
                     value={formPotrero.areaHectareas}
@@ -4431,6 +4462,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <label className="text-slate-400 block mb-1">Capacidad Animal Máxima</label>
                   <input
                     type="number"
+                    onFocus={e => e.target.select()}
                     value={formPotrero.capacidadAnimales}
                     onChange={e => setFormPotrero({ ...formPotrero, capacidadAnimales: Number(e.target.value) })}
                     className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
@@ -4544,6 +4576,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <label className="text-slate-400 block mb-1">Litros Ordeñados *</label>
                   <input
                     type="number"
+                    onFocus={e => e.target.select()}
                     step="0.1"
                     required
                     value={formOrdeno.cantidadLitros}
@@ -4558,6 +4591,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <label className="text-slate-400 block mb-1">% Grasa</label>
                   <input
                     type="number"
+                    onFocus={e => e.target.select()}
                     step="0.1"
                     value={formOrdeno.porcentajeGrasa}
                     onChange={e => setFormOrdeno({ ...formOrdeno, porcentajeGrasa: Number(e.target.value) })}
@@ -4568,6 +4602,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <label className="text-slate-400 block mb-1">Precio x Litro (USD)</label>
                   <input
                     type="number"
+                    onFocus={e => e.target.select()}
                     step="0.01"
                     value={formOrdeno.precioVentaLitro}
                     onChange={e => setFormOrdeno({ ...formOrdeno, precioVentaLitro: Number(e.target.value) })}
@@ -4587,7 +4622,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         ? "bg-sky-500/20 border-sky-400 text-sky-400 shadow-md shadow-sky-500/20"
                         : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
                     }`}>
-                    <span>🥛 Al Tanque (Stock)</span>
+                    <span className="inline-flex items-center gap-1.5"><IconMilk size={13} /> Al Tanque (Stock)</span>
                   </button>
                   <button
                     type="button"
@@ -4597,7 +4632,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         ? "bg-amber-500/20 border-amber-400 text-amber-400 shadow-md shadow-amber-500/20"
                         : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
                     }`}>
-                    <span>⚡ Venta Directa</span>
+                    <span className="inline-flex items-center gap-1.5"><IconBolt size={13} /> Venta Directa</span>
                   </button>
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">
@@ -4650,6 +4685,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <label className="text-slate-400 block mb-1">Nuevo Peso (kg) *</label>
                 <input
                   type="number"
+                  onFocus={e => e.target.select()}
                   step="0.5"
                   required
                   value={pesoNuevo}
@@ -4751,7 +4787,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
             <div className="apple-glass rounded-3xl p-5 sm:p-7 max-w-xl w-full border border-emerald-500/40 text-left space-y-4 my-auto max-h-[92vh] flex flex-col font-['Inter']">
               <div className="flex items-center justify-between pb-3 border-b border-white/10">
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">💉</span>
+                  <span className="text-emerald-400"><IconSyringe size={20} /></span>
                   <div>
                     <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
                       Aplicar Tratamiento Sanitario / Biológico
@@ -4954,6 +4990,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                           <label className="text-rose-400 block mb-1 text-[10px] font-bold">Retiro Leche (días)</label>
                           <input
                             type="number"
+                            onFocus={e => e.target.select()}
                             min="0"
                             value={nuevaVacunaForm.diasRetiroLeche}
                             onChange={e => setNuevaVacunaForm({ ...nuevaVacunaForm, diasRetiroLeche: Number(e.target.value) })}
@@ -4964,6 +5001,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                           <label className="text-amber-400 block mb-1 text-[10px] font-bold">Retiro Carne (días)</label>
                           <input
                             type="number"
+                            onFocus={e => e.target.select()}
                             min="0"
                             value={nuevaVacunaForm.diasRetiroCarne}
                             onChange={e => setNuevaVacunaForm({ ...nuevaVacunaForm, diasRetiroCarne: Number(e.target.value) })}
@@ -4974,6 +5012,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                           <label className="text-sky-400 block mb-1 text-[10px] font-bold">Refuerzo (días)</label>
                           <input
                             type="number"
+                            onFocus={e => e.target.select()}
                             min="0"
                             value={nuevaVacunaForm.diasParaRefuerzo}
                             onChange={e => setNuevaVacunaForm({ ...nuevaVacunaForm, diasParaRefuerzo: Number(e.target.value) })}
@@ -5016,7 +5055,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                           ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
                           : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                       }`}>
-                        <span className="block text-[10px] text-slate-400">🥛 Retiro Leche</span>
+                        <span className="text-[10px] text-slate-400 flex items-center justify-center gap-1"><IconMilk size={10} /> Retiro Leche</span>
                         <span className="font-bold font-mono text-xs">{vacunaSel.diasRetiroLeche ?? 0} días</span>
                       </div>
 
@@ -5025,12 +5064,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
                           ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
                           : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                       }`}>
-                        <span className="block text-[10px] text-slate-400">🥩 Retiro Carne</span>
+                        <span className="text-[10px] text-slate-400 flex items-center justify-center gap-1"><IconMeat size={10} /> Retiro Carne</span>
                         <span className="font-bold font-mono text-xs">{vacunaSel.diasRetiroCarne ?? 0} días</span>
                       </div>
 
                       <div className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-300 text-center">
-                        <span className="block text-[10px] text-slate-400">🔄 Próx. Refuerzo</span>
+                        <span className="text-[10px] text-slate-400 flex items-center justify-center gap-1"><IconRefresh size={10} /> Próx. Refuerzo</span>
                         <span className="font-bold font-mono text-xs">{vacunaSel.diasParaRefuerzo ?? 0} días</span>
                       </div>
                     </div>
@@ -5053,6 +5092,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <label className="text-slate-400 block mb-1">Costo Total Estimado (USD)</label>
                     <input
                       type="number"
+                      onFocus={e => e.target.select()}
                       step="0.1"
                       min="0"
                       value={formVacuna.costo}
@@ -5173,7 +5213,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-purple-500/40 text-left space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <span className="text-xl">🔥</span>
+                <span className="text-rose-400"><IconFire size={20} /></span>
                 <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
                   Detección de Celo
                 </h3>
@@ -5245,8 +5285,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   placeholder="Ej. Detectado AM → Inseminar PM (12 horas después)"
                   className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-[11px]"
                 />
-                <p className="text-[10px] text-purple-400 mt-1">
-                  💡 Al guardar, el estado reproductivo de la hembra cambiará automáticamente a <strong>EN_ESPERA</strong>.
+                <p className="text-[10px] text-purple-400 mt-1 flex items-start gap-1">
+                  <IconBulb size={12} className="shrink-0 mt-0.5" /> Al guardar, el estado reproductivo de la hembra cambiará automáticamente a <strong>EN_ESPERA</strong>.
                 </p>
               </div>
 
@@ -5274,7 +5314,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-rose-500/40 text-left space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <span className="text-xl">🚨</span>
+                <span className="text-rose-400"><IconWarning size={20} /></span>
                 <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
                   Diagnóstico y Tratamiento de Mastitis
                 </h3>
@@ -5347,6 +5387,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <label className="text-rose-400 block mb-1 font-bold">Días de Retiro de Leche *</label>
                   <input
                     type="number"
+                    onFocus={e => e.target.select()}
                     min="0"
                     max="30"
                     required
@@ -5372,6 +5413,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <label className="text-slate-400 block mb-1">Costo Estimado Tratamiento (USD)</label>
                   <input
                     type="number"
+                    onFocus={e => e.target.select()}
                     step="0.5"
                     min="0"
                     value={formMastitis.costo}
@@ -5393,7 +5435,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
               </div>
 
               <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-300 flex items-center gap-2">
-                <span>⛔</span>
+                <IconWarning size={14} />
                 <span>La leche de esta vaca quedará bloqueada en las alertas sanitarias y en el modo de ordeño diario durante el período de retiro.</span>
               </div>
 
@@ -5422,7 +5464,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div>
                 <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
-                  <span>🏷️</span>
+                  <IconTag size={16} />
                   <span>Despacho por Venta / Beneficio</span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-white/60 mt-1">
@@ -5480,6 +5522,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <label className="text-slate-400 block mb-1">Peso en Báscula (kg)</label>
                   <input
                     type="number"
+                    onFocus={e => e.target.select()}
                     step="1"
                     min="0"
                     placeholder="Ej. 480"
@@ -5492,6 +5535,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <label className="text-slate-400 block mb-1">Precio Total (USD) *</label>
                   <input
                     type="number"
+                    onFocus={e => e.target.select()}
                     step="0.01"
                     min="0"
                     required
@@ -5612,7 +5656,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       className={`flex-1 py-2 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
                         vaqueraDestino === "TANQUE" ? "bg-sky-500 text-slate-950 font-black shadow-md" : "bg-white/5 text-slate-300 hover:bg-white/10"
                       }`}>
-                      🥛 Tanque
+                      <span className="inline-flex items-center gap-1"><IconMilk size={11} /> Tanque</span>
                     </button>
                     <button
                       type="button"
@@ -5620,7 +5664,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       className={`flex-1 py-2 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
                         vaqueraDestino === "VENTA_DIRECTA" ? "bg-amber-500 text-slate-950 font-black shadow-md" : "bg-white/5 text-slate-300 hover:bg-white/10"
                       }`}>
-                      ⚡ Directa
+                      <span className="inline-flex items-center gap-1"><IconBolt size={11} /> Directa</span>
                     </button>
                   </div>
                 </div>
@@ -5631,6 +5675,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="absolute left-3 top-2 text-emerald-400 font-bold">$</span>
                     <input
                       type="number"
+                      onFocus={e => e.target.select()}
                       step="0.01"
                       value={vaqueraPrecioUSD}
                       onChange={e => setVaqueraPrecioUSD(Math.max(0, Number(e.target.value)))}
@@ -5648,6 +5693,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       <span className="absolute left-3 top-2 text-purple-400 font-bold">Bs.</span>
                       <input
                         type="number"
+                        onFocus={e => e.target.select()}
                         step="0.5"
                         value={vaqueraTasaVES}
                         onChange={e => setVaqueraTasaVES(Math.max(1, Number(e.target.value)))}
@@ -5659,6 +5705,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       <span className="absolute left-3 top-2 text-sky-400 font-bold text-[10px]">COP</span>
                       <input
                         type="number"
+                        onFocus={e => e.target.select()}
                         step="10"
                         value={tasaCOP}
                         readOnly
@@ -5697,7 +5744,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-0.5">
                   <span className="text-slate-400 text-[10px] uppercase block">Destino Asignado</span>
                   <div className="font-['Outfit'] font-bold text-lg text-white">
-                    {vaqueraDestino === "TANQUE" ? "🥛 Al Tanque" : "⚡ Venta Directa"}
+                    {vaqueraDestino === "TANQUE" ? "Al Tanque" : "Venta Directa"}
                   </div>
                   <span className="text-[10px] text-slate-400 block">
                     Prom. {promedioPorVaca.toFixed(1)} L/vaca
@@ -5772,6 +5819,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                               <input
                                 id={`vaquera-input-am-${idx}`}
                                 type="number"
+                                onFocus={e => e.target.select()}
                                 step="0.1"
                                 placeholder="0.0"
                                 value={fila.litrosManana}
@@ -5800,6 +5848,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                               <input
                                 id={`vaquera-input-pm-${idx}`}
                                 type="number"
+                                onFocus={e => e.target.select()}
                                 step="0.1"
                                 placeholder="0.0"
                                 value={fila.litrosTarde}
@@ -5914,7 +5963,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
           <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-emerald-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">💸</span>
+                <span className="text-emerald-400"><IconCoins size={24} /></span>
                 <div>
                   <h3 className="font-['Outfit'] font-black text-lg text-white">
                     Registrar Gasto Operativo
@@ -5944,7 +5993,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 >
                   {CATEGORIAS_GASTO_GANADERIA.map(cat => (
                     <option key={cat.id} value={cat.id}>
-                      {cat.icon} {cat.label}
+                      {cat.label}
                     </option>
                   ))}
                 </select>
@@ -5973,6 +6022,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="absolute left-3 top-2.5 text-emerald-400 font-bold">$</span>
                     <input
                       type="number"
+                      onFocus={e => e.target.select()}
                       step="0.01"
                       min="0.01"
                       required
@@ -6031,7 +6081,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <button
                   type="submit"
                   className="px-5 py-2.5 rounded-xl btn-cyber-neon text-white text-xs font-bold shadow-lg transition-all cursor-pointer flex items-center gap-1.5">
-                  <span>💾 Guardar Gasto Operativo</span>
+                  <span>Guardar Gasto Operativo</span>
                 </button>
               </div>
             </form>
