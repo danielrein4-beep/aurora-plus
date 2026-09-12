@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import {
   IconHardware, IconPrescription, IconRetail, IconCard, IconSearch, IconTrash,
   IconCheck, IconWarning, IconClose, IconUsers, IconFileText, IconHourglass,
-  IconDownload, IconRefresh, IconCheckCircle, IconBank,
+  IconDownload, IconRefresh, IconCheckCircle, IconBank, IconChart,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
@@ -20,10 +20,12 @@ import {
   crearProveedorRepuesto,
   listarComprasRepuesto,
   registrarCompraRepuesto,
+  listarMovimientos,
   type RepuestoItem,
   type PresentacionRepuesto,
   type MovimientoRepuesto,
   type ProveedorRepuesto,
+  type MovimientoCaja,
 } from "../api";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -260,6 +262,125 @@ function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaA
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// VISTA GENERAL (DASHBOARD): tarjetas de resumen + alertas de stock bajo —
+// lee de datos que ya viven en el componente padre (productos ya cargados,
+// ingresos de caja ya cargados), no dispara peticiones propias.
+// ══════════════════════════════════════════════════════════════════════════
+function DashboardGeneralComercio({ productos, ingresosCaja, onIrAInventario }: {
+  productos: ProductoComercio[];
+  ingresosCaja: MovimientoCaja[];
+  onIrAInventario: () => void;
+}) {
+  const sumarPorMoneda = (movimientos: MovimientoCaja[]) => {
+    const acc: Record<string, number> = {};
+    for (const m of movimientos) acc[m.moneda] = (acc[m.moneda] || 0) + Number(m.monto);
+    return acc;
+  };
+
+  const { ventasHoy, ventasSemana } = useMemo(() => {
+    const ahora = new Date();
+    const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    const inicioSemana = new Date(inicioHoy);
+    inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay());
+    return {
+      ventasHoy: sumarPorMoneda(ingresosCaja.filter((m) => new Date(m.fechaRegistro) >= inicioHoy)),
+      ventasSemana: sumarPorMoneda(ingresosCaja.filter((m) => new Date(m.fechaRegistro) >= inicioSemana)),
+    };
+  }, [ingresosCaja]);
+
+  const productosBajoStock = useMemo(
+    () => productos.filter((p) => p.stock <= p.stockMinimo).sort((a, b) => a.stock / Math.max(a.stockMinimo, 1) - b.stock / Math.max(b.stockMinimo, 1)),
+    [productos]
+  );
+
+  const fmtMonedas = (obj: Record<string, number>) => {
+    const entradas = Object.entries(obj);
+    if (entradas.length === 0) return "$0.00";
+    return entradas.map(([m, v]) => `${m === "USD" ? "$" : m + " "}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(" · ");
+  };
+
+  return (
+    <div className="space-y-5 animate-fade-in">
+      <div>
+        <h2 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Vista General</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Resumen de tu negocio en tiempo real</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas de Hoy</span>
+            <IconChart size={16} className="text-teal-500" />
+          </div>
+          <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasHoy)}</div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas de la Semana</span>
+            <IconChart size={16} className="text-cyan-500" />
+          </div>
+          <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasSemana)}</div>
+        </div>
+
+        <button type="button" onClick={onIrAInventario} className="text-left bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5 cursor-pointer hover:border-teal-500/50 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Productos en Stock</span>
+            <IconBank size={16} className="text-emerald-500" />
+          </div>
+          <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{productos.length}</div>
+        </button>
+
+        <div className={`rounded-2xl p-5 border shadow-sm space-y-1.5 ${productosBajoStock.length > 0 ? "bg-amber-500/10 border-amber-500/30" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"}`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-[11px] font-bold uppercase tracking-wider ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}>Alertas de Stock Bajo</span>
+            <IconWarning size={16} className={productosBajoStock.length > 0 ? "text-amber-500" : "text-slate-400"} />
+          </div>
+          <div className={`font-['Outfit'] font-black text-xl ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"}`}>{productosBajoStock.length}</div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <h3 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
+            <IconWarning size={15} className="text-amber-500" /> Alertas de Inventario Bajo
+          </h3>
+          <button type="button" onClick={onIrAInventario} className="text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer">
+            Ver Inventario →
+          </button>
+        </div>
+        {productosBajoStock.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-400">✅ Todo el inventario está por encima del mínimo configurado.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase text-[10px]">
+                  <th className="p-3">Código</th>
+                  <th className="p-3">Producto</th>
+                  <th className="p-3 text-right">Stock Actual</th>
+                  <th className="p-3 text-right">Stock Mínimo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {productosBajoStock.map((p) => (
+                  <tr key={p.id}>
+                    <td className="p-3 font-mono text-slate-500 dark:text-slate-400">{p.codigo}</td>
+                    <td className="p-3 font-bold text-slate-900 dark:text-white">{p.nombre}</td>
+                    <td className="p-3 text-right font-bold text-amber-600 dark:text-amber-400">{p.stock} {p.unidadMedida || ""}</td>
+                    <td className="p-3 text-right text-slate-500 dark:text-slate-400">{p.stockMinimo}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL: COMERCIO & RETAIL APP
 // ══════════════════════════════════════════════════════════════════════════
 export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
@@ -297,7 +418,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const tasaCop = Number(tasaCopVal) || 4180;
 
   // Tabs de Navegación
-  const [tab, setTab] = useState<"pos" | "inventario" | "clientes" | "cierre">("pos");
+  const [tab, setTab] = useState<"general" | "pos" | "inventario" | "clientes" | "cierre">("general");
 
   // Estado del Catálogo y Clientes
   const [productos, setProductos] = useState<ProductoComercio[]>(() => {
@@ -347,6 +468,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [presentacionesCargando, setPresentacionesCargando] = useState(false);
   const [modalCompraProveedor, setModalCompraProveedor] = useState(false);
   const [proveedoresRepuesto, setProveedoresRepuesto] = useState<ProveedorRepuesto[]>([]);
+  const [ingresosCaja, setIngresosCaja] = useState<MovimientoCaja[]>([]);
   const [cargandoCompra, setCargandoCompra] = useState(false);
   const [toast, setToast] = useState<{ tipo: "success" | "error" | "info"; mensaje: string } | null>(null);
 
@@ -394,10 +516,20 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     }
   };
 
+  // Ingresos de caja (ventas ya cobradas) para las tarjetas de la Vista General — es
+  // lectura en segundo plano para un panel informativo, no una acción del usuario, así
+  // que un fallo silencioso acá solo deja las tarjetas en $0. Se reconsulta después de
+  // cada venta (ver ejecutarCobro) para que "Ventas de Hoy" refleje el cobro recién hecho.
+  const cargarIngresosCaja = () => {
+    if (!user?.tenantId) return;
+    listarMovimientos(user.tenantId, "INGRESO").then(setIngresosCaja).catch(() => setIngresosCaja([]));
+  };
+
   useEffect(() => {
     if (user?.tenantId) {
       cargarRepuestosBackend();
       listarProveedoresRepuesto().then(setProveedoresRepuesto).catch(() => {});
+      cargarIngresosCaja();
     }
   }, [user?.tenantId, perfilActivo]);
 
@@ -606,9 +738,16 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       monedaVuelto,
     };
 
-    let errorSincronizacion = false;
-
-    // Registrar en backend Spring Boot para Ferretería & Retail si hay tenant activo
+    // Registrar en backend Spring Boot para Ferretería & Retail si hay tenant activo.
+    // REGLA DE ORO: el inventario real vive en el backend (con bloqueo pesimista contra
+    // sobreventa concurrente, ver RepuestoConversionService). Si el backend RECHAZA la
+    // venta (ej. "Stock insuficiente"), la venta NO se completó — antes este catch solo
+    // mostraba un toast de advertencia y de todos modos seguía como si hubiera sido
+    // exitosa (limpiaba el carrito y mostraba "¡Venta Exitosa!"), dejando creer al
+    // cajero que vendió algo que el sistema en realidad bloqueó. Ahora un fallo de
+    // sincronización DETIENE el cobro por completo: no se limpia el carrito, no se
+    // descuenta stock local, y se muestra el motivo exacto para que el cajero corrija
+    // la cantidad o cancele.
     if (user?.tenantId) {
       try {
         for (const item of carrito) {
@@ -621,27 +760,28 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           }
         }
         cargarRepuestosBackend();
+        cargarIngresosCaja();
         mostrarToast("Venta registrada y sincronizada en base de datos (Kárdex y Caja actualizados)", "success");
       } catch (err: any) {
         console.error("Fallo al sincronizar venta en backend:", err);
-        errorSincronizacion = true;
-        mostrarToast("⚠️ La venta se registró localmente pero no se sincronizó — revisa tu conexión", "error");
+        cargarRepuestosBackend(); // refresca el stock real por si otra venta concurrente ya lo cambió
+        alert(`❌ No se pudo completar la venta: ${err instanceof Error ? err.message : "error desconocido"}\n\nEl carrito NO se vació — ajusta la cantidad o cancela.`);
+        return;
       }
     }
 
-    // Solo descontar inventario localmente si NO hubo fallo del backend
-    if (!errorSincronizacion) {
-      setProductos((prev) =>
-        prev.map((prod) => {
-          const items = carrito.filter((c) => c.productoId === prod.id);
-          if (items.length > 0) {
-            const totalCant = items.reduce((s, it) => s + (it.factorConversion ? it.cantidad * it.factorConversion : it.cantidad), 0);
-            return { ...prod, stock: Math.max(0, prod.stock - totalCant) };
-          }
-          return prod;
-        })
-      );
-    }
+    // Llegar aquí significa que el backend confirmó la venta (o no hay tenant activo,
+    // ej. modo demo) — recién ahora es seguro descontar el stock mostrado localmente.
+    setProductos((prev) =>
+      prev.map((prod) => {
+        const items = carrito.filter((c) => c.productoId === prod.id);
+        if (items.length > 0) {
+          const totalCant = items.reduce((s, it) => s + (it.factorConversion ? it.cantidad * it.factorConversion : it.cantidad), 0);
+          return { ...prod, stock: Math.max(0, prod.stock - totalCant) };
+        }
+        return prod;
+      })
+    );
 
     // Si es crédito, sumar a saldo del cliente
     if (esCredito && clienteSel.id !== "c-1") {
@@ -692,89 +832,88 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-['Inter'] selection:bg-teal-500 selection:text-white">
-      
-      {/* ── HEADER SUPERIOR COMERCIAL: GLASSMORPHISM & MULTI-TASA ── */}
-      <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 shadow-lg">
-        
-        {/* Izquierda: Logo + Nombre del Negocio */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onSalir}
-            className="flex items-center gap-2.5 text-left group cursor-pointer"
-            title="Volver al Hub General"
-          >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-400 p-0.5 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-              <div className="w-full h-full bg-slate-50 dark:bg-slate-950 rounded-[10px] flex items-center justify-center">
-                {perfilActivo === "farmacia" ? <IconPrescription size={18} className="text-teal-400" /> :
-                 perfilActivo === "ferreteria" || perfilActivo === "repuestos" ? <IconHardware size={18} className="text-teal-400" /> :
-                 <IconRetail size={18} className="text-teal-400" />}
-              </div>
-            </div>
-            <div>
-              <div className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white leading-tight flex items-center gap-1.5">
-                <span>{nombreLocal}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-400 border border-teal-500/30 font-mono">
-                  {perfilActivo.toUpperCase()}
-                </span>
-              </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 tracking-wider uppercase">
-                Aurora Retail · Sistema de Mostrador
-              </div>
-            </div>
-          </button>
+    <div className="h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-['Inter'] selection:bg-teal-500 selection:text-white overflow-hidden">
 
-        </div>
+      {/* ══════════════════════ SIDEBAR FIJO ══════════════════════ */}
+      <aside className="w-64 flex-shrink-0 h-screen flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-lg">
+        {/* Logo + Nombre del Negocio */}
+        <button
+          onClick={onSalir}
+          className="flex items-center gap-2.5 text-left group cursor-pointer p-4 border-b border-slate-200 dark:border-slate-800"
+          title="Volver al Hub General"
+        >
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-400 p-0.5 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform flex-shrink-0">
+            <div className="w-full h-full bg-slate-50 dark:bg-slate-950 rounded-[10px] flex items-center justify-center">
+              {perfilActivo === "farmacia" ? <IconPrescription size={18} className="text-teal-400" /> :
+               perfilActivo === "ferreteria" || perfilActivo === "repuestos" ? <IconHardware size={18} className="text-teal-400" /> :
+               <IconRetail size={18} className="text-teal-400" />}
+            </div>
+          </div>
+          <div className="min-w-0">
+            <div className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white leading-tight truncate">
+              {nombreLocal}
+            </div>
+            <div className="text-[9px] text-slate-500 dark:text-slate-400 tracking-wider uppercase truncate">
+              Aurora Retail · {perfilActivo.toUpperCase()}
+            </div>
+          </div>
+        </button>
 
-        {/* Centro: Pestañas Principales */}
-        <nav className="flex items-center gap-1 bg-slate-100/70 dark:bg-slate-800/60 p-1 rounded-full border border-slate-300/60 dark:border-slate-700/50 text-xs">
-          <button
-            onClick={() => setTab("pos")}
-            className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              tab === "pos" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-500 dark:text-slate-400 hover:text-white"
-            }`}
-          >
-            <span>🛒 POS Mostrador</span>
-          </button>
-          <button
-            onClick={() => setTab("inventario")}
-            className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              tab === "inventario" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-500 dark:text-slate-400 hover:text-white"
-            }`}
-          >
-            <span>📦 Inventario & Stock</span>
-          </button>
-          <button
-            onClick={() => setTab("clientes")}
-            className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              tab === "clientes" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-500 dark:text-slate-400 hover:text-white"
-            }`}
-          >
-            <span>👥 Clientes & Crédito</span>
-          </button>
-          <button
-            onClick={() => setTab("cierre")}
-            className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              tab === "cierre" ? "bg-teal-500 text-slate-950 shadow-md" : "text-slate-500 dark:text-slate-400 hover:text-white"
-            }`}
-          >
-            <span>🔒 Cierre Z</span>
-          </button>
-          <button
-            type="button"
-            title="Próximamente: tu catálogo público con precios y código QR para que tus clientes lo vean desde el celular"
-            onClick={() => mostrarToast("🔒 Catálogo QR — muy pronto vas a poder compartir tus precios con un código QR. ¡Ya viene en camino!", "info")}
-            className="px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 opacity-70"
-          >
-            <span>🔒 Catálogo QR</span>
-            <span className="text-[9px] font-black uppercase tracking-wider bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full">
-              Próximamente
-            </span>
-          </button>
+        {/* Navegación principal */}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+          {([
+            { id: "general" as const, icono: "📊", etiqueta: "Vista General" },
+            { id: "pos" as const, icono: "🛒", etiqueta: "POS Mostrador" },
+            { id: "inventario" as const, icono: "📦", etiqueta: "Inventario & Stock" },
+            { id: "clientes" as const, icono: "👥", etiqueta: "Clientes & Crédito" },
+            { id: "cierre" as const, icono: "🔒", etiqueta: "Cierres & Reportes" },
+          ]).map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setTab(item.id)}
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+                tab === item.id
+                  ? "bg-teal-500 text-slate-950 shadow-md"
+                  : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <span>{item.icono}</span>
+              <span>{item.etiqueta}</span>
+            </button>
+          ))}
+
+          <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-800">
+            <button
+              type="button"
+              title="Próximamente: tu catálogo público con precios y código QR para que tus clientes lo vean desde el celular"
+              onClick={() => mostrarToast("🔒 Catálogo QR — muy pronto vas a poder compartir tus precios con un código QR. ¡Ya viene en camino!", "info")}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 opacity-70"
+            >
+              <span>🔒</span>
+              <span className="flex-1 text-left">Catálogo QR</span>
+              <span className="text-[8px] font-black uppercase tracking-wider bg-violet-500/20 text-violet-500 dark:text-violet-300 px-1.5 py-0.5 rounded-full">
+                Pronto
+              </span>
+            </button>
+          </div>
         </nav>
 
-        {/* Derecha: Multi-Tasa Badge + Salir */}
-        <div className="flex items-center gap-2.5">
+        {/* Salir al Hub */}
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+          <button
+            onClick={onSalir}
+            className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+          >
+            ← Salir al Hub
+          </button>
+        </div>
+      </aside>
+
+      {/* ══════════════════════ COLUMNA DERECHA: TOPBAR + CONTENIDO ══════════════════════ */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+
+        {/* ── TOPBAR LIMPIO: SOLO TASAS, TEMA Y PERFIL ── */}
+        <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-end gap-2.5 shadow-sm flex-shrink-0">
           {/* Badge de Tasa Flotante */}
           <div className="relative">
             <button
@@ -855,21 +994,24 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           </div>
 
           <ThemeToggle />
+        </header>
 
-          <button
-            onClick={onSalir}
-            className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
-          >
-            Salir al Hub
-          </button>
-        </div>
-      </header>
+        {/* ── CONTENIDO SEGÚN LA PESTAÑA SELECCIONADA ── */}
+        <main className="flex-1 w-full p-4 sm:p-6 overflow-y-auto flex flex-col">
 
-      {/* ── CONTENIDO SEGÚN LA PESTAÑA SELECCIONADA ── */}
-      <main className="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 overflow-hidden flex flex-col">
-        
-        {/* ══════════════════════════════════════════════════════════════════
-            TAB 1: POS MOSTRADOR ULTRA RÁPIDO
+          {/* ══════════════════════════════════════════════════════════════════
+              TAB 0: VISTA GENERAL (DASHBOARD)
+              ══════════════════════════════════════════════════════════════════ */}
+          {tab === "general" && (
+            <DashboardGeneralComercio
+              productos={productos}
+              ingresosCaja={ingresosCaja}
+              onIrAInventario={() => setTab("inventario")}
+            />
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════════
+              TAB 1: POS MOSTRADOR ULTRA RÁPIDO
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "pos" && (
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-115px)]">
@@ -1388,7 +1530,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           </div>
         )}
 
-      </main>
+        </main>
+      </div>
 
       {/* ── MODAL DE COBRO MIXTO DE MOSTRADOR ── */}
       {modalCobro && (
