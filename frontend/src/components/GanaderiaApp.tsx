@@ -87,6 +87,26 @@ const DEFAULT_VACUNAS_CATALOGO: VacunaGanaderia[] = [
   { id: 4, tenantId: 1, nombre: "Ivermectina 1% Endectocida", diasParaRefuerzo: 90, diasRetiroLeche: 28, diasRetiroCarne: 35 },
 ];
 
+// Catálogo de referencia de biológicos/antiparasitarios de uso común en ganadería
+// venezolana — se ofrece como lista buscable de un clic al agregar al catálogo real
+// del tenant (con los días de retiro/refuerzo típicos ya cargados, editables antes
+// de guardar); no reemplaza la opción de registrar cualquier otro producto a mano.
+const CATALOGO_VACUNAS_SUGERIDAS: { nombre: string; enfermedadPrevenida: string; diasRetiroLeche: number; diasRetiroCarne: number; diasParaRefuerzo: number }[] = [
+  { nombre: "Fiebre Aftosa Trivalente", enfermedadPrevenida: "Fiebre Aftosa", diasRetiroLeche: 4, diasRetiroCarne: 21, diasParaRefuerzo: 180 },
+  { nombre: "Carbón Bacteridiano y Sintomático (Carbón Combinado)", enfermedadPrevenida: "Carbunco / Carbón Sintomático", diasRetiroLeche: 0, diasRetiroCarne: 21, diasParaRefuerzo: 365 },
+  { nombre: "Brucelosis Cepa 19 (Becerras 3-8 meses)", enfermedadPrevenida: "Brucelosis", diasRetiroLeche: 0, diasRetiroCarne: 0, diasParaRefuerzo: 0 },
+  { nombre: "Brucelosis Cepa RB51", enfermedadPrevenida: "Brucelosis", diasRetiroLeche: 0, diasRetiroCarne: 0, diasParaRefuerzo: 0 },
+  { nombre: "Rabia Paralítica Bovina", enfermedadPrevenida: "Rabia (transmitida por murciélago hematófago)", diasRetiroLeche: 0, diasRetiroCarne: 0, diasParaRefuerzo: 365 },
+  { nombre: "Triple Bovina (Clostridiosis)", enfermedadPrevenida: "Clostridiosis (Pierna Negra, Enterotoxemia, Edema Maligno)", diasRetiroLeche: 0, diasRetiroCarne: 21, diasParaRefuerzo: 180 },
+  { nombre: "IBR + DVB + PI3 + BRSV (Respiratoria Bovina)", enfermedadPrevenida: "Complejo Respiratorio Bovino", diasRetiroLeche: 4, diasRetiroCarne: 30, diasParaRefuerzo: 180 },
+  { nombre: "Leptospirosis (5 vías)", enfermedadPrevenida: "Leptospirosis", diasRetiroLeche: 0, diasRetiroCarne: 21, diasParaRefuerzo: 180 },
+  { nombre: "Vitaminas ADE Inyectable", enfermedadPrevenida: "Suplemento — deficiencia de vitaminas A, D y E", diasRetiroLeche: 0, diasRetiroCarne: 0, diasParaRefuerzo: 90 },
+  { nombre: "Ivermectina 1% Endectocida", enfermedadPrevenida: "Parásitos internos y externos", diasRetiroLeche: 28, diasRetiroCarne: 35, diasParaRefuerzo: 90 },
+  { nombre: "Doramectina 1% Endectocida", enfermedadPrevenida: "Parásitos internos y externos (mayor persistencia que ivermectina)", diasRetiroLeche: 28, diasRetiroCarne: 45, diasParaRefuerzo: 120 },
+  { nombre: "Closantel (Antiparasitario Interno)", enfermedadPrevenida: "Fasciola hepática y parásitos internos", diasRetiroLeche: 28, diasRetiroCarne: 30, diasParaRefuerzo: 90 },
+  { nombre: "Baño Garrapaticida (Amitraz / Cipermetrina)", enfermedadPrevenida: "Garrapatas y ectoparásitos", diasRetiroLeche: 0, diasRetiroCarne: 0, diasParaRefuerzo: 21 },
+];
+
 const CATEGORIAS_GASTO_GANADERIA = [
   { id: "ALIMENTACION", label: "Alimentación / Suplementos / Sal", icon: IconWheat, colorBadge: "text-amber-400 bg-amber-500/10 border-amber-500/30" },
   { id: "SANIDAD", label: "Sanidad / Vacunas / Fármacos", icon: IconSyringe, colorBadge: "text-sky-400 bg-sky-500/10 border-sky-500/30" },
@@ -379,6 +399,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [vacunacionModo, setVacunacionModo] = useState<"INDIVIDUAL" | "MULTIPLE">("INDIVIDUAL");
   const [animalesVacunaSeleccionados, setAnimalesVacunaSeleccionados] = useState<number[]>([]);
   const [mostrarCrearVacuna, setMostrarCrearVacuna] = useState(false);
+  const [busquedaVacunaCatalogo, setBusquedaVacunaCatalogo] = useState("");
   const [nuevaVacunaForm, setNuevaVacunaForm] = useState({
     nombre: "",
     enfermedadPrevenida: "",
@@ -1244,6 +1265,32 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     setAnimalesVacunaSeleccionados([]);
   };
 
+  // Agrega al catálogo real del tenant una vacuna del listado de referencia con un clic
+  // (ya trae días de retiro/refuerzo típicos precargados, sin tener que teclearlos).
+  const handleAgregarVacunaDesdeCatalogoSugerido = async (item: typeof CATALOGO_VACUNAS_SUGERIDAS[number]) => {
+    if (vacunas.some(v => v.nombre.toLowerCase() === item.nombre.toLowerCase())) {
+      const existente = vacunas.find(v => v.nombre.toLowerCase() === item.nombre.toLowerCase())!;
+      setFormVacuna(prev => ({ ...prev, vacunaId: existente.id }));
+      notificar(`'${item.nombre}' ya estaba en tu catálogo — seleccionada.`);
+      return;
+    }
+    try {
+      const creada = await crearVacunaGanaderia(tenantId, {
+        nombre: item.nombre,
+        enfermedadPrevenida: item.enfermedadPrevenida,
+        diasRetiroLeche: item.diasRetiroLeche,
+        diasRetiroCarne: item.diasRetiroCarne,
+        diasParaRefuerzo: item.diasParaRefuerzo,
+      });
+      setVacunas(prev => [...prev, creada]);
+      setFormVacuna(prev => ({ ...prev, vacunaId: creada.id }));
+      setBusquedaVacunaCatalogo("");
+      notificar(`'${creada.nombre}' agregada a tu catálogo y seleccionada.`);
+    } catch {
+      notificar(`No se pudo agregar '${item.nombre}' al catálogo.`);
+    }
+  };
+
   // Manejador: Crear nueva vacuna en catálogo in-situ
   const handleCrearNuevaVacunaInSitu = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1399,16 +1446,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             onClick={() => setModalNuevoAnimal(true)}
             className="apple-glass px-3.5 py-2 rounded-xl border border-white/20 text-slate-700 dark:text-white text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2 cursor-pointer">
             <span>+ Alta Animal</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setVacunacionModo("INDIVIDUAL");
-              setModalVacuna(true);
-            }}
-            className="apple-glass px-3.5 py-2 rounded-xl border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold hover:bg-rose-500/10 transition-all flex items-center gap-1.5 cursor-pointer">
-            <IconSyringe size={14} />
-            <span>Vacunar</span>
           </button>
 
           <button
@@ -2274,21 +2311,82 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     </div>
                     <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                       <span className="font-bold text-slate-900 dark:text-white">Hembras Gestantes Confirmadas</span>
-                      <span className="font-mono font-bold text-purple-400 text-base">2</span>
+                      <span className="font-mono font-bold text-purple-400 text-base">
+                        {animalesActivos.filter(a => a.estadoReproductivo === "PREÑADA").length}
+                      </span>
                     </div>
                     <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                       <span className="font-bold text-slate-900 dark:text-white">Novillos en Fase de Engorde</span>
                       <span className="font-mono font-bold text-amber-400 text-base">
-                        {animales.filter(a => a.tipoAnimal === "NOVILLO").length}
+                        {animalesActivos.filter(a => a.tipoAnimal === "NOVILLO").length}
                       </span>
                     </div>
                     <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                       <span className="font-bold text-slate-900 dark:text-white">Crías Lactantes en Corral</span>
                       <span className="font-mono font-bold text-emerald-400 text-base">
-                        {animales.filter(a => a.tipoAnimal === "TERNERO" || a.tipoAnimal === "BECERRA").length}
+                        {animalesActivos.filter(a => a.tipoAnimal === "TERNERO" || a.tipoAnimal === "BECERRA").length}
                       </span>
                     </div>
                   </div>
+                </div>
+
+                {/* Seguimiento General del Hato: peso y estado sanitario de cada animal de un vistazo */}
+                <div className="lg:col-span-2 apple-glass rounded-3xl p-6 border border-white/10 space-y-4">
+                  <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    <IconCow size={16} className="text-emerald-400" />
+                    <span>Seguimiento General del Hato</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-white/40 -mt-2">
+                    Peso actual y estado sanitario de cada animal activo, de un solo vistazo.
+                  </p>
+                  {animalesActivos.length === 0 ? (
+                    <div className="text-xs text-slate-400 py-6 text-center bg-white/5 rounded-2xl">
+                      Sin animales activos registrados todavía.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-2xl border border-white/10">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-white/5 text-slate-500 dark:text-white/50 border-b border-white/10">
+                          <tr>
+                            <th className="p-3">Arete</th>
+                            <th className="p-3">Nombre</th>
+                            <th className="p-3">Categoría</th>
+                            <th className="p-3">Peso Actual</th>
+                            <th className="p-3">Potrero</th>
+                            <th className="p-3">Estado Sanitario</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {animalesActivos.map(a => {
+                            const alertasAnimal = alertasSanitarias.filter(al => al.animal?.id === a.id);
+                            return (
+                              <tr
+                                key={a.id}
+                                onClick={() => { setTab("sanidad"); setSubSanidad("individual"); setAnimalFichaId(a.id); }}
+                                className="hover:bg-white/5 cursor-pointer transition-colors">
+                                <td className="p-3 font-mono font-bold text-emerald-400">{a.arete}</td>
+                                <td className="p-3 text-slate-900 dark:text-white">{a.nombre || "—"}</td>
+                                <td className="p-3 text-slate-500 dark:text-white/60">{a.tipoAnimal}</td>
+                                <td className="p-3 font-mono text-slate-900 dark:text-white">{a.pesoActual ? `${a.pesoActual} kg` : "Sin pesar"}</td>
+                                <td className="p-3 text-sky-500 dark:text-sky-400">{a.potrero?.nombre || "Sin potrero"}</td>
+                                <td className="p-3">
+                                  {alertasAnimal.length === 0 ? (
+                                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
+                                      Al día
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 dark:text-rose-400 text-[10px] font-bold border border-rose-500/20">
+                                      {alertasAnimal.length} alerta{alertasAnimal.length > 1 ? "s" : ""}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -2343,6 +2441,16 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   <span className="inline-flex items-center gap-1.5"><IconTag size={14} /> Monitoreo por Lote</span>
                 </button>
               </div>
+
+              <button
+                onClick={() => {
+                  setVacunacionModo("INDIVIDUAL");
+                  setModalVacuna(true);
+                }}
+                className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md hover:scale-105 transition-all flex items-center gap-1.5 cursor-pointer">
+                <IconSyringe size={14} />
+                <span>+ Vacunar</span>
+              </button>
             </div>
 
             {/* Banner de Alertas Sanitarias (GET /api/ganaderia/sanidad/alertas) */}
@@ -5317,6 +5425,51 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     >
                       {mostrarCrearVacuna ? "Cerrar creación" : "+ Nueva Vacuna en Catálogo"}
                     </button>
+                  </div>
+
+                  {/* Buscador de vacunas/antiparasitarios de uso común — agrega al catálogo real con un clic */}
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={busquedaVacunaCatalogo}
+                        onChange={e => setBusquedaVacunaCatalogo(e.target.value)}
+                        placeholder="Buscar vacuna o antiparasitario común (ej. Aftosa, Ivermectina, Brucelosis...)"
+                        className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs placeholder:text-slate-500"
+                      />
+                    </div>
+                    {busquedaVacunaCatalogo.trim() && (
+                      <div className="max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/60 divide-y divide-white/5">
+                        {CATALOGO_VACUNAS_SUGERIDAS.filter(v =>
+                          v.nombre.toLowerCase().includes(busquedaVacunaCatalogo.toLowerCase()) ||
+                          v.enfermedadPrevenida.toLowerCase().includes(busquedaVacunaCatalogo.toLowerCase())
+                        ).length === 0 ? (
+                          <div className="p-3 text-[11px] text-slate-400 text-center">
+                            No hay coincidencias en el catálogo de referencia — usa "+ Nueva Vacuna en Catálogo" para registrar un producto distinto.
+                          </div>
+                        ) : (
+                          CATALOGO_VACUNAS_SUGERIDAS.filter(v =>
+                            v.nombre.toLowerCase().includes(busquedaVacunaCatalogo.toLowerCase()) ||
+                            v.enfermedadPrevenida.toLowerCase().includes(busquedaVacunaCatalogo.toLowerCase())
+                          ).map(item => (
+                            <button
+                              key={item.nombre}
+                              type="button"
+                              onClick={() => handleAgregarVacunaDesdeCatalogoSugerido(item)}
+                              className="w-full text-left p-2.5 hover:bg-emerald-500/10 cursor-pointer transition-colors flex items-center justify-between gap-2"
+                            >
+                              <div>
+                                <div className="text-xs font-bold text-white">{item.nombre}</div>
+                                <div className="text-[10px] text-slate-400">{item.enfermedadPrevenida}</div>
+                              </div>
+                              <span className="text-[10px] font-bold text-emerald-400 shrink-0">
+                                Retiro leche {item.diasRetiroLeche}d · carne {item.diasRetiroCarne}d
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Sub-formulario in-situ para crear vacuna nueva */}
