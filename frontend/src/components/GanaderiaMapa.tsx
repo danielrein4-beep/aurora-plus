@@ -3,12 +3,14 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { PotreroGanaderia, AnimalGanaderia } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { IconEdit } from "../Icons";
 
 interface Props {
   potreros: PotreroGanaderia[];
   animales: AnimalGanaderia[];
   onRotarHato: (potrero: PotreroGanaderia) => void;
   onCrearPotrero: () => void;
+  onEditarPotrero?: (potrero: PotreroGanaderia) => void;
   onGuardarPotreroTrazado?: (datos: {
     poligono: [number, number][];
     hectareas: number;
@@ -57,6 +59,7 @@ export default function GanaderiaMapa({
   animales,
   onRotarHato,
   onCrearPotrero,
+  onEditarPotrero,
   onGuardarPotreroTrazado,
   tenantId: propTenantId,
 }: Props) {
@@ -346,7 +349,7 @@ export default function GanaderiaMapa({
             align-items: center;
             gap: 5px;
           ">
-            <span>🏡</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.4-7-11.5A7 7 0 0 1 19 9.5C19 14.6 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
             <span>${fincaConfig.nombre}</span>
           </div>
         `,
@@ -445,14 +448,16 @@ export default function GanaderiaMapa({
     group.clearLayers();
 
     puntosInteres.forEach(pt => {
+      const svgIcon = (path: string) =>
+        `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
       const getIconEmoji = (tipo: string) => {
         switch (tipo) {
-          case "ORDENO": return "🥛";
-          case "MANGA": return "🚪";
-          case "AGUA": return "💧";
-          case "SILO": return "🌾";
-          case "CASA": return "🏠";
-          default: return "📍";
+          case "ORDENO": return svgIcon('<path d="M9 2h6"/><path d="M9 2v4l-3 4v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10l-3-4V2"/><path d="M6 13h12"/>');
+          case "MANGA": return svgIcon('<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M15 12h.01"/>');
+          case "AGUA": return svgIcon('<path d="M12 2s6 7 6 12a6 6 0 0 1-12 0c0-5 6-12 6-12z"/>');
+          case "SILO": return svgIcon('<path d="M12 2v20"/><path d="M12 5c-1.5 0-3 1-3 2.5S10.5 10 12 10"/><path d="M12 5c1.5 0 3 1 3 2.5S13.5 10 12 10"/><path d="M12 9c-1.5 0-3 1-3 2.5S10.5 14 12 14"/><path d="M12 9c1.5 0 3 1 3 2.5S13.5 14 12 14"/>');
+          case "CASA": return svgIcon('<path d="M3 11l9-7 9 7"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/>');
+          default: return svgIcon('<path d="M12 21s-7-6.4-7-11.5A7 7 0 0 1 19 9.5C19 14.6 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>');
         }
       };
 
@@ -484,7 +489,7 @@ export default function GanaderiaMapa({
       const marker = L.marker(pt.coords, { icon: pinIcon });
       marker.bindPopup(`
         <div style="font-family: sans-serif; font-size: 12px; color: #1e293b; padding: 4px;">
-          <div style="font-weight: bold; margin-bottom: 4px;">${getIconEmoji(pt.tipo)} ${pt.nombre}</div>
+          <div style="font-weight: bold; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">${getIconEmoji(pt.tipo)} <span>${pt.nombre}</span></div>
           <div style="color: #64748b; font-size: 10px; margin-bottom: 8px;">Coords: ${pt.coords[0].toFixed(5)}, ${pt.coords[1].toFixed(5)}</div>
           <button id="btn-borrar-punto-${pt.id}" style="
             background: #ef4444;
@@ -1034,12 +1039,12 @@ export default function GanaderiaMapa({
                 value={nuevoPuntoForm.tipo}
                 onChange={e => setNuevoPuntoForm({ ...nuevoPuntoForm, tipo: e.target.value as any })}
                 className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/20 text-white text-xs focus:outline-none focus:border-sky-400">
-                <option value="ORDENO">🥛 Vaquera & Sala de Ordeño</option>
-                <option value="MANGA">🚪 Corral de Trabajo & Manga</option>
-                <option value="AGUA">💧 Tanque de Agua & Molino</option>
-                <option value="SILO">🌾 Silo & Depósito de Forraje</option>
-                <option value="CASA">🏠 Casa Principal / Galpón</option>
-                <option value="OTRO">📍 Otro Punto de Referencia</option>
+                <option value="ORDENO">Vaquera & Sala de Ordeño</option>
+                <option value="MANGA">Corral de Trabajo & Manga</option>
+                <option value="AGUA">Tanque de Agua & Molino</option>
+                <option value="SILO">Silo & Depósito de Forraje</option>
+                <option value="CASA">Casa Principal / Galpón</option>
+                <option value="OTRO">Otro Punto de Referencia</option>
               </select>
             </div>
 
@@ -1086,11 +1091,21 @@ export default function GanaderiaMapa({
                   {potreroSeleccionado.nombre}
                 </h3>
               </div>
-              <button
-                onClick={() => setPotreroSeleccionado(null)}
-                className="text-slate-400 hover:text-white p-1 cursor-pointer">
-                ✕
-              </button>
+              <div className="flex items-center gap-1">
+                {onEditarPotrero && (
+                  <button
+                    onClick={() => onEditarPotrero(potreroSeleccionado)}
+                    title="Editar potrero"
+                    className="text-slate-400 hover:text-emerald-400 p-1 cursor-pointer">
+                    <IconEdit size={16} />
+                  </button>
+                )}
+                <button
+                  onClick={() => setPotreroSeleccionado(null)}
+                  className="text-slate-400 hover:text-white p-1 cursor-pointer">
+                  ✕
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs">

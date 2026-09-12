@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import AuroraLogo from "../AuroraLogo";
+import { AuroraGradientDef } from "../Icons";
 import {
   IconFarm, IconCheckCircle, IconClose, IconDownload, IconFileText,
   IconCalendar, IconCard, IconCustomize, IconRocket, IconChart,
@@ -15,7 +16,7 @@ import * as XLSX from "xlsx";
 import {
   listarAnimalesGanaderia, crearAnimalGanaderia, actualizarAnimalGanaderia,
   registrarVentaGanaderia,
-  listarPotrerosGanaderia, crearPotreroGanaderia, rotarPotreroGanaderia,
+  listarPotrerosGanaderia, crearPotreroGanaderia, actualizarPotreroGanaderia, rotarPotreroGanaderia,
   registrarOrdenoGanaderia, obtenerReporteOrdenoGanaderia,
   registrarPesoGanaderia, obtenerGdpGanaderia,
   listarVacunasGanaderia, crearVacunaGanaderia, aplicarVacunaGanaderia, aplicarVacunaLoteGanaderia,
@@ -69,6 +70,11 @@ const RAZAS_BOVINAS_COMUNES = [
   "Brahman", "Gyr", "Gyrolando", "Pardo Suizo", "Holstein", "Jersey",
   "Angus", "Brangus", "Simmental", "Charolais", "Nelore", "Senepol",
   "Guzerat", "Criollo Limonero", "Carora", "Romosinuano", "Mestizo",
+  // Cruces / F1 más comunes en fincas de doble propósito — el campo sigue
+  // siendo texto libre, así que cualquier otra combinación se puede escribir igual.
+  "F1 Brahman x Gyr", "F1 Brahman x Holstein", "F1 Gyr x Holstein",
+  "F1 Pardo Suizo x Cebú", "F1 Angus x Brahman (Brangus)",
+  "5/8 Holstein x Cebú", "3/4 Cebú x Europeo", "Cruzado (especificar)",
 ];
 
 const DEFAULT_VACUNAS_CATALOGO: VacunaGanaderia[] = [
@@ -310,6 +316,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
     observaciones: "",
     poligono: undefined as [number, number][] | undefined,
   });
+  // Si tiene valor, el modal de "Agregar Potrero" edita ese potrero en vez de crear uno nuevo.
+  const [potreroEditandoId, setPotreroEditandoId] = useState<number | null>(null);
 
   // Estados para Modo Vaquera Rápida (Bulk Entry de Ordeño Diario)
   const [modalVaqueraRapida, setModalVaqueraRapida] = useState(false);
@@ -732,9 +740,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
     e.preventDefault();
     if (!formPotrero.nombre.trim()) return;
 
-    const nuevo: PotreroGanaderia = {
-      id: Date.now(),
-      tenantId,
+    const datos: Partial<PotreroGanaderia> = {
       codigo: formPotrero.codigo,
       nombre: formPotrero.nombre,
       areaHectareas: Number(formPotrero.areaHectareas),
@@ -744,20 +750,32 @@ export default function GanaderiaApp({ onSalir }: Props) {
       diasDescansoMinimo: Number(formPotrero.diasDescansoMinimo),
       observaciones: formPotrero.observaciones,
       poligono: formPotrero.poligono,
-      estado: "ACTIVO",
-      ordenRotacion: potreros.length + 1,
     };
 
+    let guardado: PotreroGanaderia;
     try {
-      await crearPotreroGanaderia(tenantId, nuevo);
+      if (potreroEditandoId) {
+        guardado = await actualizarPotreroGanaderia(potreroEditandoId, tenantId, datos);
+      } else {
+        guardado = await crearPotreroGanaderia(tenantId, {
+          ...datos,
+          estado: "ACTIVO",
+          ordenRotacion: potreros.length + 1,
+        });
+      }
     } catch {
-      notificar(`No se pudo guardar el potrero ${nuevo.nombre} — revisa tu conexión e inténtalo de nuevo.`);
+      notificar(`No se pudo guardar el potrero ${formPotrero.nombre} — revisa tu conexión e inténtalo de nuevo.`);
       return;
     }
 
-    setPotreros(prev => [...prev, nuevo]);
-    notificar(`Potrero ${nuevo.nombre} (${nuevo.areaHectareas} ha) guardado en el mapa satelital.`);
+    if (potreroEditandoId) {
+      setPotreros(prev => prev.map(p => p.id === potreroEditandoId ? guardado : p));
+    } else {
+      setPotreros(prev => [...prev, guardado]);
+    }
+    notificar(`Potrero ${guardado.nombre} (${guardado.areaHectareas} ha) guardado en el mapa satelital.`);
     setModalNuevoPotrero(false);
+    setPotreroEditandoId(null);
     setFormPotrero({
       codigo: `POT-0${potreros.length + 2}`,
       nombre: "",
@@ -769,6 +787,40 @@ export default function GanaderiaApp({ onSalir }: Props) {
       observaciones: "",
       poligono: undefined,
     });
+  };
+
+  // Abre el modal en modo "crear" (limpio, sin arrastrar datos de una edición previa)
+  const abrirNuevoPotrero = () => {
+    setPotreroEditandoId(null);
+    setFormPotrero({
+      codigo: `POT-0${potreros.length + 1}`,
+      nombre: "",
+      areaHectareas: 15.0,
+      capacidadAnimales: 25,
+      tipoPasto: "Brachiaria brizantha",
+      color: "#10B981",
+      diasDescansoMinimo: 28,
+      observaciones: "",
+      poligono: undefined,
+    });
+    setModalNuevoPotrero(true);
+  };
+
+  // Abre el modal en modo "editar", precargado con los datos reales del potrero
+  const abrirEditarPotrero = (potrero: PotreroGanaderia) => {
+    setPotreroEditandoId(potrero.id);
+    setFormPotrero({
+      codigo: potrero.codigo || "",
+      nombre: potrero.nombre,
+      areaHectareas: Number(potrero.areaHectareas) || 0,
+      capacidadAnimales: Number(potrero.capacidadAnimales) || 0,
+      tipoPasto: potrero.tipoPasto || "",
+      color: potrero.color || "#10B981",
+      diasDescansoMinimo: Number(potrero.diasDescansoMinimo) || 28,
+      observaciones: potrero.observaciones || "",
+      poligono: potrero.poligono,
+    });
+    setModalNuevoPotrero(true);
   };
 
   // Manejador cuando el usuario traza un potrero en el mapa satelital
@@ -784,6 +836,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
       observaciones: `Georreferenciado sobre imagen satelital (${datos.poligono.length} postes).`,
       poligono: datos.poligono,
     });
+    setPotreroEditandoId(null);
     setModalNuevoPotrero(true);
     notificar(`Potrero trazado con ${datos.hectareas} ha. Completa los datos para guardarlo.`);
   };
@@ -1185,7 +1238,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 relative flex flex-col font-['Inter']">
-      
+      <AuroraGradientDef />
+
       {/* Notificación Flotante */}
       {notificacion && (
         <div className="fixed top-5 right-5 z-[2000] apple-glass px-5 py-3 rounded-2xl border border-emerald-500/50 shadow-2xl text-emerald-600 dark:text-emerald-300 text-xs font-bold flex items-center gap-3 animate-fade-in">
@@ -1457,7 +1511,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         </p>
                       </div>
                       <button
-                        onClick={() => setModalNuevoPotrero(true)}
+                        onClick={abrirNuevoPotrero}
                         className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           tienePotreros
                             ? "bg-white/10 text-white hover:bg-white/20"
@@ -1786,7 +1840,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 </div>
 
                 <button
-                  onClick={() => setModalNuevoPotrero(true)}
+                  onClick={abrirNuevoPotrero}
                   className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer">
                   + Agregar Potrero
                 </button>
@@ -1798,7 +1852,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 potreros={potreros}
                 animales={animales}
                 onRotarHato={(pot) => setModalRotar(pot)}
-                onCrearPotrero={() => setModalNuevoPotrero(true)}
+                onCrearPotrero={abrirNuevoPotrero}
+                onEditarPotrero={abrirEditarPotrero}
                 onGuardarPotreroTrazado={handleGuardarPotreroTrazado}
               />
             ) : (
@@ -2445,7 +2500,16 @@ export default function GanaderiaApp({ onSalir }: Props) {
                             {fichaVacunas.length === 0 ? (
                               <div className="text-xs text-slate-400 py-6 text-center bg-white/5 rounded-2xl">
                                 No registra vacunas aún en backend.<br />
-                                <span className="text-[11px] text-emerald-400 mt-1 inline-block">Aplica dosis desde Centro de Eventos</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setVacunacionModo("INDIVIDUAL");
+                                    setFormVacuna(prev => ({ ...prev, animalId: animalSel.id }));
+                                    setModalVacuna(true);
+                                  }}
+                                  className="text-[11px] text-emerald-400 hover:text-emerald-300 underline mt-1 inline-block cursor-pointer">
+                                  Aplicar dosis ahora →
+                                </button>
                               </div>
                             ) : (
                               <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -2808,7 +2872,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 </div>
                 <div className="space-y-1 text-xs">
                   <button
-                    onClick={() => setModalNuevoPotrero(true)}
+                    onClick={abrirNuevoPotrero}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Agregar Potrero al Mapa</span>
                     <span className="text-[10px] text-slate-400">Crear →</span>
@@ -4248,8 +4312,19 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     list="razas-bovinas-catalogo"
                     value={formAnimal.raza}
                     onChange={e => setFormAnimal({ ...formAnimal, raza: e.target.value })}
-                    onFocus={e => e.target.select()}
-                    placeholder="Ej. Brahman"
+                    onFocus={e => {
+                      // Vaciar al enfocar muestra el catálogo completo en el datalist
+                      // (el navegador solo sugiere lo que empieza igual al texto actual);
+                      // si el usuario se va sin escribir nada, se restaura el valor previo.
+                      e.target.dataset.prevRaza = formAnimal.raza;
+                      setFormAnimal(prev => ({ ...prev, raza: "" }));
+                    }}
+                    onBlur={e => {
+                      if (!formAnimal.raza.trim() && e.target.dataset.prevRaza) {
+                        setFormAnimal(prev => ({ ...prev, raza: e.target.dataset.prevRaza || "" }));
+                      }
+                    }}
+                    placeholder="Ej. Brahman, F1 Brahman x Gyr..."
                     className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
                   />
                   <datalist id="razas-bovinas-catalogo">
