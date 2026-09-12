@@ -242,7 +242,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
     fechaNacimiento: new Date().toISOString().slice(0, 10),
     pesoActual: 380,
     valorEstimado: 900,
-    potreroId: DEMO_POTREROS[0]?.id || 101,
+    potreroId: 0,
     lote: "",
     origen: "NACIMIENTO" as "NACIMIENTO" | "COMPRA",
     madreId: null as number | null,
@@ -314,7 +314,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
   }>>([]);
 
   // Formulario rotación
-  const [potreroDestinoId, setPotreroDestinoId] = useState<number>(DEMO_POTREROS[1]?.id || 102);
+  const [potreroDestinoId, setPotreroDestinoId] = useState<number>(0);
 
   // Formulario ordeño rápido
   const [formOrdeno, setFormOrdeno] = useState({
@@ -386,6 +386,28 @@ export default function GanaderiaApp({ onSalir }: Props) {
       setAnimalFichaId(null);
     }
   }, [animales, animalFichaId]);
+
+  // El formulario de Alta de Animal arranca con potreroId: 0 (sin potrero real
+  // todavía cargado) — en cuanto la lista real de potreros llega del backend,
+  // si el potrero seleccionado no existe de verdad, se corrige al primero real.
+  // Sin esto, el <select> mostraba visualmente el potrero correcto pero el
+  // estado interno se quedaba en 0/un id inventado y el guardado fallaba con
+  // "Potrero no encontrado".
+  useEffect(() => {
+    if (potreros.length > 0 && !potreros.some(p => p.id === formAnimal.potreroId)) {
+      setFormAnimal(prev => ({ ...prev, potreroId: potreros[0].id }));
+    }
+  }, [potreros]);
+
+  // Mismo problema para el potrero destino al abrir "Rotar Potrero" — debe ser
+  // un potrero real distinto del origen, nunca el 0/id inventado inicial.
+  useEffect(() => {
+    if (!modalRotar) return;
+    const opciones = potreros.filter(p => p.id !== modalRotar.id);
+    if (opciones.length > 0 && !opciones.some(p => p.id === potreroDestinoId)) {
+      setPotreroDestinoId(opciones[0].id);
+    }
+  }, [modalRotar, potreros]);
 
   useEffect(() => {
     if (!animalFichaId) return;
@@ -558,7 +580,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
       fechaNacimiento: new Date().toISOString().slice(0, 10),
       pesoActual: 380,
       valorEstimado: 900,
-      potreroId: potreros[0]?.id || 101,
+      potreroId: potreros[0]?.id || 0,
       lote: "",
       origen: "NACIMIENTO",
       madreId: null,
