@@ -61,6 +61,16 @@ public class LicenciaTenant {
     @Column(name = "hierro_base64", columnDefinition = "TEXT")
     private String hierroBase64;
 
+    // Datos fiscales OPCIONALES del negocio — se estampan en las notas de entrega/recibos
+    // (ver VentaAnimalPdfService, DespachoLechePdfService) cuando el dueño los llena; si
+    // quedan vacíos, el documento se genera igual, solo sin esa línea (nunca se bloquea
+    // la operación por falta de RIF, ya que muchos ganaderos operan sin registro fiscal formal).
+    private String rif;
+    @Column(name = "razon_social")
+    private String razonSocial;
+    @Column(name = "domicilio_fiscal", columnDefinition = "TEXT")
+    private String domicilioFiscal;
+
     // Auditoría antifraude en Cierre Z: si |descuadre| supera este margen, el
     // cierre igual se procesa (no bloquea al cajero) pero queda una
     // AlertaAdmin silenciosa para el dueño (ver TesoreriaService). Cada
@@ -96,6 +106,12 @@ public class LicenciaTenant {
     public void setLogoBase64(String logoBase64) { this.logoBase64 = logoBase64; }
     public String getHierroBase64() { return hierroBase64; }
     public void setHierroBase64(String hierroBase64) { this.hierroBase64 = hierroBase64; }
+    public String getRif() { return rif; }
+    public void setRif(String rif) { this.rif = rif; }
+    public String getRazonSocial() { return razonSocial; }
+    public void setRazonSocial(String razonSocial) { this.razonSocial = razonSocial; }
+    public String getDomicilioFiscal() { return domicilioFiscal; }
+    public void setDomicilioFiscal(String domicilioFiscal) { this.domicilioFiscal = domicilioFiscal; }
     public BigDecimal getMargenToleranciaDescuadre() { return margenToleranciaDescuadre; }
     public void setMargenToleranciaDescuadre(BigDecimal margenToleranciaDescuadre) { this.margenToleranciaDescuadre = margenToleranciaDescuadre; }
 }

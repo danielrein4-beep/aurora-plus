@@ -193,6 +193,21 @@ export function actualizarMonedaBaseNegocio(monedaBase: string): Promise<{ moned
   return request("/api/config/mi-negocio/moneda-base", { method: "PUT", body: JSON.stringify({ monedaBase }) });
 }
 
+export interface DatosFiscalesNegocio {
+  rif?: string;
+  razonSocial?: string;
+  domicilioFiscal?: string;
+}
+
+/** Datos fiscales opcionales (RIF, razón social, domicilio) que se estampan en notas de entrega y recibos — nunca obligatorios. */
+export function obtenerDatosFiscalesNegocio(): Promise<DatosFiscalesNegocio> {
+  return request("/api/config/mi-negocio/datos-fiscales");
+}
+
+export function actualizarDatosFiscalesNegocio(datos: DatosFiscalesNegocio): Promise<DatosFiscalesNegocio> {
+  return request("/api/config/mi-negocio/datos-fiscales", { method: "PUT", body: JSON.stringify(datos) });
+}
+
 // --- Salud / Mediclinic Pro ---
 
 export interface Paciente {
@@ -1315,6 +1330,49 @@ export async function descargarCierrePdf(tenantId: number, arqueoId: number): Pr
   const headers: Record<string, string> = {};
   if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
   const res = await fetch(`/api/financiero/tesoreria/cierre/${arqueoId}/pdf?tenantId=${tenantId}`, { headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) throw new ApiError(`Error ${res.status}`);
+  return res.blob();
+}
+
+// Notas de entrega de Ganadería (venta de animales y despacho de leche en tanque) — igual
+// que descargarCierrePdf, no pueden ser un <a href> plano porque necesitan el Bearer token.
+export async function descargarNotaEntregaVentaAnimalPdf(tenantId: number, ventaId: number): Promise<Blob> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const res = await fetch(`/api/ganaderia/ventas/${ventaId}/pdf?tenantId=${tenantId}`, { headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) throw new ApiError(`Error ${res.status}`);
+  return res.blob();
+}
+
+// Mismo problema que las notas de entrega: era un <a href> plano, así que el navegador
+// pedía el .xlsx sin el Bearer token y el backend respondía 401 en vez del archivo.
+export async function descargarAlertasSanitariasExcel(tenantId: number): Promise<Blob> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const res = await fetch(`/api/ganaderia/sanidad/alertas/export-excel?tenantId=${tenantId}`, { headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) throw new ApiError(`Error ${res.status}`);
+  return res.blob();
+}
+
+export async function descargarNotaEntregaDespachoLechePdf(tenantId: number, despachoId: number): Promise<Blob> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const res = await fetch(`/api/ganaderia/ordeno/tanque/ventas/${despachoId}/pdf?tenantId=${tenantId}`, { headers });
   if (res.status === 401) {
     manejarSesionVencida();
     throw new ApiError("Sesión vencida — redirigiendo al login");

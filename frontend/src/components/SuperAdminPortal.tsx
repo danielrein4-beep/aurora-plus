@@ -30,7 +30,7 @@ const MODULOS_DISPONIBLES = [
   { id: "minero", label: "Minería & Materiales", icon: "⛏️", desc: "Pesaje de ley, fundición, balanzas y despachos" },
   { id: "repuestos", label: "Repuestos & Talleres", icon: "⚙️", desc: "Compatibilidad por marca/año, VIN, órdenes mecánicas" },
   { id: "moda", label: "Moda & Calzado Retail", icon: "👗", desc: "Matriz Talla/Color, códigos de barra, boutiques" },
-  { id: "ganaderia", label: "Ganadería & Agro", icon: "🐄", desc: "Pesaje por animal, arete RFID, preñez y vacunas" },
+  { id: "ganaderia", label: "Ganadería & Agro", icon: "", desc: "Pesaje por animal, arete RFID, preñez y vacunas" },
 ];
 
 export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
@@ -516,7 +516,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                               {tenant.moduloPrincipal === "minero" && "⛏️ Minería"}
                               {tenant.moduloPrincipal === "repuestos" && "⚙️ Repuestos"}
                               {tenant.moduloPrincipal === "moda" && "👗 Moda"}
-                              {tenant.moduloPrincipal === "ganaderia" && "🐄 Ganadería"}
+                              {tenant.moduloPrincipal === "ganaderia" && "Ganadería"}
                               {!["salud", "horeca", "minero", "repuestos", "moda", "ganaderia"].includes(tenant.moduloPrincipal) &&
                                 tenant.moduloPrincipal}
                             </span>

@@ -1,6 +1,8 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.config.TenantContext;
+import com.auroraplus.core.config.entities.LicenciaTenant;
+import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.modules.ganaderia.entities.VentaAnimal;
 import com.auroraplus.modules.ganaderia.repositories.VentaAnimalRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaVentaService;
@@ -26,6 +28,9 @@ public class VentaAnimalController {
 
     @Autowired
     private VentaAnimalPdfService ventaAnimalPdfService;
+
+    @Autowired
+    private LicenciaTenantRepository licenciaTenantRepository;
 
     public static class VentaRequest {
         public String numeroTicket;
@@ -56,7 +61,8 @@ public class VentaAnimalController {
         VentaAnimal venta = ventaAnimalRepository.findById(id)
             .filter(v -> tenantId != null && tenantId.equals(v.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Venta no encontrada"));
-        byte[] pdf = ventaAnimalPdfService.generarLiquidacionPdf(venta);
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
+        byte[] pdf = ventaAnimalPdfService.generarLiquidacionPdf(venta, licencia);
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"liquidacion-" + venta.getNumeroTicket() + ".pdf\"")
             .contentType(MediaType.APPLICATION_PDF)

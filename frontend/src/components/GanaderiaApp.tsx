@@ -23,6 +23,8 @@ import {
   listarVacunasGanaderia, crearVacunaGanaderia, aplicarVacunaGanaderia, aplicarVacunaLoteGanaderia,
   obtenerAlertasGanaderia, registrarEventoReproductivoGanaderia,
   obtenerAlertasSanitariasGanaderia, obtenerVacunasPorAnimal, obtenerMedicamentosPorAnimal,
+  obtenerDatosFiscalesNegocio, actualizarDatosFiscalesNegocio,
+  descargarNotaEntregaVentaAnimalPdf, descargarNotaEntregaDespachoLechePdf, descargarAlertasSanitariasExcel,
   obtenerEventosReproductivosPorHembra, obtenerCurvaPesoGanaderia,
   registrarMastitisGanaderia,
   obtenerStockTanqueLeche, registrarDespachoLecheTanque, obtenerVentasLecheTanque, configurarTanqueLeche,
@@ -275,6 +277,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [modalFichaAnimal, setModalFichaAnimal] = useState<AnimalGanaderia | null>(null);
   const [modalVentaAnimal, setModalVentaAnimal] = useState(false);
   const [modalEditarAnimal, setModalEditarAnimal] = useState<AnimalGanaderia | null>(null);
+  const [modalDatosFiscales, setModalDatosFiscales] = useState(false);
+  const [formDatosFiscales, setFormDatosFiscales] = useState({ rif: "", razonSocial: "", domicilioFiscal: "" });
   const [formEditarAnimal, setFormEditarAnimal] = useState({
     nombre: "",
     raza: "",
@@ -336,9 +340,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     animalId: 0,
     comprador: "",
     precioUSD: 0,
+    precioPorKg: 0,
     pesoSalida: 0,
     motivo: "BENEFICIO",
   });
+  const [ventaModo, setVentaModo] = useState<"INDIVIDUAL" | "MULTIPLE">("INDIVIDUAL");
+  const [animalesVentaSeleccionados, setAnimalesVentaSeleccionados] = useState<number[]>([]);
+  const [ultimaVentaId, setUltimaVentaId] = useState<number | null>(null);
+  const [ultimoDespachoLecheId, setUltimoDespachoLecheId] = useState<number | null>(null);
 
   // Formulario nuevo potrero con color distintivo (estilo GanSoft)
   const [formPotrero, setFormPotrero] = useState({
@@ -632,7 +641,10 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   });
 
   // Manejador: Crear nuevo animal (Nacimiento en Finca o Ingreso por Compra)
-  const handleGuardarAnimal = async (e: React.FormEvent) => {
+  // cerrarAlTerminar=false deja el modal abierto y solo limpia arete/nombre — pensado para
+  // dar de alta varios animales seguidos (una compra grande, varios nacimientos del día)
+  // sin tener que reabrir el modal y volver a llenar raza/potrero/origen cada vez.
+  const handleGuardarAnimal = async (e: React.FormEvent, cerrarAlTerminar: boolean = true) => {
     e.preventDefault();
     if (!formAnimal.arete.trim()) return;
 
@@ -672,28 +684,35 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       return;
     }
 
-    setModalNuevoAnimal(false);
-    setFormAnimal({
-      arete: "",
-      tipoIdentificador: "ARETE",
-      nombre: "",
-      especie: "BOVINO",
-      raza: "Brahman",
-      sexo: "HEMBRA",
-      tipoAnimal: "VACA",
-      fechaNacimiento: new Date().toISOString().slice(0, 10),
-      pesoActual: 380,
-      valorEstimado: 900,
-      potreroId: potreros[0]?.id || 0,
-      lote: "",
-      origen: "NACIMIENTO",
-      madreId: null,
-      proveedor: "",
-      costoCompra: 0,
-      fechaCompra: new Date().toISOString().slice(0, 10),
-      estadoReproductivo: "VACIA",
-      estadoProductivo: "SECA",
-    });
+    if (cerrarAlTerminar) {
+      setModalNuevoAnimal(false);
+      setFormAnimal({
+        arete: "",
+        tipoIdentificador: "ARETE",
+        nombre: "",
+        especie: "BOVINO",
+        raza: "Brahman",
+        sexo: "HEMBRA",
+        tipoAnimal: "VACA",
+        fechaNacimiento: new Date().toISOString().slice(0, 10),
+        pesoActual: 380,
+        valorEstimado: 900,
+        potreroId: potreros[0]?.id || 0,
+        lote: "",
+        origen: "NACIMIENTO",
+        madreId: null,
+        proveedor: "",
+        costoCompra: 0,
+        fechaCompra: new Date().toISOString().slice(0, 10),
+        estadoReproductivo: "VACIA",
+        estadoProductivo: "SECA",
+      });
+    } else {
+      // Batch: se mantiene raza/sexo/categoría/potrero/origen/proveedor tal como están
+      // (lo típico al dar de alta varios animales del mismo lote/compra seguidos) y solo
+      // se limpian el arete y el nombre para el siguiente.
+      setFormAnimal(prev => ({ ...prev, arete: "", nombre: "" }));
+    }
   };
 
   // Abre el modal de edición precargado con los datos reales del animal
@@ -750,44 +769,68 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // Manejador: Despacho por Venta / Beneficio (POST /api/ganaderia/ventas a través de VentaAnimalController)
   const handleRegistrarVentaAnimal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formVenta.animalId || !formVenta.comprador.trim() || !formVenta.precioUSD) return;
+    const idsVenta = ventaModo === "INDIVIDUAL"
+      ? (formVenta.animalId ? [Number(formVenta.animalId)] : [])
+      : animalesVentaSeleccionados;
+
+    if (idsVenta.length === 0 || !formVenta.comprador.trim()) return;
+
+    const animalesAVender = idsVenta.map(id => animales.find(a => a.id === id)).filter(Boolean) as AnimalGanaderia[];
+
+    // Precio por animal: si se indicó precio/kg, se calcula peso propio × precio/kg
+    // (así se vende "por kilo" real, cada uno con su peso); si no, en modo individual
+    // se usa el precio total tal cual, y en lote se reparte el precio total en partes iguales.
+    const precioPorAnimal = (id: number): number => {
+      const animal = animales.find(a => a.id === id);
+      if (formVenta.precioPorKg > 0 && animal?.pesoActual) {
+        return Number((animal.pesoActual * formVenta.precioPorKg).toFixed(2));
+      }
+      if (ventaModo === "INDIVIDUAL") return Number(formVenta.precioUSD) || 0;
+      return Number((Number(formVenta.precioUSD) / idsVenta.length).toFixed(2));
+    };
+
+    if (!formVenta.precioPorKg && !formVenta.precioUSD) {
+      notificar("Indica un precio total o un precio por kilo para calcular la venta.");
+      return;
+    }
 
     try {
-      // 1. Si se registró nuevo peso en báscula antes del despacho, actualizar peso del animal
-      if (formVenta.pesoSalida && Number(formVenta.pesoSalida) > 0) {
+      // 1. Si se registró nuevo peso en báscula antes del despacho (solo modo individual), actualizar peso del animal
+      if (ventaModo === "INDIVIDUAL" && formVenta.pesoSalida && Number(formVenta.pesoSalida) > 0) {
         await actualizarAnimalGanaderia(formVenta.animalId, tenantId, { pesoActual: Number(formVenta.pesoSalida) });
       }
 
-      // 2. Registrar la venta oficial en el backend con VentaAnimalController (guarda comprador, precio, ticket y marca el animal como VENDIDO en servicio transaccional)
+      // 2. Registrar la venta oficial en el backend con VentaAnimalController (guarda comprador, precio,
+      // ticket y marca cada animal como VENDIDO en un solo servicio transaccional — soporta lote completo)
       const ticket = `VTA-${Date.now().toString().slice(-6)}`;
-      await registrarVentaGanaderia(tenantId, {
+      const ventaCreada = await registrarVentaGanaderia(tenantId, {
         numeroTicket: ticket,
         comprador: `${formVenta.comprador.trim()} [${formVenta.motivo}]`,
-        items: [
-          {
-            animalId: Number(formVenta.animalId),
-            precioVenta: Number(formVenta.precioUSD),
-          },
-        ],
+        items: idsVenta.map(id => ({
+          animalId: id,
+          precioVenta: precioPorAnimal(id),
+        })),
       });
 
-      // 3. Reflejar inmediatamente en el estado local: animal marcado como VENDIDO y sin potrero asignado
-      setAnimales(prev => prev.map(a => a.id === formVenta.animalId ? { ...a, estado: "VENDIDO", potrero: undefined } : a));
-      notificar(`Venta registrada exitosamente (Ticket ${ticket}). Animal despachado y liquidado.`);
+      // 3. Reflejar inmediatamente en el estado local: animales marcados como VENDIDO y sin potrero asignado
+      setAnimales(prev => prev.map(a => idsVenta.includes(a.id) ? { ...a, estado: "VENDIDO", potrero: undefined } : a));
+      notificar(`Venta registrada exitosamente (Ticket ${ticket}). ${animalesAVender.length} animal(es) despachado(s) y liquidado(s).`);
+      setUltimaVentaId(ventaCreada?.id ?? null);
     } catch (err: any) {
       const msg = err?.message || "Revisa tu conexión e inténtalo de nuevo";
       notificar(`No se pudo procesar la venta: ${msg}`);
       return;
     }
 
-    setModalVentaAnimal(false);
     setFormVenta({
       animalId: 0,
       comprador: "",
       precioUSD: 0,
+      precioPorKg: 0,
       pesoSalida: 0,
       motivo: "BENEFICIO",
     });
+    setAnimalesVentaSeleccionados([]);
   };
 
   // Manejador: Registrar Celo (Evento Reproductivo dedicado)
@@ -1124,7 +1167,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
       setTanqueLeche(res.tanque);
       setVentasLeche(prev => [res.venta, ...prev]);
-      setModalVentaLeche(false);
+      setUltimoDespachoLecheId(res.venta?.id ?? null);
       notificar(`Despacho registrado: ${litros} L entregados a ${formVentaLeche.compradorOPlanta} por $${(litros * precio).toFixed(2)} USD.`);
       setFormVentaLeche({
         fecha: new Date().toISOString().slice(0, 10),
@@ -1432,6 +1475,22 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             <span className="text-slate-500 dark:text-white/40 font-medium">Leche:</span>
             <span className="font-mono font-bold text-sky-500 dark:text-sky-400">${precioLecheUSD.toFixed(2)}/L</span>
             <span className="opacity-70 group-hover:opacity-100"><IconEdit size={12} /></span>
+          </button>
+
+          {/* Datos Fiscales (RIF / Razón Social / Domicilio) para notas de entrega */}
+          <button
+            type="button"
+            onClick={() => {
+              obtenerDatosFiscalesNegocio().then(d => setFormDatosFiscales({
+                rif: d.rif || "", razonSocial: d.razonSocial || "", domicilioFiscal: d.domicilioFiscal || "",
+              })).catch(() => {});
+              setModalDatosFiscales(true);
+            }}
+            title="Datos fiscales opcionales para tus notas de entrega (RIF, razón social, domicilio)"
+            className="flex items-center gap-1.5 apple-glass-pill rounded-full px-3 py-1.5 border border-purple-400/30 text-[11px] hover:border-purple-400/60 hover:bg-purple-500/10 transition-all cursor-pointer group shadow-sm"
+          >
+            <IconFileText size={13} className="text-purple-500 dark:text-purple-400" />
+            <span className="text-slate-500 dark:text-white/40 font-medium">Fiscal</span>
           </button>
         </div>
 
@@ -1788,7 +1847,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setModalVentaLeche(true)}
+                    onClick={() => { setUltimoDespachoLecheId(null); setModalVentaLeche(true); }}
                     className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg hover:scale-105 transition-all flex items-center gap-1.5 cursor-pointer">
                     <span>Venta Cisterna / Planta</span>
                   </button>
@@ -2470,15 +2529,23 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     {alertasSanitarias.length} pendientes
                   </span>
                 </div>
-                <a
-                  href={`/api/ganaderia/sanidad/alertas/export-excel?tenantId=${tenantId}`}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const blob = await descargarAlertasSanitariasExcel(tenantId);
+                      const url = URL.createObjectURL(blob);
+                      window.open(url, "_blank");
+                      setTimeout(() => URL.revokeObjectURL(url), 30000);
+                    } catch (e) {
+                      notificar("No se pudo exportar el Excel de alertas");
+                    }
+                  }}
                   className="px-3 py-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-bold text-slate-700 dark:text-white/80 transition-colors flex items-center gap-1 cursor-pointer"
                 >
                   <IconDownload size={12} />
                   <span>Exportar Alertas</span>
-                </a>
+                </button>
               </div>
 
               {alertasSanitarias.length === 0 ? (
@@ -3045,7 +3112,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
-                    onClick={() => setModalVentaLeche(true)}
+                    onClick={() => { setUltimoDespachoLecheId(null); setModalVentaLeche(true); }}
                     className="w-full text-left p-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-bold cursor-pointer flex items-center justify-between">
                     <span>• Venta Cisterna / Planta (Tanque)</span>
                     <span className="text-[10px] bg-sky-500/30 px-1.5 py-0.5 rounded text-sky-300">Despacho →</span>
@@ -3187,10 +3254,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                           animalId: animales[0].id,
                           comprador: "",
                           precioUSD: 0,
+                          precioPorKg: 0,
                           pesoSalida: animales[0].pesoActual || 0,
                           motivo: "BENEFICIO",
                         });
                       }
+                      setVentaModo("INDIVIDUAL");
+                      setAnimalesVentaSeleccionados([]);
+                      setUltimaVentaId(null);
                       setModalVentaAnimal(true);
                     }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
@@ -3305,7 +3376,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setModalVentaLeche(true)}
+                  onClick={() => { setUltimoDespachoLecheId(null); setModalVentaLeche(true); }}
                   className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer flex items-center gap-1.5">
                   <span className="inline-flex items-center gap-1.5"><IconTruck size={14} /> Despachar / Venta Cisterna</span>
                 </button>
@@ -3384,7 +3455,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setModalVentaLeche(true)}
+                  onClick={() => { setUltimoDespachoLecheId(null); setModalVentaLeche(true); }}
                   className="text-xs font-bold text-sky-400 hover:text-sky-300 underline cursor-pointer">
                   + Registrar Despacho
                 </button>
@@ -4080,6 +4151,93 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         </div>
       )}
 
+      {/* MODAL: DATOS FISCALES OPCIONALES (RIF, RAZÓN SOCIAL, DOMICILIO) */}
+      {modalDatosFiscales && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-md w-full border border-purple-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <IconFileText size={22} className="text-purple-400" />
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-lg text-white">
+                    Datos Fiscales (Opcional)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Se estampan en tus notas de entrega de ventas y despachos de leche</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalDatosFiscales(false)}
+                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  await actualizarDatosFiscalesNegocio(formDatosFiscales);
+                  notificar("Datos fiscales actualizados.");
+                  setModalDatosFiscales(false);
+                } catch {
+                  notificar("No se pudieron guardar los datos fiscales — revisa tu conexión.");
+                }
+              }}
+              className="space-y-3.5 text-xs"
+            >
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">Razón Social / Nombre del Negocio</label>
+                <input
+                  type="text"
+                  value={formDatosFiscales.razonSocial}
+                  onChange={e => setFormDatosFiscales({ ...formDatosFiscales, razonSocial: e.target.value })}
+                  placeholder="Ej. Agropecuaria El Roble, C.A."
+                  className="w-full p-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white focus:border-purple-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">RIF</label>
+                <input
+                  type="text"
+                  value={formDatosFiscales.rif}
+                  onChange={e => setFormDatosFiscales({ ...formDatosFiscales, rif: e.target.value })}
+                  placeholder="Ej. J-12345678-9"
+                  className="w-full p-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono focus:border-purple-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">Domicilio Fiscal</label>
+                <textarea
+                  rows={2}
+                  value={formDatosFiscales.domicilioFiscal}
+                  onChange={e => setFormDatosFiscales({ ...formDatosFiscales, domicilioFiscal: e.target.value })}
+                  placeholder="Dirección de la finca o del negocio"
+                  className="w-full p-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white focus:border-purple-500 focus:outline-none"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Ninguno de estos datos es obligatorio — las notas de entrega se generan igual sin ellos, solo sin esa línea.
+              </p>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModalDatosFiscales(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-cyber-neon text-white font-bold px-6 py-2.5 rounded-xl cursor-pointer">
+                  Guardar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: EDITAR PRECIO DE LA LECHE CENTRALIZADO */}
       {modalEditarPrecioLeche && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
@@ -4172,12 +4330,45 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
               </div>
               <button
                 type="button"
-                onClick={() => setModalVentaLeche(false)}
+                onClick={() => { setModalVentaLeche(false); setUltimoDespachoLecheId(null); }}
                 className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
                 ✕
               </button>
             </div>
 
+            {ultimoDespachoLecheId ? (
+              <div className="space-y-4 text-xs text-center py-4">
+                <div className="text-emerald-400 flex flex-col items-center gap-2">
+                  <IconCheckCircle size={36} />
+                  <span className="font-bold text-sm text-white">Despacho registrado correctamente</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const blob = await descargarNotaEntregaDespachoLechePdf(tenantId, ultimoDespachoLecheId);
+                      const url = URL.createObjectURL(blob);
+                      window.open(url, "_blank");
+                      setTimeout(() => URL.revokeObjectURL(url), 30000);
+                    } catch (e) {
+                      notificar("No se pudo descargar la nota de entrega");
+                    }
+                  }}
+                  className="btn-cyber-neon text-white font-bold px-5 py-2.5 rounded-xl cursor-pointer inline-flex items-center gap-2">
+                  <IconDownload size={14} />
+                  Descargar Nota de Entrega (PDF)
+                </button>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => { setModalVentaLeche(false); setUltimoDespachoLecheId(null); }}
+                    className="text-slate-400 hover:text-white text-[11px] underline cursor-pointer">
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            ) : (
+            <>
             {/* Alerta de Stock Actual Disponible en Tanque */}
             <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/25 flex items-center justify-between">
               <div className="space-y-0.5">
@@ -4317,6 +4508,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </button>
               </div>
             </form>
+            </>
+            )}
           </div>
         </div>
       )}
@@ -4433,7 +4626,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
               </button>
             </div>
 
-            <form onSubmit={handleGuardarAnimal} className="space-y-4 text-xs">
+            <form onSubmit={(e) => handleGuardarAnimal(e, false)} className="space-y-4 text-xs">
               {/* Selector de Origen: Nacimiento vs Compra */}
               <div>
                 <label className="text-slate-400 block mb-1.5 font-bold">Origen del Animal *</label>
@@ -4598,7 +4791,18 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   <label className="text-slate-400 block mb-1">Sexo</label>
                   <select
                     value={formAnimal.sexo}
-                    onChange={e => setFormAnimal({ ...formAnimal, sexo: e.target.value })}
+                    onChange={e => {
+                      const nuevoSexo = e.target.value;
+                      // La categoría depende del sexo (Vaca/Novilla/... son hembra, Toro/Novillo/... son macho) —
+                      // si no se corrige acá, se podía guardar "Hembra" con categoría "Toro" sin darse cuenta.
+                      const categoriasValidas = nuevoSexo === "HEMBRA"
+                        ? ["VACA", "NOVILLA", "MAUTA", "BECERRA"]
+                        : ["TORO", "NOVILLO", "MAUTE", "TERNERO"];
+                      const categoriaCorregida = categoriasValidas.includes(formAnimal.tipoAnimal)
+                        ? formAnimal.tipoAnimal
+                        : categoriasValidas[0];
+                      setFormAnimal({ ...formAnimal, sexo: nuevoSexo, tipoAnimal: categoriaCorregida });
+                    }}
                     className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
                     <option value="HEMBRA">Hembra</option>
                     <option value="MACHO">Macho</option>
@@ -4610,13 +4814,10 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     value={formAnimal.tipoAnimal}
                     onChange={e => setFormAnimal({ ...formAnimal, tipoAnimal: e.target.value })}
                     className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
-                    <option value="VACA">Vaca</option>
-                    <option value="TORO">Toro</option>
-                    <option value="NOVILLA">Novilla</option>
-                    <option value="MAUTA">Mauta</option>
-                    <option value="BECERRA">Becerra</option>
-                    <option value="TERNERO">Ternero/a</option>
-                    <option value="NOVILLO">Novillo</option>
+                    {(formAnimal.sexo === "HEMBRA"
+                      ? [["VACA", "Vaca"], ["NOVILLA", "Novilla"], ["MAUTA", "Mauta"], ["BECERRA", "Becerra"]]
+                      : [["TORO", "Toro"], ["NOVILLO", "Novillo"], ["MAUTE", "Maute"], ["TERNERO", "Ternero"]]
+                    ).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 </div>
               </div>
@@ -4627,7 +4828,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   <input
                     type="number"
                     onFocus={e => e.target.select()}
-                    value={formAnimal.pesoActual}
+                    value={formAnimal.pesoActual || ""}
                     onChange={e => setFormAnimal({ ...formAnimal, pesoActual: Number(e.target.value) })}
                     className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
                   />
@@ -4695,9 +4896,16 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   Cancelar
                 </button>
                 <button
+                  type="button"
+                  onClick={(e) => handleGuardarAnimal(e, true)}
+                  className="apple-glass-btn text-slate-700 dark:text-white font-bold px-5 py-2 rounded-xl cursor-pointer border border-emerald-500/30">
+                  Guardar y Cerrar
+                </button>
+                <button
                   type="submit"
+                  title="Deja el formulario abierto, listo para dar de alta el siguiente animal del mismo lote/compra"
                   className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer">
-                  Guardar Animal
+                  Guardar y Agregar Otro
                 </button>
               </div>
             </form>
@@ -5977,10 +6185,20 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         </div>
       )}
 
-      {/* MODAL: REGISTRO DE VENTA / DESPACHO DE ANIMAL */}
-      {modalVentaAnimal && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-rose-500/30 text-left space-y-4">
+      {/* MODAL: REGISTRO DE VENTA / DESPACHO DE ANIMAL (individual o lote, por precio total o por kilo) */}
+      {modalVentaAnimal && (() => {
+        const animalesActivosVenta = animales.filter(a => a.estado === "ACTIVO");
+        const idsSeleccionados = ventaModo === "INDIVIDUAL"
+          ? (formVenta.animalId ? [formVenta.animalId] : [])
+          : animalesVentaSeleccionados;
+        const pesoTotalSeleccion = idsSeleccionados.reduce((sum, id) => sum + (animales.find(a => a.id === id)?.pesoActual || 0), 0);
+        const totalEstimado = formVenta.precioPorKg > 0
+          ? pesoTotalSeleccion * formVenta.precioPorKg
+          : Number(formVenta.precioUSD) || 0;
+
+        return (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-rose-500/30 text-left space-y-4 my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div>
                 <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
@@ -5988,42 +6206,136 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   <span>Despacho por Venta / Beneficio</span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-white/60 mt-1">
-                  Registra la salida formal del animal y márcalo como vendido en el hato.
+                  Registra la salida formal (uno o varios animales) y márcalos como vendidos en el hato.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setModalVentaAnimal(false)}
+                onClick={() => { setModalVentaAnimal(false); setUltimaVentaId(null); }}
                 className="text-slate-400 hover:text-white cursor-pointer">
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleRegistrarVentaAnimal} className="space-y-3 text-xs">
-              <div>
-                <label className="text-slate-400 block mb-1">Animal a Despachar *</label>
-                <select
-                  required
-                  value={formVenta.animalId}
-                  onChange={e => {
-                    const selId = Number(e.target.value);
-                    const animalObj = animales.find(a => a.id === selId);
-                    setFormVenta({
-                      ...formVenta,
-                      animalId: selId,
-                      pesoSalida: animalObj?.pesoActual || formVenta.pesoSalida,
-                    });
+            {ultimaVentaId ? (
+              <div className="space-y-4 text-xs text-center py-4">
+                <div className="text-emerald-400 flex flex-col items-center gap-2">
+                  <IconCheckCircle size={36} />
+                  <span className="font-bold text-sm text-white">Venta registrada correctamente</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const blob = await descargarNotaEntregaVentaAnimalPdf(tenantId, ultimaVentaId);
+                      const url = URL.createObjectURL(blob);
+                      window.open(url, "_blank");
+                      setTimeout(() => URL.revokeObjectURL(url), 30000);
+                    } catch (e) {
+                      notificar("No se pudo descargar la nota de entrega");
+                    }
                   }}
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold"
-                >
-                  <option value="">Selecciona un animal activo...</option>
-                  {animales.filter(a => a.estado === "ACTIVO").map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.arete} - {a.nombre || a.tipoAnimal} ({a.pesoActual || 0} kg)
-                    </option>
-                  ))}
-                </select>
+                  className="btn-cyber-neon text-white font-bold px-5 py-2.5 rounded-xl cursor-pointer inline-flex items-center gap-2">
+                  <IconDownload size={14} />
+                  Descargar Nota de Entrega (PDF)
+                </button>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => { setModalVentaAnimal(false); setUltimaVentaId(null); }}
+                    className="text-slate-400 hover:text-white text-[11px] underline cursor-pointer">
+                    Cerrar
+                  </button>
+                </div>
               </div>
+            ) : (
+            <form onSubmit={handleRegistrarVentaAnimal} className="space-y-3 text-xs">
+              <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10 w-fit">
+                <button
+                  type="button"
+                  onClick={() => setVentaModo("INDIVIDUAL")}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                    ventaModo === "INDIVIDUAL" ? "bg-rose-500 text-white shadow-md" : "text-slate-400 hover:text-white"
+                  }`}>
+                  Individual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVentaModo("MULTIPLE")}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                    ventaModo === "MULTIPLE" ? "bg-rose-500 text-white shadow-md" : "text-slate-400 hover:text-white"
+                  }`}>
+                  Lote / Varios Animales
+                </button>
+              </div>
+
+              {ventaModo === "INDIVIDUAL" ? (
+                <div>
+                  <label className="text-slate-400 block mb-1">Animal a Despachar *</label>
+                  <select
+                    required
+                    value={formVenta.animalId}
+                    onChange={e => {
+                      const selId = Number(e.target.value);
+                      const animalObj = animales.find(a => a.id === selId);
+                      setFormVenta({
+                        ...formVenta,
+                        animalId: selId,
+                        pesoSalida: animalObj?.pesoActual || formVenta.pesoSalida,
+                      });
+                    }}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold"
+                  >
+                    <option value="">Selecciona un animal activo...</option>
+                    {animalesActivosVenta.map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.arete} - {a.nombre || a.tipoAnimal} ({a.pesoActual || 0} kg)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-400 block">Animales a Despachar *</label>
+                    <button
+                      type="button"
+                      onClick={() => setAnimalesVentaSeleccionados(
+                        animalesVentaSeleccionados.length === animalesActivosVenta.length ? [] : animalesActivosVenta.map(a => a.id)
+                      )}
+                      className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 cursor-pointer">
+                      {animalesVentaSeleccionados.length === animalesActivosVenta.length ? "Desmarcar todos" : `Todos (${animalesActivosVenta.length})`}
+                    </button>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/70 p-2 space-y-1">
+                    {animalesActivosVenta.map(a => {
+                      const isSel = animalesVentaSeleccionados.includes(a.id);
+                      return (
+                        <label key={a.id} className={`flex items-center justify-between p-1.5 rounded-lg text-[11px] cursor-pointer transition-colors ${
+                          isSel ? "bg-rose-500/20 text-white font-bold" : "hover:bg-white/5 text-slate-300"
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isSel}
+                              onChange={e => setAnimalesVentaSeleccionados(prev =>
+                                e.target.checked ? [...prev, a.id] : prev.filter(id => id !== a.id)
+                              )}
+                              className="rounded text-rose-500 focus:ring-0"
+                            />
+                            <span className="font-mono text-rose-300">{a.arete}</span>
+                            <span>{a.nombre || a.tipoAnimal}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">{a.pesoActual || 0} kg</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="text-[11px] text-right font-bold text-rose-400">
+                    {animalesVentaSeleccionados.length} animal(es) · {pesoTotalSeleccion} kg total
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="text-slate-400 block mb-1">Comprador / Frigorífico / Destino *</label>
@@ -6037,7 +6349,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {ventaModo === "INDIVIDUAL" && (
                 <div>
                   <label className="text-slate-400 block mb-1">Peso en Báscula (kg)</label>
                   <input
@@ -6051,21 +6363,46 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
                   />
                 </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1">Precio Total (USD) *</label>
+                  <label className="text-slate-400 block mb-1">Precio por Kilo (USD)</label>
                   <input
                     type="number"
                     onFocus={e => e.target.select()}
                     step="0.01"
                     min="0"
-                    required
+                    placeholder="Ej. 2.20"
+                    value={formVenta.precioPorKg || ""}
+                    onChange={e => setFormVenta({ ...formVenta, precioPorKg: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/30 text-emerald-300 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">
+                    Precio Total (USD) {formVenta.precioPorKg > 0 ? "(calculado)" : "*"}
+                  </label>
+                  <input
+                    type="number"
+                    onFocus={e => e.target.select()}
+                    step="0.01"
+                    min="0"
+                    required={!formVenta.precioPorKg}
+                    disabled={formVenta.precioPorKg > 0}
                     placeholder="Ej. 1100"
-                    value={formVenta.precioUSD || ""}
+                    value={formVenta.precioPorKg > 0 ? totalEstimado.toFixed(2) : (formVenta.precioUSD || "")}
                     onChange={e => setFormVenta({ ...formVenta, precioUSD: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono disabled:opacity-60"
                   />
                 </div>
               </div>
+              {formVenta.precioPorKg > 0 && (
+                <p className="text-[10px] text-emerald-400 -mt-1">
+                  {pesoTotalSeleccion} kg × ${formVenta.precioPorKg}/kg = ${totalEstimado.toFixed(2)} USD
+                  {ventaModo === "MULTIPLE" ? " (repartido por el peso real de cada animal)" : ""}
+                </p>
+              )}
 
               <div>
                 <label className="text-slate-400 block mb-1">Motivo / Tipo de Salida</label>
@@ -6094,9 +6431,11 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ─────────────────────────────────────────────────────────────
           MODAL: MODO VAQUERA RÁPIDA (BULK ENTRY DE ORDEÑO DIARIO)
