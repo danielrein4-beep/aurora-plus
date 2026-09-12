@@ -93,9 +93,13 @@ public class PotreroController {
             throw new RuntimeException("Violación de seguridad: Potrero no pertenece a este tenant");
         }
         potrero.setNombre(datos.getNombre());
+        potrero.setCodigo(datos.getCodigo());
         potrero.setAreaHectareas(datos.getAreaHectareas());
         potrero.setCapacidadAnimales(datos.getCapacidadAnimales());
         potrero.setTipoPasto(datos.getTipoPasto());
+        potrero.setColor(datos.getColor());
+        potrero.setObservaciones(datos.getObservaciones());
+        potrero.setPoligono(datos.getPoligono());
         potrero.setDiasDescansoMinimo(datos.getDiasDescansoMinimo());
         potrero.setOrdenRotacion(datos.getOrdenRotacion());
         aplicarRecomendacionSiFalta(tenantId, potrero);

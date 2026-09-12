@@ -13,6 +13,7 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
@@ -24,12 +25,17 @@ import java.util.Map;
 
 /**
  * Ficha con código QR por animal (Subfase de trazabilidad), pensada para
- * lectura con el celular en el campo: apunta la cámara y trae el arete
- * directo, sin escribir nada a mano. El QR codifica el arete en texto plano
- * — el mismo valor que ya identifica al animal en toda la trazabilidad.
+ * lectura con el celular en el campo: apunta la cámara y va directo a la
+ * ficha de ese animal en Aurora (historial de vacunas, peso, reproducción),
+ * sin escribir ni buscar nada a mano. El QR codifica un link profundo a
+ * /ganaderia/animal/{id} — no el arete en texto plano — porque lo que se
+ * quiere al escanear en el campo es LLEGAR al historial, no solo leer el número.
  */
 @Service
 public class AnimalQrService {
+
+    @Value("${app.frontend.url:http://localhost:8443}")
+    private String frontendUrl;
 
     private static final float LABEL_WIDTH = 141.7f; // 50mm
     private static final float LABEL_HEIGHT = 141.7f; // 50mm — cuadrada, para que el QR quede grande y legible
@@ -55,7 +61,8 @@ public class AnimalQrService {
             PDPage page = new PDPage(new PDRectangle(LABEL_WIDTH, LABEL_HEIGHT));
             document.addPage(page);
 
-            byte[] qrPng = generarQrPng(animal.getArete(), 300);
+            String urlFicha = frontendUrl + "/ganaderia/animal/" + animal.getId();
+            byte[] qrPng = generarQrPng(urlFicha, 300);
             PDImageXObject qrImg = PDImageXObject.createFromByteArray(document, qrPng, "qr-animal");
 
             PDImageXObject hierroImg = null;

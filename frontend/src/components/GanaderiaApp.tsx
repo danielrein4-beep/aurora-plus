@@ -37,6 +37,9 @@ import {
 
 interface Props {
   onSalir: () => void;
+  // Presente cuando se entra por el QR de un animal (deep link /ganaderia/animal/:id):
+  // salta directo a su ficha en Sanidad & Trazabilidad en vez del Panel General.
+  deepLinkAnimalId?: number;
 }
 
 // Datos de demostración de alto realismo para cuando el backend está sin datos o en carga
@@ -95,7 +98,7 @@ const CATEGORIAS_GASTO_GANADERIA = [
   { id: "OTROS", label: "Otros Gastos Operativos", icon: IconBox, colorBadge: "text-slate-300 bg-slate-500/10 border-slate-500/30" },
 ];
 
-export default function GanaderiaApp({ onSalir }: Props) {
+export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const { user } = useAuth();
   const tenantId = user?.tenantId ? Number(user.tenantId) : 1;
 
@@ -430,6 +433,17 @@ export default function GanaderiaApp({ onSalir }: Props) {
       setPotreroDestinoId(opciones[0].id);
     }
   }, [modalRotar, potreros]);
+
+  // Deep link desde el QR de un animal (/ganaderia/animal/:id): en cuanto
+  // carga la lista real, salta directo a su ficha en Sanidad & Trazabilidad
+  // en vez de dejar al usuario en el Panel General.
+  useEffect(() => {
+    if (!deepLinkAnimalId || animales.length === 0) return;
+    if (!animales.some(a => a.id === deepLinkAnimalId)) return;
+    setTab("sanidad");
+    setSubSanidad("individual");
+    setAnimalFichaId(deepLinkAnimalId);
+  }, [deepLinkAnimalId, animales]);
 
   // Mismo saneamiento para el resto de formularios que empiezan en 0/sin
   // selección: en cuanto la lista real de animales carga, si el animal
@@ -1302,7 +1316,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
             title="Precio centralizado de leche por litro — Haga clic para editar"
             className="flex items-center gap-1.5 apple-glass-pill rounded-full px-3 py-1.5 border border-sky-400/30 text-[11px] hover:border-sky-400/60 hover:bg-sky-500/10 transition-all cursor-pointer group shadow-sm"
           >
-            <span className="text-slate-500 dark:text-white/40 font-medium inline-flex items-center gap-1"><IconMilk size={12} /> Leche:</span>
+            <span className="text-slate-500 dark:text-white/40 font-medium">Leche:</span>
             <span className="font-mono font-bold text-sky-500 dark:text-sky-400">${precioLecheUSD.toFixed(2)}/L</span>
             <span className="opacity-70 group-hover:opacity-100"><IconEdit size={12} /></span>
           </button>
@@ -1433,7 +1447,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-emerald-500/15 text-emerald-400"><IconRocket size={15} /></span>
+                        
                         <h3 className="font-['Outfit'] font-black text-lg text-white">
                           Checklist de Primeros Pasos para tu Finca
                         </h3>
@@ -1460,13 +1474,13 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-slate-400">Paso 1</span>
                           {fincaUbicada ? (
-                            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">✓ Listo</span>
+                            <span className="text-[11px] font-bold text-emerald-400">Completado</span>
                           ) : (
                             <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
                           )}
                         </div>
                         <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
-                          <span className="text-rose-400"><IconPin size={14} /></span> Fijar Ubicación Real
+                          Fijar Ubicación Real
                         </h4>
                         <p className="text-[11px] text-slate-400">
                           {fincaUbicada 
@@ -1496,13 +1510,13 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-slate-400">Paso 2</span>
                           {tienePotreros ? (
-                            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">✓ Listo ({potreros.length})</span>
+                            <span className="text-[11px] font-bold text-emerald-400">Completado ({potreros.length})</span>
                           ) : (
                             <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
                           )}
                         </div>
                         <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
-                          <span className="text-amber-400"><IconWheat size={14} /></span> Crear Primer Potrero
+                          Crear Primer Potrero
                         </h4>
                         <p className="text-[11px] text-slate-400">
                           {tienePotreros 
@@ -1532,13 +1546,13 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-slate-400">Paso 3</span>
                           {tieneAnimales ? (
-                            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">✓ Listo ({animales.length})</span>
+                            <span className="text-[11px] font-bold text-emerald-400">Completado ({animales.length})</span>
                           ) : (
                             <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
                           )}
                         </div>
                         <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
-                          <span className="text-emerald-400"><IconCow size={14} /></span> Dar de Alta Primer Animal
+                          Dar de Alta Primer Animal
                         </h4>
                         <p className="text-[11px] text-slate-400">
                           {tieneAnimales 
@@ -1634,16 +1648,14 @@ export default function GanaderiaApp({ onSalir }: Props) {
             <div className="apple-glass rounded-3xl p-6 border border-sky-500/30 bg-gradient-to-r from-sky-950/40 via-slate-900/70 to-slate-900/50 shadow-xl space-y-4 text-left">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 shadow-inner">
-                    <IconMilk size={22} />
-                  </div>
+                  
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
                         Tanque de Leche Frío
                       </h3>
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-500/20 text-sky-400 border border-sky-500/30">
-                        <span className="inline-flex items-center gap-1"><IconSnowflake size={11} /> {tanqueLeche?.temperaturaCelsius ?? 4.0}°C Óptima</span>
+                        <span>{tanqueLeche?.temperaturaCelsius ?? 4.0}°C Óptima</span>
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 dark:text-white/50">
@@ -1663,7 +1675,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     type="button"
                     onClick={() => setModalVentaLeche(true)}
                     className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg hover:scale-105 transition-all flex items-center gap-1.5 cursor-pointer">
-                    <span className="inline-flex items-center gap-1.5"><IconTruck size={14} /> Venta Cisterna / Planta</span>
+                    <span>Venta Cisterna / Planta</span>
                   </button>
                 </div>
               </div>
@@ -1717,9 +1729,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
               {/* Alertas del Hato */}
               <div className="apple-glass rounded-3xl p-6 border border-white/10 space-y-4 text-left">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                    <IconHourglass size={16} />
-                    <span>Alertas Sanitarias & Reproductivas</span>
+                  <h3 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">
+                    Alertas Sanitarias & Reproductivas
                   </h3>
                   <span className="text-xs font-bold text-emerald-500 dark:text-emerald-400">Próximos 30 días</span>
                 </div>
@@ -4939,7 +4950,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                           onClick={() => setAnimalesVacunaSeleccionados(animalesActivos.map(a => a.id))}
                           className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold hover:bg-emerald-500/30 cursor-pointer"
                         >
-                          ✓ Todos ({animalesActivos.length})
+                          Todos ({animalesActivos.length})
                         </button>
                         <button
                           type="button"
@@ -5028,7 +5039,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       onClick={() => setMostrarCrearVacuna(!mostrarCrearVacuna)}
                       className="text-xs font-bold text-emerald-400 hover:text-emerald-300 cursor-pointer"
                     >
-                      {mostrarCrearVacuna ? "✕ Cerrar creación" : "+ Nueva Vacuna en Catálogo"}
+                      {mostrarCrearVacuna ? "Cerrar creación" : "+ Nueva Vacuna en Catálogo"}
                     </button>
                   </div>
 

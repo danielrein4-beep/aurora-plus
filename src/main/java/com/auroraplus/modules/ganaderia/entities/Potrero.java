@@ -1,10 +1,13 @@
 package com.auroraplus.modules.ganaderia.entities;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Potrero/lote de pastoreo: unidad de ubicación física del hato, base del manejo rotacional. */
 @Entity
@@ -30,6 +33,25 @@ public class Potrero {
 
     @Column(name = "tipo_pasto")
     private String tipoPasto;
+
+    // Código corto opcional del potrero (ej. "POT-01"), solo referencia visual para el ganadero.
+    private String codigo;
+
+    // Color hexadecimal elegido por el usuario para distinguirlo en el mapa/listas
+    // (ej. "#10B981") — si no se guarda, el mapa cae a un color por defecto según el estado.
+    @Column(length = 20)
+    private String color;
+
+    @Column(columnDefinition = "TEXT")
+    private String observaciones;
+
+    // El polígono real trazado sobre el mapa satelital (lista de [lat, lng]) se guarda como
+    // JSON en esta columna — sin esto, el potrero "trazado" perdía su forma real al recargar
+    // y el mapa lo re-dibujaba en una posición y tamaño inventados junto a la finca.
+    @Column(name = "poligono_json", columnDefinition = "TEXT")
+    private String poligonoJson;
+
+    private static final ObjectMapper POLIGONO_MAPPER = new ObjectMapper();
 
     @Column(nullable = false, length = 20)
     private String estado = "ACTIVO"; // ACTIVO, EN_DESCANSO
@@ -75,6 +97,40 @@ public class Potrero {
     public void setCapacidadAnimales(Integer capacidadAnimales) { this.capacidadAnimales = capacidadAnimales; }
     public String getTipoPasto() { return tipoPasto; }
     public void setTipoPasto(String tipoPasto) { this.tipoPasto = tipoPasto; }
+    public String getCodigo() { return codigo; }
+    public void setCodigo(String codigo) { this.codigo = codigo; }
+    public String getColor() { return color; }
+    public void setColor(String color) { this.color = color; }
+    public String getObservaciones() { return observaciones; }
+    public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
+
+    @Transient
+    @SuppressWarnings("unchecked")
+    public List<double[]> getPoligono() {
+        if (poligonoJson == null || poligonoJson.isBlank()) return null;
+        try {
+            List<List<Double>> crudo = POLIGONO_MAPPER.readValue(poligonoJson, List.class);
+            List<double[]> resultado = new ArrayList<>();
+            for (List<Double> punto : crudo) {
+                resultado.add(new double[]{ punto.get(0), punto.get(1) });
+            }
+            return resultado;
+        } catch (Exception e) {
+            return null; // JSON corrupto — la ficha se muestra igual, solo sin el polígono trazado.
+        }
+    }
+
+    public void setPoligono(List<double[]> poligono) {
+        if (poligono == null || poligono.isEmpty()) {
+            this.poligonoJson = null;
+            return;
+        }
+        try {
+            this.poligonoJson = POLIGONO_MAPPER.writeValueAsString(poligono);
+        } catch (Exception e) {
+            this.poligonoJson = null;
+        }
+    }
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
     public LocalDate getFechaInicioDescanso() { return fechaInicioDescanso; }

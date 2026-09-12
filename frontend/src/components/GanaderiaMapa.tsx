@@ -706,7 +706,7 @@ export default function GanaderiaMapa({
                     setModalGuardarFinca(true);
                   }}
                   className="text-[10px] text-slate-400 hover:text-white cursor-pointer ml-1">
-                  ✎ Editar
+                  Editar
                 </button>
               </div>
             ) : (
