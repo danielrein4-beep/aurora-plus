@@ -656,6 +656,23 @@ html.light .input-horeca:hover { background: #ffffff; }
 }
 
 /* Home público: una sola tinta de acento, sin superficies de cristal. */
+.home-pointer-aurora {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 840px;
+  height: 480px;
+  max-width: none;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0;
+  filter: blur(12px);
+  mix-blend-mode: screen;
+}
+@media (prefers-reduced-motion: reduce), (hover: none) and (any-pointer: coarse) {
+  .home-pointer-aurora { display: none; }
+}
+
 .aurora-home-hero {
   font-family: 'IBM Plex Sans', sans-serif;
 }

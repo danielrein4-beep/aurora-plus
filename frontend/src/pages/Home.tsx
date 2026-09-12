@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, type RefObject } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import AuroraLogo from "../AuroraLogo";
@@ -81,7 +81,139 @@ const previewData: Record<string, { metric: string; value: string; sub: string; 
   ],
 };
 
+// A small, local canvas follows the pointer instead of allocating a canvas as
+// tall as the landing page. It never captures input or creates a fixed layer.
+function HomePointerAurora({ hostRef }: { hostRef: RefObject<HTMLElement | null> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!host || !canvas || !context) return;
+
+    const motionAllowed = window.matchMedia("(prefers-reduced-motion: no-preference) and (any-hover: hover) and (any-pointer: fine)");
+    const width = 840;
+    const height = 480;
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+    canvas.width = width * pixelRatio;
+    canvas.height = height * pixelRatio;
+    context.scale(pixelRatio, pixelRatio);
+
+    let frame = 0;
+    let previousTime = 0;
+    let entered = false;
+    let visible = false;
+    let opacity = 0;
+    let clientX = 0;
+    let clientY = 0;
+    let targetX = 0;
+    let targetY = 0;
+    let x = 0;
+    let y = 0;
+
+    const render = (time: number) => {
+      frame = 0;
+      const delta = previousTime ? Math.min(time - previousTime, 64) : 16;
+      previousTime = time;
+      const follow = 1 - Math.exp(-delta / 150);
+      x += (targetX - x) * follow;
+      y += (targetY - y) * follow;
+      opacity += ((visible ? 1 : 0) - opacity) * (1 - Math.exp(-delta / 260));
+      canvas.style.transform = `translate3d(${x - width / 2}px, ${y - height / 2}px, 0)`;
+      canvas.style.opacity = String(opacity * 0.7);
+      context.clearRect(0, 0, width, height);
+
+      // Many feathered rays form three flowing curtains, with a soft luminous
+      // lower edge and taller, diffuse folds like a real aurora.
+      const phase = time / 1800;
+      const colors = ["44, 134, 224", "48, 203, 132", "53, 215, 195"];
+      context.globalCompositeOperation = "lighter";
+      colors.forEach((color, layer) => {
+        for (let ray = 0; ray < 116; ray++) {
+          const u = ray / 115;
+          const envelope = Math.sin(Math.PI * u) ** 1.4;
+          const rayX = 55 + u * 730;
+          const wave = Math.sin(u * 8 + phase + layer * 0.9) * 35
+            + Math.sin(u * 17 - phase * 0.6 + layer) * 12;
+          const bottom = 285 + wave + layer * 18;
+          const length = (100 + Math.sin(u * 11 + phase + layer) * 40) * envelope;
+          const glow = context.createLinearGradient(0, bottom - length, 0, bottom + 30);
+          glow.addColorStop(0, `rgba(${color}, 0)`);
+          glow.addColorStop(0.6, `rgba(${color}, ${0.11 * envelope})`);
+          glow.addColorStop(0.88, `rgba(${color}, ${0.38 * envelope})`);
+          glow.addColorStop(1, `rgba(${color}, 0)`);
+          context.fillStyle = glow;
+          context.fillRect(rayX, bottom - length, 9, length + 30);
+        }
+      });
+
+      if (visible || opacity > 0.01) frame = requestAnimationFrame(render);
+      else {
+        canvas.style.opacity = "0";
+        previousTime = 0;
+      }
+    };
+    const start = () => {
+      if (!frame) frame = requestAnimationFrame(render);
+    };
+    const updatePosition = () => {
+      const rect = host.getBoundingClientRect();
+      targetX = clientX - rect.left;
+      targetY = clientY - rect.top;
+      visible = entered && motionAllowed.matches && !document.hidden
+        && targetX >= 0 && targetX <= rect.width && targetY >= 0 && targetY <= rect.height;
+    };
+    const move = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse" || !motionAllowed.matches || document.hidden) return;
+      clientX = event.clientX;
+      clientY = event.clientY;
+      entered = true;
+      updatePosition();
+      if (opacity < 0.01) { x = targetX; y = targetY; }
+      start();
+    };
+    const leave = () => { entered = false; visible = false; if (opacity > 0) start(); };
+    const scroll = () => {
+      if (!entered) return;
+      // Recompute page coordinates even if the mouse stays still while scrolling.
+      updatePosition();
+      x = targetX;
+      y = targetY;
+      start();
+    };
+    const stop = () => {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      previousTime = 0;
+      entered = visible = false;
+      opacity = 0;
+      canvas.style.opacity = "0";
+    };
+    host.addEventListener("pointermove", move, { passive: true });
+    host.addEventListener("pointerleave", leave);
+    window.addEventListener("scroll", scroll, { passive: true });
+    window.addEventListener("resize", scroll, { passive: true });
+    window.addEventListener("blur", stop);
+    document.addEventListener("visibilitychange", stop);
+    motionAllowed.addEventListener("change", stop);
+    return () => {
+      stop();
+      host.removeEventListener("pointermove", move);
+      host.removeEventListener("pointerleave", leave);
+      window.removeEventListener("scroll", scroll);
+      window.removeEventListener("resize", scroll);
+      window.removeEventListener("blur", stop);
+      document.removeEventListener("visibilitychange", stop);
+      motionAllowed.removeEventListener("change", stop);
+    };
+  }, [hostRef]);
+
+  return <canvas ref={canvasRef} className="home-pointer-aurora" aria-hidden="true" />;
+}
+
 export default function Home() {
+  const homeRef = useRef<HTMLElement>(null);
   const [activeTab, setActiveTab] = useState("Ferretería");
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
@@ -101,7 +233,8 @@ export default function Home() {
   };
 
   return (
-    <main className="aurora-public-page relative overflow-hidden bg-transparent transition-colors duration-500">
+    <main ref={homeRef} className="aurora-public-page relative overflow-hidden bg-transparent transition-colors duration-500">
+      <HomePointerAurora hostRef={homeRef} />
       {/* ── HERO: composición editorial sobre una fotografía real ── */}
       <section
         ref={heroRef}
