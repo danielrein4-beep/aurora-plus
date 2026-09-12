@@ -39,8 +39,8 @@ export default function ResetearClave() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#05070d] p-4">
-      <div className="w-full max-w-sm rounded-3xl p-7 bg-[#0a0e17] border border-white/10 text-white shadow-2xl space-y-5">
+    <div className="aurora-access-page min-h-screen flex items-center justify-center p-4">
+      <div className="aurora-access-card w-full max-w-sm rounded-3xl p-7 text-white space-y-5">
         <div className="flex justify-center mb-1">
           <AuroraLogo size={36} />
         </div>
@@ -84,7 +84,7 @@ export default function ResetearClave() {
             <button
               type="submit"
               disabled={enviando}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 text-slate-900 text-sm font-bold cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              className="aurora-access-primary w-full py-3 rounded-xl text-sm font-bold cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <IconLock size={14} />
               {enviando ? "Guardando…" : "Guardar nueva contraseña"}
