@@ -2317,6 +2317,29 @@ export interface RegistroOrdenoGanaderia {
   montoVenta?: number;
   porcentajeGrasa?: number;
   porcentajeProteina?: number;
+  destino?: "TANQUE" | "VENTA_DIRECTA";
+}
+
+export interface TanqueLeche {
+  id: number;
+  tenantId: number;
+  stockActualLitros: number;
+  capacidadLitros: number;
+  temperaturaCelsius: number;
+  ultimaActualizacion?: string;
+}
+
+export interface VentaLecheTanque {
+  id: number;
+  tenantId: number;
+  fecha: string;
+  litrosVendidos: number;
+  precioLitroUSD: number;
+  totalUSD: number;
+  compradorOPlanta: string;
+  monedaPago: string;
+  notas?: string;
+  createdAt?: string;
 }
 
 export interface ReporteOrdenoGanaderia {
@@ -2499,9 +2522,43 @@ export function registrarOrdenoGanaderia(tenantId: number, datos: {
   precioVentaLitro?: number;
   porcentajeGrasa?: number;
   porcentajeProteina?: number;
+  destino?: "TANQUE" | "VENTA_DIRECTA";
 }): Promise<RegistroOrdenoGanaderia> {
   return request(`/api/ganaderia/ordeno?tenantId=${tenantId}`, {
     method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function obtenerStockTanqueLeche(tenantId: number): Promise<TanqueLeche> {
+  return request(`/api/ganaderia/ordeno/tanque?tenantId=${tenantId}`);
+}
+
+export function registrarDespachoLecheTanque(tenantId: number, datos: {
+  fecha: string;
+  litrosVendidos: number;
+  precioLitroUSD: number;
+  compradorOPlanta: string;
+  monedaPago?: string;
+  notas?: string;
+}): Promise<{ tanque: TanqueLeche; venta: VentaLecheTanque; mensaje: string }> {
+  return request(`/api/ganaderia/ordeno/tanque/despacho?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function obtenerVentasLecheTanque(tenantId: number): Promise<VentaLecheTanque[]> {
+  return request(`/api/ganaderia/ordeno/tanque/ventas?tenantId=${tenantId}`);
+}
+
+export function configurarTanqueLeche(tenantId: number, datos: {
+  capacidadLitros?: number;
+  temperaturaCelsius?: number;
+  stockAjuste?: number;
+}): Promise<TanqueLeche> {
+  return request(`/api/ganaderia/ordeno/tanque/config?tenantId=${tenantId}`, {
+    method: "PUT",
     body: JSON.stringify(datos),
   });
 }
@@ -2621,6 +2678,47 @@ export function registrarMastitisGanaderia(tenantId: number, datos: {
 
 export function obtenerFinanzasGanaderia(tenantId: number, desde: string, hasta: string): Promise<ResumenFinancieroGanaderia> {
   return request(`/api/ganaderia/finanzas/resumen-periodo?tenantId=${tenantId}&desde=${desde}&hasta=${hasta}`);
+}
+
+export interface GastoGanaderia {
+  id: number;
+  tenantId: number;
+  categoria: string;
+  descripcion: string;
+  monto: number;
+  fecha: string;
+}
+
+export function listarGastosGanaderia(tenantId?: number): Promise<GastoGanaderia[]> {
+  const q = tenantId ? `?tenantId=${tenantId}` : "";
+  return request(`/api/ganaderia/gastos${q}`);
+}
+
+export function crearGastoGanaderia(tenantId: number, datos: {
+  categoria: string;
+  descripcion: string;
+  monto: number;
+  fecha: string;
+}): Promise<GastoGanaderia> {
+  return request(`/api/ganaderia/gastos?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export interface VentaGanaderiaResumen {
+  id: number;
+  tenantId: number;
+  numeroTicket: string;
+  comprador?: string;
+  total: number;
+  fecha: string;
+  items?: any[];
+}
+
+export function listarVentasGanaderia(tenantId?: number): Promise<VentaGanaderiaResumen[]> {
+  const q = tenantId ? `?tenantId=${tenantId}` : "";
+  return request(`/api/ganaderia/ventas${q}`);
 }
 
 

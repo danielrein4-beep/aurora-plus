@@ -37,7 +37,10 @@ public class VentaAnimalController {
     }
 
     @GetMapping
-    public List<VentaAnimal> listar() {
+    public List<VentaAnimal> listar(@RequestParam(required = false) Long tenantId) {
+        if (tenantId != null) {
+            return ventaAnimalRepository.findByTenantIdOrderByFechaDesc(tenantId);
+        }
         return ventaAnimalRepository.findAllByOrderByFechaDesc();
     }
 

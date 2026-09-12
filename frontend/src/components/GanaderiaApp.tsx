@@ -19,11 +19,15 @@ import {
   obtenerAlertasSanitariasGanaderia, obtenerVacunasPorAnimal,
   obtenerEventosReproductivosPorHembra, obtenerCurvaPesoGanaderia,
   registrarMastitisGanaderia,
+  obtenerStockTanqueLeche, registrarDespachoLecheTanque, obtenerVentasLecheTanque, configurarTanqueLeche,
+  listarGastosGanaderia, crearGastoGanaderia, listarVentasGanaderia,
   type AnimalGanaderia, type PotreroGanaderia, type RegistroOrdenoGanaderia,
   type TableroAlertasGanaderia, type VacunaGanaderia,
   type AlertaSanitariaGanaderia, type AplicacionVacunaGanaderia,
   type EventoReproductivoGanaderia, type RegistroPesoGanaderia,
-  type GdpGanaderiaResponse
+  type GdpGanaderiaResponse,
+  type TanqueLeche, type VentaLecheTanque,
+  type GastoGanaderia, type VentaGanaderiaResumen
 } from "../api";
 
 interface Props {
@@ -62,6 +66,17 @@ const DEFAULT_VACUNAS_CATALOGO: VacunaGanaderia[] = [
   { id: 4, tenantId: 1, nombre: "Ivermectina 1% Endectocida", diasParaRefuerzo: 90, diasRetiroLeche: 28, diasRetiroCarne: 35 },
 ];
 
+const CATEGORIAS_GASTO_GANADERIA = [
+  { id: "ALIMENTACION", label: "Alimentación / Suplementos / Sal", icon: "🌾", colorBadge: "text-amber-400 bg-amber-500/10 border-amber-500/30" },
+  { id: "SANIDAD", label: "Sanidad / Vacunas / Fármacos", icon: "💉", colorBadge: "text-sky-400 bg-sky-500/10 border-sky-500/30" },
+  { id: "MANO_DE_OBRA", label: "Mano de Obra / Jornales / Nómina", icon: "🤠", colorBadge: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" },
+  { id: "MANTENIMIENTO", label: "Mantenimiento / Cercas / Potreros", icon: "🪵", colorBadge: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30" },
+  { id: "MAQUINARIA", label: "Maquinaria / Repuestos / Combustible", icon: "🚜", colorBadge: "text-purple-400 bg-purple-500/10 border-purple-500/30" },
+  { id: "TRANSPORTE", label: "Fletes / Transporte de Ganado", icon: "🚛", colorBadge: "text-blue-400 bg-blue-500/10 border-blue-500/30" },
+  { id: "SERVICIOS", label: "Servicios Básicos / Electricidad / Agua", icon: "⚡", colorBadge: "text-orange-400 bg-orange-500/10 border-orange-500/30" },
+  { id: "OTROS", label: "Otros Gastos Operativos", icon: "📦", colorBadge: "text-slate-300 bg-slate-500/10 border-slate-500/30" },
+];
+
 export default function GanaderiaApp({ onSalir }: Props) {
   const { user } = useAuth();
   const tenantId = user?.tenantId ? Number(user.tenantId) : 1;
@@ -85,18 +100,94 @@ export default function GanaderiaApp({ onSalir }: Props) {
     }
   });
 
+  // Configuración de monedas activables por finca (USD siempre activa, VES y COP configurables)
+  const [monedasConfig, setMonedasConfig] = useState<{ USD: boolean; VES: boolean; COP: boolean }>(() => {
+    try {
+      const c = localStorage.getItem(`aurora_finca_config_${tenantId}`);
+      if (c) {
+        const parsed = JSON.parse(c);
+        return {
+          USD: true,
+          VES: parsed.VES !== false,
+          COP: parsed.COP !== false,
+        };
+      }
+    } catch {}
+    return { USD: true, VES: true, COP: true };
+  });
+
+  const guardarMonedasConfig = (ves: boolean, cop: boolean) => {
+    const conf = { USD: true, VES: ves, COP: cop };
+    setMonedasConfig(conf);
+    try {
+      localStorage.setItem(`aurora_finca_config_${tenantId}`, JSON.stringify(conf));
+    } catch {}
+  };
+
+  // Precio de leche centralizado editable por tenant
+  const [precioLecheUSD, setPrecioLecheUSD] = useState<number>(() => {
+    try {
+      const p = localStorage.getItem(`aurora_ganaderia_precio_leche_usd_${tenantId}`);
+      return p ? Number(p) || 0.55 : 0.55;
+    } catch {
+      return 0.55;
+    }
+  });
+  const [modalEditarPrecioLeche, setModalEditarPrecioLeche] = useState(false);
+
+  const guardarPrecioLeche = (nuevoPrecio: number) => {
+    setPrecioLecheUSD(nuevoPrecio);
+    setFormOrdeno(prev => ({ ...prev, precioVentaLitro: nuevoPrecio }));
+    setVaqueraPrecioUSD(nuevoPrecio);
+    try {
+      localStorage.setItem(`aurora_ganaderia_precio_leche_usd_${tenantId}`, String(nuevoPrecio));
+    } catch {}
+    setModalEditarPrecioLeche(false);
+    notificar(`Precio de la leche actualizado a $${nuevoPrecio.toFixed(2)} USD / Litro`);
+  };
+
   const [modalEditarTasas, setModalEditarTasas] = useState(false);
 
-  const guardarTasas = (nuevaBcv: number, nuevaCop: number) => {
+  const guardarTasas = (nuevaBcv: number, nuevaCop: number, vesActivo?: boolean, copActivo?: boolean) => {
     setTasaBCV(nuevaBcv);
     setTasaCOP(nuevaCop);
     setVaqueraTasaVES(nuevaBcv);
+    if (vesActivo !== undefined && copActivo !== undefined) {
+      guardarMonedasConfig(vesActivo, copActivo);
+    }
     try {
       localStorage.setItem("aurora_ganaderia_tasa_bcv", String(nuevaBcv));
       localStorage.setItem("aurora_ganaderia_tasa_cop", String(nuevaCop));
     } catch {}
     setModalEditarTasas(false);
   };
+
+  // Tanque de Leche & Ventas en Cisterna
+  const [tanqueLeche, setTanqueLeche] = useState<TanqueLeche | null>(null);
+  const [ventasLeche, setVentasLeche] = useState<VentaLecheTanque[]>([]);
+  const [modalVentaLeche, setModalVentaLeche] = useState(false);
+  const [modalAjusteTanque, setModalAjusteTanque] = useState(false);
+  const [vaqueraDestino, setVaqueraDestino] = useState<"TANQUE" | "VENTA_DIRECTA">("TANQUE");
+
+  const [formVentaLeche, setFormVentaLeche] = useState({
+    fecha: new Date().toISOString().slice(0, 10),
+    litrosVendidos: 200,
+    precioLitroUSD: 0.55,
+    compradorOPlanta: "",
+    monedaPago: "USD",
+    notas: "",
+  });
+
+  // Gastos Operativos del Hato & Ventas de Animales
+  const [gastos, setGastos] = useState<GastoGanaderia[]>([]);
+  const [ventasAnimales, setVentasAnimales] = useState<VentaGanaderiaResumen[]>([]);
+  const [modalGasto, setModalGasto] = useState(false);
+  const [formGasto, setFormGasto] = useState({
+    categoria: "ALIMENTACION",
+    descripcion: "",
+    monto: "" as number | string,
+    fecha: new Date().toISOString().slice(0, 10),
+  });
 
   // Pestaña principal activa
   const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes">("resumen");
@@ -117,6 +208,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Estados de datos
   const [animales, setAnimales] = useState<AnimalGanaderia[]>([]);
+  // Animales activos en el hato (excluye vendidos/muertos) — usado en conteos y selectores operativos
+  const animalesActivos = animales.filter(a => a.estado === "ACTIVO" || !a.estado);
   const [potreros, setPotreros] = useState<PotreroGanaderia[]>([]);
   const [ordenos, setOrdenos] = useState<RegistroOrdenoGanaderia[]>([]);
   const [vacunas, setVacunas] = useState<VacunaGanaderia[]>(DEFAULT_VACUNAS_CATALOGO);
@@ -151,7 +244,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
     fechaNacimiento: new Date().toISOString().slice(0, 10),
     pesoActual: 380,
     valorEstimado: 900,
-    potreroId: DEMO_POTREROS[0]?.id || 101,
+    potreroId: 0,
     lote: "",
     origen: "NACIMIENTO" as "NACIMIENTO" | "COMPRA",
     madreId: null as number | null,
@@ -164,7 +257,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Formulario de Celos (Evento Reproductivo dedicado)
   const [formCelo, setFormCelo] = useState({
-    hembraId: DEMO_ANIMALES.find(a => a.sexo === "HEMBRA")?.id || 201,
+    hembraId: 0,
     fecha: new Date().toISOString().slice(0, 10),
     tipoCelo: "NATURAL",
     sintomasCelo: "Acepta monta, moco cristalino abundante, hiperactividad",
@@ -173,7 +266,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Formulario de Mastitis (Sanidad dedicada con retiro de leche)
   const [formMastitis, setFormMastitis] = useState({
-    animalId: DEMO_ANIMALES.find(a => a.sexo === "HEMBRA")?.id || 201,
+    animalId: 0,
     fecha: new Date().toISOString().slice(0, 10),
     cuartoAfectado: "PD",
     gradoCmt: "GRADO_2",
@@ -223,16 +316,17 @@ export default function GanaderiaApp({ onSalir }: Props) {
   }>>([]);
 
   // Formulario rotación
-  const [potreroDestinoId, setPotreroDestinoId] = useState<number>(DEMO_POTREROS[1]?.id || 102);
+  const [potreroDestinoId, setPotreroDestinoId] = useState<number>(0);
 
   // Formulario ordeño rápido
   const [formOrdeno, setFormOrdeno] = useState({
-    animalId: DEMO_ANIMALES[0]?.id || 201,
+    animalId: 0,
     turno: "MANANA",
     cantidadLitros: 12.5,
-    precioVentaLitro: 0.55,
+    precioVentaLitro: precioLecheUSD,
     porcentajeGrasa: 3.8,
     porcentajeProteina: 3.2,
+    destino: "TANQUE" as "TANQUE" | "VENTA_DIRECTA",
   });
 
   // Formulario pesaje
@@ -241,8 +335,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Formulario vacunación (soporte de catálogo real, días de retiro fidedignos y aplicación masiva)
   const [formVacuna, setFormVacuna] = useState({
-    animalId: DEMO_ANIMALES[0]?.id || 201,
-    vacunaId: DEFAULT_VACUNAS_CATALOGO[0]?.id || 1,
+    animalId: 0,
+    vacunaId: 0,
     lote: "L-2026-98",
     veterinario: "Dr. Médico Veterinario",
     costo: 3.5,
@@ -260,7 +354,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Formulario reproducción
   const [formRepro, setFormRepro] = useState({
-    hembraId: DEMO_ANIMALES[0]?.id || 201,
+    hembraId: 0,
     tipo: "DIAGNOSTICO_PRENEZ",
     fecha: new Date().toISOString().slice(0, 10),
     resultado: "PREÑADA_CONFIRMADA",
@@ -294,6 +388,60 @@ export default function GanaderiaApp({ onSalir }: Props) {
       setAnimalFichaId(null);
     }
   }, [animales, animalFichaId]);
+
+  // El formulario de Alta de Animal arranca con potreroId: 0 (sin potrero real
+  // todavía cargado) — en cuanto la lista real de potreros llega del backend,
+  // si el potrero seleccionado no existe de verdad, se corrige al primero real.
+  // Sin esto, el <select> mostraba visualmente el potrero correcto pero el
+  // estado interno se quedaba en 0/un id inventado y el guardado fallaba con
+  // "Potrero no encontrado".
+  useEffect(() => {
+    if (potreros.length > 0 && !potreros.some(p => p.id === formAnimal.potreroId)) {
+      setFormAnimal(prev => ({ ...prev, potreroId: potreros[0].id }));
+    }
+  }, [potreros]);
+
+  // Mismo problema para el potrero destino al abrir "Rotar Potrero" — debe ser
+  // un potrero real distinto del origen, nunca el 0/id inventado inicial.
+  useEffect(() => {
+    if (!modalRotar) return;
+    const opciones = potreros.filter(p => p.id !== modalRotar.id);
+    if (opciones.length > 0 && !opciones.some(p => p.id === potreroDestinoId)) {
+      setPotreroDestinoId(opciones[0].id);
+    }
+  }, [modalRotar, potreros]);
+
+  // Mismo saneamiento para el resto de formularios que empiezan en 0/sin
+  // selección: en cuanto la lista real de animales carga, si el animal
+  // seleccionado no existe de verdad, se corrige al primero real disponible.
+  useEffect(() => {
+    if (animalesActivos.length === 0) return;
+    const hembras = animalesActivos.filter(a => a.sexo === "HEMBRA");
+    if (!animalesActivos.some(a => a.id === formOrdeno.animalId)) {
+      setFormOrdeno(prev => ({ ...prev, animalId: animalesActivos[0].id }));
+    }
+    if (!animalesActivos.some(a => a.id === formVacuna.animalId)) {
+      setFormVacuna(prev => ({ ...prev, animalId: animalesActivos[0].id }));
+    }
+    if (hembras.length > 0) {
+      if (!hembras.some(a => a.id === formRepro.hembraId)) {
+        setFormRepro(prev => ({ ...prev, hembraId: hembras[0].id }));
+      }
+      if (!hembras.some(a => a.id === formCelo.hembraId)) {
+        setFormCelo(prev => ({ ...prev, hembraId: hembras[0].id }));
+      }
+      if (!hembras.some(a => a.id === formMastitis.animalId)) {
+        setFormMastitis(prev => ({ ...prev, animalId: hembras[0].id }));
+      }
+    }
+  }, [animalesActivos]);
+
+  // Igual para la vacuna seleccionada en el formulario de aplicación.
+  useEffect(() => {
+    if (vacunas.length > 0 && !vacunas.some(v => v.id === formVacuna.vacunaId)) {
+      setFormVacuna(prev => ({ ...prev, vacunaId: vacunas[0].id }));
+    }
+  }, [vacunas]);
 
   useEffect(() => {
     if (!animalFichaId) return;
@@ -342,27 +490,44 @@ export default function GanaderiaApp({ onSalir }: Props) {
         const repOrdeno = await obtenerReporteOrdenoGanaderia(tenantId, hace30d, hoy);
         setOrdenos(repOrdeno?.registros ?? []);
       } catch {}
+
+      // Cargar estado del tanque de leche y ventas históricas
+      try {
+        const tanque = await obtenerStockTanqueLeche(tenantId);
+        setTanqueLeche(tanque);
+      } catch {}
+      try {
+        const ventas = await obtenerVentasLecheTanque(tenantId);
+        setVentasLeche(ventas ?? []);
+      } catch {}
+
+      // Cargar gastos operativos y ventas de animales
+      try {
+        const [resGastos, resVentasAnimales] = await Promise.allSettled([
+          listarGastosGanaderia(tenantId),
+          listarVentasGanaderia(tenantId),
+        ]);
+        if (resGastos.status === "fulfilled" && resGastos.value) {
+          setGastos(resGastos.value ?? []);
+        }
+        if (resVentasAnimales.status === "fulfilled" && resVentasAnimales.value) {
+          setVentasAnimales(resVentasAnimales.value ?? []);
+        }
+      } catch {}
     } catch (err) {
-      // Si el backend falla de verdad (sin conexión, error real), NO se muestra
-      // data falsa como si fuera la finca real del negocio — se deja vacío y se
-      // reintenta en el próximo montaje/cambio de tenant. Antes esto dejaba un
-      // catálogo de demostración (animales/potreros inventados) indistinguible
-      // de datos reales, y un negocio nuevo con 0 animales de verdad se quedaba
-      // viendo esa finca falsa para siempre porque nunca había nada real con
-      // qué reemplazarla.
       console.warn("No se pudo cargar la información real de Ganadería desde el backend:", err);
     }
   };
 
   // Métricas calculadas
-  const totalAnimales = animales.length;
-  const vacasOrdeno = animales.filter(a => a.tipoAnimal === "VACA" && a.sexo === "HEMBRA").length;
+  const totalAnimales = animalesActivos.length;
+  const vacasOrdeno = animalesActivos.filter(a => a.tipoAnimal === "VACA" && a.sexo === "HEMBRA").length;
   const totalHectareas = potreros.reduce((sum, p) => sum + (Number(p.areaHectareas) || 0), 0);
   const cargaAnimalHa = totalHectareas > 0 ? (totalAnimales / totalHectareas).toFixed(2) : "0.00";
   const litrosHoy = ordenos
     .filter(o => o.fecha === new Date().toISOString().slice(0, 10))
     .reduce((sum, o) => sum + (Number(o.cantidadLitros) || 0), 0);
-  const ingresosLecheHoy = litrosHoy * 0.55;
+  const ingresosLecheHoy = litrosHoy * precioLecheUSD;
 
   // Matriz de Categorías Canónicas del Hato (GanSoft Style)
   const categoriasHato = [
@@ -379,10 +544,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
   // Conteo por categoría
   const matrizConteos = categoriasHato.map(cat => ({
     ...cat,
-    count: animales.filter(cat.filter).length,
+    count: animalesActivos.filter(cat.filter).length,
     pesoPromedio: Math.round(
-      animales.filter(cat.filter).reduce((sum, a) => sum + (a.pesoActual || 0), 0) /
-      Math.max(1, animales.filter(cat.filter).length)
+      animalesActivos.filter(cat.filter).reduce((sum, a) => sum + (a.pesoActual || 0), 0) /
+      Math.max(1, animalesActivos.filter(cat.filter).length)
     ),
   }));
 
@@ -449,7 +614,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
       fechaNacimiento: new Date().toISOString().slice(0, 10),
       pesoActual: 380,
       valorEstimado: 900,
-      potreroId: potreros[0]?.id || 101,
+      potreroId: potreros[0]?.id || 0,
       lote: "",
       origen: "NACIMIENTO",
       madreId: null,
@@ -613,20 +778,17 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Abrir Modo Vaquera Rápida (Bulk Entry de Ordeño)
   const abrirVaqueraRapida = () => {
-    const vacas = animales.filter(a => a.sexo === "HEMBRA" && (a.tipoAnimal === "VACA" || a.tipoAnimal === "NOVILLA"));
-    const vacasBase = vacas.length > 0 ? vacas : [
-      { id: 201, arete: "V-402", nombre: "Mariposa", tipoAnimal: "VACA", sexo: "HEMBRA" },
-      { id: 202, arete: "V-115", nombre: "Lucero", tipoAnimal: "VACA", sexo: "HEMBRA" },
-      { id: 203, arete: "V-089", nombre: "Esperanza", tipoAnimal: "VACA", sexo: "HEMBRA" },
-      { id: 204, arete: "V-210", nombre: "Canela", tipoAnimal: "VACA", sexo: "HEMBRA" },
-      { id: 205, arete: "V-305", nombre: "Barinesa", tipoAnimal: "VACA", sexo: "HEMBRA" },
-    ];
+    const vacas = animalesActivos.filter(a => a.sexo === "HEMBRA" && (a.tipoAnimal === "VACA" || a.tipoAnimal === "NOVILLA"));
+    if (vacas.length === 0) {
+      notificar("⚠️ No hay vacas u novillas registradas en el hato todavía. Da de alta tus animales antes de usar Vaquera Rápida.");
+      return;
+    }
 
-    const filas = vacasBase.map((v, i) => ({
+    const filas = vacas.map((v) => ({
       animalId: v.id,
       arete: v.arete,
       nombre: v.nombre || `Vaca ${v.arete}`,
-      litrosManana: i === 0 ? 11.5 : i === 1 ? 9.0 : i === 2 ? 8.5 : i === 3 ? 12.0 : 10.0,
+      litrosManana: "",
       litrosTarde: "",
       estado: "NORMAL" as const,
       notas: "",
@@ -637,55 +799,70 @@ export default function GanaderiaApp({ onSalir }: Props) {
   };
 
   // Guardar Jornada de Ordeño en Lote desde Modo Vaquera Rápida
-  const guardarJornadaVaquera = () => {
+  const guardarJornadaVaquera = async () => {
     const filasValidas = vaqueraFilas.filter(f => Number(f.litrosManana) > 0 || Number(f.litrosTarde) > 0);
     if (filasValidas.length === 0) {
       notificar("No se ingresaron litros en ninguna vaca.");
       return;
     }
 
-    const nuevosOrdenos: RegistroOrdenoGanaderia[] = [];
     let mastitisCount = 0;
+    let litrosComercialesTotal = 0;
+    const nuevosOrdenos: RegistroOrdenoGanaderia[] = [];
+    const fallidas: string[] = [];
 
-    filasValidas.forEach(f => {
+    for (const f of filasValidas) {
       const litrosTotales = (Number(f.litrosManana) || 0) + (Number(f.litrosTarde) || 0);
       const esComercial = f.estado !== "MASTITIS";
-      if (f.estado === "MASTITIS") mastitisCount++;
 
-      const animalObj = animales.find(a => a.id === f.animalId) || ({
-        id: f.animalId,
-        tenantId,
-        arete: f.arete,
-        nombre: f.nombre,
-        tipoAnimal: "VACA",
-        sexo: "HEMBRA",
-      } as AnimalGanaderia);
-
-      nuevosOrdenos.push({
-        id: Date.now() + Math.floor(Math.random() * 1000),
-        tenantId,
-        animal: animalObj,
-        fecha: vaqueraFecha,
-        turno: vaqueraTurno === "DOBLE" ? "MANANA" : vaqueraTurno,
-        cantidadLitros: litrosTotales,
-        precioVentaLitro: vaqueraPrecioUSD,
-        montoVenta: esComercial ? Number((litrosTotales * vaqueraPrecioUSD).toFixed(2)) : 0,
-        porcentajeGrasa: 3.8,
-        porcentajeProteina: 3.2,
-      });
-    });
+      try {
+        const reg = await registrarOrdenoGanaderia(tenantId, {
+          animalId: f.animalId,
+          fecha: vaqueraFecha,
+          turno: vaqueraTurno === "DOBLE" ? "MANANA" : vaqueraTurno,
+          cantidadLitros: litrosTotales,
+          precioVentaLitro: vaqueraPrecioUSD,
+          porcentajeGrasa: 3.8,
+          porcentajeProteina: 3.2,
+          destino: vaqueraDestino,
+        });
+        nuevosOrdenos.push(reg);
+        if (f.estado === "MASTITIS") {
+          mastitisCount++;
+        } else {
+          litrosComercialesTotal += litrosTotales;
+        }
+      } catch {
+        fallidas.push(f.arete);
+      }
+    }
 
     setOrdenos(prev => [...nuevosOrdenos, ...prev]);
+
+    if (vaqueraDestino === "TANQUE") {
+      setTanqueLeche(prev => prev ? {
+        ...prev,
+        stockActualLitros: (Number(prev.stockActualLitros) || 0) + litrosComercialesTotal
+      } : {
+        id: 1,
+        tenantId,
+        stockActualLitros: litrosComercialesTotal,
+        capacidadLitros: 2000,
+        temperaturaCelsius: 4.0
+      });
+    }
+
     setModalVaqueraRapida(false);
 
-    const litrosComerciales = nuevosOrdenos.reduce((s, o) => s + (Number(o.montoVenta) > 0 ? o.cantidadLitros : 0), 0);
-    const ingresoUSD = (litrosComerciales * vaqueraPrecioUSD).toFixed(2);
-    const ingresoBs = (litrosComerciales * vaqueraPrecioUSD * vaqueraTasaVES).toFixed(2);
+    const ingresoUSD = (litrosComercialesTotal * vaqueraPrecioUSD).toFixed(2);
+    const destinoLabel = vaqueraDestino === "TANQUE" ? "almacenados en tanque" : "venta directa";
 
-    if (mastitisCount > 0) {
-      notificar(`Jornada guardada: ${litrosComerciales.toFixed(1)} L comerciales ($${ingresoUSD} / Bs. ${ingresoBs}). ¡Atención! ${mastitisCount} vaca(s) aislada(s) con Mastitis.`);
+    if (fallidas.length > 0) {
+      notificar(`⚠️ Se guardaron ${nuevosOrdenos.length} de ${filasValidas.length} registros. No se pudo registrar: ${fallidas.join(", ")} — revisa tu conexión e inténtalo de nuevo con esas vacas.`);
+    } else if (mastitisCount > 0) {
+      notificar(`Jornada guardada: ${litrosComercialesTotal.toFixed(1)} L comerciales (${destinoLabel}). ¡Atención! ${mastitisCount} vaca(s) aislada(s) con Mastitis.`);
     } else {
-      notificar(`Jornada registrada: ${litrosComerciales.toFixed(1)} L recolectados ($${ingresoUSD} USD / Bs. ${ingresoBs}).`);
+      notificar(`Jornada registrada: ${litrosComercialesTotal.toFixed(1)} L recolectados (${destinoLabel}) por $${ingresoUSD} USD.`);
     }
   };
 
@@ -709,7 +886,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
     setModalRotar(null);
   };
 
-  // Manejador: Registrar ordeño
+  // Manejador: Registrar ordeño individual
   const handleGuardarOrdeno = async (e: React.FormEvent) => {
     e.preventDefault();
     const animalSeleccionado = animales.find(a => a.id === Number(formOrdeno.animalId)) || animales[0];
@@ -723,15 +900,130 @@ export default function GanaderiaApp({ onSalir }: Props) {
         precioVentaLitro: Number(formOrdeno.precioVentaLitro),
         porcentajeGrasa: Number(formOrdeno.porcentajeGrasa),
         porcentajeProteina: Number(formOrdeno.porcentajeProteina),
+        destino: formOrdeno.destino,
       });
       setOrdenos(prev => [nuevoReg, ...prev]);
+
+      if (formOrdeno.destino === "TANQUE") {
+        setTanqueLeche(prev => prev ? {
+          ...prev,
+          stockActualLitros: (Number(prev.stockActualLitros) || 0) + Number(formOrdeno.cantidadLitros)
+        } : {
+          id: 1,
+          tenantId,
+          stockActualLitros: Number(formOrdeno.cantidadLitros),
+          capacidadLitros: 2000,
+          temperaturaCelsius: 4.0
+        });
+      }
     } catch {
       notificar(`⚠️ No se pudo registrar el ordeño de ${animalSeleccionado.nombre || animalSeleccionado.arete} — revisa tu conexión e inténtalo de nuevo.`);
       return;
     }
 
-    notificar(`${formOrdeno.cantidadLitros} L registrados para ${animalSeleccionado.nombre || animalSeleccionado.arete}.`);
+    const destinoTexto = formOrdeno.destino === "TANQUE" ? "almacenados en tanque de leche" : "registrados como venta directa";
+    notificar(`${formOrdeno.cantidadLitros} L ${destinoTexto} para ${animalSeleccionado.nombre || animalSeleccionado.arete}.`);
     setModalOrdeno(false);
+  };
+
+  // Manejador: Despacho / Venta de Leche desde el Tanque
+  const handleGuardarVentaLeche = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const litros = Number(formVentaLeche.litrosVendidos);
+    const precio = Number(formVentaLeche.precioLitroUSD);
+    const stockActual = Number(tanqueLeche?.stockActualLitros) || 0;
+
+    if (litros <= 0) {
+      notificar("⚠️ La cantidad de litros a despachar debe ser mayor a cero.");
+      return;
+    }
+    if (litros > stockActual) {
+      notificar(`⚠️ Stock insuficiente en el tanque (${stockActual.toFixed(1)} L disponibles). No se pueden despachar ${litros} L.`);
+      return;
+    }
+    if (!formVentaLeche.compradorOPlanta.trim()) {
+      notificar("⚠️ Debe indicar el comprador o planta receptora.");
+      return;
+    }
+
+    try {
+      const res = await registrarDespachoLecheTanque(tenantId, {
+        fecha: formVentaLeche.fecha,
+        litrosVendidos: litros,
+        precioLitroUSD: precio,
+        compradorOPlanta: formVentaLeche.compradorOPlanta.trim(),
+        monedaPago: formVentaLeche.monedaPago,
+        notas: formVentaLeche.notas,
+      });
+
+      setTanqueLeche(res.tanque);
+      setVentasLeche(prev => [res.venta, ...prev]);
+      setModalVentaLeche(false);
+      notificar(`🚚 Despacho registrado: ${litros} L entregados a ${formVentaLeche.compradorOPlanta} por $${(litros * precio).toFixed(2)} USD.`);
+      setFormVentaLeche({
+        fecha: new Date().toISOString().slice(0, 10),
+        litrosVendidos: Math.min(200, res.tanque.stockActualLitros),
+        precioLitroUSD: precioLecheUSD,
+        compradorOPlanta: "",
+        monedaPago: "USD",
+        notas: "",
+      });
+    } catch (err: any) {
+      notificar(`⚠️ Error al despachar leche: ${err.message || "revisa la conexión"}`);
+    }
+  };
+
+  // Manejador: Ajuste / Calibración de Tanque
+  const handleAjustarTanque = async (capacidad: number, temp: number, stockAjuste: number) => {
+    try {
+      const res = await configurarTanqueLeche(tenantId, {
+        capacidadLitros: capacidad,
+        temperaturaCelsius: temp,
+        stockAjuste: stockAjuste,
+      });
+      setTanqueLeche(res);
+      setModalAjusteTanque(false);
+      notificar("Tanque de leche calibrado exitosamente.");
+    } catch {
+      notificar("⚠️ No se pudo guardar la configuración del tanque.");
+    }
+  };
+
+  // Manejador: Registrar Gasto Operativo del Hato
+  const handleGuardarGasto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const montoNum = Number(formGasto.monto);
+    if (!formGasto.descripcion.trim()) {
+      notificar("⚠️ Ingrese una descripción detallada del gasto.");
+      return;
+    }
+    if (isNaN(montoNum) || montoNum <= 0) {
+      notificar("⚠️ El monto del gasto debe ser mayor a cero.");
+      return;
+    }
+
+    const catInfo = CATEGORIAS_GASTO_GANADERIA.find(c => c.id === formGasto.categoria);
+    const catLabel = catInfo ? catInfo.label.split("/")[0].trim() : formGasto.categoria;
+
+    try {
+      const nuevo = await crearGastoGanaderia(tenantId, {
+        categoria: formGasto.categoria,
+        descripcion: formGasto.descripcion.trim(),
+        monto: montoNum,
+        fecha: formGasto.fecha || new Date().toISOString().slice(0, 10),
+      });
+      setGastos(prev => [nuevo, ...prev]);
+      setModalGasto(false);
+      setFormGasto({
+        categoria: "ALIMENTACION",
+        descripcion: "",
+        monto: "",
+        fecha: new Date().toISOString().slice(0, 10),
+      });
+      notificar(`💸 Gasto registrado: $${montoNum.toFixed(2)} USD en ${catLabel}`);
+    } catch (err: any) {
+      notificar(`⚠️ Error al registrar gasto: ${err?.message || "revisa tu conexión e inténtalo de nuevo"}.`);
+    }
   };
 
   // Manejador: Registrar pesaje
@@ -768,8 +1060,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
       notificar("⚠️ Debes seleccionar al menos un animal para aplicar el tratamiento sanitario.");
       return;
     }
+    if (!formVacuna.vacunaId) {
+      notificar("⚠️ Selecciona o crea primero una vacuna del catálogo antes de aplicarla.");
+      return;
+    }
 
-    const vacunaSeleccionada = vacunas.find(v => v.id === Number(formVacuna.vacunaId)) || DEFAULT_VACUNAS_CATALOGO[0];
+    const vacunaSeleccionada = vacunas.find(v => v.id === Number(formVacuna.vacunaId));
 
     try {
       await aplicarVacunaLoteGanaderia(tenantId, {
@@ -782,15 +1078,15 @@ export default function GanaderiaApp({ onSalir }: Props) {
       });
 
       const retiroMsg = [];
-      if (vacunaSeleccionada.diasRetiroLeche && vacunaSeleccionada.diasRetiroLeche > 0) {
+      if (vacunaSeleccionada?.diasRetiroLeche && vacunaSeleccionada.diasRetiroLeche > 0) {
         retiroMsg.push(`Retiro leche: ${vacunaSeleccionada.diasRetiroLeche}d`);
       }
-      if (vacunaSeleccionada.diasRetiroCarne && vacunaSeleccionada.diasRetiroCarne > 0) {
+      if (vacunaSeleccionada?.diasRetiroCarne && vacunaSeleccionada.diasRetiroCarne > 0) {
         retiroMsg.push(`Retiro carne: ${vacunaSeleccionada.diasRetiroCarne}d`);
       }
       const detalleRetiro = retiroMsg.length > 0 ? ` (${retiroMsg.join(" • ")})` : " (Sin tiempo de retiro obligatorio)";
 
-      notificar(`✅ Vacuna '${vacunaSeleccionada.nombre}' aplicada a ${idsParaAplicar.length} animal(es)${detalleRetiro}. Alertas sanitarias actualizadas.`);
+      notificar(`✅ Vacuna '${vacunaSeleccionada?.nombre || "aplicada"}' aplicada a ${idsParaAplicar.length} animal(es)${detalleRetiro}. Alertas sanitarias actualizadas.`);
 
       // Recargar alertas sanitarias para reflejar inmediatamente los bloqueos de leche y carne
       obtenerAlertasSanitariasGanaderia(tenantId).then(setAlertasSanitarias).catch(() => {});
@@ -905,21 +1201,46 @@ export default function GanaderiaApp({ onSalir }: Props) {
           </div>
         </div>
 
-        {/* Barra de Tasas Multi-Moneda (Editable con 1 clic) */}
-        <button
-          type="button"
-          onClick={() => setModalEditarTasas(true)}
-          title="Haga clic para actualizar las tasas de cambio a mano"
-          className="flex items-center gap-2 apple-glass-pill rounded-full px-3.5 py-1.5 border border-slate-300/80 dark:border-white/15 text-[11px] hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all cursor-pointer group shadow-sm"
-        >
-          <span className="text-slate-500 dark:text-white/40 font-medium flex items-center gap-1">
-            <span>Tasas:</span>
-          </span>
-          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">1$ = Bs. {tasaBCV.toFixed(2)}</span>
-          <span className="text-slate-400 dark:text-white/20">•</span>
-          <span className="font-mono font-bold text-sky-600 dark:text-sky-400">{tasaCOP.toLocaleString()} COP</span>
-          <span className="text-[11px] opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all">✏️</span>
-        </button>
+        {/* Barra de Tasas Multi-Moneda & Precio Leche Centralizado */}
+        <div className="flex items-center gap-2">
+          {/* Tasas de cambio */}
+          <button
+            type="button"
+            onClick={() => setModalEditarTasas(true)}
+            title="Configurar monedas activas y tasas de cambio de la finca"
+            className="flex items-center gap-2 apple-glass-pill rounded-full px-3.5 py-1.5 border border-slate-300/80 dark:border-white/15 text-[11px] hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all cursor-pointer group shadow-sm"
+          >
+            <span className="text-slate-500 dark:text-white/40 font-medium flex items-center gap-1">
+              <span>Monedas:</span>
+            </span>
+            <span className="font-mono font-bold text-slate-700 dark:text-white">USD</span>
+            {monedasConfig.VES && (
+              <>
+                <span className="text-slate-400 dark:text-white/20">•</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">1$ = Bs. {tasaBCV.toFixed(2)}</span>
+              </>
+            )}
+            {monedasConfig.COP && (
+              <>
+                <span className="text-slate-400 dark:text-white/20">•</span>
+                <span className="font-mono font-bold text-sky-600 dark:text-sky-400">{tasaCOP.toLocaleString()} COP</span>
+              </>
+            )}
+            <span className="text-[11px] opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all">⚙️</span>
+          </button>
+
+          {/* Precio Leche */}
+          <button
+            type="button"
+            onClick={() => setModalEditarPrecioLeche(true)}
+            title="Precio centralizado de leche por litro — Haga clic para editar"
+            className="flex items-center gap-1.5 apple-glass-pill rounded-full px-3 py-1.5 border border-sky-400/30 text-[11px] hover:border-sky-400/60 hover:bg-sky-500/10 transition-all cursor-pointer group shadow-sm"
+          >
+            <span className="text-slate-500 dark:text-white/40 font-medium">🥛 Leche:</span>
+            <span className="font-mono font-bold text-sky-500 dark:text-sky-400">${precioLecheUSD.toFixed(2)}/L</span>
+            <span className="text-[10px] opacity-70 group-hover:opacity-100">✏️</span>
+          </button>
+        </div>
 
         {/* Acciones de Cabecera */}
         <div className="flex items-center gap-2.5">
@@ -1218,7 +1539,11 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <div className="font-['Outfit'] font-black text-2xl text-sky-500 dark:text-sky-400">
                     {litrosHoy.toFixed(1)} <span className="text-xs font-normal text-slate-400">Litros</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 dark:text-white/40">${ingresosLecheHoy.toFixed(2)} USD • Bs. {(ingresosLecheHoy * tasaBCV).toFixed(2)}</div>
+                  <div className="text-[10px] text-slate-400 dark:text-white/40">
+                    ${ingresosLecheHoy.toFixed(2)} USD
+                    {monedasConfig.VES && ` • Bs. ${(ingresosLecheHoy * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    {monedasConfig.COP && ` • COP $${Math.round(ingresosLecheHoy * tasaCOP).toLocaleString()}`}
+                  </div>
                 </div>
 
                 <div className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-1">
@@ -1239,6 +1564,87 @@ export default function GanaderiaApp({ onSalir }: Props) {
               </div>
             </div>
 
+            {/* Widget: Tanque de Leche Frío (Stock en Finca & Despacho a Cisterna) */}
+            <div className="apple-glass rounded-3xl p-6 border border-sky-500/30 bg-gradient-to-r from-sky-950/40 via-slate-900/70 to-slate-900/50 shadow-xl space-y-4 text-left">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-2xl shadow-inner">
+                    🥛
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
+                        Tanque de Leche Frío
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                        ❄️ {tanqueLeche?.temperaturaCelsius ?? 4.0}°C Óptima
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-white/50">
+                      Stock recolectado en sala de ordeño listo para despacho a planta o camión cisterna.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalAjusteTanque(true)}
+                    className="px-3.5 py-2 rounded-xl apple-glass border border-white/15 text-slate-700 dark:text-white/80 hover:text-white text-xs font-semibold cursor-pointer transition-all">
+                    ⚙️ Calibrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalVentaLeche(true)}
+                    className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg hover:scale-105 transition-all flex items-center gap-1.5 cursor-pointer">
+                    <span>🚚 Venta Cisterna / Planta</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-medium">Stock en Tanque</span>
+                    <span className="text-[11px] font-mono font-bold text-sky-400">
+                      {Math.round(((tanqueLeche?.stockActualLitros ?? 0) / (tanqueLeche?.capacidadLitros ?? 2000)) * 100)}%
+                    </span>
+                  </div>
+                  <div className="font-['Outfit'] font-black text-2xl text-sky-400">
+                    {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} <span className="text-xs font-normal text-slate-400">/ {(tanqueLeche?.capacidadLitros ?? 2000).toLocaleString()} L</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-sky-500 to-cyan-400 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, Math.max(0, ((tanqueLeche?.stockActualLitros ?? 0) / (tanqueLeche?.capacidadLitros ?? 2000)) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                  <div className="text-[11px] text-slate-400 font-medium">Valor Comercial del Stock</div>
+                  <div className="font-['Outfit'] font-black text-2xl text-emerald-400">
+                    ${((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    A ${precioLecheUSD.toFixed(2)} USD/L
+                    {monedasConfig.VES && ` • Bs. ${(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    {monedasConfig.COP && ` • COP $${Math.round(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaCOP).toLocaleString()}`}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                  <div className="text-[11px] text-slate-400 font-medium">Último Despacho Registrado</div>
+                  <div className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    {ventasLeche[0] ? `${ventasLeche[0].litrosVendidos} L • ${ventasLeche[0].compradorOPlanta}` : "Sin despachos recientes"}
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    {ventasLeche[0] ? `${ventasLeche[0].fecha} • $${Number(ventasLeche[0].totalUSD).toFixed(2)} USD (${ventasLeche[0].monedaPago || "USD"})` : "Tanque en fase de recolección"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Cuadrícula Inferior: Alertas Sanitarias & Potreros Activos */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
@@ -1253,29 +1659,34 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 </div>
 
                 <div className="space-y-2.5">
-                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs flex items-start gap-3">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Refuerzo Vacuna Antiaftosa Pendiente</div>
-                      <div className="text-slate-500 dark:text-white/50 text-[11px] mt-0.5">Lote de 8 novillas en Potrero Maternidad. Vence en 5 días.</div>
+                  {alertasSanitarias.length === 0 ? (
+                    <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-start gap-3">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />
+                      <div>
+                        <div className="font-bold text-slate-900 dark:text-white">Todo el hato está al día</div>
+                        <div className="text-slate-500 dark:text-white/50 text-[11px] mt-0.5">No hay retiros de leche/carne activos ni vacunas vencidas registradas.</div>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="p-3 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-xs flex items-start gap-3">
-                    <span className="w-2 h-2 rounded-full bg-purple-400 mt-1.5 flex-shrink-0" />
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Parto Estimado: Vaca V-042 (Mariposa)</div>
-                      <div className="text-slate-500 dark:text-white/50 text-[11px] mt-0.5">Fecha probable de parto: 28 de Septiembre 2026. Preparar corral de maternidad.</div>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-start gap-3">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Carencia y Retiro en Leche al 100% Libre</div>
-                      <div className="text-slate-500 dark:text-white/50 text-[11px] mt-0.5">Ningún animal en ordeño presenta restricciones de despacho actualmente.</div>
-                    </div>
-                  </div>
+                  ) : (
+                    alertasSanitarias.slice(0, 3).map((alerta, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-2xl border text-xs flex items-start gap-3 ${
+                          alerta.tipo.includes("RETIRO")
+                            ? "bg-red-500/10 border-red-500/20"
+                            : "bg-amber-500/10 border-amber-500/20"
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${alerta.tipo.includes("RETIRO") ? "bg-red-400" : "bg-amber-400"}`} />
+                        <div>
+                          <div className="font-bold text-slate-900 dark:text-white">
+                            {alerta.producto || alerta.tipo.replace("_", " ")} — Arete {alerta.animal?.arete}
+                          </div>
+                          <div className="text-slate-500 dark:text-white/50 text-[11px] mt-0.5">{alerta.mensaje}</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -2295,6 +2706,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
+                    onClick={() => setModalVentaLeche(true)}
+                    className="w-full text-left p-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-bold cursor-pointer flex items-center justify-between">
+                    <span>• Venta Cisterna / Planta (Tanque)</span>
+                    <span className="text-[10px] bg-sky-500/30 px-1.5 py-0.5 rounded text-sky-300">Despacho →</span>
+                  </button>
+                  <button
                     onClick={() => {
                       setModalReproduccion(true);
                       setFormRepro({ ...formRepro, tipo: "DIAGNOSTICO_PRENEZ", resultado: "SECADO_PREVIO_PARTO" });
@@ -2486,7 +2903,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <div className="font-['Outfit'] font-black text-3xl text-sky-500 dark:text-sky-400">
                   {ordenos.reduce((sum, o) => sum + (Number(o.cantidadLitros) || 0), 0).toFixed(1)} L
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-white/40">En {ordenos.length} ordeños</div>
+                <div className="text-[11px] text-slate-500 dark:text-white/40">En {ordenos.length} registros individuales</div>
               </div>
 
               <div className="apple-glass rounded-2xl p-5 border border-white/10 text-left space-y-1">
@@ -2494,59 +2911,184 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <div className="font-['Outfit'] font-black text-3xl text-emerald-500 dark:text-emerald-400">
                   ${ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0).toFixed(2)}
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-white/40">A razón de $0.55 / Litro</div>
+                <div className="text-[11px] text-slate-500 dark:text-white/40 flex items-center justify-between">
+                  <span>A razón de ${precioLecheUSD.toFixed(2)} / Litro</span>
+                  <button
+                    type="button"
+                    onClick={() => setModalEditarPrecioLeche(true)}
+                    className="text-sky-400 hover:text-sky-300 font-bold ml-1 underline cursor-pointer text-[10px]">
+                    ✏️ Editar Precio
+                  </button>
+                </div>
               </div>
 
               <div className="apple-glass rounded-2xl p-5 border border-white/10 text-left space-y-1">
                 <div className="text-xs text-slate-400 font-medium">Equivalente en Moneda Local</div>
-                <div className="font-['Outfit'] font-black text-3xl text-purple-500 dark:text-purple-400">
-                  Bs. {(ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                <div className="font-['Outfit'] font-black text-2xl text-purple-500 dark:text-purple-400">
+                  {monedasConfig.VES && (
+                    <div>Bs. {(ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  )}
+                  {monedasConfig.COP && (
+                    <div className="text-lg text-sky-400">COP ${Math.round(ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0) * tasaCOP).toLocaleString()}</div>
+                  )}
+                  {!monedasConfig.VES && !monedasConfig.COP && (
+                    <div className="text-base text-slate-400">Solo USD (Base)</div>
+                  )}
                 </div>
                 <div className="text-[11px] text-slate-500 dark:text-white/40 flex items-center justify-between">
-                  <span>Tasa Bs: {tasaBCV.toFixed(2)}</span>
-                  <button onClick={() => setModalEditarTasas(true)} className="text-purple-400 hover:text-purple-300 font-bold ml-2 underline cursor-pointer">Editar</button>
+                  <span>{monedasConfig.VES ? `Tasa Bs: ${tasaBCV.toFixed(2)}` : "Configuración de monedas"}</span>
+                  <button onClick={() => setModalEditarTasas(true)} className="text-purple-400 hover:text-purple-300 font-bold ml-2 underline cursor-pointer">
+                    ⚙️ Monedas & Tasas
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Tabla de Registros */}
-            <div className="overflow-x-auto rounded-3xl border border-slate-200/80 dark:border-white/10 apple-glass">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
-                  <tr>
-                    <th className="p-4">Fecha</th>
-                    <th className="p-4">Arete / Animal</th>
-                    <th className="p-4">Turno</th>
-                    <th className="p-4">Litros</th>
-                    <th className="p-4">% Grasa / Prot.</th>
-                    <th className="p-4">Monto USD</th>
-                    <th className="p-4 text-right">Monto Bs.</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
-                  {ordenos.map(o => (
-                    <tr key={o.id} className="hover:bg-white/5 transition-colors">
-                      <td className="p-4 font-mono">{o.fecha}</td>
-                      <td className="p-4 font-bold text-slate-900 dark:text-white">
-                        {o.animal?.arete} - {o.animal?.nombre || "Sin nombre"}
-                      </td>
-                      <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          o.turno === "MANANA" ? "bg-amber-500/15 text-amber-500" : "bg-indigo-500/15 text-indigo-400"
-                        }`}>
-                          {o.turno}
-                        </span>
-                      </td>
-                      <td className="p-4 font-bold text-sky-500 text-sm">{o.cantidadLitros} L</td>
-                      <td className="p-4 text-slate-400">{o.porcentajeGrasa || 3.8}% / {o.porcentajeProteina || 3.2}%</td>
-                      <td className="p-4 font-bold text-emerald-500">${Number(o.montoVenta || 0).toFixed(2)}</td>
-                      <td className="p-4 text-right font-mono text-slate-500 dark:text-white/70">
-                        Bs. {(Number(o.montoVenta || 0) * tasaBCV).toFixed(2)}
-                      </td>
+            {/* Subsección: Tanque de Leche & Despacho a Cisterna */}
+            <div className="apple-glass rounded-3xl p-5 border border-sky-500/20 bg-sky-950/20 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🥛</span>
+                <div>
+                  <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">
+                    Tanque Frío: {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} L en Stock
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-white/50">
+                    Capacidad {(tanqueLeche?.capacidadLitros ?? 2000).toLocaleString()} L • Temperatura {tanqueLeche?.temperaturaCelsius ?? 4.0}°C
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalAjusteTanque(true)}
+                  className="px-3 py-1.5 rounded-xl apple-glass border border-white/15 text-slate-700 dark:text-white text-xs font-semibold cursor-pointer">
+                  ⚙️ Calibrar Tanque
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalVentaLeche(true)}
+                  className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer flex items-center gap-1.5">
+                  <span>🚚 Despachar / Venta Cisterna</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Tabla de Registros de Ordeño */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">
+                  Registros de Ordeño por Vaca & Turno
+                </h4>
+                <span className="text-xs text-slate-400">{ordenos.length} registros</span>
+              </div>
+
+              <div className="overflow-x-auto rounded-3xl border border-slate-200/80 dark:border-white/10 apple-glass">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                    <tr>
+                      <th className="p-4">Fecha</th>
+                      <th className="p-4">Arete / Animal</th>
+                      <th className="p-4">Turno</th>
+                      <th className="p-4">Destino</th>
+                      <th className="p-4">Litros</th>
+                      <th className="p-4">% Grasa / Prot.</th>
+                      <th className="p-4">Monto USD</th>
+                      {monedasConfig.VES && <th className="p-4 text-right">Monto Bs.</th>}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                    {ordenos.map(o => (
+                      <tr key={o.id} className="hover:bg-white/5 transition-colors">
+                        <td className="p-4 font-mono">{o.fecha}</td>
+                        <td className="p-4 font-bold text-slate-900 dark:text-white">
+                          {o.animal?.arete} - {o.animal?.nombre || "Sin nombre"}
+                        </td>
+                        <td className="p-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            o.turno === "MANANA" ? "bg-amber-500/15 text-amber-500" : "bg-indigo-500/15 text-indigo-400"
+                          }`}>
+                            {o.turno}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            o.destino === "VENTA_DIRECTA"
+                              ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                              : "bg-sky-500/15 text-sky-400 border border-sky-500/30"
+                          }`}>
+                            {o.destino === "VENTA_DIRECTA" ? "⚡ Venta Directa" : "🥛 Tanque"}
+                          </span>
+                        </td>
+                        <td className="p-4 font-bold text-sky-500 text-sm">{o.cantidadLitros} L</td>
+                        <td className="p-4 text-slate-400">{o.porcentajeGrasa || 3.8}% / {o.porcentajeProteina || 3.2}%</td>
+                        <td className="p-4 font-bold text-emerald-500">${Number(o.montoVenta || 0).toFixed(2)}</td>
+                        {monedasConfig.VES && (
+                          <td className="p-4 text-right font-mono text-slate-500 dark:text-white/70">
+                            Bs. {(Number(o.montoVenta || 0) * tasaBCV).toFixed(2)}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Histórico de Ventas de Leche (Despachos de Tanque) */}
+            <div className="space-y-3 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">
+                    Histórico de Despachos & Ventas de Leche en Tanque
+                  </h4>
+                  <p className="text-[11px] text-slate-400">Entregas de cisterna a receptoras, queseras o plantas industriales</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalVentaLeche(true)}
+                  className="text-xs font-bold text-sky-400 hover:text-sky-300 underline cursor-pointer">
+                  + Registrar Despacho
+                </button>
+              </div>
+
+              {ventasLeche.length === 0 ? (
+                <div className="p-6 rounded-2xl bg-white/5 border border-white/10 text-center text-xs text-slate-400">
+                  No hay ventas registradas aún. El stock del tanque se acumula de los ordeños diarios con destino "Tanque".
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-3xl border border-slate-200/80 dark:border-white/10 apple-glass">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                      <tr>
+                        <th className="p-4">Fecha</th>
+                        <th className="p-4">Comprador / Planta</th>
+                        <th className="p-4">Litros Vendidos</th>
+                        <th className="p-4">Precio x Litro</th>
+                        <th className="p-4">Total USD</th>
+                        <th className="p-4">Moneda Pago</th>
+                        <th className="p-4">Notas</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                      {ventasLeche.map(v => (
+                        <tr key={v.id} className="hover:bg-white/5 transition-colors">
+                          <td className="p-4 font-mono">{v.fecha}</td>
+                          <td className="p-4 font-bold text-slate-900 dark:text-white">{v.compradorOPlanta}</td>
+                          <td className="p-4 font-bold text-sky-400">{v.litrosVendidos} L</td>
+                          <td className="p-4 font-mono">${Number(v.precioLitroUSD).toFixed(4)}</td>
+                          <td className="p-4 font-bold text-emerald-400">${Number(v.totalUSD).toFixed(2)}</td>
+                          <td className="p-4">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-white border border-white/15">
+                              {v.monedaPago || "USD"}
+                            </span>
+                          </td>
+                          <td className="p-4 text-slate-400 italic max-w-xs truncate">{v.notas || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
           </div>
@@ -2555,108 +3097,525 @@ export default function GanaderiaApp({ onSalir }: Props) {
         {/* ─────────────────────────────────────────────────────────────
             PESTAÑA 6: CENTRO DE REPORTES (GANSOFT STYLE)
         ───────────────────────────────────────────────────────────── */}
-        {tab === "reportes" && (
-          <div className="space-y-6 text-left">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-                  Centro de Reportes
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-white/40">
-                  Exportación de informes consolidados para gestión ganadera, técnica y fiscal.
-                </p>
+        {/* ─────────────────────────────────────────────────────────────
+            PESTAÑA 6: CENTRO DE REPORTES & FINANZAS DEL HATO
+        ───────────────────────────────────────────────────────────── */}
+        {tab === "reportes" && (() => {
+          // Helper para calcular semana ISO (YYYY-Www)
+          const getISOWeekInfo = (dateStr: string) => {
+            if (!dateStr) return null;
+            const cleanDate = dateStr.slice(0, 10);
+            const d = new Date(cleanDate + "T12:00:00Z");
+            if (isNaN(d.getTime())) return null;
+
+            const day = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - day);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+            const year = d.getUTCFullYear();
+            const weekKey = `${year}-W${String(weekNo).padStart(2, "0")}`;
+
+            const orig = new Date(cleanDate + "T12:00:00Z");
+            const origDay = orig.getUTCDay() || 7;
+            const monday = new Date(orig);
+            monday.setUTCDate(orig.getUTCDate() - (origDay - 1));
+            const sunday = new Date(monday);
+            sunday.setUTCDate(monday.getUTCDate() + 6);
+
+            const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", timeZone: "UTC" };
+            const rangoTexto = `${monday.toLocaleDateString("es-ES", opts)} – ${sunday.toLocaleDateString("es-ES", opts)}`;
+
+            return { weekKey, year, weekNo, rangoTexto, mondayTime: monday.getTime() };
+          };
+
+          const hoyInfo = getISOWeekInfo(new Date().toISOString().slice(0, 10));
+          const semanaActualKey = hoyInfo?.weekKey ?? "2026-W37";
+
+          const listaGastos = gastos;
+
+          interface SemanaBucket {
+            weekKey: string;
+            rangoTexto: string;
+            mondayTime: number;
+            esSemanaActual: boolean;
+            ingresosLeche: number;
+            ingresosAnimales: number;
+            ingresosTotales: number;
+            gastosTotales: number;
+            neto: number;
+            gastosCount: number;
+          }
+
+          const weekMap = new Map<string, SemanaBucket>();
+
+          const getOrCreateBucket = (info: NonNullable<ReturnType<typeof getISOWeekInfo>>) => {
+            if (!weekMap.has(info.weekKey)) {
+              weekMap.set(info.weekKey, {
+                weekKey: info.weekKey,
+                rangoTexto: info.rangoTexto,
+                mondayTime: info.mondayTime,
+                esSemanaActual: info.weekKey === semanaActualKey,
+                ingresosLeche: 0,
+                ingresosAnimales: 0,
+                ingresosTotales: 0,
+                gastosTotales: 0,
+                neto: 0,
+                gastosCount: 0,
+              });
+            }
+            return weekMap.get(info.weekKey)!;
+          };
+
+          // Asegurar que la semana actual siempre esté inicializada
+          if (hoyInfo) {
+            getOrCreateBucket(hoyInfo);
+          }
+
+          // 1. Ingresos: Ventas de leche de tanque
+          for (const v of ventasLeche) {
+            const info = getISOWeekInfo(v.fecha);
+            if (!info) continue;
+            const b = getOrCreateBucket(info);
+            const monto = Number(v.totalUSD) || (Number(v.litrosVendidos || 0) * Number(v.precioLitroUSD || precioLecheUSD));
+            b.ingresosLeche += monto;
+            b.ingresosTotales += monto;
+          }
+
+          // 2. Ingresos: Ordeños con venta directa
+          for (const o of ordenos) {
+            if (o.destino === "VENTA_DIRECTA" || (Number(o.montoVenta) > 0 && o.destino !== "TANQUE")) {
+              const info = getISOWeekInfo(o.fecha);
+              if (!info) continue;
+              const b = getOrCreateBucket(info);
+              const monto = Number(o.montoVenta) || (Number(o.cantidadLitros || 0) * (Number(o.precioVentaLitro) || precioLecheUSD));
+              b.ingresosLeche += monto;
+              b.ingresosTotales += monto;
+            }
+          }
+
+          // 3. Ingresos: Ventas de Animales
+          for (const va of ventasAnimales) {
+            const info = getISOWeekInfo(va.fecha);
+            if (!info) continue;
+            const b = getOrCreateBucket(info);
+            const monto = Number(va.total) || 0;
+            b.ingresosAnimales += monto;
+            b.ingresosTotales += monto;
+          }
+
+          // 4. Gastos Operativos
+          for (const g of listaGastos) {
+            const info = getISOWeekInfo(g.fecha);
+            if (!info) continue;
+            const b = getOrCreateBucket(info);
+            const monto = Number(g.monto) || 0;
+            b.gastosTotales += monto;
+            b.gastosCount++;
+          }
+
+          // Calcular balances netos
+          for (const b of weekMap.values()) {
+            b.neto = b.ingresosTotales - b.gastosTotales;
+          }
+
+          // Orden cronológico descendente
+          const listaSemanas = Array.from(weekMap.values()).sort((a, b) => b.mondayTime - a.mondayTime);
+
+          const semActual = weekMap.get(semanaActualKey) || {
+            weekKey: semanaActualKey,
+            rangoTexto: hoyInfo?.rangoTexto ?? "Esta semana",
+            mondayTime: 0,
+            esSemanaActual: true,
+            ingresosLeche: 0,
+            ingresosAnimales: 0,
+            ingresosTotales: 0,
+            gastosTotales: 0,
+            neto: 0,
+            gastosCount: 0,
+          };
+
+          return (
+            <div className="space-y-7 text-left">
+              {/* Encabezado Principal de la Pestaña */}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider mb-2">
+                    <span>Módulo Financiero & Operativo</span>
+                  </div>
+                  <h3 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-slate-900 dark:text-white">
+                    Centro Financiero & Reportes
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-white/50 max-w-2xl">
+                    Flujo de caja semanal del hato (Semanas ISO), balance de ingresos por ventas de leche y ganado vs gastos operativos, y exportaciones oficiales.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => setModalGasto(true)}
+                    className="btn-cyber-neon text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg hover:scale-105 transition-all cursor-pointer flex items-center gap-2"
+                  >
+                    <span>💸</span>
+                    <span>+ Registrar Gasto</span>
+                  </button>
+                  <button
+                    onClick={exportarInventarioXLSX}
+                    className="apple-glass px-4 py-2.5 rounded-xl border border-white/20 text-slate-700 dark:text-white text-xs font-bold hover:bg-white/10 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>📊</span>
+                    <span>Exportar XLSX</span>
+                  </button>
+                </div>
               </div>
 
-              <button
-                onClick={exportarInventarioXLSX}
-                className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer">
-                Exportar XLSX Consolidado
-              </button>
+              {/* 3 Tarjetas de Resumen Financiero Semanal (Semana Actual) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Tarjeta 1: Ingresos de la Semana */}
+                <div className="apple-glass rounded-3xl p-6 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-slate-900/60 to-slate-900/80 text-left space-y-2 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>📈</span> Ingresos Semanales
+                    </span>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {semActual.weekKey}
+                    </span>
+                  </div>
+                  <div className="font-['Outfit'] font-black text-3xl text-emerald-400">
+                    ${semActual.ingresosTotales.toFixed(2)} <span className="text-sm font-normal text-slate-400">USD</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span>🥛 Leche: ${semActual.ingresosLeche.toFixed(2)}</span>
+                    <span>•</span>
+                    <span>🐮 Ganado: ${semActual.ingresosAnimales.toFixed(2)}</span>
+                  </div>
+                  {(monedasConfig.VES || monedasConfig.COP) && (
+                    <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300 flex flex-col gap-0.5">
+                      {monedasConfig.VES && (
+                        <div className="font-mono text-emerald-300">
+                          Bs. {(semActual.ingresosTotales * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      )}
+                      {monedasConfig.COP && (
+                        <div className="font-mono text-sky-300">
+                          COP ${Math.round(semActual.ingresosTotales * tasaCOP).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tarjeta 2: Gastos de la Semana */}
+                <div className="apple-glass rounded-3xl p-6 border border-rose-500/30 bg-gradient-to-br from-rose-950/20 via-slate-900/60 to-slate-900/80 text-left space-y-2 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>📉</span> Gastos Semanales
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      {semActual.gastosCount} registro(s)
+                    </span>
+                  </div>
+                  <div className="font-['Outfit'] font-black text-3xl text-rose-400">
+                    ${semActual.gastosTotales.toFixed(2)} <span className="text-sm font-normal text-slate-400">USD</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Egresos de caja en insumos, mano de obra y mantenimiento
+                  </div>
+                  {(monedasConfig.VES || monedasConfig.COP) && (
+                    <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300 flex flex-col gap-0.5">
+                      {monedasConfig.VES && (
+                        <div className="font-mono text-rose-300">
+                          Bs. {(semActual.gastosTotales * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      )}
+                      {monedasConfig.COP && (
+                        <div className="font-mono text-sky-300">
+                          COP ${Math.round(semActual.gastosTotales * tasaCOP).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tarjeta 3: Neto de la Semana */}
+                <div className={`apple-glass rounded-3xl p-6 border text-left space-y-2 shadow-lg ${
+                  semActual.neto >= 0
+                    ? "border-sky-500/30 bg-gradient-to-br from-sky-950/20 via-slate-900/60 to-slate-900/80"
+                    : "border-amber-500/30 bg-gradient-to-br from-amber-950/20 via-slate-900/60 to-slate-900/80"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>⚖️</span> Neto de la Semana
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      semActual.neto >= 0 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                    }`}>
+                      {semActual.neto >= 0 ? "Superávit" : "Déficit"}
+                    </span>
+                  </div>
+                  <div className={`font-['Outfit'] font-black text-3xl ${semActual.neto >= 0 ? "text-sky-400" : "text-amber-400"}`}>
+                    {semActual.neto >= 0 ? `+$${semActual.neto.toFixed(2)}` : `-$${Math.abs(semActual.neto).toFixed(2)}`} <span className="text-sm font-normal text-slate-400">USD</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    {semActual.rangoTexto}
+                  </div>
+                  {(monedasConfig.VES || monedasConfig.COP) && (
+                    <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300 flex flex-col gap-0.5">
+                      {monedasConfig.VES && (
+                        <div className="font-mono text-slate-200">
+                          Bs. {(semActual.neto * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      )}
+                      {monedasConfig.COP && (
+                        <div className="font-mono text-sky-300">
+                          COP ${Math.round(semActual.neto * tasaCOP).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sección 1: Gastos Operativos Recientes */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>💸</span> Gastos Operativos Recientes
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-white/40">
+                      Registro de egresos por categoría (alimentación, sanidad, jornales, repuestos)
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setModalGasto(true)}
+                    className="text-xs font-bold text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+                  >
+                    + Registrar Gasto
+                  </button>
+                </div>
+
+                {listaGastos.length === 0 ? (
+                  <div className="p-8 rounded-3xl border border-white/10 apple-glass text-center space-y-2">
+                    <span className="text-3xl block">📋</span>
+                    <h5 className="font-bold text-sm text-white">Sin gastos operativos registrados aún</h5>
+                    <p className="text-xs text-slate-400 max-w-md mx-auto">
+                      Esta finca no tiene salidas de caja registradas. Presiona el botón "+ Registrar Gasto" para registrar alimentación, sanidad, insumos o jornales.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-3xl border border-slate-200/80 dark:border-white/10 apple-glass">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                        <tr>
+                          <th className="p-4">Fecha</th>
+                          <th className="p-4">Categoría</th>
+                          <th className="p-4">Descripción</th>
+                          <th className="p-4">Monto USD</th>
+                          {monedasConfig.VES && <th className="p-4 text-right">Monto Bs.</th>}
+                          {monedasConfig.COP && <th className="p-4 text-right">Monto COP</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                        {listaGastos.map(g => {
+                          const cat = CATEGORIAS_GASTO_GANADERIA.find(c => c.id === g.categoria);
+                          return (
+                            <tr key={g.id} className="hover:bg-white/5 transition-colors">
+                              <td className="p-4 font-mono">{g.fecha}</td>
+                              <td className="p-4">
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${cat?.colorBadge || "text-slate-300 bg-white/10 border-white/20"}`}>
+                                  <span>{cat?.icon || "📌"}</span>
+                                  <span>{cat ? cat.label.split("/")[0].trim() : g.categoria}</span>
+                                </span>
+                              </td>
+                              <td className="p-4 text-slate-800 dark:text-white/90 font-medium max-w-sm truncate">{g.descripcion}</td>
+                              <td className="p-4 font-mono font-bold text-rose-400">${Number(g.monto).toFixed(2)}</td>
+                              {monedasConfig.VES && (
+                                <td className="p-4 text-right font-mono text-slate-400">
+                                  Bs. {(Number(g.monto) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                              )}
+                              {monedasConfig.COP && (
+                                <td className="p-4 text-right font-mono text-sky-400/80">
+                                  COP ${Math.round(Number(g.monto) * tasaCOP).toLocaleString()}
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Sección 2: Flujo de Caja Semanal (Semanas ISO) */}
+              <div className="space-y-3 pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>📅</span> Flujo de Caja Semanal (Semanas ISO)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-white/40">
+                      Balance neto: Ingresos (Leche en cisterna + ordeño + ganado) menos Gastos Operativos agrupados por semana ISO
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-3xl border border-slate-200/80 dark:border-white/10 apple-glass">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                      <tr>
+                        <th className="p-4">Semana ISO</th>
+                        <th className="p-4">Venta Leche</th>
+                        <th className="p-4">Venta Ganado</th>
+                        <th className="p-4">Total Ingresos</th>
+                        <th className="p-4">Gastos Operativos</th>
+                        <th className="p-4">Balance Neto</th>
+                        {(monedasConfig.VES || monedasConfig.COP) && <th className="p-4 text-right">Equivalente Local</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                      {listaSemanas.map(s => (
+                        <tr key={s.weekKey} className={`hover:bg-white/5 transition-colors ${s.esSemanaActual ? "bg-emerald-500/[0.04]" : ""}`}>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-slate-900 dark:text-white">{s.weekKey}</span>
+                              {s.esSemanaActual && (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                  Semana Actual
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400 block">{s.rangoTexto}</span>
+                          </td>
+                          <td className="p-4 font-mono text-sky-400">${s.ingresosLeche.toFixed(2)}</td>
+                          <td className="p-4 font-mono text-emerald-400">${s.ingresosAnimales.toFixed(2)}</td>
+                          <td className="p-4 font-mono font-bold text-slate-900 dark:text-white">${s.ingresosTotales.toFixed(2)}</td>
+                          <td className="p-4 font-mono font-bold text-rose-400">${s.gastosTotales.toFixed(2)}</td>
+                          <td className="p-4">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-xl font-mono font-black text-xs ${
+                              s.neto >= 0
+                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                            }`}>
+                              {s.neto >= 0 ? `+$${s.neto.toFixed(2)}` : `-$${Math.abs(s.neto).toFixed(2)}`}
+                            </span>
+                          </td>
+                          {(monedasConfig.VES || monedasConfig.COP) && (
+                            <td className="p-4 text-right font-mono text-xs">
+                              {monedasConfig.VES && (
+                                <div className={s.neto >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                                  Bs. {(s.neto * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
+                              )}
+                              {monedasConfig.COP && (
+                                <div className="text-[10px] text-slate-400">
+                                  COP ${Math.round(s.neto * tasaCOP).toLocaleString()}
+                                </div>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Sección 3: Informes Oficiales & Exportaciones Consolidadas */}
+              <div className="space-y-3 pt-4">
+                <div>
+                  <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>📑</span> Informes Consolidados & Exportaciones
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-white/40">
+                    Informes ejecutivos y de gestión técnica para auditoría, registros sanitarios y fiscales
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {/* Reportes de Gestión */}
+                  <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
+                    <h5 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white pb-2 border-b border-white/10">
+                      Gestión del Hato
+                    </h5>
+                    <div className="space-y-2 text-xs">
+                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={exportarInventarioXLSX}>
+                        <span>Inventario de Animales</span>
+                        <span className="text-emerald-400 font-bold">XLSX</span>
+                      </div>
+                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando informe de movimientos de potrero...")}>
+                        <span>Historial de Movimientos</span>
+                        <span className="text-emerald-400 font-bold">PDF</span>
+                      </div>
+                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando distribución reproductiva...")}>
+                        <span>Reproductores & Vientres</span>
+                        <span className="text-emerald-400 font-bold">XLSX</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Reportes de Animales */}
+                  <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
+                    <h5 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white pb-2 border-b border-white/10">
+                      Animales & Vientres
+                    </h5>
+                    <div className="space-y-2 text-xs">
+                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Cargando vientres confirmados...")}>
+                        <span>Vientres Preñados</span>
+                        <span className="text-emerald-400 font-bold">Ver</span>
+                      </div>
+                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Cargando hembras próximas a parir...")}>
+                        <span>Próximas a Parir (30d)</span>
+                        <span className="text-emerald-400 font-bold">Ver</span>
+                      </div>
+                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Cargando hembras en ordeño...")}>
+                        <span>Animales en Lactancia</span>
+                        <span className="text-emerald-400 font-bold">Ver</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Reportes de Potreros */}
+                  <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
+                    <h5 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white pb-2 border-b border-white/10">
+                      Potreros & Pasturas
+                    </h5>
+                    <div className="space-y-2 text-xs">
+                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => { setTab("potreros"); setSubPotreros("lista"); }}>
+                        <span>Aforo General de Pastos</span>
+                        <span className="text-emerald-400 font-bold">Ver</span>
+                      </div>
+                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando registro de descansos...")}>
+                        <span>Días de Descanso Acumulados</span>
+                        <span className="text-emerald-400 font-bold">XLSX</span>
+                      </div>
+                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Calculando carga animal global...")}>
+                        <span>Carga Animal por Hectárea</span>
+                        <span className="text-emerald-400 font-bold">XLSX</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              
-              {/* Reportes de Gestión */}
-              <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white pb-2 border-b border-white/10">
-                  Gestión del Hato
-                </h4>
-                <div className="space-y-2 text-xs">
-                  <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={exportarInventarioXLSX}>
-                    <span>Inventario de Animales</span>
-                    <span className="text-emerald-400 font-bold">XLSX</span>
-                  </div>
-                  <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando informe de movimientos de potrero...")}>
-                    <span>Historial de Movimientos</span>
-                    <span className="text-emerald-400 font-bold">PDF</span>
-                  </div>
-                  <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando distribución reproductiva...")}>
-                    <span>Reproductores & Vientres</span>
-                    <span className="text-emerald-400 font-bold">XLSX</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Reportes de Animales */}
-              <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white pb-2 border-b border-white/10">
-                  Animales & Vientres
-                </h4>
-                <div className="space-y-2 text-xs">
-                  <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Cargando vientres confirmados...")}>
-                    <span>Vientres Preñados</span>
-                    <span className="text-emerald-400 font-bold">Ver</span>
-                  </div>
-                  <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Cargando hembras próximas a parir...")}>
-                    <span>Próximas a Parir (30d)</span>
-                    <span className="text-emerald-400 font-bold">Ver</span>
-                  </div>
-                  <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Cargando hembras en ordeño...")}>
-                    <span>Animales en Lactancia</span>
-                    <span className="text-emerald-400 font-bold">Ver</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Reportes de Potreros */}
-              <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white pb-2 border-b border-white/10">
-                  Potreros & Pasturas
-                </h4>
-                <div className="space-y-2 text-xs">
-                  <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => { setTab("potreros"); setSubPotreros("lista"); }}>
-                    <span>Aforo General de Pastos</span>
-                    <span className="text-emerald-400 font-bold">Ver</span>
-                  </div>
-                  <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando registro de descansos...")}>
-                    <span>Días de Descanso Acumulados</span>
-                    <span className="text-emerald-400 font-bold">XLSX</span>
-                  </div>
-                  <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Calculando carga animal global...")}>
-                    <span>Carga Animal por Hectárea</span>
-                    <span className="text-emerald-400 font-bold">XLSX</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
       </main>
 
       {/* ── MODAL: ACTUALIZAR TASAS A MANO ── */}
       {modalEditarTasas && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="apple-glass rounded-3xl p-6 sm:p-7 max-w-md w-full border border-emerald-500/40 text-left space-y-5 shadow-2xl bg-slate-900/90 text-white">
+          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-md w-full border border-emerald-500/40 text-left space-y-5 shadow-2xl bg-slate-900/95 text-white">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
                 <span className="text-xl">💱</span>
                 <div>
                   <h3 className="font-['Outfit'] font-black text-lg text-white">
-                    Actualizar Tasas de Cambio
+                    Configuración de Monedas & Tasas
                   </h3>
-                  <p className="text-[11px] text-slate-400">Ajusta los valores de cambio a mano para la finca</p>
+                  <p className="text-[11px] text-slate-400">Activa las monedas operativas de la finca y ajusta sus tasas</p>
                 </div>
               </div>
               <button
@@ -2671,14 +3630,57 @@ export default function GanaderiaApp({ onSalir }: Props) {
               onSubmit={(e) => {
                 e.preventDefault();
                 const fd = new FormData(e.currentTarget);
-                const bcv = parseFloat(String(fd.get("tasaBcv") || "0"));
-                const cop = parseFloat(String(fd.get("tasaCop") || "0"));
-                if (bcv > 0 && cop > 0) {
-                  guardarTasas(bcv, cop);
-                }
+                const bcv = parseFloat(String(fd.get("tasaBcv") || String(tasaBCV)));
+                const cop = parseFloat(String(fd.get("tasaCop") || String(tasaCOP)));
+                const vesActivo = fd.get("vesActivo") === "on";
+                const copActivo = fd.get("copActivo") === "on";
+                guardarTasas(bcv > 0 ? bcv : tasaBCV, cop > 0 ? cop : tasaCOP, vesActivo, copActivo);
               }}
               className="space-y-4 text-xs"
             >
+              {/* Selector de Monedas Activas */}
+              <div className="space-y-2 p-3 rounded-2xl bg-white/5 border border-white/10">
+                <label className="text-[11px] font-bold text-slate-300 block">
+                  Monedas Activas en esta Finca
+                </label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-emerald-400">USD ($)</span>
+                      <span className="text-[10px] text-slate-400">Dólar Estadounidense (Moneda Base)</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full">Fija</span>
+                  </div>
+
+                  <label className="flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-purple-400">VES (Bs.)</span>
+                      <span className="text-[10px] text-slate-400">Bolívares (Tasa Oficial / Mercado)</span>
+                    </div>
+                    <input
+                      name="vesActivo"
+                      type="checkbox"
+                      defaultChecked={monedasConfig.VES}
+                      className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-sky-400">COP ($)</span>
+                      <span className="text-[10px] text-slate-400">Pesos Colombianos (Frontera)</span>
+                    </div>
+                    <input
+                      name="copActivo"
+                      type="checkbox"
+                      defaultChecked={monedasConfig.COP}
+                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Inputs de Tasas */}
               <div>
                 <label className="text-[11px] font-bold text-emerald-400 block mb-1">
                   Tasa Bolívares (Bs. por 1 USD)
@@ -2696,7 +3698,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     placeholder="43.50"
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">Usada para liquidar el ordeño y pagos en moneda local.</p>
+                <p className="text-[10px] text-slate-400 mt-1">Usada para liquidar el ordeño y compras de ganado en moneda local.</p>
               </div>
 
               <div>
@@ -2716,7 +3718,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     placeholder="4150"
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">Referencia fronteriza para transacciones en efectivo.</p>
+                <p className="text-[10px] text-slate-400 mt-1">Referencia fronteriza para transacciones y compras en efectivo.</p>
               </div>
 
               <div className="pt-3 flex items-center justify-end gap-2 border-t border-white/10">
@@ -2729,7 +3731,335 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 <button
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg transition-all cursor-pointer">
-                  Guardar Tasas
+                  Guardar Configuración
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDITAR PRECIO DE LA LECHE CENTRALIZADO */}
+      {modalEditarPrecioLeche && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-sm w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🥛</span>
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-lg text-white">
+                    Precio Base de la Leche
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Valor de referencia por litro en USD</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalEditarPrecioLeche(false)}
+                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const precio = parseFloat(String(fd.get("precioLeche") || "0"));
+                if (precio > 0) {
+                  guardarPrecioLeche(precio);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div>
+                <label className="text-[11px] font-bold text-sky-400 block mb-1">
+                  Precio por Litro (USD $)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-slate-400 font-mono font-bold text-sm">$</span>
+                  <input
+                    name="precioLeche"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    defaultValue={precioLecheUSD}
+                    required
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-base font-bold focus:border-sky-500 focus:outline-none"
+                    placeholder="0.55"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1.5">
+                  Este precio se sincroniza automáticamente en la sala de ordeño, Modo Vaquera Rápida y los despachos de tanque.
+                </p>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setModalEditarPrecioLeche(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg transition-all cursor-pointer">
+                  Guardar Precio
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: VENTA DE LECHE EN TANQUE (CISTERNA / PLANTA) */}
+      {modalVentaLeche && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white font-['Inter']">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🚚</span>
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-lg text-white">
+                    Despacho de Leche en Tanque
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Venta de cisterna a receptoría, planta pasteurizadora o quesera
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalVentaLeche(false)}
+                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            {/* Alerta de Stock Actual Disponible en Tanque */}
+            <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/25 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-[10px] uppercase font-bold text-sky-400">Stock Actual en Tanque</span>
+                <div className="font-mono font-black text-xl text-white">
+                  {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} <span className="text-xs text-slate-400">L disponibles</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormVentaLeche({ ...formVentaLeche, litrosVendidos: Number(tanqueLeche?.stockActualLitros) || 0 })}
+                className="px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[11px] font-bold border border-sky-500/30 transition-all cursor-pointer">
+                Despachar Todo
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarVentaLeche} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Fecha de Despacho *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formVentaLeche.fecha}
+                    onChange={e => setFormVentaLeche({ ...formVentaLeche, fecha: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-xs focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Litros a Despachar *</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    max={Number(tanqueLeche?.stockActualLitros) || 999999}
+                    required
+                    value={formVentaLeche.litrosVendidos}
+                    onChange={e => setFormVentaLeche({ ...formVentaLeche, litrosVendidos: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-sky-400 font-mono font-bold text-sm focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">Comprador / Planta Receptora *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Planta Lácteos San Simón, Camión Cisterna #04, Quesera Don Luis"
+                  value={formVentaLeche.compradorOPlanta}
+                  onChange={e => setFormVentaLeche({ ...formVentaLeche, compradorOPlanta: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Precio x Litro (USD) *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-emerald-400 font-bold">$</span>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      min="0.0001"
+                      required
+                      value={formVentaLeche.precioLitroUSD}
+                      onChange={e => setFormVentaLeche({ ...formVentaLeche, precioLitroUSD: Number(e.target.value) })}
+                      className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-800 border border-white/15 text-emerald-400 font-mono font-bold text-xs focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Moneda de Pago</label>
+                  <select
+                    value={formVentaLeche.monedaPago}
+                    onChange={e => setFormVentaLeche({ ...formVentaLeche, monedaPago: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-sky-500 focus:outline-none">
+                    <option value="USD">USD ($ Dólares)</option>
+                    {monedasConfig.VES && <option value="VES">VES (Bs. Bolívares)</option>}
+                    {monedasConfig.COP && <option value="COP">COP ($ Pesos Colombianos)</option>}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-medium text-slate-400 block mb-1">Notas / Guía de Movilización (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Número de guía INSAI / chofer / precinto de cisterna..."
+                  value={formVentaLeche.notas}
+                  onChange={e => setFormVentaLeche({ ...formVentaLeche, notas: e.target.value })}
+                  className="w-full p-2 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Liquidación Total en Tiempo Real */}
+              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium text-xs">Total Facturado (USD):</span>
+                  <span className="font-mono font-black text-xl text-emerald-400">
+                    ${(formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD).toFixed(2)} USD
+                  </span>
+                </div>
+                {monedasConfig.VES && formVentaLeche.monedaPago === "VES" && (
+                  <div className="flex items-center justify-between text-[11px] text-emerald-300">
+                    <span>Equivalente en Bolívares:</span>
+                    <span className="font-mono font-bold">
+                      Bs. {((formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                {monedasConfig.COP && formVentaLeche.monedaPago === "COP" && (
+                  <div className="flex items-center justify-between text-[11px] text-sky-300">
+                    <span>Equivalente en Pesos:</span>
+                    <span className="font-mono font-bold">
+                      COP ${Math.round((formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD) * tasaCOP).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setModalVentaLeche(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl btn-cyber-neon text-white text-xs font-bold shadow-lg transition-all cursor-pointer flex items-center gap-1.5">
+                  <span>🚚 Confirmar Despacho & Descontar Stock</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CALIBRACIÓN Y AJUSTE DE TANQUE DE LECHE */}
+      {modalAjusteTanque && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-md w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white font-['Inter']">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">⚙️</span>
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-lg text-white">
+                    Calibrar Tanque de Leche
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Ajuste técnico de capacidad y vara medidora</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalAjusteTanque(false)}
+                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const cap = parseFloat(String(fd.get("capacidad") || "2000"));
+                const temp = parseFloat(String(fd.get("temperatura") || "4.0"));
+                const stock = parseFloat(String(fd.get("stock") || "0"));
+                handleAjustarTanque(cap, temp, stock);
+              }}
+              className="space-y-3.5 text-xs"
+            >
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">Capacidad Total del Tanque (Litros)</label>
+                <input
+                  name="capacidad"
+                  type="number"
+                  step="50"
+                  min="100"
+                  defaultValue={tanqueLeche?.capacidadLitros ?? 2000}
+                  required
+                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-sm focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">Temperatura de Enfriamiento (°C)</label>
+                <input
+                  name="temperatura"
+                  type="number"
+                  step="0.1"
+                  defaultValue={tanqueLeche?.temperaturaCelsius ?? 4.0}
+                  required
+                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-sm focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-sky-400 block mb-1">Stock Actual Calibrado (Litros)</label>
+                <input
+                  name="stock"
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  defaultValue={tanqueLeche?.stockActualLitros ?? 0}
+                  required
+                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-sky-500/40 text-sky-300 font-mono text-sm font-bold focus:border-sky-400 focus:outline-none"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Útil tras aforar la regla o realizar limpieza técnica del tanque.</p>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setModalAjusteTanque(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg transition-all cursor-pointer">
+                  Guardar Calibración
                 </button>
               </div>
             </form>
@@ -2803,7 +4133,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         onChange={e => setFormAnimal({ ...formAnimal, madreId: e.target.value ? Number(e.target.value) : null })}
                         className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white text-xs">
                         <option value="">Sin madre vinculada</option>
-                        {animales.filter(a => a.sexo === "HEMBRA").map(h => (
+                        {animalesActivos.filter(a => a.sexo === "HEMBRA").map(h => (
                           <option key={h.id} value={h.id}>
                             {h.arete} - {h.nombre || h.tipoAnimal} ({h.raza || "Brahman"})
                           </option>
@@ -3193,7 +4523,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   value={formOrdeno.animalId}
                   onChange={e => setFormOrdeno({ ...formOrdeno, animalId: Number(e.target.value) })}
                   className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
-                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
                     <option key={a.id} value={a.id}>{a.arete} - {a.nombre || "Sin nombre"}</option>
                   ))}
                 </select>
@@ -3244,6 +4574,46 @@ export default function GanaderiaApp({ onSalir }: Props) {
                     className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-emerald-400 font-mono font-bold"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Destino de la Leche *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormOrdeno({ ...formOrdeno, destino: "TANQUE" })}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      formOrdeno.destino === "TANQUE"
+                        ? "bg-sky-500/20 border-sky-400 text-sky-400 shadow-md shadow-sky-500/20"
+                        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                    }`}>
+                    <span>🥛 Al Tanque (Stock)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormOrdeno({ ...formOrdeno, destino: "VENTA_DIRECTA" })}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      formOrdeno.destino === "VENTA_DIRECTA"
+                        ? "bg-amber-500/20 border-amber-400 text-amber-400 shadow-md shadow-amber-500/20"
+                        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                    }`}>
+                    <span>⚡ Venta Directa</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {formOrdeno.destino === "TANQUE"
+                    ? "Suma los litros al tanque refrigerado de la finca para posterior despacho a cisterna."
+                    : "Ingreso inmediato por venta directa a pie de vaca o despacho sin almacenamiento."}
+                </p>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">Liquidación estimada:</span>
+                <span className="font-mono font-bold text-emerald-400">
+                  ${(formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro).toFixed(2)} USD
+                  {monedasConfig.VES && ` • Bs. ${((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaBCV).toFixed(2)}`}
+                  {monedasConfig.COP && ` • COP $${Math.round((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaCOP).toLocaleString()}`}
+                </span>
               </div>
 
               <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
@@ -3370,7 +4740,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: VACUNACIÓN & TRATAMIENTOS SANITARIOS */}
       {modalVacuna && (() => {
-        const vacunaSel = vacunas.find(v => v.id === Number(formVacuna.vacunaId)) || DEFAULT_VACUNAS_CATALOGO[0];
+        const vacunaSel = vacunas.find(v => v.id === Number(formVacuna.vacunaId));
         const lotesUnicos = Array.from(new Set(animales.map(a => a.lote).filter(Boolean))) as string[];
         const totalSeleccionados = vacunacionModo === "INDIVIDUAL"
           ? (formVacuna.animalId ? 1 : 0)
@@ -3443,7 +4813,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         onChange={e => setFormVacuna({ ...formVacuna, animalId: Number(e.target.value) })}
                         className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs"
                       >
-                        {animales.map(a => (
+                        {animalesActivos.map(a => (
                           <option key={a.id} value={a.id}>
                             {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"}) {a.lote ? `[${a.lote}]` : ""}
                           </option>
@@ -3455,10 +4825,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
                       <div className="flex flex-wrap items-center gap-1.5 pt-1">
                         <button
                           type="button"
-                          onClick={() => setAnimalesVacunaSeleccionados(animales.map(a => a.id))}
+                          onClick={() => setAnimalesVacunaSeleccionados(animalesActivos.map(a => a.id))}
                           className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold hover:bg-emerald-500/30 cursor-pointer"
                         >
-                          ✓ Todos ({animales.length})
+                          ✓ Todos ({animalesActivos.length})
                         </button>
                         <button
                           type="button"
@@ -3474,7 +4844,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                             key={loteNombre}
                             type="button"
                             onClick={() => {
-                              const idsLote = animales.filter(a => a.lote === loteNombre).map(a => a.id);
+                              const idsLote = animalesActivos.filter(a => a.lote === loteNombre).map(a => a.id);
                               setAnimalesVacunaSeleccionados(prev => Array.from(new Set([...prev, ...idsLote])));
                             }}
                             className="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-bold hover:bg-purple-500/30 cursor-pointer"
@@ -3489,7 +4859,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                             key={pot.id}
                             type="button"
                             onClick={() => {
-                              const idsPot = animales.filter(a => a.potrero?.id === pot.id).map(a => a.id);
+                              const idsPot = animalesActivos.filter(a => a.potrero?.id === pot.id).map(a => a.id);
                               setAnimalesVacunaSeleccionados(prev => Array.from(new Set([...prev, ...idsPot])));
                             }}
                             className="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-bold hover:bg-sky-500/30 cursor-pointer"
@@ -3501,7 +4871,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
                       {/* Lista scrolleable de animales seleccionables */}
                       <div className="max-h-36 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/70 p-2 space-y-1">
-                        {animales.map(a => {
+                        {animalesActivos.map(a => {
                           const isSel = animalesVacunaSeleccionados.includes(a.id);
                           return (
                             <label
@@ -3532,7 +4902,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                         })}
                       </div>
                       <div className="text-[11px] text-right font-bold text-emerald-400">
-                        {animalesVacunaSeleccionados.length} de {animales.length} animales seleccionados
+                        {animalesVacunaSeleccionados.length} de {animalesActivos.length} animales seleccionados
                       </div>
                     </div>
                   )}
@@ -3741,7 +5111,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   value={formRepro.hembraId}
                   onChange={e => setFormRepro({ ...formRepro, hembraId: Number(e.target.value) })}
                   className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
-                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
                     <option key={a.id} value={a.id}>{a.arete} - {a.nombre || a.tipoAnimal}</option>
                   ))}
                 </select>
@@ -3824,7 +5194,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   value={formCelo.hembraId}
                   onChange={e => setFormCelo({ ...formCelo, hembraId: Number(e.target.value) })}
                   className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
-                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
                     <option key={a.id} value={a.id}>
                       {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"})
                     </option>
@@ -3925,7 +5295,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   value={formMastitis.animalId}
                   onChange={e => setFormMastitis({ ...formMastitis, animalId: Number(e.target.value) })}
                   className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
-                  {animales.filter(a => a.sexo === "HEMBRA").map(a => (
+                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
                     <option key={a.id} value={a.id}>
                       {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"}) · Potrero: {a.potrero?.nombre || "Sin Potrero"}
                     </option>
@@ -4205,7 +5575,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
               </div>
 
               {/* Barra Superior de Parámetros Económicos y de Jornada */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs">
                 <div>
                   <label className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Fecha</label>
                   <input
@@ -4234,6 +5604,28 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 </div>
 
                 <div>
+                  <label className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Destino Leche</label>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setVaqueraDestino("TANQUE")}
+                      className={`flex-1 py-2 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+                        vaqueraDestino === "TANQUE" ? "bg-sky-500 text-slate-950 font-black shadow-md" : "bg-white/5 text-slate-300 hover:bg-white/10"
+                      }`}>
+                      🥛 Tanque
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVaqueraDestino("VENTA_DIRECTA")}
+                      className={`flex-1 py-2 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+                        vaqueraDestino === "VENTA_DIRECTA" ? "bg-amber-500 text-slate-950 font-black shadow-md" : "bg-white/5 text-slate-300 hover:bg-white/10"
+                      }`}>
+                      ⚡ Directa
+                    </button>
+                  </div>
+                </div>
+
+                <div>
                   <label className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Precio Leche ($/L)</label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-emerald-400 font-bold">$</span>
@@ -4248,17 +5640,36 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 </div>
 
                 <div>
-                  <label className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Tasa Cambio (Bs.)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-purple-400 font-bold">Bs.</span>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={vaqueraTasaVES}
-                      onChange={e => setVaqueraTasaVES(Math.max(1, Number(e.target.value)))}
-                      className="w-full p-2 pl-9 rounded-xl bg-slate-900 border border-white/15 text-white font-mono font-bold text-xs"
-                    />
-                  </div>
+                  <label className="text-slate-400 block text-[10px] uppercase font-bold mb-1">
+                    {monedasConfig.VES ? "Tasa Cambio (Bs.)" : monedasConfig.COP ? "Tasa Cambio (COP)" : "Moneda Base"}
+                  </label>
+                  {monedasConfig.VES ? (
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-purple-400 font-bold">Bs.</span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={vaqueraTasaVES}
+                        onChange={e => setVaqueraTasaVES(Math.max(1, Number(e.target.value)))}
+                        className="w-full p-2 pl-9 rounded-xl bg-slate-900 border border-white/15 text-white font-mono font-bold text-xs"
+                      />
+                    </div>
+                  ) : monedasConfig.COP ? (
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-sky-400 font-bold text-[10px]">COP</span>
+                      <input
+                        type="number"
+                        step="10"
+                        value={tasaCOP}
+                        readOnly
+                        className="w-full p-2 pl-11 rounded-xl bg-slate-900 border border-white/15 text-white font-mono font-bold text-xs"
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-2 rounded-xl bg-slate-900 border border-white/15 text-slate-400 font-mono text-xs">
+                      USD ($) Fijo
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -4284,10 +5695,13 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-0.5">
-                  <span className="text-slate-400 text-[10px] uppercase block">Promedio / Vaca</span>
-                  <div className="font-['Outfit'] font-bold text-xl text-white">
-                    {promedioPorVaca.toFixed(1)} <span className="text-slate-400 text-xs">L/vaca</span>
+                  <span className="text-slate-400 text-[10px] uppercase block">Destino Asignado</span>
+                  <div className="font-['Outfit'] font-bold text-lg text-white">
+                    {vaqueraDestino === "TANQUE" ? "🥛 Al Tanque" : "⚡ Venta Directa"}
                   </div>
+                  <span className="text-[10px] text-slate-400 block">
+                    Prom. {promedioPorVaca.toFixed(1)} L/vaca
+                  </span>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-0.5">
@@ -4295,9 +5709,16 @@ export default function GanaderiaApp({ onSalir }: Props) {
                   <div className="font-['Outfit'] font-black text-xl text-emerald-400">
                     ${ingresoUSD}
                   </div>
-                  <span className="text-[10px] text-emerald-300/80 font-mono block">
-                    Bs. {ingresoVES}
-                  </span>
+                  {monedasConfig.VES && (
+                    <span className="text-[10px] text-emerald-300/80 font-mono block">
+                      Bs. {ingresoVES}
+                    </span>
+                  )}
+                  {monedasConfig.COP && (
+                    <span className="text-[10px] text-sky-300/80 font-mono block">
+                      COP ${Math.round(Number(ingresoUSD) * tasaCOP).toLocaleString()}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -4486,6 +5907,137 @@ export default function GanaderiaApp({ onSalir }: Props) {
           </div>
         );
       })()}
+
+      {/* ── MODAL: REGISTRAR GASTO OPERATIVO DEL HATO ── */}
+      {modalGasto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in font-['Inter']">
+          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-emerald-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">💸</span>
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-lg text-white">
+                    Registrar Gasto Operativo
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Egreso de caja para insumos, alimentación, veterinario o jornales
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalGasto(false)}
+                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarGasto} className="space-y-4 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
+                  Categoría del Gasto *
+                </label>
+                <select
+                  value={formGasto.categoria}
+                  onChange={e => setFormGasto({ ...formGasto, categoria: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                >
+                  {CATEGORIAS_GASTO_GANADERIA.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
+                  Descripción Detallada *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: 10 sacos de sal mineralizada y 2 tambores de melaza..."
+                  value={formGasto.descripcion}
+                  onChange={e => setFormGasto({ ...formGasto, descripcion: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
+                    Monto en Dólares (USD) *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-emerald-400 font-bold">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      required
+                      placeholder="0.00"
+                      value={formGasto.monto}
+                      onChange={e => setFormGasto({ ...formGasto, monto: e.target.value })}
+                      className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-800 border border-white/15 text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
+                    Fecha del Gasto *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formGasto.fecha}
+                    onChange={e => setFormGasto({ ...formGasto, fecha: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Conversión en vivo a monedas activas */}
+              {Number(formGasto.monto) > 0 && (monedasConfig.VES || monedasConfig.COP) && (
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1 text-[11px]">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Equivalencia al cambio actual:</span>
+                  {monedasConfig.VES && (
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>Bolívares (Tasa {tasaBCV.toFixed(2)}):</span>
+                      <span className="font-mono font-bold text-emerald-300">
+                        Bs. {(Number(formGasto.monto) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                  {monedasConfig.COP && (
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>Pesos Colombianos (Tasa {tasaCOP}):</span>
+                      <span className="font-mono font-bold text-sky-300">
+                        COP ${Math.round(Number(formGasto.monto) * tasaCOP).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setModalGasto(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl btn-cyber-neon text-white text-xs font-bold shadow-lg transition-all cursor-pointer flex items-center gap-1.5">
+                  <span>💾 Guardar Gasto Operativo</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -285,6 +285,22 @@ html.light textarea:focus {
   background-color: rgba(255, 255, 255, 0.95) !important;
 }
 
+/* Modales marcados explícitamente como "siempre oscuros" (bg-slate-900/95 +
+   texto blanco, un patrón usado en varios modales de las apps de vertical)
+   deben verse igual sin importar el tema del sitio — el override de
+   .apple-glass en modo claro de arriba los dejaba con fondo casi blanco
+   pero texto/labels pensados para fondo oscuro, ilegibles. */
+html.light .modal-siempre-oscuro.apple-glass,
+html.light .modal-siempre-oscuro .apple-glass {
+  background: rgba(5, 19, 34, 0.90) !important;
+  border-color: rgba(0, 255, 194, 0.15) !important;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.8) !important;
+}
+html.light .modal-siempre-oscuro.text-white,
+html.light .modal-siempre-oscuro .text-white {
+  color: #ffffff !important;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 201, 167, 0.35) transparent;

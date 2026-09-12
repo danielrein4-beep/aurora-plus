@@ -54,6 +54,9 @@ public class RegistroOrdeno {
     @Column(name = "porcentaje_proteina", precision = 5, scale = 2)
     private BigDecimal porcentajeProteina;
 
+    @Column(name = "destino", length = 30)
+    private String destino = "TANQUE"; // "TANQUE" o "VENTA_DIRECTA"
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -74,6 +77,8 @@ public class RegistroOrdeno {
     public void setPorcentajeProteina(BigDecimal porcentajeProteina) { this.porcentajeProteina = porcentajeProteina; }
     public BigDecimal getPrecioVentaLitro() { return precioVentaLitro; }
     public void setPrecioVentaLitro(BigDecimal precioVentaLitro) { this.precioVentaLitro = precioVentaLitro; }
+    public String getDestino() { return destino != null ? destino : "TANQUE"; }
+    public void setDestino(String destino) { this.destino = destino; }
 
     @Transient
     public BigDecimal getMontoVenta() {
