@@ -673,7 +673,7 @@ export default function GanaderiaMapa({
     : [];
 
   return (
-    <div className="relative w-full h-[680px] rounded-3xl overflow-hidden border border-slate-300/60 dark:border-white/10 shadow-2xl flex flex-col font-['Inter']">
+    <div className="modal-siempre-oscuro relative w-full h-[680px] rounded-3xl overflow-hidden border border-slate-300/60 dark:border-white/10 shadow-2xl flex flex-col font-['Inter']">
       
       {/* ── BARRA DE HERRAMIENTAS SUPERIOR DEL MAPA ── */}
       <div className="absolute top-4 left-4 right-4 z-[500] flex flex-wrap items-center justify-between gap-3 pointer-events-none">

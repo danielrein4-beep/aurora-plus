@@ -1188,7 +1188,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
       
       {/* Notificación Flotante */}
       {notificacion && (
-        <div className="fixed top-5 right-5 z-50 apple-glass px-5 py-3 rounded-2xl border border-emerald-500/50 shadow-2xl text-emerald-600 dark:text-emerald-300 text-xs font-bold flex items-center gap-3 animate-fade-in">
+        <div className="fixed top-5 right-5 z-[2000] apple-glass px-5 py-3 rounded-2xl border border-emerald-500/50 shadow-2xl text-emerald-600 dark:text-emerald-300 text-xs font-bold flex items-center gap-3 animate-fade-in">
           <IconCheckCircle size={18} />
           <span>{notificacion}</span>
         </div>
@@ -3618,7 +3618,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* ── MODAL: ACTUALIZAR TASAS A MANO ── */}
       {modalEditarTasas && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
           <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-md w-full border border-emerald-500/40 text-left space-y-5 shadow-2xl bg-slate-900/95 text-white">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
@@ -3755,7 +3755,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: EDITAR PRECIO DE LA LECHE CENTRALIZADO */}
       {modalEditarPrecioLeche && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
           <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-sm w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
@@ -3829,7 +3829,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: VENTA DE LECHE EN TANQUE (CISTERNA / PLANTA) */}
       {modalVentaLeche && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
           <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white font-['Inter']">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
@@ -3996,7 +3996,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: CALIBRACIÓN Y AJUSTE DE TANQUE DE LECHE */}
       {modalAjusteTanque && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
           <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-md w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white font-['Inter']">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
@@ -4093,7 +4093,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: ALTA DE ANIMAL */}
       {modalNuevoAnimal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/30 text-left space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
@@ -4369,7 +4369,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: AGREGAR POTRERO (MEJORADO CON COLOR PICKER GANSOFT) */}
       {modalNuevoPotrero && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/30 text-left space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
@@ -4501,7 +4501,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: ROTAR POTRERO */}
       {modalRotar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-emerald-500/30 text-left space-y-4">
             <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
               Rotación de Potrero
@@ -4542,7 +4542,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: REGISTRAR ORDEÑO */}
       {modalOrdeno && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-sky-500/30 text-left space-y-4">
             <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
               Registrar Ordeño
@@ -4671,7 +4671,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: REGISTRAR PESAJE & GDP */}
       {modalPesaje && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-emerald-500/30 text-left space-y-4">
             <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
               Pesaje: {modalPesaje.nombre || modalPesaje.arete}
@@ -4724,7 +4724,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: FICHA & QR */}
       {modalFichaAnimal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-sm w-full border border-emerald-500/30 text-center space-y-4">
             <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
               Ficha de Trazabilidad
@@ -4783,7 +4783,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
           : animalesVacunaSeleccionados.length;
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md overflow-y-auto">
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md overflow-y-auto">
             <div className="apple-glass rounded-3xl p-5 sm:p-7 max-w-xl w-full border border-emerald-500/40 text-left space-y-4 my-auto max-h-[92vh] flex flex-col font-['Inter']">
               <div className="flex items-center justify-between pb-3 border-b border-white/10">
                 <div className="flex items-center gap-2">
@@ -5139,7 +5139,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: REPRODUCCIÓN */}
       {modalReproduccion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-purple-500/30 text-left space-y-4">
             <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
               Registro Reproductivo
@@ -5209,7 +5209,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: EVENTO DEDICADO DE CELO & SINCRONIZACIÓN */}
       {modalCelo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-purple-500/40 text-left space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
@@ -5310,7 +5310,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: EVENTO DEDICADO DE MASTITIS (SANIDAD & RETIRO DE LECHE) */}
       {modalMastitis && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-rose-500/40 text-left space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
@@ -5459,7 +5459,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: REGISTRO DE VENTA / DESPACHO DE ANIMAL */}
       {modalVentaAnimal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-rose-500/30 text-left space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div>
@@ -5594,7 +5594,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
         const ingresoVES = (litrosComerciales * vaqueraPrecioUSD * vaqueraTasaVES).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-md overflow-y-auto">
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-md overflow-y-auto">
             <div className="apple-glass rounded-3xl p-5 sm:p-7 max-w-5xl w-full border border-emerald-500/40 bg-slate-950/95 shadow-2xl text-left space-y-5 my-auto max-h-[92vh] flex flex-col font-['Inter']">
               
               {/* Cabecera del Modal */}
@@ -5959,7 +5959,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* ── MODAL: REGISTRAR GASTO OPERATIVO DEL HATO ── */}
       {modalGasto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in font-['Inter']">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in font-['Inter']">
           <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-emerald-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
