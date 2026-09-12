@@ -741,6 +741,7 @@ html.light .aurora-public-nav {
 /* Páginas públicas interiores: misma atmósfera fotográfica y sistema visual
    que el hero, sin alterar Dashboard ni las aplicaciones verticales. */
 .aurora-public-page {
+  position: relative;
   isolation: isolate;
   min-height: 100vh;
   overflow: hidden;
@@ -750,7 +751,15 @@ html.light .aurora-public-nav {
 }
 .aurora-public-page::before {
   content: "";
-  position: fixed;
+  /* Antes usaba position:fixed, pero el wrapper de transición de página
+     (.animate-page-enter, en Layout.tsx) tiene will-change:transform, lo
+     que convierte a cualquier descendiente `fixed` en un elemento "atrapado"
+     dentro de ese wrapper en vez del viewport real. Efecto visible: la
+     página se veía pegada/congelada al hacer scroll con la rueda del mouse,
+     aunque arrastrar la barra de scroll sí movía el contenido por debajo.
+     position:absolute (contenido dentro de este mismo elemento, que ya es
+     position:relative) evita el problema por completo. */
+  position: absolute;
   z-index: -2;
   inset: -8%;
   pointer-events: none;
@@ -761,7 +770,7 @@ html.light .aurora-public-nav {
 }
 .aurora-public-page::after {
   content: "";
-  position: fixed;
+  position: absolute;
   z-index: -1;
   inset: 0;
   pointer-events: none;
@@ -1026,7 +1035,10 @@ html.light .aurora-access-page .text-white { color: #f8f6ef !important; }
 
 .animate-page-enter {
   animation: pageEnter 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity;
+  /* Sin will-change persistente: dejarlo declarado permanentemente convierte a
+     cualquier position:fixed dentro de esta página (como los fondos de
+     .aurora-public-page) en un elemento "atrapado" relativo a este div en vez
+     del viewport, rompiendo el scroll con la rueda del mouse. */
 }
 
 .animate-tab-enter {
