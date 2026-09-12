@@ -723,19 +723,16 @@ export default function GanaderiaApp({ onSalir }: Props) {
   // Abrir Modo Vaquera Rápida (Bulk Entry de Ordeño)
   const abrirVaqueraRapida = () => {
     const vacas = animales.filter(a => a.sexo === "HEMBRA" && (a.tipoAnimal === "VACA" || a.tipoAnimal === "NOVILLA"));
-    const vacasBase = vacas.length > 0 ? vacas : [
-      { id: 201, arete: "V-402", nombre: "Mariposa", tipoAnimal: "VACA", sexo: "HEMBRA" },
-      { id: 202, arete: "V-115", nombre: "Lucero", tipoAnimal: "VACA", sexo: "HEMBRA" },
-      { id: 203, arete: "V-089", nombre: "Esperanza", tipoAnimal: "VACA", sexo: "HEMBRA" },
-      { id: 204, arete: "V-210", nombre: "Canela", tipoAnimal: "VACA", sexo: "HEMBRA" },
-      { id: 205, arete: "V-305", nombre: "Barinesa", tipoAnimal: "VACA", sexo: "HEMBRA" },
-    ];
+    if (vacas.length === 0) {
+      notificar("⚠️ No hay vacas u novillas registradas en el hato todavía. Da de alta tus animales antes de usar Vaquera Rápida.");
+      return;
+    }
 
-    const filas = vacasBase.map((v, i) => ({
+    const filas = vacas.map((v) => ({
       animalId: v.id,
       arete: v.arete,
       nombre: v.nombre || `Vaca ${v.arete}`,
-      litrosManana: i === 0 ? 11.5 : i === 1 ? 9.0 : i === 2 ? 8.5 : i === 3 ? 12.0 : 10.0,
+      litrosManana: "",
       litrosTarde: "",
       estado: "NORMAL" as const,
       notas: "",
@@ -756,24 +753,11 @@ export default function GanaderiaApp({ onSalir }: Props) {
     let mastitisCount = 0;
     let litrosComercialesTotal = 0;
     const nuevosOrdenos: RegistroOrdenoGanaderia[] = [];
+    const fallidas: string[] = [];
 
     for (const f of filasValidas) {
       const litrosTotales = (Number(f.litrosManana) || 0) + (Number(f.litrosTarde) || 0);
       const esComercial = f.estado !== "MASTITIS";
-      if (f.estado === "MASTITIS") {
-        mastitisCount++;
-      } else {
-        litrosComercialesTotal += litrosTotales;
-      }
-
-      const animalObj = animales.find(a => a.id === f.animalId) || ({
-        id: f.animalId,
-        tenantId,
-        arete: f.arete,
-        nombre: f.nombre,
-        tipoAnimal: "VACA",
-        sexo: "HEMBRA",
-      } as AnimalGanaderia);
 
       try {
         const reg = await registrarOrdenoGanaderia(tenantId, {
@@ -787,20 +771,13 @@ export default function GanaderiaApp({ onSalir }: Props) {
           destino: vaqueraDestino,
         });
         nuevosOrdenos.push(reg);
+        if (f.estado === "MASTITIS") {
+          mastitisCount++;
+        } else {
+          litrosComercialesTotal += litrosTotales;
+        }
       } catch {
-        nuevosOrdenos.push({
-          id: Date.now() + Math.floor(Math.random() * 1000),
-          tenantId,
-          animal: animalObj,
-          fecha: vaqueraFecha,
-          turno: vaqueraTurno === "DOBLE" ? "MANANA" : vaqueraTurno,
-          cantidadLitros: litrosTotales,
-          precioVentaLitro: vaqueraPrecioUSD,
-          montoVenta: esComercial ? Number((litrosTotales * vaqueraPrecioUSD).toFixed(2)) : 0,
-          porcentajeGrasa: 3.8,
-          porcentajeProteina: 3.2,
-          destino: vaqueraDestino,
-        });
+        fallidas.push(f.arete);
       }
     }
 
@@ -823,7 +800,10 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
     const ingresoUSD = (litrosComercialesTotal * vaqueraPrecioUSD).toFixed(2);
     const destinoLabel = vaqueraDestino === "TANQUE" ? "almacenados en tanque" : "venta directa";
-    if (mastitisCount > 0) {
+
+    if (fallidas.length > 0) {
+      notificar(`⚠️ Se guardaron ${nuevosOrdenos.length} de ${filasValidas.length} registros. No se pudo registrar: ${fallidas.join(", ")} — revisa tu conexión e inténtalo de nuevo con esas vacas.`);
+    } else if (mastitisCount > 0) {
       notificar(`Jornada guardada: ${litrosComercialesTotal.toFixed(1)} L comerciales (${destinoLabel}). ¡Atención! ${mastitisCount} vaca(s) aislada(s) con Mastitis.`);
     } else {
       notificar(`Jornada registrada: ${litrosComercialesTotal.toFixed(1)} L recolectados (${destinoLabel}) por $${ingresoUSD} USD.`);
@@ -1619,29 +1599,34 @@ export default function GanaderiaApp({ onSalir }: Props) {
                 </div>
 
                 <div className="space-y-2.5">
-                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs flex items-start gap-3">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Refuerzo Vacuna Antiaftosa Pendiente</div>
-                      <div className="text-slate-500 dark:text-white/50 text-[11px] mt-0.5">Lote de 8 novillas en Potrero Maternidad. Vence en 5 días.</div>
+                  {alertasSanitarias.length === 0 ? (
+                    <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-start gap-3">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />
+                      <div>
+                        <div className="font-bold text-slate-900 dark:text-white">Todo el hato está al día</div>
+                        <div className="text-slate-500 dark:text-white/50 text-[11px] mt-0.5">No hay retiros de leche/carne activos ni vacunas vencidas registradas.</div>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="p-3 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-xs flex items-start gap-3">
-                    <span className="w-2 h-2 rounded-full bg-purple-400 mt-1.5 flex-shrink-0" />
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Parto Estimado: Vaca V-042 (Mariposa)</div>
-                      <div className="text-slate-500 dark:text-white/50 text-[11px] mt-0.5">Fecha probable de parto: 28 de Septiembre 2026. Preparar corral de maternidad.</div>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-start gap-3">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Carencia y Retiro en Leche al 100% Libre</div>
-                      <div className="text-slate-500 dark:text-white/50 text-[11px] mt-0.5">Ningún animal en ordeño presenta restricciones de despacho actualmente.</div>
-                    </div>
-                  </div>
+                  ) : (
+                    alertasSanitarias.slice(0, 3).map((alerta, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-2xl border text-xs flex items-start gap-3 ${
+                          alerta.tipo.includes("RETIRO")
+                            ? "bg-red-500/10 border-red-500/20"
+                            : "bg-amber-500/10 border-amber-500/20"
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${alerta.tipo.includes("RETIRO") ? "bg-red-400" : "bg-amber-400"}`} />
+                        <div>
+                          <div className="font-bold text-slate-900 dark:text-white">
+                            {alerta.producto || alerta.tipo.replace("_", " ")} — Arete {alerta.animal?.arete}
+                          </div>
+                          <div className="text-slate-500 dark:text-white/50 text-[11px] mt-0.5">{alerta.mensaje}</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
