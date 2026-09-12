@@ -2307,7 +2307,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   <div className="space-y-3 text-xs">
                     <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                       <span className="font-bold text-slate-900 dark:text-white">Vacas en Ordeño Activo</span>
-                      <span className="font-mono font-bold text-sky-400 text-base">{vacasOrdeno}</span>
+                      <span className="font-mono font-bold text-sky-400 text-base">
+                        {animalesActivos.filter(a => a.tipoAnimal === "VACA" && a.sexo === "HEMBRA" && a.estadoProductivo === "ORDEÑO").length}
+                      </span>
                     </div>
                     <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                       <span className="font-bold text-slate-900 dark:text-white">Hembras Gestantes Confirmadas</span>
