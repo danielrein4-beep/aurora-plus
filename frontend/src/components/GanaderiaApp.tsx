@@ -255,7 +255,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Formulario de Celos (Evento Reproductivo dedicado)
   const [formCelo, setFormCelo] = useState({
-    hembraId: DEMO_ANIMALES.find(a => a.sexo === "HEMBRA")?.id || 201,
+    hembraId: 0,
     fecha: new Date().toISOString().slice(0, 10),
     tipoCelo: "NATURAL",
     sintomasCelo: "Acepta monta, moco cristalino abundante, hiperactividad",
@@ -264,7 +264,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Formulario de Mastitis (Sanidad dedicada con retiro de leche)
   const [formMastitis, setFormMastitis] = useState({
-    animalId: DEMO_ANIMALES.find(a => a.sexo === "HEMBRA")?.id || 201,
+    animalId: 0,
     fecha: new Date().toISOString().slice(0, 10),
     cuartoAfectado: "PD",
     gradoCmt: "GRADO_2",
@@ -318,7 +318,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Formulario ordeño rápido
   const [formOrdeno, setFormOrdeno] = useState({
-    animalId: DEMO_ANIMALES[0]?.id || 201,
+    animalId: 0,
     turno: "MANANA",
     cantidadLitros: 12.5,
     precioVentaLitro: precioLecheUSD,
@@ -333,8 +333,8 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Formulario vacunación (soporte de catálogo real, días de retiro fidedignos y aplicación masiva)
   const [formVacuna, setFormVacuna] = useState({
-    animalId: DEMO_ANIMALES[0]?.id || 201,
-    vacunaId: DEFAULT_VACUNAS_CATALOGO[0]?.id || 1,
+    animalId: 0,
+    vacunaId: 0,
     lote: "L-2026-98",
     veterinario: "Dr. Médico Veterinario",
     costo: 3.5,
@@ -352,7 +352,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
   // Formulario reproducción
   const [formRepro, setFormRepro] = useState({
-    hembraId: DEMO_ANIMALES[0]?.id || 201,
+    hembraId: 0,
     tipo: "DIAGNOSTICO_PRENEZ",
     fecha: new Date().toISOString().slice(0, 10),
     resultado: "PREÑADA_CONFIRMADA",
@@ -408,6 +408,38 @@ export default function GanaderiaApp({ onSalir }: Props) {
       setPotreroDestinoId(opciones[0].id);
     }
   }, [modalRotar, potreros]);
+
+  // Mismo saneamiento para el resto de formularios que empiezan en 0/sin
+  // selección: en cuanto la lista real de animales carga, si el animal
+  // seleccionado no existe de verdad, se corrige al primero real disponible.
+  useEffect(() => {
+    if (animales.length === 0) return;
+    const hembras = animales.filter(a => a.sexo === "HEMBRA");
+    if (!animales.some(a => a.id === formOrdeno.animalId)) {
+      setFormOrdeno(prev => ({ ...prev, animalId: animales[0].id }));
+    }
+    if (!animales.some(a => a.id === formVacuna.animalId)) {
+      setFormVacuna(prev => ({ ...prev, animalId: animales[0].id }));
+    }
+    if (hembras.length > 0) {
+      if (!hembras.some(a => a.id === formRepro.hembraId)) {
+        setFormRepro(prev => ({ ...prev, hembraId: hembras[0].id }));
+      }
+      if (!hembras.some(a => a.id === formCelo.hembraId)) {
+        setFormCelo(prev => ({ ...prev, hembraId: hembras[0].id }));
+      }
+      if (!hembras.some(a => a.id === formMastitis.animalId)) {
+        setFormMastitis(prev => ({ ...prev, animalId: hembras[0].id }));
+      }
+    }
+  }, [animales]);
+
+  // Igual para la vacuna seleccionada en el formulario de aplicación.
+  useEffect(() => {
+    if (vacunas.length > 0 && !vacunas.some(v => v.id === formVacuna.vacunaId)) {
+      setFormVacuna(prev => ({ ...prev, vacunaId: vacunas[0].id }));
+    }
+  }, [vacunas]);
 
   useEffect(() => {
     if (!animalFichaId) return;
@@ -1026,8 +1058,12 @@ export default function GanaderiaApp({ onSalir }: Props) {
       notificar("⚠️ Debes seleccionar al menos un animal para aplicar el tratamiento sanitario.");
       return;
     }
+    if (!formVacuna.vacunaId) {
+      notificar("⚠️ Selecciona o crea primero una vacuna del catálogo antes de aplicarla.");
+      return;
+    }
 
-    const vacunaSeleccionada = vacunas.find(v => v.id === Number(formVacuna.vacunaId)) || DEFAULT_VACUNAS_CATALOGO[0];
+    const vacunaSeleccionada = vacunas.find(v => v.id === Number(formVacuna.vacunaId));
 
     try {
       await aplicarVacunaLoteGanaderia(tenantId, {
@@ -1040,15 +1076,15 @@ export default function GanaderiaApp({ onSalir }: Props) {
       });
 
       const retiroMsg = [];
-      if (vacunaSeleccionada.diasRetiroLeche && vacunaSeleccionada.diasRetiroLeche > 0) {
+      if (vacunaSeleccionada?.diasRetiroLeche && vacunaSeleccionada.diasRetiroLeche > 0) {
         retiroMsg.push(`Retiro leche: ${vacunaSeleccionada.diasRetiroLeche}d`);
       }
-      if (vacunaSeleccionada.diasRetiroCarne && vacunaSeleccionada.diasRetiroCarne > 0) {
+      if (vacunaSeleccionada?.diasRetiroCarne && vacunaSeleccionada.diasRetiroCarne > 0) {
         retiroMsg.push(`Retiro carne: ${vacunaSeleccionada.diasRetiroCarne}d`);
       }
       const detalleRetiro = retiroMsg.length > 0 ? ` (${retiroMsg.join(" • ")})` : " (Sin tiempo de retiro obligatorio)";
 
-      notificar(`✅ Vacuna '${vacunaSeleccionada.nombre}' aplicada a ${idsParaAplicar.length} animal(es)${detalleRetiro}. Alertas sanitarias actualizadas.`);
+      notificar(`✅ Vacuna '${vacunaSeleccionada?.nombre || "aplicada"}' aplicada a ${idsParaAplicar.length} animal(es)${detalleRetiro}. Alertas sanitarias actualizadas.`);
 
       // Recargar alertas sanitarias para reflejar inmediatamente los bloqueos de leche y carne
       obtenerAlertasSanitariasGanaderia(tenantId).then(setAlertasSanitarias).catch(() => {});
@@ -4702,7 +4738,7 @@ export default function GanaderiaApp({ onSalir }: Props) {
 
       {/* MODAL: VACUNACIÓN & TRATAMIENTOS SANITARIOS */}
       {modalVacuna && (() => {
-        const vacunaSel = vacunas.find(v => v.id === Number(formVacuna.vacunaId)) || DEFAULT_VACUNAS_CATALOGO[0];
+        const vacunaSel = vacunas.find(v => v.id === Number(formVacuna.vacunaId));
         const lotesUnicos = Array.from(new Set(animales.map(a => a.lote).filter(Boolean))) as string[];
         const totalSeleccionados = vacunacionModo === "INDIVIDUAL"
           ? (formVacuna.animalId ? 1 : 0)
