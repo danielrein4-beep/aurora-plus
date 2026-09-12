@@ -190,7 +190,7 @@ export default function Auth() {
                 Aurora Plus
               </div>
               <div className="text-white/35 text-[10px] uppercase tracking-widest mt-1">
-                Next-Gen ERP Platform
+                Software Administrativo
               </div>
             </div>
           </button>
@@ -243,7 +243,7 @@ export default function Auth() {
           <div className="lg:col-span-7">
             <div className="mb-6">
               <h2 className="font-['Outfit'] font-black text-3xl sm:text-4xl text-white tracking-tight">
-                {mode === "register" ? "Join the Future" : "Welcome Back"}
+                {mode === "register" ? "Crea tu cuenta" : "Bienvenido de vuelta"}
               </h2>
               {/* Barra de acento aurora estilo futurista */}
               <div className="h-1 w-20 bg-gradient-to-r from-[#00FFC2] via-[#00C9A7] to-[#0B3D91] rounded-full mt-2 shadow-[0_0_12px_rgba(0,255,194,0.5)]" />
@@ -377,7 +377,7 @@ export default function Auth() {
                     type="checkbox"
                     checked={mode === "login" ? form.remember : form.terms}
                     onChange={(e) => set(mode === "login" ? "remember" : "terms", e.target.checked)}
-                    className="w-4 h-4 rounded border-white/20 bg-white/5 text-teal-400 focus:ring-0 focus:outline-none"
+                    className="w-4 h-4 rounded border-white/20 bg-white/5 accent-teal-400 focus:ring-0 focus:outline-none"
                   />
                   <span className="text-xs text-white/60 hover:text-white/80 transition-colors">
                     {mode === "login" ? (
@@ -429,25 +429,25 @@ export default function Auth() {
               <div className="line-aurora absolute top-0 left-0 right-0" />
               
               <p className="text-sm sm:text-base text-white/80 leading-relaxed italic mb-4 font-light">
-                "Ingresa al futuro de la gestión operativa multi-empresa. Automatiza clínicas, fincas, minería, restaurantes y ferreterías con un motor central inteligente y multi-moneda."
+                "1 USD = 43,50 Bs. = 4.150 COP — convertido en cada cobro, sin que nadie lo teclee a mano."
               </p>
-              
+
               <div className="text-xs font-mono text-teal-400 font-semibold tracking-wider">
-                // Aurora Plus Next-Gen Enterprise
+                // Aurora Engine Core
               </div>
 
               <div className="mt-6 pt-5 border-t border-white/10 space-y-2 text-xs text-white/50">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                  <span>5 Verticales listas hoy — Salud, Restaurante, Ferretería, Farmacia y Repuestos</span>
+                  <span>6 verticales nativas — Clínicas, Restaurantes, Minería, Repuestos, Moda y Ganadería</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-                  <span>Motor Financiero Multi-Moneda (USD/VES/COP)</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                  <span>Multi-moneda en vivo (USD · VES · COP)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                  <span>Offline-First POS & Idempotencia de Caja</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                  <span>Offline-First POS & caja 100% idempotente</span>
                 </div>
               </div>
             </div>
