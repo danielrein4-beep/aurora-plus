@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
-import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware, IconMining,
   IconRestaurant, IconFarm, IconRetail,
   IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile,
-  IconLaptop, IconPhone, IconPlane, IconBoutique, IconFactory,
-  IconCard, IconBox, IconBolt, IconShield, IconCheck,
+  IconLaptop, IconPhone, IconPlane, IconCheck,
 } from "../Icons";
 
 const INDUSTRIES = [
@@ -70,213 +68,54 @@ const previewData: Record<string, { metric: string; value: string; sub: string; 
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("Ferretería");
-  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
   const navigate = useNavigate();
-  const { isLoggedIn, user } = useAuth();
-
-  const HERO_VERTICALS = [
-    { title: "Salud & Clínicas", subtitle: "Historias clínicas, citas y triaje", badge: "NUEVO", stat: "100% Digital", Icon: IconClinic },
-    { title: "Minería & Faenas", subtitle: "Control de mineral, cuadrillas y romana", badge: "ACTIVO", stat: "Balanza Real", Icon: IconMining },
-    { title: "Horeca & Restaurantes", subtitle: "Comandas POS, cocina y escandallo", badge: "POPULAR", stat: "Offline POS", Icon: IconRestaurant },
-    { title: "Ganadería & Fincas", subtitle: "Hato, potreros y control sanitario", badge: "PRO", stat: "Trazabilidad", Icon: IconFarm },
-    { title: "Ferreterías & Retail", subtitle: "Kardex multi-unidad y listas por volumen", badge: "PRO", stat: "Stock en Vivo", Icon: IconHardware },
-    { title: "Moda & Boutique", subtitle: "Variantes talla/color y fidelización", badge: "SMART", stat: "Puntos & Gift", Icon: IconBoutique },
-    { title: "Tamanaco Industrial", subtitle: "Operación integral, tesorería y OCR", badge: "ENTERPRISE", stat: "Multi-Empresa", Icon: IconFactory },
-  ];
 
   return (
-    <main className="relative overflow-hidden bg-transparent transition-colors duration-500">
-      {/* ── HERO: foto real de aurora boreal con movimiento sutil ── */}
-      <section className="relative min-h-[92vh] flex flex-col justify-between pt-24 pb-12 px-4 sm:px-8 max-w-7xl mx-auto overflow-hidden rounded-b-[2.5rem]">
+    <main className="aurora-public-page relative overflow-hidden bg-transparent transition-colors duration-500">
+      {/* ── HERO: composición editorial sobre una fotografía real ── */}
+      <section className="aurora-home-hero relative min-h-[920px] flex flex-col pt-24 pb-0 px-5 sm:px-10 max-w-[1536px] mx-auto overflow-hidden">
 
-        <div className="absolute inset-0 -z-10 overflow-hidden rounded-b-[2.5rem]">
+        <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="home-hero-photo" />
         </div>
 
-        {/* Título */}
-        <div className="relative z-10 text-center max-w-3xl mx-auto pt-6">
-          <div className="inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-black/25 backdrop-blur-md px-5 py-2 text-xs text-teal-300 mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-            <span className="font-semibold tracking-wide">ECOSISTEMA ERP MULTI-INDUSTRIA &amp; AUTOMATIZACIÓN</span>
-          </div>
-
-          <h1 className="font-['Outfit'] font-black text-4xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight text-white mb-6">
-            Del lápiz y el papel <br className="hidden sm:inline" />
-            a la <span className="text-aurora">automatización</span>
+        <div className="relative z-10 w-full max-w-5xl mx-auto pt-24 sm:pt-28">
+          <p className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · seis rubros · tres monedas</p>
+          <h1 className="mt-5 max-w-3xl font-['IBM_Plex_Sans'] text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-[-0.055em] text-[#f8f6ef]">
+            Del lápiz y el papel<br />a la <span className="text-[#35d7c3]">automatización</span>
           </h1>
-          <p className="text-white/70 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
-            De la libreta y la hoja de Excel a medianoche, a la comodidad de tu teléfono y tu computadora.
+          <p className="mt-6 max-w-xl text-base leading-7 text-[#e5e1d5]/90">
+            De la libreta y la hoja de Excel a medianoche, a la comodidad de tu teléfono y tu computadora. Aurora Plus corre la caja, el inventario y la sanidad regulatoria de clínicas, restaurantes, minas, talleres, boutiques y fincas venezolanas.
           </p>
-        </div>
-
-        {/* ── ACCESO DIRECTO DESTACADO PARA USUARIOS EN SESIÓN: MIS SISTEMAS ── */}
-        {isLoggedIn && (
-          <div className="relative z-20 max-w-4xl mx-auto my-4 w-full animate-fadeIn">
-            <div className="rounded-3xl p-6 sm:p-7 relative overflow-hidden border border-teal-400/30 bg-black/40 backdrop-blur-xl">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-4 text-left">
-                  <div className="w-14 h-14 rounded-2xl g-aurora flex items-center justify-center text-white flex-shrink-0">
-                    <IconClinic size={30} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-400/20 text-teal-300 border border-teal-400/30 tracking-wider uppercase">
-                        Tu sistema asignado &amp; activo
-                      </span>
-                      <span className="text-xs text-white/50">• {user?.empresa || "Clínica & Consultorios"}</span>
-                    </div>
-                    <h3 className="text-xl font-black text-white font-['Outfit'] mt-1">
-                      Mediclinic Pro — Espacio Clínico de {user?.nombre || user?.email?.split("@")[0]}
-                    </h3>
-                    <p className="text-xs text-white/70 mt-0.5">
-                      Historias clínicas digitales, agenda médica, sala de espera reactiva, cotizador y caja diaria.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => navigate("/mediclinic")}
-                  className="g-aurora text-white font-bold px-7 py-3.5 rounded-2xl text-sm cursor-pointer whitespace-nowrap hover:opacity-90 transition-opacity flex items-center gap-2 group"
-                >
-                  <span>Abrir Mediclinic Pro</span>
-                  <span className="group-hover:translate-x-1 transition-transform">→</span>
-                </button>
-              </div>
-            </div>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <button onClick={() => navigate("/onboarding")} className="aurora-solid-button px-6 py-3 text-sm font-semibold cursor-pointer">Solicitar demo</button>
+            <button onClick={() => navigate("/industrias")} className="aurora-outline-button px-6 py-3 text-sm font-semibold cursor-pointer">Ver los 6 rubros ↓</button>
           </div>
-        )}
 
-        {/* Panel: Aurora Engine Core */}
-        <div className="relative z-10 max-w-4xl mx-auto my-3 w-full">
-          <div className="rounded-3xl p-6 sm:p-8 relative overflow-hidden border border-white/12 bg-black/35 backdrop-blur-xl">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-white/10">
-              <div className="flex items-center gap-3.5">
-                <div className="p-2 rounded-2xl bg-white/5 border border-white/10">
-                  <AuroraLogo size={36} animated={false} />
-                </div>
-                <div className="text-left">
-                  <div className="font-['Outfit'] font-bold text-base text-white flex items-center gap-2">
-                    Aurora Engine Core <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-teal-400/15 text-teal-300 font-mono border border-teal-400/30">ONLINE v2.4</span>
-                  </div>
-                  <div className="text-white/45 text-xs font-mono">Arquitectura Multi-Tenant · PostgreSQL · Offline Sync</div>
-                </div>
+          <div className="mt-12 grid max-w-4xl grid-cols-2 gap-x-7 gap-y-6 border-t border-white/15 pt-6 sm:grid-cols-4">
+            {[
+              ["6", "industrias nativas"],
+              ["100%", "caja offline-first"],
+              ["3", "monedas convertidas"],
+              ["RBAC", "roles estrictos"],
+            ].map(([value, label]) => (
+              <div key={label}>
+                <div className="font-['IBM_Plex_Sans'] text-2xl font-bold text-[#f8f6ef]">{value}</div>
+                <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/85">{label}</div>
               </div>
-
-              <div className="flex items-center gap-2">
-                <span className="px-3.5 py-1.5 rounded-xl bg-teal-500/10 border border-teal-500/25 text-xs text-teal-300 font-medium flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" /> Multi-Moneda (USD · VES · COP)
-                </span>
-                <span className="hidden sm:inline-flex px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/15 text-xs text-white/70 font-medium items-center gap-1.5">
-                  6 Verticales Nativas
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-5">
-              {[
-                { label: "Caja Central", val: "Sincronizada", Icon: IconCard },
-                { label: "Kardex e Insumos", val: "Auto-Descuento", Icon: IconBox },
-                { label: "Offline POS", val: "100% Idempotente", Icon: IconBolt },
-                { label: "Roles & Privacidad", val: "RBAC Estricto", Icon: IconShield },
-              ].map((n) => (
-                <div key={n.label} className="bg-white/[0.03] hover:bg-white/[0.07] rounded-2xl p-4 border border-white/5 hover:border-teal-400/30 transition-all duration-300 cursor-default">
-                  <div className="mb-1.5 text-teal-300"><n.Icon size={22} /></div>
-                  <div className="text-white font-semibold text-xs tracking-tight">{n.label}</div>
-                  <div className="text-[11px] font-mono mt-0.5 text-teal-300/80">{n.val}</div>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
-        </div>
 
-        {/* Métricas + CTA + Preview de verticales */}
-        <div className="relative z-10 pt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
-
-            <div className="lg:col-span-7 space-y-6">
-              <div className="grid grid-cols-3 gap-4 sm:gap-6 border-b border-white/10 pb-6">
-                <div>
-                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-white">6</div>
-                  <div className="text-white/50 text-xs mt-1 font-medium leading-snug">Industrias nativas</div>
-                </div>
-                <div>
-                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-teal-300">100%</div>
-                  <div className="text-white/50 text-xs mt-1 font-medium leading-snug">Offline-First POS</div>
-                </div>
-                <div>
-                  <div className="font-['Outfit'] font-black text-2xl sm:text-3xl text-teal-300">Multi</div>
-                  <div className="text-white/50 text-xs mt-1 font-medium leading-snug">USD · VES · COP</div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => navigate("/onboarding")}
-                    className="g-aurora text-white font-bold px-8 py-3.5 rounded-full text-sm flex items-center gap-2 tracking-wide cursor-pointer hover:opacity-90 transition-opacity">
-                    <span>Solicitar demo ahora</span>
-                    <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">↗</span>
-                  </button>
-                  <button
-                    onClick={() => navigate("/auth")}
-                    className="border border-white/20 text-white/90 hover:text-white hover:border-white/40 font-semibold px-6 py-3.5 rounded-full text-sm cursor-pointer transition-colors">
-                    Iniciar sesión
-                  </button>
-                </div>
-                <p className="text-white/50 text-xs sm:text-sm leading-relaxed max-w-sm">
-                  Automatiza clínicas, fincas, restaurantes, ferreterías y minería desde una sola plataforma.
-                </p>
-              </div>
+          <div className="aurora-rate-card mt-12 w-full max-w-md p-6 sm:p-7">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[#d9d8ce]/80">
+              <span>Tasa del día · motor Aurora</span><span className="text-[#3fe0ce]">● en vivo</span>
             </div>
-
-            <div className="lg:col-span-5">
-              <div className="rounded-3xl p-6 relative overflow-hidden border border-white/12 bg-black/35 backdrop-blur-xl">
-                <div className="flex items-center justify-between mb-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-teal-300">
-                      {(() => { const HeroIcon = HERO_VERTICALS[activeHeroIndex].Icon; return <HeroIcon size={24} />; })()}
-                    </div>
-                    <div className="text-left">
-                      <h4 className="font-['Outfit'] font-bold text-white text-base tracking-tight flex items-center gap-2">
-                        {HERO_VERTICALS[activeHeroIndex].title}
-                      </h4>
-                      <p className="text-white/50 text-xs">
-                        {HERO_VERTICALS[activeHeroIndex].subtitle}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-500/15 text-teal-300 border border-teal-500/30">
-                    {HERO_VERTICALS[activeHeroIndex].badge}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-white/10 text-xs text-white/50">
-                  <span className="font-mono text-teal-300 font-bold tracking-wider">
-                    0{activeHeroIndex + 1} <span className="text-white/25">/ 07</span>
-                  </span>
-
-                  <div className="flex items-center gap-1.5">
-                    {HERO_VERTICALS.map((_, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setActiveHeroIndex(idx)}
-                        aria-label={`Ver vertical ${idx + 1}`}
-                        className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                          activeHeroIndex === idx ? "w-7 bg-teal-300" : "w-2 bg-white/20 hover:bg-white/40"
-                        }`}
-                      />
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => setActiveHeroIndex((prev) => (prev + 1) % HERO_VERTICALS.length)}
-                    className="text-white/70 hover:text-teal-300 transition-colors font-semibold flex items-center gap-1 cursor-pointer">
-                    Siguiente →
-                  </button>
-                </div>
-              </div>
+            <div className="space-y-4 pt-4 font-mono text-sm text-[#e9e7df]">
+              <div className="flex items-baseline justify-between"><span className="text-xs">1 USD</span><strong className="text-2xl">43,50 <small className="text-xs font-normal text-white/55">Bs.</small></strong></div>
+              <div className="flex items-baseline justify-between border-t border-white/10 pt-4"><span className="text-xs">1 USD</span><strong className="text-2xl">4.150 <small className="text-xs font-normal text-white/55">COP</small></strong></div>
+              <div className="flex items-baseline justify-between border-t border-white/10 pt-4"><span className="text-xs">Ejemplo · venta de 380 kg</span><strong className="text-xl">$1.045,00</strong></div>
             </div>
-
+            <p className="mt-5 border-t border-white/10 pt-4 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/65">Actualiza cada cobro · sin hoja de cálculo</p>
           </div>
         </div>
 

@@ -19,43 +19,39 @@ export default function Nav() {
   const { isLoggedIn, user, logout } = useAuth();
 
   return (
-    <nav className="nav-glass fixed top-0 left-0 right-0 z-50 border-b border-black/5 dark:border-white/5 transition-colors duration-500">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+    <nav className="aurora-public-nav fixed top-0 left-0 right-0 z-50 transition-colors duration-500">
+      <div className="max-w-5xl mx-auto px-5 sm:px-8 h-20 flex items-center justify-between">
 
         {/* Logo */}
         <button onClick={() => navigate("/")} className="flex items-center gap-3 group cursor-pointer">
           <AuroraLogo size={38} animated />
           <div className="text-left">
-            <div className="font-['Outfit'] font-bold text-base leading-none tracking-tight text-aurora">
+            <div className="font-['IBM_Plex_Sans'] font-bold text-base leading-none tracking-tight text-[#f8f6ef]">
               Aurora Plus
             </div>
-            <div className="text-slate-400 dark:text-white/30 text-[10px] leading-none tracking-widest uppercase mt-0.5">
+            <div className="font-mono text-white/65 text-[9px] leading-none tracking-[0.16em] uppercase mt-1">
               Software Administrativo
             </div>
           </div>
         </button>
 
-        {/* Desktop links en Cápsula Liquid Glass (Solo Texto, sin emojis) */}
-        <div className="hidden md:flex items-center gap-1 apple-glass-pill rounded-full p-1 border border-slate-300/80 dark:border-white/15 bg-slate-100/90 dark:bg-white/[0.04] backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.8),0_2px_10px_rgba(0,0,0,0.04)]">
+        <div className="hidden md:flex items-center gap-8">
           {LINKS.map((l) => (
             <button
               key={l.path}
               onClick={() => navigate(l.path)}
-              className={`px-5 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 cursor-pointer ${
+              className={`aurora-nav-link font-['IBM_Plex_Sans'] text-sm font-semibold transition-colors duration-200 cursor-pointer ${
                 pathname === l.path
-                  ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.12),inset_0_1px_1.5px_rgba(255,255,255,1)] border border-slate-200 dark:bg-white/18 dark:text-white dark:border-white/25 backdrop-blur-md"
-                  : "text-slate-600 hover:text-slate-950 dark:text-white/60 dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/8 hover:shadow-xs"
+                  ? "is-active text-[#f8f6ef]"
+                  : "text-white/70 hover:text-[#35d7c3]"
               }`}>
               {l.label}
             </button>
           ))}
         </div>
 
-        {/* CTA & Theme Switcher */}
+        {/* CTA */}
         <div className="hidden md:flex items-center gap-3">
-          {/* Liquid Glass Theme Switcher */}
-          <ThemeToggle />
-
           {isLoggedIn ? (
             <div className="flex items-center gap-2.5">
               {/* Botón directo y llamativo a Mis Sistemas */}
@@ -94,11 +90,11 @@ export default function Nav() {
           ) : (
             <>
               <button onClick={() => navigate("/auth")}
-                className="apple-glass-btn text-xs font-bold text-slate-900 dark:text-white/90 hover:text-black dark:hover:text-white px-4 py-2 rounded-full cursor-pointer bg-white border border-slate-300 dark:border-white/18 shadow-xs">
+                className="aurora-nav-outline text-xs font-bold px-4 py-2 rounded-md cursor-pointer">
                 Iniciar sesión
               </button>
               <button onClick={() => navigate("/onboarding")}
-                className="btn-cyber-neon text-white text-xs font-bold px-5 py-2 rounded-full cursor-pointer tracking-wide shadow-md">
+                className="aurora-nav-primary text-xs font-bold px-5 py-2 rounded-md cursor-pointer tracking-wide">
                 Solicitar demo
               </button>
             </>

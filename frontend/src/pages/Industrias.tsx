@@ -62,7 +62,7 @@ export default function Industrias() {
   const ind = INDUSTRIES.find((i) => i.name === active)!;
 
   return (
-    <main className="pt-28 pb-24 relative">
+    <main className="aurora-public-page pt-32 pb-24 relative">
 
       {/* Header */}
       <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-16">

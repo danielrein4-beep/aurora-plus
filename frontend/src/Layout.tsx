@@ -50,7 +50,8 @@ export default function Layout() {
       </div>
 
       {/* Footer con el logo interactivo para CEOs (5 clics) */}
-      <footer className="border-t border-slate-200/60 dark:border-white/5 py-12 px-4 sm:px-6 max-w-7xl mx-auto relative transition-colors duration-500">
+      <footer className="aurora-public-footer border-t py-12 px-4 sm:px-6 relative transition-colors duration-500">
+        <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div
             onClick={handleFooterLogoClick}
@@ -78,6 +79,7 @@ export default function Layout() {
             ))}
           </div>
           <p className="text-slate-400 dark:text-white/20 text-xs">© 2026 Aurora Plus. Todos los derechos reservados.</p>
+        </div>
         </div>
       </footer>
 

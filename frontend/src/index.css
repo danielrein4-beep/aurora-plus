@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import 'tailwindcss';
 @custom-variant dark (&:where(.dark, .dark *));
@@ -617,27 +617,28 @@ html.light .input-horeca:hover { background: #ffffff; }
    que había antes — nombres con prefijo home- para no chocar con nada más. */
 .home-hero-photo {
   position: absolute;
-  inset: -6%;
+  inset: -3%;
   background-image: url('/aurora-hero.jpg');
   background-size: cover;
-  background-position: center 55%;
-  animation: home-aurora-pan 34s ease-in-out infinite alternate;
+  background-position: center 62%;
+  filter: brightness(.68) saturate(.9);
+  animation: home-aurora-pan 50s ease-in-out infinite alternate;
 }
 .home-hero-photo::after {
   content: "";
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(5,10,9,.55) 0%, rgba(5,10,9,.25) 35%, rgba(5,10,9,.55) 78%, rgba(5,10,9,.92) 100%),
-    linear-gradient(90deg, rgba(5,10,9,.35) 0%, transparent 40%, transparent 60%, rgba(5,10,9,.35) 100%);
+    linear-gradient(90deg, rgba(3, 10, 13, .94) 0%, rgba(3, 10, 13, .73) 35%, rgba(3, 10, 13, .28) 72%, rgba(3, 10, 13, .48) 100%),
+    linear-gradient(180deg, rgba(3, 10, 13, .18) 0%, rgba(3, 10, 13, .46) 100%);
 }
 .home-hero-photo::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(0, 201, 167, .12);
-  mix-blend-mode: overlay;
-  animation: home-aurora-breathe 8s ease-in-out infinite alternate;
+  background: rgba(0, 184, 164, .08);
+  mix-blend-mode: soft-light;
+  animation: none;
 }
 @keyframes home-aurora-pan {
   from { transform: scale(1.06) translate(0, 0); }
@@ -652,6 +653,200 @@ html.light .input-horeca:hover { background: #ffffff; }
   .home-hero-photo::before {
     animation: none;
   }
+}
+
+/* Home público: una sola tinta de acento, sin superficies de cristal. */
+.aurora-home-hero {
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+.aurora-home-hero .font-mono,
+.aurora-home-hero [class*="font-['IBM_Plex_Sans']"] + .font-mono {
+  font-family: 'IBM Plex Mono', monospace;
+}
+.aurora-solid-button {
+  border-radius: .45rem;
+  background: #35d7c3;
+  color: #062323;
+  transition: background-color .2s ease, transform .2s ease;
+}
+.aurora-solid-button:hover { background: #58e3d2; transform: translateY(-1px); }
+.aurora-outline-button {
+  border: 1px solid rgba(248, 246, 239, .32);
+  border-radius: .45rem;
+  color: #f8f6ef;
+  transition: border-color .2s ease, background-color .2s ease;
+}
+.aurora-outline-button:hover { border-color: #35d7c3; background: rgba(53, 215, 195, .1); }
+.aurora-rate-card {
+  border: 1px solid rgba(248, 246, 239, .16);
+  border-radius: 1rem 1rem 0 0;
+  background: rgba(3, 12, 15, .72);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, .28);
+}
+/* El hero usa fotografía nocturna en ambos temas; las reglas globales de
+   modo claro no deben invertir su contraste. */
+html.light .aurora-home-hero h1,
+html.light .aurora-home-hero .text-\[\#f8f6ef\] { color: #f8f6ef !important; }
+html.light .aurora-home-hero p,
+html.light .aurora-home-hero .text-\[\#e5e1d5\]\/90 { color: rgba(229, 225, 213, .92) !important; }
+html.light .aurora-home-hero .text-\[\#35d7c3\],
+html.light .aurora-home-hero .text-\[\#3fe0ce\] { color: #35d7c3 !important; }
+html.light .aurora-home-hero .text-\[\#d9d8ce\]\/85,
+html.light .aurora-home-hero .text-\[\#d9d8ce\]\/80,
+html.light .aurora-home-hero .text-\[\#d9d8ce\]\/65 { color: rgba(217, 216, 206, .82) !important; }
+.aurora-public-nav {
+  background: rgba(3, 10, 13, .42);
+  border-bottom: 1px solid rgba(248, 246, 239, .08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+html.light .aurora-public-nav {
+  background: rgba(3, 10, 13, .66) !important;
+  border-bottom-color: rgba(248, 246, 239, .08) !important;
+}
+.aurora-nav-primary {
+  background: #35d7c3;
+  color: #062323;
+  transition: background-color .2s ease;
+}
+.aurora-nav-primary:hover { background: #58e3d2; }
+.aurora-nav-outline {
+  color: #f8f6ef;
+  border: 1px solid rgba(248, 246, 239, .32);
+  transition: border-color .2s ease, background-color .2s ease;
+}
+.aurora-nav-outline:hover { border-color: #35d7c3; background: rgba(53, 215, 195, .1); }
+
+/* Navegación editorial: el signo aparece solo al interactuar. */
+.aurora-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .42rem;
+}
+.aurora-nav-link::after {
+  content: "+";
+  color: #35d7c3;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  opacity: 0;
+  transform: translateX(-4px) rotate(-20deg);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.aurora-nav-link:hover::after,
+.aurora-nav-link:focus-visible::after {
+  opacity: 1;
+  transform: translateX(0) rotate(0);
+}
+
+/* Páginas públicas interiores: misma atmósfera fotográfica y sistema visual
+   que el hero, sin alterar Dashboard ni las aplicaciones verticales. */
+.aurora-public-page {
+  isolation: isolate;
+  min-height: 100vh;
+  overflow: hidden;
+  color: #d9d8ce;
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: #050d10;
+}
+.aurora-public-page::before {
+  content: "";
+  position: fixed;
+  z-index: -2;
+  inset: -8%;
+  pointer-events: none;
+  background: url('/aurora-hero.jpg') center 42% / cover no-repeat;
+  filter: brightness(.32) saturate(.82);
+  opacity: .72;
+  animation: public-aurora-drift 42s ease-in-out infinite alternate;
+}
+.aurora-public-page::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(3, 11, 14, .76);
+}
+@keyframes public-aurora-drift {
+  from { transform: scale(1.03) translate3d(-1%, -1%, 0); }
+  to { transform: scale(1.12) translate3d(2%, 1.5%, 0); }
+}
+.aurora-public-page h1,
+.aurora-public-page h2,
+.aurora-public-page h3,
+.aurora-public-page h4 {
+  color: #f8f6ef !important;
+  font-family: 'IBM Plex Sans', sans-serif !important;
+  letter-spacing: -.025em;
+}
+.aurora-public-page .text-aurora,
+.aurora-public-page .text-aurora-r,
+html.light .aurora-public-page .text-aurora,
+html.light .aurora-public-page .text-aurora-r {
+  background: none !important;
+  color: #35d7c3 !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+.aurora-public-page .text-slate-900,
+.aurora-public-page .text-slate-800,
+.aurora-public-page .text-slate-700 { color: #f8f6ef !important; }
+.aurora-public-page .text-slate-600,
+.aurora-public-page .text-slate-500 { color: rgba(229, 225, 213, .78) !important; }
+.aurora-public-page .text-slate-400 { color: rgba(217, 216, 206, .58) !important; }
+.aurora-public-page .apple-glass,
+html.light .aurora-public-page .apple-glass {
+  background: rgba(5, 17, 20, .88) !important;
+  border: 1px solid rgba(53, 215, 195, .2) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .24) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.aurora-public-page .apple-glass:hover {
+  border-color: rgba(53, 215, 195, .52) !important;
+  box-shadow: 0 20px 46px rgba(0, 0, 0, .32) !important;
+}
+.aurora-public-page .g-aurora,
+.aurora-public-page .btn-cyber-neon {
+  background: #35d7c3 !important;
+  color: #062323 !important;
+  box-shadow: none !important;
+}
+.aurora-public-page .glow-teal { box-shadow: 0 10px 28px rgba(53, 215, 195, .18) !important; }
+.aurora-public-page input,
+.aurora-public-page select,
+.aurora-public-page textarea,
+html.light .aurora-public-page input,
+html.light .aurora-public-page select,
+html.light .aurora-public-page textarea {
+  background: #071518 !important;
+  border-color: rgba(53, 215, 195, .22) !important;
+  color: #f8f6ef !important;
+  box-shadow: none !important;
+}
+.aurora-public-page input::placeholder,
+.aurora-public-page textarea::placeholder { color: rgba(217, 216, 206, .45) !important; }
+.aurora-public-page [class*="border-slate"],
+.aurora-public-page [class*="border-white"] { border-color: rgba(53, 215, 195, .16) !important; }
+.aurora-public-footer,
+html.light .aurora-public-footer {
+  background: #050d10;
+  border-color: rgba(53, 215, 195, .14) !important;
+  color: rgba(217, 216, 206, .72);
+}
+.aurora-public-footer .text-aurora {
+  background: none !important;
+  color: #35d7c3 !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+.aurora-public-footer .text-slate-400,
+.aurora-public-footer .text-slate-500 { color: rgba(217, 216, 206, .58) !important; }
+@media (prefers-reduced-motion: reduce) {
+  .aurora-public-page::before { animation: none; }
+  .aurora-nav-link::after { transition: none; }
+}
+@media (max-width: 640px) {
+  .aurora-home-hero { min-height: 980px; }
+  .home-hero-photo { background-position: 58% center; }
 }
 
 /* Ticker de módulos en Home.tsx: se renderiza 3 veces la misma lista seguida, así que
