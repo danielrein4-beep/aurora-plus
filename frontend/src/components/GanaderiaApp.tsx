@@ -609,14 +609,21 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const ingresosLecheHoy = litrosHoy * precioLecheUSD;
 
   // Matriz de Categorías Canónicas del Hato (GanSoft Style)
+  // El tipoAnimal elegido por el usuario en el Alta SIEMPRE manda; el peso solo
+  // clasifica como respaldo cuando el animal no trae un tipoAnimal reconocido
+  // (dato legado). Antes el respaldo por peso se evaluaba en paralelo al tipo
+  // real, así que un Toro joven (p.ej. 259 kg) se contaba a la vez en "Toros" y
+  // en "Mautes" por caer en ese rango de peso.
+  const TIPOS_HEMBRA_CONOCIDOS = ["BECERRA", "MAUTA", "NOVILLA", "VACA"];
+  const TIPOS_MACHO_CONOCIDOS = ["TERNERO", "BECERRO", "MAUTE", "NOVILLO", "TORO"];
   const categoriasHato = [
-    { key: "BECERRA", label: "Becerras", filter: (a: AnimalGanaderia) => a.sexo === "HEMBRA" && (a.tipoAnimal === "BECERRA" || (a.pesoActual || 0) < 120) },
-    { key: "MAUTA", label: "Mautas", filter: (a: AnimalGanaderia) => a.sexo === "HEMBRA" && (a.tipoAnimal === "MAUTA" || ((a.pesoActual || 0) >= 120 && (a.pesoActual || 0) < 280)) },
+    { key: "BECERRA", label: "Becerras", filter: (a: AnimalGanaderia) => a.sexo === "HEMBRA" && (a.tipoAnimal === "BECERRA" || (!TIPOS_HEMBRA_CONOCIDOS.includes(a.tipoAnimal || "") && (a.pesoActual || 0) < 120)) },
+    { key: "MAUTA", label: "Mautas", filter: (a: AnimalGanaderia) => a.sexo === "HEMBRA" && (a.tipoAnimal === "MAUTA" || (!TIPOS_HEMBRA_CONOCIDOS.includes(a.tipoAnimal || "") && (a.pesoActual || 0) >= 120 && (a.pesoActual || 0) < 280)) },
     { key: "NOVILLA", label: "Novillas", filter: (a: AnimalGanaderia) => a.sexo === "HEMBRA" && a.tipoAnimal === "NOVILLA" },
     { key: "VACA", label: "Vacas", filter: (a: AnimalGanaderia) => a.sexo === "HEMBRA" && a.tipoAnimal === "VACA" },
-    { key: "BECERRO", label: "Becerros", filter: (a: AnimalGanaderia) => a.sexo === "MACHO" && (a.tipoAnimal === "TERNERO" || a.tipoAnimal === "BECERRO" || (a.pesoActual || 0) < 130) },
-    { key: "MAUTE", label: "Mautes", filter: (a: AnimalGanaderia) => a.sexo === "MACHO" && (a.tipoAnimal === "MAUTE" || ((a.pesoActual || 0) >= 130 && (a.pesoActual || 0) < 320)) },
-    { key: "NOVILLO", label: "Novillos", filter: (a: AnimalGanaderia) => a.sexo === "MACHO" && (a.tipoAnimal === "NOVILLO" || ((a.pesoActual || 0) >= 320 && (a.pesoActual || 0) < 600 && a.tipoAnimal !== "TORO")) },
+    { key: "BECERRO", label: "Becerros", filter: (a: AnimalGanaderia) => a.sexo === "MACHO" && (a.tipoAnimal === "TERNERO" || a.tipoAnimal === "BECERRO" || (!TIPOS_MACHO_CONOCIDOS.includes(a.tipoAnimal || "") && (a.pesoActual || 0) < 130)) },
+    { key: "MAUTE", label: "Mautes", filter: (a: AnimalGanaderia) => a.sexo === "MACHO" && (a.tipoAnimal === "MAUTE" || (!TIPOS_MACHO_CONOCIDOS.includes(a.tipoAnimal || "") && (a.pesoActual || 0) >= 130 && (a.pesoActual || 0) < 320)) },
+    { key: "NOVILLO", label: "Novillos", filter: (a: AnimalGanaderia) => a.sexo === "MACHO" && (a.tipoAnimal === "NOVILLO" || (!TIPOS_MACHO_CONOCIDOS.includes(a.tipoAnimal || "") && (a.pesoActual || 0) >= 320 && (a.pesoActual || 0) < 600)) },
     { key: "TORO", label: "Toros", filter: (a: AnimalGanaderia) => a.sexo === "MACHO" && a.tipoAnimal === "TORO" },
   ];
 
