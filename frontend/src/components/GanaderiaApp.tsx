@@ -1402,6 +1402,16 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           </button>
 
           <button
+            onClick={() => {
+              setVacunacionModo("INDIVIDUAL");
+              setModalVacuna(true);
+            }}
+            className="apple-glass px-3.5 py-2 rounded-xl border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold hover:bg-rose-500/10 transition-all flex items-center gap-1.5 cursor-pointer">
+            <IconSyringe size={14} />
+            <span>Vacunar</span>
+          </button>
+
+          <button
             onClick={onSalir}
             className="apple-glass-btn text-xs font-semibold px-4 py-2 rounded-xl text-slate-700 dark:text-white/70 hover:text-red-500 dark:hover:text-red-400 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer">
             ← Volver al Hub
