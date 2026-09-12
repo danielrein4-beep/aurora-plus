@@ -2598,6 +2598,33 @@ export function obtenerVacunasPorAnimal(animalId: number): Promise<AplicacionVac
   return request(`/api/ganaderia/vacunas/animal/${animalId}`);
 }
 
+export interface MedicamentoGanaderia {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  tipoTratamiento?: string;
+  diasRetiroLeche?: number;
+  diasRetiroCarne?: number;
+}
+
+export interface AplicacionMedicamentoGanaderia {
+  id: number;
+  tenantId: number;
+  animal: AnimalGanaderia;
+  medicamento: MedicamentoGanaderia;
+  fechaAplicacion: string;
+  dosis?: string;
+  motivoDiagnostico?: string;
+  veterinarioResponsable?: string;
+  fechaFinRetiroLeche?: string;
+  fechaFinRetiroCarne?: string;
+  costo?: number;
+}
+
+export function obtenerMedicamentosPorAnimal(animalId: number): Promise<AplicacionMedicamentoGanaderia[]> {
+  return request(`/api/ganaderia/medicamentos/animal/${animalId}`);
+}
+
 export function obtenerEventosReproductivosPorHembra(hembraId: number): Promise<EventoReproductivoGanaderia[]> {
   return request(`/api/ganaderia/reproduccion/hembra/${hembraId}`);
 }

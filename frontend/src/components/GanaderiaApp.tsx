@@ -21,14 +21,14 @@ import {
   registrarPesoGanaderia, obtenerGdpGanaderia,
   listarVacunasGanaderia, crearVacunaGanaderia, aplicarVacunaGanaderia, aplicarVacunaLoteGanaderia,
   obtenerAlertasGanaderia, registrarEventoReproductivoGanaderia,
-  obtenerAlertasSanitariasGanaderia, obtenerVacunasPorAnimal,
+  obtenerAlertasSanitariasGanaderia, obtenerVacunasPorAnimal, obtenerMedicamentosPorAnimal,
   obtenerEventosReproductivosPorHembra, obtenerCurvaPesoGanaderia,
   registrarMastitisGanaderia,
   obtenerStockTanqueLeche, registrarDespachoLecheTanque, obtenerVentasLecheTanque, configurarTanqueLeche,
   listarGastosGanaderia, crearGastoGanaderia, listarVentasGanaderia,
   type AnimalGanaderia, type PotreroGanaderia, type RegistroOrdenoGanaderia,
   type TableroAlertasGanaderia, type VacunaGanaderia,
-  type AlertaSanitariaGanaderia, type AplicacionVacunaGanaderia,
+  type AlertaSanitariaGanaderia, type AplicacionVacunaGanaderia, type AplicacionMedicamentoGanaderia,
   type EventoReproductivoGanaderia, type RegistroPesoGanaderia,
   type GdpGanaderiaResponse,
   type TanqueLeche, type VentaLecheTanque,
@@ -218,6 +218,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [animalFichaId, setAnimalFichaId] = useState<number | null>(null);
   const [alertasSanitarias, setAlertasSanitarias] = useState<AlertaSanitariaGanaderia[]>([]);
   const [fichaVacunas, setFichaVacunas] = useState<AplicacionVacunaGanaderia[]>([]);
+  const [fichaMedicamentos, setFichaMedicamentos] = useState<AplicacionMedicamentoGanaderia[]>([]);
   const [fichaEventosRepro, setFichaEventosRepro] = useState<EventoReproductivoGanaderia[]>([]);
   const [fichaPesos, setFichaPesos] = useState<RegistroPesoGanaderia[]>([]);
   const [fichaGdp, setFichaGdp] = useState<GdpGanaderiaResponse | null>(null);
@@ -483,11 +484,13 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     const sel = animales.find(a => a.id === animalFichaId);
     Promise.all([
       obtenerVacunasPorAnimal(animalFichaId).catch(() => []),
+      obtenerMedicamentosPorAnimal(animalFichaId).catch(() => []),
       sel && sel.sexo === "HEMBRA" ? obtenerEventosReproductivosPorHembra(animalFichaId).catch(() => []) : Promise.resolve([]),
       obtenerCurvaPesoGanaderia(animalFichaId).catch(() => []),
       obtenerGdpGanaderia(animalFichaId).catch(() => null)
-    ]).then(([vacs, repros, pesos, gdp]) => {
+    ]).then(([vacs, meds, repros, pesos, gdp]) => {
       setFichaVacunas(vacs);
+      setFichaMedicamentos(meds);
       setFichaEventosRepro(repros);
       setFichaPesos(pesos);
       setFichaGdp(gdp);
@@ -2503,11 +2506,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                               <span>Vacunas & Sanidad</span>
                             </h4>
                             <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold">
-                              {fichaVacunas.length} dosis
+                              {fichaVacunas.length + fichaMedicamentos.length} eventos
                             </span>
                           </div>
 
                           <div className="space-y-2">
+                            <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-white/40">
+                              Vacunas ({fichaVacunas.length})
+                            </div>
                             {fichaVacunas.length === 0 ? (
                               <div className="text-xs text-slate-400 py-6 text-center bg-white/5 rounded-2xl">
                                 No registra vacunas aún en backend.<br />
@@ -2539,6 +2545,52 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                                     )}
                                   </div>
                                 ))}
+                              </div>
+                            )}
+
+                            <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-white/40 pt-2">
+                              Tratamientos & Medicamentos ({fichaMedicamentos.length})
+                            </div>
+                            {fichaMedicamentos.length === 0 ? (
+                              <div className="text-xs text-slate-400 py-4 text-center bg-white/5 rounded-2xl">
+                                Sin tratamientos con medicamentos registrados.
+                              </div>
+                            ) : (
+                              <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {fichaMedicamentos.map((m) => {
+                                  const hoy = new Date().toISOString().slice(0, 10);
+                                  const retiroLecheActivo = m.fechaFinRetiroLeche && m.fechaFinRetiroLeche >= hoy;
+                                  const retiroCarneActivo = m.fechaFinRetiroCarne && m.fechaFinRetiroCarne >= hoy;
+                                  return (
+                                    <div key={m.id} className="p-2.5 rounded-xl bg-rose-500/5 border border-rose-500/15 text-xs space-y-1">
+                                      <div className="flex justify-between font-bold text-white">
+                                        <span>{m.medicamento?.nombre || "Tratamiento"}</span>
+                                        <span className="text-rose-300 font-mono text-[11px]">${m.costo || 0} USD</span>
+                                      </div>
+                                      {m.motivoDiagnostico && (
+                                        <div className="text-[10px] text-slate-300">{m.motivoDiagnostico}</div>
+                                      )}
+                                      <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                                        <span>Fecha: {m.fechaAplicacion}</span>
+                                        {m.veterinarioResponsable && <span>Vet: {m.veterinarioResponsable}</span>}
+                                      </div>
+                                      {(retiroLecheActivo || retiroCarneActivo) && (
+                                        <div className="flex flex-wrap gap-1.5 pt-1">
+                                          {retiroLecheActivo && (
+                                            <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold">
+                                              Retiro leche hasta {m.fechaFinRetiroLeche}
+                                            </span>
+                                          )}
+                                          {retiroCarneActivo && (
+                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">
+                                              Retiro carne hasta {m.fechaFinRetiroCarne}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
