@@ -111,14 +111,20 @@ export default function Home() {
 
           <div className="aurora-rate-card mt-16 w-full max-w-md p-7 sm:p-8">
             <div className="flex items-center justify-between border-b border-white/10 pb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[#d9d8ce]/80">
-              <span>Tasa del día · motor Aurora</span><span className="text-[#3fe0ce]">● en vivo</span>
+              <span>Multi-moneda · motor Aurora</span>
             </div>
-            <div className="space-y-4 pt-4 font-mono text-sm text-[#e9e7df]">
-              <div className="flex items-baseline justify-between"><span className="text-xs">1 USD</span><strong className="text-2xl">43,50 <small className="text-xs font-normal text-white/55">Bs.</small></strong></div>
-              <div className="flex items-baseline justify-between border-t border-white/10 pt-4"><span className="text-xs">1 USD</span><strong className="text-2xl">4.150 <small className="text-xs font-normal text-white/55">COP</small></strong></div>
-              <div className="flex items-baseline justify-between border-t border-white/10 pt-4"><span className="text-xs">Ejemplo · venta de 380 kg</span><strong className="text-xl">$1.045,00</strong></div>
+            <div className="flex items-center justify-center gap-3 pt-6 pb-2">
+              {["USD", "VES", "COP"].map((cur, i) => (
+                <div key={cur} className="flex items-center gap-3">
+                  <span className="font-mono text-lg font-bold text-[#f8f6ef] border border-white/15 rounded-lg px-3 py-1.5">{cur}</span>
+                  {i < 2 && <span className="text-[#3fe0ce] text-sm">⇄</span>}
+                </div>
+              ))}
             </div>
-            <p className="mt-5 border-t border-white/10 pt-4 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/65">Actualiza cada cobro · sin hoja de cálculo</p>
+            <p className="mt-4 pt-4 border-t border-white/10 text-sm text-[#e9e7df]/85 leading-relaxed">
+              Tú defines la tasa del día en segundos. Si el bolívar sube 15% de la mañana a la tarde, tu caja lo refleja al instante — sin hoja de cálculo, sin esperar a nadie.
+            </p>
+            <p className="mt-4 pt-4 border-t border-white/10 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/65">Sin tasa fija · tú la actualizas cuando quieras</p>
           </div>
 
           {/* ── ACCESO DIRECTO PARA USUARIOS EN SESIÓN ── */}
