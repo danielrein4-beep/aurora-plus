@@ -29,7 +29,10 @@ public class GastoGanaderiaController {
     }
 
     @GetMapping
-    public List<GastoGanaderia> listar() {
+    public List<GastoGanaderia> listar(@RequestParam(required = false) Long tenantId) {
+        if (tenantId != null) {
+            return gastoGanaderiaRepository.findByTenantIdOrderByFechaDesc(tenantId);
+        }
         return gastoGanaderiaRepository.findAllByOrderByFechaDesc();
     }
 

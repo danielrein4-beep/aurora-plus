@@ -9,5 +9,6 @@ import java.util.List;
 @Repository
 public interface GastoGanaderiaRepository extends JpaRepository<GastoGanaderia, Long> {
     List<GastoGanaderia> findAllByOrderByFechaDesc();
+    List<GastoGanaderia> findByTenantIdOrderByFechaDesc(Long tenantId);
     List<GastoGanaderia> findByTenantIdAndFechaBetween(Long tenantId, LocalDate desde, LocalDate hasta);
 }

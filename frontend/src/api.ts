@@ -2680,4 +2680,45 @@ export function obtenerFinanzasGanaderia(tenantId: number, desde: string, hasta:
   return request(`/api/ganaderia/finanzas/resumen-periodo?tenantId=${tenantId}&desde=${desde}&hasta=${hasta}`);
 }
 
+export interface GastoGanaderia {
+  id: number;
+  tenantId: number;
+  categoria: string;
+  descripcion: string;
+  monto: number;
+  fecha: string;
+}
+
+export function listarGastosGanaderia(tenantId?: number): Promise<GastoGanaderia[]> {
+  const q = tenantId ? `?tenantId=${tenantId}` : "";
+  return request(`/api/ganaderia/gastos${q}`);
+}
+
+export function crearGastoGanaderia(tenantId: number, datos: {
+  categoria: string;
+  descripcion: string;
+  monto: number;
+  fecha: string;
+}): Promise<GastoGanaderia> {
+  return request(`/api/ganaderia/gastos?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export interface VentaGanaderiaResumen {
+  id: number;
+  tenantId: number;
+  numeroTicket: string;
+  comprador?: string;
+  total: number;
+  fecha: string;
+  items?: any[];
+}
+
+export function listarVentasGanaderia(tenantId?: number): Promise<VentaGanaderiaResumen[]> {
+  const q = tenantId ? `?tenantId=${tenantId}` : "";
+  return request(`/api/ganaderia/ventas${q}`);
+}
+
 

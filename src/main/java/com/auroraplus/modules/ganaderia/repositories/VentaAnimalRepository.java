@@ -9,5 +9,6 @@ import java.util.List;
 @Repository
 public interface VentaAnimalRepository extends JpaRepository<VentaAnimal, Long> {
     List<VentaAnimal> findAllByOrderByFechaDesc();
+    List<VentaAnimal> findByTenantIdOrderByFechaDesc(Long tenantId);
     List<VentaAnimal> findByTenantIdAndFechaBetween(Long tenantId, LocalDateTime desde, LocalDateTime hasta);
 }
