@@ -1,0 +1,104 @@
+/* DepthCarousel (react-bits.dev) — tarjetas apiladas en profundidad
+   (translateZ/rotateY) que se deslizan con drag, rueda del mouse, flechas
+   de teclado o autoplay. El JS calcula transform/opacity/filter por tarjeta
+   en cada frame; este CSS solo define la escena 3D y los controles. */
+.depth-carousel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.depth-carousel__stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  perspective: var(--dc-perspective, 1400px);
+  transform-style: preserve-3d;
+}
+
+.depth-carousel__card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-style: preserve-3d;
+  overflow: hidden;
+  cursor: pointer;
+  background: #0a0a12;
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.55);
+  will-change: transform, opacity, filter;
+}
+
+.depth-carousel__card--content {
+  cursor: default;
+}
+
+.depth-carousel__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+
+.depth-carousel__tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.depth-carousel__arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3000;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 20, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f2f2f2;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.depth-carousel__arrow:hover {
+  background: rgba(53, 215, 195, 0.25);
+  transform: translateY(-50%) scale(1.06);
+}
+.depth-carousel__arrow--prev { left: 4px; }
+.depth-carousel__arrow--next { right: 4px; }
+
+.depth-carousel__dots {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.depth-carousel__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.depth-carousel__dot.is-active {
+  background: #35d7c3;
+  transform: scale(1.3);
+}

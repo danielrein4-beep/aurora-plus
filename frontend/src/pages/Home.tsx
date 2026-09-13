@@ -8,6 +8,7 @@ import ScrollReveal from "../components/ScrollReveal";
 import AccordionGallery from "../components/AccordionGallery";
 import CursorGrid from "../components/CursorGrid";
 import GlareHover from "../components/GlareHover";
+import DepthCarousel from "../components/DepthCarousel";
 import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware, IconMining,
@@ -217,6 +218,18 @@ export default function Home() {
   const [heroTitleSettled, setHeroTitleSettled] = useState(false);
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
+
+  const featureCarouselItems = FEATURES.map((f) => ({
+    content: (
+      <div className="w-full h-full bg-[#0b1014] border border-white/10 shadow-xl p-6 flex flex-col justify-center">
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 bg-teal-500/10 border border-teal-500/20">
+          <f.Icon size={22} />
+        </div>
+        <h3 className="font-['Outfit'] font-semibold text-white text-lg mb-2">{f.title}</h3>
+        <p className="text-white/45 text-sm leading-relaxed">{f.desc}</p>
+      </div>
+    ),
+  }));
 
   // Parallax sutil: la foto de fondo se desplaza unos pocos píxeles según la
   // posición del mouse dentro del hero, dando sensación de profundidad.
@@ -542,16 +555,29 @@ export default function Home() {
             Construido para la<br /><span className="text-aurora-r">operación real</span>
           </h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="hover-card apple-glass rounded-2xl p-6 card-shadow">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8">
-                <f.Icon size={22} />
-              </div>
-              <h3 className="font-['Outfit'] font-semibold text-slate-900 dark:text-white text-lg mb-2">{f.title}</h3>
-              <p className="text-slate-500 dark:text-white/45 text-sm leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
+        <div style={{ height: 440, position: "relative" }}>
+          <DepthCarousel
+            items={featureCarouselItems}
+            depth={220}
+            spread={90}
+            tilt={22}
+            tiltDirection="right"
+            perspective={1400}
+            visibleCards={4}
+            falloff={0.2}
+            blur={6}
+            autoplay
+            loop
+            cardWidth={300}
+            cardHeight={380}
+            radius={18}
+            tint="#05060a"
+            duration={700}
+            ease="power3.out"
+            autoplayDelay={3200}
+            showControls
+            showIndicators
+          />
         </div>
         <div className="text-center mt-8">
           <button onClick={() => navigate("/soluciones")} className="text-teal-600 dark:text-teal-400 hover:text-teal-500 dark:hover:text-teal-300 text-sm font-semibold transition-colors cursor-pointer">
