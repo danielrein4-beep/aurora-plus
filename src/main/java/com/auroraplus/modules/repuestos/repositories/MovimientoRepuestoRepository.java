@@ -17,6 +17,9 @@ public interface MovimientoRepuestoRepository extends JpaRepository<MovimientoRe
     @Query("SELECT m FROM MovimientoRepuesto m JOIN FETCH m.repuesto WHERE m.repuesto.id = :repuestoId ORDER BY m.fechaRegistro DESC")
     List<MovimientoRepuesto> findByRepuestoIdOrderByFechaRegistroDesc(@Param("repuestoId") Long repuestoId);
 
+    List<MovimientoRepuesto> findByTenantIdAndTipoAndFechaRegistroGreaterThanEqualAndFechaRegistroLessThan(
+        Long tenantId, MovimientoRepuesto.TipoMovimiento tipo, LocalDateTime desde, LocalDateTime hastaExclusivo);
+
     /** Proyección agregada por cliente para la Regla ABC (ver ClasificacionClientesJob). */
     interface ResumenComprasCliente {
         Long getTenantId();

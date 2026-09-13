@@ -56,6 +56,7 @@ const VERTICAL_NAMES: Record<string, string> = {
 const sourcesFor = (modulo: string) => {
   if (modulo === 'HORECA') return ['Comandas pagadas', 'Costos congelados'];
   if (modulo === 'RETAIL') return ['Ventas de mostrador', 'Costos congelados'];
+  if (modulo === 'REPUESTOS') return ['Ventas del kardex de repuestos'];
   return ['Operaciones registradas'];
 };
 

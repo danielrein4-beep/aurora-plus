@@ -1,15 +1,15 @@
 # Contrato del Motor Financiero Compartido — Aurora Plus
 
-**Estado:** Aprobado para Capa 1 + esqueleto probado de Capa 2 (Horeca y Retail). Capas 3 y 4 quedan en el roadmap, sin implementar.
+**Estado:** Aprobado para Capa 1 + Capa 2 parcial (Horeca, Retail y Repuestos). La contabilidad interna queda en el roadmap, sin implementar.
 **Rama:** `feature/finance-core` (worktree aislado, no toca `feature/astra-hero-redesign` ni el trabajo en curso de Antigravity sobre Horeca).
-**No incluido en esta fase:** cambios a `Dashboard.tsx`, contabilidad de partida doble (Capa 4), libros fiscales (Capa 3).
+**No incluido en esta fase:** cambios a `Dashboard.tsx`, contabilidad de partida doble y emisión fiscal.
 
 ## Changelog de esta revisión (respuesta a la ronda de observaciones)
 
 1. **`DetalleVentaModa` sí se migra en esta fase** — columna `costo_unitario` nullable, se congela solo en ventas nuevas, sin inventar costos para el histórico. Ver §3.1.
-2. **Se conectan primero Horeca y Retail** (costeo real/congelado ya existente). El resto queda con la interfaz `CosteoProvider` diseñada pero sin implementación conectada — se conectan según calidad real de sus datos, en una fase posterior.
-3. **Capa 4 (partida doble) confirmada en el roadmap, no se construye ahora.** Primero se valida trazabilidad + KPI + libros con datos reales.
-4. **RIF:** sigue opcional para el registro general del tenant. Pasa a ser **obligatorio para habilitar exportaciones o cualquier función presentada como fiscal** (libro de ventas/compras, folio, etc. — Capa 3). El RIF del comprador (no del tenant) se maneja por tipo de documento y su validación queda fuera de este motor: se define junto con un contador o proveedor fiscal antes de construir la Capa 3 — no se resuelve por decreto de ingeniería. Ver §4.1.
+2. **Se conectan Horeca, Retail y Repuestos.** Horeca/Retail aportan costo congelado; Repuestos aporta ventas reales desde su kardex, pero cobertura de costo 0% hasta que el movimiento congele el costo histórico.
+3. **Partida doble permanece en el roadmap, no se construye ahora.** Primero se valida trazabilidad + KPI con datos reales.
+4. **Alcance estrictamente no fiscal:** Aurora Plus puede consolidar notas de entrega y documentos de venta no fiscales con referencia interna, pero no genera facturas fiscales, folios fiscales, libros fiscales ni declaraciones tributarias.
 5. **Tenant nunca viaje libre en la URL/query/body.** Todo endpoint nuevo de este contrato saca el tenant de `TenantContext.getCurrentTenant()` (ya resuelto por `TenantInterceptor` desde el JWT verificado — el propio código ya tiene el comentario "YA NO confía en el header X-Tenant-ID que antes el cliente podía mandar con cualquier valor"). Se corrigieron los ejemplos de endpoint de este documento, que originalmente sí aceptaban `?tenantId=` — eso fue un error de esta propuesta, no una práctica del código real. Ver §3.3.
 6. **Consolidación de monedas:** no hace falta diseñar nada nuevo — `MovimientoCaja` YA guarda `monto`/`moneda` (lo que físicamente entró, en su moneda real) y `montoEquivalenteBase`/`monedaBaseEquivalente`/`tasaAplicada` (el equivalente congelado con la tasa vigente AL MOMENTO del movimiento, ver `MotorFinancieroService.registrarMovimientoMultiMoneda`). El contrato solo agrega la regla explícita: **ningún reporte de este motor puede reconvertir un movimiento histórico con la tasa de hoy** — siempre se lee `montoEquivalenteBase`/`tasaAplicada` ya guardados, nunca se vuelve a llamar `convertirMoneda` sobre datos pasados. Ver §2.1.
 7. **"Utilidad neta" se renombra a "resultado estimado"** en todo el motor de KPI mientras no todos los proveedores tengan costo completo, y cada respuesta trae `cobertura` por vertical (qué % de las ventas de ese módulo tienen costo real conocido, no aproximado ni en cero por defecto). Ver §3.2.
@@ -26,7 +26,7 @@ Le pediste a Claude un diagnóstico honesto de KPIs/libros/costos/balances/factu
 
 1. `core.financiero` — caja multi-moneda simple (`MovimientoCaja`, `Turno`, `TasaCambio`). Funciona, pero es de partida simple, no de partida doble, y **no sabe qué vertical/venta generó cada movimiento**.
 2. Lógica de costeo **duplicada y no convergente** en 3 lugares distintos (`Articulo.costoUnitario` en core, `ProductoModa.costoUnitario` en Moda, `RepuestoItem.costoUnitario` en Repuestos), más un cuarto modelo completamente distinto en Horeca (`EscandalloReceta`/`DetalleReceta`, el más sofisticado de todos) y un quinto ad-hoc en Ganadería (`CostosGanaderiaController`, solo compra+sanidad).
-3. Un único módulo legado (`tamanacocomercial`, la mina de carbón) que sí tiene algo parecido a un ERP contable real: `Factura` con numeración correlativa, IVA/IGTF/retenciones, y `RentabilidadRestController` con P&L semanal real — pero hardcodeado para ese tenant, no reutilizable.
+3. Un único módulo legado (`tamanacocomercial`, la mina de carbón) contiene estructuras tributarias hardcodeadas para ese tenant. Se documentan como evidencia histórica, pero **no se reutilizan ni forman parte del motor genérico**.
 
 Este documento define el contrato para construir **un solo motor** que las 6 verticales alimenten de la misma forma, sin obligar a reescribir de golpe Moda/Repuestos/Ganadería (eso sería un proyecto aparte, más grande y más riesgoso que lo que se propone aquí).
 
@@ -38,8 +38,8 @@ No se propone borrar ni migrar de un tirón `ProductoModa.costoUnitario`, `Repue
 
 - **Capa 1 — Trazabilidad de origen** (aditiva, bajo riesgo): cada `MovimientoCaja` sabe qué lo generó.
 - **Capa 2 — Motor de KPI de empresa** (solo lectura, agrega lo que ya existe): un servicio que consulta las fuentes de datos actuales de cada vertical vía un **adaptador de costeo** común, sin tocar sus tablas.
-- **Capa 3 — Libros fiscales** (indexación, no duplicación): tablas nuevas que *referencian* las ventas/compras ya existentes de cada vertical y les agregan los campos fiscales que faltan (folio, RIF, base imponible, IVA), en vez de duplicar los datos operativos.
-- **Capa 4 — Contabilidad de partida doble** (la más grande, la más valiosa, la más invasiva): plan de cuentas + asientos automáticos generados desde las capas 1-3.
+- **Capa 3 — Registro comercial no fiscal**: índice de notas de entrega y documentos de venta no fiscales, siempre con referencia interna y aviso visible `DOCUMENTO NO FISCAL`.
+- **Capa 4 — Contabilidad interna de partida doble**: plan de cuentas + asientos automáticos para gestión interna; no convierte los documentos comerciales en comprobantes fiscales.
 
 Cada capa es útil por sí sola y no depende de que la siguiente exista. Se puede parar después de la Capa 2 y ya se resolvió "no tengo KPIs de mi empresa completa" sin haber tocado contabilidad de verdad.
 
@@ -60,8 +60,8 @@ El borrador anterior decía "6 verticales" pero enumeraba 7 `CosteoProvider` (GA
 |---|---|---|
 | `GANADERIA` | Control de Fincas | `modules/ganaderia` |
 | `HORECA` | Restaurantes | `modules/horeca` |
-| `RETAIL` | Retail | `modules/retail` |
-| `REPUESTOS` | Ferretería | `modules/repuestos` (también sirve a `farmacia`/`ferreteria` como módulos de licencia) |
+| `RETAIL` | Retail | `modules/retail` (también sirve a `farmacia`) |
+| `REPUESTOS` | Ferretería | `modules/repuestos` (licencias `repuestos`/`ferreteria`) |
 | `MINERIA` | Minería | `modules/minero` |
 | `SALUD` | Clínicas Médicas | `modules/salud` |
 
@@ -105,7 +105,7 @@ Se agregan las 3 columnas a `MovimientoCaja` y un nuevo overload de `MotorFinanc
 - `monto` / `moneda` — lo que **físicamente entró a la caja**, en la moneda real en que entró (USD, VES, COP). Nunca se toca.
 - `montoEquivalenteBase` / `monedaBaseEquivalente` / `tasaAplicada` — el equivalente en la moneda base del negocio, calculado **una sola vez, con la tasa vigente en el momento del movimiento** (`MotorFinancieroService.registrarMovimientoMultiMoneda`, línea que hace `tasaAplicada = montoEnMonedaCobro.divide(montoBase, 6, HALF_UP)`). Quedan `null` si el movimiento ya estaba en la moneda base.
 
-**Regla que sí agrega este contrato, porque no estaba escrita en ningún lado:** todo reporte construido sobre esta capa (KPI de empresa, libros fiscales, y a futuro contabilidad) **lee `montoEquivalenteBase`/`tasaAplicada` ya guardados — nunca vuelve a llamar `convertirMoneda(...)` con la tasa de hoy sobre un movimiento pasado.** Reconvertir históricos con la tasa actual falsificaría cualquier comparación entre períodos (un mes "creció" solo porque el bolívar se devaluó, no porque vendió más). `EmpresaKpiService` (§3) sigue esta regla explícitamente.
+**Regla que sí agrega este contrato, porque no estaba escrita en ningún lado:** todo reporte construido sobre esta capa (KPI de empresa, registro comercial no fiscal y contabilidad interna futura) **lee `montoEquivalenteBase`/`tasaAplicada` ya guardados — nunca vuelve a llamar `convertirMoneda(...)` con la tasa de hoy sobre un movimiento pasado.** Reconvertir históricos con la tasa actual falsificaría cualquier comparación entre períodos (un mes "creció" solo porque el bolívar se devaluó, no porque vendió más). `EmpresaKpiService` (§3) sigue esta regla explícitamente.
 
 ### 2.2 Trazabilidad con porcentaje explícito
 
@@ -154,13 +154,14 @@ Esta fase **implementa de verdad** dos proveedores (los que ya tienen costo cong
 
 - `HorecaCosteoProvider`: lee `ItemComanda` (join `Comanda`, `estado = PAGADA`, por `fechaCierre`) — `costoUnitario` ya está congelado por venta (`EscandalloService.recalcularCosto` lo fija al vender). Items sin escandallo (cargos manuales tipo "Cover") tienen `costoUnitario = null`: cuentan en `ventasBrutas` pero no en `ventasConCostoConocido` — la cobertura de Horeca normalmente no será 100% por esto, y eso es correcto reportarlo así, no forzarlo a cero.
 - `RetailCosteoProvider`: lee `ItemVentaRetail` (join `VentaRetail`, por `fechaRegistro`) — `costoUnitario` es `NOT NULL` en esa tabla (siempre se congela), así que su cobertura es 100% por diseño de esquema.
+- `RepuestosCosteoProvider`: lee ventas de `MovimientoRepuesto` por `fechaRegistro`. Suma el `total` real de venta, pero reporta costo y cobertura en 0% porque esa tabla todavía no congela el costo unitario histórico; nunca usa el costo actual del catálogo para reconstruir el pasado.
 
 Las demás verticales quedan con la **interfaz diseñada pero sin bean registrado todavía** (no se crean implementaciones vacías que nadie usa):
 
 | Vertical | Por qué no se conecta aún |
 |---|---|
 | `GANADERIA` | Costeo hoy vive en `CostosGanaderiaController` (solo compra+sanidad, no ventas) — falta decidir cómo mapea a `ResumenVentasCostos` antes de escribir el adaptador. |
-| `REPUESTOS` | `MovimientoRepuesto` no congela costo por movimiento (solo `total` de venta) — mismo problema de fondo que Moda, se conecta cuando se decida si también se migra a costo congelado. |
+| `REPUESTOS` | Conectado parcialmente: ventas reales desde `MovimientoRepuesto`; costo histórico pendiente, cobertura 0%. |
 | `MINERIA` | Tiene ventas y gastos (`VentaMineral`/`GastoMinero`) pero sin costo de producción detallado — el propio `RentabilidadRestController` de `tamanacocomercial` ya resuelve esto para un tenant a mano; falta generalizarlo. |
 | `SALUD` | No existe costeo de insumos por consulta todavía — conectar hoy significaría reportar costo `ZERO` siempre, lo cual el punto 7 de este contrato prohíbe presentar como "resultado" real. |
 | `MODA` | Recién en esta fase se le agrega congelamiento de costo a ventas *nuevas* (§3.1) — su historial sigue sin costo real hasta que se acumulen suficientes ventas nuevas. Se conecta cuando ese dato exista en volumen suficiente. |
@@ -195,7 +196,7 @@ Mientras cualquier vertical conectada tenga cobertura menor al 100% (Horeca, por
     { "modulo": "HORECA", "ventasBrutas": 8900.50, "costoVentas": 4200.00, "margenBruto": 4700.50, "coberturaPct": 84.3 },
     { "modulo": "RETAIL", "ventasBrutas": 5200.00, "costoVentas": 2200.00, "margenBruto": 3000.00, "coberturaPct": 100.0 }
   ],
-  "verticalesNoConectadas": ["GANADERIA", "REPUESTOS", "MINERIA", "SALUD"],
+  "verticalesNoConectadas": ["GANADERIA", "MINERIA", "SALUD"],
   "trazabilidad": { "movimientosTotales": 340, "movimientosIdentificados": 62, "porcentajeIdentificado": 18.2 }
 }
 ```
@@ -214,51 +215,17 @@ GET /api/empresa/kpis?desde=2026-09-01&hasta=2026-09-30
 
 ---
 
-## 4. Capa 3 — Libro de compras y libro de ventas (fiscal)
+## 4. Capa 3 — Registro comercial no fiscal
 
-### Problema exacto
-Cada vertical ya registra sus ventas y compras operativas (`VentaAnimal`, `DetalleVentaModa`, `CompraRepuesto`, etc.), pero ninguna tiene folio correlativo, período fiscal, ni desglose de base imponible / crédito-débito fiscal de IVA — lo que un libro de compras/ventas formal exige.
+Cada vertical conserva sus operaciones reales y el Centro Financiero puede indexarlas sin duplicar el detalle. Los únicos documentos de salida permitidos son:
 
-### Diseño: tabla índice, no tabla espejo
+- notas de entrega;
+- documentos de venta no fiscales;
+- referencias internas no correlativas fiscalmente.
 
-```java
-@Entity @Table(name = "libro_ventas_fiscal")
-@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class AsientoLibroVenta {
-    Long id;
-    Long tenantId;
-    Integer folio;              // correlativo por tenant, se asigna al crear (no reutilizable ni editable)
-    LocalDate fecha;
-    String moduloOrigen;        // igual patrón que Capa 1
-    String referenciaTipo;
-    Long referenciaId;
-    String rifCompradorOpcional; // null si no lo dio (RIF sigue siendo opcional, decisión ya tomada antes)
-    BigDecimal baseImponible;
-    BigDecimal montoIva;        // 0 si no aplica (igual que hoy con las notas de entrega sin factura fiscal)
-    BigDecimal montoTotal;
-    String moneda;
-}
-```
+Todo documento debe mostrar de forma visible `DOCUMENTO NO FISCAL`. Aurora Plus no asigna números de factura fiscal, no calcula libros fiscales, no declara IVA y no presenta estos registros como documentos autorizados por el SENIAT.
 
-Estructura simétrica para `AsientoLibroCompra`. **No se duplica el detalle de items** — el libro apunta a la venta/compra real vía `referenciaTipo`+`referenciaId`; si alguien necesita el detalle línea por línea, lo consulta en la tabla original de la vertical.
-
-### Cuándo se crea un folio
-Un `AsientoLibroVenta` se crea automáticamente cuando cualquier vertical registra una venta **con RIF y razón social cargados** en la ficha fiscal del tenant (`LicenciaTenant.rif`/`razonSocial`, ya existen). Si el tenant no llenó esos datos opcionales, la venta se registra igual (como hoy) pero no genera folio — porque un libro de ventas sin RIF del emisor no tiene sentido fiscal. Esto es consistente con la decisión ya tomada de que el RIF es opcional en todo el sistema.
-
-### Endpoints nuevos (sin `tenantId` de query — mismo criterio que §3.3)
-```
-GET /api/contabilidad/libro-ventas?desde=&hasta=&formato=json|pdf
-GET /api/contabilidad/libro-compras?desde=&hasta=&formato=json|pdf
-```
-
-### 4.1 RIF: opcional para registrarse, obligatorio para lo fiscal
-
-Dos RIF distintos entran en juego acá y no se resuelven igual:
-
-- **RIF del tenant (emisor).** Sigue opcional en el registro general — decisión ya tomada, no se revierte. Pero **ninguna función presentada como fiscal se habilita sin él**: exportar el libro de ventas/compras, generar folio correlativo, o cualquier reporte que el usuario pueda entregarle a su contador o al SENIAT requiere `LicenciaTenant.rif`/`razonSocial` cargados. Sin ellos, `GET /api/contabilidad/libro-ventas` responde `409` con un mensaje claro ("Complete el RIF y razón social del negocio para habilitar el libro de ventas fiscal"), no un libro vacío o a medias que parezca válido.
-- **RIF del comprador (receptor).** Depende del tipo de documento que la vertical ya emite (nota de entrega vs. factura fiscal), y esa regla — cuándo es obligatorio, cómo se valida el formato, qué pasa con consumidor final — **no la decide este documento**. Se define junto con un contador o proveedor de servicios fiscales venezolano antes de escribir código de validación, para no inventar una regla fiscal incorrecta. Queda como entrada explícita del backlog de la Capa 3, no como parte de este contrato.
-
-Ninguna de las dos reglas se implementa en esta fase (Capa 3 no se construye todavía) — quedan documentadas para cuando se aborde.
+Una futura tabla índice, si se implementa, solo podrá guardar `tenantId`, fecha, módulo y referencia interna hacia la operación original. Su finalidad será búsqueda, auditoría operativa y exportación administrativa interna; nunca certificación tributaria.
 
 ---
 
@@ -315,6 +282,7 @@ src/main/java/com/auroraplus/core/costeo/CosteoProvider.java
 src/main/java/com/auroraplus/core/costeo/ResumenVentasCostos.java
 src/main/java/com/auroraplus/core/costeo/impl/HorecaCosteoProvider.java
 src/main/java/com/auroraplus/core/costeo/impl/RetailCosteoProvider.java
+src/main/java/com/auroraplus/core/costeo/impl/RepuestosCosteoProvider.java
 ```
 Las demás (`GanaderiaCosteoProvider`, `RepuestosCosteoProvider`, `MineriaCosteoProvider`, `SaludCosteoProvider`, `ModaCosteoProvider`) **no se crean todavía** — solo la interfaz que las va a recibir el día que se conecten (tabla en §3).
 
@@ -347,20 +315,18 @@ src/test/java/com/auroraplus/core/kpi/EmpresaKpiServiceTest.java
 
 ### Propuesto, NO se crea en esta fase — Capas 3 y 4
 ```
-src/main/java/com/auroraplus/core/contabilidad/entities/AsientoLibroVenta.java
-src/main/java/com/auroraplus/core/contabilidad/entities/AsientoLibroCompra.java
+src/main/java/com/auroraplus/core/financiero/entities/DocumentoComercialNoFiscal.java
 src/main/java/com/auroraplus/core/contabilidad/entities/PlanCuenta.java
 src/main/java/com/auroraplus/core/contabilidad/entities/Asiento.java
 src/main/java/com/auroraplus/core/contabilidad/entities/AsientoLinea.java
-src/main/java/com/auroraplus/core/contabilidad/services/LibroFiscalService.java
+src/main/java/com/auroraplus/core/financiero/services/RegistroComercialNoFiscalService.java
 src/main/java/com/auroraplus/core/contabilidad/services/AsientoAutomaticoService.java
 src/main/java/com/auroraplus/core/contabilidad/services/EstadosFinancierosService.java
-src/main/java/com/auroraplus/core/contabilidad/controllers/LibroComprasController.java
-src/main/java/com/auroraplus/core/contabilidad/controllers/LibroVentasController.java
+src/main/java/com/auroraplus/core/financiero/controllers/DocumentosComercialesController.java
 src/main/java/com/auroraplus/core/contabilidad/controllers/PlanCuentaController.java
 src/main/java/com/auroraplus/core/contabilidad/controllers/EstadosFinancierosController.java
 src/main/resources/db/migration/V##__plan_cuentas_y_asientos.sql
-src/main/resources/db/migration/V##__libros_fiscales.sql
+src/main/resources/db/migration/V##__documentos_comerciales_no_fiscales.sql
 ```
 
 ### Frontend — nada en esta fase
@@ -383,6 +349,6 @@ Backend ya trae `spring-boot-starter-test` + H2 en modo PostgreSQL (`src/test/re
 
 Las 4 preguntas originales de esta sección ya se resolvieron con la aprobación de este mensaje (ver Changelog al inicio del documento). Quedan estas, que solo se pueden responder con más información o cuando se llegue a esa fase:
 
-1. **¿Quién define la regla de RIF del comprador por tipo de documento (§4.1)?** Se necesita un contador o proveedor fiscal venezolano antes de escribir esa validación — no es una decisión de ingeniería.
-2. **Cuando se acumule suficiente volumen de ventas nuevas de Moda con costo congelado (§3.1), ¿qué umbral define "suficiente" para conectar `ModaCosteoProvider`** (ej. % de ventas del período con costo conocido, o simplemente una fecha de corte)?
-3. **Ganadería/Repuestos/Minería/Salud** siguen sin un plan concreto de qué forma tomaría su `CosteoProvider` — eso requiere revisar cada uno por separado (no es una pregunta que se responda en bloque), cuando llegue su turno.
+1. **Cuando se acumule suficiente volumen de ventas nuevas de Moda con costo congelado (§3.1), ¿qué umbral define "suficiente" para conectar `ModaCosteoProvider`** (ej. % de ventas del período con costo conocido, o simplemente una fecha de corte)?
+2. **Ganadería/Minería/Salud** siguen sin un plan concreto de qué forma tomaría su `CosteoProvider` — eso requiere revisar cada uno por separado, cuando llegue su turno.
+3. **Repuestos:** ¿en qué cambio futuro se congelará el costo unitario dentro de `MovimientoRepuesto`? Hasta entonces el proveedor seguirá mostrando ventas reales con cobertura de costos 0%, sin estimar con el costo actual.

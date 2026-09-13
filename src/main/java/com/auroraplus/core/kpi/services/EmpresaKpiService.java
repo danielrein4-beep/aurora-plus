@@ -30,8 +30,9 @@ public class EmpresaKpiService {
 
     private static final Map<String, Set<String>> MODULOS_QUE_HABILITAN_PROVIDER = Map.of(
         "HORECA", Set.of("horeca"),
-        // El alta pública de Comercio/Retail usa hoy el módulo de licencia "repuestos".
-        "RETAIL", Set.of("retail", "repuestos", "farmacia", "ferreteria")
+        "RETAIL", Set.of("retail", "farmacia"),
+        // Repuestos tiene sus propias tablas y no puede presentarse como Retail.
+        "REPUESTOS", Set.of("repuestos", "ferreteria")
     );
 
     @Autowired
@@ -134,9 +135,11 @@ public class EmpresaKpiService {
         Set<String> resultado = new LinkedHashSet<>();
         if (modulosActivos.contains("ganaderia")) resultado.add("GANADERIA");
         if (modulosActivos.contains("horeca")) resultado.add("HORECA");
-        if (modulosActivos.contains("retail") || modulosActivos.contains("repuestos")
-                || modulosActivos.contains("farmacia") || modulosActivos.contains("ferreteria")) {
+        if (modulosActivos.contains("retail") || modulosActivos.contains("farmacia")) {
             resultado.add("RETAIL");
+        }
+        if (modulosActivos.contains("repuestos") || modulosActivos.contains("ferreteria")) {
+            resultado.add("REPUESTOS");
         }
         if (modulosActivos.contains("minero")) resultado.add("MINERIA");
         if (modulosActivos.contains("salud")) resultado.add("SALUD");

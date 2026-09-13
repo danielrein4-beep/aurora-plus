@@ -14,6 +14,10 @@ import com.auroraplus.modules.retail.entities.ItemVentaRetail;
 import com.auroraplus.modules.retail.entities.VentaRetail;
 import com.auroraplus.modules.retail.repositories.ItemVentaRetailRepository;
 import com.auroraplus.modules.retail.repositories.VentaRetailRepository;
+import com.auroraplus.modules.repuestos.entities.MovimientoRepuesto;
+import com.auroraplus.modules.repuestos.entities.RepuestoItem;
+import com.auroraplus.modules.repuestos.repositories.MovimientoRepuestoRepository;
+import com.auroraplus.modules.repuestos.repositories.RepuestoItemRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -53,6 +57,12 @@ class EmpresaKpiServiceTest {
 
     @Autowired
     private ItemVentaRetailRepository itemVentaRetailRepository;
+
+    @Autowired
+    private RepuestoItemRepository repuestoItemRepository;
+
+    @Autowired
+    private MovimientoRepuestoRepository movimientoRepuestoRepository;
 
     private static final LocalDate DESDE = LocalDate.of(2026, 1, 1);
     private static final LocalDate HASTA = LocalDate.of(2026, 1, 31);
@@ -110,7 +120,7 @@ class EmpresaKpiServiceTest {
     @Test
     void retailRespetaModuloActivoYAislaElLimiteSuperiorDelPeriodo() {
         long tenantId = 92004L;
-        activarModulo(tenantId, "repuestos");
+        activarModulo(tenantId, "retail");
 
         agregarVentaRetail(tenantId, LocalDateTime.of(2026, 1, 15, 10, 0),
             new BigDecimal("15.00"), new BigDecimal("6.00"));
@@ -123,6 +133,42 @@ class EmpresaKpiServiceTest {
         assertEquals(0, new BigDecimal("6.00").compareTo(retail.costoVentas()));
         assertEquals(0, new BigDecimal("100.00").compareTo(retail.coberturaPct()));
         assertFalse(kpi.verticalesNoConectadas().contains("MODA"));
+    }
+
+    @Test
+    void repuestosUsaSuKardexYNoFingeCostoHistorico() {
+        long tenantId = 92006L;
+        activarModulo(tenantId, "repuestos");
+
+        RepuestoItem repuesto = new RepuestoItem();
+        repuesto.setTenantId(tenantId);
+        repuesto.setCodigoSku("REP-92006");
+        repuesto.setDescripcion("Rodamiento de prueba");
+        repuesto.setStockActual(new BigDecimal("9"));
+        repuesto.setPrecioVenta(new BigDecimal("25.00"));
+        repuesto.setCostoUnitario(new BigDecimal("10.00"));
+        repuesto = repuestoItemRepository.save(repuesto);
+
+        MovimientoRepuesto venta = new MovimientoRepuesto();
+        venta.setTenantId(tenantId);
+        venta.setRepuesto(repuesto);
+        venta.setTipo(MovimientoRepuesto.TipoMovimiento.VENTA);
+        venta.setCantidad(BigDecimal.ONE);
+        venta.setStockAnterior(new BigDecimal("10"));
+        venta.setStockNuevo(new BigDecimal("9"));
+        venta.setMotivo("Venta de prueba");
+        venta.setTotal(new BigDecimal("25.00"));
+        venta.setFechaRegistro(LocalDateTime.of(2026, 1, 20, 10, 0));
+        movimientoRepuestoRepository.save(venta);
+
+        EmpresaKpiDTO kpi = empresaKpiService.obtenerKpis(tenantId, DESDE, HASTA);
+        EmpresaKpiDTO.ModuloKpi repuestos = buscarModulo(kpi, "REPUESTOS");
+        assertEquals(0, new BigDecimal("25.00").compareTo(repuestos.ventasBrutas()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(repuestos.costoVentas()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(repuestos.coberturaPct()),
+            "No se debe usar el costo actual del catálogo como costo histórico");
+        assertTrue(kpi.porModulo().stream().noneMatch(m -> m.modulo().equals("RETAIL")),
+            "Repuestos no debe quedar etiquetado como Retail");
     }
 
     @Test
