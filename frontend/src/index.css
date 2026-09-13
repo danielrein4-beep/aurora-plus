@@ -347,9 +347,13 @@ html.light .modal-siempre-oscuro textarea:focus {
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb { background: rgba(0, 201, 167, 0.35); border-radius: 2px; }
 
-/* Aurora gradient utilities (5 Colores Oficiales) */
-.g-aurora   { background: linear-gradient(135deg, #00FFC2 0%, #00C9A7 35%, #008B8B 70%, #0B3D91 100%); }
-.g-aurora-r { background: linear-gradient(135deg, #0B3D91 0%, #008B8B 30%, #00C9A7 65%, #00FFC2 100%); }
+/* g-aurora: se usa como fondo de botones/badges de acción en toda la app.
+   Antes era el mismo degradado arcoíris teal→azul→morado que venimos
+   quitando — un solo teal sólido se ve más suave y menos "genérico de IA",
+   igual que .btn-cyber-neon. text-aurora (abajo) SÍ conserva el degradado:
+   ahí es texto de titular, un uso distinto y más tolerable que un botón. */
+.g-aurora   { background: #0E9C86; }
+.g-aurora-r { background: #0E9C86; }
 .text-aurora {
   background: linear-gradient(135deg, #00FFC2 0%, #00C9A7 40%, #008B8B 75%, #0B3D91 100%);
   -webkit-background-clip: text;
@@ -503,15 +507,16 @@ html.light .input-horeca:hover { background: #ffffff; }
 }
 
 .btn-electric-blue {
-  background: linear-gradient(135deg, #00FFC2 0%, #00C9A7 40%, #0B3D91 100%);
-  box-shadow: 0 4px 18px rgba(0, 201, 167, 0.35);
+  background: #0E9C86;
+  box-shadow: 0 6px 20px rgba(14, 156, 134, 0.28);
   color: #fff;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .btn-electric-blue:hover {
-  box-shadow: 0 8px 28px rgba(0, 255, 194, 0.5);
-  transform: translateY(-2px);
+  background: #12b89e;
+  box-shadow: 0 10px 28px rgba(14, 156, 134, 0.4);
+  transform: translateY(-1px);
 }
 
 /* =========================================================================
