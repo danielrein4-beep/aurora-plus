@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, type RefObject } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import AuroraLogo from "../AuroraLogo";
+import MagneticButton from "../components/MagneticButton";
 import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware, IconMining,
   IconRestaurant, IconFarm, IconRetail,
   IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile,
-  IconLaptop, IconPhone, IconPlane, IconBoutique, IconFactory,
-  IconCard, IconBox, IconBolt, IconShield, IconCheck,
+  IconLaptop, IconPhone, IconPlane, IconCheck,
+  IconCard, IconBox, IconBolt, IconShield,
 } from "../Icons";
 
 const INDUSTRIES = [
@@ -50,6 +52,17 @@ const STATS = [
 
 const MODULES = ["Ventas & POS", "Inventario", "RRHH & Nómina", "Contabilidad", "CRM", "Compras", "Producción", "Proyectos", "Reportes BI"];
 
+// Revelado escalonado del hero al cargar la página: cada bloque aparece un
+// poco después del anterior en vez de todos de golpe.
+const heroContainer = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
+};
+const heroItem = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
+};
+
 const previewData: Record<string, { metric: string; value: string; sub: string; color: string }[]> = {
   "Ferretería": [
     { metric: "Ventas hoy",         value: "$14,820", sub: "+9% vs ayer",           color: "text-teal-500 dark:text-teal-400" },
@@ -68,217 +81,271 @@ const previewData: Record<string, { metric: string; value: string; sub: string; 
   ],
 };
 
+// Estela: cada movimiento del mouse deja un pequeño trazo de aurora que se
+// desvanece solo, en vez de un blob que persigue el cursor en tiempo real.
+// El canvas cubre el viewport (fixed) porque la estela puede cruzar zonas
+// amplias de la pantalla; sigue sin capturar input y sigue apagándose con
+// prefers-reduced-motion, touch, blur de pestaña, etc.
+function HomePointerAurora({ hostRef }: { hostRef: RefObject<HTMLElement | null> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!host || !canvas || !context) return;
+
+    const motionAllowed = window.matchMedia("(prefers-reduced-motion: no-preference) and (any-hover: hover) and (any-pointer: fine)");
+    const colors = ["44, 134, 224", "48, 203, 132", "53, 215, 195"];
+    const trailDuration = 1200; // ms que tarda cada trazo en desvanecerse por completo (humo dura más que un rayo fino)
+    const minDistance = 7; // px mínimos entre puntos. Ya no usamos "lighter" (ver drawWisp),
+    // así que puntos densos ya no saturan a blanco — y a velocidad normal de mouse
+    // (más lenta que las pruebas automatizadas) hace falta esta densidad para
+    // que la estela se sienta pegada al cursor en vez de aparecer a saltos.
+
+    type Point = { x: number; y: number; born: number; hue: number };
+    let points: Point[] = [];
+    let lastX = -Infinity;
+    let lastY = -Infinity;
+    let frame = 0;
+    let pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+
+    const resize = () => {
+      pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = window.innerWidth * pixelRatio;
+      canvas.height = window.innerHeight * pixelRatio;
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    };
+    resize();
+
+    const drawWisp = (p: Point, age: number) => {
+      // age: 0 = recién nacido, 1 = totalmente desvanecido.
+      // Como el humo real: nace denso y compacto, y a medida que envejece se
+      // expande, se difumina y sube levemente — no es un rayo fino, es una
+      // nube de varias capas superpuestas.
+      const fade = Math.pow(1 - age, 1.3);
+      if (fade <= 0.01) return;
+      const color = colors[p.hue % colors.length];
+      const baseRadius = 30 + age * 46;
+      const drift = age * 26; // sube un poco mientras se desvanece
+      // source-over (no "lighter"): con muchos puntos superpuestos, el modo
+      // aditivo satura a blanco sólido casi de inmediato. El brillo tipo
+      // aurora ya lo da mix-blend-mode:screen del canvas completo contra la
+      // página, una sola vez, no cada blob contra sí mismo.
+      context.globalCompositeOperation = "source-over";
+      for (let i = 0; i < 2; i++) {
+        const angle = i * 2.4 + p.born * 0.001;
+        const spread = baseRadius * 0.28;
+        const cx = p.x + Math.cos(angle) * spread;
+        const cy = p.y - drift + Math.sin(angle) * spread * 0.6;
+        const r = baseRadius * (0.8 + i * 0.22);
+        const glow = context.createRadialGradient(cx, cy, 0, cx, cy, r);
+        glow.addColorStop(0, `rgba(${color}, ${0.24 * fade})`);
+        glow.addColorStop(0.45, `rgba(${color}, ${0.13 * fade})`);
+        glow.addColorStop(1, `rgba(${color}, 0)`);
+        context.fillStyle = glow;
+        context.beginPath();
+        context.arc(cx, cy, r, 0, Math.PI * 2);
+        context.fill();
+      }
+    };
+
+    const render = (now: number) => {
+      frame = 0;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      points = points.filter((p) => now - p.born < trailDuration);
+      for (const p of points) drawWisp(p, (now - p.born) / trailDuration);
+      if (points.length > 0) frame = requestAnimationFrame(render);
+    };
+    const start = () => {
+      if (!frame) frame = requestAnimationFrame(render);
+    };
+    const addPoint = (x: number, y: number) => {
+      const dx = x - lastX;
+      const dy = y - lastY;
+      if (dx * dx + dy * dy < minDistance * minDistance) return;
+      lastX = x;
+      lastY = y;
+      points.push({ x, y, born: performance.now(), hue: points.length });
+      if (points.length > 140) points.shift();
+      start();
+    };
+    const move = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse" || !motionAllowed.matches || document.hidden) return;
+      addPoint(event.clientX, event.clientY);
+    };
+    const clear = () => {
+      points = [];
+      lastX = lastY = -Infinity;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+    };
+    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("resize", resize);
+    window.addEventListener("blur", clear);
+    document.addEventListener("visibilitychange", clear);
+    motionAllowed.addEventListener("change", clear);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("blur", clear);
+      document.removeEventListener("visibilitychange", clear);
+      motionAllowed.removeEventListener("change", clear);
+    };
+  }, [hostRef]);
+
+  return <canvas ref={canvasRef} className="home-pointer-aurora" aria-hidden="true" />;
+}
+
 export default function Home() {
+  const homeRef = useRef<HTMLElement>(null);
   const [activeTab, setActiveTab] = useState("Ferretería");
-  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
 
-  const HERO_VERTICALS = [
-    { title: "Salud & Clínicas", subtitle: "Historias clínicas, citas y triaje", badge: "NUEVO", stat: "100% Digital", Icon: IconClinic },
-    { title: "Minería & Faenas", subtitle: "Control de mineral, cuadrillas y romana", badge: "ACTIVO", stat: "Balanza Real", Icon: IconMining },
-    { title: "Horeca & Restaurantes", subtitle: "Comandas POS, cocina y escandallo", badge: "POPULAR", stat: "Offline POS", Icon: IconRestaurant },
-    { title: "Ganadería & Fincas", subtitle: "Hato, potreros y control sanitario", badge: "PRO", stat: "Trazabilidad", Icon: IconFarm },
-    { title: "Ferreterías & Retail", subtitle: "Kardex multi-unidad y listas por volumen", badge: "PRO", stat: "Stock en Vivo", Icon: IconHardware },
-    { title: "Moda & Boutique", subtitle: "Variantes talla/color y fidelización", badge: "SMART", stat: "Puntos & Gift", Icon: IconBoutique },
-    { title: "Tamanaco Industrial", subtitle: "Operación integral, tesorería y OCR", badge: "ENTERPRISE", stat: "Multi-Empresa", Icon: IconFactory },
-  ];
+  // Parallax sutil: la foto de fondo se desplaza unos pocos píxeles según la
+  // posición del mouse dentro del hero, dando sensación de profundidad.
+  const heroRef = useRef<HTMLElement>(null);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const photoX = useSpring(useTransform(mouseX, [-1, 1], [-14, 14]), { stiffness: 60, damping: 20 });
+  const photoY = useSpring(useTransform(mouseY, [-1, 1], [-14, 14]), { stiffness: 60, damping: 20 });
+  const handleHeroMouseMove = (e: React.MouseEvent<HTMLElement>) => {
+    const rect = heroRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    mouseX.set(((e.clientX - rect.left) / rect.width) * 2 - 1);
+    mouseY.set(((e.clientY - rect.top) / rect.height) * 2 - 1);
+  };
 
   return (
-    <main className="relative overflow-hidden bg-transparent transition-colors duration-500">
-      {/* ── HERO: foto real de aurora boreal con movimiento sutil ── */}
-      <section className="relative min-h-[92vh] flex flex-col justify-between pt-24 pb-12 px-4 sm:px-8 max-w-7xl mx-auto overflow-hidden rounded-b-[2.5rem]">
+    <main ref={homeRef} className="aurora-public-page relative overflow-hidden bg-transparent transition-colors duration-500">
+      <HomePointerAurora hostRef={homeRef} />
+      {/* ── HERO: composición editorial sobre una fotografía real ── */}
+      <section
+        ref={heroRef}
+        onMouseMove={handleHeroMouseMove}
+        className="aurora-home-hero relative min-h-[1080px] lg:min-h-[1160px] flex flex-col pt-28 sm:pt-36 pb-0 px-5 sm:px-10 max-w-[1536px] mx-auto overflow-hidden">
 
-        <div className="absolute inset-0 -z-10 overflow-hidden rounded-b-[2.5rem]">
-          <div className="home-hero-photo" />
+        <div className="absolute inset-0 -z-10 overflow-hidden">
+          <motion.div className="home-hero-photo" style={{ x: photoX, y: photoY }} />
         </div>
 
-        {/* Título */}
-        <div className="relative z-10 text-center max-w-3xl mx-auto pt-6">
-          <div className="inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-black/25 backdrop-blur-md px-5 py-2 text-xs text-teal-300 mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-            <span className="font-semibold tracking-wide">ECOSISTEMA ERP MULTI-INDUSTRIA &amp; AUTOMATIZACIÓN</span>
+        <motion.div
+          variants={heroContainer}
+          initial="hidden"
+          animate="show"
+          className="relative z-10 w-full max-w-5xl mx-auto pt-28 sm:pt-36">
+          <motion.p variants={heroItem} className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · seis rubros · tres monedas</motion.p>
+          <motion.h1 variants={heroItem} className="mt-5 max-w-3xl font-['IBM_Plex_Sans'] text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-[-0.055em] text-[#f8f6ef]">
+            Del lápiz y el papel<br />a la <span className="text-[#35d7c3]">automatización</span>
+          </motion.h1>
+          <motion.p variants={heroItem} className="mt-8 max-w-xl text-base leading-7 text-[#e5e1d5]/90">
+            De la libreta y la hoja de Excel a medianoche, a la comodidad de tu teléfono y tu computadora. Aurora Plus corre la caja, el inventario y la sanidad regulatoria de clínicas, restaurantes, minas, talleres, boutiques y fincas venezolanas.
+          </motion.p>
+          <motion.div variants={heroItem} className="mt-10 flex flex-wrap gap-3">
+            <MagneticButton onClick={() => navigate("/onboarding")} className="aurora-solid-button px-6 py-3 text-sm font-semibold cursor-pointer">Solicitar demo</MagneticButton>
+            <button onClick={() => navigate("/industrias")} className="aurora-outline-button px-6 py-3 text-sm font-semibold cursor-pointer">Ver los 6 rubros ↓</button>
+          </motion.div>
+
+          <motion.div variants={heroItem} className="mt-16 grid max-w-4xl grid-cols-2 gap-x-7 gap-y-8 border-t border-white/15 pt-8 sm:grid-cols-4">
+            {[
+              ["6", "industrias nativas"],
+              ["100%", "caja offline-first"],
+              ["3", "monedas convertidas"],
+              ["RBAC", "roles estrictos"],
+            ].map(([value, label]) => (
+              <div key={label}>
+                <div className="font-['IBM_Plex_Sans'] text-2xl font-bold text-[#f8f6ef]">{value}</div>
+                <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/85">{label}</div>
+              </div>
+            ))}
+          </motion.div>
+
+          <div className="aurora-rate-card mt-16 w-full max-w-md p-7 sm:p-8">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[#d9d8ce]/80">
+              <span>Multi-moneda · motor Aurora</span>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-6 pb-2">
+              {["USD", "VES", "COP"].map((cur, i) => (
+                <div key={cur} className="flex items-center gap-3">
+                  <span className="font-mono text-lg font-bold text-[#f8f6ef] border border-white/15 rounded-lg px-3 py-1.5">{cur}</span>
+                  {i < 2 && <span className="text-[#3fe0ce] text-sm">⇄</span>}
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 pt-4 border-t border-white/10 text-sm text-[#e9e7df]/85 leading-relaxed">
+              Tú defines la tasa del día en segundos. Si el bolívar se mueve de la mañana a la tarde, tu caja lo refleja al instante — sin hoja de cálculo, sin esperar a nadie.
+            </p>
+            <p className="mt-4 pt-4 border-t border-white/10 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/65">Sin tasa fija · tú la actualizas cuando quieras</p>
           </div>
 
-          <h1 className="font-['Outfit'] font-black text-4xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight text-white mb-6">
-            Del lápiz y el papel <br className="hidden sm:inline" />
-            a la <span className="text-aurora">automatización</span>
-          </h1>
-          <p className="text-white/70 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
-            De la libreta y la hoja de Excel a medianoche, a la comodidad de tu teléfono y tu computadora.
-          </p>
-        </div>
-
-        {/* ── ACCESO DIRECTO DESTACADO PARA USUARIOS EN SESIÓN: MIS SISTEMAS ── */}
-        {isLoggedIn && (
-          <div className="relative z-20 max-w-4xl mx-auto my-4 w-full animate-fadeIn">
-            <div className="rounded-3xl p-6 sm:p-7 relative overflow-hidden border border-teal-400/30 bg-black/40 backdrop-blur-xl">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          {/* ── ACCESO DIRECTO PARA USUARIOS EN SESIÓN ── */}
+          {isLoggedIn && (
+            <div className="mt-8 w-full max-w-2xl rounded-2xl p-6 sm:p-7 border border-[#35d7c3]/25 bg-[#030c0f]/80">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4 text-left">
-                  <div className="w-14 h-14 rounded-2xl g-aurora flex items-center justify-center text-white flex-shrink-0">
-                    <IconClinic size={30} />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#35d7c3", color: "#062323" }}>
+                    <IconClinic size={26} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-400/20 text-teal-300 border border-teal-400/30 tracking-wider uppercase">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#35d7c3]/15 text-[#35d7c3] border border-[#35d7c3]/25 tracking-wider uppercase font-mono">
                         Tu sistema asignado &amp; activo
                       </span>
-                      <span className="text-xs text-white/50">• {user?.empresa || "Clínica & Consultorios"}</span>
+                      <span className="text-xs text-white/45">• {user?.empresa || "Clínica & Consultorios"}</span>
                     </div>
-                    <h3 className="text-xl font-black text-white font-['Outfit'] mt-1">
+                    <h3 className="text-lg font-bold text-[#f8f6ef] font-['IBM_Plex_Sans'] mt-1">
                       Mediclinic Pro — Espacio Clínico de {user?.nombre || user?.email?.split("@")[0]}
                     </h3>
-                    <p className="text-xs text-white/70 mt-0.5">
+                    <p className="text-xs text-white/55 mt-0.5">
                       Historias clínicas digitales, agenda médica, sala de espera reactiva, cotizador y caja diaria.
                     </p>
                   </div>
                 </div>
-
                 <button
                   onClick={() => navigate("/mediclinic")}
-                  className="g-aurora text-white font-bold px-7 py-3.5 rounded-2xl text-sm cursor-pointer whitespace-nowrap hover:opacity-90 transition-opacity flex items-center gap-2 group"
-                >
+                  className="aurora-solid-button px-6 py-3 text-sm font-semibold cursor-pointer whitespace-nowrap flex items-center gap-2">
                   <span>Abrir Mediclinic Pro</span>
-                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  <span>→</span>
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Panel: Aurora Engine Core */}
-        <div className="relative z-10 max-w-4xl mx-auto my-3 w-full">
-          <div className="rounded-3xl p-6 sm:p-8 relative overflow-hidden border border-white/12 bg-black/35 backdrop-blur-xl">
+          {/* ── AURORA ENGINE CORE ── */}
+          <div className="mt-8 w-full max-w-2xl rounded-2xl p-6 sm:p-7 border border-white/12 bg-[#030c0f]/70">
             <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-white/10">
               <div className="flex items-center gap-3.5">
-                <div className="p-2 rounded-2xl bg-white/5 border border-white/10">
-                  <AuroraLogo size={36} animated={false} />
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                  <AuroraLogo size={32} animated={false} />
                 </div>
                 <div className="text-left">
-                  <div className="font-['Outfit'] font-bold text-base text-white flex items-center gap-2">
-                    Aurora Engine Core <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-teal-400/15 text-teal-300 font-mono border border-teal-400/30">ONLINE v2.4</span>
+                  <div className="font-['IBM_Plex_Sans'] font-bold text-sm text-[#f8f6ef] flex items-center gap-2">
+                    Aurora Engine Core
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-[#35d7c3]/15 text-[#35d7c3] font-mono border border-[#35d7c3]/25">ONLINE v2.4</span>
                   </div>
                   <div className="text-white/45 text-xs font-mono">Arquitectura Multi-Tenant · PostgreSQL · Offline Sync</div>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2">
-                <span className="px-3.5 py-1.5 rounded-xl bg-teal-500/10 border border-teal-500/25 text-xs text-teal-300 font-medium flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" /> Multi-Moneda (USD · VES · COP)
-                </span>
-                <span className="hidden sm:inline-flex px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/15 text-xs text-white/70 font-medium items-center gap-1.5">
-                  6 Verticales Nativas
-                </span>
-              </div>
             </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5">
               {[
                 { label: "Caja Central", val: "Sincronizada", Icon: IconCard },
                 { label: "Kardex e Insumos", val: "Auto-Descuento", Icon: IconBox },
                 { label: "Offline POS", val: "100% Idempotente", Icon: IconBolt },
                 { label: "Roles & Privacidad", val: "RBAC Estricto", Icon: IconShield },
               ].map((n) => (
-                <div key={n.label} className="bg-white/[0.03] hover:bg-white/[0.07] rounded-2xl p-4 border border-white/5 hover:border-teal-400/30 transition-all duration-300 cursor-default">
-                  <div className="mb-1.5 text-teal-300"><n.Icon size={22} /></div>
-                  <div className="text-white font-semibold text-xs tracking-tight">{n.label}</div>
-                  <div className="text-[11px] font-mono mt-0.5 text-teal-300/80">{n.val}</div>
+                <div key={n.label} className="bg-white/[0.03] hover:bg-white/[0.06] rounded-xl p-3.5 border border-white/5 hover:border-[#35d7c3]/30 transition-all duration-300 cursor-default">
+                  <div className="mb-1.5 text-[#35d7c3]"><n.Icon size={18} /></div>
+                  <div className="text-[#f8f6ef] font-semibold text-[11px] tracking-tight">{n.label}</div>
+                  <div className="text-[11px] font-mono mt-0.5 text-[#d9d8ce]/80">{n.val}</div>
                 </div>
               ))}
             </div>
           </div>
-        </div>
-
-        {/* Métricas + CTA + Preview de verticales */}
-        <div className="relative z-10 pt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
-
-            <div className="lg:col-span-7 space-y-6">
-              <div className="grid grid-cols-3 gap-4 sm:gap-6 border-b border-white/10 pb-6">
-                <div>
-                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-white">6</div>
-                  <div className="text-white/50 text-xs mt-1 font-medium leading-snug">Industrias nativas</div>
-                </div>
-                <div>
-                  <div className="font-['Outfit'] font-black text-3xl sm:text-4xl text-teal-300">100%</div>
-                  <div className="text-white/50 text-xs mt-1 font-medium leading-snug">Offline-First POS</div>
-                </div>
-                <div>
-                  <div className="font-['Outfit'] font-black text-2xl sm:text-3xl text-teal-300">Multi</div>
-                  <div className="text-white/50 text-xs mt-1 font-medium leading-snug">USD · VES · COP</div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => navigate("/onboarding")}
-                    className="g-aurora text-white font-bold px-8 py-3.5 rounded-full text-sm flex items-center gap-2 tracking-wide cursor-pointer hover:opacity-90 transition-opacity">
-                    <span>Solicitar demo ahora</span>
-                    <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">↗</span>
-                  </button>
-                  <button
-                    onClick={() => navigate("/auth")}
-                    className="border border-white/20 text-white/90 hover:text-white hover:border-white/40 font-semibold px-6 py-3.5 rounded-full text-sm cursor-pointer transition-colors">
-                    Iniciar sesión
-                  </button>
-                </div>
-                <p className="text-white/50 text-xs sm:text-sm leading-relaxed max-w-sm">
-                  Automatiza clínicas, fincas, restaurantes, ferreterías y minería desde una sola plataforma.
-                </p>
-              </div>
-            </div>
-
-            <div className="lg:col-span-5">
-              <div className="rounded-3xl p-6 relative overflow-hidden border border-white/12 bg-black/35 backdrop-blur-xl">
-                <div className="flex items-center justify-between mb-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-teal-300">
-                      {(() => { const HeroIcon = HERO_VERTICALS[activeHeroIndex].Icon; return <HeroIcon size={24} />; })()}
-                    </div>
-                    <div className="text-left">
-                      <h4 className="font-['Outfit'] font-bold text-white text-base tracking-tight flex items-center gap-2">
-                        {HERO_VERTICALS[activeHeroIndex].title}
-                      </h4>
-                      <p className="text-white/50 text-xs">
-                        {HERO_VERTICALS[activeHeroIndex].subtitle}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-500/15 text-teal-300 border border-teal-500/30">
-                    {HERO_VERTICALS[activeHeroIndex].badge}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-white/10 text-xs text-white/50">
-                  <span className="font-mono text-teal-300 font-bold tracking-wider">
-                    0{activeHeroIndex + 1} <span className="text-white/25">/ 07</span>
-                  </span>
-
-                  <div className="flex items-center gap-1.5">
-                    {HERO_VERTICALS.map((_, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setActiveHeroIndex(idx)}
-                        aria-label={`Ver vertical ${idx + 1}`}
-                        className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                          activeHeroIndex === idx ? "w-7 bg-teal-300" : "w-2 bg-white/20 hover:bg-white/40"
-                        }`}
-                      />
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => setActiveHeroIndex((prev) => (prev + 1) % HERO_VERTICALS.length)}
-                    className="text-white/70 hover:text-teal-300 transition-colors font-semibold flex items-center gap-1 cursor-pointer">
-                    Siguiente →
-                  </button>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
+        </motion.div>
 
       </section>
 

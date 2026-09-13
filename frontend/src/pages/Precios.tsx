@@ -40,7 +40,7 @@ export default function Precios() {
   const totalPeriodo = precioMensualConDescuento * periodo.meses;
 
   return (
-    <main className="pt-28 pb-24 relative">
+    <main className="aurora-public-page pt-32 pb-24 relative">
 
       {/* Header */}
       <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-16">
@@ -60,7 +60,7 @@ export default function Precios() {
       {/* Plan único con selector de período */}
       <section className="px-4 sm:px-6 max-w-2xl mx-auto mb-20">
         {/* Selector de período de facturación */}
-        <div className="flex items-center justify-center gap-1.5 mb-8 p-1.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 max-w-md mx-auto">
+        <div className="flex items-center justify-center gap-1.5 mb-8 p-1.5 rounded-2xl bg-white/5 border border-white/10 max-w-md mx-auto">
           {PERIODOS.map((p) => (
             <button
               key={p.id}
@@ -68,13 +68,13 @@ export default function Precios() {
               className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 periodoId === p.id
                   ? "g-aurora text-white shadow-md"
-                  : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
+                  : "text-white/60 hover:text-white"
               }`}
             >
               {p.label}
               {p.descuento > 0 && (
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  periodoId === p.id ? "bg-white/20" : "bg-teal-500/15 text-teal-600 dark:text-teal-400"
+                  periodoId === p.id ? "bg-white/20" : "bg-teal-500/15 text-teal-300"
                 }`}>
                   -{Math.round(p.descuento * 100)}%
                 </span>

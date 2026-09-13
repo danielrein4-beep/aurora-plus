@@ -344,7 +344,7 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden transition-colors duration-300">
+    <div className="aurora-access-page min-h-screen text-[var(--text-primary)] flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden transition-colors duration-300">
       <AuroraGradientDef />
 
       {/* ── FONDOS ATMOSFÉRICOS: AURORAS BOREALES EN MOVIMIENTO ── */}
