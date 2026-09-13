@@ -6,6 +6,7 @@ import {
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
+import { useBarcodeScanner, decodificarCodigoPesado } from "../hooks/useBarcodeScanner";
 import {
   listarRepuestos,
   crearRepuesto,
@@ -703,6 +704,36 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const quitarDelCarrito = (id: string) => {
     setCarrito((prev) => prev.filter((item) => (item.presentacionId ? `${item.productoId}-pres-${item.presentacionId}` : item.productoId) !== id));
   };
+
+  // Lectura de código de barras "zero-click": el hook detecta la ráfaga del
+  // lector sin importar dónde esté el foco (ver useBarcodeScanner). Solo
+  // queda activo en la pestaña POS — en Inventario/Clientes/Cierre un
+  // escaneo accidental no debe intentar cobrar nada.
+  const manejarCodigoEscaneado = (codigo: string) => {
+    const pesado = decodificarCodigoPesado(codigo);
+    const claveBusqueda = (pesado ? pesado.plu : codigo).toLowerCase();
+
+    const producto = productos.find((p) => {
+      if (p.rubro !== perfilActivo) return false;
+      return p.codigo.toLowerCase() === claveBusqueda
+        || p.codigo.toLowerCase().endsWith(claveBusqueda)
+        || (p.codigoParte ? p.codigoParte.toLowerCase() === claveBusqueda : false);
+    });
+
+    if (!producto) {
+      mostrarToast(`Código escaneado (${codigo}) no coincide con ningún producto del catálogo.`, "error");
+      return;
+    }
+
+    agregarAlCarrito(producto);
+    if (pesado && pesado.pesoKg !== 1) {
+      cambiarCantidad(producto.id, pesado.pesoKg - 1);
+    }
+    setBusqueda(""); // limpia dígitos que el lector haya tecleado de paso en el buscador enfocado
+    mostrarToast(`${producto.nombre} agregado${pesado ? ` (${pesado.pesoKg.toFixed(3)} kg)` : ""} por escaneo.`, "success");
+  };
+
+  useBarcodeScanner(manejarCodigoEscaneado, tab === "pos");
 
   // Finalizar Cobro
   const ejecutarCobro = async (esCredito = false) => {
