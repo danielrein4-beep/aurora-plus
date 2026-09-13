@@ -1,8 +1,21 @@
 # Contrato del Motor Financiero Compartido — Aurora Plus
 
-**Estado:** Propuesta para revisión. Nada de esto está implementado todavía.
+**Estado:** Aprobado para Capa 1 + esqueleto probado de Capa 2 (Horeca y Retail). Capas 3 y 4 quedan en el roadmap, sin implementar.
 **Rama:** `feature/finance-core` (worktree aislado, no toca `feature/astra-hero-redesign` ni el trabajo en curso de Antigravity sobre Horeca).
-**No incluido en esta fase:** cambios a `Dashboard.tsx` ni a ningún contrato de API que ya consuma el Hub.
+**No incluido en esta fase:** cambios a `Dashboard.tsx`, contabilidad de partida doble (Capa 4), libros fiscales (Capa 3).
+
+## Changelog de esta revisión (respuesta a la ronda de observaciones)
+
+1. **`DetalleVentaModa` sí se migra en esta fase** — columna `costo_unitario` nullable, se congela solo en ventas nuevas, sin inventar costos para el histórico. Ver §3.1.
+2. **Se conectan primero Horeca y Retail** (costeo real/congelado ya existente). El resto queda con la interfaz `CosteoProvider` diseñada pero sin implementación conectada — se conectan según calidad real de sus datos, en una fase posterior.
+3. **Capa 4 (partida doble) confirmada en el roadmap, no se construye ahora.** Primero se valida trazabilidad + KPI + libros con datos reales.
+4. **RIF:** sigue opcional para el registro general del tenant. Pasa a ser **obligatorio para habilitar exportaciones o cualquier función presentada como fiscal** (libro de ventas/compras, folio, etc. — Capa 3). El RIF del comprador (no del tenant) se maneja por tipo de documento y su validación queda fuera de este motor: se define junto con un contador o proveedor fiscal antes de construir la Capa 3 — no se resuelve por decreto de ingeniería. Ver §4.1.
+5. **Tenant nunca viaje libre en la URL/query/body.** Todo endpoint nuevo de este contrato saca el tenant de `TenantContext.getCurrentTenant()` (ya resuelto por `TenantInterceptor` desde el JWT verificado — el propio código ya tiene el comentario "YA NO confía en el header X-Tenant-ID que antes el cliente podía mandar con cualquier valor"). Se corrigieron los ejemplos de endpoint de este documento, que originalmente sí aceptaban `?tenantId=` — eso fue un error de esta propuesta, no una práctica del código real. Ver §3.3.
+6. **Consolidación de monedas:** no hace falta diseñar nada nuevo — `MovimientoCaja` YA guarda `monto`/`moneda` (lo que físicamente entró, en su moneda real) y `montoEquivalenteBase`/`monedaBaseEquivalente`/`tasaAplicada` (el equivalente congelado con la tasa vigente AL MOMENTO del movimiento, ver `MotorFinancieroService.registrarMovimientoMultiMoneda`). El contrato solo agrega la regla explícita: **ningún reporte de este motor puede reconvertir un movimiento histórico con la tasa de hoy** — siempre se lee `montoEquivalenteBase`/`tasaAplicada` ya guardados, nunca se vuelve a llamar `convertirMoneda` sobre datos pasados. Ver §2.1.
+7. **"Utilidad neta" se renombra a "resultado estimado"** en todo el motor de KPI mientras no todos los proveedores tengan costo completo, y cada respuesta trae `cobertura` por vertical (qué % de las ventas de ese módulo tienen costo real conocido, no aproximado ni en cero por defecto). Ver §3.2.
+8. **Catálogo de verticales corregido** — el borrador anterior mezclaba 6 verticales públicas con 7 proveedores de costeo. Ver §1.1 para la evidencia y la resolución.
+9. **Trazabilidad con porcentaje explícito** de movimientos identificados vs. `MANUAL`/sin referencia — nunca se atribuye un movimiento sin origen a ninguna vertical. Ver §2.2.
+10. **Pruebas nuevas**: aislamiento entre tenants, concurrencia, redondeo monetario, períodos sin datos. Ver §8.
 
 ---
 
@@ -31,6 +44,30 @@ Cada capa es útil por sí sola y no depende de que la siguiente exista. Se pued
 
 ---
 
+## 1.1 Catálogo de verticales — corrección
+
+El borrador anterior decía "6 verticales" pero enumeraba 7 `CosteoProvider` (GANADERIA, HORECA, RETAIL, MODA, REPUESTOS, MINERIA, SALUD). Evidencia real del código:
+
+- La página pública `Industrias.tsx` muestra exactamente 6 tarjetas: **Clínicas Médicas, Ferretería, Minería, Restaurantes, Control de Fincas, Retail.**
+- `LicenciaService.NIVEL_REQUERIDO_POR_MODULO` (backend, fuente de verdad de qué vertical puede contratar un tenant) define estos identificadores de módulo: `minero`, `horeca`, `repuestos`, `farmacia`, `ferreteria`, `moda`, `ganaderia`, `salud`, `tamanaco-comercial`.
+- `moda` **no aparece en la página pública** — es una vertical real, con módulo Java completo (`modules/moda`, boutique: variantes, gift cards, fidelización), pero no forma parte de "las seis" que el negocio comercializa hoy. Es la 7ª vertical que colaba el borrador anterior.
+- `retail` (paquete `modules/retail`, tabla `items_venta_retail`) y `repuestos` (paquete `modules/repuestos`, tabla `movimientos_repuesto`) son **dos implementaciones de backend genuinamente separadas y sin solape de tablas** — no hay riesgo de sumar la misma venta dos veces si cada `CosteoProvider` lee solo su propia tabla (ver regla explícita en §3).
+
+**Resolución — identificadores canónicos de vertical para este motor (los mismos 6 de la página pública):**
+
+| ID canónico | Nombre público | Paquete(s) backend |
+|---|---|---|
+| `GANADERIA` | Control de Fincas | `modules/ganaderia` |
+| `HORECA` | Restaurantes | `modules/horeca` |
+| `RETAIL` | Retail | `modules/retail` |
+| `REPUESTOS` | Ferretería | `modules/repuestos` (también sirve a `farmacia`/`ferreteria` como módulos de licencia) |
+| `MINERIA` | Minería | `modules/minero` |
+| `SALUD` | Clínicas Médicas | `modules/salud` |
+
+`MODA` se documenta aparte como **vertical adicional, no pública todavía**: su `CosteoProvider` se diseña con la misma interfaz, pero no se cuenta entre "las seis" en ningún reporte agregado hasta que el negocio decida lanzarla públicamente. `tamanaco-comercial` no entra en este catálogo — es el módulo legado de un solo tenant, fuera de alcance de este motor genérico.
+
+---
+
 ## 2. Capa 1 — Trazabilidad de movimientos financieros
 
 ### Problema exacto
@@ -55,12 +92,40 @@ No es una FK física (no se puede, apunta a tablas distintas según el módulo) 
 ### Por qué primero esto
 Sin esto, la Capa 2 (KPI de empresa) no puede saber "¿cuánto de mi caja de hoy vino de Ganadería vs. de Horeca?" — tendría que adivinar por `concepto` (texto libre), que es fragil.
 
+### Alcance real de esta fase (importante)
+Se agregan las 3 columnas a `MovimientoCaja` y un nuevo overload de `MotorFinancieroService.registrarMovimientoMultiMoneda`/`registrarMovimientoEnMoneda` que las acepta — **pero no se modifican los ~12 call-sites existentes** en Ganadería/Horeca/Retail/Moda/Salud/Minería que ya llaman a estos métodos hoy. Eso es intencional: tocar cada punto de cobro de cada vertical es un cambio de mucha más superficie que "agregar 3 columnas aditivas", y no fue lo aprobado en este mensaje. El mecanismo queda construido y probado (§8); conectar cada vertical (empezando por Horeca y Retail, que son las que se conectan en Capa 2) es el siguiente paso, no parte de este.
+
+**Consecuencia honesta:** hasta que se conecten los call-sites, el `%` de trazabilidad de `/api/empresa/kpis` (§2.2) va a mostrar un número bajo — eso es correcto, no un bug. Es preferible reportar "10% trazado" real a fingir 100%.
+
+### 2.1 Regla de consolidación de monedas — no hay que construir nada nuevo
+
+`MovimientoCaja` ya resuelve esto correctamente desde antes de este documento:
+
+- `monto` / `moneda` — lo que **físicamente entró a la caja**, en la moneda real en que entró (USD, VES, COP). Nunca se toca.
+- `montoEquivalenteBase` / `monedaBaseEquivalente` / `tasaAplicada` — el equivalente en la moneda base del negocio, calculado **una sola vez, con la tasa vigente en el momento del movimiento** (`MotorFinancieroService.registrarMovimientoMultiMoneda`, línea que hace `tasaAplicada = montoEnMonedaCobro.divide(montoBase, 6, HALF_UP)`). Quedan `null` si el movimiento ya estaba en la moneda base.
+
+**Regla que sí agrega este contrato, porque no estaba escrita en ningún lado:** todo reporte construido sobre esta capa (KPI de empresa, libros fiscales, y a futuro contabilidad) **lee `montoEquivalenteBase`/`tasaAplicada` ya guardados — nunca vuelve a llamar `convertirMoneda(...)` con la tasa de hoy sobre un movimiento pasado.** Reconvertir históricos con la tasa actual falsificaría cualquier comparación entre períodos (un mes "creció" solo porque el bolívar se devaluó, no porque vendió más). `EmpresaKpiService` (§3) sigue esta regla explícitamente.
+
+### 2.2 Trazabilidad con porcentaje explícito
+
+`moduloOrigen` puede ser `null` (movimiento legado, antes de esta migración) o `"MANUAL"` (un ingreso/egreso de caja sin vertical asociada, ej. un retiro del dueño). Ninguno de los dos casos se atribuye a ninguna vertical en ningún reporte — ni por defecto, ni por heurística sobre el texto de `concepto`. `EmpresaKpiService` reporta:
+
+```json
+"trazabilidad": {
+  "movimientosTotales": 340,
+  "movimientosIdentificados": 210,
+  "porcentajeIdentificado": 61.8
+}
+```
+
+Este número es informativo sobre la calidad del dato de caja — no bloquea ni ajusta el cálculo de `ventasBrutas`/`costoVentas` por vertical, que se lee directo de las tablas de cada módulo (Horeca: `ItemComanda`+`Comanda`; Retail: `ItemVentaRetail`+`VentaRetail`), no de `MovimientoCaja`. Son dos señales distintas a propósito: una mide "qué tan buena es mi vertical de costeo" (cobertura, §3.2), la otra mide "qué tan bien etiquetado está mi flujo de caja" (trazabilidad).
+
 ---
 
 ## 3. Capa 2 — Motor de KPI de empresa
 
 ### Problema exacto
-Cada vertical calcula "su" rentabilidad a su manera (o no la calcula). No existe `GET /api/empresa/kpis` que sume Ganadería + Horeca + Retail + Moda + Repuestos + Minería + Salud de un tenant en un solo número de "ventas totales del mes" o "utilidad neta".
+Cada vertical calcula "su" rentabilidad a su manera (o no la calcula). No existe `GET /api/empresa/kpis` que sume Ganadería + Horeca + Retail + Repuestos + Minería + Salud de un tenant en un solo número de "ventas totales del mes".
 
 ### Diseño: adaptador de costeo, no migración de datos
 
@@ -68,49 +133,69 @@ Cada vertical calcula "su" rentabilidad a su manera (o no la calcula). No existe
 package com.auroraplus.core.costeo;
 
 public interface CosteoProvider {
-    String moduloId(); // "GANADERIA", "HORECA", "RETAIL", "MODA", "REPUESTOS", "MINERIA", "SALUD"
+    String moduloId(); // "GANADERIA", "HORECA", "RETAIL", "REPUESTOS", "MINERIA", "SALUD", "MODA"
     ResumenVentasCostos resumenPeriodo(Long tenantId, LocalDate desde, LocalDate hasta);
 }
 
 public record ResumenVentasCostos(
     BigDecimal ventasBrutas,
-    BigDecimal costoVentas,      // COGS del período, calculado como cada vertical ya sabe calcularlo
-    BigDecimal gastosOperativos, // si el módulo los distingue (ej. GastoMinero); si no, BigDecimal.ZERO
+    BigDecimal costoVentas,        // COGS del período, solo la porción con costo real conocido
+    BigDecimal gastosOperativos,   // si el módulo los distingue (ej. GastoMinero); si no, BigDecimal.ZERO
+    BigDecimal ventasConCostoConocido, // subconjunto de ventasBrutas cuyo costoUnitario NO es null/aproximado
     String moneda
-) {}
+) {
+    // cobertura = ventasConCostoConocido / ventasBrutas — ver §3.2. Vive acá y no en el DTO de
+    // salida porque cada CosteoProvider es quien sabe de verdad qué parte de SU venta tiene costo real.
+}
 ```
 
-Cada vertical implementa **un solo método** sobre lo que YA tiene:
-- `GanaderiaCosteoProvider`: envuelve `CostosGanaderiaController`/`GanaderiaVentaService` existentes.
-- `HorecaCosteoProvider`: envuelve `EscandalloService` (ya calcula costo real por venta).
-- `RetailCosteoProvider`: suma `ItemVentaRetail.costoUnitario` (ya congelado en la venta — el único módulo que ya lo hace bien).
-- `ModaCosteoProvider`: usa `ProductoModa.costoUnitario` actual como aproximación (con nota de que el margen histórico no es exacto — ver Capa 1.5 abajo).
-- `RepuestosCosteoProvider`: envuelve `RepuestoItem`/`MovimientoRepuesto`.
-- `MineriaCosteoProvider`: suma `VentaMineral` - `GastoMinero` (sin costo de producción detallado todavía, igual que hoy).
-- `SaludCosteoProvider`: solo ventas (`CobroConsulta.montoTotal`), costo en `ZERO` hasta que exista costeo de insumos por consulta (gap ya documentado, fuera de alcance de esta fase).
+Esta fase **implementa de verdad** dos proveedores (los que ya tienen costo congelado en la venta, sin aproximar nada):
 
-### Nuevo endpoint
+- `HorecaCosteoProvider`: lee `ItemComanda` (join `Comanda`, `estado = PAGADA`, por `fechaCierre`) — `costoUnitario` ya está congelado por venta (`EscandalloService.recalcularCosto` lo fija al vender). Items sin escandallo (cargos manuales tipo "Cover") tienen `costoUnitario = null`: cuentan en `ventasBrutas` pero no en `ventasConCostoConocido` — la cobertura de Horeca normalmente no será 100% por esto, y eso es correcto reportarlo así, no forzarlo a cero.
+- `RetailCosteoProvider`: lee `ItemVentaRetail` (join `VentaRetail`, por `fechaRegistro`) — `costoUnitario` es `NOT NULL` en esa tabla (siempre se congela), así que su cobertura es 100% por diseño de esquema.
 
-```
-GET /api/empresa/kpis?tenantId=&desde=&hasta=&moneda=USD
-```
+Las demás verticales quedan con la **interfaz diseñada pero sin bean registrado todavía** (no se crean implementaciones vacías que nadie usa):
+
+| Vertical | Por qué no se conecta aún |
+|---|---|
+| `GANADERIA` | Costeo hoy vive en `CostosGanaderiaController` (solo compra+sanidad, no ventas) — falta decidir cómo mapea a `ResumenVentasCostos` antes de escribir el adaptador. |
+| `REPUESTOS` | `MovimientoRepuesto` no congela costo por movimiento (solo `total` de venta) — mismo problema de fondo que Moda, se conecta cuando se decida si también se migra a costo congelado. |
+| `MINERIA` | Tiene ventas y gastos (`VentaMineral`/`GastoMinero`) pero sin costo de producción detallado — el propio `RentabilidadRestController` de `tamanacocomercial` ya resuelve esto para un tenant a mano; falta generalizarlo. |
+| `SALUD` | No existe costeo de insumos por consulta todavía — conectar hoy significaría reportar costo `ZERO` siempre, lo cual el punto 7 de este contrato prohíbe presentar como "resultado" real. |
+| `MODA` | Recién en esta fase se le agrega congelamiento de costo a ventas *nuevas* (§3.1) — su historial sigue sin costo real hasta que se acumulen suficientes ventas nuevas. Se conecta cuando ese dato exista en volumen suficiente. |
+
+`EmpresaKpiService` recibe `List<CosteoProvider>` por inyección de Spring — agregar una vertical más adelante es agregar un bean, no tocar el servicio.
+
+### 3.1 Decisión: `DetalleVentaModa` sí se migra en esta fase
+
+Se aprueba agregar `costo_unitario NUMERIC(18,4) NULL` a `detalles_venta_moda` (ver migración en §7). Reglas:
+- **Nullable, sin backfill.** Las ventas ya existentes quedan con `costo_unitario = NULL` — no se inventa un costo retroactivo con el costo actual del producto, porque eso falsificaría el margen histórico con un número que no es real (exactamente el error que este contrato busca evitar en el punto 7).
+- **Ventas nuevas** (a partir del deploy de esta migración): `ModaVentaService.registrarVenta` congela `variante.getProducto().getCostoUnitario()` en cada `DetalleVentaModa` al momento de vender, mismo criterio que `ItemVentaRetail`/`ItemComanda`.
+- Esto NO conecta `ModaCosteoProvider` todavía (tabla §3, fila MODA) — solo prepara el dato para cuando se conecte.
+
+### 3.2 "Resultado estimado", no "utilidad neta" — y cobertura obligatoria
+
+Mientras cualquier vertical conectada tenga cobertura menor al 100% (Horeca, por los cargos manuales sin escandallo), el consolidado de la empresa **no puede llamarse "utilidad neta"** — ese nombre implica que el costo está completo, y no lo está. Se usa **"resultado estimado"** hasta que todos los módulos activos reporten cobertura 100%, y cada fila trae su propia cobertura para que el usuario sepa cuánto confiar en el número:
 
 ```json
 {
   "periodo": { "desde": "2026-09-01", "hasta": "2026-09-30" },
   "moneda": "USD",
   "consolidado": {
-    "ventasBrutas": 18420.50,
-    "costoVentas": 9200.00,
-    "margenBruto": 9220.50,
-    "margenBrutoPct": 50.05,
-    "gastosOperativos": 2100.00,
-    "utilidadNeta": 7120.50
+    "ventasBrutas": 14100.50,
+    "costoVentas": 6400.00,
+    "margenBruto": 7700.50,
+    "margenBrutoPct": 54.6,
+    "gastosOperativos": 0,
+    "resultadoEstimado": 7700.50,
+    "coberturaPromedioPonderada": 91.2
   },
   "porModulo": [
-    { "modulo": "GANADERIA", "ventasBrutas": 5200.00, "costoVentas": 3100.00, "margenBruto": 2100.00 },
-    { "modulo": "HORECA", "ventasBrutas": 8900.50, "costoVentas": 4200.00, "margenBruto": 4700.50 }
+    { "modulo": "HORECA", "ventasBrutas": 8900.50, "costoVentas": 4200.00, "margenBruto": 4700.50, "coberturaPct": 84.3 },
+    { "modulo": "RETAIL", "ventasBrutas": 5200.00, "costoVentas": 2200.00, "margenBruto": 3000.00, "coberturaPct": 100.0 }
   ],
+  "verticalesNoConectadas": ["GANADERIA", "REPUESTOS", "MINERIA", "SALUD", "MODA"],
+  "trazabilidad": { "movimientosTotales": 340, "movimientosIdentificados": 62, "porcentajeIdentificado": 18.2 },
   "cajaYFlujo": {
     "montoEsperadoEnCaja": 12400.00,
     "cxcPendiente": 1800.00,
@@ -119,12 +204,19 @@ GET /api/empresa/kpis?tenantId=&desde=&hasta=&moneda=USD
 }
 ```
 
-`cajaYFlujo` se llena **reusando** `TesoreriaController` / `resumen-periodo-abierto` y `listarMovimientos(tipo=CXC/CXP)` ya existentes — no se duplica esa lógica, se agrega como sub-objeto del nuevo endpoint.
+`verticalesNoConectadas` se lista explícitamente en la respuesta — nunca se omiten en silencio, para que quien lea el KPI sepa que "resultado estimado" es de las verticales activas, no de la empresa completa.
 
-**Este endpoint es nuevo y aditivo.** No reemplaza `/api/financiero/tesoreria/resumen-periodo-abierto` ni `/api/financiero/movimientos` — el Hub sigue funcionando exactamente igual hasta que alguien decida conectarlo al nuevo endpoint (fuera de alcance de esta fase, `Dashboard.tsx` no se toca).
+`cajaYFlujo` se llena **reusando** `TesoreriaController` / `resumen-periodo-abierto` y `listarMovimientos(tipo=CXC/CXP)` ya existentes — no se duplica esa lógica.
 
-### Capa 1.5 — nota sobre Moda
-`DetalleVentaModa` no congela `costoUnitario` al vender (a diferencia de `ItemVentaRetail`). Esto significa que el margen histórico de ventas pasadas de Moda, calculado por `ModaCosteoProvider`, es una **aproximación con el costo actual**, no el costo real del momento de la venta. Se documenta como limitación conocida; el fix real (agregar columna `costoUnitario` a `DetalleVentaModa`, igual que Retail) es una migración de una línea, se puede hacer en esta misma fase si el usuario lo aprueba — **queda como pregunta abierta en la sección 8**.
+**Este endpoint es nuevo y aditivo.** No reemplaza `/api/financiero/tesoreria/resumen-periodo-abierto` ni `/api/financiero/movimientos` — el Hub sigue funcionando exactamente igual hasta que alguien decida conectarlo (fuera de alcance de esta fase, `Dashboard.tsx` no se toca).
+
+### 3.3 El tenant nunca viaja en la URL
+
+```
+GET /api/empresa/kpis?desde=2026-09-01&hasta=2026-09-30&moneda=USD
+```
+
+**Sin `tenantId` como parámetro.** El controlador resuelve `Long tenantId = TenantContext.getCurrentTenant();` igual que cualquier otro controlador del proyecto — el JWT ya lo trae verificado, y aceptar un `tenantId` de query permitiría a cualquier usuario autenticado pedir el KPI de OTRO negocio con solo cambiar el número. `desde`/`hasta` son obligatorios (sin default silencioso a "todo el histórico", que sería lentísimo y ambiguo); `moneda` es opcional, default a la moneda base del tenant (`MotorFinancieroService.obtenerMonedaBase`).
 
 ---
 
@@ -159,11 +251,20 @@ Estructura simétrica para `AsientoLibroCompra`. **No se duplica el detalle de i
 ### Cuándo se crea un folio
 Un `AsientoLibroVenta` se crea automáticamente cuando cualquier vertical registra una venta **con RIF y razón social cargados** en la ficha fiscal del tenant (`LicenciaTenant.rif`/`razonSocial`, ya existen). Si el tenant no llenó esos datos opcionales, la venta se registra igual (como hoy) pero no genera folio — porque un libro de ventas sin RIF del emisor no tiene sentido fiscal. Esto es consistente con la decisión ya tomada de que el RIF es opcional en todo el sistema.
 
-### Endpoints nuevos
+### Endpoints nuevos (sin `tenantId` de query — mismo criterio que §3.3)
 ```
-GET /api/contabilidad/libro-ventas?tenantId=&desde=&hasta=&formato=json|pdf
-GET /api/contabilidad/libro-compras?tenantId=&desde=&hasta=&formato=json|pdf
+GET /api/contabilidad/libro-ventas?desde=&hasta=&formato=json|pdf
+GET /api/contabilidad/libro-compras?desde=&hasta=&formato=json|pdf
 ```
+
+### 4.1 RIF: opcional para registrarse, obligatorio para lo fiscal
+
+Dos RIF distintos entran en juego acá y no se resuelven igual:
+
+- **RIF del tenant (emisor).** Sigue opcional en el registro general — decisión ya tomada, no se revierte. Pero **ninguna función presentada como fiscal se habilita sin él**: exportar el libro de ventas/compras, generar folio correlativo, o cualquier reporte que el usuario pueda entregarle a su contador o al SENIAT requiere `LicenciaTenant.rif`/`razonSocial` cargados. Sin ellos, `GET /api/contabilidad/libro-ventas` responde `409` con un mensaje claro ("Complete el RIF y razón social del negocio para habilitar el libro de ventas fiscal"), no un libro vacío o a medias que parezca válido.
+- **RIF del comprador (receptor).** Depende del tipo de documento que la vertical ya emite (nota de entrega vs. factura fiscal), y esa regla — cuándo es obligatorio, cómo se valida el formato, qué pasa con consumidor final — **no la decide este documento**. Se define junto con un contador o proveedor de servicios fiscales venezolano antes de escribir código de validación, para no inventar una regla fiscal incorrecta. Queda como entrada explícita del backlog de la Capa 3, no como parte de este contrato.
+
+Ninguna de las dos reglas se implementa en esta fase (Capa 3 no se construye todavía) — quedan documentadas para cuando se aborde.
 
 ---
 
@@ -210,36 +311,47 @@ más columna `tenant_id NOT NULL`. `TenantInterceptor` + `TenantFilterAspect` ya
 
 ---
 
-## 7. Mapa de archivos propuesto (nada de esto se crea todavía)
+## 7. Mapa de archivos
 
-### Backend — nuevo paquete `core.costeo` (Capa 2)
+Esta vez se marca explícitamente **qué se crea en esta fase** (Capa 1 + esqueleto probado de Capa 2) vs. **qué queda propuesto para después** (Capas 3-4 y las 5 verticales sin conectar).
+
+### Se crea ahora — `core.costeo` (Capa 2, Horeca + Retail reales)
 ```
 src/main/java/com/auroraplus/core/costeo/CosteoProvider.java
 src/main/java/com/auroraplus/core/costeo/ResumenVentasCostos.java
-src/main/java/com/auroraplus/core/costeo/impl/GanaderiaCosteoProvider.java
 src/main/java/com/auroraplus/core/costeo/impl/HorecaCosteoProvider.java
 src/main/java/com/auroraplus/core/costeo/impl/RetailCosteoProvider.java
-src/main/java/com/auroraplus/core/costeo/impl/ModaCosteoProvider.java
-src/main/java/com/auroraplus/core/costeo/impl/RepuestosCosteoProvider.java
-src/main/java/com/auroraplus/core/costeo/impl/MineriaCosteoProvider.java
-src/main/java/com/auroraplus/core/costeo/impl/SaludCosteoProvider.java
 ```
+Las demás (`GanaderiaCosteoProvider`, `RepuestosCosteoProvider`, `MineriaCosteoProvider`, `SaludCosteoProvider`, `ModaCosteoProvider`) **no se crean todavía** — solo la interfaz que las va a recibir el día que se conecten (tabla en §3).
 
-### Backend — nuevo paquete `core.kpi` (Capa 2)
+### Se crea ahora — `core.kpi` (Capa 2)
 ```
 src/main/java/com/auroraplus/core/kpi/controllers/EmpresaKpiController.java
 src/main/java/com/auroraplus/core/kpi/services/EmpresaKpiService.java
 src/main/java/com/auroraplus/core/kpi/dto/EmpresaKpiDTO.java
 ```
 
-### Backend — cambios aditivos a `core.financiero` (Capa 1)
+### Se modifica ahora — `core.financiero` (Capa 1, aditivo)
 ```
-src/main/java/com/auroraplus/core/financiero/entities/MovimientoCaja.java   (agregar 3 columnas)
-src/main/java/com/auroraplus/core/financiero/services/MotorFinancieroService.java  (agregar parámetros opcionales)
-src/main/resources/db/migration/V##__movimiento_caja_origen.sql
+src/main/java/com/auroraplus/core/financiero/entities/MovimientoCaja.java          (+3 columnas)
+src/main/java/com/auroraplus/core/financiero/services/MotorFinancieroService.java  (+overload con moduloOrigen/referenciaTipo/referenciaId)
+src/main/resources/db/migration/V12__trazabilidad_movimiento_caja_y_costo_moda.sql
 ```
 
-### Backend — nuevo paquete `core.contabilidad` (Capas 3 y 4)
+### Se modifica ahora — Moda (§3.1)
+```
+src/main/java/com/auroraplus/modules/moda/entities/DetalleVentaModa.java   (+costoUnitario nullable)
+src/main/java/com/auroraplus/modules/moda/services/ModaVentaService.java  (congela costo en ventas nuevas)
+```
+(migración en el mismo `V12__...sql` de arriba)
+
+### Se crea ahora — pruebas (§8)
+```
+src/test/java/com/auroraplus/core/financiero/MovimientoCajaTrazabilidadTest.java
+src/test/java/com/auroraplus/core/kpi/EmpresaKpiServiceTest.java
+```
+
+### Propuesto, NO se crea en esta fase — Capas 3 y 4
 ```
 src/main/java/com/auroraplus/core/contabilidad/entities/AsientoLibroVenta.java
 src/main/java/com/auroraplus/core/contabilidad/entities/AsientoLibroCompra.java
@@ -258,13 +370,25 @@ src/main/resources/db/migration/V##__libros_fiscales.sql
 ```
 
 ### Frontend — nada en esta fase
-No se propone ningún archivo de frontend todavía. `Dashboard.tsx` no se toca (instrucción explícita). Cuando se apruebe conectar el Hub al nuevo `/api/empresa/kpis`, eso es una tarea aparte y pequeña (una función nueva en `api.ts` + un tab nuevo en el Hub) que se planifica después de que el backend de la Capa 2 esté probado.
+`Dashboard.tsx` no se toca (instrucción explícita). Conectar el Hub a `/api/empresa/kpis` es una tarea aparte y pequeña (una función en `api.ts` + un tab nuevo) que se planifica después de que este backend esté probado y en uso.
 
 ---
 
-## 8. Preguntas abiertas para la revisión conjunta
+## 8. Pruebas
 
-1. **¿Migramos `DetalleVentaModa` para que congele `costoUnitario`** (como ya hace Retail) dentro de esta misma fase, ya que es un cambio de una columna, o lo dejamos como limitación documentada de la Capa 2?
-2. **¿Orden de las verticales para conectar `CosteoProvider`?** Se recomienda empezar por Horeca y Retail (ya tienen costeo real/congelado) para tener el KPI de empresa funcionando rápido con datos confiables, y dejar Ganadería/Moda/Repuestos/Minería/Salud para una segunda pasada.
-3. **¿La Capa 4 (contabilidad de partida doble) es un objetivo real del producto,** o el KPI de empresa (Capa 2) + libros fiscales (Capa 3) ya resuelven lo que un cliente típico va a pedir? Es la parte más cara de construir y la que más mantenimiento pide después (cualquier bug en las reglas de asiento automático descuadra un balance).
-4. **¿RIF opcional en libro de ventas es aceptable fiscalmente para tu mercado**, o en la práctica un libro de ventas sin RIF del tenant no le sirve a nadie y deberíamos exigirlo antes de activar la Capa 3 para ese tenant?
+Backend ya trae `spring-boot-starter-test` + H2 en modo PostgreSQL (`src/test/resources/application-test.properties`), con el pool de conexiones ya ampliado a 30 específicamente para pruebas de concurrencia — se usa esa infraestructura, no se agrega ninguna nueva.
+
+1. **Aislamiento entre tenants** (`MovimientoCajaTrazabilidadTest`): se crean movimientos con `moduloOrigen`/`referenciaId` para dos tenants distintos y se confirma que `findByTenantId` (nunca `findAll`, mismo criterio de todo el código existente) de uno no devuelve filas del otro, incluidas las nuevas columnas.
+2. **Redondeo monetario** (`MovimientoCajaTrazabilidadTest`): se registra un movimiento multi-moneda, se verifica que `tasaAplicada` quede con escala 6 y `montoEquivalenteBase` con escala 2 (mismo `RoundingMode.HALF_UP` que ya usa `MotorFinancieroService`), y que **cambiar la `TasaCambio` después no altere el movimiento ya guardado** — prueba directa de la regla del §2.1.
+3. **Concurrencia** (`EmpresaKpiServiceTest`): N hilos registran ventas simultáneas del mismo tenant (Horeca y Retail) contra el pool de 30 conexiones; se verifica que la suma que reporta `EmpresaKpiService` sea exactamente la suma de lo insertado — sin ventas perdidas ni duplicadas por condición de carrera.
+4. **Período sin datos** (`EmpresaKpiServiceTest`): tenant válido, rango de fechas sin ninguna venta — el servicio responde `ventasBrutas=0`, `costoVentas=0`, sin excepción y sin división por cero en `coberturaPct`/`margenBrutoPct` (se define `0` cuando `ventasBrutas` es cero, no `NaN` ni error 500).
+
+---
+
+## 9. Preguntas que siguen abiertas
+
+Las 4 preguntas originales de esta sección ya se resolvieron con la aprobación de este mensaje (ver Changelog al inicio del documento). Quedan estas, que solo se pueden responder con más información o cuando se llegue a esa fase:
+
+1. **¿Quién define la regla de RIF del comprador por tipo de documento (§4.1)?** Se necesita un contador o proveedor fiscal venezolano antes de escribir esa validación — no es una decisión de ingeniería.
+2. **Cuando se acumule suficiente volumen de ventas nuevas de Moda con costo congelado (§3.1), ¿qué umbral define "suficiente" para conectar `ModaCosteoProvider`** (ej. % de ventas del período con costo conocido, o simplemente una fecha de corte)?
+3. **Ganadería/Repuestos/Minería/Salud** siguen sin un plan concreto de qué forma tomaría su `CosteoProvider` — eso requiere revisar cada uno por separado (no es una pregunta que se responda en bloque), cuando llegue su turno.
