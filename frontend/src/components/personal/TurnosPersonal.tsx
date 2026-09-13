@@ -1,17 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TurnoHorario, AsignacionTurno, Empleado, DepartamentoPersonal } from './types';
 
 interface TurnosPersonalProps {
   turnosHorarios: TurnoHorario[];
   asignaciones: AsignacionTurno[];
   empleados: Empleado[];
+  onAgregarAsignacion?: (nueva: AsignacionTurno) => void;
 }
 
 export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
   turnosHorarios,
-  asignaciones,
+  asignaciones: initialAsignaciones,
   empleados,
+  onAgregarAsignacion,
 }) => {
+  const [asignaciones, setAsignaciones] = useState<AsignacionTurno[]>(initialAsignaciones);
   const [fechaSeleccionada, setFechaSeleccionada] = useState('2026-09-15');
   const [deptoFiltro, setDeptoFiltro] = useState<string>('TODOS');
   const [modalAsignarAbierto, setModalAsignarAbierto] = useState(false);
@@ -19,9 +22,52 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
   const [turnoSeleccionado, setTurnoSeleccionado] = useState<string>(turnosHorarios[0]?.id || '');
   const [toastMensaje, setToastMensaje] = useState<string | null>(null);
 
+  // Sincronizar props iniciales si cambian
+  useEffect(() => {
+    setAsignaciones(initialAsignaciones);
+  }, [initialAsignaciones]);
+
+  // Accesibilidad: Cerrar modal con tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && modalAsignarAbierto) {
+        setModalAsignarAbierto(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalAsignarAbierto]);
+
   const mostrarNotificacion = (msg: string) => {
     setToastMensaje(msg);
-    setTimeout(() => setToastMensaje(null), 3000);
+    setTimeout(() => setToastMensaje(null), 3500);
+  };
+
+  const handleCrearAsignacion = () => {
+    const emp = empleados.find((e) => e.id === empleadoSeleccionado);
+    const trn = turnosHorarios.find((t) => t.id === turnoSeleccionado);
+
+    if (!emp || !trn) return;
+
+    const nueva: AsignacionTurno = {
+      id: `ASG-${Date.now()}`,
+      empleadoId: emp.id,
+      empleadoNombre: `${emp.nombre} ${emp.apellidos}`,
+      empleadoCargo: emp.cargo,
+      departamento: emp.departamento,
+      fecha: fechaSeleccionada,
+      turnoId: trn.id,
+      turnoNombre: `${trn.nombre} (${trn.horaInicio} - ${trn.horaFin})`,
+      tipoTurno: trn.tipo,
+      estado: 'PROGRAMADO',
+    };
+
+    setAsignaciones([nueva, ...asignaciones]);
+    if (onAgregarAsignacion) {
+      onAgregarAsignacion(nueva);
+    }
+    setModalAsignarAbierto(false);
+    mostrarNotificacion(`Turno programado exitosamente para ${emp.nombre} [DEMO]`);
   };
 
   const asignacionesFiltradas = asignaciones.filter((a) => {
@@ -32,12 +78,12 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
 
   const departamentos: (DepartamentoPersonal | 'TODOS')[] = [
     'TODOS',
-    'Médico',
-    'Enfermería',
-    'Administración',
-    'Laboratorio / Farmacia',
-    'Operaciones / Servicios',
-    'Soporte y Sistemas',
+    'Atención & Salud',
+    'Cocina & Restauración',
+    'Operaciones & Campo',
+    'Administración & Finanzas',
+    'Logística & Mantenimiento',
+    'Sistemas & Soporte',
   ];
 
   return (
@@ -46,7 +92,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
       {toastMensaje && (
         <div className="p-3 bg-[#10b981]/20 border border-[#10b981]/40 rounded-xl text-xs text-[#34d399] font-medium flex items-center justify-between animate-fade-in">
           <span>{toastMensaje}</span>
-          <button onClick={() => setToastMensaje(null)} className="text-xs text-[#34d399] hover:underline">
+          <button onClick={() => setToastMensaje(null)} className="text-xs text-[#34d399] hover:underline" aria-label="Cerrar notificación">
             ✕
           </button>
         </div>
@@ -56,10 +102,10 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-[#f8fafc] uppercase tracking-wider text-[#94a3b8]">
-              Catálogo de Turnos y Guardias Clínicas
+            <h3 className="text-xs sm:text-sm font-semibold text-[#f8fafc] uppercase tracking-wider text-[#94a3b8]">
+              Catálogo de Turnos y Jornadas Operativas
             </h3>
-            <p className="text-xs text-[#64748b]">Esquemas horarios estandarizados en la institución</p>
+            <p className="text-xs text-[#64748b]">Esquemas horarios adaptados a salud, gastronomía y campo</p>
           </div>
           <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#131c2e] text-[#35d7c3] border border-[#1e2d48]">
             [DEMO]
@@ -154,7 +200,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-[#f8fafc] text-sm">{asg.empleadoNombre}</span>
-                    <span className="px-2 py-0.5 rounded bg-[#0b111e] text-[#94a3b8] font-mono text-[11px]">
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#0b111e] text-[#94a3b8] font-mono">
                       {asg.departamento}
                     </span>
                   </div>
@@ -180,15 +226,23 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
         )}
       </div>
 
-      {/* Modal de Asignación Rápida de Turno */}
+      {/* Modal de Asignación Rápida de Turno con Accesibilidad */}
       {modalAsignarAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-asignar-turno-titulo"
+        >
           <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#f8fafc]">Asignar Turno de Trabajo [DEMO]</h3>
+              <h3 id="modal-asignar-turno-titulo" className="text-base font-bold text-[#f8fafc]">
+                Asignar Turno de Trabajo [DEMO]
+              </h3>
               <button
                 onClick={() => setModalAsignarAbierto(false)}
                 className="text-[#94a3b8] hover:text-[#f8fafc]"
+                aria-label="Cerrar modal"
               >
                 ✕
               </button>
@@ -244,10 +298,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
                 Cancelar
               </button>
               <button
-                onClick={() => {
-                  setModalAsignarAbierto(false);
-                  mostrarNotificacion('Turno asignado satisfactoriamente en el cronograma [DEMO]');
-                }}
+                onClick={handleCrearAsignacion}
                 className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs"
               >
                 Confirmar Asignación

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Empleado, DepartamentoPersonal, EstadoEmpleado } from './types';
+import { Empleado, DepartamentoPersonal, EstadoEmpleado, formatearMoneda } from './types';
 
 interface ListaEmpleadosProps {
   empleados: Empleado[];
@@ -20,12 +20,12 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
 
   const departamentos: (DepartamentoPersonal | 'TODOS')[] = [
     'TODOS',
-    'Médico',
-    'Enfermería',
-    'Administración',
-    'Laboratorio / Farmacia',
-    'Operaciones / Servicios',
-    'Soporte y Sistemas',
+    'Atención & Salud',
+    'Cocina & Restauración',
+    'Operaciones & Campo',
+    'Administración & Finanzas',
+    'Logística & Mantenimiento',
+    'Sistemas & Soporte',
   ];
 
   const filtrados = empleados.filter((emp) => {
@@ -83,15 +83,16 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Buscar por nombre, cédula, cargo o código [DEMO]..."
+            placeholder="Buscar por nombre, cargo, cédula o código [DEMO]..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-2 text-sm text-[#f8fafc] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
+            className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#f8fafc] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
           />
           {busqueda && (
             <button
               onClick={() => setBusqueda('')}
               className="absolute right-2.5 top-2.5 text-xs text-[#94a3b8] hover:text-[#f8fafc]"
+              aria-label="Limpiar búsqueda"
             >
               ✕
             </button>
@@ -132,7 +133,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
                 ? 'bg-[#1e293b] border-[#334155] text-[#94a3b8] hover:text-[#f8fafc]'
                 : 'bg-[#35d7c3]/15 border-[#35d7c3]/40 text-[#35d7c3]'
             }`}
-            title="Alternar privacidad de salarios por perfil"
+            title="Alternar modo privacidad de remuneraciones"
           >
             <span>{ocultarSueldo ? '👁️ Sueldos Ocultos' : '🔓 Sueldos Visibles'}</span>
           </button>
@@ -172,7 +173,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
               <div>
                 <span className="text-[#64748b] block text-[10px]">Sueldo Ref. [DEMO]</span>
                 <span className="font-mono font-medium text-[#35d7c3]">
-                  {ocultarSueldo ? '••••••' : `$${emp.salarioBaseReferencial.toFixed(2)} ${emp.moneda}`}
+                  {ocultarSueldo ? '••••••' : formatearMoneda(emp.salarioBaseReferencial, emp.moneda)}
                 </span>
               </div>
             </div>
@@ -229,7 +230,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
                   <td className="py-3 px-4 text-[#94a3b8]">{emp.turnoAsignado}</td>
                   <td className="py-3 px-4">{getEstadoBadge(emp.estado)}</td>
                   <td className="py-3 px-4 text-right font-mono font-medium text-[#35d7c3]">
-                    {ocultarSueldo ? '••••••' : `$${emp.salarioBaseReferencial.toFixed(2)} ${emp.moneda}`}
+                    {ocultarSueldo ? '••••••' : formatearMoneda(emp.salarioBaseReferencial, emp.moneda)}
                   </td>
                   <td className="py-3 px-4 text-center">
                     <button

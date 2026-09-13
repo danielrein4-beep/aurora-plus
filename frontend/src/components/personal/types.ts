@@ -1,23 +1,26 @@
 /**
- * Tipos y Definiciones de Datos para el módulo de Personal y Aurora Nómina
- * Todos los identificadores y datos de prueba llevan el indicador [DEMO].
+ * Tipos y Definiciones de Datos para el módulo compartido de Personal y Aurora Nómina
+ * Adaptado para las verticales de Salud (MediClinic), Horeca (Restaurantes/Hoteles) y Ganadería/Agropecuaria.
+ * Todos los registros de prueba llevan el indicador explícito [DEMO].
  */
 
-export type DepartamentoPersonal = 
-  | 'Médico'
-  | 'Enfermería'
-  | 'Administración'
-  | 'Laboratorio / Farmacia'
-  | 'Operaciones / Servicios'
-  | 'Soporte y Sistemas';
+export type VerticalNegocio = 'salud' | 'horeca' | 'ganaderia' | 'general';
+
+export type DepartamentoPersonal =
+  | 'Atención & Salud'
+  | 'Cocina & Restauración'
+  | 'Operaciones & Campo'
+  | 'Administración & Finanzas'
+  | 'Logística & Mantenimiento'
+  | 'Sistemas & Soporte';
 
 export type EstadoEmpleado = 'ACTIVO' | 'DE_VACACIONES' | 'LICENCIA' | 'INACTIVO';
 
-export type TipoContrato = 'TIEMPO_COMPLETO' | 'MEDIO_TIEMPO' | 'POR_HONORARIOS' | 'GUARDIA';
+export type TipoContrato = 'TIEMPO_COMPLETO' | 'MEDIO_TIEMPO' | 'POR_HONORARIOS' | 'POR_JORNAL_GUARDIA';
 
 export interface Empleado {
   id: string;
-  codigoEmpleado: string; // ej. EMP-001
+  codigoEmpleado: string; // ej. EMP-001 [DEMO]
   nombre: string;
   apellidos: string;
   email: string;
@@ -25,27 +28,27 @@ export interface Empleado {
   identificacion: string;
   cargo: string;
   departamento: DepartamentoPersonal;
+  verticalPrincipal: VerticalNegocio;
   tipoContrato: TipoContrato;
   estado: EstadoEmpleado;
   fechaIngreso: string;
-  fotoUrl?: string;
   
-  // Datos Salariales (protegidos por RBAC)
-  salarioBaseReferencial: number; // Monto referencial en USD [DEMO]
+  // Remuneración referencial (oculta por defecto en la UI)
+  salarioBaseReferencial: number;
   moneda: 'USD' | 'VES' | 'COP';
-  modalidadPago: 'QUINCENAL' | 'MENSUAL' | 'SEMANAL';
+  modalidadPago: 'QUINCENAL' | 'MENSUAL' | 'SEMANAL' | 'POR_JORNAL';
   bancoReferencial?: string;
   cuentaReferencial?: string;
 
   // Turno habitual
-  turnoAsignado: string; // ej. "Mañana (07:00 - 15:00)"
+  turnoAsignado: string;
   
-  // Metas asignadas activas
+  // Métricas referenciales
   metasActivasCount?: number;
-  asistenciaTasaMes?: number; // Porcentaje ej. 98%
+  asistenciaTasaMes?: number; // ej. 98%
 }
 
-export type TipoTurno = 'MANANA' | 'TARDE' | 'NOCHE' | 'GUARDIA_24H' | 'ROTATIVO' | 'LIBRE';
+export type TipoTurno = 'MANANA' | 'TARDE' | 'NOCHE' | 'JORNADA_CONTINUA' | 'ROTATIVO' | 'LIBRE';
 
 export interface TurnoHorario {
   id: string;
@@ -74,6 +77,8 @@ export interface AsignacionTurno {
 
 export type EstadoAsistencia = 'PRESENTE' | 'RETARDO' | 'AUSENCIA_JUSTIFICADA' | 'AUSENCIA_INJUSTIFICADA' | 'PERMISO' | 'VACACIONES';
 
+export type MetodoMarcaje = 'PIN_TERMINAL' | 'REGISTRO_SUPERVISOR' | 'PLANILLA_DIGITAL' | 'HORARIO_ASIGNADO';
+
 export interface RegistroAsistencia {
   id: string;
   empleadoId: string;
@@ -89,11 +94,11 @@ export interface RegistroAsistencia {
   horasExtras: number;
   estado: EstadoAsistencia;
   justificacion?: string;
-  metodoMarcaje: 'BIOMETRICO_DEMO' | 'PIN_TERMINAL' | 'MANUAL_SUPERVISOR' | 'MOVIL_GPS';
+  metodoMarcaje: MetodoMarcaje;
 }
 
 export type TipoMeta = 'AUTOMATICA' | 'MANUAL';
-export type CategoriaMeta = 'ATENCION_PACIENTES' | 'PUNTUALIDAD' | 'EFICIENCIA_PROCESOS' | 'SATISFACCION' | 'DOCUMENTACION_HISTORIAS' | 'CAPACITACION';
+export type CategoriaMeta = 'CALIDAD_SERVICIO' | 'PUNTUALIDAD' | 'EFICIENCIA_PROCESOS' | 'DOCUMENTACION' | 'CAPACITACION' | 'PRODUCCION_CAMPO';
 
 export interface MetaPersonal {
   id: string;
@@ -101,32 +106,32 @@ export interface MetaPersonal {
   descripcion: string;
   categoria: CategoriaMeta;
   tipo: TipoMeta; // Automática vs Manual
-  origenMetrica: string; // ej. "Citas finalizadas en Historias Clínicas" o "Evaluación trimestral de jefatura"
-  departamentoObjetivo?: DepartamentoPersonal | 'TODOS';
-  empleadoAsignadoId?: string; // Si es individual o grupal
+  origenMetrica: string;
+  departamentoObjetivo: DepartamentoPersonal | 'TODOS';
+  verticalObjetivo: VerticalNegocio | 'TODAS';
+  empleadoAsignadoId?: string;
   empleadoAsignadoNombre?: string;
   metaValor: number;
-  unidadMedida: string; // ej. "pacientes", "%", "historias", "puntos"
+  unidadMedida: string;
   progresoActual: number;
   fechaInicio: string;
   fechaLimite: string;
   estado: 'EN_PROGRESO' | 'COMPLETADA' | 'EN_RIESGO' | 'VENCIDA';
   
-  // Regla no punitiva:
-  esNoPunitiva: boolean; // Siempre true en Aurora Plus
-  premioOReconocimiento?: string; // ej. "Mención de honor en cartelera médica"
+  // Regla no punitiva garantizada
+  esNoPunitiva: boolean;
+  reconocimiento?: string;
 }
 
 export type EstadoNomina = 'BORRADOR' | 'EN_REVISION' | 'APROBADA' | 'AJUSTADA' | 'REVERSADA';
 
-export type TipoConceptoNomina = 'ASIGNACION_SALARIO' | 'BONO_PUNTUALIDAD' | 'GUARDIA_EXTRA' | 'DEDUCCION_SEGURO' | 'DEDUCCION_ANTICIPO' | 'OTRO_RECONOCIMIENTO';
-
 export interface DesgloseCalculoConcepto {
   concepto: string;
   tipo: 'PERCEPCION' | 'DEDUCCION';
-  baseCalculo: string; // ej. "15 días laborados @ $20.00/día"
-  reglaAplicada: string; // ej. "Salario base mensual / 30 * días computados"
-  vigencia: string; // ej. "Tabulador General Q1-2026 [DEMO]"
+  baseCalculo: string;
+  baseCalculoMascara?: string; // Para no filtrar cifras en modo protegido
+  reglaAplicada: string;
+  vigencia: string;
   monto: number;
   moneda: 'USD' | 'VES' | 'COP';
   observacion?: string;
@@ -153,13 +158,12 @@ export interface HistorialAjusteNomina {
   tipoAccion: 'AJUSTE_POSTERIOR' | 'REVERSO_TOTAL' | 'APROBACION_INICIAL';
   autor: string;
   motivoJustificado: string;
-  montoAfectadoUSD?: number;
 }
 
 export interface PeriodoNomina {
   id: string;
-  codigoPeriodo: string; // ej. "NOM-2026-Q1-01"
-  nombre: string; // ej. "1ra Quincena Enero 2026 [DEMO]"
+  codigoPeriodo: string;
+  nombre: string;
   fechaInicio: string;
   fechaFin: string;
   fechaTentativaPago: string;
@@ -168,15 +172,29 @@ export interface PeriodoNomina {
   montoTotalBruto: number;
   montoTotalDeducciones: number;
   montoTotalNeto: number;
-  monedaPrincipal: 'USD';
+  monedaPrincipal: 'USD' | 'VES' | 'COP';
   
   recibos: ReciboNominaEmpleado[];
   historialAjustes: HistorialAjusteNomina[];
   
-  // Auditoría
   aprobadoPor?: string;
   fechaAprobacion?: string;
   notasAuditoria?: string;
 }
 
 export type SeccionPersonal = 'resumen' | 'empleados' | 'turnos' | 'asistencia' | 'metas' | 'nomina';
+
+/**
+ * Formateador Multi-Moneda oficial para Aurora Plus (USD, VES, COP)
+ */
+export function formatearMoneda(monto: number, moneda: 'USD' | 'VES' | 'COP' = 'USD'): string {
+  if (isNaN(monto)) return '$0.00 USD';
+  
+  if (moneda === 'VES') {
+    return `Bs. ${monto.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES`;
+  }
+  if (moneda === 'COP') {
+    return `$${Math.round(monto).toLocaleString('es-CO')} COP`;
+  }
+  return `$${monto.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+}

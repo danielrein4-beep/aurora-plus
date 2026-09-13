@@ -1,28 +1,91 @@
-import React, { useState } from 'react';
-import { MetaPersonal, DepartamentoPersonal, TipoMeta } from './types';
+import React, { useState, useEffect } from 'react';
+import { MetaPersonal, DepartamentoPersonal, TipoMeta, CategoriaMeta } from './types';
 
 interface MetasPersonalProps {
   metas: MetaPersonal[];
+  onAgregarMeta?: (nueva: MetaPersonal) => void;
 }
 
-export const MetasPersonal: React.FC<MetasPersonalProps> = ({ metas }) => {
+export const MetasPersonal: React.FC<MetasPersonalProps> = ({
+  metas: initialMetas,
+  onAgregarMeta,
+}) => {
+  const [metas, setMetas] = useState<MetaPersonal[]>(initialMetas);
   const [tipoFiltro, setTipoFiltro] = useState<'TODAS' | TipoMeta>('TODAS');
   const [deptoFiltro, setDeptoFiltro] = useState<string>('TODOS');
+  const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
+  const [nuevoTitulo, setNuevoTitulo] = useState('');
+  const [nuevaDescripcion, setNuevaDescripcion] = useState('');
+  const [nuevoDepto, setNuevoDepto] = useState<DepartamentoPersonal>('Atención & Salud');
+  const [nuevaCategoria, setNuevaCategoria] = useState<CategoriaMeta>('CALIDAD_SERVICIO');
+  const [nuevoTipo, setNuevoTipo] = useState<TipoMeta>('MANUAL');
+  const [nuevoValor, setNuevoValor] = useState(100);
+  const [nuevaUnidad, setNuevaUnidad] = useState('%');
   const [toastMensaje, setToastMensaje] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMetas(initialMetas);
+  }, [initialMetas]);
+
+  // Accesibilidad: Cerrar modal con tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && modalCrearAbierto) {
+        setModalCrearAbierto(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalCrearAbierto]);
 
   const mostrarNotificacion = (msg: string) => {
     setToastMensaje(msg);
-    setTimeout(() => setToastMensaje(null), 3000);
+    setTimeout(() => setToastMensaje(null), 3500);
+  };
+
+  const handleCrearMeta = () => {
+    if (!nuevoTitulo.trim()) {
+      alert('Debe indicar un título para la meta formativa.');
+      return;
+    }
+
+    const nueva: MetaPersonal = {
+      id: `MET-${Date.now()}`,
+      titulo: `${nuevoTitulo} [DEMO]`,
+      descripcion: nuevaDescripcion || 'Meta de desarrollo y excelencia operativa.',
+      categoria: nuevaCategoria,
+      tipo: nuevoTipo,
+      origenMetrica: nuevoTipo === 'AUTOMATICA' ? 'Módulo central ERP' : 'Supervisión de área',
+      departamentoObjetivo: nuevoDepto,
+      verticalObjetivo: 'TODAS',
+      metaValor: nuevoValor,
+      unidadMedida: nuevaUnidad,
+      progresoActual: 0,
+      fechaInicio: '2026-09-01',
+      fechaLimite: '2026-09-30',
+      estado: 'EN_PROGRESO',
+      esNoPunitiva: true,
+      reconocimiento: 'Reconocimiento al equipo por cumplimiento [DEMO]',
+    };
+
+    setMetas([nueva, ...metas]);
+    if (onAgregarMeta) {
+      onAgregarMeta(nueva);
+    }
+    setModalCrearAbierto(false);
+    setNuevoTitulo('');
+    setNuevaDescripcion('');
+    mostrarNotificacion('Meta formativa creada y registrada en el ciclo actual [DEMO]');
   };
 
   const departamentos: (DepartamentoPersonal | 'TODOS')[] = [
     'TODOS',
-    'Médico',
-    'Enfermería',
-    'Administración',
-    'Laboratorio / Farmacia',
-    'Operaciones / Servicios',
-    'Soporte y Sistemas',
+    'Atención & Salud',
+    'Cocina & Restauración',
+    'Operaciones & Campo',
+    'Administración & Finanzas',
+    'Logística & Mantenimiento',
+    'Sistemas & Soporte',
   ];
 
   const filtradas = metas.filter((m) => {
@@ -40,7 +103,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({ metas }) => {
       {toastMensaje && (
         <div className="p-3 bg-[#10b981]/20 border border-[#10b981]/40 rounded-xl text-xs text-[#34d399] font-medium flex items-center justify-between animate-fade-in">
           <span>{toastMensaje}</span>
-          <button onClick={() => setToastMensaje(null)} className="text-xs text-[#34d399] hover:underline">
+          <button onClick={() => setToastMensaje(null)} className="text-xs text-[#34d399] hover:underline" aria-label="Cerrar notificación">
             ✕
           </button>
         </div>
@@ -82,7 +145,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({ metas }) => {
               className="bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-1.5 text-xs text-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
             >
               <option value="TODAS">Todas (Automáticas y Manuales)</option>
-              <option value="AUTOMATICA">Solo Automáticas [Sistema]</option>
+              <option value="AUTOMATICA">Solo Automáticas [Sistema ERP]</option>
               <option value="MANUAL">Solo Manuales [Supervisión]</option>
             </select>
           </div>
@@ -107,7 +170,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({ metas }) => {
         </div>
 
         <button
-          onClick={() => mostrarNotificacion('Formulario de nueva meta formativa abierto [DEMO]')}
+          onClick={() => setModalCrearAbierto(true)}
           className="px-3.5 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white"
         >
           + Crear Meta Formativa [DEMO]
@@ -181,10 +244,10 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({ metas }) => {
                   <span className="font-mono">Límite: {meta.fechaLimite}</span>
                 </div>
 
-                {meta.premioOReconocimiento && (
+                {meta.reconocimiento && (
                   <div className="p-2 bg-[#0b111e] rounded-lg border border-[#1e293b] text-[11px] text-[#cbd5e1] flex items-center gap-1.5">
                     <span>🏆</span>
-                    <span>{meta.premioOReconocimiento}</span>
+                    <span>{meta.reconocimiento}</span>
                   </div>
                 )}
               </div>
@@ -192,6 +255,119 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({ metas }) => {
           );
         })}
       </div>
+
+      {/* Modal de Creación de Meta con Accesibilidad */}
+      {modalCrearAbierto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-crear-meta-titulo"
+        >
+          <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 id="modal-crear-meta-titulo" className="text-base font-bold text-[#f8fafc]">
+                Nueva Meta Formativa [DEMO]
+              </h3>
+              <button
+                onClick={() => setModalCrearAbierto(false)}
+                className="text-[#94a3b8] hover:text-[#f8fafc]"
+                aria-label="Cerrar modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[#94a3b8] block mb-1">Título del Objetivo:</label>
+                <input
+                  type="text"
+                  value={nuevoTitulo}
+                  onChange={(e) => setNuevoTitulo(e.target.value)}
+                  placeholder="Ej. Tiempo de atención en mesa, Control de inventario..."
+                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                />
+              </div>
+
+              <div>
+                <label className="text-[#94a3b8] block mb-1">Descripción:</label>
+                <textarea
+                  rows={2}
+                  value={nuevaDescripcion}
+                  onChange={(e) => setNuevaDescripcion(e.target.value)}
+                  placeholder="Criterio de excelencia..."
+                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[#94a3b8] block mb-1">Departamento:</label>
+                  <select
+                    value={nuevoDepto}
+                    onChange={(e) => setNuevoDepto(e.target.value as any)}
+                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                  >
+                    <option value="Atención & Salud">Atención & Salud</option>
+                    <option value="Cocina & Restauración">Cocina & Restauración</option>
+                    <option value="Operaciones & Campo">Operaciones & Campo</option>
+                    <option value="Administración & Finanzas">Administración & Finanzas</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[#94a3b8] block mb-1">Tipo de Meta:</label>
+                  <select
+                    value={nuevoTipo}
+                    onChange={(e) => setNuevoTipo(e.target.value as any)}
+                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                  >
+                    <option value="MANUAL">Manual (Supervisión)</option>
+                    <option value="AUTOMATICA">Automática (ERP)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[#94a3b8] block mb-1">Meta a Alcanzar:</label>
+                  <input
+                    type="number"
+                    value={nuevoValor}
+                    onChange={(e) => setNuevoValor(Number(e.target.value))}
+                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[#94a3b8] block mb-1">Unidad:</label>
+                  <input
+                    type="text"
+                    value={nuevaUnidad}
+                    onChange={(e) => setNuevaUnidad(e.target.value)}
+                    placeholder="%, minutos, órdenes..."
+                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setModalCrearAbierto(false)}
+                className="px-4 py-2 rounded-lg bg-[#1e293b] text-xs text-[#cbd5e1] hover:bg-[#334155]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCrearMeta}
+                className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs"
+              >
+                Crear Meta Formativa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

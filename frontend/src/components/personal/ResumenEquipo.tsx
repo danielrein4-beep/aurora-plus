@@ -1,5 +1,5 @@
 import React from 'react';
-import { Empleado, PeriodoNomina, RegistroAsistencia, AsignacionTurno, SeccionPersonal } from './types';
+import { Empleado, PeriodoNomina, RegistroAsistencia, AsignacionTurno, SeccionPersonal, formatearMoneda } from './types';
 import { EstadoNominaBadge } from './EstadoNominaBadge';
 
 interface ResumenEquipoProps {
@@ -9,6 +9,7 @@ interface ResumenEquipoProps {
   turnosHoy: AsignacionTurno[];
   onNavegarSeccion: (seccion: SeccionPersonal) => void;
   ocultarSueldo: boolean;
+  nominaHabilitada: boolean;
 }
 
 export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
@@ -18,6 +19,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
   turnosHoy,
   onNavegarSeccion,
   ocultarSueldo,
+  nominaHabilitada,
 }) => {
   const activosCount = empleados.filter((e) => e.estado === 'ACTIVO').length;
   const vacacionesCount = empleados.filter((e) => e.estado === 'DE_VACACIONES').length;
@@ -39,12 +41,12 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             [DEMO]
           </span>
           <span className="text-[#94a3b8]">
-            Entorno de demostración operativa. Las cifras y registros mostrados son referenciales.
+            Entorno referencial de gestión de personal (Salud, Horeca y Agropecuaria).
           </span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#35d7c3] animate-pulse" />
-          <span className="text-[#f8fafc] font-medium font-mono">Motor de Personal v2.4</span>
+          <span className="text-[#f8fafc] font-medium font-mono">Personal & Nómina Hub v2.4</span>
         </div>
       </div>
 
@@ -87,20 +89,20 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
           <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1">
             <span>Asistencia Hoy</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#0b111e] font-mono text-[#38bdf8]">
-              {turnosHoy.length} Programados
+              {asistenciasHoy.length} Registros
             </span>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl sm:text-3xl font-bold font-mono text-[#f8fafc]">
               {presentesHoy}
             </span>
-            <span className="text-xs text-[#64748b]">marcaciones</span>
+            <span className="text-xs text-[#64748b]">en jornada</span>
           </div>
           <div className="mt-2 text-xs text-[#94a3b8] flex items-center gap-2">
             {retardoHoy > 0 ? (
               <span className="text-[#fbbf24] font-medium">{retardoHoy} con retardo justificado</span>
             ) : (
-              <span className="text-[#35d7c3]">100% puntualidad matutina</span>
+              <span className="text-[#35d7c3]">100% puntualidad de inicio</span>
             )}
           </div>
         </div>
@@ -126,7 +128,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             <span className="text-xs text-[#64748b]">en puesto</span>
           </div>
           <div className="mt-2 text-xs text-[#94a3b8]">
-            <span>Triaje, Médicos y Admisión cubiertos</span>
+            <span>Áreas clínicas, cocina y campo activas</span>
           </div>
         </div>
 
@@ -140,13 +142,19 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
         >
           <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1">
             <span>Aurora Nómina</span>
-            <EstadoNominaBadge estado={periodoActual.estado} />
+            {nominaHabilitada ? (
+              <EstadoNominaBadge estado={periodoActual.estado} />
+            ) : (
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#f59e0b]/15 text-[#fbbf24] font-mono font-medium border border-[#f59e0b]/30">
+                Desactivado
+              </span>
+            )}
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-xl sm:text-2xl font-bold font-mono text-[#35d7c3]">
-              {ocultarSueldo ? '••••••' : `$${periodoActual.montoTotalNeto.toFixed(2)}`}
+              {ocultarSueldo ? '••••••' : formatearMoneda(periodoActual.montoTotalNeto, periodoActual.monedaPrincipal)}
             </span>
-            <span className="text-xs text-[#64748b]">USD neto</span>
+            <span className="text-xs text-[#64748b]">neto</span>
           </div>
           <div className="mt-2 text-[11px] text-[#94a3b8] truncate font-mono">
             {periodoActual.nombre}
@@ -161,7 +169,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-semibold text-[#f8fafc]">Distribución del Equipo</h3>
-              <p className="text-xs text-[#94a3b8]">Personal asignado por departamento clínico y de soporte</p>
+              <p className="text-xs text-[#94a3b8]">Colaboradores por departamento operativo</p>
             </div>
             <button
               onClick={() => onNavegarSeccion('empleados')}
@@ -199,7 +207,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-semibold text-[#f8fafc]">Turnos de la Jornada</h3>
-              <p className="text-xs text-[#94a3b8]">Personal actualmente en guardia o servicio activo</p>
+              <p className="text-xs text-[#94a3b8]">Personal actualmente en servicio programado</p>
             </div>
             <button
               onClick={() => onNavegarSeccion('turnos')}

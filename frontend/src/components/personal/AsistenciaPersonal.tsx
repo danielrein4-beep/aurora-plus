@@ -1,35 +1,88 @@
-import React, { useState } from 'react';
-import { RegistroAsistencia, Empleado, DepartamentoPersonal } from './types';
+import React, { useState, useEffect } from 'react';
+import { RegistroAsistencia, Empleado, DepartamentoPersonal, MetodoMarcaje } from './types';
 
 interface AsistenciaPersonalProps {
   asistencias: RegistroAsistencia[];
   empleados: Empleado[];
+  onAgregarAsistencia?: (nueva: RegistroAsistencia) => void;
 }
 
 export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
-  asistencias,
+  asistencias: initialAsistencias,
   empleados,
+  onAgregarAsistencia,
 }) => {
+  const [asistencias, setAsistencias] = useState<RegistroAsistencia[]>(initialAsistencias);
   const [fechaFiltro, setFechaFiltro] = useState('2026-09-15');
   const [deptoFiltro, setDeptoFiltro] = useState<string>('TODOS');
   const [modalMarcajeAbierto, setModalMarcajeAbierto] = useState(false);
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<string>(empleados[0]?.id || '');
   const [tipoMarcaje, setTipoMarcaje] = useState<'ENTRADA' | 'SALIDA'>('ENTRADA');
+  const [horaMarcaje, setHoraMarcaje] = useState('07:00');
+  const [metodoSeleccionado, setMetodoSeleccionado] = useState<MetodoMarcaje>('PIN_TERMINAL');
+  const [observacionMarcaje, setObservacionMarcaje] = useState('');
   const [toastMensaje, setToastMensaje] = useState<string | null>(null);
+
+  // Sincronizar props iniciales
+  useEffect(() => {
+    setAsistencias(initialAsistencias);
+  }, [initialAsistencias]);
+
+  // Accesibilidad: Cerrar modal con tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && modalMarcajeAbierto) {
+        setModalMarcajeAbierto(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalMarcajeAbierto]);
 
   const mostrarNotificacion = (msg: string) => {
     setToastMensaje(msg);
-    setTimeout(() => setToastMensaje(null), 3000);
+    setTimeout(() => setToastMensaje(null), 3500);
+  };
+
+  const handleRegistrarMarcaje = () => {
+    const emp = empleados.find((e) => e.id === empleadoSeleccionado);
+    if (!emp) return;
+
+    const nueva: RegistroAsistencia = {
+      id: `AST-${Date.now()}`,
+      empleadoId: emp.id,
+      empleadoNombre: `${emp.nombre} ${emp.apellidos}`,
+      departamento: emp.departamento,
+      fecha: fechaFiltro,
+      horaEntradaProgramada: '07:00',
+      horaSalidaProgramada: '15:00',
+      horaEntradaReal: tipoMarcaje === 'ENTRADA' ? horaMarcaje : '07:00',
+      horaSalidaReal: tipoMarcaje === 'SALIDA' ? horaMarcaje : undefined,
+      minutosRetardo: tipoMarcaje === 'ENTRADA' && horaMarcaje > '07:05' ? 15 : 0,
+      horasTrabajadas: 8.0,
+      horasExtras: 0,
+      estado: tipoMarcaje === 'ENTRADA' && horaMarcaje > '07:05' ? 'RETARDO' : 'PRESENTE',
+      justificacion: observacionMarcaje ? `${observacionMarcaje} [DEMO]` : undefined,
+      metodoMarcaje: metodoSeleccionado,
+    };
+
+    setAsistencias([nueva, ...asistencias]);
+    if (onAgregarAsistencia) {
+      onAgregarAsistencia(nueva);
+    }
+    setModalMarcajeAbierto(false);
+    setObservacionMarcaje('');
+    mostrarNotificacion(`Marcaje de ${tipoMarcaje.toLowerCase()} registrado correctamente para ${emp.nombre} [DEMO]`);
   };
 
   const departamentos: (DepartamentoPersonal | 'TODOS')[] = [
     'TODOS',
-    'Médico',
-    'Enfermería',
-    'Administración',
-    'Laboratorio / Farmacia',
-    'Operaciones / Servicios',
-    'Soporte y Sistemas',
+    'Atención & Salud',
+    'Cocina & Restauración',
+    'Operaciones & Campo',
+    'Administración & Finanzas',
+    'Logística & Mantenimiento',
+    'Sistemas & Soporte',
   ];
 
   const filtradas = asistencias.filter((a) => {
@@ -38,16 +91,18 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
     return coincideFecha && coincideDepto;
   });
 
-  const getMetodoIcon = (metodo: string) => {
+  const getMetodoIcon = (metodo: MetodoMarcaje) => {
     switch (metodo) {
-      case 'BIOMETRICO_DEMO':
-        return '🔒 Biométrico';
       case 'PIN_TERMINAL':
         return '🔢 Terminal PIN';
-      case 'MANUAL_SUPERVISOR':
+      case 'REGISTRO_SUPERVISOR':
         return '✍️ Supervisor';
+      case 'PLANILLA_DIGITAL':
+        return '📋 Planilla Digital';
+      case 'HORARIO_ASIGNADO':
+        return '⏱️ Horario Asignado';
       default:
-        return '📱 App';
+        return '📝 Registro Manual';
     }
   };
 
@@ -57,7 +112,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
       {toastMensaje && (
         <div className="p-3 bg-[#10b981]/20 border border-[#10b981]/40 rounded-xl text-xs text-[#34d399] font-medium flex items-center justify-between animate-fade-in">
           <span>{toastMensaje}</span>
-          <button onClick={() => setToastMensaje(null)} className="text-xs text-[#34d399] hover:underline">
+          <button onClick={() => setToastMensaje(null)} className="text-xs text-[#34d399] hover:underline" aria-label="Cerrar notificación">
             ✕
           </button>
         </div>
@@ -102,7 +157,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
           onClick={() => setModalMarcajeAbierto(true)}
           className="px-3.5 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white"
         >
-          ⏱️ Registrar Marcaje Manual [DEMO]
+          ⏱️ Registrar Marcaje en Terminal [DEMO]
         </button>
       </div>
 
@@ -190,15 +245,23 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
         )}
       </div>
 
-      {/* Modal de Marcaje Manual */}
+      {/* Modal de Marcaje Manual con Accesibilidad */}
       {modalMarcajeAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-marcaje-titulo"
+        >
           <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#f8fafc]">Marcaje de Asistencia [DEMO]</h3>
+              <h3 id="modal-marcaje-titulo" className="text-base font-bold text-[#f8fafc]">
+                Marcaje de Asistencia [DEMO]
+              </h3>
               <button
                 onClick={() => setModalMarcajeAbierto(false)}
                 className="text-[#94a3b8] hover:text-[#f8fafc]"
+                aria-label="Cerrar modal"
               >
                 ✕
               </button>
@@ -214,14 +277,14 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                 >
                   {empleados.map((e) => (
                     <option key={e.id} value={e.id}>
-                      {e.nombre} {e.apellidos}
+                      {e.nombre} {e.apellidos} ({e.departamento})
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="text-[#94a3b8] block mb-1">Tipo de Evento:</label>
+                <label className="text-[#94a3b8] block mb-1">Tipo de Marcación:</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -248,20 +311,38 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="text-[#94a3b8] block mb-1">Hora Actual:</label>
-                <input
-                  type="time"
-                  defaultValue="07:00"
-                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] font-mono"
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[#94a3b8] block mb-1">Hora:</label>
+                  <input
+                    type="time"
+                    value={horaMarcaje}
+                    onChange={(e) => setHoraMarcaje(e.target.value)}
+                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[#94a3b8] block mb-1">Método:</label>
+                  <select
+                    value={metodoSeleccionado}
+                    onChange={(e) => setMetodoSeleccionado(e.target.value as MetodoMarcaje)}
+                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                  >
+                    <option value="PIN_TERMINAL">Terminal PIN</option>
+                    <option value="REGISTRO_SUPERVISOR">Supervisor</option>
+                    <option value="PLANILLA_DIGITAL">Planilla Digital</option>
+                    <option value="HORARIO_ASIGNADO">Horario Asignado</option>
+                  </select>
+                </div>
               </div>
 
               <div>
                 <label className="text-[#94a3b8] block mb-1">Observación / Justificación:</label>
                 <input
                   type="text"
-                  placeholder="Opcional..."
+                  value={observacionMarcaje}
+                  onChange={(e) => setObservacionMarcaje(e.target.value)}
+                  placeholder="Ej. Tráfico matutino, soporte especial..."
                   className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
                 />
               </div>
@@ -275,13 +356,10 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                 Cancelar
               </button>
               <button
-                onClick={() => {
-                  setModalMarcajeAbierto(false);
-                  mostrarNotificacion(`Marcaje de ${tipoMarcaje.toLowerCase()} registrado correctamente [DEMO]`);
-                }}
+                onClick={handleRegistrarMarcaje}
                 className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs"
               >
-                Registrar Marcaje
+                Confirmar Registro
               </button>
             </div>
           </div>

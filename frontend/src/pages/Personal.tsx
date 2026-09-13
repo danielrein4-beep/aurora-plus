@@ -7,7 +7,14 @@ import {
   MOCK_METAS_PERSONAL,
   MOCK_PERIODOS_NOMINA,
 } from '../components/personal/mockPersonalData';
-import { SeccionPersonal, Empleado } from '../components/personal/types';
+import {
+  SeccionPersonal,
+  Empleado,
+  AsignacionTurno,
+  RegistroAsistencia,
+  MetaPersonal,
+  PeriodoNomina,
+} from '../components/personal/types';
 import { ResumenEquipo } from '../components/personal/ResumenEquipo';
 import { ListaEmpleados } from '../components/personal/ListaEmpleados';
 import { TurnosPersonal } from '../components/personal/TurnosPersonal';
@@ -18,7 +25,20 @@ import { PerfilEmpleado } from '../components/personal/PerfilEmpleado';
 
 export const PersonalPage: React.FC = () => {
   const [seccionActiva, setSeccionActiva] = useState<SeccionPersonal>('resumen');
-  const [ocultarSueldo, setOcultarSueldo] = useState(false);
+  
+  // Regla estricta: Salarios OCULTOS por defecto en la interfaz
+  const [ocultarSueldo, setOcultarSueldo] = useState(true);
+  
+  // Nómina desactivada por defecto
+  const [nominaHabilitada, setNominaHabilitada] = useState(false);
+
+  // Estado unificado en sesión para que las acciones conserven sus cambios en tiempo real
+  const [empleados] = useState<Empleado[]>(MOCK_EMPLEADOS);
+  const [turnosAsignados, setTurnosAsignados] = useState<AsignacionTurno[]>(MOCK_ASIGNACIONES_TURNOS);
+  const [asistencias, setAsistencias] = useState<RegistroAsistencia[]>(MOCK_REGISTROS_ASISTENCIA);
+  const [metas, setMetas] = useState<MetaPersonal[]>(MOCK_METAS_PERSONAL);
+  const [periodosNomina, setPeriodosNomina] = useState<PeriodoNomina[]>(MOCK_PERIODOS_NOMINA);
+
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<Empleado | null>(null);
 
   const pestanas: { id: SeccionPersonal; etiqueta: string; icono: string }[] = [
@@ -30,7 +50,7 @@ export const PersonalPage: React.FC = () => {
     { id: 'nomina', etiqueta: 'Nómina', icono: '💵' },
   ];
 
-  const todosRecibos = MOCK_PERIODOS_NOMINA.flatMap((p) => p.recibos);
+  const todosRecibos = periodosNomina.flatMap((p) => p.recibos);
 
   return (
     <div className="min-h-screen bg-[#0b111e] text-[#f8fafc] font-sans antialiased selection:bg-[#35d7c3] selection:text-black">
@@ -49,13 +69,13 @@ export const PersonalPage: React.FC = () => {
               </span>
             </div>
             <p className="text-xs sm:text-sm text-[#94a3b8]">
-              Administración de colaboradores clínicos, turnos asistenciales, marcaje de asistencia y cálculo interno de nómina.
+              Administración unificada de colaboradores, jornadas y nómina interna para Salud, Gastronomía y Agropecuaria.
             </p>
           </div>
 
           {/* Acciones Rápidas de Cabecera */}
           <div className="flex items-center gap-2 self-start md:self-auto">
-            {/* Máscara de Privacidad Salarial Global */}
+            {/* Modo Privacidad Salarial (Protegido por defecto) */}
             <button
               onClick={() => setOcultarSueldo(!ocultarSueldo)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#35d7c3] ${
@@ -65,7 +85,7 @@ export const PersonalPage: React.FC = () => {
               }`}
               title="Alternar privacidad de remuneraciones"
             >
-              <span>{ocultarSueldo ? '👁️ Sueldos Ocultos (RBAC)' : '🔓 Sueldos Visibles'}</span>
+              <span>{ocultarSueldo ? '👁️ Sueldos Ocultos' : '🔓 Sueldos Visibles'}</span>
             </button>
           </div>
         </div>
@@ -100,18 +120,19 @@ export const PersonalPage: React.FC = () => {
         <main className="space-y-6">
           {seccionActiva === 'resumen' && (
             <ResumenEquipo
-              empleados={MOCK_EMPLEADOS}
-              periodoActual={MOCK_PERIODOS_NOMINA[0]}
-              asistenciasHoy={MOCK_REGISTROS_ASISTENCIA}
-              turnosHoy={MOCK_ASIGNACIONES_TURNOS}
+              empleados={empleados}
+              periodoActual={periodosNomina[0]}
+              asistenciasHoy={asistencias}
+              turnosHoy={turnosAsignados}
               onNavegarSeccion={(sec) => setSeccionActiva(sec)}
               ocultarSueldo={ocultarSueldo}
+              nominaHabilitada={nominaHabilitada}
             />
           )}
 
           {seccionActiva === 'empleados' && (
             <ListaEmpleados
-              empleados={MOCK_EMPLEADOS}
+              empleados={empleados}
               onSeleccionarEmpleado={(emp) => setEmpleadoSeleccionado(emp)}
               ocultarSueldo={ocultarSueldo}
               onAlternarPrivacidadSueldo={() => setOcultarSueldo(!ocultarSueldo)}
@@ -121,36 +142,45 @@ export const PersonalPage: React.FC = () => {
           {seccionActiva === 'turnos' && (
             <TurnosPersonal
               turnosHorarios={MOCK_TURNOS_HORARIOS}
-              asignaciones={MOCK_ASIGNACIONES_TURNOS}
-              empleados={MOCK_EMPLEADOS}
+              asignaciones={turnosAsignados}
+              empleados={empleados}
+              onAgregarAsignacion={(nueva) => setTurnosAsignados([nueva, ...turnosAsignados])}
             />
           )}
 
           {seccionActiva === 'asistencia' && (
             <AsistenciaPersonal
-              asistencias={MOCK_REGISTROS_ASISTENCIA}
-              empleados={MOCK_EMPLEADOS}
+              asistencias={asistencias}
+              empleados={empleados}
+              onAgregarAsistencia={(nueva) => setAsistencias([nueva, ...asistencias])}
             />
           )}
 
           {seccionActiva === 'metas' && (
-            <MetasPersonal metas={MOCK_METAS_PERSONAL} />
+            <MetasPersonal
+              metas={metas}
+              onAgregarMeta={(nueva) => setMetas([nueva, ...metas])}
+            />
           )}
 
           {seccionActiva === 'nomina' && (
             <NominaPersonal
-              periodos={MOCK_PERIODOS_NOMINA}
+              periodos={periodosNomina}
               ocultarSueldo={ocultarSueldo}
+              onActualizarPeriodos={(actualizados) => {
+                setPeriodosNomina(actualizados);
+                setNominaHabilitada(true);
+              }}
             />
           )}
         </main>
 
-        {/* Modal de Ficha de Empleado (cuando se selecciona uno) */}
+        {/* Modal de Ficha de Empleado */}
         {empleadoSeleccionado && (
           <PerfilEmpleado
             empleado={empleadoSeleccionado}
-            asistencias={MOCK_REGISTROS_ASISTENCIA}
-            metas={MOCK_METAS_PERSONAL}
+            asistencias={asistencias}
+            metas={metas}
             recibosHistoricos={todosRecibos}
             onCerrar={() => setEmpleadoSeleccionado(null)}
             ocultarSueldo={ocultarSueldo}

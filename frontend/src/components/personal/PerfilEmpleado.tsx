@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Empleado, RegistroAsistencia, MetaPersonal, ReciboNominaEmpleado } from './types';
+import React, { useState, useEffect } from 'react';
+import { Empleado, RegistroAsistencia, MetaPersonal, ReciboNominaEmpleado, formatearMoneda } from './types';
 import { DetalleCalculoNomina } from './DetalleCalculoNomina';
 
 interface PerfilEmpleadoProps {
@@ -21,6 +21,17 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
 }) => {
   const [pestanaActiva, setPestanaActiva] = useState<'info' | 'asistencia' | 'metas' | 'recibos'>('info');
 
+  // Accesibilidad: Cerrar con tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCerrar();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onCerrar]);
+
   const asistenciasEmpleado = asistencias.filter((a) => a.empleadoId === empleado.id);
   const metasEmpleado = metas.filter(
     (m) =>
@@ -31,7 +42,12 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
   const recibosEmpleado = recibosHistoricos.filter((r) => r.empleadoId === empleado.id);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="perfil-titulo"
+    >
       <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden my-auto">
         {/* Cabecera del Perfil */}
         <div className="p-4 sm:p-6 bg-[#0f172a] border-b border-[#1e2d48] flex items-start justify-between gap-4">
@@ -42,7 +58,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-bold text-[#f8fafc]">
+                <h3 id="perfil-titulo" className="text-base sm:text-lg font-bold text-[#f8fafc]">
                   {empleado.nombre} {empleado.apellidos}
                 </h3>
                 <span className="text-xs px-2 py-0.5 rounded bg-[#35d7c3]/15 text-[#35d7c3] font-mono">
@@ -58,7 +74,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
           <button
             onClick={onCerrar}
             className="p-1.5 rounded-lg text-[#94a3b8] hover:text-[#f8fafc] hover:bg-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
-            aria-label="Cerrar ficha de empleado"
+            aria-label="Cerrar ficha de colaborador"
           >
             ✕
           </button>
@@ -145,7 +161,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-[#0f172a] rounded-xl border border-[#1e293b]">
                   <div>
                     <span className="text-xs text-[#64748b] block">Tipo de Contrato</span>
-                    <span className="text-[#cbd5e1] font-medium">{empleado.tipoContrato.replace('_', ' ')}</span>
+                    <span className="text-[#cbd5e1] font-medium">{empleado.tipoContrato.replace(/_/g, ' ')}</span>
                   </div>
                   <div>
                     <span className="text-xs text-[#64748b] block">Modalidad de Pago</span>
@@ -157,19 +173,19 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                   </div>
                   <div>
                     <span className="text-xs text-[#64748b] block">Sueldo Base Referencial [DEMO]</span>
-                    <span className="font-mono text-[#35d7c3] font-bold text-base">
+                    <span className="font-mono text-[#35d7c3] font-bold text-sm sm:text-base">
                       {ocultarSueldo
                         ? '••••••'
-                        : `$${empleado.salarioBaseReferencial.toFixed(2)} ${empleado.moneda} / mes`}
+                        : `${formatearMoneda(empleado.salarioBaseReferencial, empleado.moneda)} / mes`}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs text-[#64748b] block">Entidad Bancaria [DEMO]</span>
-                    <span className="text-[#cbd5e1]">{empleado.bancoReferencial || 'No configurado'}</span>
+                    <span className="text-[#cbd5e1]">{ocultarSueldo ? '••••••' : (empleado.bancoReferencial || 'No configurado')}</span>
                   </div>
                   <div>
                     <span className="text-xs text-[#64748b] block">Cuenta / Referencia</span>
-                    <span className="font-mono text-[#cbd5e1]">{empleado.cuentaReferencial || '••••'}</span>
+                    <span className="font-mono text-[#cbd5e1]">{ocultarSueldo ? '••••••' : (empleado.cuentaReferencial || '••••')}</span>
                   </div>
                 </div>
               </div>
