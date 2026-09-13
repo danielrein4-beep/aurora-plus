@@ -7,6 +7,7 @@ import SpecularButton from "../components/SpecularButton";
 import ScrollReveal from "../components/ScrollReveal";
 import AccordionGallery from "../components/AccordionGallery";
 import CursorGrid from "../components/CursorGrid";
+import GlareHover from "../components/GlareHover";
 import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware, IconMining,
@@ -428,15 +429,27 @@ export default function Home() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {INDUSTRIES.map((ind) => (
-            <div key={ind.name}
+            <GlareHover
+              key={ind.name}
+              width="100%"
+              height="100%"
+              background="transparent"
+              borderRadius="1rem"
+              borderColor="transparent"
+              glareColor="#35d7c3"
+              glareOpacity={0.3}
+              glareAngle={-45}
+              glareSize={250}
+              transitionDuration={650}
               onClick={() => navigate("/industrias")}
-              className="hover-card apple-glass rounded-2xl p-5 cursor-pointer card-shadow">
+              className="hover-card apple-glass p-5 cursor-pointer card-shadow"
+            >
               <div className="w-10 h-10 rounded-xl bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8 flex items-center justify-center mb-3">
                 <ind.Icon size={20} />
               </div>
               <h3 className="font-['Outfit'] font-semibold text-slate-900 dark:text-white text-base mb-1.5">{ind.name}</h3>
               <p className="text-slate-500 dark:text-white/40 text-xs leading-relaxed">{ind.desc}</p>
-            </div>
+            </GlareHover>
           ))}
         </div>
         <div className="text-center mt-8">
