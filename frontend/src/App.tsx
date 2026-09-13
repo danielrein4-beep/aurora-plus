@@ -14,6 +14,7 @@ import ResetearClave from "./pages/ResetearClave";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import MediclinicApp from "./components/MediclinicApp";
+import VeterinariaApp from "./components/VeterinariaApp";
 import RestauranteApp from "./components/RestauranteApp";
 import RetailApp from "./components/RetailApp";
 import ComercioApp from "./components/ComercioApp";
@@ -29,6 +30,11 @@ function AnimatedRoute({ children }: { children: React.ReactNode }) {
 function MediclinicPage() {
   const navigate = useNavigate();
   return <MediclinicApp onSalir={() => navigate("/dashboard")} />;
+}
+
+function VeterinariaPage() {
+  const navigate = useNavigate();
+  return <VeterinariaApp onSalir={() => navigate("/dashboard")} />;
 }
 
 function RestaurantePage() {
@@ -86,6 +92,7 @@ export default function App() {
             {/* Protected — requiere sesión activa */}
             <Route path="/dashboard"  element={<ProtectedRoute><AnimatedRoute><Dashboard /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/mediclinic" element={<ProtectedRoute><AnimatedRoute><MediclinicPage /></AnimatedRoute></ProtectedRoute>} />
+            <Route path="/veterinaria" element={<ProtectedRoute><AnimatedRoute><VeterinariaPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/restaurante" element={<ProtectedRoute><AnimatedRoute><RestaurantePage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/retail" element={<ProtectedRoute><AnimatedRoute><RetailPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/comercio"   element={<ProtectedRoute><AnimatedRoute><ComercioPage /></AnimatedRoute></ProtectedRoute>} />

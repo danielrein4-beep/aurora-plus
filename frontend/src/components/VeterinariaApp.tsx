@@ -6,7 +6,7 @@ import {
   IconStethoscope, IconUsers, IconFileText, IconPrescription, IconHourglass, IconCalendar,
   IconCard, IconCustomize, IconSearch, IconUser, IconCheck, IconTrash, IconRefresh,
   IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconUnlock, IconWarning, IconClose, IconBank,
-  IconWhatsApp, IconMail, IconChart
+  IconWhatsApp, IconMail, IconChart, IconVet
 } from "../Icons";
 import ThemeToggle from "./ThemeToggle";
 import CanalEndemico from "./CanalEndemico";
@@ -215,10 +215,10 @@ function SelectorPerfilesNetflix({
           </div>
           <div>
             <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white tracking-tight">
-              Mediclinic <span className="text-teal-600 dark:text-[#00FFC2]">Pro</span>
+              Aurora <span className="text-teal-600 dark:text-[#00FFC2]">Vet</span>
             </div>
             <div className="text-[10px] text-slate-500 dark:text-white/50 uppercase font-mono tracking-widest">
-              {configPerfil.clinicaNombre || "Mi Consultorio Médico"}
+              {configPerfil.clinicaNombre || "Mi Veterinaria"}
             </div>
           </div>
         </div>
@@ -338,7 +338,7 @@ function SelectorPerfilesNetflix({
 
       {/* Footer */}
       <div className="w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 dark:text-slate-400 z-10 pt-4 border-t border-slate-200 dark:border-white/5 gap-2">
-        <div>Mediclinic Pro v2.4 · Sistema de Control Médico Multiusuario</div>
+        <div>Aurora Vet v2.4 · Sistema de Control Médico Multiusuario</div>
         <div className="text-[11px] font-mono">El perfil del Doctor está protegido con encriptación y PIN</div>
       </div>
     </div>
@@ -564,7 +564,7 @@ function ModalConfigurarClavePrimeraVez({
   );
 }
 
-export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
+export default function VeterinariaApp({ onSalir }: { onSalir: () => void }) {
   const [inboxLabPendientes, setInboxLabPendientes] = useState(0);
 
   const cargarContadorLab = () => {
@@ -874,7 +874,10 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1.5 bg-slate-50/50 dark:bg-black/10">
         <div className="px-2 pb-3 mb-2 border-b border-slate-300/60 dark:border-white/10">
           <div className="flex items-center justify-between">
-            <div className="font-['Outfit'] font-black text-lg text-aurora">Mediclinic Pro</div>
+            <div className="font-['Outfit'] font-black text-lg text-aurora flex items-center gap-2">
+              <IconVet size={20} />
+              Aurora Vet
+            </div>
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
               rolActivo === "MEDICO"
                 ? "bg-teal-500/20 text-teal-700 dark:text-teal-300"
@@ -948,7 +951,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           <button
             onClick={cerrarSesionPerfil}
             className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-teal-600 dark:text-teal-400 hover:bg-teal-500/10 flex items-center gap-2 cursor-pointer transition-colors"
-            title="Volver a la selección de perfiles de Mediclinic"
+            title="Volver a la selección de perfiles de Aurora Vet"
           >
             <IconLock size={14} />
             <span>Cambiar Perfil</span>
@@ -3058,7 +3061,7 @@ function HistoriasClinicas({
         satO2: "99%",
       },
       motivoConsulta: c.motivoConsulta || "Consulta Médica",
-      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      evolucionClinica: "Consulta registrada en el sistema médico Aurora Vet.",
       diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
       planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
       proximaCita: undefined,
@@ -3106,7 +3109,7 @@ function HistoriasClinicas({
         satO2: "99%",
       },
       motivoConsulta: c.motivoConsulta || "Consulta Médica",
-      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      evolucionClinica: "Consulta registrada en el sistema médico Aurora Vet.",
       diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
       planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
       proximaCita: undefined,
@@ -3157,7 +3160,7 @@ function HistoriasClinicas({
         satO2: "99%",
       },
       motivoConsulta: c.motivoConsulta || "Consulta Médica",
-      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      evolucionClinica: "Consulta registrada en el sistema médico Aurora Vet.",
       diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
       planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
       proximaCita: undefined,

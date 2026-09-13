@@ -301,7 +301,9 @@ export default function Onboarding() {
     const rutaDestino =
       selectedIndustry === "restaurante"
         ? "/restaurante"
-        : selectedIndustry === "clinica" || selectedIndustry === "farmacia" || selectedIndustry === "veterinaria"
+        : selectedIndustry === "veterinaria"
+        ? "/veterinaria"
+        : selectedIndustry === "clinica" || selectedIndustry === "farmacia"
         ? "/mediclinic"
         : "/dashboard";
 
@@ -314,6 +316,7 @@ export default function Onboarding() {
         await completarRegistro({
           nombreEmpresa: empresaNombre.trim() || nombrePorDefecto,
           moduloPrincipal: INDUSTRIA_A_MODULO[selectedIndustry] || "horeca",
+          industria: selectedIndustry,
           emailContacto: pendingSignup.email,
           username: pendingSignup.email,
           password: pendingSignup.password,

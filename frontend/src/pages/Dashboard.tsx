@@ -275,14 +275,16 @@ export default function Dashboard() {
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
   const esComercioReal = (userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "farmacia" || userIndustry === "retail") && !!user?.tenantId;
   const esGanaderiaReal = (userIndustry === "finca" || userIndustry === "ganaderia") && !!user?.tenantId;
-  const rutaVertical = 
-    userIndustry === "restaurante" 
-      ? "/restaurante" 
+  const rutaVertical =
+    userIndustry === "restaurante"
+      ? "/restaurante"
       : (userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "farmacia" || userIndustry === "retail")
         ? "/comercio"
         : (userIndustry === "finca" || userIndustry === "ganaderia")
           ? "/ganaderia"
-          : "/mediclinic";
+          : userIndustry === "veterinaria"
+            ? "/veterinaria"
+            : "/mediclinic";
   const esVerticalReal = esClinicaReal || esRestauranteReal || esComercioReal || esGanaderiaReal;
 
   useEffect(() => {
@@ -553,7 +555,7 @@ export default function Dashboard() {
         listarPacientes(tid),
         listarCitasDelDia(tid, hoy),
         listarCobrosDelDia(`${hoy}T00:00:00`, `${hoy}T23:59:59`),
-        listarSalaEspera(),
+        listarSalaEspera(tid),
       ]).then(([resPac, resCit, resCob, resSal]) => {
         const pacientes = resPac.status === "fulfilled" && Array.isArray(resPac.value) ? resPac.value : [];
         setPacientesReales(pacientes);
@@ -600,7 +602,7 @@ export default function Dashboard() {
         listarPacientes(tid),
         listarCitasDelDia(tid, hoy),
         listarCobrosDelDia(`${hoy}T00:00:00`, `${hoy}T23:59:59`),
-        listarSalaEspera(),
+        listarSalaEspera(tid),
       ]).then(([resPac, resCit, resCob, resSal]) => {
         const pacientes = resPac.status === "fulfilled" && Array.isArray(resPac.value) ? resPac.value : [];
         setPacientesReales(pacientes);

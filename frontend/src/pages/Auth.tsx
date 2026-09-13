@@ -29,7 +29,7 @@ const RUBROS_REGISTRO: RubroNegocioItem[] = [
   { id: "ferreteria", label: "Ferretería & Materiales", sub: "POS, inventario y retail", Icon: IconHardware, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Ferretería" },
   { id: "clinica", label: "Clínica & Consultorios", sub: "Historias clínicas y citas", Icon: IconClinic, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Consultorio" },
   { id: "retail", label: "Comercio & Tienda Retail", sub: "Venta mostrador y stock", Icon: IconRetail, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Tienda" },
-  { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "Fichas, vacunas y petshop", Icon: IconVet, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Veterinaria" },
+  { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "Fichas, vacunas y petshop", Icon: IconVet, modulo: "salud", ruta: "/veterinaria", nombreDefault: "Mi Veterinaria" },
   { id: "finca", label: "Finca & Ganadería", sub: "Potreros, vacunas y animales", Icon: IconFarm, modulo: "ganaderia", ruta: "/dashboard", nombreDefault: "Mi Finca" },
   { id: "otro", label: "Otro Rubro Comercial", sub: "ERP y suite administrativa", Icon: IconBank, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Empresa" },
 ];
@@ -97,6 +97,7 @@ export default function Auth() {
         await completarRegistro({
           nombreEmpresa: form.empresa.trim() || rubroActual.nombreDefault,
           moduloPrincipal: rubroActual.modulo,
+          industria: rubroActual.id,
           emailContacto: form.email,
           username: form.email,
           password: form.password,
@@ -123,6 +124,7 @@ export default function Auth() {
             if (u.industry === "restaurante") rutaDestino = "/restaurante";
             else if (u.industry === "ferreteria" || u.industry === "farmacia" || u.industry === "retail") rutaDestino = "/comercio";
             else if (u.industry === "clinica") rutaDestino = "/mediclinic";
+            else if (u.industry === "veterinaria") rutaDestino = "/veterinaria";
           }
         } catch {}
 
