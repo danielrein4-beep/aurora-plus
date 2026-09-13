@@ -8,6 +8,13 @@
   align-items: baseline;
   row-gap: 0.15em;
   column-gap: 0.28em;
+  transform: scale(1);
+  transform-origin: left center;
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.focus-container.settled {
+  transform: scale(1.05);
 }
 
 .focus-word {
