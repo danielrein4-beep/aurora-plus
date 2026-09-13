@@ -250,7 +250,7 @@ export default function Home() {
           <motion.p variants={heroItem} className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · seis rubros · tres monedas</motion.p>
           <motion.h1 variants={heroItem} className="mt-5 max-w-3xl font-['IBM_Plex_Sans'] text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-[-0.055em] text-[#f8f6ef]">
             <TrueFocus
-              sentence="Del lápiz y el papel a la automatización"
+              sentence="Automatiza, simplifica, crece..."
               manualMode={false}
               blurAmount={6}
               borderColor="#35d7c3"
