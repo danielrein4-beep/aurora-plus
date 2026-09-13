@@ -12,6 +12,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useAuth } from "../context/AuthContext";
+import AlertasCampanita from "./AlertasCampanita";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
   dividirCuenta, cerrarComandaMixto, anularComanda, listarEscandallos, crearEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo,
@@ -402,6 +403,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
               <div className="font-bold text-slate-900 dark:text-white">{config.nombreLocal}</div>
             </div>
             <TasaBadge tenantId={tenantId} tasaBcv={tasaBcv} tasaCop={tasaCop} onActualizadaBcv={setTasaBcv} onActualizadaCop={setTasaCop} />
+            <AlertasCampanita tenantId={tenantId} />
             <button onClick={recargarTodo} className="p-2 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
               <IconRefresh size={16} />
             </button>

@@ -5,6 +5,7 @@ import {
   IconCard, IconTrash, IconRefresh, IconCheck, IconCheckCircle, IconClose, IconBank, IconDownload,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
+import AlertasCampanita from "./AlertasCampanita";
 import {
   type Articulo, listarArticulos, crearArticulo, editarArticulo, eliminarArticulo, entradaArticulo,
   type PresentacionArticulo, listarPresentaciones, crearPresentacion,
@@ -64,9 +65,12 @@ export default function RetailApp({ onSalir }: { onSalir: () => void }) {
   return (
     <div className="h-screen w-screen flex bg-slate-100 dark:bg-[#0a0e14] text-slate-900 dark:text-white overflow-hidden">
       <aside className="w-56 flex-shrink-0 border-r border-slate-300/50 dark:border-white/10 flex flex-col p-3 gap-1">
-        <div className="flex items-center gap-2 px-2 py-3 mb-2">
-          <info.Icon size={22} />
-          <span className="font-['Outfit'] font-bold text-sm leading-tight">{info.nombre}</span>
+        <div className="flex items-center justify-between gap-2 px-2 py-3 mb-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <info.Icon size={22} />
+            <span className="font-['Outfit'] font-bold text-sm leading-tight truncate">{info.nombre}</span>
+          </div>
+          <AlertasCampanita tenantId={tenantId} />
         </div>
         {NAV.map((n) => (
           <button
