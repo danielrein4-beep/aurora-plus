@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NonFiscalDocument, NonFiscalDocType } from './types';
+import { NonFiscalDocument, NonFiscalDocType, SupportedCurrency } from './types';
 import { QualityBadge } from './QualityBadge';
 
 interface DocumentosFinancierosProps {
@@ -9,6 +9,7 @@ interface DocumentosFinancierosProps {
 export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ documents }) => {
   const [selectedType, setSelectedType] = useState<'ALL' | NonFiscalDocType>('ALL');
   const [selectedVertical, setSelectedVertical] = useState<string>('ALL');
+  const [selectedCurrency, setSelectedCurrency] = useState<'ALL' | SupportedCurrency>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   const verticals = Array.from(new Set(documents.map(d => d.verticalOrigin)));
@@ -16,14 +17,23 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
   const filtered = documents.filter((doc) => {
     const matchesType = selectedType === 'ALL' || doc.docType === selectedType;
     const matchesVertical = selectedVertical === 'ALL' || doc.verticalOrigin === selectedVertical;
-    const matchesSearch = doc.internalReference.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesCurrency = selectedCurrency === 'ALL' || doc.currency === selectedCurrency;
+    const matchesSearch = doc.referenciaInterna.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           doc.clientOrBeneficiary.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           doc.itemsSummary.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesType && matchesVertical && matchesSearch;
+    return matchesType && matchesVertical && matchesCurrency && matchesSearch;
   });
 
-  const formatUsd = (val: number) => `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const formatVes = (val: number) => `Bs. ${val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatCurrency = (amount: number, currency: SupportedCurrency) => {
+    switch (currency) {
+      case 'USD':
+        return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      case 'VES':
+        return `Bs. ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      case 'COP':
+        return `$${amount.toLocaleString('es-CO', { maximumFractionDigits: 0 })} COP`;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -38,7 +48,7 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
               </h3>
             </div>
             <p className="text-xs text-white/65 mt-1 leading-relaxed">
-              Consolidación centralizada de notas de entrega y comprobantes comerciales generados en cada vertical operativa (Restaurante, Retail, etc.). Esta vista permite auditar la entrega de productos y el cobro operativo de tu empresa.
+              Consolidación centralizada de notas de entrega y documentos de venta no fiscales generados en cada vertical de tu empresa. Cada documento cuenta con su referencia interna exclusiva.
             </p>
           </div>
 
@@ -49,8 +59,8 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
           </div>
         </div>
 
-        {/* Filtros de Tipo y Origen Vertical */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 mt-4 pt-4 border-t border-white/10">
+        {/* Filtros de Tipo, Origen Vertical y Moneda */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mt-4 pt-4 border-t border-white/10">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1 p-1 bg-[#071a2e] rounded-xl border border-white/10">
               {(['ALL', 'NOTA_ENTREGA', 'DOCUMENTO_VENTA_NO_FISCAL'] as const).map((type) => (
@@ -78,14 +88,30 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
                 <option key={v} value={v}>{v}</option>
               ))}
             </select>
+
+            <div className="flex items-center gap-1 p-1 bg-[#071a2e] rounded-xl border border-white/10">
+              {(['ALL', 'USD', 'VES', 'COP'] as const).map((curr) => (
+                <button
+                  key={curr}
+                  onClick={() => setSelectedCurrency(curr)}
+                  className={`px-2 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    selectedCurrency === curr
+                      ? 'bg-[#00FFC2]/20 text-[#00FFC2] border border-[#00FFC2]/30'
+                      : 'text-white/50 hover:text-white'
+                  }`}
+                >
+                  {curr === 'ALL' ? 'Monedas' : curr}
+                </button>
+              ))}
+            </div>
           </div>
 
           <input
             type="text"
-            placeholder="Buscar por referencia, cliente o detalle..."
+            placeholder="Buscar por referencia interna o cliente..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full md:w-64 bg-[#071a2e] border border-white/10 focus:border-[#00FFC2]/50 text-white placeholder-white/35 text-xs rounded-xl px-3.5 py-2 outline-none transition-all"
+            className="w-full lg:w-64 bg-[#071a2e] border border-white/10 focus:border-[#00FFC2]/50 text-white placeholder-white/35 text-xs rounded-xl px-3.5 py-2 outline-none transition-all"
           />
         </div>
       </div>
@@ -95,8 +121,8 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
         <div className="hidden lg:grid grid-cols-12 gap-4 px-5 py-3 text-[11px] font-semibold text-white/50 border-b border-white/10 uppercase tracking-wider bg-[#071a2e]/50">
           <div className="col-span-3">Referencia Interna / Tipo</div>
           <div className="col-span-3">Vertical de Origen / Receptor</div>
-          <div className="col-span-3">Contenido y Método</div>
-          <div className="col-span-2 text-right">Monto (USD / VES)</div>
+          <div className="col-span-3">Detalle Operativo</div>
+          <div className="col-span-2 text-right">Monto Operativo</div>
           <div className="col-span-1 text-center">Estado</div>
         </div>
 
@@ -114,11 +140,11 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
                   key={doc.id}
                   className="p-4 lg:px-5 lg:py-3.5 hover:bg-white/[0.03] transition-all flex flex-col lg:grid lg:grid-cols-12 lg:gap-4 lg:items-center gap-2 group"
                 >
-                  {/* Referencia y Tipo */}
+                  {/* Referencia Interna y Etiqueta No Fiscal */}
                   <div className="lg:col-span-3">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-bold text-[#00FFC2]">
-                        {doc.internalReference}
+                        {doc.referenciaInterna}
                       </span>
                       <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">
                         {doc.nonFiscalNotice}
@@ -159,11 +185,11 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
                     <span className="lg:hidden text-xs text-white/40">Monto:</span>
                     <div>
                       <div className="text-sm font-bold text-white">
-                        {formatUsd(doc.amountUsd)}
+                        {formatCurrency(doc.amount, doc.currency)}
                       </div>
-                      <div className="text-[11px] font-mono text-[#00FFC2]/80">
-                        {formatVes(doc.amountVes)}
-                      </div>
+                      <span className="text-[10px] text-white/50 font-mono">
+                        {doc.currency}
+                      </span>
                     </div>
                   </div>
 
