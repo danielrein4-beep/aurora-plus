@@ -76,6 +76,15 @@ public class MotorNominaService {
         return periodo;
     }
 
+    /**
+     * docs/personal-nomina-contract.md §3 — bonos, comisiones y demás conceptos ASIGNACION
+     * (hallazgo de la revisión de Codex: antes se saltaban por completo con un `continue`, solo
+     * se pagaba el sueldo base calculado aparte). Se procesan en DOS pasadas: primero TODAS las
+     * ASIGNACION (para que el bruto final quede completo sin importar el orden en que estén
+     * guardados los conceptos), y solo después DEDUCCION/APORTE_PATRONAL — así una deducción
+     * "% del sueldo" siempre calcula sobre el bruto YA con bonos/comisiones incluidos, nunca
+     * sobre un total parcial que depende del orden de iteración.
+     */
     private void calcularParaEmpleado(Long tenantId, PeriodoNomina periodo, Empleado empleado, AsignacionEmpleado asignacion, String monedaBase) {
         List<DetalleNomina> detalles = new ArrayList<>();
 
@@ -83,25 +92,21 @@ public class MotorNominaService {
         BigDecimal totalDeducciones = BigDecimal.ZERO;
         BigDecimal totalAportes = BigDecimal.ZERO;
 
-        for (ConceptoNomina concepto : conceptoRepository.findByTenantIdAndActivoTrue(tenantId)) {
-            if (concepto.getTipo() == ConceptoNomina.Tipo.ASIGNACION) continue; // el sueldo base ya se calculó aparte
-            Optional<ReglaNominaVersionada> reglaOpt = reglaNominaService.buscarVigenteEnPorConcepto(tenantId, concepto.getId(), periodo.getFechaInicio());
-            if (reglaOpt.isEmpty()) continue; // concepto activo sin regla vigente: no se aplica, no se inventa un valor
+        List<ConceptoNomina> conceptos = conceptoRepository.findByTenantIdAndActivoTrue(tenantId);
 
-            ReglaNominaVersionada regla = reglaOpt.get();
-            BigDecimal montoConcepto = aplicarRegla(regla, totalAsignaciones);
-            if (montoConcepto.compareTo(BigDecimal.ZERO) <= 0) continue;
-
-            DetalleNomina detalle = new DetalleNomina();
-            detalle.setTenantId(tenantId);
-            detalle.setConceptoId(concepto.getId());
-            detalle.setReglaAplicadaId(regla.getId());
-            detalle.setDescripcion(concepto.getNombre());
-            detalle.setMontoTotal(montoConcepto.setScale(2, RoundingMode.HALF_UP));
-            detalle.setMoneda(periodo.getMoneda());
-            detalle.setTipo(concepto.getTipo());
+        for (ConceptoNomina concepto : conceptos) {
+            if (concepto.getTipo() != ConceptoNomina.Tipo.ASIGNACION) continue;
+            DetalleNomina detalle = calcularLineaDeConcepto(tenantId, periodo, concepto, totalAsignaciones);
+            if (detalle == null) continue;
             detalles.add(detalle);
+            totalAsignaciones = totalAsignaciones.add(detalle.getMontoTotal());
+        }
 
+        for (ConceptoNomina concepto : conceptos) {
+            if (concepto.getTipo() == ConceptoNomina.Tipo.ASIGNACION) continue;
+            DetalleNomina detalle = calcularLineaDeConcepto(tenantId, periodo, concepto, totalAsignaciones);
+            if (detalle == null) continue;
+            detalles.add(detalle);
             if (concepto.getTipo() == ConceptoNomina.Tipo.DEDUCCION) {
                 totalDeducciones = totalDeducciones.add(detalle.getMontoTotal());
             } else {
@@ -139,12 +144,40 @@ public class MotorNominaService {
         }
     }
 
+    /** Concepto activo sin regla vigente => null (no se aplica, no se inventa un valor). Con regla, SIEMPRE produce una línea o revienta — nunca cero silencioso. */
+    private DetalleNomina calcularLineaDeConcepto(Long tenantId, PeriodoNomina periodo, ConceptoNomina concepto, BigDecimal baseAsignaciones) {
+        Optional<ReglaNominaVersionada> reglaOpt = reglaNominaService.buscarVigenteEnPorConcepto(tenantId, concepto.getId(), periodo.getFechaInicio());
+        if (reglaOpt.isEmpty()) return null;
+
+        ReglaNominaVersionada regla = reglaOpt.get();
+        BigDecimal monto = aplicarRegla(regla, baseAsignaciones).setScale(2, RoundingMode.HALF_UP);
+        if (monto.compareTo(BigDecimal.ZERO) <= 0) return null;
+
+        DetalleNomina detalle = new DetalleNomina();
+        detalle.setTenantId(tenantId);
+        detalle.setConceptoId(concepto.getId());
+        detalle.setReglaAplicadaId(regla.getId());
+        detalle.setDescripcion(concepto.getNombre());
+        detalle.setMontoTotal(monto);
+        detalle.setMoneda(periodo.getMoneda());
+        detalle.setTipo(concepto.getTipo());
+        return detalle;
+    }
+
+    /**
+     * docs/personal-nomina-contract.md §3 — un tipoRegla que el motor no reconoce SIEMPRE
+     * revienta con un mensaje claro. Hallazgo de la revisión de Codex: antes el caso `default`
+     * devolvía BigDecimal.ZERO en silencio — una regla mal escrita (typo en tipoRegla, ej.
+     * "PORCENTAJE_SUELDO" en vez de "PORCENTAJE_DEL_SUELDO") se traducía en "este concepto no
+     * aporta nada" sin ningún aviso, en vez de fallar visiblemente al calcular el período.
+     */
     private BigDecimal aplicarRegla(ReglaNominaVersionada regla, BigDecimal baseAsignaciones) {
         return switch (regla.getTipoRegla()) {
             case "PORCENTAJE_DEL_SUELDO" -> baseAsignaciones.multiply(regla.getValorNumerico())
                 .divide(new BigDecimal("100"), 6, RoundingMode.HALF_UP);
             case "MONTO_FIJO" -> regla.getValorNumerico();
-            default -> BigDecimal.ZERO; // tipoRegla desconocido para el motor mínimo: no se inventa un cálculo
+            default -> throw new RuntimeException("tipoRegla desconocido para el motor de nómina: \"" + regla.getTipoRegla()
+                + "\" (regla id " + regla.getId() + ") — revise la configuración antes de calcular este período");
         };
     }
 

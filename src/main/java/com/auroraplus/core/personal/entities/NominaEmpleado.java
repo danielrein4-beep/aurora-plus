@@ -67,6 +67,13 @@ public class NominaEmpleado {
     @Column(nullable = false, length = 20)
     private Estado estado = Estado.CALCULADA;
 
+    // Bloqueo optimista: protege contra dos ajustes/reversos concurrentes sobre la MISMA nómina
+    // (ej. dos usuarios de NOMINA reversando el mismo registro a la vez) — mismo criterio que
+    // PeriodoNomina.version. Hallazgo de la revisión de Codex: no existía ninguna protección acá.
+    @Version
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private Long version = 0L;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -95,4 +102,6 @@ public class NominaEmpleado {
     public void setTasaAplicada(BigDecimal tasaAplicada) { this.tasaAplicada = tasaAplicada; }
     public Estado getEstado() { return estado; }
     public void setEstado(Estado estado) { this.estado = estado; }
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

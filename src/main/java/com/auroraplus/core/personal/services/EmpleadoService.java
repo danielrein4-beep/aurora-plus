@@ -1,9 +1,11 @@
 package com.auroraplus.core.personal.services;
 
 import com.auroraplus.core.personal.entities.AsignacionEmpleado;
+import com.auroraplus.core.personal.entities.Cargo;
 import com.auroraplus.core.personal.entities.Empleado;
 import com.auroraplus.core.personal.entities.PermisoPersonal.RolPersonal;
 import com.auroraplus.core.personal.repositories.AsignacionEmpleadoRepository;
+import com.auroraplus.core.personal.repositories.CargoRepository;
 import com.auroraplus.core.personal.repositories.EmpleadoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,9 @@ public class EmpleadoService {
     private AsignacionEmpleadoRepository asignacionEmpleadoRepository;
 
     @Autowired
+    private CargoRepository cargoRepository;
+
+    @Autowired
     private PersonalAccessService accessService;
 
     @Autowired
@@ -33,6 +38,7 @@ public class EmpleadoService {
 
     public List<Empleado> listar(Long tenantId) {
         accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_PERSONAL);
+        accessService.exigirVerDirectorioPersonal(tenantId);
         return empleadoRepository.findByTenantId(tenantId);
     }
 
@@ -64,6 +70,8 @@ public class EmpleadoService {
         accessService.exigirRol(tenantId, PUEDEN_ESCRIBIR);
         empleadoRepository.findByTenantIdAndId(tenantId, empleadoId)
             .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));
+        Cargo cargo = cargoRepository.findByTenantIdAndId(tenantId, nueva.getCargoId())
+            .orElseThrow(() -> new RuntimeException("Cargo no encontrado (o no pertenece a este tenant)"));
 
         asignacionEmpleadoRepository.findByTenantIdAndEmpleadoIdAndVigenciaHastaIsNull(tenantId, empleadoId)
             .ifPresent(actual -> {

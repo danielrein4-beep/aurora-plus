@@ -56,8 +56,15 @@ public class ReglaNominaService {
         if (nueva.getValorNumerico() == null) {
             throw new RuntimeException("valorNumerico es obligatorio");
         }
+        if (nueva.getConceptoId() != null) {
+            conceptoNominaRepository.findByTenantIdAndId(tenantId, nueva.getConceptoId())
+                .orElseThrow(() -> new RuntimeException("Concepto no encontrado (o no pertenece a este tenant)"));
+        }
 
-        reglaRepository.findByTenantIdAndTipoReglaAndVigenciaHastaIsNull(tenantId, nueva.getTipoRegla())
+        // Cierra SOLO la versión abierta de esta combinación exacta (conceptoId + tipoRegla) —
+        // ver el comentario de buscarVigenteAbiertaPorConceptoYTipo. Antes esto cerraba por
+        // tipoRegla a secas, invalidando por error reglas de OTRO concepto con el mismo tipo.
+        reglaRepository.buscarVigenteAbiertaPorConceptoYTipo(tenantId, nueva.getConceptoId(), nueva.getTipoRegla())
             .ifPresent(vigente -> {
                 vigente.setVigenciaHasta(vigenciaDesde.minusDays(1));
                 reglaRepository.save(vigente);

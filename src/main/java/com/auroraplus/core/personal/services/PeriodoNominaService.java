@@ -77,8 +77,10 @@ public class PeriodoNominaService {
         return periodo;
     }
 
+    /** Lista con MONTOS de todos los empleados de un período — solo NOMINA/AUDITOR (nunca RRHH, ver contrato §1.2). */
     public List<NominaEmpleado> listarNominasDelPeriodo(Long tenantId, Long periodoId) {
         accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirVerMontosDeNominaEnGeneral(tenantId);
         return nominaEmpleadoRepository.findByTenantIdAndPeriodoId(tenantId, periodoId);
     }
 

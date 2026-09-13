@@ -13,7 +13,19 @@ import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.Set;
 
-/** docs/personal-nomina-contract.md §4 — única vía de corrección de una NominaEmpleado ya APROBADA/PAGADA. */
+/**
+ * docs/personal-nomina-contract.md §4 — única vía de corrección de una NominaEmpleado ya
+ * APROBADA/PAGADA.
+ *
+ * Hallazgo de la revisión de Codex: la versión anterior SÍ mutaba netoAPagar del registro
+ * original al corregir — eso rompe la garantía de "congelado al calcular" (contrato §3 punto 4):
+ * un ajuste posterior no puede reescribir el número que ya se aprobó/pagó, porque entonces
+ * releer esa nómina "aprobada" ya no muestra lo que realmente se aprobó. Ahora netoAPagar NUNCA
+ * se toca — el AjusteNomina.CORRECCION es el único registro del cambio, y el "neto efectivo"
+ * (lo que de verdad se le paga al empleado) se calcula sumando netoAPagar + todas las
+ * correcciones vigentes, siempre al vuelo, nunca persistido sobre el original (ver
+ * calcularNetoEfectivo).
+ */
 @Service
 public class AjusteNominaService {
 
@@ -35,6 +47,9 @@ public class AjusteNominaService {
         if (motivo == null || motivo.isBlank()) {
             throw new RuntimeException("El motivo del ajuste es obligatorio");
         }
+        if (montoAjuste == null) {
+            throw new RuntimeException("El monto del ajuste es obligatorio");
+        }
 
         Long usuarioId = accessService.resolverUsuarioIdActual(tenantId);
         AjusteNomina ajuste = new AjusteNomina();
@@ -47,12 +62,8 @@ public class AjusteNominaService {
         ajuste.setCreadoPorUsuarioId(usuarioId);
         AjusteNomina guardado = ajusteNominaRepository.save(ajuste);
 
-        // La línea original de NominaEmpleado NO se toca — el ajuste es un registro aparte que se
-        // suma al neto ya congelado, para que la auditoría vea exactamente qué se calculó
-        // originalmente y qué se corrigió después, sin mezclar ambos en un solo número mutado.
-        nomina.setNetoAPagar(nomina.getNetoAPagar().add(montoAjuste));
-        nominaEmpleadoRepository.save(nomina);
-
+        // netoAPagar, montoEquivalenteBase y tasaAplicada de NominaEmpleado NUNCA se tocan acá —
+        // el ajuste queda como su propio registro compensatorio, inmutable, aparte.
         auditoriaService.registrar(tenantId, usuarioId, "CORREGIR", "NominaEmpleado", nominaEmpleadoId, "Ajuste de corrección: " + motivo);
         return guardado;
     }
@@ -70,8 +81,15 @@ public class AjusteNominaService {
         }
 
         Long usuarioId = accessService.resolverUsuarioIdActual(tenantId);
+
+        // Reclamo atómico del estado ANTES de insertar el AjusteNomina — mismo criterio que
+        // MotorNominaService.calcularPeriodo: el flush inmediato fuerza el chequeo de @Version
+        // ya, así que si dos usuarios reversan la MISMA nómina al mismo tiempo, el segundo
+        // recibe un conflicto de concurrencia (409) acá mismo y nunca llega a insertar un
+        // segundo registro de reverso duplicado. netoAPagar/montoEquivalenteBase/tasaAplicada
+        // tampoco se tocan — quedan como el registro histórico de lo que se calculó.
         nomina.setEstado(NominaEmpleado.Estado.REVERSADA);
-        nominaEmpleadoRepository.save(nomina);
+        nominaEmpleadoRepository.saveAndFlush(nomina);
 
         AjusteNomina ajuste = new AjusteNomina();
         ajuste.setTenantId(tenantId);
@@ -83,6 +101,11 @@ public class AjusteNominaService {
 
         auditoriaService.registrar(tenantId, usuarioId, "REVERSAR", "NominaEmpleado", nominaEmpleadoId, "Reverso: " + motivo);
         return guardado;
+    }
+
+    /** netoAPagar (congelado) + todas las correcciones ya aplicadas — nunca persistido, siempre calculado. */
+    public BigDecimal calcularNetoEfectivo(Long tenantId, NominaEmpleado nomina) {
+        return nomina.getNetoAPagar().add(ajusteNominaRepository.sumarCorrecciones(tenantId, nomina.getId()));
     }
 
     private NominaEmpleado obtenerOFallar(Long tenantId, Long nominaEmpleadoId) {

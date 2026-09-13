@@ -10,6 +10,7 @@ import com.auroraplus.core.personal.repositories.PermisoPersonalRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.EnumSet;
 import java.util.Optional;
 import java.util.Set;
 
@@ -70,16 +71,47 @@ public class PersonalAccessService {
         }
     }
 
-    /** El AUDITOR (y cualquier otro rol de solo lectura) nunca puede pasar una exigencia de escritura. */
-    public void exigirNoAuditor(Long tenantId) {
-        if (esDuenoAdmin()) return;
-        Optional<PermisoPersonal.RolPersonal> rol = obtenerRolPersonalActual(tenantId);
-        if (rol.isPresent() && rol.get() == PermisoPersonal.RolPersonal.AUDITOR) {
-            throw new AccesoPersonalDenegadoException("El rol AUDITOR es de solo lectura");
-        }
+    // RRHH/NOMINA/SUPERVISOR/AUDITOR administran o supervisan personal en general (turnos,
+    // asistencia, metas) — ninguno de estos ve MONTOS de nómina salvo NOMINA/AUDITOR, ver
+    // exigirVerNominaDe más abajo. Un usuario SIN PermisoPersonal (ni dueño) queda fuera de
+    // TODO — antes exigirNoAuditor lo dejaba pasar por error (solo bloqueaba AUDITOR
+    // explícitamente), hallazgo real de la revisión de Codex.
+    private static final Set<PermisoPersonal.RolPersonal> PUEDEN_VER_DIRECTORIO_PERSONAL =
+        EnumSet.of(PermisoPersonal.RolPersonal.RRHH, PermisoPersonal.RolPersonal.NOMINA,
+            PermisoPersonal.RolPersonal.SUPERVISOR, PermisoPersonal.RolPersonal.AUDITOR);
+
+    private static final Set<PermisoPersonal.RolPersonal> PUEDEN_VER_MONTOS_DE_CUALQUIERA =
+        EnumSet.of(PermisoPersonal.RolPersonal.NOMINA, PermisoPersonal.RolPersonal.AUDITOR);
+
+    /** Directorio de personal (nombres/cargos, SIN montos) — RRHH/NOMINA/SUPERVISOR/AUDITOR, nunca EMPLEADO ni un usuario sin permiso. */
+    public void exigirVerDirectorioPersonal(Long tenantId) {
+        exigirRol(tenantId, PUEDEN_VER_DIRECTORIO_PERSONAL);
     }
 
-    /** Para que un EMPLEADO solo pueda leer su propio recibo/asistencia, nunca la de otro. */
+    /**
+     * Ver los MONTOS de nómina de un empleado puntual — docs/personal-nomina-contract.md §1.2:
+     * RRHH gestiona personal pero NUNCA ve montos de nómina calculada. Solo NOMINA/AUDITOR ven
+     * la de cualquiera; un EMPLEADO solo la suya propia; cualquier otro rol (incluido RRHH,
+     * SUPERVISOR, o ningún permiso) queda denegado.
+     */
+    public void exigirVerNominaDe(Long tenantId, Long empleadoId) {
+        if (esDuenoAdmin()) return;
+        PermisoPersonal permiso = permisoPersonalRepository.findByTenantIdAndUsuarioId(tenantId, resolverUsuarioIdActual(tenantId))
+            .orElseThrow(() -> new AccesoPersonalDenegadoException("Este usuario no tiene permisos asignados en Personal/Nómina"));
+        if (PUEDEN_VER_MONTOS_DE_CUALQUIERA.contains(permiso.getRol())) return;
+        if (permiso.getRol() == PermisoPersonal.RolPersonal.EMPLEADO
+                && empleadoId != null && empleadoId.equals(permiso.getEmpleadoId())) {
+            return;
+        }
+        throw new AccesoPersonalDenegadoException("No tienes permiso para ver la nómina de este empleado");
+    }
+
+    /** Igual que exigirVerNominaDe, pero para consultas que no traen un empleadoId puntual (ej. listar todo un período). */
+    public void exigirVerMontosDeNominaEnGeneral(Long tenantId) {
+        exigirRol(tenantId, PUEDEN_VER_MONTOS_DE_CUALQUIERA);
+    }
+
+    /** Para que un EMPLEADO solo pueda leer su propia asistencia/metas (no montos de nómina), nunca la de otro. */
     public Long empleadoIdPropioSiAplica(Long tenantId) {
         if (esDuenoAdmin()) return null; // sin restricción
         Long usuarioId = resolverUsuarioIdActual(tenantId);

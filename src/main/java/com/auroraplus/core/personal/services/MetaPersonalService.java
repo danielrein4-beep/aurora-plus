@@ -3,6 +3,7 @@ package com.auroraplus.core.personal.services;
 import com.auroraplus.core.personal.entities.MetaPersonal;
 import com.auroraplus.core.personal.entities.PermisoPersonal.RolPersonal;
 import com.auroraplus.core.personal.entities.SeguimientoMeta;
+import com.auroraplus.core.personal.repositories.EmpleadoRepository;
 import com.auroraplus.core.personal.repositories.MetaPersonalRepository;
 import com.auroraplus.core.personal.repositories.SeguimientoMetaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,12 +26,17 @@ public class MetaPersonalService {
     private SeguimientoMetaRepository seguimientoMetaRepository;
 
     @Autowired
+    private EmpleadoRepository empleadoRepository;
+
+    @Autowired
     private PersonalAccessService accessService;
 
     @Transactional
     public MetaPersonal crear(Long tenantId, MetaPersonal meta) {
         accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_METAS);
         accessService.exigirRol(tenantId, PUEDEN_ESCRIBIR);
+        empleadoRepository.findByTenantIdAndId(tenantId, meta.getEmpleadoId())
+            .orElseThrow(() -> new RuntimeException("Empleado no encontrado (o no pertenece a este tenant)"));
         meta.setTenantId(tenantId);
         meta.setId(null);
         return metaPersonalRepository.save(meta);

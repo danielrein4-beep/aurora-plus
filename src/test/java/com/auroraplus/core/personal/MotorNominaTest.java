@@ -158,11 +158,14 @@ class MotorNominaTest {
 
         periodoNominaService.aprobar(tenantId, periodo.getId());
 
-        // Corrección: agrega un bono olvidado sin tocar el cálculo original.
+        // Corrección: registra un bono olvidado SIN tocar el cálculo original congelado.
         AjusteNomina correccion = ajusteNominaService.corregir(tenantId, nomina.getId(), new BigDecimal("25.00"), "Bono de puntualidad olvidado");
         assertEquals(AjusteNomina.Tipo.CORRECCION, correccion.getTipo());
         NominaEmpleado tresCorregida = nominaEmpleadoRepository.findByTenantIdAndId(tenantId, nomina.getId()).get();
-        assertEquals(0, new BigDecimal("425.00").compareTo(tresCorregida.getNetoAPagar()));
+        assertEquals(0, new BigDecimal("400.00").compareTo(tresCorregida.getNetoAPagar()),
+            "netoAPagar NUNCA se muta — sigue siendo el original congelado al aprobar");
+        assertEquals(0, new BigDecimal("425.00").compareTo(ajusteNominaService.calcularNetoEfectivo(tenantId, tresCorregida)),
+            "el neto EFECTIVO (original + correcciones) sí refleja el ajuste, calculado al vuelo");
 
         // Reverso: la marca REVERSADA y queda registrado el motivo.
         AjusteNomina reverso = ajusteNominaService.reversar(tenantId, nomina.getId(), "Empleado no trabajó ese período, nómina cargada por error");
