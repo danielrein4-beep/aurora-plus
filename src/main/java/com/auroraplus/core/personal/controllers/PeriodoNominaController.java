@@ -25,6 +25,11 @@ public class PeriodoNominaController {
         return periodoNominaService.crear(TenantContext.getCurrentTenant(), periodo);
     }
 
+    @GetMapping
+    public List<PeriodoNomina> listar() {
+        return periodoNominaService.listar(TenantContext.getCurrentTenant());
+    }
+
     @PostMapping("/{id}/calcular")
     public PeriodoNomina calcular(@PathVariable Long id) {
         return motorNominaService.calcularPeriodo(TenantContext.getCurrentTenant(), id);

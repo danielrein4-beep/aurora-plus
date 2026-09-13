@@ -38,11 +38,15 @@ public class PersonalAccessService {
 
     /** Lanza si el tenant no tiene el feature flag activo — nunca se devuelve una lista vacía silenciosa en su lugar. */
     public void exigirFlag(Long tenantId, String flag) {
-        boolean activo = moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, flag)
-            .map(ModuloTenant::isActivo).orElse(false);
+        boolean activo = tieneFlag(tenantId, flag);
         if (!activo) {
             throw new AccesoPersonalDenegadoException("Este negocio no tiene activado el módulo \"" + flag + "\"");
         }
+    }
+
+    public boolean tieneFlag(Long tenantId, String flag) {
+        return moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, flag)
+            .map(ModuloTenant::isActivo).orElse(false);
     }
 
     /** DUENO_ADMIN (rol global) tiene acceso total sin necesitar PermisoPersonal — es el dueño del negocio. */
@@ -59,6 +63,16 @@ public class PersonalAccessService {
     public Optional<PermisoPersonal.RolPersonal> obtenerRolPersonalActual(Long tenantId) {
         Long usuarioId = resolverUsuarioIdActual(tenantId);
         return permisoPersonalRepository.findByTenantIdAndUsuarioId(tenantId, usuarioId).map(PermisoPersonal::getRol);
+    }
+
+    public Optional<PermisoPersonal> obtenerPermisoPersonalActual(Long tenantId) {
+        Long usuarioId = resolverUsuarioIdActual(tenantId);
+        return permisoPersonalRepository.findByTenantIdAndUsuarioId(tenantId, usuarioId);
+    }
+
+    public boolean tieneRol(Long tenantId, Set<PermisoPersonal.RolPersonal> rolesPermitidos) {
+        if (esDuenoAdmin()) return true;
+        return obtenerRolPersonalActual(tenantId).map(rolesPermitidos::contains).orElse(false);
     }
 
     /** Lanza si el usuario actual no es dueño ni tiene uno de los roles permitidos para esta acción. */
@@ -88,6 +102,10 @@ public class PersonalAccessService {
         exigirRol(tenantId, PUEDEN_VER_DIRECTORIO_PERSONAL);
     }
 
+    public boolean puedeVerDirectorio(Long tenantId) {
+        return tieneRol(tenantId, PUEDEN_VER_DIRECTORIO_PERSONAL);
+    }
+
     /**
      * Ver los MONTOS de nómina de un empleado puntual — docs/personal-nomina-contract.md §1.2:
      * RRHH gestiona personal pero NUNCA ve montos de nómina calculada. Solo NOMINA/AUDITOR ven
@@ -109,6 +127,10 @@ public class PersonalAccessService {
     /** Igual que exigirVerNominaDe, pero para consultas que no traen un empleadoId puntual (ej. listar todo un período). */
     public void exigirVerMontosDeNominaEnGeneral(Long tenantId) {
         exigirRol(tenantId, PUEDEN_VER_MONTOS_DE_CUALQUIERA);
+    }
+
+    public boolean puedeVerMontosGenerales(Long tenantId) {
+        return tieneRol(tenantId, PUEDEN_VER_MONTOS_DE_CUALQUIERA);
     }
 
     /** Para que un EMPLEADO solo pueda leer su propia asistencia/metas (no montos de nómina), nunca la de otro. */

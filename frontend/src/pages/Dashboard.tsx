@@ -31,6 +31,7 @@ import {
   type TableroAlertasGanaderia,
   type RepuestoItem,
   type MapaMesaEntrada,
+  obtenerCapacidadesPersonal,
 } from "../api";
 import MediclinicApp from "../components/MediclinicApp";
 
@@ -270,6 +271,15 @@ export default function Dashboard() {
   const [alertasGanaderia, setAlertasGanaderia] = useState<TableroAlertasGanaderia | null>(null);
   const [repuestosReales, setRepuestosReales] = useState<RepuestoItem[] | null>(null);
   const [mapaReales, setMapaReales] = useState<MapaMesaEntrada[] | null>(null);
+  const [accesoPersonal, setAccesoPersonal] = useState(false);
+
+  useEffect(() => {
+    let activo = true;
+    obtenerCapacidadesPersonal()
+      .then((capacidades) => activo && setAccesoPersonal(capacidades.accesoPersonal))
+      .catch(() => activo && setAccesoPersonal(false));
+    return () => { activo = false; };
+  }, [user?.tenantId]);
 
   const esClinicaReal = (userIndustry === "clinica" || userIndustry === "veterinaria") && !!user?.tenantId;
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
@@ -740,6 +750,16 @@ export default function Dashboard() {
 
         {/* Derecha: Botón Directo a Mediclinic + Estado + Salir */}
         <div className="flex items-center gap-2.5 whitespace-nowrap">
+          {accesoPersonal && (
+            <button
+              onClick={() => navigate("/personal")}
+              className="px-3.5 py-2 rounded-full border border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300 text-xs font-bold hover:bg-teal-500/20 transition-colors flex items-center gap-2"
+              title="Abrir Gestión de Personal"
+            >
+              <IconUsers size={15} />
+              <span className="hidden xl:inline">Personal</span>
+            </button>
+          )}
           {/* Botón Destacado: Entrar a la app de la vertical activa */}
           {esVerticalReal && (
             <button

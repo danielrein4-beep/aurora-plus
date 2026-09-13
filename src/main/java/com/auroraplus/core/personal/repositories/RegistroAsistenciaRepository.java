@@ -13,4 +13,7 @@ public interface RegistroAsistenciaRepository extends JpaRepository<RegistroAsis
 
     List<RegistroAsistencia> findByTenantIdAndEmpleadoIdAndFechaHoraEntradaGreaterThanEqualAndFechaHoraEntradaLessThan(
         Long tenantId, Long empleadoId, LocalDateTime desde, LocalDateTime hastaExclusivo);
+
+    List<RegistroAsistencia> findByTenantIdAndFechaHoraEntradaGreaterThanEqualAndFechaHoraEntradaLessThanOrderByFechaHoraEntradaDesc(
+        Long tenantId, LocalDateTime desde, LocalDateTime hastaExclusivo);
 }

@@ -179,6 +179,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#94a3b8]">Estado del módulo:</span>
             <button
+              disabled={!onToggleNominaHabilitada}
               onClick={() => {
                 const nuevoEstado = !nominaHabilitada;
                 if (onToggleNominaHabilitada) {
@@ -186,11 +187,12 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 }
                 mostrarNotificacion(`Módulo de nómina ${nuevoEstado ? 'habilitado' : 'desactivado'} para este espacio [DEMO]`);
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#35d7c3] ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#35d7c3] disabled:cursor-not-allowed disabled:opacity-60 ${
                 nominaHabilitada
                   ? 'bg-[#35d7c3] text-black hover:bg-[#28b8a6]'
                   : 'bg-[#1e293b] text-[#94a3b8] border border-[#334155] hover:text-[#f8fafc]'
               }`}
+              title={!onToggleNominaHabilitada ? 'La activación se administra desde la configuración del negocio' : undefined}
             >
               {nominaHabilitada ? '✓ Habilitado' : 'Desactivado'}
             </button>
@@ -212,13 +214,14 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             </span>
           </div>
           <button
+            disabled={!onToggleNominaHabilitada}
             onClick={() => {
               if (onToggleNominaHabilitada) {
                 onToggleNominaHabilitada(true);
               }
               mostrarNotificacion('Módulo de nómina habilitado [DEMO]');
             }}
-            className="px-3 py-1.5 rounded bg-[#f59e0b]/20 hover:bg-[#f59e0b]/30 text-[#fbbf24] font-semibold text-xs border border-[#f59e0b]/40 whitespace-nowrap self-start sm:self-auto"
+            className="px-3 py-1.5 rounded bg-[#f59e0b]/20 hover:bg-[#f59e0b]/30 text-[#fbbf24] font-semibold text-xs border border-[#f59e0b]/40 whitespace-nowrap self-start sm:self-auto disabled:cursor-not-allowed disabled:opacity-60"
           >
             Activar Ahora
           </button>

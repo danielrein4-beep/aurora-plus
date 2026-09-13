@@ -84,6 +84,12 @@ public class PeriodoNominaService {
         return nominaEmpleadoRepository.findByTenantIdAndPeriodoId(tenantId, periodoId);
     }
 
+    public List<PeriodoNomina> listar(Long tenantId) {
+        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirVerMontosDeNominaEnGeneral(tenantId);
+        return periodoRepository.findByTenantIdOrderByFechaInicioDesc(tenantId);
+    }
+
     private PeriodoNomina obtenerOFallar(Long tenantId, Long periodoId) {
         return periodoRepository.findByTenantIdAndId(tenantId, periodoId)
             .orElseThrow(() -> new RuntimeException("Período no encontrado"));

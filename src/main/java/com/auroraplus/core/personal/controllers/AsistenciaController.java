@@ -7,7 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
 @RequestMapping("/api/personal/asistencia")
@@ -29,5 +31,12 @@ public class AsistenciaController {
     @GetMapping("/empleado/{empleadoId}")
     public List<RegistroAsistencia> listarDeEmpleado(@PathVariable Long empleadoId) {
         return asistenciaService.listarDeEmpleado(TenantContext.getCurrentTenant(), empleadoId);
+    }
+
+    @GetMapping
+    public List<RegistroAsistencia> listarRango(
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+        return asistenciaService.listarRango(TenantContext.getCurrentTenant(), desde, hasta);
     }
 }

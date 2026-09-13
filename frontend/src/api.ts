@@ -2880,4 +2880,35 @@ export function obtenerEmpresaKpis(desde: string, hasta: string): Promise<Empres
   return request(`/api/empresa/kpis?${params.toString()}`);
 }
 
+// --- Personal y Aurora Nómina ---
+
+export interface CapacidadesPersonal {
+  accesoPersonal: boolean;
+  asistencia: boolean;
+  metas: boolean;
+  nominaAvanzada: boolean;
+  puedeVerDirectorio: boolean;
+  puedeVerMontosNomina: boolean;
+  rolPersonal: "DUENO_ADMIN" | "RRHH" | "NOMINA" | "SUPERVISOR" | "EMPLEADO" | "AUDITOR" | null;
+  empleadoId: number | null;
+}
+
+export function obtenerCapacidadesPersonal(): Promise<CapacidadesPersonal> {
+  return request("/api/personal/capacidades");
+}
+
+export interface EmpleadoPersonalApi {
+  id: number;
+  nombreCompleto: string;
+  documentoIdentidad: string;
+  fechaIngreso: string;
+  fechaEgreso: string | null;
+  usuarioId: number | null;
+  activo: boolean;
+}
+
+export function listarEmpleadosPersonal(): Promise<EmpleadoPersonalApi[]> {
+  return request("/api/personal/empleados");
+}
+
 

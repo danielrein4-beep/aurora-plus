@@ -21,6 +21,11 @@ public class MetaPersonalController {
         return metaPersonalService.crear(TenantContext.getCurrentTenant(), meta);
     }
 
+    @GetMapping
+    public List<MetaPersonal> listarTodas() {
+        return metaPersonalService.listarTodas(TenantContext.getCurrentTenant());
+    }
+
     @GetMapping("/empleado/{empleadoId}")
     public List<MetaPersonal> listarDeEmpleado(@PathVariable Long empleadoId) {
         return metaPersonalService.listarDeEmpleado(TenantContext.getCurrentTenant(), empleadoId);

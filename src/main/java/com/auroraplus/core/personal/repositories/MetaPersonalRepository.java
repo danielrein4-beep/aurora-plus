@@ -9,5 +9,6 @@ import java.util.Optional;
 @Repository
 public interface MetaPersonalRepository extends JpaRepository<MetaPersonal, Long> {
     List<MetaPersonal> findByTenantIdAndEmpleadoId(Long tenantId, Long empleadoId);
+    List<MetaPersonal> findByTenantIdOrderByPeriodoHastaDesc(Long tenantId);
     Optional<MetaPersonal> findByTenantIdAndId(Long tenantId, Long id);
 }

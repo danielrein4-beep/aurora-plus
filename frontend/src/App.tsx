@@ -19,7 +19,9 @@ import RetailApp from "./components/RetailApp";
 import ComercioApp from "./components/ComercioApp";
 import GanaderiaApp from "./components/GanaderiaApp";
 import CentroFinanciero from "./pages/CentroFinanciero";
+import Personal from "./pages/Personal";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PersonalRoute from "./components/PersonalRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 
@@ -87,6 +89,7 @@ export default function App() {
             {/* Protected — requiere sesión activa */}
             <Route path="/dashboard"  element={<ProtectedRoute><AnimatedRoute><Dashboard /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/finanzas" element={<ProtectedRoute><AnimatedRoute><CentroFinanciero /></AnimatedRoute></ProtectedRoute>} />
+            <Route path="/personal" element={<ProtectedRoute><PersonalRoute><AnimatedRoute><Personal /></AnimatedRoute></PersonalRoute></ProtectedRoute>} />
             <Route path="/mediclinic" element={<ProtectedRoute><AnimatedRoute><MediclinicPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/restaurante" element={<ProtectedRoute><AnimatedRoute><RestaurantePage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/retail" element={<ProtectedRoute><AnimatedRoute><RetailPage /></AnimatedRoute></ProtectedRoute>} />

@@ -9,5 +9,6 @@ import java.util.Optional;
 @Repository
 public interface PeriodoNominaRepository extends JpaRepository<PeriodoNomina, Long> {
     List<PeriodoNomina> findByTenantId(Long tenantId);
+    List<PeriodoNomina> findByTenantIdOrderByFechaInicioDesc(Long tenantId);
     Optional<PeriodoNomina> findByTenantIdAndId(Long tenantId, Long id);
 }

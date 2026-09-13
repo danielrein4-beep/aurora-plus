@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.time.LocalDate;
 
 @Service
 public class AsistenciaService {
@@ -69,5 +70,14 @@ public class AsistenciaService {
             throw new PersonalAccessService.AccesoPersonalDenegadoException("No puedes consultar la asistencia de otro empleado");
         }
         return registroAsistenciaRepository.findByTenantIdAndEmpleadoId(tenantId, empleadoId);
+    }
+
+    public List<RegistroAsistencia> listarRango(Long tenantId, LocalDate desde, LocalDate hasta) {
+        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA);
+        accessService.exigirVerDirectorioPersonal(tenantId);
+        if (desde.isAfter(hasta)) throw new IllegalArgumentException("El inicio no puede ser posterior al fin");
+        return registroAsistenciaRepository
+            .findByTenantIdAndFechaHoraEntradaGreaterThanEqualAndFechaHoraEntradaLessThanOrderByFechaHoraEntradaDesc(
+                tenantId, desde.atStartOfDay(), hasta.plusDays(1).atStartOfDay());
     }
 }

@@ -51,6 +51,12 @@ public class MetaPersonalService {
         return metaPersonalRepository.findByTenantIdAndEmpleadoId(tenantId, empleadoId);
     }
 
+    public List<MetaPersonal> listarTodas(Long tenantId) {
+        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_METAS);
+        accessService.exigirVerDirectorioPersonal(tenantId);
+        return metaPersonalRepository.findByTenantIdOrderByPeriodoHastaDesc(tenantId);
+    }
+
     @Transactional
     public SeguimientoMeta registrarAvance(Long tenantId, Long metaId, SeguimientoMeta seguimiento) {
         accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_METAS);

@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.time.LocalDate;
 
 /** No existía en la primera entrega (solo la entidad/repositorio) — agregado junto con la validación de tenant del punto 6. */
 @Service
@@ -45,5 +46,12 @@ public class TurnoPersonalService {
             throw new PersonalAccessService.AccesoPersonalDenegadoException("No puedes consultar los turnos de otro empleado");
         }
         return turnoPersonalRepository.findByTenantIdAndEmpleadoId(tenantId, empleadoId);
+    }
+
+    public List<TurnoPersonal> listarRango(Long tenantId, LocalDate desde, LocalDate hasta) {
+        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA);
+        accessService.exigirVerDirectorioPersonal(tenantId);
+        if (desde.isAfter(hasta)) throw new IllegalArgumentException("El inicio no puede ser posterior al fin");
+        return turnoPersonalRepository.findByTenantIdAndFechaBetweenOrderByFechaAscHoraInicioAsc(tenantId, desde, hasta);
     }
 }

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { obtenerCapacidadesPersonal, type CapacidadesPersonal } from '../api';
 import {
   MOCK_EMPLEADOS,
   MOCK_TURNOS_HORARIOS,
@@ -31,6 +32,19 @@ export const PersonalPage: React.FC = () => {
   
   // Nómina DESACTIVADA por defecto (centralizada en Personal.tsx)
   const [nominaHabilitada, setNominaHabilitada] = useState(false);
+  const [capacidades, setCapacidades] = useState<CapacidadesPersonal | null>(null);
+
+  useEffect(() => {
+    obtenerCapacidadesPersonal().then((datos) => {
+      setCapacidades(datos);
+      setNominaHabilitada(datos.nominaAvanzada);
+      if (!datos.puedeVerMontosNomina) setOcultarSueldo(true);
+    }).catch(() => {
+      setCapacidades(null);
+      setNominaHabilitada(false);
+      setOcultarSueldo(true);
+    });
+  }, []);
 
   // Estado unificado en sesión para que las acciones conserven sus cambios en tiempo real
   const [empleados] = useState<Empleado[]>(MOCK_EMPLEADOS);
@@ -76,7 +90,7 @@ export const PersonalPage: React.FC = () => {
           {/* Acciones Rápidas de Cabecera */}
           <div className="flex items-center gap-2 self-start md:self-auto">
             {/* Modo Privacidad Salarial (Protegido por defecto) */}
-            <button
+            {capacidades?.puedeVerMontosNomina && <button
               onClick={() => setOcultarSueldo(!ocultarSueldo)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#35d7c3] ${
                 ocultarSueldo
@@ -86,13 +100,13 @@ export const PersonalPage: React.FC = () => {
               title="Alternar privacidad de remuneraciones"
             >
               <span>{ocultarSueldo ? '👁️ Sueldos Ocultos' : '🔓 Sueldos Visibles'}</span>
-            </button>
+            </button>}
           </div>
         </div>
 
         {/* Barra de Navegación de Secciones (Scroll Horizontal Fluido en Móvil) */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-[#1e2d48] no-scrollbar">
-          {pestanas.map((p) => {
+          {pestanas.filter((p) => p.id !== 'nomina' || capacidades?.puedeVerMontosNomina).map((p) => {
             const esActiva = seccionActiva === p.id;
             return (
               <button
@@ -168,10 +182,8 @@ export const PersonalPage: React.FC = () => {
               periodos={periodosNomina}
               ocultarSueldo={ocultarSueldo}
               nominaHabilitada={nominaHabilitada}
-              onToggleNominaHabilitada={(habilitada) => setNominaHabilitada(habilitada)}
               onActualizarPeriodos={(actualizados) => {
                 setPeriodosNomina(actualizados);
-                setNominaHabilitada(true);
               }}
             />
           )}
