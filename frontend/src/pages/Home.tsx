@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import AuroraLogo from "../AuroraLogo";
 import MagneticButton from "../components/MagneticButton";
+import TrueFocus from "../components/TrueFocus";
 import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware, IconMining,
@@ -236,10 +237,18 @@ export default function Home() {
           variants={heroContainer}
           initial="hidden"
           animate="show"
-          className="relative z-10 w-full max-w-5xl mx-auto pt-28 sm:pt-36">
+          className="relative z-10 w-full max-w-5xl mx-auto">
           <motion.p variants={heroItem} className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · seis rubros · tres monedas</motion.p>
           <motion.h1 variants={heroItem} className="mt-5 max-w-3xl font-['IBM_Plex_Sans'] text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-[-0.055em] text-[#f8f6ef]">
-            Del lápiz y el papel<br />a la <span className="text-[#35d7c3]">automatización</span>
+            <TrueFocus
+              sentence="Del lápiz y el papel a la automatización"
+              manualMode={false}
+              blurAmount={6}
+              borderColor="#35d7c3"
+              glowColor="rgba(53, 215, 195, 0.6)"
+              animationDuration={0.3}
+              pauseBetweenAnimations={0.5}
+            />
           </motion.h1>
           <motion.p variants={heroItem} className="mt-8 max-w-xl text-base leading-7 text-[#e5e1d5]/90">
             De la libreta y la hoja de Excel a medianoche, a la comodidad de tu teléfono y tu computadora. Aurora Plus corre la caja, el inventario y la sanidad regulatoria de clínicas, restaurantes, minas, talleres, boutiques y fincas venezolanas.
