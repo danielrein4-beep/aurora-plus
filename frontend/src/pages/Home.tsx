@@ -98,7 +98,10 @@ function HomePointerAurora({ hostRef }: { hostRef: RefObject<HTMLElement | null>
     const motionAllowed = window.matchMedia("(prefers-reduced-motion: no-preference) and (any-hover: hover) and (any-pointer: fine)");
     const colors = ["44, 134, 224", "48, 203, 132", "53, 215, 195"];
     const trailDuration = 1200; // ms que tarda cada trazo en desvanecerse por completo (humo dura más que un rayo fino)
-    const minDistance = 22; // px mínimos entre puntos — con radios grandes, puntos muy juntos saturan a blanco en modo "lighter"
+    const minDistance = 7; // px mínimos entre puntos. Ya no usamos "lighter" (ver drawWisp),
+    // así que puntos densos ya no saturan a blanco — y a velocidad normal de mouse
+    // (más lenta que las pruebas automatizadas) hace falta esta densidad para
+    // que la estela se sienta pegada al cursor en vez de aparecer a saltos.
 
     type Point = { x: number; y: number; born: number; hue: number };
     let points: Point[] = [];
@@ -166,7 +169,7 @@ function HomePointerAurora({ hostRef }: { hostRef: RefObject<HTMLElement | null>
       lastX = x;
       lastY = y;
       points.push({ x, y, born: performance.now(), hue: points.length });
-      if (points.length > 60) points.shift();
+      if (points.length > 140) points.shift();
       start();
     };
     const move = (event: PointerEvent) => {
@@ -337,7 +340,7 @@ export default function Home() {
                 <div key={n.label} className="bg-white/[0.03] hover:bg-white/[0.06] rounded-xl p-3.5 border border-white/5 hover:border-[#35d7c3]/30 transition-all duration-300 cursor-default">
                   <div className="mb-1.5 text-[#35d7c3]"><n.Icon size={18} /></div>
                   <div className="text-[#f8f6ef] font-semibold text-[11px] tracking-tight">{n.label}</div>
-                  <div className="text-[10px] font-mono mt-0.5 text-[#35d7c3]/80">{n.val}</div>
+                  <div className="text-[11px] font-mono mt-0.5 text-[#d9d8ce]/80">{n.val}</div>
                 </div>
               ))}
             </div>
