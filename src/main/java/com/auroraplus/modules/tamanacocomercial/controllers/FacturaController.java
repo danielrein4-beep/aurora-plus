@@ -5,6 +5,8 @@ import com.auroraplus.modules.tamanacocomercial.entities.Factura;
 import com.auroraplus.modules.tamanacocomercial.entities.Retencion;
 import com.auroraplus.modules.tamanacocomercial.repositories.FacturaRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.RetencionRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +30,9 @@ public class FacturaController {
     @Autowired
     private RetencionRepository retencionRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     @GetMapping
     public List<Factura> listarFacturas() {
         return facturaRepository.findAllByOrderByFechaEmisionDesc();
@@ -37,18 +42,11 @@ public class FacturaController {
     @Transactional
     public ResponseEntity<?> crearFactura(@RequestParam Long tenantId, @RequestBody Factura factura) {
 
-        Factura ultimaFactura = facturaRepository.findTopByOrderByNumeroControlDesc();
-        int siguienteNumero = 1;
-        if (ultimaFactura != null && ultimaFactura.getNumeroControl() != null) {
-            try {
-                String[] partes = ultimaFactura.getNumeroControl().split("-");
-                if (partes.length == 2) {
-                    siguienteNumero = Integer.parseInt(partes[1]) + 1;
-                }
-            } catch (Exception e) {
-                // usa el default
-            }
-        }
+        // seq_factura_comercial (V13__...sql): nextval() de Postgres es atómico — dos facturas
+        // creadas en el mismo milisegundo nunca reciben el mismo número. El cálculo anterior
+        // (leer la última factura y sumarle 1 en Java) sí podía chocar bajo esa concurrencia y
+        // abortar la transacción con un error de clave duplicada.
+        long siguienteNumero = ((Number) entityManager.createNativeQuery("SELECT nextval('seq_factura_comercial')").getSingleResult()).longValue();
         factura.setTenantId(tenantId);
         factura.setNumeroControl(String.format("00-%06d", siguienteNumero));
 
