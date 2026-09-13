@@ -16,6 +16,7 @@ export interface TrueFocusProps {
   animationDuration?: number;
   pauseBetweenAnimations?: number;
   className?: string;
+  onSettle?: () => void;
 }
 
 interface FocusRect {
@@ -35,6 +36,7 @@ export default function TrueFocus({
   animationDuration = 0.5,
   pauseBetweenAnimations = 1,
   className = "",
+  onSettle,
 }: TrueFocusProps) {
   const CYCLES_BEFORE_SETTLE = 2;
 
@@ -65,6 +67,11 @@ export default function TrueFocus({
 
     return () => clearInterval(interval);
   }, [manualMode, settled, animationDuration, pauseBetweenAnimations, words.length]);
+
+  useEffect(() => {
+    if (settled) onSettle?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settled]);
 
   useEffect(() => {
     if (currentIndex === null || currentIndex === -1) return;

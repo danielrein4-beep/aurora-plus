@@ -6,6 +6,7 @@ import TrueFocus from "../components/TrueFocus";
 import SpecularButton from "../components/SpecularButton";
 import ScrollReveal from "../components/ScrollReveal";
 import AccordionGallery from "../components/AccordionGallery";
+import CursorGrid from "../components/CursorGrid";
 import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware, IconMining,
@@ -212,6 +213,7 @@ function HomePointerAurora({ hostRef }: { hostRef: RefObject<HTMLElement | null>
 export default function Home() {
   const homeRef = useRef<HTMLElement>(null);
   const [activeTab, setActiveTab] = useState("Ferretería");
+  const [heroTitleSettled, setHeroTitleSettled] = useState(false);
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
 
@@ -242,6 +244,28 @@ export default function Home() {
           <motion.div className="home-hero-photo" style={{ x: photoX, y: photoY }} />
         </div>
 
+        <div
+          className="absolute inset-0 z-0 pointer-events-auto transition-opacity duration-[1400ms] ease-out"
+          style={{ opacity: heroTitleSettled ? 1 : 0 }}
+          aria-hidden="true"
+        >
+          <CursorGrid
+            cellSize={65}
+            color="#b2aee3"
+            radius={140}
+            falloff="smooth"
+            holdTime={400}
+            fadeDuration={950}
+            lineWidth={1.2}
+            maxOpacity={0.35}
+            fillOpacity={0}
+            gridOpacity={0}
+            cellRadius={0}
+            clickPulse
+            pulseSpeed={600}
+          />
+        </div>
+
         <motion.div
           variants={heroContainer}
           initial="hidden"
@@ -257,6 +281,7 @@ export default function Home() {
               glowColor="rgba(53, 215, 195, 0.6)"
               animationDuration={0.3}
               pauseBetweenAnimations={0.5}
+              onSettle={() => setHeroTitleSettled(true)}
             />
           </motion.h1>
           <motion.p variants={heroItem} className="mt-8 max-w-xl text-base leading-7 text-[#e5e1d5]/90">
