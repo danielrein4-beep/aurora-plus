@@ -5,8 +5,7 @@ import {
   MOCK_COVERAGE,
   MOCK_TRANSACTIONS,
   MOCK_COSTS,
-  MOCK_NON_FISCAL_DOCS,
-  DEMO_BCV_RATE
+  MOCK_NON_FISCAL_DOCS
 } from '../components/finanzas/mockFinanceData';
 import { ResumenFinanciero } from '../components/finanzas/ResumenFinanciero';
 import { VentasComprasFinanciero } from '../components/finanzas/VentasComprasFinanciero';
@@ -14,7 +13,7 @@ import { CostosFinanciero } from '../components/finanzas/CostosFinanciero';
 import { DocumentosFinancieros } from '../components/finanzas/DocumentosFinancieros';
 import { VerticalCoverageCard } from '../components/finanzas/VerticalCoverageCard';
 
-type ActiveTab = 'resumen' | 'ventas-compras' | 'costos' | 'documentos';
+type ActiveTab = 'resumen' | 'ventas-compras' | 'costos' | 'documentos' | 'cobertura';
 
 export const CentroFinanciero: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('resumen');
@@ -23,7 +22,8 @@ export const CentroFinanciero: React.FC = () => {
     { id: 'resumen', label: 'Resumen General', icon: '📊' },
     { id: 'ventas-compras', label: 'Ventas y Compras', icon: '🔄' },
     { id: 'costos', label: 'Estructura de Costos', icon: '📉' },
-    { id: 'documentos', label: 'Documentos', icon: '📋' }
+    { id: 'documentos', label: 'Documentos', icon: '📋' },
+    { id: 'cobertura', label: 'Cobertura por Vertical', icon: '🌐' }
   ];
 
   return (
@@ -37,7 +37,7 @@ export const CentroFinanciero: React.FC = () => {
           Estás explorando la maqueta funcional del Centro Financiero de Aurora Plus.
         </span>
         <span className="text-white/60 text-[11px] hidden sm:inline">
-          (Tasa referencial documental: {DEMO_BCV_RATE} Bs./USD • Cero cifras simuladas como reales)
+          (Monedas admitidas: USD, VES, COP • Cero tasas inventadas • Documentación no fiscal)
         </span>
       </div>
 
@@ -54,7 +54,7 @@ export const CentroFinanciero: React.FC = () => {
                   Centro Financiero Aurora Plus
                 </h1>
                 <p className="text-xs text-white/60">
-                  Visión ejecutiva del negocio, diseñada para dueños sin conocimientos contables.
+                  Visión operativa consolidada del negocio, diseñada para dueños sin conocimientos contables.
                 </p>
               </div>
             </div>
@@ -72,12 +72,12 @@ export const CentroFinanciero: React.FC = () => {
           </div>
         </div>
 
-        {/* Cobertura de Verticales */}
+        {/* Tarjeta de Cobertura Rápida en Cabecera */}
         <div className="mt-6">
           <VerticalCoverageCard coverageList={MOCK_COVERAGE} />
         </div>
 
-        {/* Barra de Navegación de Pestañas (Desktop y Móvil Horizontal) */}
+        {/* Barra de Navegación de Pestañas Activas */}
         <div className="mt-6 flex items-center gap-2 p-1.5 bg-[#0b2341]/90 rounded-2xl border border-white/10 overflow-x-auto scrollbar-none">
           {tabs.map((tab) => (
             <button
@@ -119,6 +119,20 @@ export const CentroFinanciero: React.FC = () => {
           {activeTab === 'documentos' && (
             <DocumentosFinancieros documents={MOCK_NON_FISCAL_DOCS} />
           )}
+
+          {activeTab === 'cobertura' && (
+            <div className="space-y-4">
+              <div className="bg-[#0b2341]/80 border border-white/10 rounded-2xl p-5 backdrop-blur-xl">
+                <h3 className="text-base font-semibold text-white">
+                  Detalle de Integración de Fuentes por Vertical
+                </h3>
+                <p className="text-xs text-white/65 mt-1 leading-relaxed">
+                  Para que las cifras operativas reflejen la realidad de tu empresa, Aurora Plus clasifica cada área en estado cualitativo: <strong className="text-emerald-400">Con datos</strong>, <strong className="text-amber-400">Parcial</strong> o <strong className="text-rose-400">Sin conexión</strong>.
+                </p>
+              </div>
+              <VerticalCoverageCard coverageList={MOCK_COVERAGE} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -135,7 +149,7 @@ export const CentroFinanciero: React.FC = () => {
             }`}
           >
             <span className="text-base">{tab.icon}</span>
-            <span className="truncate max-w-[60px]">{tab.label.split(' ')[0]}</span>
+            <span className="truncate max-w-[55px]">{tab.label.split(' ')[0]}</span>
           </button>
         ))}
       </div>

@@ -1,16 +1,21 @@
 import React from 'react';
-import { CostItem } from './types';
+import { CostItem, SupportedCurrency } from './types';
 
 interface CostosFinancieroProps {
   costs: CostItem[];
 }
 
 export const CostosFinanciero: React.FC<CostosFinancieroProps> = ({ costs }) => {
-  const formatUsd = (val: number) => `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const formatVes = (val: number) => `Bs. ${val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-  const totalCostsUsd = costs.reduce((acc, c) => acc + c.amountUsd, 0);
-  const totalCostsVes = costs.reduce((acc, c) => acc + c.amountVes, 0);
+  const formatCurrency = (amount: number, currency: SupportedCurrency) => {
+    switch (currency) {
+      case 'USD':
+        return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      case 'VES':
+        return `Bs. ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      case 'COP':
+        return `$${amount.toLocaleString('es-CO', { maximumFractionDigits: 0 })} COP`;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -34,16 +39,17 @@ export const CostosFinanciero: React.FC<CostosFinancieroProps> = ({ costs }) => 
         <div className="lg:col-span-1 bg-[#0b2341]/80 border border-white/10 rounded-2xl p-5 backdrop-blur-xl flex flex-col justify-between shadow-lg">
           <div>
             <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
-              Total Costos y Gastos Operativos
+              Estructura de Costos Operativos
             </span>
-            <div className="text-3xl font-extrabold text-white mt-2">
-              {formatUsd(totalCostsUsd)}
+            <div className="text-2xl font-extrabold text-white mt-2">
+              Desglose por Moneda
             </div>
-            <div className="text-xs font-mono text-[#00FFC2] mt-0.5">
-              {formatVes(totalCostsVes)}
+            <div className="mt-2 space-y-1">
+              <div className="text-xl font-bold text-[#00FFC2]">$9,500.00 USD</div>
+              <div className="text-sm font-mono text-white/70">Bs. 140,000.00 VES</div>
             </div>
             <p className="text-xs text-white/60 mt-3 leading-relaxed">
-              Representa el 64.0% de las ventas brutas del mes. Mantener los costos directos de materia prima por debajo del 35% es clave para la rentabilidad de tu negocio gastronómico o comercial.
+              Representa el consumo operativo de insumos y nómina registrado en el período. Mantener los costos directos de materia prima controlados es clave para la rentabilidad de tu negocio.
             </p>
           </div>
 
@@ -87,11 +93,13 @@ export const CostosFinanciero: React.FC<CostosFinancieroProps> = ({ costs }) => 
                     )}
                   </div>
 
-                  <div className="text-right">
-                    <span className="text-sm font-bold text-white">
-                      {formatUsd(item.amountUsd)}
-                    </span>
-                    <span className="text-xs text-white/50 ml-2">
+                  <div className="text-right flex flex-wrap gap-2 items-center sm:justify-end">
+                    {item.balances.map((b, bIdx) => (
+                      <span key={bIdx} className="text-xs font-bold text-white bg-white/5 px-2 py-0.5 rounded">
+                        {formatCurrency(b.amount, b.currency)}
+                      </span>
+                    ))}
+                    <span className="text-xs text-white/50">
                       ({item.percentageOfTotal}%)
                     </span>
                   </div>

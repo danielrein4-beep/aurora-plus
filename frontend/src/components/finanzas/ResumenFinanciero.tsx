@@ -1,5 +1,5 @@
 import React from 'react';
-import { KpiCardData, CashDrawerBalance } from './types';
+import { KpiCardData, CashDrawerBalance, SupportedCurrency } from './types';
 import { QualityBadge } from './QualityBadge';
 
 interface ResumenFinancieroProps {
@@ -13,8 +13,16 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
   cashBalances,
   onNavigateToDocuments
 }) => {
-  const formatUsd = (val: number) => `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const formatVes = (val: number) => `Bs. ${val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatCurrency = (amount: number, currency: SupportedCurrency) => {
+    switch (currency) {
+      case 'USD':
+        return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      case 'VES':
+        return `Bs. ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      case 'COP':
+        return `$${amount.toLocaleString('es-CO', { maximumFractionDigits: 0 })} COP`;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -29,7 +37,7 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
               Centro Financiero Diseñado para la Toma de Decisiones
             </h4>
             <p className="text-xs text-white/70 mt-0.5 leading-relaxed">
-              Monitorea el flujo operativo consolidado de tu negocio en lenguaje simple. Cada cifra muestra su nivel de certeza y puedes auditar los comprobantes comerciales en cualquier momento.
+              Monitorea el flujo operativo consolidado de tu negocio en lenguaje simple. Los importes se presentan de forma independiente en sus monedas de origen admitidas (USD, VES y COP), sin conversiones ficticias.
             </p>
           </div>
         </div>
@@ -43,10 +51,12 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
         </button>
       </div>
 
-      {/* Grid de 4 KPIs Principales */}
+      {/* Grid de 4 KPIs Principales con Desglose Multi-moneda */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {Object.entries(kpis).map(([key, kpi]) => {
           const isResult = key === 'resultado';
+          const primaryBalance = kpi.balances[0];
+          const secondaryBalances = kpi.balances.slice(1);
 
           return (
             <div
@@ -70,12 +80,21 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <div className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
-                    {formatUsd(kpi.amountUsd)}
-                  </div>
-                  <div className="text-xs font-mono font-medium text-[#00FFC2]/90">
-                    {formatVes(kpi.amountVes)}
-                  </div>
+                  {primaryBalance && (
+                    <div className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
+                      {formatCurrency(primaryBalance.amount, primaryBalance.currency)}
+                    </div>
+                  )}
+
+                  {secondaryBalances.length > 0 && (
+                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs font-mono font-medium text-[#00FFC2]/90 pt-1">
+                      {secondaryBalances.map((sec, idx) => (
+                        <span key={idx} className="bg-white/5 px-1.5 py-0.5 rounded">
+                          {formatCurrency(sec.amount, sec.currency)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <p className="text-xs text-white/55 mt-2.5 leading-snug">
@@ -104,10 +123,10 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-base">🏦</span>
-              <h3 className="text-base font-semibold text-white">Disponibilidad en Caja y Bancos</h3>
+              <h3 className="text-base font-semibold text-white">Disponibilidad en Caja y Cuentas (USD / VES / COP)</h3>
             </div>
             <p className="text-xs text-white/60 mt-0.5">
-              Saldos en moneda real disponibles inmediatamente para pagos e imprevistos. Sin conversiones ficticias.
+              Saldos en moneda real disponibles inmediatamente para pagos e imprevistos. Sin sumas heterogéneas.
             </p>
           </div>
 
@@ -118,8 +137,6 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-4">
           {cashBalances.map((acc) => {
-            const isUsd = acc.currency === 'USD';
-
             return (
               <div
                 key={acc.id}
@@ -131,16 +148,18 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
                       {acc.accountName}
                     </span>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      isUsd 
+                      acc.currency === 'USD'
                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
-                        : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                        : acc.currency === 'VES'
+                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                     }`}>
                       {acc.currency}
                     </span>
                   </div>
 
                   <div className="text-xl font-bold text-white mt-1">
-                    {isUsd ? formatUsd(acc.balance) : formatVes(acc.balance)}
+                    {formatCurrency(acc.balance, acc.currency)}
                   </div>
                 </div>
 
