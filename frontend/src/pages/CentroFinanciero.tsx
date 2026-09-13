@@ -137,11 +137,11 @@ export const CentroFinanciero: React.FC = () => {
           {/* Selector de Período y Estado de Sincronización */}
           <div className="flex flex-wrap items-center gap-2 mt-2 md:mt-0">
             <div className="bg-[#0b2341] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/80 font-['IBM_Plex_Mono',monospace]">
-              Período: <span className="text-[#35d7c3] font-semibold">Marzo 2026</span>
+              Período: <span className="text-[#35d7c3] font-semibold">Período de ejemplo</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-medium">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Sincronizado</span>
+              <span>Fuentes simuladas</span>
             </div>
           </div>
         </div>
