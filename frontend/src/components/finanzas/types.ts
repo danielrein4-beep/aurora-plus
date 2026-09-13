@@ -15,7 +15,7 @@ export interface KpiCardData {
   title: string;
   subtitle: string;
   balances: CurrencyBalance[]; // Desglose explícito en monedas admitidas (USD, VES, COP)
-  changePercent: number;
+  changePercent?: number;
   state: QualityState;
   stateExplanation: string;
   detailsHint?: string;

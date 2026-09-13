@@ -5,14 +5,16 @@ import { IconBank, IconFileText, IconHourglass, IconInfo } from '../../Icons';
 
 interface ResumenFinancieroProps {
   kpis: Record<string, KpiCardData>;
-  cashBalances: CashDrawerBalance[];
+  cashBalances?: CashDrawerBalance[];
   onNavigateToDocuments: () => void;
+  dataMode?: 'real' | 'demo';
 }
 
 export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
   kpis,
-  cashBalances,
-  onNavigateToDocuments
+  cashBalances = [],
+  onNavigateToDocuments,
+  dataMode = 'demo'
 }) => {
   const formatCurrency = (amount: number, currency: SupportedCurrency) => {
     switch (currency) {
@@ -38,7 +40,9 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
               Centro Financiero Diseñado para la Toma de Decisiones
             </h4>
             <p className="text-xs text-white/70 mt-0.5 leading-relaxed">
-              Monitorea el flujo operativo consolidado de tu negocio en lenguaje simple. Los importes se presentan de forma independiente en sus monedas de origen admitidas (USD, VES y COP), sin conversiones ficticias.
+              {dataMode === 'real'
+                ? 'Importes consolidados en la moneda base del negocio. Los movimientos históricos conservan el equivalente registrado al momento de la operación.'
+                : 'Los importes de esta maqueta se presentan por moneda de origen (USD, VES y COP), sin tasas de cambio inventadas.'}
             </p>
           </div>
         </div>
@@ -99,10 +103,12 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
                 </p>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs">
-                <span className={`font-semibold font-['IBM_Plex_Mono',monospace] ${kpi.changePercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {kpi.changePercent >= 0 ? '+' : ''}{kpi.changePercent}% vs mes ant.
-                </span>
+              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs min-h-5">
+                {kpi.changePercent !== undefined && (
+                  <span className={`font-semibold font-['IBM_Plex_Mono',monospace] ${kpi.changePercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {kpi.changePercent >= 0 ? '+' : ''}{kpi.changePercent}% vs mes ant.
+                  </span>
+                )}
                 {kpi.detailsHint && (
                   <span className="text-[11px] text-white/40 truncate max-w-[130px]" title={kpi.detailsHint}>
                     {kpi.detailsHint}
@@ -114,7 +120,8 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
         })}
       </div>
 
-      {/* Caja y Cuentas Bancarias Multi-Moneda */}
+      {/* La caja solo aparece cuando existe una fuente real o una maqueta explícita. */}
+      {cashBalances.length > 0 && (
       <div className="bg-[#0b2341] border border-white/10 rounded-2xl p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-white/10">
           <div>
@@ -169,6 +176,7 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
           })}
         </div>
       </div>
+      )}
     </div>
   );
 };

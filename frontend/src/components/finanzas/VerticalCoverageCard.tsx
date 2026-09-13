@@ -66,6 +66,11 @@ export const VerticalCoverageCard: React.FC<VerticalCoverageProps> = ({ coverage
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5 mt-4">
+        {coverageList.length === 0 && (
+          <div className="md:col-span-2 lg:col-span-3 xl:col-span-5 rounded-xl border border-white/10 bg-[#071a2e] p-5 text-center text-sm text-white/60">
+            No hay verticales operativas conectadas para este período.
+          </div>
+        )}
         {coverageList.map((item) => {
           const badge = getStatusBadge(item.status);
 
