@@ -1,0 +1,245 @@
+import React from 'react';
+import { Empleado, PeriodoNomina, RegistroAsistencia, AsignacionTurno, SeccionPersonal } from './types';
+import { EstadoNominaBadge } from './EstadoNominaBadge';
+
+interface ResumenEquipoProps {
+  empleados: Empleado[];
+  periodoActual: PeriodoNomina;
+  asistenciasHoy: RegistroAsistencia[];
+  turnosHoy: AsignacionTurno[];
+  onNavegarSeccion: (seccion: SeccionPersonal) => void;
+  ocultarSueldo: boolean;
+}
+
+export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
+  empleados,
+  periodoActual,
+  asistenciasHoy,
+  turnosHoy,
+  onNavegarSeccion,
+  ocultarSueldo,
+}) => {
+  const activosCount = empleados.filter((e) => e.estado === 'ACTIVO').length;
+  const vacacionesCount = empleados.filter((e) => e.estado === 'DE_VACACIONES').length;
+  const presentesHoy = asistenciasHoy.filter((a) => a.estado === 'PRESENTE' || a.estado === 'RETARDO').length;
+  const retardoHoy = asistenciasHoy.filter((a) => a.estado === 'RETARDO').length;
+  
+  // Conteo por departamento
+  const porDepto = empleados.reduce<Record<string, number>>((acc, emp) => {
+    acc[emp.departamento] = (acc[emp.departamento] || 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-6">
+      {/* Banner de Datos Simulados */}
+      <div className="p-3 bg-[#131c2e] border border-[#1e2d48] rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded bg-[#35d7c3]/15 text-[#35d7c3] font-mono font-semibold border border-[#35d7c3]/30">
+            [DEMO]
+          </span>
+          <span className="text-[#94a3b8]">
+            Entorno de demostración operativa. Las cifras y registros mostrados son referenciales.
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[#35d7c3] animate-pulse" />
+          <span className="text-[#f8fafc] font-medium font-mono">Motor de Personal v2.4</span>
+        </div>
+      </div>
+
+      {/* Tarjetas de Métricas Principales (Grid Responsive 360px+) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Equipo */}
+        <div
+          onClick={() => onNavegarSeccion('empleados')}
+          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#35d7c3]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#35d7c3]"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('empleados')}
+        >
+          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1">
+            <span>Total Colaboradores</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#0b111e] font-mono text-[#35d7c3]">
+              {activosCount} Activos
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-bold font-mono text-[#f8fafc]">
+              {empleados.length}
+            </span>
+            <span className="text-xs text-[#64748b]">en nómina [DEMO]</span>
+          </div>
+          <div className="mt-2 text-xs text-[#94a3b8] flex items-center gap-2">
+            <span className="text-[#35d7c3]">&bull;</span>
+            <span>{vacacionesCount} de vacaciones</span>
+          </div>
+        </div>
+
+        {/* Asistencia de Hoy */}
+        <div
+          onClick={() => onNavegarSeccion('asistencia')}
+          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#35d7c3]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#35d7c3]"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('asistencia')}
+        >
+          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1">
+            <span>Asistencia Hoy</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#0b111e] font-mono text-[#38bdf8]">
+              {turnosHoy.length} Programados
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-bold font-mono text-[#f8fafc]">
+              {presentesHoy}
+            </span>
+            <span className="text-xs text-[#64748b]">marcaciones</span>
+          </div>
+          <div className="mt-2 text-xs text-[#94a3b8] flex items-center gap-2">
+            {retardoHoy > 0 ? (
+              <span className="text-[#fbbf24] font-medium">{retardoHoy} con retardo justificado</span>
+            ) : (
+              <span className="text-[#35d7c3]">100% puntualidad matutina</span>
+            )}
+          </div>
+        </div>
+
+        {/* Turnos en Curso */}
+        <div
+          onClick={() => onNavegarSeccion('turnos')}
+          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#35d7c3]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#35d7c3]"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('turnos')}
+        >
+          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1">
+            <span>Cobertura de Turnos</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#0b111e] font-mono text-[#a855f7]">
+              Jornada Activa
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-bold font-mono text-[#f8fafc]">
+              {turnosHoy.filter((t) => t.estado === 'EN_CURSO').length}
+            </span>
+            <span className="text-xs text-[#64748b]">en puesto</span>
+          </div>
+          <div className="mt-2 text-xs text-[#94a3b8]">
+            <span>Triaje, Médicos y Admisión cubiertos</span>
+          </div>
+        </div>
+
+        {/* Período de Nómina Actual */}
+        <div
+          onClick={() => onNavegarSeccion('nomina')}
+          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#35d7c3]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#35d7c3]"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('nomina')}
+        >
+          <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1">
+            <span>Aurora Nómina</span>
+            <EstadoNominaBadge estado={periodoActual.estado} />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xl sm:text-2xl font-bold font-mono text-[#35d7c3]">
+              {ocultarSueldo ? '••••••' : `$${periodoActual.montoTotalNeto.toFixed(2)}`}
+            </span>
+            <span className="text-xs text-[#64748b]">USD neto</span>
+          </div>
+          <div className="mt-2 text-[11px] text-[#94a3b8] truncate font-mono">
+            {periodoActual.nombre}
+          </div>
+        </div>
+      </div>
+
+      {/* Sección Doble: Distribución por Área y Turnos del Día */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Distribución de Personal */}
+        <div className="p-5 bg-[#131c2e] border border-[#1e2d48] rounded-xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-[#f8fafc]">Distribución del Equipo</h3>
+              <p className="text-xs text-[#94a3b8]">Personal asignado por departamento clínico y de soporte</p>
+            </div>
+            <button
+              onClick={() => onNavegarSeccion('empleados')}
+              className="text-xs text-[#35d7c3] hover:underline font-medium"
+            >
+              Ver todos &rarr;
+            </button>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            {Object.entries(porDepto).map(([depto, count]) => {
+              const porcentaje = Math.round((count / empleados.length) * 100);
+              return (
+                <div key={depto} className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[#cbd5e1] font-medium">{depto}</span>
+                    <span className="font-mono text-[#94a3b8]">
+                      {count} ({porcentaje}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-[#0b111e] h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-[#35d7c3] h-full rounded-full transition-all duration-300"
+                      style={{ width: `${porcentaje}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Turnos en Curso Hoy */}
+        <div className="p-5 bg-[#131c2e] border border-[#1e2d48] rounded-xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-[#f8fafc]">Turnos de la Jornada</h3>
+              <p className="text-xs text-[#94a3b8]">Personal actualmente en guardia o servicio activo</p>
+            </div>
+            <button
+              onClick={() => onNavegarSeccion('turnos')}
+              className="text-xs text-[#35d7c3] hover:underline font-medium"
+            >
+              Gestionar matriz &rarr;
+            </button>
+          </div>
+
+          <div className="space-y-2 pt-1 max-h-[260px] overflow-y-auto pr-1">
+            {turnosHoy.map((t) => (
+              <div
+                key={t.id}
+                className="p-3 bg-[#0f172a] border border-[#1e293b] rounded-lg flex items-center justify-between gap-3 text-xs"
+              >
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-[#f8fafc]">{t.empleadoNombre}</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#1e293b] text-[#94a3b8]">
+                      {t.departamento}
+                    </span>
+                  </div>
+                  <p className="text-[#64748b] text-[11px]">{t.turnoNombre}</p>
+                </div>
+
+                <div>
+                  {t.estado === 'EN_CURSO' ? (
+                    <span className="inline-flex items-center gap-1 text-[#35d7c3] font-medium font-mono text-[11px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#35d7c3] animate-pulse" />
+                      En Servicio
+                    </span>
+                  ) : (
+                    <span className="text-[#94a3b8] font-mono text-[11px]">Programado</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
