@@ -28,10 +28,12 @@ public class EscandalloRecetaController {
     @Autowired
     private EscandalloService escandalloService;
 
-    // Hallazgo de seguridad corregido: en vez de depender del filtro de
-    // Hibernate del TenantInterceptor (no siempre "vivo" en la sesión que
-    // ejecuta el findAll(), ver MesaController), se pide el tenant explícito
-    // al repositorio.
+    // El filtro de Hibernate no siempre llega vivo a la sesión que ejecuta un
+    // findAll() (hallazgo de seguridad ya confirmado dos veces en este código:
+    // ver ArticuloController y MesaController, donde un enableFilter()+findAll()
+    // como este dejó pasar datos de otro tenant en pruebas). Se pide el tenant
+    // explícito al repositorio en su lugar — no depende de que ningún filtro
+    // de sesión esté "vivo".
     @GetMapping
     public List<EscandalloReceta> listar() {
         return escandalloRecetaRepository.findByTenantId(TenantContext.getCurrentTenant());
@@ -118,6 +120,111 @@ public class EscandalloRecetaController {
 
         detalleRecetaRepository.save(detalle);
 
+        return ResponseEntity.ok(escandalloService.recalcularCosto(id, tenantId));
+    }
+
+    public static class EditarEscandalloRequest {
+        public String nombrePlato;
+        public String estacionCocina;
+        public BigDecimal precioVenta;
+        public Boolean requiereCocina;
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<EscandalloReceta> editar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody EditarEscandalloRequest request) {
+        EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
+        if (!escandallo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Escandallo no pertenece a este tenant");
+        }
+        if (request.nombrePlato != null && !request.nombrePlato.isBlank()) {
+            escandallo.setNombrePlato(request.nombrePlato.trim());
+        }
+        if (request.estacionCocina != null && !request.estacionCocina.isBlank()) {
+            escandallo.setEstacionCocina(request.estacionCocina);
+        }
+        if (request.precioVenta != null) {
+            escandallo.setPrecioVenta(request.precioVenta);
+        }
+        if (request.requiereCocina != null) {
+            escandallo.setRequiereCocina(request.requiereCocina);
+        }
+        escandalloRecetaRepository.save(escandallo);
+        return ResponseEntity.ok(escandalloService.recalcularCosto(id, tenantId));
+    }
+
+    public static class EditarIngredienteRequest {
+        public BigDecimal cantidadRequerida;
+        public BigDecimal pesoNeto;
+        public BigDecimal porcentajeMerma;
+    }
+
+    @PutMapping("/{id}/ingredientes/{detalleId}")
+    public ResponseEntity<EscandalloReceta> editarIngrediente(
+            @PathVariable Long id,
+            @PathVariable Long detalleId,
+            @RequestParam Long tenantId,
+            @RequestBody EditarIngredienteRequest request) {
+        EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
+        if (!escandallo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Escandallo no pertenece a este tenant");
+        }
+
+        DetalleReceta detalle = detalleRecetaRepository.findById(detalleId)
+            .orElseThrow(() -> new RuntimeException("Detalle de receta no encontrado"));
+        if (!detalle.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Detalle no pertenece a este tenant");
+        }
+        if (!detalle.getEscandallo().getId().equals(id)) {
+            throw new RuntimeException("El detalle no corresponde a este escandallo");
+        }
+
+        if (request.pesoNeto != null && request.porcentajeMerma != null) {
+            BigDecimal cantidadBruta = escandalloService.calcularCantidadBruta(request.pesoNeto, request.porcentajeMerma);
+            detalle.setPesoNeto(request.pesoNeto);
+            detalle.setPorcentajeMerma(request.porcentajeMerma);
+            detalle.setCantidadRequerida(cantidadBruta != null ? cantidadBruta : request.cantidadRequerida);
+        } else if (request.cantidadRequerida != null) {
+            detalle.setCantidadRequerida(request.cantidadRequerida);
+            if (request.pesoNeto != null) detalle.setPesoNeto(request.pesoNeto);
+            if (request.porcentajeMerma != null) detalle.setPorcentajeMerma(request.porcentajeMerma);
+        } else if (request.pesoNeto != null) {
+            detalle.setPesoNeto(request.pesoNeto);
+            BigDecimal merma = detalle.getPorcentajeMerma() != null ? detalle.getPorcentajeMerma() : BigDecimal.ZERO;
+            BigDecimal cantidadBruta = escandalloService.calcularCantidadBruta(request.pesoNeto, merma);
+            detalle.setCantidadRequerida(cantidadBruta != null ? cantidadBruta : request.pesoNeto);
+        }
+
+        if (detalle.getCantidadRequerida() == null || detalle.getCantidadRequerida().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("La cantidad requerida debe ser mayor a cero");
+        }
+
+        detalleRecetaRepository.save(detalle);
+        return ResponseEntity.ok(escandalloService.recalcularCosto(id, tenantId));
+    }
+
+    @DeleteMapping("/{id}/ingredientes/{detalleId}")
+    public ResponseEntity<EscandalloReceta> eliminarIngrediente(
+            @PathVariable Long id,
+            @PathVariable Long detalleId,
+            @RequestParam Long tenantId) {
+        EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
+        if (!escandallo.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Escandallo no pertenece a este tenant");
+        }
+
+        DetalleReceta detalle = detalleRecetaRepository.findById(detalleId)
+            .orElseThrow(() -> new RuntimeException("Detalle de receta no encontrado"));
+        if (!detalle.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Detalle no pertenece a este tenant");
+        }
+        if (!detalle.getEscandallo().getId().equals(id)) {
+            throw new RuntimeException("El detalle no corresponde a este escandallo");
+        }
+
+        detalleRecetaRepository.delete(detalle);
         return ResponseEntity.ok(escandalloService.recalcularCosto(id, tenantId));
     }
 

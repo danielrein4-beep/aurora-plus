@@ -837,6 +837,18 @@ export function crearEscandallo(tenantId: number, datos: { nombrePlato: string; 
   return request(`/api/horeca/escandallos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
+export function editarEscandallo(tenantId: number, escandalloId: number, datos: {
+  nombrePlato?: string;
+  estacionCocina?: string;
+  precioVenta?: number;
+  requiereCocina?: boolean;
+}): Promise<EscandalloReceta> {
+  return request(`/api/horeca/escandallos/${escandalloId}?tenantId=${tenantId}`, {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}
+
 // Si la receta ya tiene ventas, el backend no la borra: la marca inactiva
 // (desaparece de Venta Rápida) y devuelve el escandallo actualizado en vez
 // de nada — por eso el tipo de retorno no es void.
@@ -856,6 +868,27 @@ export function agregarIngredienteEscandallo(tenantId: number, escandalloId: num
   ingredienteSku?: string; subEscandalloId?: number; cantidadRequerida?: number; pesoNeto?: number; porcentajeMerma?: number;
 }): Promise<EscandalloReceta> {
   return request(`/api/horeca/escandallos/${escandalloId}/ingredientes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function editarIngredienteEscandallo(tenantId: number, escandalloId: number, detalleId: number, datos: {
+  cantidadRequerida?: number; pesoNeto?: number; porcentajeMerma?: number;
+}): Promise<EscandalloReceta> {
+  return request(`/api/horeca/escandallos/${escandalloId}/ingredientes/${detalleId}?tenantId=${tenantId}`, {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function eliminarIngredienteEscandallo(tenantId: number, escandalloId: number, detalleId: number): Promise<EscandalloReceta> {
+  return request(`/api/horeca/escandallos/${escandalloId}/ingredientes/${detalleId}?tenantId=${tenantId}`, {
+    method: "DELETE",
+  });
+}
+
+export function recalcularCostoEscandallo(tenantId: number, escandalloId: number): Promise<EscandalloReceta> {
+  return request(`/api/horeca/escandallos/${escandalloId}/recalcular-costo?tenantId=${tenantId}`, {
+    method: "POST",
+  });
 }
 
 export function listarIngredientesEscandallo(tenantId: number, escandalloId: number): Promise<DetalleReceta[]> {

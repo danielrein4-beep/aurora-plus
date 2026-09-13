@@ -14,7 +14,7 @@ import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Cart
 import { useAuth } from "../context/AuthContext";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
-  dividirCuenta, cerrarComandaMixto, anularComanda, listarEscandallos, crearEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo,
+  dividirCuenta, cerrarComandaMixto, anularComanda, listarEscandallos, crearEscandallo, editarEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo, editarIngredienteEscandallo, eliminarIngredienteEscandallo, recalcularCostoEscandallo,
   listarIngredientesEscandallo, listarFastBar,
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
@@ -2054,7 +2054,7 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
   const [form, setForm] = useState({ nombrePlato: "", estacionCocina: "COCINA", precioVenta: "", requiereCocina: true });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [seleccionado, setSeleccionado] = useState<EscandalloReceta | null>(null);
+  const [editandoReceta, setEditandoReceta] = useState<EscandalloReceta | null>(null);
   const [eliminandoId, setEliminandoId] = useState<number | null>(null);
 
   const eliminar = async (e: React.MouseEvent, escandallo: EscandalloReceta) => {
@@ -2094,10 +2094,14 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
     setGuardando(true);
     setError(null);
     try {
-      await crearEscandallo(tenantId, { nombrePlato: form.nombrePlato.trim(), estacionCocina: form.estacionCocina, precioVenta: Number(form.precioVenta), requiereCocina: form.requiereCocina });
+      const nueva = await crearEscandallo(tenantId, { nombrePlato: form.nombrePlato.trim(), estacionCocina: form.estacionCocina, precioVenta: Number(form.precioVenta), requiereCocina: form.requiereCocina });
       setForm({ nombrePlato: "", estacionCocina: "COCINA", precioVenta: "", requiereCocina: true });
       setMostrarForm(false);
       onCambio();
+      // Abrir inmediatamente el modal para cargar ingredientes
+      if (nueva && nueva.id) {
+        setEditandoReceta(nueva);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo crear la receta");
     } finally {
@@ -2122,7 +2126,10 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500 dark:text-white/40">{(escandallos || []).length} recetas registradas</p>
+        <div>
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">Catálogo de Recetas & Escandallos</h3>
+          <p className="text-xs text-slate-500 dark:text-white/50">{(escandallos || []).length} recetas registradas · costeo en vivo según inventario</p>
+        </div>
         <button onClick={() => setMostrarForm((v) => !v)} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
           {mostrarForm ? "Cancelar" : "+ Nueva receta"}
         </button>
@@ -2142,7 +2149,7 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
             Necesita preparación de cocina (desmarcar para bebida embotellada, snack o combo sin cocción)
           </label>
           <button onClick={crear} disabled={guardando} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
-            {guardando ? "Guardando…" : "Guardar receta"}
+            {guardando ? "Creando…" : "Crear receta y configurar escandallo"}
           </button>
         </div>
       )}
@@ -2151,131 +2158,680 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {(escandallos || []).map((e) => {
-          const margen = Number(e.precioVenta) - Number(e.costoTotalProduccion || 0);
+          const costoNum = Number(e.costoTotalProduccion || 0);
+          const tieneCosto = costoNum > 0;
+          const precioNum = Number(e.precioVenta || 0);
+          const margen = precioNum - costoNum;
+          const margenPct = precioNum > 0 ? (margen / precioNum) * 100 : 0;
           const inactivo = e.activo === false;
+
           return (
-            <div key={e.id} onClick={() => setSeleccionado(e)}
-              className={`apple-glass rounded-2xl p-5 hover-card cursor-pointer space-y-2 ${inactivo ? "opacity-50 border-dashed" : ""}`}>
+            <div key={e.id} onClick={() => setEditandoReceta(e)}
+              className={`apple-glass rounded-2xl p-5 hover-card cursor-pointer space-y-2.5 transition-all ${inactivo ? "opacity-50 border-dashed" : ""}`}>
               <div className="flex items-center justify-between gap-2">
-                <h4 className="font-bold text-slate-900 dark:text-white text-sm">{e.nombrePlato}{inactivo && <span className="ml-1.5 text-[9px] font-normal text-slate-400">(oculta)</span>}</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate" title={e.nombrePlato}>
+                  {e.nombrePlato}
+                  {inactivo && <span className="ml-1.5 text-[9px] font-normal text-slate-400">(oculta)</span>}
+                </h4>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-white/10 text-slate-500 dark:text-white/40">{e.estacionCocina}</span>
+                  {/* Botón de edición explícito */}
+                  <button onClick={(ev) => { ev.stopPropagation(); setEditandoReceta(e); }}
+                    title="Editar datos, ingredientes y escandallo"
+                    className="text-slate-400 hover:text-sky-500 cursor-pointer p-1 rounded-lg hover:bg-sky-500/10 transition-colors">
+                    <IconEdit size={13} />
+                  </button>
                   <button onClick={(ev) => alternarActivo(ev, e)} disabled={eliminandoId === e.id}
                     title={inactivo ? "Mostrar de nuevo en Venta Rápida" : "Ocultar de Venta Rápida (sin borrar)"}
-                    className="text-slate-400 hover:text-teal-500 cursor-pointer disabled:opacity-40">
+                    className="text-slate-400 hover:text-teal-500 cursor-pointer p-1 rounded-lg hover:bg-teal-500/10 transition-colors disabled:opacity-40">
                     {inactivo ? <IconCheckCircle size={13} /> : <IconClose size={13} />}
                   </button>
                   <button onClick={(ev) => eliminar(ev, e)} disabled={eliminandoId === e.id} title="Eliminar receta"
-                    className="text-slate-400 hover:text-red-500 cursor-pointer disabled:opacity-40">
+                    className="text-slate-400 hover:text-red-500 cursor-pointer p-1 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-40">
                     <IconTrash size={13} />
                   </button>
                 </div>
               </div>
+
+              {/* Precios y Costos — con aviso explícito cuando tiene 0 ingredientes */}
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200/50 dark:border-white/5">
+                <span className="text-slate-500 dark:text-white/50">
+                  Precio: <strong className="text-slate-900 dark:text-white">${precioNum.toFixed(2)}</strong>
+                </span>
+                <span className="text-right">
+                  {tieneCosto ? (
+                    <span className="text-slate-500 dark:text-white/50">
+                      Costo: <strong className="text-slate-900 dark:text-white font-mono">${costoNum.toFixed(2)}</strong>
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md">
+                      Costo: sin calcular · falta cargar ingredientes
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* Margen */}
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 dark:text-white/40">Precio: <strong className="text-slate-900 dark:text-white">${Number(e.precioVenta).toFixed(2)}</strong></span>
-                <span className="text-slate-500 dark:text-white/40">Costo: <strong className="text-slate-900 dark:text-white">${Number(e.costoTotalProduccion || 0).toFixed(2)}</strong></span>
-              </div>
-              <div className={`text-xs font-semibold ${margen >= 0 ? "text-teal-600 dark:text-teal-400" : "text-red-500"}`}>
-                Margen: ${margen.toFixed(2)}
-              </div>
-              <button onClick={(ev) => alternarRequiereCocina(ev, e)} disabled={eliminandoId === e.id}
-                title="Si se desmarca, esta venta no pasa por el tablero de cocina — queda entregada de una vez"
-                className={`text-[10px] font-bold px-2 py-1 rounded-full cursor-pointer disabled:opacity-40 ${
-                  e.requiereCocina !== false ? "bg-sky-500/15 text-sky-600 dark:text-sky-300" : "bg-slate-200/60 dark:bg-white/10 text-slate-500 dark:text-white/40"
-                }`}>
-                {e.requiereCocina !== false ? (
-                  <span className="inline-flex items-center gap-1">
-                    <IconHourglass size={11} />
-                    <span>Pasa por cocina</span>
-                  </span>
+                {tieneCosto ? (
+                  <div className={`font-semibold ${margen >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
+                    Margen: ${margen.toFixed(2)} <span className="text-[10px] font-normal opacity-80">({margenPct.toFixed(1)}%)</span>
+                  </div>
                 ) : (
-                  <span className="inline-flex items-center gap-1">
-                    <IconBolt size={11} />
-                    <span>Entrega directa</span>
+                  <span className="text-[11px] text-slate-400 dark:text-white/30 italic">
+                    Margen: pendiente de insumos
                   </span>
                 )}
-              </button>
+                <span className="text-[10px] text-sky-500/80 hover:underline">Ver escandallo →</span>
+              </div>
+
+              <div className="pt-1">
+                <button onClick={(ev) => alternarRequiereCocina(ev, e)} disabled={eliminandoId === e.id}
+                  title="Si se desmarca, esta venta no pasa por el tablero de cocina — queda entregada de una vez"
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer disabled:opacity-40 transition-colors ${
+                    e.requiereCocina !== false ? "bg-sky-500/15 text-sky-600 dark:text-sky-300" : "bg-slate-200/60 dark:bg-white/10 text-slate-500 dark:text-white/40"
+                  }`}>
+                  {e.requiereCocina !== false ? (
+                    <span className="inline-flex items-center gap-1">
+                      <IconHourglass size={10} />
+                      <span>Pasa por cocina</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">
+                      <IconBolt size={10} />
+                      <span>Entrega directa</span>
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
           );
         })}
       </div>
 
-      {seleccionado && (
-        <IngredientesModal tenantId={tenantId} escandallo={seleccionado} articulos={articulos} onClose={() => setSeleccionado(null)} onCambio={onCambio} />
+      {editandoReceta && (
+        <ModalEditarReceta
+          tenantId={tenantId}
+          escandallo={editandoReceta}
+          articulos={articulos}
+          escandallos={escandallos}
+          onClose={() => setEditandoReceta(null)}
+          onCambio={onCambio}
+        />
       )}
     </div>
   );
 }
 
-function IngredientesModal({ tenantId, escandallo, articulos, onClose, onCambio }: { tenantId: number; escandallo: EscandalloReceta; articulos: Articulo[] | null; onClose: () => void; onCambio: () => void }) {
+function ModalEditarReceta({
+  tenantId, escandallo, articulos, escandallos, onClose, onCambio,
+}: {
+  tenantId: number;
+  escandallo: EscandalloReceta;
+  articulos: Articulo[] | null;
+  escandallos: EscandalloReceta[] | null;
+  onClose: () => void;
+  onCambio: () => void;
+}) {
+  const [receta, setReceta] = useState<EscandalloReceta>(escandallo);
   const [ingredientes, setIngredientes] = useState<DetalleReceta[] | null>(null);
-  const [articuloId, setArticuloId] = useState("");
-  const [pesoNeto, setPesoNeto] = useState("");
-  const [merma, setMerma] = useState("0");
+
+  // Formulario de edición de datos de la receta
+  const [nombrePlato, setNombrePlato] = useState(escandallo.nombrePlato || "");
+  const [estacionCocina, setEstacionCocina] = useState(escandallo.estacionCocina || "COCINA");
+  const [precioVenta, setPrecioVenta] = useState(String(escandallo.precioVenta ?? ""));
+  const [requiereCocina, setRequiereCocina] = useState(escandallo.requiereCocina ?? true);
+  const [guardandoPlato, setGuardandoPlato] = useState(false);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
 
-  const cargar = () => listarIngredientesEscandallo(tenantId, escandallo.id).then(setIngredientes).catch(() => setIngredientes([]));
-  useEffect(() => { cargar(); }, [escandallo.id]);
+  // Edición en línea de una fila de ingrediente
+  const [editandoDetalleId, setEditandoDetalleId] = useState<number | null>(null);
+  const [editPesoNeto, setEditPesoNeto] = useState("");
+  const [editMerma, setEditMerma] = useState("0");
+  const [guardandoDetalle, setGuardandoDetalle] = useState(false);
 
-  const agregar = async () => {
-    const articulo = (articulos || []).find((a) => String(a.id) === articuloId);
-    if (!articulo || !pesoNeto) { setError("Elige el ingrediente del inventario e indica el peso neto"); return; }
-    setGuardando(true);
+  // Formulario para nuevo ingrediente
+  const [tipoNuevo, setTipoNuevo] = useState<"articulo" | "subreceta">("articulo");
+  const [nuevoArticuloId, setNuevoArticuloId] = useState("");
+  const [nuevoSubRecetaId, setNuevoSubRecetaId] = useState("");
+  const [nuevoPesoNeto, setNuevoPesoNeto] = useState("");
+  const [nuevoMerma, setNuevoMerma] = useState("0");
+  const [guardandoNuevo, setGuardandoNuevo] = useState(false);
+
+  const cargarIngredientes = () => {
+    listarIngredientesEscandallo(tenantId, escandallo.id)
+      .then(setIngredientes)
+      .catch(() => setIngredientes([]));
+  };
+
+  useEffect(() => {
+    cargarIngredientes();
+  }, [escandallo.id]);
+
+  // Guardar datos básicos de la receta (nombre, precio, estación, cocina)
+  const guardarDatosPlato = async () => {
+    if (!nombrePlato.trim() || !precioVenta) {
+      setError("Nombre del plato y precio de venta son obligatorios");
+      return;
+    }
+    setGuardandoPlato(true);
     setError(null);
     try {
-      await agregarIngredienteEscandallo(tenantId, escandallo.id, { ingredienteSku: articulo.sku, pesoNeto: Number(pesoNeto), porcentajeMerma: Number(merma) || 0 });
-      setArticuloId(""); setPesoNeto(""); setMerma("0");
-      cargar();
+      const actualizada = await editarEscandallo(tenantId, receta.id, {
+        nombrePlato: nombrePlato.trim(),
+        estacionCocina,
+        precioVenta: Number(precioVenta),
+        requiereCocina,
+      });
+      setReceta(actualizada);
+      setMensajeExito("Datos de la receta guardados correctamente");
+      setTimeout(() => setMensajeExito(null), 3000);
       onCambio();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo agregar el ingrediente");
+      setError(e instanceof Error ? e.message : "No se pudo actualizar la receta");
     } finally {
-      setGuardando(false);
+      setGuardandoPlato(false);
     }
   };
 
-  return (
-    <Modal onClose={onClose} titulo={`Ingredientes — ${escandallo.nombrePlato}`}>
-      <div className="space-y-3">
-        {ingredientes === null ? <p className="text-xs text-slate-400">Cargando…</p> : ingredientes.length === 0 ? (
-          <p className="text-xs text-slate-400">Sin ingredientes registrados todavía.</p>
-        ) : (
-          <div className="space-y-2">
-            {ingredientes.map((d) => {
-              const articuloIngrediente = (articulos || []).find((a) => a.sku === d.ingredienteSku);
-              return (
-                <div key={d.id} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3.5 py-2.5 text-sm">
-                  <span className="text-slate-900 dark:text-white">{d.subReceta ? `Sub-receta: ${d.subReceta.nombrePlato}` : articuloIngrediente?.nombre || d.ingredienteSku}</span>
-                  <span className="font-mono text-xs text-slate-500 dark:text-white/40">{Number(d.cantidadRequerida).toFixed(3)}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+  // Iniciar edición en línea de un ingrediente
+  const iniciarEdicionDetalle = (d: DetalleReceta) => {
+    setEditandoDetalleId(d.id);
+    setEditPesoNeto(d.pesoNeto != null ? String(d.pesoNeto) : String(d.cantidadRequerida));
+    setEditMerma(d.porcentajeMerma != null ? String(d.porcentajeMerma) : "0");
+    setError(null);
+  };
 
-        <div className="apple-glass rounded-xl p-4 space-y-2.5 border-t border-slate-300/50 dark:border-white/10">
-          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Agregar ingrediente desde Inventario</p>
-          <div className="grid grid-cols-3 gap-2">
-            <select value={articuloId} onChange={(e) => setArticuloId(e.target.value)} className="input-horeca">
-              <option value="">— Ingrediente —</option>
-              {(articulos || []).map((a) => <option key={a.id} value={a.id}>{a.nombre} ({a.unidadMedida})</option>)}
-            </select>
-            <input value={pesoNeto} onChange={(e) => setPesoNeto(e.target.value)} type="number" step="0.001" placeholder="Cantidad" className="input-horeca" />
-            <input value={merma} onChange={(e) => setMerma(e.target.value)} type="number" step="0.1" placeholder="% merma" className="input-horeca" />
+  const cancelarEdicionDetalle = () => {
+    setEditandoDetalleId(null);
+    setEditPesoNeto("");
+    setEditMerma("0");
+  };
+
+  // Guardar edición de un ingrediente
+  const guardarEdicionDetalle = async (detalleId: number) => {
+    const neto = parseFloat(editPesoNeto);
+    const merma = parseFloat(editMerma) || 0;
+    if (isNaN(neto) || neto <= 0) {
+      setError("La cantidad/peso debe ser mayor a cero");
+      return;
+    }
+    setGuardandoDetalle(true);
+    setError(null);
+    try {
+      const actualizada = await editarIngredienteEscandallo(tenantId, receta.id, detalleId, {
+        pesoNeto: neto,
+        porcentajeMerma: merma,
+      });
+      setReceta(actualizada);
+      setEditandoDetalleId(null);
+      cargarIngredientes();
+      onCambio();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo editar el ingrediente");
+    } finally {
+      setGuardandoDetalle(false);
+    }
+  };
+
+  // Eliminar un ingrediente
+  const eliminarDetalle = async (detalleId: number, nombreInsumo: string) => {
+    if (!window.confirm(`¿Quitar "${nombreInsumo}" de esta receta?`)) return;
+    setError(null);
+    try {
+      const actualizada = await eliminarIngredienteEscandallo(tenantId, receta.id, detalleId);
+      setReceta(actualizada);
+      cargarIngredientes();
+      onCambio();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo eliminar el ingrediente");
+    }
+  };
+
+  // Agregar nuevo ingrediente directo o sub-receta
+  const agregarNuevoIngrediente = async () => {
+    const neto = parseFloat(nuevoPesoNeto);
+    const merma = parseFloat(nuevoMerma) || 0;
+
+    if (isNaN(neto) || neto <= 0) {
+      setError("Indica una cantidad mayor a cero");
+      return;
+    }
+
+    if (tipoNuevo === "articulo") {
+      const art = (articulos || []).find((a) => String(a.id) === nuevoArticuloId);
+      if (!art) { setError("Selecciona un insumo de inventario"); return; }
+      setGuardandoNuevo(true);
+      setError(null);
+      try {
+        const actualizada = await agregarIngredienteEscandallo(tenantId, receta.id, {
+          ingredienteSku: art.sku,
+          pesoNeto: neto,
+          porcentajeMerma: merma,
+        });
+        setReceta(actualizada);
+        setNuevoArticuloId("");
+        setNuevoPesoNeto("");
+        setNuevoMerma("0");
+        cargarIngredientes();
+        onCambio();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo agregar el ingrediente");
+      } finally {
+        setGuardandoNuevo(false);
+      }
+    } else {
+      const subId = Number(nuevoSubRecetaId);
+      if (!subId) { setError("Selecciona una sub-receta"); return; }
+      setGuardandoNuevo(true);
+      setError(null);
+      try {
+        const actualizada = await agregarIngredienteEscandallo(tenantId, receta.id, {
+          subEscandalloId: subId,
+          cantidadRequerida: neto,
+        });
+        setReceta(actualizada);
+        setNuevoSubRecetaId("");
+        setNuevoPesoNeto("");
+        setNuevoMerma("0");
+        cargarIngredientes();
+        onCambio();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo agregar la sub-receta");
+      } finally {
+        setGuardandoNuevo(false);
+      }
+    }
+  };
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CÁLCULO DE COSTEO EN VIVO (HOJA DE CÁLCULO EN TIEMPO REAL)
+  // ══════════════════════════════════════════════════════════════════════════
+  const calcularMetricasLinea = (d: DetalleReceta) => {
+    const isEditing = d.id === editandoDetalleId;
+    let cantBruta = Number(d.cantidadRequerida || 0);
+    let unitCost = 0;
+    let unidad = "";
+    let nombre = "";
+    let esSubReceta = false;
+
+    if (d.subReceta) {
+      esSubReceta = true;
+      const sub = (escandallos || []).find((s) => s.id === d.subReceta?.id) || d.subReceta;
+      unitCost = Number(sub?.costoTotalProduccion || 0);
+      unidad = "ración/unidad";
+      nombre = sub?.nombrePlato || "Sub-receta";
+    } else {
+      const art = (articulos || []).find((a) => a.sku === d.ingredienteSku);
+      unitCost = Number(art?.costoUnitario || 0);
+      unidad = art?.unidadMedida || "ud";
+      nombre = art?.nombre || d.ingredienteSku || "Artículo";
+    }
+
+    if (isEditing) {
+      const neto = parseFloat(editPesoNeto) || 0;
+      const merma = parseFloat(editMerma) || 0;
+      if (neto > 0) {
+        cantBruta = merma < 100 ? neto / (1 - merma / 100) : neto;
+      }
+    }
+
+    const costoLinea = cantBruta * unitCost;
+
+    return {
+      nombre,
+      unidad,
+      unitCost,
+      cantBruta,
+      costoLinea,
+      esSubReceta,
+      isEditing,
+    };
+  };
+
+  const desgloseLineas = useMemo(() => {
+    return (ingredientes || []).map(calcularMetricasLinea);
+  }, [ingredientes, editandoDetalleId, editPesoNeto, editMerma, articulos, escandallos]);
+
+  const costoTotalEnVivo = useMemo(() => {
+    return desgloseLineas.reduce((acc, curr) => acc + curr.costoLinea, 0);
+  }, [desgloseLineas]);
+
+  const precioNumEnVivo = parseFloat(precioVenta) || 0;
+  const margenEnVivo = precioNumEnVivo - costoTotalEnVivo;
+  const margenPctEnVivo = precioNumEnVivo > 0 ? (margenEnVivo / precioNumEnVivo) * 100 : 0;
+  const tieneIngredientes = (ingredientes || []).length > 0;
+
+  // Vista previa de costo del nuevo insumo antes de agregarlo
+  const previewNuevo = useMemo(() => {
+    const neto = parseFloat(nuevoPesoNeto) || 0;
+    const merma = parseFloat(nuevoMerma) || 0;
+    if (neto <= 0) return null;
+    const cantBruta = merma < 100 ? neto / (1 - merma / 100) : neto;
+
+    if (tipoNuevo === "articulo") {
+      const art = (articulos || []).find((a) => String(a.id) === nuevoArticuloId);
+      if (!art) return null;
+      const unit = Number(art.costoUnitario || 0);
+      return { cantBruta, unit, costo: cantBruta * unit, unidad: art.unidadMedida };
+    } else {
+      const sub = (escandallos || []).find((s) => String(s.id) === nuevoSubRecetaId);
+      if (!sub) return null;
+      const unit = Number(sub.costoTotalProduccion || 0);
+      return { cantBruta: neto, unit, costo: neto * unit, unidad: "ración" };
+    }
+  }, [tipoNuevo, nuevoArticuloId, nuevoSubRecetaId, nuevoPesoNeto, nuevoMerma, articulos, escandallos]);
+
+  return (
+    <Modal onClose={onClose} titulo={`Editar Receta & Escandallo — ${receta.nombrePlato}`} ancho="max-w-4xl">
+      <div className="space-y-5">
+        {/* Notificaciones */}
+        {error && <div className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">{error}</div>}
+        {mensajeExito && <div className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">{mensajeExito}</div>}
+
+        {/* 1. SECCIÓN: DATOS BÁSICOS DEL PLATO */}
+        <div className="apple-glass rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white/40">Datos del Plato</span>
+            <button onClick={guardarDatosPlato} disabled={guardandoPlato}
+              className="btn-cyber-neon text-white text-xs font-semibold px-4 py-1.5 rounded-lg cursor-pointer disabled:opacity-50">
+              {guardandoPlato ? "Guardando…" : "Guardar cambios del plato"}
+            </button>
           </div>
-          {(articulos || []).length === 0 && (
-            <p className="text-[11px] text-amber-500">Todavía no tienes artículos en Inventario — agrega uno primero para poder elegirlo aquí.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 dark:text-white/50 mb-1">Nombre del plato</label>
+              <input value={nombrePlato} onChange={(e) => setNombrePlato(e.target.value)} className="input-horeca w-full" placeholder="Ej. Torta de Chocolate" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 dark:text-white/50 mb-1">Estación de Cocina</label>
+              <select value={estacionCocina} onChange={(e) => setEstacionCocina(e.target.value)} className="input-horeca w-full">
+                {ESTACIONES.map((est) => <option key={est} value={est}>{est.replace("_", " ")}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 dark:text-white/50 mb-1">Precio de venta ($)</label>
+              <input value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} type="number" step="0.01" className="input-horeca w-full font-bold" placeholder="0.00" />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-white/60 cursor-pointer pt-1">
+            <input type="checkbox" checked={requiereCocina} onChange={(e) => setRequiereCocina(e.target.checked)} className="cursor-pointer" />
+            <span>Pasa por tablero de cocina KDS (desmarcar para bebidas o despacho directo)</span>
+          </label>
+        </div>
+
+        {/* 2. SECCIÓN: TABLERO DE COSTEO EN VIVO (HOJA DE CÁLCULO) */}
+        <div className="bg-slate-900/80 border border-slate-700/60 rounded-2xl p-4 shadow-xl text-white">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Costeo en Tiempo Real</span>
+            </div>
+            <span className="text-[11px] text-slate-400 font-mono">
+              {tieneIngredientes ? `${desgloseLineas.length} insumo(s) costeados` : "Sin ingredientes"}
+            </span>
+          </div>
+
+          {!tieneIngredientes ? (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between">
+              <div>
+                <strong className="text-amber-300 text-sm block">Costo: sin calcular · falta cargar ingredientes</strong>
+                <span className="text-xs text-slate-300">Agrega abajo los ingredientes del inventario para ver el costo exacto y margen en vivo.</span>
+              </div>
+              <span className="text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full font-mono">Margen pendiente</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Costo Total */}
+              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700">
+                <span className="text-[11px] text-slate-400 uppercase font-semibold block">Costo de Producción</span>
+                <div className="text-xl font-bold font-mono text-white mt-1">
+                  ${costoTotalEnVivo.toFixed(2)}
+                </div>
+                <span className="text-[10px] text-slate-400">Calculado desde inventario real</span>
+              </div>
+
+              {/* Precio de Venta */}
+              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700">
+                <span className="text-[11px] text-slate-400 uppercase font-semibold block">Precio de Venta</span>
+                <div className="text-xl font-bold font-mono text-sky-400 mt-1">
+                  ${precioNumEnVivo.toFixed(2)}
+                </div>
+                <span className="text-[10px] text-slate-400">Definido en el plato</span>
+              </div>
+
+              {/* Margen Resultante */}
+              <div className={`rounded-xl p-3 border ${
+                margenEnVivo >= 0
+                  ? (margenPctEnVivo >= 40 ? "bg-emerald-950/40 border-emerald-500/40" : "bg-amber-950/40 border-amber-500/40")
+                  : "bg-red-950/40 border-red-500/40"
+              }`}>
+                <span className="text-[11px] text-slate-300 uppercase font-semibold block">Margen de Ganancia</span>
+                <div className={`text-xl font-bold font-mono mt-1 flex items-baseline gap-2 ${
+                  margenEnVivo >= 0 ? (margenPctEnVivo >= 40 ? "text-emerald-400" : "text-amber-400") : "text-red-400"
+                }`}>
+                  <span>${margenEnVivo.toFixed(2)}</span>
+                  <span className="text-xs font-semibold">({margenPctEnVivo.toFixed(1)}%)</span>
+                </div>
+                <span className="text-[10px] text-slate-300">
+                  {margenEnVivo < 0 ? "⚠️ El costo supera el precio de venta" : "Margen bruto por ración"}
+                </span>
+              </div>
+            </div>
           )}
-          {error && <p className="text-xs text-red-500">{error}</p>}
-          <button onClick={agregar} disabled={guardando} className="w-full g-aurora text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
-            {guardando ? "Agregando…" : "+ Agregar ingrediente"}
+        </div>
+
+        {/* 3. SECCIÓN: TABLA DE INGREDIENTES CON EDICIÓN Y ELIMINACIÓN */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white/40">
+              Ingredientes & Desglose ({desgloseLineas.length})
+            </span>
+            <span className="text-[11px] text-slate-400">Puedes editar cantidades o quitar ingredientes directamente</span>
+          </div>
+
+          {ingredientes === null ? (
+            <p className="text-xs text-slate-400 py-4 text-center">Cargando escandallo…</p>
+          ) : ingredientes.length === 0 ? (
+            <div className="apple-glass rounded-xl p-6 text-center text-slate-400 space-y-1">
+              <p className="text-sm font-medium">Esta receta aún no tiene ingredientes cargados.</p>
+              <p className="text-xs text-slate-500">Utiliza el formulario siguiente para agregar insumos desde tu inventario.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100/80 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/50">
+                    <th className="py-2.5 px-3">Insumo / Artículo</th>
+                    <th className="py-2.5 px-3">Costo Unitario</th>
+                    <th className="py-2.5 px-3">Cantidad / Merma</th>
+                    <th className="py-2.5 px-3 text-right">Costo Línea</th>
+                    <th className="py-2.5 px-3 text-center w-24">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                  {ingredientes.map((d) => {
+                    const met = calcularMetricasLinea(d);
+                    const isEditing = d.id === editandoDetalleId;
+
+                    return (
+                      <tr key={d.id} className={isEditing ? "bg-sky-500/5 dark:bg-sky-500/10" : "hover:bg-slate-50 dark:hover:bg-white/5"}>
+                        {/* Nombre del insumo */}
+                        <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-white">
+                          <div>{met.nombre}</div>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {met.esSubReceta ? "Sub-receta" : `SKU: ${d.ingredienteSku}`}
+                          </span>
+                        </td>
+
+                        {/* Costo unitario */}
+                        <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-white/60">
+                          ${met.unitCost.toFixed(3)} / {met.unidad}
+                        </td>
+
+                        {/* Cantidad requerida (modo vista o modo edición) */}
+                        <td className="py-2.5 px-3">
+                          {isEditing ? (
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <input value={editPesoNeto} onChange={(e) => setEditPesoNeto(e.target.value)}
+                                  type="number" step="0.001" className="input-horeca w-20 py-1 text-xs font-mono" placeholder="Cant" />
+                                <span className="text-[9px] text-slate-400 block">Neto ({met.unidad})</span>
+                              </div>
+                              {!met.esSubReceta && (
+                                <div>
+                                  <input value={editMerma} onChange={(e) => setEditMerma(e.target.value)}
+                                    type="number" step="0.1" className="input-horeca w-16 py-1 text-xs font-mono" placeholder="% merma" />
+                                  <span className="text-[9px] text-slate-400 block">% Merma</span>
+                                </div>
+                              )}
+                              <span className="text-[10px] font-mono text-sky-500">
+                                → Bruto: {met.cantBruta.toFixed(3)}
+                              </span>
+                            </div>
+                          ) : (
+                            <div>
+                              <span className="font-mono font-bold text-slate-800 dark:text-white">
+                                {Number(d.cantidadRequerida).toFixed(3)} {met.unidad}
+                              </span>
+                              {d.porcentajeMerma != null && Number(d.porcentajeMerma) > 0 && (
+                                <span className="text-[10px] text-amber-500 ml-1.5 font-medium">
+                                  ({Number(d.porcentajeMerma).toFixed(1)}% merma)
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Costo de la línea en vivo */}
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
+                          ${met.costoLinea.toFixed(2)}
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="py-2.5 px-3 text-center">
+                          {isEditing ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <button onClick={() => guardarEdicionDetalle(d.id)} disabled={guardandoDetalle}
+                                title="Guardar cantidad"
+                                className="text-emerald-500 hover:text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-500/10 cursor-pointer disabled:opacity-40">
+                                <IconCheck size={14} />
+                              </button>
+                              <button onClick={cancelarEdicionDetalle}
+                                title="Cancelar"
+                                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+                                <IconClose size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-1">
+                              <button onClick={() => iniciarEdicionDetalle(d)}
+                                title="Editar cantidad o merma"
+                                className="text-slate-400 hover:text-sky-500 p-1.5 rounded-lg hover:bg-sky-500/10 cursor-pointer">
+                                <IconEdit size={13} />
+                              </button>
+                              <button onClick={() => eliminarDetalle(d.id, met.nombre)}
+                                title="Eliminar ingrediente de la receta"
+                                className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 cursor-pointer">
+                                <IconTrash size={13} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* 4. SECCIÓN: AGREGAR NUEVO INGREDIENTE */}
+        <div className="apple-glass rounded-2xl p-4 space-y-3 border-t border-slate-300/50 dark:border-white/10">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white/40">
+              + Agregar Ingrediente o Sub-receta
+            </span>
+            <div className="flex gap-2 text-xs">
+              <button onClick={() => { setTipoNuevo("articulo"); setError(null); }}
+                className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition-colors ${
+                  tipoNuevo === "articulo" ? "bg-sky-500 text-white" : "bg-slate-200/60 dark:bg-white/10 text-slate-600 dark:text-white/60"
+                }`}>
+                Insumo de Inventario
+              </button>
+              <button onClick={() => { setTipoNuevo("subreceta"); setError(null); }}
+                className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition-colors ${
+                  tipoNuevo === "subreceta" ? "bg-sky-500 text-white" : "bg-slate-200/60 dark:bg-white/10 text-slate-600 dark:text-white/60"
+                }`}>
+                Sub-receta
+              </button>
+            </div>
+          </div>
+
+          {tipoNuevo === "articulo" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+              <div className="sm:col-span-2">
+                <select value={nuevoArticuloId} onChange={(e) => setNuevoArticuloId(e.target.value)} className="input-horeca w-full text-xs">
+                  <option value="">— Elegir insumo de inventario —</option>
+                  {(articulos || []).map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.nombre} (${Number(a.costoUnitario || 0).toFixed(3)} / {a.unidadMedida})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <input value={nuevoPesoNeto} onChange={(e) => setNuevoPesoNeto(e.target.value)}
+                  type="number" step="0.001" placeholder="Peso neto / cantidad" className="input-horeca w-full text-xs" />
+              </div>
+              <div>
+                <input value={nuevoMerma} onChange={(e) => setNuevoMerma(e.target.value)}
+                  type="number" step="0.1" placeholder="% Merma" className="input-horeca w-full text-xs" />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="sm:col-span-2">
+                <select value={nuevoSubRecetaId} onChange={(e) => setNuevoSubRecetaId(e.target.value)} className="input-horeca w-full text-xs">
+                  <option value="">— Elegir sub-receta —</option>
+                  {(escandallos || []).filter((s) => s.id !== receta.id).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nombrePlato} (Costo ración: ${Number(s.costoTotalProduccion || 0).toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <input value={nuevoPesoNeto} onChange={(e) => setNuevoPesoNeto(e.target.value)}
+                  type="number" step="0.01" placeholder="Cantidad raciones" className="input-horeca w-full text-xs" />
+              </div>
+            </div>
+          )}
+
+          {/* Vista previa en tiempo real antes de guardar */}
+          {previewNuevo && (
+            <div className="flex items-center justify-between text-xs bg-sky-500/10 border border-sky-500/20 rounded-xl px-3 py-2 text-sky-700 dark:text-sky-300">
+              <span>
+                Cálculo previo: <strong>{previewNuevo.cantBruta.toFixed(3)} {previewNuevo.unidad}</strong> × ${previewNuevo.unit.toFixed(3)}
+              </span>
+              <span className="font-mono font-bold">
+                Impacto en costo: +${previewNuevo.costo.toFixed(2)}
+              </span>
+            </div>
+          )}
+
+          <button onClick={agregarNuevoIngrediente} disabled={guardandoNuevo}
+            className="w-full g-aurora text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+            {guardandoNuevo ? "Agregando…" : "+ Agregar ingrediente al escandallo"}
           </button>
         </div>
       </div>
     </Modal>
   );
 }
+
 
 
 // ══════════════════════════════════════════════════════════════════════════
