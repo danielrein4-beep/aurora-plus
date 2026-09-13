@@ -323,7 +323,7 @@ export default function Home() {
             <AccordionGallery
               items={VERTICAL_PREVIEWS}
               defaultIndex={2}
-              expandRatio={0.5}
+              expandRatio={0.85}
               trigger="hover"
               accentColor="#35d7c3"
               overlayColor="#04100f"
