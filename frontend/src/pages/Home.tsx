@@ -2,8 +2,8 @@ import { useState, useRef, useEffect, type RefObject } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import AuroraLogo from "../AuroraLogo";
-import MagneticButton from "../components/MagneticButton";
 import TrueFocus from "../components/TrueFocus";
+import SpecularButton from "../components/SpecularButton";
 import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware, IconMining,
@@ -254,8 +254,37 @@ export default function Home() {
             De la libreta y la hoja de Excel a medianoche, a la comodidad de tu teléfono y tu computadora. Aurora Plus corre la caja, el inventario y la sanidad regulatoria de clínicas, restaurantes, minas, talleres, boutiques y fincas venezolanas.
           </motion.p>
           <motion.div variants={heroItem} className="mt-10 flex flex-wrap gap-3">
-            <MagneticButton onClick={() => navigate("/onboarding")} className="aurora-solid-button px-6 py-3 text-sm font-semibold cursor-pointer">Solicitar demo</MagneticButton>
-            <button onClick={() => navigate("/industrias")} className="aurora-outline-button px-6 py-3 text-sm font-semibold cursor-pointer">Ver los 6 rubros ↓</button>
+            <SpecularButton
+              size="md"
+              radius={10}
+              tint="#35d7c3"
+              tintOpacity={0.16}
+              textColor="#ffffff"
+              lineColor="#7cf3e3"
+              baseColor="#0f766e"
+              shineSize={12}
+              shineFade={45}
+              intensity={1.3}
+              proximity={260}
+              onClick={() => navigate("/onboarding")}
+            >
+              Solicitar demo
+            </SpecularButton>
+            <SpecularButton
+              size="md"
+              radius={10}
+              tint="#ffffff"
+              tintOpacity={0}
+              textColor="#f8f6ef"
+              lineColor="#ffffff"
+              baseColor="#4b4b4b"
+              shineSize={10}
+              shineFade={40}
+              proximity={260}
+              onClick={() => navigate("/industrias")}
+            >
+              Ver los 6 rubros ↓
+            </SpecularButton>
           </motion.div>
 
           <motion.div variants={heroItem} className="mt-16 grid max-w-4xl grid-cols-2 gap-x-7 gap-y-8 border-t border-white/15 pt-8 sm:grid-cols-4">
