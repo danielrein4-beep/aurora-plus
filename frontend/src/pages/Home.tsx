@@ -701,10 +701,23 @@ export default function Home() {
               Implementación en menos de 2 semanas. Sin migraciones complicadas. Tu equipo trabajando mejor desde el primer día.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button onClick={() => navigate("/precios")}
-                className="g-aurora glow-teal text-white font-semibold px-10 py-4 rounded-xl text-base hover:opacity-90 transition-opacity w-full sm:w-auto shadow-lg cursor-pointer">
+              <SpecularButton
+                size="lg"
+                radius={12}
+                tint="#35d7c3"
+                tintOpacity={0.16}
+                textColor="#ffffff"
+                lineColor="#7cf3e3"
+                baseColor="#0f766e"
+                shineSize={12}
+                shineFade={45}
+                intensity={1.3}
+                proximity={280}
+                className="w-full sm:w-auto"
+                onClick={() => navigate("/precios")}
+              >
                 Solicitar demo gratuita
-              </button>
+              </SpecularButton>
               <button onClick={() => navigate("/nosotros")} className="text-slate-500 dark:text-white/45 hover:text-slate-900 dark:hover:text-white transition-colors text-sm font-semibold cursor-pointer">
                 Hablar con un especialista →
               </button>

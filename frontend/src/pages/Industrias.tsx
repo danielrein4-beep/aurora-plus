@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import SpecularButton from "../components/SpecularButton";
 import {
   IconClinic, IconHardware, IconMining,
   IconRestaurant, IconFarm, IconRetail, IconCheck,
@@ -137,16 +138,37 @@ export default function Industrias() {
 
             {/* CTA */}
             <div className="mt-5 flex flex-col sm:flex-row gap-3">
-              <button
+              <SpecularButton
+                size="md"
+                radius={12}
+                tint="#35d7c3"
+                tintOpacity={0.16}
+                textColor="#ffffff"
+                lineColor="#7cf3e3"
+                baseColor="#0f766e"
+                shineSize={12}
+                shineFade={45}
+                intensity={1.3}
+                proximity={280}
                 onClick={() => navigate("/onboarding")}
-                className="g-aurora glow-teal text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm shadow-md cursor-pointer">
+              >
                 Quiero una demo para {ind.name}
-              </button>
-              <button
+              </SpecularButton>
+              <SpecularButton
+                size="md"
+                radius={12}
+                tint="#ffffff"
+                tintOpacity={0}
+                textColor="#f8f6ef"
+                lineColor="#ffffff"
+                baseColor="#4b4b4b"
+                shineSize={10}
+                shineFade={40}
+                proximity={280}
                 onClick={() => navigate("/precios")}
-                className="bg-white/70 dark:bg-transparent border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white/55 hover:border-slate-400 dark:hover:border-white/25 hover:text-black dark:hover:text-white px-6 py-3.5 rounded-xl text-sm font-semibold transition-all cursor-pointer">
+              >
                 Ver precios →
-              </button>
+              </SpecularButton>
             </div>
           </div>
         </div>
