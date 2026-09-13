@@ -2,6 +2,7 @@ package com.auroraplus.core.kpi.services;
 
 import com.auroraplus.core.costeo.CosteoProvider;
 import com.auroraplus.core.costeo.ResumenVentasCostos;
+import com.auroraplus.core.config.LicenciaService;
 import com.auroraplus.core.financiero.repositories.MovimientoCajaRepository;
 import com.auroraplus.core.financiero.services.MotorFinancieroService;
 import com.auroraplus.core.kpi.dto.EmpresaKpiDTO;
@@ -14,6 +15,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.LinkedHashSet;
 
 /**
  * docs/finance-contract.md §3 — agrega lo que cada CosteoProvider conectado ya sabe calcular.
@@ -23,11 +28,11 @@ import java.util.List;
 @Service
 public class EmpresaKpiService {
 
-    // Catálogo canónico de verticales (docs/finance-contract.md §1.1). MODA se lista aparte del
-    // resto porque no es pública todavía, pero igual se reporta como "no conectada" hasta que
-    // tenga suficientes ventas nuevas con costo congelado (ver §3.1) para conectar su proveedor.
-    private static final List<String> TODAS_LAS_VERTICALES =
-        List.of("GANADERIA", "HORECA", "RETAIL", "REPUESTOS", "MINERIA", "SALUD", "MODA");
+    private static final Map<String, Set<String>> MODULOS_QUE_HABILITAN_PROVIDER = Map.of(
+        "HORECA", Set.of("horeca"),
+        // El alta pública de Comercio/Retail usa hoy el módulo de licencia "repuestos".
+        "RETAIL", Set.of("retail", "repuestos", "farmacia", "ferreteria")
+    );
 
     @Autowired
     private List<CosteoProvider> proveedores;
@@ -38,7 +43,10 @@ public class EmpresaKpiService {
     @Autowired
     private MotorFinancieroService motorFinancieroService;
 
-    public EmpresaKpiDTO obtenerKpis(Long tenantId, LocalDate desde, LocalDate hasta, String monedaSolicitada) {
+    @Autowired
+    private LicenciaService licenciaService;
+
+    public EmpresaKpiDTO obtenerKpis(Long tenantId, LocalDate desde, LocalDate hasta) {
         if (desde == null || hasta == null) {
             throw new RuntimeException("Debe indicar 'desde' y 'hasta' — este endpoint no asume un rango por defecto");
         }
@@ -47,7 +55,12 @@ public class EmpresaKpiService {
         }
 
         String monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
-        String moneda = (monedaSolicitada != null && !monedaSolicitada.isBlank()) ? monedaSolicitada : monedaBase;
+        Set<String> modulosActivos = licenciaService.obtenerModulosActivos(tenantId).stream()
+            .map(m -> m.toLowerCase(Locale.ROOT))
+            .collect(java.util.stream.Collectors.toSet());
+        List<CosteoProvider> proveedoresAplicables = proveedores.stream()
+            .filter(p -> aplicaAlTenant(p.moduloId(), modulosActivos))
+            .toList();
 
         BigDecimal ventasBrutas = BigDecimal.ZERO;
         BigDecimal costoVentas = BigDecimal.ZERO;
@@ -55,13 +68,17 @@ public class EmpresaKpiService {
         BigDecimal ventasConCostoConocido = BigDecimal.ZERO;
         List<EmpresaKpiDTO.ModuloKpi> porModulo = new ArrayList<>();
 
-        for (CosteoProvider proveedor : proveedores) {
+        for (CosteoProvider proveedor : proveedoresAplicables) {
             ResumenVentasCostos resumen = proveedor.resumenPeriodo(tenantId, desde, hasta);
 
-            BigDecimal ventasModulo = convertirSiHaceFalta(tenantId, resumen.ventasBrutas(), resumen.moneda(), moneda);
-            BigDecimal costoModulo = convertirSiHaceFalta(tenantId, resumen.costoVentas(), resumen.moneda(), moneda);
-            BigDecimal gastosModulo = convertirSiHaceFalta(tenantId, resumen.gastosOperativos(), resumen.moneda(), moneda);
-            BigDecimal conCostoConocidoModulo = convertirSiHaceFalta(tenantId, resumen.ventasConCostoConocido(), resumen.moneda(), moneda);
+            if (!monedaBase.equals(resumen.moneda())) {
+                throw new IllegalStateException("El proveedor " + proveedor.moduloId()
+                    + " devolvió " + resumen.moneda() + " pero la moneda base del tenant es " + monedaBase);
+            }
+            BigDecimal ventasModulo = resumen.ventasBrutas();
+            BigDecimal costoModulo = resumen.costoVentas();
+            BigDecimal gastosModulo = resumen.gastosOperativos();
+            BigDecimal conCostoConocidoModulo = resumen.ventasConCostoConocido();
 
             ventasBrutas = ventasBrutas.add(ventasModulo);
             costoVentas = costoVentas.add(costoModulo);
@@ -77,13 +94,14 @@ public class EmpresaKpiService {
         BigDecimal resultadoEstimado = margenBruto.subtract(gastosOperativos);
         BigDecimal coberturaPromedioPonderada = porcentajeSeguro(ventasConCostoConocido, ventasBrutas);
 
-        List<String> verticalesNoConectadas = TODAS_LAS_VERTICALES.stream()
-            .filter(v -> proveedores.stream().noneMatch(p -> p.moduloId().equals(v)))
+        Set<String> verticalesActivas = verticalesActivas(modulosActivos);
+        List<String> verticalesNoConectadas = verticalesActivas.stream()
+            .filter(v -> proveedoresAplicables.stream().noneMatch(p -> p.moduloId().equals(v)))
             .toList();
 
         return new EmpresaKpiDTO(
             new EmpresaKpiDTO.Periodo(desde, hasta),
-            moneda,
+            monedaBase,
             new EmpresaKpiDTO.Consolidado(ventasBrutas, costoVentas, margenBruto, margenBrutoPct,
                 gastosOperativos, resultadoEstimado, coberturaPromedioPonderada),
             porModulo,
@@ -96,8 +114,10 @@ public class EmpresaKpiService {
         LocalDateTime desdeInicio = desde.atStartOfDay();
         LocalDateTime hastaFin = hasta.plusDays(1).atStartOfDay();
 
-        long total = movimientoCajaRepository.countByTenantIdAndFechaRegistroBetween(tenantId, desdeInicio, hastaFin);
-        long identificados = movimientoCajaRepository.contarIdentificadosEntreFechas(tenantId, desdeInicio, hastaFin);
+        long total = movimientoCajaRepository.countByTenantIdAndFechaRegistroGreaterThanEqualAndFechaRegistroLessThan(
+            tenantId, desdeInicio, hastaFin);
+        long identificados = movimientoCajaRepository.contarIdentificadosEntreFechas(
+            tenantId, desdeInicio, hastaFin);
         BigDecimal porcentaje = total > 0
             ? BigDecimal.valueOf(identificados).divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100")).setScale(2, RoundingMode.HALF_UP)
             : BigDecimal.ZERO;
@@ -105,14 +125,22 @@ public class EmpresaKpiService {
         return new EmpresaKpiDTO.Trazabilidad(total, identificados, porcentaje);
     }
 
-    // Los ResumenVentasCostos de esta fase (Horeca/Retail) siempre vienen en la moneda base del
-    // tenant, así que esto normalmente es un no-op. Si la moneda solicitada difiere, se convierte
-    // con la tasa VIGENTE porque es un agregado del período actual, no un movimiento histórico
-    // guardado — no viola la regla del §2.1 (esa regla es sobre no reconvertir un
-    // montoEquivalenteBase ya congelado en MovimientoCaja con la tasa de hoy).
-    private BigDecimal convertirSiHaceFalta(Long tenantId, BigDecimal monto, String monedaOrigen, String monedaDestino) {
-        if (monedaOrigen.equals(monedaDestino)) return monto;
-        return motorFinancieroService.convertirMoneda(tenantId, monto, monedaOrigen, monedaDestino);
+    private boolean aplicaAlTenant(String moduloId, Set<String> modulosActivos) {
+        return MODULOS_QUE_HABILITAN_PROVIDER.getOrDefault(moduloId, Set.of()).stream()
+            .anyMatch(modulosActivos::contains);
+    }
+
+    private Set<String> verticalesActivas(Set<String> modulosActivos) {
+        Set<String> resultado = new LinkedHashSet<>();
+        if (modulosActivos.contains("ganaderia")) resultado.add("GANADERIA");
+        if (modulosActivos.contains("horeca")) resultado.add("HORECA");
+        if (modulosActivos.contains("retail") || modulosActivos.contains("repuestos")
+                || modulosActivos.contains("farmacia") || modulosActivos.contains("ferreteria")) {
+            resultado.add("RETAIL");
+        }
+        if (modulosActivos.contains("minero")) resultado.add("MINERIA");
+        if (modulosActivos.contains("salud")) resultado.add("SALUD");
+        return resultado;
     }
 
     private BigDecimal porcentajeSeguro(BigDecimal numerador, BigDecimal denominador) {

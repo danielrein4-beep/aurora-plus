@@ -12,5 +12,6 @@ public interface ItemVentaRetailRepository extends JpaRepository<ItemVentaRetail
 
     // Base de RetailCosteoProvider (docs/finance-contract.md §3) — costoUnitario ya viene
     // NOT NULL en esta tabla, así que la cobertura de Retail es 100% por diseño de esquema.
-    List<ItemVentaRetail> findByTenantIdAndVenta_FechaRegistroBetween(Long tenantId, LocalDateTime desde, LocalDateTime hasta);
+    List<ItemVentaRetail> findByTenantIdAndVenta_FechaRegistroGreaterThanEqualAndVenta_FechaRegistroLessThan(
+        Long tenantId, LocalDateTime desde, LocalDateTime hastaExclusivo);
 }
