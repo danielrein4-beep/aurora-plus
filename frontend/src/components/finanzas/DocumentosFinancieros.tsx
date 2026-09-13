@@ -49,7 +49,7 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
               </h3>
             </div>
             <p className="text-xs text-white/65 mt-1 leading-relaxed">
-              Consolidación centralizada de notas de entrega y documentos de venta no fiscales generados en cada vertical de tu empresa. Cada documento cuenta con su referencia interna exclusiva.
+              Consolidación centralizada de notas de entrega y documentos de venta no fiscales generados en cada vertical de tu empresa. Cada documento cuenta con su referencia interna.
             </p>
           </div>
 
