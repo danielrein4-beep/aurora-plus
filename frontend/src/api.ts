@@ -2813,4 +2813,25 @@ export function listarVentasGanaderia(tenantId?: number): Promise<VentaGanaderia
   return request(`/api/ganaderia/ventas${q}`);
 }
 
+// Alertas silenciosas para el dueño/admin (descuadres de caja, cuentas por cobrar/pagar por
+// vencer o vencidas) — ver AlertaAdmin en el backend. No dispara correo ni push, solo se ve al
+// abrir el panel (campanita en Dashboard.tsx).
+export interface AlertaAdmin {
+  id: number;
+  tenantId: number;
+  tipo: "DESCUADRE_CAJA" | "CUENTA_POR_VENCER" | "CUENTA_VENCIDA";
+  mensaje: string;
+  leida: boolean;
+  fechaCreacion: string;
+  referenciaId?: number;
+}
+
+export function listarAlertas(tenantId: number, soloNoLeidas = false): Promise<AlertaAdmin[]> {
+  return request(`/api/admin/alertas?tenantId=${tenantId}&soloNoLeidas=${soloNoLeidas}`);
+}
+
+export function marcarAlertaLeida(id: number, tenantId: number): Promise<AlertaAdmin> {
+  return request(`/api/admin/alertas/${id}/marcar-leida?tenantId=${tenantId}`, { method: "PATCH" });
+}
+
 

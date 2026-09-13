@@ -33,6 +33,7 @@ import {
   type MapaMesaEntrada,
 } from "../api";
 import MediclinicApp from "../components/MediclinicApp";
+import AlertasCampanita from "../components/AlertasCampanita";
 
 const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNode> = {
   clinica: IconClinic,
@@ -761,6 +762,8 @@ export default function Dashboard() {
             <span className={`w-2 h-2 rounded-full ${isTrial ? "bg-amber-400 animate-ping" : "bg-teal-400"}`} />
             <span>{isTrial ? `Trial (${daysLeft}d)` : "Plan Activo"}</span>
           </div>
+
+          {user?.tenantId != null && <AlertasCampanita tenantId={user.tenantId} />}
 
           <button
             onClick={logout}
