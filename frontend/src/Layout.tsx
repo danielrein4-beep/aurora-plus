@@ -31,7 +31,15 @@ export default function Layout() {
   };
 
   return (
-    <div className="min-h-full bg-[#050d10] text-[var(--text-primary)] transition-colors duration-500 overflow-x-hidden">
+    // Clase "dark" fija: el sitio público quedó oscuro permanente (decisión ya
+    // tomada), pero todo el código heredado usa clases dark: de Tailwind que
+    // solo se activan bajo un ancestro .dark (ver @custom-variant en index.css).
+    // Sin esto, cualquier bg-slate-100/bg-white con su variante dark: se queda
+    // pegado al fondo claro mientras el texto de arriba sí se recolorea vía los
+    // overrides de .aurora-public-page — texto claro sobre fondo claro,
+    // ilegible. Esto activa TODO el sistema dark: de una vez, en vez de tener
+    // que perseguir cada caso suelto con !important.
+    <div className="dark min-h-full bg-[#050d10] text-[var(--text-primary)] transition-colors duration-500 overflow-x-hidden">
       <AuroraGradientDef />
 
       {/* Ambient blobs */}

@@ -485,15 +485,21 @@ html.light .input-horeca:hover { background: #ffffff; }
 }
 
 /* Cyber Neon Button (Verde Cian Brillante to Turquesa Glacial to Azul Medianoche) */
+/* Un solo tono sólido de marca, sin el degradado arcoíris teal→azul→morado
+   ni el glow multicolor de antes — eso es exactamente el look genérico de
+   "app de IA" que venimos quitando del resto del sitio. Se deja sin `color`
+   a propósito: cada uso ya trae su propia clase de color de texto (casi
+   siempre text-white), y este tono es lo bastante oscuro para que se lea bien. */
 .btn-cyber-neon {
-  background: linear-gradient(90deg, #00FFC2 0%, #00C9A7 45%, #0B3D91 100%);
-  box-shadow: 0 8px 30px rgba(0, 255, 194, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.4);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  background: #0E9C86;
+  box-shadow: 0 6px 20px rgba(14, 156, 134, 0.28);
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .btn-cyber-neon:hover {
-  box-shadow: 0 12px 40px rgba(0, 255, 194, 0.55), 0 0 20px rgba(0, 201, 167, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.7);
-  transform: translateY(-2px) scale(1.01);
+  background: #12b89e;
+  box-shadow: 0 10px 28px rgba(14, 156, 134, 0.4);
+  transform: translateY(-1px);
 }
 
 .btn-electric-blue {
