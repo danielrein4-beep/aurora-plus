@@ -10,7 +10,6 @@ import {
   IconRestaurant, IconFarm, IconRetail,
   IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile,
   IconLaptop, IconPhone, IconPlane, IconCheck,
-  IconCard, IconBox, IconBolt, IconShield,
 } from "../Icons";
 
 const INDUSTRIES = [
@@ -301,24 +300,6 @@ export default function Home() {
             ))}
           </motion.div>
 
-          <div className="aurora-rate-card mt-16 w-full max-w-md p-7 sm:p-8">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[#d9d8ce]/80">
-              <span>Multi-moneda · motor Aurora</span>
-            </div>
-            <div className="flex items-center justify-center gap-3 pt-6 pb-2">
-              {["USD", "VES", "COP"].map((cur, i) => (
-                <div key={cur} className="flex items-center gap-3">
-                  <span className="font-mono text-lg font-bold text-[#f8f6ef] border border-white/15 rounded-lg px-3 py-1.5">{cur}</span>
-                  {i < 2 && <span className="text-[#3fe0ce] text-sm">⇄</span>}
-                </div>
-              ))}
-            </div>
-            <p className="mt-4 pt-4 border-t border-white/10 text-sm text-[#e9e7df]/85 leading-relaxed">
-              Tú defines la tasa del día en segundos. Si el bolívar se mueve de la mañana a la tarde, tu caja lo refleja al instante — sin hoja de cálculo, sin esperar a nadie.
-            </p>
-            <p className="mt-4 pt-4 border-t border-white/10 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/65">Sin tasa fija · tú la actualizas cuando quieras</p>
-          </div>
-
           {/* ── ACCESO DIRECTO PARA USUARIOS EN SESIÓN ── */}
           {isLoggedIn && (
             <div className="mt-8 w-full max-w-2xl rounded-2xl p-6 sm:p-7 border border-[#35d7c3]/25 bg-[#030c0f]/80">
@@ -352,37 +333,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* ── AURORA ENGINE CORE ── */}
-          <div className="mt-8 w-full max-w-2xl rounded-2xl p-6 sm:p-7 border border-white/12 bg-[#030c0f]/70">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-white/10">
-              <div className="flex items-center gap-3.5">
-                <div className="p-2 rounded-xl bg-white/5 border border-white/10">
-                  <AuroraLogo size={32} animated={false} />
-                </div>
-                <div className="text-left">
-                  <div className="font-['IBM_Plex_Sans'] font-bold text-sm text-[#f8f6ef] flex items-center gap-2">
-                    Aurora Engine Core
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-[#35d7c3]/15 text-[#35d7c3] font-mono border border-[#35d7c3]/25">ONLINE v2.4</span>
-                  </div>
-                  <div className="text-white/45 text-xs font-mono">Arquitectura Multi-Tenant · PostgreSQL · Offline Sync</div>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5">
-              {[
-                { label: "Caja Central", val: "Sincronizada", Icon: IconCard },
-                { label: "Kardex e Insumos", val: "Auto-Descuento", Icon: IconBox },
-                { label: "Offline POS", val: "100% Idempotente", Icon: IconBolt },
-                { label: "Roles & Privacidad", val: "RBAC Estricto", Icon: IconShield },
-              ].map((n) => (
-                <div key={n.label} className="bg-white/[0.03] hover:bg-white/[0.06] rounded-xl p-3.5 border border-white/5 hover:border-[#35d7c3]/30 transition-all duration-300 cursor-default">
-                  <div className="mb-1.5 text-[#35d7c3]"><n.Icon size={18} /></div>
-                  <div className="text-[#f8f6ef] font-semibold text-[11px] tracking-tight">{n.label}</div>
-                  <div className="text-[11px] font-mono mt-0.5 text-[#d9d8ce]/80">{n.val}</div>
-                </div>
-              ))}
-            </div>
-          </div>
         </motion.div>
 
       </section>
