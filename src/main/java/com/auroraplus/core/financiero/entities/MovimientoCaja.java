@@ -3,6 +3,7 @@ package com.auroraplus.core.financiero.entities;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -60,6 +61,13 @@ public class MovimientoCaja {
     @Column(length = 20)
     private String estado; // PENDIENTE | PAGADO — solo para CXC/CXP
 
+    // Solo aplica a CXC/CXP (null en INGRESO/EGRESO) — fecha pactada de cobro/pago. Sin esto,
+    // AlertaVencimientoCuentasJob no tiene cómo saber cuándo avisar; queda null si el call-site
+    // no informó plazo (ej. fiado sin fecha acordada), y esas cuentas simplemente no generan
+    // alerta — no se inventa una fecha por defecto.
+    @Column(name = "fecha_vencimiento")
+    private LocalDate fechaVencimiento;
+
     public enum TipoMovimiento { INGRESO, EGRESO, CXC, CXP }
 
     // Getters y Setters
@@ -87,4 +95,6 @@ public class MovimientoCaja {
     public void setSaldoPendiente(BigDecimal saldoPendiente) { this.saldoPendiente = saldoPendiente; }
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
+    public LocalDate getFechaVencimiento() { return fechaVencimiento; }
+    public void setFechaVencimiento(LocalDate fechaVencimiento) { this.fechaVencimiento = fechaVencimiento; }
 }

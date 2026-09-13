@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Service
@@ -149,6 +150,24 @@ public class MotorFinancieroService {
     }
 
     /**
+     * Igual que el overload de arriba, pero para CXC/CXP con fecha de vencimiento pactada
+     * (fiado a cliente, crédito de proveedor) — la usa AlertaVencimientoCuentasJob para avisar
+     * antes de que venza y cuando ya venció. fechaVencimiento null es válido (cuenta sin plazo
+     * acordado: no genera alerta, no se le inventa una fecha).
+     */
+    @Transactional
+    public MovimientoCaja registrarMovimientoMultiMoneda(Long tenantId, MovimientoCaja.TipoMovimiento tipo, BigDecimal montoBase,
+                                                            String monedaPago, BigDecimal montoRecibido, String concepto,
+                                                            LocalDate fechaVencimiento) {
+        MovimientoCaja movimiento = registrarMovimientoMultiMoneda(tenantId, tipo, montoBase, monedaPago, montoRecibido, concepto);
+        if (fechaVencimiento != null) {
+            movimiento.setFechaVencimiento(fechaVencimiento);
+            movimiento = movimientoCajaRepository.save(movimiento);
+        }
+        return movimiento;
+    }
+
+    /**
      * Registra un movimiento DIRECTAMENTE en la moneda indicada (no en la
      * moneda base) — para casos como la nómina de destajo, donde cada rol
      * puede pactarse en una moneda distinta (ej. picador a $/tonelada,
@@ -189,6 +208,18 @@ public class MotorFinancieroService {
         }
 
         return movimientoCajaRepository.save(movimiento);
+    }
+
+    /** Igual que el overload de arriba, con fecha de vencimiento — ver el equivalente en registrarMovimientoMultiMoneda. */
+    @Transactional
+    public MovimientoCaja registrarMovimientoEnMoneda(Long tenantId, MovimientoCaja.TipoMovimiento tipo, BigDecimal monto,
+                                                         String moneda, String concepto, LocalDate fechaVencimiento) {
+        MovimientoCaja movimiento = registrarMovimientoEnMoneda(tenantId, tipo, monto, moneda, concepto);
+        if (fechaVencimiento != null) {
+            movimiento.setFechaVencimiento(fechaVencimiento);
+            movimiento = movimientoCajaRepository.save(movimiento);
+        }
+        return movimiento;
     }
 
     /**

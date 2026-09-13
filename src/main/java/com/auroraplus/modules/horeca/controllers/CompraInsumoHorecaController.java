@@ -37,6 +37,10 @@ public class CompraInsumoHorecaController {
         public List<ItemCompraRequest> items;
         public BigDecimal montoPagadoAhora; // opcional — null/0 = factura entera a crédito
         public String monedaPago;
+        // Plazo pactado con el proveedor para pagar el saldo, en días desde hoy. Null = sin
+        // fecha pactada — la CXP queda igual, pero AlertaVencimientoCuentasJob no avisará de
+        // ella (no se inventa un plazo por defecto).
+        public Integer diasPlazoProveedor;
     }
 
     // Sin tenantId acá, findAll() devolvía las compras de TODOS los tenants
@@ -60,6 +64,6 @@ public class CompraInsumoHorecaController {
             items.add(item);
         }
         return ResponseEntity.ok(compraInsumoHorecaService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, items,
-            request.montoPagadoAhora, request.monedaPago));
+            request.montoPagadoAhora, request.monedaPago, request.diasPlazoProveedor));
     }
 }

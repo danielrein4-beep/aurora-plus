@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -101,6 +102,10 @@ public class RetailVentaService {
         // Si esCredito=true, la venta queda como cuenta por cobrar (CXC) en
         // vez de cobrarse de una — "fiado" (lo que pide Ferretería).
         public boolean esCredito;
+        // Plazo acordado con el cliente para pagar el fiado, en días desde hoy. Null = sin
+        // fecha pactada — la cuenta queda pendiente igual, pero AlertaVencimientoCuentasJob no
+        // tiene cómo avisar de ella (no se inventa un plazo por defecto).
+        public Integer diasPlazo;
         public String metodoPago;
         public String monedaPago; // null = moneda base del tenant
         public BigDecimal montoRecibido; // solo si monedaPago != moneda base
@@ -187,8 +192,9 @@ public class RetailVentaService {
         itemVentaRetailRepository.saveAll(items);
 
         if (request.esCredito) {
+            LocalDate fechaVencimiento = request.diasPlazo != null ? LocalDate.now().plusDays(request.diasPlazo) : null;
             motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.CXC,
-                totalVenta, null, null, "Venta a crédito — Cliente: " + cliente.getNombre());
+                totalVenta, null, null, "Venta a crédito — Cliente: " + cliente.getNombre(), fechaVencimiento);
         } else {
             motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
                 totalVenta, request.monedaPago, request.montoRecibido, "Venta de mostrador"

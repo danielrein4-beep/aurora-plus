@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class AlertaAdmin {
 
-    public enum Tipo { DESCUADRE_CAJA }
+    public enum Tipo { DESCUADRE_CAJA, CUENTA_POR_VENCER, CUENTA_VENCIDA }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,6 +38,13 @@ public class AlertaAdmin {
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();
 
+    // Referencia opcional al registro que disparó la alerta (ej. el id de un MovimientoCaja
+    // CXC/CXP) — polimórfica simple, sin FK física, mismo patrón ya usado en MovimientoCaja
+    // para su propia trazabilidad de origen. Null en alertas que no apuntan a un registro
+    // puntual (ej. DESCUADRE_CAJA, que es del arqueo del día, no de una fila específica).
+    @Column(name = "referencia_id")
+    private Long referenciaId;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -50,4 +57,6 @@ public class AlertaAdmin {
     public void setLeida(boolean leida) { this.leida = leida; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
+    public Long getReferenciaId() { return referenciaId; }
+    public void setReferenciaId(Long referenciaId) { this.referenciaId = referenciaId; }
 }

@@ -90,6 +90,13 @@ public class CompraInsumoHorecaService {
     @Transactional
     public CompraInsumoHoreca registrarCompra(Long tenantId, Long proveedorId, String numeroFactura, List<ItemCompraInsumo> items,
                                                BigDecimal montoPagadoAhora, String monedaPago) {
+        return registrarCompra(tenantId, proveedorId, numeroFactura, items, montoPagadoAhora, monedaPago, null);
+    }
+
+    /** @param diasPlazoProveedor plazo pactado para pagar el saldo (si queda alguno), en días desde hoy — null = sin fecha pactada. */
+    @Transactional
+    public CompraInsumoHoreca registrarCompra(Long tenantId, Long proveedorId, String numeroFactura, List<ItemCompraInsumo> items,
+                                               BigDecimal montoPagadoAhora, String monedaPago, Integer diasPlazoProveedor) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("La compra debe tener al menos un ítem");
         }
@@ -206,8 +213,10 @@ public class CompraInsumoHorecaService {
 
         BigDecimal saldoPendiente = totalCompra.subtract(montoPagadoBase).setScale(2, RoundingMode.HALF_UP);
         if (saldoPendiente.compareTo(BigDecimal.ZERO) > 0) {
+            LocalDate fechaVencimiento = diasPlazoProveedor != null ? LocalDate.now().plusDays(diasPlazoProveedor) : null;
             motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.CXP,
-                saldoPendiente, null, null, "Compra de insumos factura " + numeroFactura + " — Proveedor: " + proveedor.getNombre());
+                saldoPendiente, null, null, "Compra de insumos factura " + numeroFactura + " — Proveedor: " + proveedor.getNombre(),
+                fechaVencimiento);
         }
 
         return guardada;
