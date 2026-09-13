@@ -78,6 +78,14 @@ public class LicenciaTenant {
     @Column(name = "margen_tolerancia_descuadre", nullable = false, precision = 18, scale = 2)
     private BigDecimal margenToleranciaDescuadre = new BigDecimal("2.00");
 
+    // Quién manda en la tasa USD->VES de este negocio: MANUAL (el dueño/cajero la teclea, ver
+    // TasaCambioController) o BCV (TasaBcvAutomaticaJob la actualiza sola una vez al día desde
+    // un espejo de la tasa oficial). La mayoría opera con tasa paralela y sigue en MANUAL —
+    // BCV es para el que sí se rige por la oficial. Solo aplica a USD/VES; USD/COP no tiene
+    // equivalente de "tasa oficial de un banco central" en este contexto, siempre es manual.
+    @Column(name = "origen_tasa_usd_ves", nullable = false, length = 10)
+    private String origenTasaUsdVes = "MANUAL";
+
     public enum TipoLicencia { BASICA, COMERCIAL, INDUSTRIAL }
 
     public Long getId() { return id; }
@@ -114,4 +122,6 @@ public class LicenciaTenant {
     public void setDomicilioFiscal(String domicilioFiscal) { this.domicilioFiscal = domicilioFiscal; }
     public BigDecimal getMargenToleranciaDescuadre() { return margenToleranciaDescuadre; }
     public void setMargenToleranciaDescuadre(BigDecimal margenToleranciaDescuadre) { this.margenToleranciaDescuadre = margenToleranciaDescuadre; }
+    public String getOrigenTasaUsdVes() { return origenTasaUsdVes; }
+    public void setOrigenTasaUsdVes(String origenTasaUsdVes) { this.origenTasaUsdVes = origenTasaUsdVes; }
 }

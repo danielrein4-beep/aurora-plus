@@ -37,11 +37,30 @@ public class TasaCambioController {
         public String origen; // MANUAL, BCV, TRM... por defecto MANUAL
     }
 
-    /** Registra una tasa nueva (queda historial — nunca se sobreescribe la anterior). */
+    /**
+     * Registra una tasa nueva (queda historial — nunca se sobreescribe la anterior).
+     *
+     * Si el par es USD/VES y el tenant eligió que esa tasa la gobierne el BCV
+     * (LicenciaTenant.origenTasaUsdVes = "BCV"), se rechaza una carga MANUAL — si no, cualquier
+     * cajero podría pisar en silencio la tasa oficial que el dueño decidió seguir, sin que nadie
+     * note por qué el sistema empezó a usar un número distinto. Para volver a cargar manual hay
+     * que cambiar la preferencia primero (PATCH /origen-usd-ves).
+     */
     @PostMapping
     public ResponseEntity<TasaCambio> actualizar(@RequestParam Long tenantId, @RequestBody ActualizarTasaRequest request) {
         if (request.tasa == null || request.tasa.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("La tasa debe ser mayor a cero");
+        }
+        boolean esUsdVes = "USD".equals(request.monedaOrigen) && "VES".equals(request.monedaDestino);
+        if (esUsdVes) {
+            String origenActual = licenciaTenantRepository.findByTenantId(tenantId)
+                .map(LicenciaTenant::getOrigenTasaUsdVes).orElse("MANUAL");
+            // Rechaza CUALQUIER carga por este endpoint mientras el tenant esté en modo BCV — sin
+            // importar qué "origen" declare el llamador — porque el punto es que solo
+            // TasaBcvAutomaticaJob (que llama al motor directo, no pasa por acá) escriba este par.
+            if ("BCV".equals(origenActual)) {
+                throw new RuntimeException("Este negocio eligió regirse por la tasa BCV automática — cambia la preferencia a manual en Configuración si quieres cargar una tasa a mano.");
+            }
         }
         return ResponseEntity.ok(motorFinancieroService.actualizarTasa(
             tenantId, request.monedaOrigen, request.monedaDestino, request.tasa, request.origen));
@@ -83,5 +102,33 @@ public class TasaCambioController {
         return licenciaTenantRepository.findByTenantId(tenantId)
             .map(LicenciaTenant::getMonedaBase)
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
+    }
+
+    /** Quién gobierna la tasa USD->VES de este negocio hoy: MANUAL o BCV (ver TasaBcvAutomaticaJob). */
+    @GetMapping("/origen-usd-ves")
+    public String origenUsdVes(@RequestParam Long tenantId) {
+        return licenciaTenantRepository.findByTenantId(tenantId)
+            .map(LicenciaTenant::getOrigenTasaUsdVes)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
+    }
+
+    public static class OrigenUsdVesRequest {
+        public String origen; // MANUAL | BCV
+    }
+
+    /**
+     * Cambia si la tasa USD->VES la teclea el negocio (MANUAL, el default de siempre) o si se
+     * actualiza sola desde el BCV una vez al día (BCV). No dispara una actualización inmediata:
+     * el cambio surte efecto en la próxima corrida de TasaBcvAutomaticaJob (8:30 am).
+     */
+    @PatchMapping("/origen-usd-ves")
+    public ResponseEntity<LicenciaTenant> cambiarOrigenUsdVes(@RequestParam Long tenantId, @RequestBody OrigenUsdVesRequest request) {
+        if (!"MANUAL".equals(request.origen) && !"BCV".equals(request.origen)) {
+            throw new RuntimeException("Origen inválido: use MANUAL o BCV");
+        }
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
+        licencia.setOrigenTasaUsdVes(request.origen);
+        return ResponseEntity.ok(licenciaTenantRepository.save(licencia));
     }
 }
