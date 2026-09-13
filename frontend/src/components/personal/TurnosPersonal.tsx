@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TurnoHorario, AsignacionTurno, Empleado, DepartamentoPersonal } from './types';
 
 interface TurnosPersonalProps {
@@ -22,13 +22,23 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
   const [turnoSeleccionado, setTurnoSeleccionado] = useState<string>(turnosHorarios[0]?.id || '');
   const [toastMensaje, setToastMensaje] = useState<string | null>(null);
 
+  const btnCerrarModalRef = useRef<HTMLButtonElement | null>(null);
+  const elementoPrevioRef = useRef<HTMLElement | null>(null);
+
   // Sincronizar props iniciales si cambian
   useEffect(() => {
     setAsignaciones(initialAsignaciones);
   }, [initialAsignaciones]);
 
-  // Accesibilidad: Cerrar modal con tecla Escape
+  // Accesibilidad: Guardar foco, capturar y restaurar foco, y cerrar modal con Escape
   useEffect(() => {
+    if (modalAsignarAbierto) {
+      elementoPrevioRef.current = document.activeElement as HTMLElement | null;
+      btnCerrarModalRef.current?.focus();
+    } else if (elementoPrevioRef.current) {
+      elementoPrevioRef.current.focus();
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && modalAsignarAbierto) {
         setModalAsignarAbierto(false);
@@ -240,8 +250,9 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
                 Asignar Turno de Trabajo [DEMO]
               </h3>
               <button
+                ref={btnCerrarModalRef}
                 onClick={() => setModalAsignarAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc]"
+                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3] rounded p-1"
                 aria-label="Cerrar modal"
               >
                 ✕

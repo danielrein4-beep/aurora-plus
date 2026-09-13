@@ -60,8 +60,8 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
         );
       case 'LICENCIA':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#818cf8] bg-[#818cf8]/10 px-2 py-0.5 rounded-full border border-[#818cf8]/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#818cf8]" />
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#38bdf8] bg-[#38bdf8]/10 px-2 py-0.5 rounded-full border border-[#38bdf8]/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8]" />
             Licencia
           </span>
         );

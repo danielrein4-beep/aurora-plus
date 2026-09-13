@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PeriodoNomina, ReciboNominaEmpleado, formatearMoneda } from './types';
 import { EstadoNominaBadge } from './EstadoNominaBadge';
 import { DetalleCalculoNomina } from './DetalleCalculoNomina';
@@ -6,12 +6,16 @@ import { DetalleCalculoNomina } from './DetalleCalculoNomina';
 interface NominaPersonalProps {
   periodos: PeriodoNomina[];
   ocultarSueldo: boolean;
+  nominaHabilitada: boolean;
+  onToggleNominaHabilitada?: (habilitada: boolean) => void;
   onActualizarPeriodos?: (actualizados: PeriodoNomina[]) => void;
 }
 
 export const NominaPersonal: React.FC<NominaPersonalProps> = ({
   periodos: initialPeriodos,
   ocultarSueldo,
+  nominaHabilitada,
+  onToggleNominaHabilitada,
   onActualizarPeriodos,
 }) => {
   const [periodos, setPeriodos] = useState<PeriodoNomina[]>(initialPeriodos);
@@ -21,27 +25,50 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
   const [modalAjusteAbierto, setModalAjusteAbierto] = useState(false);
   const [motivoAjuste, setMotivoAjuste] = useState('');
   const [toastMensaje, setToastMensaje] = useState<string | null>(null);
-  
-  // Regla estricta: Nómina DESACTIVADA por defecto
-  const [moduloHabilitado, setModuloHabilitado] = useState(false);
+
+  // Referencias para gestión real del foco accesible
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+  const btnCerrarRevisionRef = useRef<HTMLButtonElement | null>(null);
+  const btnCerrarAjusteRef = useRef<HTMLButtonElement | null>(null);
+  const btnCerrarDesgloseRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     setPeriodos(initialPeriodos);
     setPeriodoActivo(initialPeriodos[0]);
   }, [initialPeriodos]);
 
+  // Gestión de foco en apertura y cierre de modales
+  useEffect(() => {
+    if (modalRevisionAbierto || modalAjusteAbierto || reciboDetalle) {
+      previousActiveElementRef.current = document.activeElement as HTMLElement;
+      
+      // Enfocar botón de cierre correspondiente
+      setTimeout(() => {
+        if (modalRevisionAbierto && btnCerrarRevisionRef.current) {
+          btnCerrarRevisionRef.current.focus();
+        } else if (modalAjusteAbierto && btnCerrarAjusteRef.current) {
+          btnCerrarAjusteRef.current.focus();
+        } else if (reciboDetalle && btnCerrarDesgloseRef.current) {
+          btnCerrarDesgloseRef.current.focus();
+        }
+      }, 50);
+    } else if (previousActiveElementRef.current) {
+      previousActiveElementRef.current.focus();
+    }
+  }, [modalRevisionAbierto, modalAjusteAbierto, reciboDetalle]);
+
   // Accesibilidad: Cerrar modales con tecla Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setReciboDetalle(null);
-        setModalRevisionAbierto(false);
-        setModalAjusteAbierto(false);
+        if (reciboDetalle) setReciboDetalle(null);
+        if (modalRevisionAbierto) setModalRevisionAbierto(false);
+        if (modalAjusteAbierto) setModalAjusteAbierto(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [reciboDetalle, modalRevisionAbierto, modalAjusteAbierto]);
 
   const mostrarNotificacion = (msg: string) => {
     setToastMensaje(msg);
@@ -49,7 +76,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
   };
 
   const handleAprobarPeriodo = () => {
-    if (!moduloHabilitado) {
+    if (!nominaHabilitada) {
       mostrarNotificacion('Debe habilitar el módulo de nómina para ejecutar aprobaciones.');
       return;
     }
@@ -57,7 +84,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
     const actualizado: PeriodoNomina = {
       ...periodoActivo,
       estado: 'APROBADA',
-      aprobadoPor: 'Dirección Médica y Finanzas [DEMO]',
+      aprobadoPor: 'Dirección General & Finanzas [DEMO]',
       fechaAprobacion: new Date().toLocaleString(),
       historialAjustes: [
         {
@@ -82,7 +109,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
   };
 
   const handleRegistrarAjuste = (tipo: 'AJUSTE_POSTERIOR' | 'REVERSO_TOTAL') => {
-    if (!moduloHabilitado) {
+    if (!nominaHabilitada) {
       mostrarNotificacion('El módulo de nómina está desactivado.');
       return;
     }
@@ -153,16 +180,19 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             <span className="text-xs text-[#94a3b8]">Estado del módulo:</span>
             <button
               onClick={() => {
-                setModuloHabilitado(!moduloHabilitado);
-                mostrarNotificacion(`Módulo de nómina ${!moduloHabilitado ? 'habilitado' : 'desactivado'} para este espacio [DEMO]`);
+                const nuevoEstado = !nominaHabilitada;
+                if (onToggleNominaHabilitada) {
+                  onToggleNominaHabilitada(nuevoEstado);
+                }
+                mostrarNotificacion(`Módulo de nómina ${nuevoEstado ? 'habilitado' : 'desactivado'} para este espacio [DEMO]`);
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#35d7c3] ${
-                moduloHabilitado
+                nominaHabilitada
                   ? 'bg-[#35d7c3] text-black hover:bg-[#28b8a6]'
                   : 'bg-[#1e293b] text-[#94a3b8] border border-[#334155] hover:text-[#f8fafc]'
               }`}
             >
-              {moduloHabilitado ? '✓ Habilitado' : 'Desactivado'}
+              {nominaHabilitada ? '✓ Habilitado' : 'Desactivado'}
             </button>
           </div>
         </div>
@@ -173,8 +203,8 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
       </div>
 
       {/* Alerta si el módulo está desactivado */}
-      {!moduloHabilitado && (
-        <div className="p-4 bg-[#0b111e] border border-[#f59e0b]/30 rounded-xl flex items-center justify-between text-xs text-[#fbbf24]">
+      {!nominaHabilitada && (
+        <div className="p-4 bg-[#0b111e] border border-[#f59e0b]/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#fbbf24]">
           <div className="flex items-center gap-2">
             <span>⚠️</span>
             <span>
@@ -183,10 +213,12 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
           </div>
           <button
             onClick={() => {
-              setModuloHabilitado(true);
+              if (onToggleNominaHabilitada) {
+                onToggleNominaHabilitada(true);
+              }
               mostrarNotificacion('Módulo de nómina habilitado [DEMO]');
             }}
-            className="px-3 py-1 rounded bg-[#f59e0b]/20 hover:bg-[#f59e0b]/30 text-[#fbbf24] font-semibold text-xs border border-[#f59e0b]/40 whitespace-nowrap"
+            className="px-3 py-1.5 rounded bg-[#f59e0b]/20 hover:bg-[#f59e0b]/30 text-[#fbbf24] font-semibold text-xs border border-[#f59e0b]/40 whitespace-nowrap self-start sm:self-auto"
           >
             Activar Ahora
           </button>
@@ -225,7 +257,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                   </div>
                   <h5 className="font-medium text-xs text-[#f8fafc]">{p.nombre}</h5>
                   <div className="flex items-center justify-between text-[11px] text-[#94a3b8] mt-2 font-mono">
-                    <span>{p.totalEmpleados} empleados</span>
+                    <span>{p.totalEmpleados} colaboradores</span>
                     <span className="text-[#35d7c3] font-bold">
                       {ocultarSueldo ? '••••••' : formatearMoneda(p.montoTotalNeto, p.monedaPrincipal)}
                     </span>
@@ -253,14 +285,14 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             <div className="flex items-center gap-2">
               {periodoActivo.estado === 'BORRADOR' || periodoActivo.estado === 'EN_REVISION' ? (
                 <button
-                  disabled={!moduloHabilitado}
+                  disabled={!nominaHabilitada}
                   onClick={() => setModalRevisionAbierto(true)}
                   className={`px-3.5 py-2 rounded-lg font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white ${
-                    moduloHabilitado
+                    nominaHabilitada
                       ? 'bg-[#35d7c3] hover:bg-[#28b8a6] text-black cursor-pointer'
                       : 'bg-[#1e293b] text-[#64748b] border border-[#334155] cursor-not-allowed opacity-60'
                   }`}
-                  title={!moduloHabilitado ? 'Habilite el módulo de nómina para autorizar revisiones' : ''}
+                  title={!nominaHabilitada ? 'Habilite el módulo de nómina para autorizar revisiones' : ''}
                 >
                   🔍 Revisar y Aprobar Período
                 </button>
@@ -270,10 +302,10 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                     🔒 Nómina Bloqueada
                   </span>
                   <button
-                    disabled={!moduloHabilitado}
+                    disabled={!nominaHabilitada}
                     onClick={() => setModalAjusteAbierto(true)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${
-                      moduloHabilitado
+                      nominaHabilitada
                         ? 'bg-[#1e293b] hover:bg-[#334155] text-[#cbd5e1] border-[#334155] cursor-pointer'
                         : 'bg-[#1e293b] text-[#64748b] border-[#334155] cursor-not-allowed opacity-60'
                     }`}
@@ -372,7 +404,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
         </div>
       </div>
 
-      {/* Modal de Detalle de Fórmulas y Cálculos de un Recibo con Accesibilidad */}
+      {/* Modal de Detalle de Fórmulas y Cálculos de un Recibo */}
       {reciboDetalle && (
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
@@ -389,8 +421,9 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 <p className="text-xs text-[#94a3b8]">Desglose de bases de cálculo y reglas aplicadas</p>
               </div>
               <button
+                ref={btnCerrarDesgloseRef}
                 onClick={() => setReciboDetalle(null)}
-                className="text-[#94a3b8] hover:text-[#f8fafc]"
+                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3] rounded p-1"
                 aria-label="Cerrar desglose"
               >
                 ✕
@@ -402,7 +435,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             <div className="flex justify-end pt-3 border-t border-[#1e2d48]">
               <button
                 onClick={() => setReciboDetalle(null)}
-                className="px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#334155] text-xs text-[#f8fafc]"
+                className="px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#334155] text-xs text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
               >
                 Cerrar Desglose
               </button>
@@ -411,7 +444,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
         </div>
       )}
 
-      {/* Modal de Pre-Revisión antes de Aprobación con Protección de Importes y Accesibilidad */}
+      {/* Modal de Pre-Revisión antes de Aprobación */}
       {modalRevisionAbierto && (
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
@@ -430,8 +463,9 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 </span>
               </div>
               <button
+                ref={btnCerrarRevisionRef}
                 onClick={() => setModalRevisionAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc]"
+                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3] rounded p-1"
                 aria-label="Cerrar revisión"
               >
                 ✕
@@ -477,13 +511,13 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             <div className="flex justify-end gap-2 pt-3 border-t border-[#1e2d48]">
               <button
                 onClick={() => setModalRevisionAbierto(false)}
-                className="px-4 py-2 rounded-lg bg-[#1e293b] text-xs text-[#cbd5e1] hover:bg-[#334155]"
+                className="px-4 py-2 rounded-lg bg-[#1e293b] text-xs text-[#cbd5e1] hover:bg-[#334155] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleAprobarPeriodo}
-                className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs"
+                className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs focus:outline-none focus:ring-2 focus:ring-white"
               >
                 Confirmar y Congelar Nómina
               </button>
@@ -492,7 +526,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
         </div>
       )}
 
-      {/* Modal de Registro de Ajuste o Reverso con Accesibilidad */}
+      {/* Modal de Registro de Ajuste o Reverso */}
       {modalAjusteAbierto && (
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
@@ -506,8 +540,9 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 Ajuste / Reverso de Período [DEMO]
               </h3>
               <button
+                ref={btnCerrarAjusteRef}
                 onClick={() => setModalAjusteAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc]"
+                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3] rounded p-1"
                 aria-label="Cerrar modal"
               >
                 ✕
@@ -526,7 +561,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                   value={motivoAjuste}
                   onChange={(e) => setMotivoAjuste(e.target.value)}
                   placeholder="Ej. Corrección por reporte tardío de jornada extraordinaria..."
-                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] text-xs"
+                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] text-xs focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
                 />
               </div>
             </div>
@@ -534,13 +569,13 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-[#1e2d48]">
               <button
                 onClick={() => handleRegistrarAjuste('AJUSTE_POSTERIOR')}
-                className="px-3.5 py-2 rounded-lg bg-[#6366f1] hover:bg-[#4f46e5] text-white font-medium text-xs"
+                className="px-3.5 py-2 rounded-lg bg-[#1e293b] hover:bg-[#334155] border border-[#334155] text-[#35d7c3] font-medium text-xs focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
               >
                 Registrar Nota de Ajuste
               </button>
               <button
                 onClick={() => handleRegistrarAjuste('REVERSO_TOTAL')}
-                className="px-3.5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-white font-medium text-xs"
+                className="px-3.5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-white font-medium text-xs focus:outline-none focus:ring-2 focus:ring-white"
               >
                 Reversar Período Completo
               </button>

@@ -29,7 +29,7 @@ export const PersonalPage: React.FC = () => {
   // Regla estricta: Salarios OCULTOS por defecto en la interfaz
   const [ocultarSueldo, setOcultarSueldo] = useState(true);
   
-  // Nómina desactivada por defecto
+  // Nómina DESACTIVADA por defecto (centralizada en Personal.tsx)
   const [nominaHabilitada, setNominaHabilitada] = useState(false);
 
   // Estado unificado en sesión para que las acciones conserven sus cambios en tiempo real
@@ -108,7 +108,7 @@ export const PersonalPage: React.FC = () => {
                 <span>{p.etiqueta}</span>
                 {p.id === 'nomina' && (
                   <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#f59e0b]/20 text-[#fbbf24] font-mono">
-                    Opcional
+                    {nominaHabilitada ? 'Activo' : 'Opcional'}
                   </span>
                 )}
               </button>
@@ -167,6 +167,8 @@ export const PersonalPage: React.FC = () => {
             <NominaPersonal
               periodos={periodosNomina}
               ocultarSueldo={ocultarSueldo}
+              nominaHabilitada={nominaHabilitada}
+              onToggleNominaHabilitada={(habilitada) => setNominaHabilitada(habilitada)}
               onActualizarPeriodos={(actualizados) => {
                 setPeriodosNomina(actualizados);
                 setNominaHabilitada(true);

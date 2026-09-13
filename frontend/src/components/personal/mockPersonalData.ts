@@ -35,7 +35,7 @@ export const MOCK_TURNOS_HORARIOS: TurnoHorario[] = [
     horaInicio: '21:00',
     horaFin: '07:00',
     horasJornada: 10,
-    color: '#818cf8',
+    color: '#38bdf8',
     descripcion: 'Guardia médica, ronda de potreros y cierre nocturno',
   },
   {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MetaPersonal, DepartamentoPersonal, TipoMeta, CategoriaMeta } from './types';
 
 interface MetasPersonalProps {
@@ -23,9 +23,27 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
   const [nuevaUnidad, setNuevaUnidad] = useState('%');
   const [toastMensaje, setToastMensaje] = useState<string | null>(null);
 
+  // Referencias para gestión real del foco
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+  const btnCerrarModalRef = useRef<HTMLButtonElement | null>(null);
+
   useEffect(() => {
     setMetas(initialMetas);
   }, [initialMetas]);
+
+  // Gestión de foco al abrir/cerrar modal
+  useEffect(() => {
+    if (modalCrearAbierto) {
+      previousActiveElementRef.current = document.activeElement as HTMLElement;
+      setTimeout(() => {
+        if (btnCerrarModalRef.current) {
+          btnCerrarModalRef.current.focus();
+        }
+      }, 50);
+    } else if (previousActiveElementRef.current) {
+      previousActiveElementRef.current.focus();
+    }
+  }, [modalCrearAbierto]);
 
   // Accesibilidad: Cerrar modal con tecla Escape
   useEffect(() => {
@@ -196,7 +214,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                         className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold border ${
                           esAutomatica
                             ? 'bg-[#38bdf8]/15 text-[#38bdf8] border-[#38bdf8]/30'
-                            : 'bg-[#a855f7]/15 text-[#a855f7] border-[#a855f7]/30'
+                            : 'bg-[#1e293b] text-[#cbd5e1] border-[#334155]'
                         }`}
                       >
                         {esAutomatica ? '⚡ Automática (ERP)' : '📝 Manual (Supervisión)'}
@@ -256,7 +274,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
         })}
       </div>
 
-      {/* Modal de Creación de Meta con Accesibilidad */}
+      {/* Modal de Creación de Meta con Gestión de Foco Real */}
       {modalCrearAbierto && (
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
@@ -270,8 +288,9 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                 Nueva Meta Formativa [DEMO]
               </h3>
               <button
+                ref={btnCerrarModalRef}
                 onClick={() => setModalCrearAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc]"
+                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3] rounded p-1"
                 aria-label="Cerrar modal"
               >
                 ✕
@@ -286,7 +305,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                   value={nuevoTitulo}
                   onChange={(e) => setNuevoTitulo(e.target.value)}
                   placeholder="Ej. Tiempo de atención en mesa, Control de inventario..."
-                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
                 />
               </div>
 
@@ -297,7 +316,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                   value={nuevaDescripcion}
                   onChange={(e) => setNuevaDescripcion(e.target.value)}
                   placeholder="Criterio de excelencia..."
-                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
                 />
               </div>
 
@@ -307,7 +326,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                   <select
                     value={nuevoDepto}
                     onChange={(e) => setNuevoDepto(e.target.value as any)}
-                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
                   >
                     <option value="Atención & Salud">Atención & Salud</option>
                     <option value="Cocina & Restauración">Cocina & Restauración</option>
@@ -320,7 +339,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                   <select
                     value={nuevoTipo}
                     onChange={(e) => setNuevoTipo(e.target.value as any)}
-                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
                   >
                     <option value="MANUAL">Manual (Supervisión)</option>
                     <option value="AUTOMATICA">Automática (ERP)</option>
@@ -335,7 +354,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                     type="number"
                     value={nuevoValor}
                     onChange={(e) => setNuevoValor(Number(e.target.value))}
-                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] font-mono"
+                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] font-mono focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
                   />
                 </div>
                 <div>
@@ -345,7 +364,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                     value={nuevaUnidad}
                     onChange={(e) => setNuevaUnidad(e.target.value)}
                     placeholder="%, minutos, órdenes..."
-                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                    className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
                   />
                 </div>
               </div>
@@ -354,13 +373,13 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setModalCrearAbierto(false)}
-                className="px-4 py-2 rounded-lg bg-[#1e293b] text-xs text-[#cbd5e1] hover:bg-[#334155]"
+                className="px-4 py-2 rounded-lg bg-[#1e293b] text-xs text-[#cbd5e1] hover:bg-[#334155] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCrearMeta}
-                className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs"
+                className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs focus:outline-none focus:ring-2 focus:ring-white"
               >
                 Crear Meta Formativa
               </button>

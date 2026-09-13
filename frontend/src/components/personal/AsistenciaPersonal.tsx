@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RegistroAsistencia, Empleado, DepartamentoPersonal, MetodoMarcaje } from './types';
 
 interface AsistenciaPersonalProps {
@@ -23,13 +23,23 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
   const [observacionMarcaje, setObservacionMarcaje] = useState('');
   const [toastMensaje, setToastMensaje] = useState<string | null>(null);
 
+  const btnCerrarModalRef = useRef<HTMLButtonElement | null>(null);
+  const elementoPrevioRef = useRef<HTMLElement | null>(null);
+
   // Sincronizar props iniciales
   useEffect(() => {
     setAsistencias(initialAsistencias);
   }, [initialAsistencias]);
 
-  // Accesibilidad: Cerrar modal con tecla Escape
+  // Accesibilidad: Guardar foco, capturar y restaurar foco, y cerrar modal con Escape
   useEffect(() => {
+    if (modalMarcajeAbierto) {
+      elementoPrevioRef.current = document.activeElement as HTMLElement | null;
+      btnCerrarModalRef.current?.focus();
+    } else if (elementoPrevioRef.current) {
+      elementoPrevioRef.current.focus();
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && modalMarcajeAbierto) {
         setModalMarcajeAbierto(false);
@@ -221,7 +231,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                             ? 'bg-[#10b981]/15 text-[#34d399]'
                             : ast.estado === 'RETARDO'
                             ? 'bg-[#fbbf24]/15 text-[#fbbf24]'
-                            : 'bg-[#818cf8]/15 text-[#818cf8]'
+                            : 'bg-[#38bdf8]/15 text-[#38bdf8]'
                         }`}
                       >
                         {ast.estado}
@@ -259,8 +269,9 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                 Marcaje de Asistencia [DEMO]
               </h3>
               <button
+                ref={btnCerrarModalRef}
                 onClick={() => setModalMarcajeAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc]"
+                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3] rounded p-1"
                 aria-label="Cerrar modal"
               >
                 ✕

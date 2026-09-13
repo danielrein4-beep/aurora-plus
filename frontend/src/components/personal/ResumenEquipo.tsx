@@ -117,7 +117,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
         >
           <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1">
             <span>Cobertura de Turnos</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#0b111e] font-mono text-[#a855f7]">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#0b111e] font-mono text-[#38bdf8]">
               Jornada Activa
             </span>
           </div>

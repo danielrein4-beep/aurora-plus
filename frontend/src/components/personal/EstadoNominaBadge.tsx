@@ -38,9 +38,9 @@ export const EstadoNominaBadge: React.FC<EstadoNominaBadgeProps> = ({ estado, cl
     case 'AJUSTADA':
       return (
         <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#6366f1]/15 text-[#818cf8] border border-[#6366f1]/30 ${className}`}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#38bdf8]/15 text-[#38bdf8] border border-[#38bdf8]/30 ${className}`}
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#818cf8]" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8]" />
           Ajustada
         </span>
       );
@@ -55,7 +55,7 @@ export const EstadoNominaBadge: React.FC<EstadoNominaBadgeProps> = ({ estado, cl
       );
     default:
       return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-300 ${className}`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs bg-[#1e293b] text-[#cbd5e1] ${className}`}>
           {estado}
         </span>
       );

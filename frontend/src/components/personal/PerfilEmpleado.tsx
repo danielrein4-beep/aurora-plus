@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Empleado, RegistroAsistencia, MetaPersonal, ReciboNominaEmpleado, formatearMoneda } from './types';
 import { DetalleCalculoNomina } from './DetalleCalculoNomina';
 
@@ -20,16 +20,24 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
   ocultarSueldo,
 }) => {
   const [pestanaActiva, setPestanaActiva] = useState<'info' | 'asistencia' | 'metas' | 'recibos'>('info');
+  const btnCerrarRef = useRef<HTMLButtonElement | null>(null);
+  const elementoPrevioRef = useRef<HTMLElement | null>(null);
 
-  // Accesibilidad: Cerrar con tecla Escape
+  // Accesibilidad: Guardar foco anterior, enfocar botón de cierre al montar y restaurar foco al desmontar
   useEffect(() => {
+    elementoPrevioRef.current = document.activeElement as HTMLElement | null;
+    btnCerrarRef.current?.focus();
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onCerrar();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      elementoPrevioRef.current?.focus();
+    };
   }, [onCerrar]);
 
   const asistenciasEmpleado = asistencias.filter((a) => a.empleadoId === empleado.id);
@@ -72,6 +80,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
           </div>
 
           <button
+            ref={btnCerrarRef}
             onClick={onCerrar}
             className="p-1.5 rounded-lg text-[#94a3b8] hover:text-[#f8fafc] hover:bg-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
             aria-label="Cerrar ficha de colaborador"
@@ -263,7 +272,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                               className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-medium ${
                                 m.tipo === 'AUTOMATICA'
                                   ? 'bg-[#38bdf8]/15 text-[#38bdf8] border border-[#38bdf8]/30'
-                                  : 'bg-[#a855f7]/15 text-[#a855f7] border border-[#a855f7]/30'
+                                  : 'bg-[#1e293b] text-[#cbd5e1] border border-[#334155]'
                               }`}
                             >
                               [{m.tipo}]
