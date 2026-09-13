@@ -2802,8 +2802,9 @@ function ModalEditarReceta({
           </div>
 
           {tipoNuevo === "articulo" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-              <div className="sm:col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-6 gap-2.5 items-end">
+              <div className="sm:col-span-3">
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">Insumo</label>
                 <select value={nuevoArticuloId}
                   onChange={(e) => { setNuevoArticuloId(e.target.value); setNuevoUnidad(""); }}
                   className="input-horeca w-full text-xs">
@@ -2815,19 +2816,27 @@ function ModalEditarReceta({
                   ))}
                 </select>
               </div>
-              <div className="flex gap-1.5">
-                <input value={nuevoPesoNeto} onChange={(e) => setNuevoPesoNeto(e.target.value)}
-                  type="number" step="0.001" placeholder="Peso neto / cantidad" className="input-horeca w-full text-xs" />
-                {opcionesUnidadPara(articuloSeleccionadoNuevo?.unidadMedida || "").length > 0 && (
-                  <select value={nuevoUnidad || articuloSeleccionadoNuevo?.unidadMedida || ""} onChange={(e) => setNuevoUnidad(e.target.value)}
-                    className="input-horeca text-xs w-16 flex-shrink-0" title="Unidad en la que estás capturando esta cantidad">
-                    {opcionesUnidadPara(articuloSeleccionadoNuevo?.unidadMedida || "").map((u) => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                )}
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">Cantidad usada</label>
+                <div className="flex gap-1.5">
+                  <input value={nuevoPesoNeto} onChange={(e) => setNuevoPesoNeto(e.target.value)}
+                    type="number" step="0.001" placeholder="Ej. 200" className="input-horeca w-full text-xs min-w-0" />
+                  {opcionesUnidadPara(articuloSeleccionadoNuevo?.unidadMedida || "").length > 0 ? (
+                    <select value={nuevoUnidad || articuloSeleccionadoNuevo?.unidadMedida || ""} onChange={(e) => setNuevoUnidad(e.target.value)}
+                      className="input-horeca text-xs w-[4.5rem] flex-shrink-0" title="Unidad en la que estás capturando esta cantidad">
+                      {opcionesUnidadPara(articuloSeleccionadoNuevo?.unidadMedida || "").map((u) => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  ) : articuloSeleccionadoNuevo ? (
+                    <span className="input-horeca text-xs w-[4.5rem] flex-shrink-0 flex items-center justify-center text-slate-400">
+                      {articuloSeleccionadoNuevo.unidadMedida}
+                    </span>
+                  ) : null}
+                </div>
               </div>
               <div>
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">% Merma</label>
                 <input value={nuevoMerma} onChange={(e) => setNuevoMerma(e.target.value)}
-                  type="number" step="0.1" placeholder="% Merma" className="input-horeca w-full text-xs" />
+                  type="number" step="0.1" placeholder="0" className="input-horeca w-full text-xs" />
               </div>
             </div>
           ) : (
