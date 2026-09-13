@@ -97,8 +97,8 @@ function HomePointerAurora({ hostRef }: { hostRef: RefObject<HTMLElement | null>
 
     const motionAllowed = window.matchMedia("(prefers-reduced-motion: no-preference) and (any-hover: hover) and (any-pointer: fine)");
     const colors = ["44, 134, 224", "48, 203, 132", "53, 215, 195"];
-    const trailDuration = 850; // ms que tarda cada trazo en desvanecerse por completo
-    const minDistance = 14; // px mínimos entre puntos para no saturar la estela
+    const trailDuration = 1200; // ms que tarda cada trazo en desvanecerse por completo (humo dura más que un rayo fino)
+    const minDistance = 22; // px mínimos entre puntos — con radios grandes, puntos muy juntos saturan a blanco en modo "lighter"
 
     type Point = { x: number; y: number; born: number; hue: number };
     let points: Point[] = [];
@@ -118,22 +118,34 @@ function HomePointerAurora({ hostRef }: { hostRef: RefObject<HTMLElement | null>
     resize();
 
     const drawWisp = (p: Point, age: number) => {
-      // age: 0 = recién nacido, 1 = totalmente desvanecido
-      const fade = Math.pow(1 - age, 1.6);
+      // age: 0 = recién nacido, 1 = totalmente desvanecido.
+      // Como el humo real: nace denso y compacto, y a medida que envejece se
+      // expande, se difumina y sube levemente — no es un rayo fino, es una
+      // nube de varias capas superpuestas.
+      const fade = Math.pow(1 - age, 1.3);
       if (fade <= 0.01) return;
       const color = colors[p.hue % colors.length];
-      const size = 34 + age * 18;
-      context.globalCompositeOperation = "lighter";
-      for (let i = 0; i < 4; i++) {
-        const jitterX = (i - 1.5) * 6;
-        const rayHeight = size * (0.7 + 0.3 * Math.sin(i * 1.7 + p.born));
-        const glow = context.createLinearGradient(0, p.y - rayHeight, 0, p.y + rayHeight * 0.4);
-        glow.addColorStop(0, `rgba(${color}, 0)`);
-        glow.addColorStop(0.55, `rgba(${color}, ${0.16 * fade})`);
-        glow.addColorStop(0.85, `rgba(${color}, ${0.34 * fade})`);
+      const baseRadius = 30 + age * 46;
+      const drift = age * 26; // sube un poco mientras se desvanece
+      // source-over (no "lighter"): con muchos puntos superpuestos, el modo
+      // aditivo satura a blanco sólido casi de inmediato. El brillo tipo
+      // aurora ya lo da mix-blend-mode:screen del canvas completo contra la
+      // página, una sola vez, no cada blob contra sí mismo.
+      context.globalCompositeOperation = "source-over";
+      for (let i = 0; i < 2; i++) {
+        const angle = i * 2.4 + p.born * 0.001;
+        const spread = baseRadius * 0.28;
+        const cx = p.x + Math.cos(angle) * spread;
+        const cy = p.y - drift + Math.sin(angle) * spread * 0.6;
+        const r = baseRadius * (0.8 + i * 0.22);
+        const glow = context.createRadialGradient(cx, cy, 0, cx, cy, r);
+        glow.addColorStop(0, `rgba(${color}, ${0.24 * fade})`);
+        glow.addColorStop(0.45, `rgba(${color}, ${0.13 * fade})`);
         glow.addColorStop(1, `rgba(${color}, 0)`);
         context.fillStyle = glow;
-        context.fillRect(p.x + jitterX - 3, p.y - rayHeight, 6, rayHeight * 1.4);
+        context.beginPath();
+        context.arc(cx, cy, r, 0, Math.PI * 2);
+        context.fill();
       }
     };
 

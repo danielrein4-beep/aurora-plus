@@ -662,7 +662,7 @@ html.light .input-horeca:hover { background: #ffffff; }
   left: 0;
   z-index: 20;
   pointer-events: none;
-  filter: blur(10px);
+  filter: blur(16px);
   mix-blend-mode: screen;
 }
 @media (prefers-reduced-motion: reduce), (hover: none) and (any-pointer: coarse) {
