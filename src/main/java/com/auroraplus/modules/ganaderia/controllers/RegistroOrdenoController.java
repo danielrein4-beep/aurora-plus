@@ -250,6 +250,26 @@ public class RegistroOrdenoController {
         return ventaLecheTanqueRepository.findByTenantIdOrderByFechaDesc(tenantId);
     }
 
+    @Autowired
+    private com.auroraplus.modules.ganaderia.services.DespachoLechePdfService despachoLechePdfService;
+
+    @Autowired
+    private com.auroraplus.core.config.repositories.LicenciaTenantRepository licenciaTenantRepository;
+
+    @GetMapping(value = "/tanque/ventas/{id}/pdf", produces = org.springframework.http.MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> pdfDespacho(@PathVariable Long id) throws Exception {
+        Long tenantId = com.auroraplus.core.config.TenantContext.getCurrentTenant();
+        VentaLecheTanque despacho = ventaLecheTanqueRepository.findById(id)
+            .filter(v -> tenantId != null && tenantId.equals(v.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Despacho no encontrado"));
+        var licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
+        byte[] pdf = despachoLechePdfService.generarNotaEntregaPdf(despacho, licencia);
+        return ResponseEntity.ok()
+            .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"nota-entrega-leche-" + id + ".pdf\"")
+            .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+            .body(pdf);
+    }
+
     @PutMapping("/tanque/config")
     public ResponseEntity<TanqueLeche> configurarTanque(@RequestParam Long tenantId, @RequestBody ConfigTanqueRequest req) {
         TanqueLeche tanque = tanqueLecheRepository.findByTenantId(tenantId)

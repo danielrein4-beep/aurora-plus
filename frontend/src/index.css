@@ -300,6 +300,44 @@ html.light .modal-siempre-oscuro.text-white,
 html.light .modal-siempre-oscuro .text-white {
   color: #ffffff !important;
 }
+/* Los <input>/<select>/<textarea> dentro de estos modales también quedaban
+   forzados a fondo blanco por la regla global de inputs en modo claro,
+   ilegibles sobre un modal que sigue oscuro. */
+html.light .modal-siempre-oscuro input,
+html.light .modal-siempre-oscuro select,
+html.light .modal-siempre-oscuro textarea {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+html.light .modal-siempre-oscuro input::placeholder,
+html.light .modal-siempre-oscuro textarea::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+/* Paneles/cajas internas translúcidas (bg-white/5, bg-white/10, etc.) usadas
+   como "sub-tarjetas" dentro de estos modales también quedaban forzadas a
+   fondo casi blanco por las reglas globales de esas utilidades en modo
+   claro, con texto claro pensado para fondo oscuro encima — ilegible. */
+html.light .modal-siempre-oscuro [class*="bg-white/"] {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: none !important;
+}
+/* Texto sin una utilidad de color explícita (texto plano heredado) dentro de
+   estas cajitas: por defecto que sea claro, ya que el fondo sigue oscuro. */
+html.light .modal-siempre-oscuro [class*="bg-white/"]:not([class*="text-"]) {
+  color: #e2e8f0 !important;
+}
+html.light .modal-siempre-oscuro [class*="border-white/"] {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+html.light .modal-siempre-oscuro input:focus,
+html.light .modal-siempre-oscuro select:focus,
+html.light .modal-siempre-oscuro textarea:focus {
+  border-color: #00c9a7 !important;
+  box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.25) !important;
+  background-color: rgba(15, 23, 42, 0.95) !important;
+}
 
 * {
   scrollbar-width: thin;
@@ -572,6 +610,48 @@ html.light .input-horeca:hover { background: #ffffff; }
 
 .animate-float {
   animation: float 5s ease-in-out infinite;
+}
+
+/* Hero del Home: foto real de aurora boreal con paneo lentísimo (Ken Burns) +
+   un respiro de color muy sutil encima. Reemplaza las cortinas SVG sintéticas
+   que había antes — nombres con prefijo home- para no chocar con nada más. */
+.home-hero-photo {
+  position: absolute;
+  inset: -6%;
+  background-image: url('/aurora-hero.jpg');
+  background-size: cover;
+  background-position: center 55%;
+  animation: home-aurora-pan 34s ease-in-out infinite alternate;
+}
+.home-hero-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(5,10,9,.55) 0%, rgba(5,10,9,.25) 35%, rgba(5,10,9,.55) 78%, rgba(5,10,9,.92) 100%),
+    linear-gradient(90deg, rgba(5,10,9,.35) 0%, transparent 40%, transparent 60%, rgba(5,10,9,.35) 100%);
+}
+.home-hero-photo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 201, 167, .12);
+  mix-blend-mode: overlay;
+  animation: home-aurora-breathe 8s ease-in-out infinite alternate;
+}
+@keyframes home-aurora-pan {
+  from { transform: scale(1.06) translate(0, 0); }
+  to   { transform: scale(1.14) translate(-1.5%, -1%); }
+}
+@keyframes home-aurora-breathe {
+  from { opacity: .55; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-photo,
+  .home-hero-photo::before {
+    animation: none;
+  }
 }
 
 /* Ticker de módulos en Home.tsx: se renderiza 3 veces la misma lista seguida, así que

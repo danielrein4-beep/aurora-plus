@@ -181,4 +181,38 @@ public class ModuloTenantController {
         licenciaTenantRepository.save(licencia);
         return new MonedaBaseResponse(licencia.getMonedaBase());
     }
+
+    // --- Datos fiscales opcionales (RIF, razón social, domicilio fiscal) — se
+    // estampan en notas de entrega/recibos de venta y despacho cuando el dueño
+    // los llena; nunca bloquean la operación si quedan vacíos.
+
+    public static class DatosFiscalesResponse {
+        public String rif;
+        public String razonSocial;
+        public String domicilioFiscal;
+    }
+
+    @GetMapping("/mi-negocio/datos-fiscales")
+    public DatosFiscalesResponse obtenerDatosFiscales() {
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        DatosFiscalesResponse r = new DatosFiscalesResponse();
+        r.rif = licencia.getRif();
+        r.razonSocial = licencia.getRazonSocial();
+        r.domicilioFiscal = licencia.getDomicilioFiscal();
+        return r;
+    }
+
+    @PutMapping("/mi-negocio/datos-fiscales")
+    public DatosFiscalesResponse actualizarDatosFiscales(@RequestBody DatosFiscalesResponse request) {
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        licencia.setRif(request.rif);
+        licencia.setRazonSocial(request.razonSocial);
+        licencia.setDomicilioFiscal(request.domicilioFiscal);
+        licenciaTenantRepository.save(licencia);
+        return obtenerDatosFiscales();
+    }
 }

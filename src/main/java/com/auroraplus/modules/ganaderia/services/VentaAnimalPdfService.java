@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.services;
 
+import com.auroraplus.core.config.entities.LicenciaTenant;
 import com.auroraplus.modules.ganaderia.entities.VentaAnimal;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -13,13 +14,23 @@ import java.io.ByteArrayOutputStream;
 import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
 
-/** Liquidación/nota de venta de animales — comprobante para el comprador y respaldo contable del hato. */
+/**
+ * Nota de entrega / recibo de venta de animales — comprobante para el comprador y
+ * respaldo contable del hato. Formato tipo factura (encabezado del negocio, datos
+ * del comprador, tabla de items, total) pero SIN número correlativo de factura —
+ * no somos un emisor fiscal autorizado, así que nunca se numera como tal.
+ */
 @Service
 public class VentaAnimalPdfService {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     public byte[] generarLiquidacionPdf(VentaAnimal venta) throws Exception {
+        return generarLiquidacionPdf(venta, null);
+    }
+
+    /** licencia (opcional): si el dueño llenó razón social/RIF/domicilio, se estampan en el encabezado. */
+    public byte[] generarLiquidacionPdf(VentaAnimal venta, LicenciaTenant licencia) throws Exception {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PDPage page = new PDPage(PDRectangle.A4);
             document.addPage(page);
@@ -29,10 +40,36 @@ public class VentaAnimalPdfService {
             try (PDPageContentStream cs = new PDPageContentStream(document, page)) {
                 float y = pageHeight - 50;
 
+                if (licencia != null && licencia.getRazonSocial() != null && !licencia.getRazonSocial().isBlank()) {
+                    cs.beginText();
+                    cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 13);
+                    cs.newLineAtOffset(startX, y);
+                    cs.showText(licencia.getRazonSocial());
+                    cs.endText();
+                    y -= 16;
+                    if (licencia.getRif() != null && !licencia.getRif().isBlank()) {
+                        cs.beginText();
+                        cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
+                        cs.newLineAtOffset(startX, y);
+                        cs.showText("RIF: " + licencia.getRif());
+                        cs.endText();
+                        y -= 13;
+                    }
+                    if (licencia.getDomicilioFiscal() != null && !licencia.getDomicilioFiscal().isBlank()) {
+                        cs.beginText();
+                        cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
+                        cs.newLineAtOffset(startX, y);
+                        cs.showText(licencia.getDomicilioFiscal());
+                        cs.endText();
+                        y -= 13;
+                    }
+                    y -= 10;
+                }
+
                 cs.beginText();
                 cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 16);
                 cs.newLineAtOffset(startX, y);
-                cs.showText("LIQUIDACION DE VENTA DE GANADO");
+                cs.showText("NOTA DE ENTREGA - VENTA DE GANADO");
                 cs.endText();
                 y -= 25;
 

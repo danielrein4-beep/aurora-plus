@@ -1,6 +1,6 @@
 import PortalPublicoBioanalista from "./pages/PortalPublicoBioanalista";
 import PortalLaboratorioPaciente from "./pages/PortalLaboratorioPaciente";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useParams } from "react-router-dom";
 import Layout from "./Layout";
 import Home from "./pages/Home";
 import Soluciones from "./pages/Soluciones";
@@ -51,6 +51,14 @@ function GanaderiaPage() {
   return <GanaderiaApp onSalir={() => navigate("/dashboard")} />;
 }
 
+// Deep link del QR impreso de cada animal: /ganaderia/animal/:animalId
+function GanaderiaAnimalPage() {
+  const navigate = useNavigate();
+  const { animalId } = useParams();
+  const id = Number(animalId);
+  return <GanaderiaApp onSalir={() => navigate("/dashboard")} deepLinkAnimalId={Number.isFinite(id) ? id : undefined} />;
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -82,6 +90,7 @@ export default function App() {
             <Route path="/retail" element={<ProtectedRoute><AnimatedRoute><RetailPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/comercio"   element={<ProtectedRoute><AnimatedRoute><ComercioPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/ganaderia"  element={<ProtectedRoute><AnimatedRoute><GanaderiaPage /></AnimatedRoute></ProtectedRoute>} />
+            <Route path="/ganaderia/animal/:animalId" element={<ProtectedRoute><AnimatedRoute><GanaderiaAnimalPage /></AnimatedRoute></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
