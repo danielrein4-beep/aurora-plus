@@ -36,9 +36,9 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-['IBM_Plex_Sans',sans-serif]">
       {/* Explicación en lenguaje simple para dueños de negocio */}
-      <div className="bg-[#0b2341]/80 border border-white/10 rounded-2xl p-5 backdrop-blur-xl">
+      <div className="bg-[#0b2341] border border-white/10 rounded-2xl p-4 sm:p-5">
         <h3 className="text-base font-semibold text-white">
           Registro Comercial: Ventas vs. Compras
         </h3>
@@ -48,15 +48,15 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
 
         {/* Barra de Filtros y Búsqueda */}
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mt-4 pt-4 border-t border-white/10">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 p-1 bg-[#071a2e] rounded-xl border border-white/10 overflow-x-auto">
+          <div className="flex flex-wrap items-center gap-2 max-w-full">
+            <div className="flex items-center gap-1 p-1 bg-[#071a2e] rounded-xl border border-white/10 overflow-x-auto max-w-full scrollbar-none">
               {(['ALL', 'VENTA', 'COMPRA', 'GASTO'] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => setFilterType(type)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
                     filterType === type
-                      ? 'bg-[#00FFC2] text-[#051322] shadow-[0_0_10px_rgba(0,255,194,0.3)]'
+                      ? 'bg-[#35d7c3] text-[#051322]'
                       : 'text-white/60 hover:text-white'
                   }`}
                 >
@@ -65,18 +65,18 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
               ))}
             </div>
 
-            <div className="flex items-center gap-1 p-1 bg-[#071a2e] rounded-xl border border-white/10">
+            <div className="flex items-center gap-1 p-1 bg-[#071a2e] rounded-xl border border-white/10 overflow-x-auto max-w-full scrollbar-none">
               {(['ALL', 'USD', 'VES', 'COP'] as const).map((curr) => (
                 <button
                   key={curr}
                   onClick={() => setFilterCurrency(curr)}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-2.5 py-1 text-xs font-semibold font-['IBM_Plex_Mono',monospace] rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
                     filterCurrency === curr
-                      ? 'bg-[#00FFC2]/20 text-[#00FFC2] border border-[#00FFC2]/40'
+                      ? 'bg-[#35d7c3]/20 text-[#35d7c3] border border-[#35d7c3]/40'
                       : 'text-white/50 hover:text-white'
                   }`}
                 >
-                  {curr === 'ALL' ? 'Todas Monedas' : curr}
+                  {curr === 'ALL' ? 'Todas' : curr}
                 </button>
               ))}
             </div>
@@ -88,14 +88,14 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
               placeholder="Buscar por cliente, proveedor o referencia..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full lg:w-72 bg-[#071a2e] border border-white/10 focus:border-[#00FFC2]/50 text-white placeholder-white/35 text-xs rounded-xl px-3.5 py-2 outline-none transition-all"
+              className="w-full lg:w-72 bg-[#071a2e] border border-white/10 focus:border-[#35d7c3] text-white placeholder-white/35 text-xs rounded-xl px-3.5 py-2 outline-none transition-colors"
             />
           </div>
         </div>
       </div>
 
       {/* Lista de Transacciones Responsive */}
-      <div className="bg-[#0b2341]/80 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-xl shadow-lg">
+      <div className="bg-[#0b2341] border border-white/10 rounded-2xl overflow-hidden">
         <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 text-[11px] font-semibold text-white/50 border-b border-white/10 uppercase tracking-wider bg-[#071a2e]/50">
           <div className="col-span-4">Operación / Referencia Interna</div>
           <div className="col-span-3">Contraparte / Vertical</div>
@@ -117,29 +117,29 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
               return (
                 <div
                   key={tx.id}
-                  className="p-4 md:px-5 md:py-3.5 hover:bg-white/[0.03] transition-all flex flex-col md:grid md:grid-cols-12 md:gap-4 md:items-center gap-2 group"
+                  className="p-3.5 sm:p-4 md:px-5 md:py-3.5 hover:bg-white/[0.02] transition-colors flex flex-col md:grid md:grid-cols-12 md:gap-4 md:items-center gap-2 group"
                 >
                   {/* Móvil / Escritorio: Info Operación */}
                   <div className="md:col-span-4 flex items-start gap-2.5">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold ${
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-['IBM_Plex_Mono',monospace] font-bold ${
                       isSale 
                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' 
                         : isExpense
                           ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                           : 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
                     }`}>
-                      {isSale ? '↑' : '↓'}
+                      {isSale ? '+' : '-'}
                     </div>
                     <div>
-                      <div className="text-xs font-semibold text-white group-hover:text-[#00FFC2] transition-colors line-clamp-1">
+                      <div className="text-xs font-semibold text-white group-hover:text-[#35d7c3] transition-colors line-clamp-1">
                         {tx.description}
                       </div>
-                      <div className="text-[11px] text-white/50 flex items-center gap-1.5 mt-0.5">
+                      <div className="text-[11px] text-white/50 flex items-center gap-1.5 mt-0.5 font-['IBM_Plex_Mono',monospace]">
                         <span>{tx.date}</span>
                         {tx.referenciaInterna && (
                           <span 
                             onClick={() => onSelectDocReference && onSelectDocReference(tx.referenciaInterna!)}
-                            className="font-mono bg-white/5 px-1 rounded text-[#00FFC2] hover:underline cursor-pointer"
+                            className="bg-white/5 border border-white/10 px-1 rounded text-[#35d7c3] hover:underline cursor-pointer"
                           >
                             {tx.referenciaInterna}
                           </span>
@@ -168,10 +168,10 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
                   <div className="md:col-span-2 md:text-right flex items-center justify-between md:block">
                     <span className="md:hidden text-xs text-white/40">Monto:</span>
                     <div>
-                      <div className={`text-sm font-bold ${isSale ? 'text-emerald-400' : 'text-white'}`}>
+                      <div className={`text-sm font-bold font-['IBM_Plex_Mono',monospace] ${isSale ? 'text-emerald-400' : 'text-white'}`}>
                         {formatCurrency(tx.amount, tx.currency)}
                       </div>
-                      <span className="text-[10px] text-white/50 font-mono">
+                      <span className="text-[10px] text-white/50 font-['IBM_Plex_Mono',monospace]">
                         {tx.currency}
                       </span>
                     </div>
@@ -190,3 +190,4 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
     </div>
   );
 };
+
