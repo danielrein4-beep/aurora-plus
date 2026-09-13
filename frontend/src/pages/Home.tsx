@@ -4,6 +4,7 @@ import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import AuroraLogo from "../AuroraLogo";
 import TrueFocus from "../components/TrueFocus";
 import SpecularButton from "../components/SpecularButton";
+import ScrollReveal from "../components/ScrollReveal";
 import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware, IconMining,
@@ -286,7 +287,7 @@ export default function Home() {
             </SpecularButton>
           </motion.div>
 
-          <motion.div variants={heroItem} className="mt-16 grid max-w-4xl grid-cols-2 gap-x-7 gap-y-8 border-t border-white/15 pt-8 sm:grid-cols-4">
+          <motion.div variants={heroItem} className="mt-16 grid w-full max-w-5xl mx-auto grid-cols-2 gap-x-8 gap-y-12 border-t border-white/15 pt-10 sm:grid-cols-4 text-center justify-items-center">
             {[
               ["6", "industrias nativas"],
               ["100%", "caja offline-first"],
@@ -294,8 +295,17 @@ export default function Home() {
               ["RBAC", "roles estrictos"],
             ].map(([value, label]) => (
               <div key={label}>
-                <div className="font-['IBM_Plex_Sans'] text-2xl font-bold text-[#f8f6ef]">{value}</div>
-                <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/85">{label}</div>
+                <div className="font-['IBM_Plex_Sans'] text-4xl sm:text-5xl font-bold text-[#f8f6ef]">{value}</div>
+                <ScrollReveal
+                  baseOpacity={0.15}
+                  enableBlur
+                  baseRotation={2}
+                  blurStrength={3}
+                  containerClassName="mt-2"
+                  textClassName="font-mono text-xs sm:text-sm uppercase tracking-wide text-[#d9d8ce]/85"
+                >
+                  {label}
+                </ScrollReveal>
               </div>
             ))}
           </motion.div>
