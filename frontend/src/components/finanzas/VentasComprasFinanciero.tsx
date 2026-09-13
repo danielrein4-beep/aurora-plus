@@ -4,12 +4,12 @@ import { QualityBadge } from './QualityBadge';
 
 interface VentasComprasFinancieroProps {
   transactions: TransactionSummary[];
-  onSelectTransaction: (tx: TransactionSummary) => void;
+  onSelectDocReference?: (ref: string) => void;
 }
 
 export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = ({
   transactions,
-  onSelectTransaction
+  onSelectDocReference
 }) => {
   const [filterType, setFilterType] = useState<'ALL' | 'VENTA' | 'COMPRA' | 'GASTO'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,7 +18,7 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
     const matchesType = filterType === 'ALL' || t.type === filterType;
     const matchesSearch = t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           t.counterparty.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (t.invoiceNumber && t.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()));
+                          (t.docReference && t.docReference.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesType && matchesSearch;
   });
 
@@ -33,7 +33,7 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
           Registro Comercial: Ventas vs. Compras
         </h3>
         <p className="text-xs text-white/65 mt-1 leading-relaxed">
-          Aquí ves con total claridad cuánto dinero entró por ventas y cuánto salió en compras o reposiciones. Haz clic en cualquier movimiento para auditar su documento y su asiento de partida doble.
+          Aquí ves con total claridad cuánto dinero entró por ventas y cuánto salió en compras o reposiciones. Cada movimiento cuenta con su documento operativo de respaldo.
         </p>
 
         {/* Barra de Filtros y Búsqueda */}
@@ -57,7 +57,7 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
           <div className="relative">
             <input
               type="text"
-              placeholder="Buscar por cliente, proveedor o factura..."
+              placeholder="Buscar por cliente, proveedor o documento..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full sm:w-72 bg-[#071a2e] border border-white/10 focus:border-[#00FFC2]/50 text-white placeholder-white/35 text-xs rounded-xl px-3.5 py-2 outline-none transition-all"
@@ -69,11 +69,11 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
       {/* Lista de Transacciones Responsive */}
       <div className="bg-[#0b2341]/80 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-xl shadow-lg">
         <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 text-[11px] font-semibold text-white/50 border-b border-white/10 uppercase tracking-wider bg-[#071a2e]/50">
-          <div className="col-span-3">Operación / Documento</div>
+          <div className="col-span-4">Operación / Comprobante</div>
           <div className="col-span-3">Contraparte / Vertical</div>
           <div className="col-span-2">Método de Pago</div>
           <div className="col-span-2 text-right">Monto (USD / VES)</div>
-          <div className="col-span-2 text-center">Estado y Acción</div>
+          <div className="col-span-1 text-center">Estado</div>
         </div>
 
         <div className="divide-y divide-white/5">
@@ -89,11 +89,10 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
               return (
                 <div
                   key={tx.id}
-                  onClick={() => onSelectTransaction(tx)}
-                  className="p-4 md:px-5 md:py-3.5 hover:bg-white/[0.03] transition-all cursor-pointer flex flex-col md:grid md:grid-cols-12 md:gap-4 md:items-center gap-2 group"
+                  className="p-4 md:px-5 md:py-3.5 hover:bg-white/[0.03] transition-all flex flex-col md:grid md:grid-cols-12 md:gap-4 md:items-center gap-2 group"
                 >
                   {/* Móvil / Escritorio: Info Operación */}
-                  <div className="md:col-span-3 flex items-start gap-2.5">
+                  <div className="md:col-span-4 flex items-start gap-2.5">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold ${
                       isSale 
                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' 
@@ -109,9 +108,12 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
                       </div>
                       <div className="text-[11px] text-white/50 flex items-center gap-1.5 mt-0.5">
                         <span>{tx.date}</span>
-                        {tx.invoiceNumber && (
-                          <span className="font-mono bg-white/5 px-1 rounded text-white/70">
-                            {tx.invoiceNumber}
+                        {tx.docReference && (
+                          <span 
+                            onClick={() => onSelectDocReference && onSelectDocReference(tx.docReference!)}
+                            className="font-mono bg-white/5 px-1 rounded text-[#00FFC2] hover:underline cursor-pointer"
+                          >
+                            {tx.docReference}
                           </span>
                         )}
                       </div>
@@ -147,18 +149,9 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
                     </div>
                   </div>
 
-                  {/* Calidad y Auditoría */}
-                  <div className="md:col-span-2 flex items-center justify-between md:justify-center gap-2 mt-2 md:mt-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
+                  {/* Estado */}
+                  <div className="md:col-span-1 flex items-center justify-between md:justify-center">
                     <QualityBadge state={tx.qualityState} size="sm" />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectTransaction(tx);
-                      }}
-                      className="text-[11px] font-medium text-[#00FFC2] hover:underline bg-[#00FFC2]/10 px-2 py-1 rounded-md border border-[#00FFC2]/20"
-                    >
-                      Auditar Asiento
-                    </button>
                   </div>
                 </div>
               );

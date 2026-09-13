@@ -5,91 +5,25 @@ import {
   MOCK_COVERAGE,
   MOCK_TRANSACTIONS,
   MOCK_COSTS,
-  MOCK_FISCAL,
-  MOCK_ACCOUNTING_SAMPLE,
+  MOCK_NON_FISCAL_DOCS,
   DEMO_BCV_RATE
 } from '../components/finanzas/mockFinanceData';
 import { ResumenFinanciero } from '../components/finanzas/ResumenFinanciero';
 import { VentasComprasFinanciero } from '../components/finanzas/VentasComprasFinanciero';
 import { CostosFinanciero } from '../components/finanzas/CostosFinanciero';
-import { ContabilidadFinanciero } from '../components/finanzas/ContabilidadFinanciero';
-import { FiscalFinanciero } from '../components/finanzas/FiscalFinanciero';
+import { DocumentosFinancieros } from '../components/finanzas/DocumentosFinancieros';
 import { VerticalCoverageCard } from '../components/finanzas/VerticalCoverageCard';
-import { DetalleContableModal } from '../components/finanzas/DetalleContableModal';
-import { TransactionSummary, AccountingEntry } from '../components/finanzas/types';
 
-type ActiveTab = 'resumen' | 'ventas-compras' | 'costos' | 'contabilidad' | 'fiscal';
+type ActiveTab = 'resumen' | 'ventas-compras' | 'costos' | 'documentos';
 
 export const CentroFinanciero: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('resumen');
-  const [selectedEntry, setSelectedEntry] = useState<AccountingEntry | null>(null);
-
-  // Convierte una transacción en asiento contable simulado para inspección
-  const handleSelectTransaction = (tx: TransactionSummary) => {
-    const isSale = tx.type === 'VENTA';
-    const entry: AccountingEntry = {
-      id: `ASI-${tx.id.toUpperCase()}`,
-      referenceDoc: tx.invoiceNumber || tx.id,
-      date: tx.date,
-      description: tx.description,
-      lines: isSale
-        ? [
-            {
-              accountCode: '1.1.01.01',
-              accountName: `Caja / Cobro (${tx.paymentMethod})`,
-              debit: tx.amountUsd,
-              credit: 0,
-              currency: 'USD'
-            },
-            {
-              accountCode: '4.1.01.01',
-              accountName: `Ingresos por Ventas (${tx.vertical})`,
-              debit: 0,
-              credit: Number((tx.amountUsd * 0.862).toFixed(2)),
-              currency: 'USD'
-            },
-            {
-              accountCode: '2.1.04.01',
-              accountName: 'Débito Fiscal IVA 16%',
-              debit: 0,
-              credit: Number((tx.amountUsd * 0.138).toFixed(2)),
-              currency: 'USD'
-            }
-          ]
-        : [
-            {
-              accountCode: '5.1.01.01',
-              accountName: `Costo / Gasto Operativo (${tx.vertical})`,
-              debit: Number((tx.amountUsd * 0.862).toFixed(2)),
-              credit: 0,
-              currency: 'USD'
-            },
-            {
-              accountCode: '1.1.05.01',
-              accountName: 'Crédito Fiscal IVA Soportado 16%',
-              debit: Number((tx.amountUsd * 0.138).toFixed(2)),
-              credit: 0,
-              currency: 'USD'
-            },
-            {
-              accountCode: '1.1.02.01',
-              accountName: `Bancos / Salida de Fondos (${tx.paymentMethod})`,
-              debit: 0,
-              credit: tx.amountUsd,
-              currency: 'USD'
-            }
-          ],
-      isBalanced: true
-    };
-    setSelectedEntry(entry);
-  };
 
   const tabs: { id: ActiveTab; label: string; icon: string }[] = [
     { id: 'resumen', label: 'Resumen General', icon: '📊' },
     { id: 'ventas-compras', label: 'Ventas y Compras', icon: '🔄' },
     { id: 'costos', label: 'Estructura de Costos', icon: '📉' },
-    { id: 'contabilidad', label: 'Contabilidad Simple', icon: '🧭' },
-    { id: 'fiscal', label: 'Libros y Fiscal', icon: '⚖' }
+    { id: 'documentos', label: 'Documentos', icon: '📋' }
   ];
 
   return (
@@ -103,7 +37,7 @@ export const CentroFinanciero: React.FC = () => {
           Estás explorando la maqueta funcional del Centro Financiero de Aurora Plus.
         </span>
         <span className="text-white/60 text-[11px] hidden sm:inline">
-          (Tasa referencial BCV: {DEMO_BCV_RATE} Bs./USD • Cero cifras simuladas como reales)
+          (Tasa referencial documental: {DEMO_BCV_RATE} Bs./USD • Cero cifras simuladas como reales)
         </span>
       </div>
 
@@ -167,14 +101,14 @@ export const CentroFinanciero: React.FC = () => {
             <ResumenFinanciero
               kpis={MOCK_KPIS}
               cashBalances={MOCK_CASH_BALANCES}
-              onOpenAccountingSample={() => setSelectedEntry(MOCK_ACCOUNTING_SAMPLE)}
+              onNavigateToDocuments={() => setActiveTab('documentos')}
             />
           )}
 
           {activeTab === 'ventas-compras' && (
             <VentasComprasFinanciero
               transactions={MOCK_TRANSACTIONS}
-              onSelectTransaction={handleSelectTransaction}
+              onSelectDocReference={() => setActiveTab('documentos')}
             />
           )}
 
@@ -182,24 +116,11 @@ export const CentroFinanciero: React.FC = () => {
             <CostosFinanciero costs={MOCK_COSTS} />
           )}
 
-          {activeTab === 'contabilidad' && (
-            <ContabilidadFinanciero
-              sampleEntry={MOCK_ACCOUNTING_SAMPLE}
-              onViewEntryDetails={setSelectedEntry}
-            />
-          )}
-
-          {activeTab === 'fiscal' && (
-            <FiscalFinanciero fiscal={MOCK_FISCAL} />
+          {activeTab === 'documentos' && (
+            <DocumentosFinancieros documents={MOCK_NON_FISCAL_DOCS} />
           )}
         </div>
       </div>
-
-      {/* Modal de Auditoría Contable */}
-      <DetalleContableModal
-        entry={selectedEntry}
-        onClose={() => setSelectedEntry(null)}
-      />
 
       {/* Barra de Navegación Móvil Inferior Fija (Mobile Dock) */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#071a2e]/95 backdrop-blur-xl border-t border-white/10 px-2 py-1.5 flex justify-around items-center">

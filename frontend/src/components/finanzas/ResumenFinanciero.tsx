@@ -5,20 +5,20 @@ import { QualityBadge } from './QualityBadge';
 interface ResumenFinancieroProps {
   kpis: Record<string, KpiCardData>;
   cashBalances: CashDrawerBalance[];
-  onOpenAccountingSample: () => void;
+  onNavigateToDocuments: () => void;
 }
 
 export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
   kpis,
   cashBalances,
-  onOpenAccountingSample
+  onNavigateToDocuments
 }) => {
   const formatUsd = (val: number) => `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const formatVes = (val: number) => `Bs. ${val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-6">
-      {/* Disclaimer / Banner de Claridad Empresarial */}
+      {/* Banner de Claridad Empresarial */}
       <div className="bg-gradient-to-r from-blue-950/40 via-[#0b2341]/60 to-[#071a2e]/40 border border-[#00FFC2]/20 rounded-2xl p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 backdrop-blur-md">
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-xl bg-[#00FFC2]/10 border border-[#00FFC2]/30 flex items-center justify-center shrink-0 mt-0.5">
@@ -29,17 +29,17 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
               Centro Financiero Diseñado para la Toma de Decisiones
             </h4>
             <p className="text-xs text-white/70 mt-0.5 leading-relaxed">
-              Monitorea el flujo operativo real de tu negocio en lenguaje simple. Cada cifra muestra su estado de certeza y puedes auditar el detalle contable en cualquier momento.
+              Monitorea el flujo operativo consolidado de tu negocio en lenguaje simple. Cada cifra muestra su nivel de certeza y puedes auditar los comprobantes comerciales en cualquier momento.
             </p>
           </div>
         </div>
 
         <button
-          onClick={onOpenAccountingSample}
+          onClick={onNavigateToDocuments}
           className="self-stretch sm:self-auto px-4 py-2 text-xs font-semibold rounded-xl bg-[#00FFC2]/15 hover:bg-[#00FFC2]/25 text-[#00FFC2] border border-[#00FFC2]/30 transition-all cursor-pointer whitespace-nowrap shadow-[0_0_12px_rgba(0,255,194,0.1)] flex items-center justify-center gap-1.5"
         >
-          <span>📑</span>
-          <span>Ver Ejemplo de Asiento Contable</span>
+          <span>📋</span>
+          <span>Ver Documentos No Fiscales</span>
         </button>
       </div>
 
@@ -112,7 +112,7 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
           </div>
 
           <span className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full self-start sm:self-auto font-medium">
-            Arqueos y Bancos al día
+            Arqueos al día
           </span>
         </div>
 
