@@ -50,7 +50,23 @@ export default function Terminos() {
         </section>
 
         <section>
-          <h2 className="font-['Outfit'] font-bold text-xl text-slate-900 dark:text-white mb-3">8. Contacto</h2>
+          <h2 className="font-['Outfit'] font-bold text-xl text-slate-900 dark:text-white mb-3">8. Ley aplicable y arbitraje</h2>
+          <p className="mb-3">
+            Estos Términos de Servicio se rigen e interpretan de acuerdo con las leyes de la República Bolivariana de Venezuela.
+          </p>
+          <p className="mb-3">
+            Cualquier controversia, reclamo o discrepancia que surja de estos Términos o del uso de Aurora Plus —incluyendo su existencia, validez, interpretación, alcance o terminación— se resolverá mediante arbitraje institucional administrado por el <strong>Centro de Arbitraje de la Cámara de Caracas (CACC)</strong>, conforme a su Reglamento vigente al momento de iniciarse el procedimiento. El arbitraje será de derecho, con sede en Caracas, Venezuela, y se sustanciará en idioma español. El laudo arbitral será definitivo y vinculante para ambas partes, sin perjuicio de los recursos que la ley venezolana reconozca como irrenunciables.
+          </p>
+          <p className="mb-3">
+            Cualquiera de las partes podrá acudir a un tribunal competente únicamente para solicitar medidas cautelares o de urgencia mientras se constituye el tribunal arbitral, sin que ello implique renuncia al arbitraje como mecanismo de resolución del fondo de la controversia.
+          </p>
+          <p>
+            <strong>Renuncia a acciones colectivas.</strong> Toda controversia se resolverá de forma individual. Ni tú ni Aurora Plus podrán iniciar o participar, como demandante o miembro de una clase, en una demanda o arbitraje colectivo, consolidado o representativo de otros usuarios de la plataforma.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-['Outfit'] font-bold text-xl text-slate-900 dark:text-white mb-3">9. Contacto</h2>
           <p>Para cualquier pregunta sobre estos términos, escríbenos a <span className="text-teal-600 dark:text-teal-400 font-medium">auroraplussoftware@gmail.com</span>.</p>
         </section>
       </div>
