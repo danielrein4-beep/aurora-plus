@@ -5,6 +5,7 @@ import AuroraLogo from "../AuroraLogo";
 import TrueFocus from "../components/TrueFocus";
 import SpecularButton from "../components/SpecularButton";
 import ScrollReveal from "../components/ScrollReveal";
+import AccordionGallery from "../components/AccordionGallery";
 import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware, IconMining,
@@ -20,6 +21,14 @@ const INDUSTRIES = [
   { Icon: IconRestaurant, name: "Restaurantes",        desc: "Comandas digitales, mesas, cocina en tiempo real, inventario y cierres de caja automáticos." },
   { Icon: IconFarm,       name: "Control de Fincas",   desc: "Gestión integral de ganadería, rotación de potreros, registro sanitario, vacunación y trazabilidad animal por lote." },
   { Icon: IconRetail,     name: "Retail",              desc: "POS multitienda, e-commerce, fidelización de clientes y análisis de ventas por categoría." },
+];
+
+const VERTICAL_PREVIEWS = [
+  { image: "/verticales/mediclinic.png", label: "Mediclinic Pro", link: "/industrias" },
+  { image: "/verticales/restaurante.png", label: "Aurora Horeca", link: "/industrias" },
+  { image: "/verticales/retail.png", label: "Aurora Retail", link: "/industrias" },
+  { image: "/verticales/comercio.png", label: "Ferretería & Repuestos", link: "/industrias" },
+  { image: "/verticales/ganaderia.jpg", label: "Control de Fincas", link: "/industrias" },
 ];
 
 const FEATURES = [
@@ -308,6 +317,29 @@ export default function Home() {
                 </ScrollReveal>
               </div>
             ))}
+          </motion.div>
+
+          <motion.div variants={heroItem} className="mt-16 w-full">
+            <AccordionGallery
+              items={VERTICAL_PREVIEWS}
+              defaultIndex={2}
+              expandRatio={0.5}
+              trigger="hover"
+              accentColor="#35d7c3"
+              overlayColor="#04100f"
+              textColor="#ffffff"
+              grayscale
+              showLabels
+              duration={0.6}
+              ease="power3.out"
+              parallax={0.5}
+              tilt={8}
+              stagger={0.06}
+              height={420}
+              gap={10}
+              radius={16}
+              orientation="horizontal"
+            />
           </motion.div>
 
           {/* ── ACCESO DIRECTO PARA USUARIOS EN SESIÓN ── */}
