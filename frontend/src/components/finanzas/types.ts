@@ -1,4 +1,4 @@
-// Tipos y modelos para el Centro Financiero de Aurora Plus
+// Tipos y modelos para el Centro Financiero de Aurora Plus (Fase No Fiscal / Consolidada)
 
 export type QualityState = 'VERIFICADO' | 'ESTIMADO' | 'DATOS_INCOMPLETOS';
 
@@ -13,7 +13,7 @@ export interface KpiCardData {
   subtitle: string;
   amountUsd: number;
   amountVes: number;
-  changePercent: number; // e.g. +12.5% vs mes anterior
+  changePercent: number;
   state: QualityState;
   stateExplanation: string;
   detailsHint?: string;
@@ -21,17 +21,17 @@ export interface KpiCardData {
 
 export interface CashDrawerBalance {
   id: string;
-  accountName: string; // ej: "Caja Principal Efectivo", "Banco Banesco Cuenta Corriente", "Pago Móvil BNC"
+  accountName: string;
   currency: 'USD' | 'VES' | 'COP';
   balance: number;
-  lastReconciliation: string; // ej: "Hoy, 18:30"
+  lastReconciliation: string;
   type: 'EFECTIVO' | 'BANCO' | 'DIGITAL';
 }
 
 export interface VerticalCoverage {
   verticalId: string;
   name: string;
-  coveragePercent: number; // 0 - 100
+  coveragePercent: number;
   activeSourceCount: number;
   totalSourceCount: number;
   status: 'COMPLETO' | 'PARCIAL' | 'DESCONECTADO';
@@ -45,34 +45,16 @@ export interface TransactionSummary {
   type: 'VENTA' | 'COMPRA' | 'GASTO';
   amountUsd: number;
   amountVes: number;
-  counterparty: string; // Cliente o Proveedor
-  vertical: string; // ej: "Restaurante (Horeca)", "Retail", "Administración"
+  counterparty: string;
+  vertical: string;
   qualityState: QualityState;
   paymentMethod: string;
-  invoiceNumber?: string;
-  hasAccountingEntry: boolean;
-}
-
-export interface AccountingEntryLine {
-  accountCode: string;
-  accountName: string;
-  debit: number;
-  credit: number;
-  currency: 'USD' | 'VES';
-}
-
-export interface AccountingEntry {
-  id: string;
-  referenceDoc: string;
-  date: string;
-  description: string;
-  lines: AccountingEntryLine[];
-  isBalanced: boolean;
+  docReference?: string;
 }
 
 export interface CostItem {
   id: string;
-  category: string; // "Materia Prima (Alimentos)", "Nómina Operativa", "Alquiler", "Servicios"
+  category: string;
   amountUsd: number;
   amountVes: number;
   percentageOfTotal: number;
@@ -80,34 +62,19 @@ export interface CostItem {
   missingDataWarning?: string;
 }
 
-export interface FiscalSummary {
-  period: string; // "Marzo 2026"
-  officialRateBcv: number; // Tasa de cambio oficial BCV de referencia
-  salesIvaDebito: {
-    baseUsd: number;
-    baseVes: number;
-    ivaUsd: number;
-    ivaVes: number;
-    invoicesCount: number;
-  };
-  purchasesIvaCredito: {
-    baseUsd: number;
-    baseVes: number;
-    ivaUsd: number;
-    ivaVes: number;
-    invoicesCount: number;
-  };
-  estimatedNetIvaPayableVes: number;
-  correlativeRanges: {
-    type: string;
-    from: string;
-    to: string;
-    missingNumbers: number;
-  }[];
-  rifStatus: {
-    rif: string;
-    razonSocial: string;
-    retentionAgent: boolean;
-    validUntil: string;
-  };
+export type NonFiscalDocType = 'NOTA_ENTREGA' | 'DOCUMENTO_VENTA_NO_FISCAL';
+
+export interface NonFiscalDocument {
+  id: string;
+  docType: NonFiscalDocType;
+  internalReference: string; // ej: "NE-HORECA-00412" o "DNV-RETAIL-0089"
+  date: string;
+  verticalOrigin: string; // ej: "Restaurante (Horeca)", "Tienda Retail", "Distribuidora"
+  clientOrBeneficiary: string;
+  amountUsd: number;
+  amountVes: number;
+  paymentMethod: string;
+  itemsSummary: string;
+  qualityState: QualityState;
+  nonFiscalNotice: string; // "DOCUMENTO NO FISCAL"
 }
