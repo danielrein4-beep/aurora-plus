@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import AuroraLogo from "./AuroraLogo";
 import { useAuth } from "./context/AuthContext";
+import SpecularButton from "./components/SpecularButton";
 
 const LINKS = [
   { label: "Inicio",      path: "/" },
@@ -88,14 +89,37 @@ export default function Nav() {
             </div>
           ) : (
             <>
-              <button onClick={() => navigate("/auth")}
-                className="aurora-nav-outline text-xs font-bold px-4 py-2 rounded-md cursor-pointer">
+              <SpecularButton
+                size="sm"
+                radius={10}
+                tint="#ffffff"
+                tintOpacity={0}
+                textColor="#f8f6ef"
+                lineColor="#ffffff"
+                baseColor="#4b4b4b"
+                shineSize={10}
+                shineFade={40}
+                proximity={220}
+                onClick={() => navigate("/auth")}
+              >
                 Iniciar sesión
-              </button>
-              <button onClick={() => navigate("/onboarding")}
-                className="aurora-nav-primary text-xs font-bold px-5 py-2 rounded-md cursor-pointer tracking-wide">
+              </SpecularButton>
+              <SpecularButton
+                size="sm"
+                radius={10}
+                tint="#35d7c3"
+                tintOpacity={0.16}
+                textColor="#ffffff"
+                lineColor="#7cf3e3"
+                baseColor="#0f766e"
+                shineSize={12}
+                shineFade={45}
+                intensity={1.3}
+                proximity={220}
+                onClick={() => navigate("/onboarding")}
+              >
                 Solicitar demo
-              </button>
+              </SpecularButton>
             </>
           )}
         </div>
