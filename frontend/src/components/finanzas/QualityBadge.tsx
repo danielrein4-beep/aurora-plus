@@ -1,5 +1,6 @@
 import React from 'react';
 import { QualityState } from './types';
+import { IconCheck, IconWarning } from '../../Icons';
 
 interface QualityBadgeProps {
   state: QualityState;
@@ -15,23 +16,23 @@ export const QualityBadge: React.FC<QualityBadgeProps> = ({
   const config = {
     VERIFICADO: {
       label: 'Verificado',
-      bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400',
-      dot: 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]',
-      iconText: '✓',
-      defaultDesc: 'Información respaldada por documentos fiscales y conciliación bancaria completa.'
+      bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
+      dot: 'bg-emerald-400',
+      icon: <IconCheck size={12} className="text-emerald-400" />,
+      defaultDesc: 'Información respaldada por documentos operativos y conciliación completa.'
     },
     ESTIMADO: {
       label: 'Estimado',
-      bg: 'bg-amber-500/15 border-amber-500/30 text-amber-400',
-      dot: 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]',
-      iconText: '≈',
+      bg: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
+      dot: 'bg-amber-400',
+      icon: <span className="font-mono text-xs text-amber-400 leading-none font-bold">~</span>,
       defaultDesc: 'Incluye cálculos proyectados o provisiones temporales en espera de cierre.'
     },
     DATOS_INCOMPLETOS: {
       label: 'Datos incompletos',
-      bg: 'bg-rose-500/15 border-rose-500/30 text-rose-400',
-      dot: 'bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]',
-      iconText: '!',
+      bg: 'bg-rose-500/10 border-rose-500/30 text-rose-400',
+      dot: 'bg-rose-400',
+      icon: <IconWarning size={12} className="text-rose-400" />,
       defaultDesc: 'Faltan comprobantes o fuentes sin costear. No tomar como cifra concluyente.'
     }
   }[state];
@@ -42,16 +43,17 @@ export const QualityBadge: React.FC<QualityBadgeProps> = ({
 
   return (
     <div 
-      className={`inline-flex items-center gap-1.5 rounded-full border ${config.bg} ${sizeClasses} backdrop-blur-md transition-all select-none group relative cursor-help`}
+      className={`inline-flex items-center gap-1.5 rounded-full border ${config.bg} ${sizeClasses} select-none group relative cursor-help font-['IBM_Plex_Sans',sans-serif]`}
       title={explanation || config.defaultDesc}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
       <span>{config.label}</span>
       
       {explanation && (
-        <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 p-2 text-[11px] leading-snug rounded-lg bg-[#071a2e] border border-white/10 text-white/90 shadow-2xl z-50 pointer-events-none">
-          <p className="font-semibold text-white mb-0.5 flex items-center gap-1">
-            <span>{config.iconText}</span> {config.label}
+        <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 max-w-[calc(100vw-32px)] p-2 text-[11px] leading-snug rounded-lg bg-[#071a2e] border border-white/10 text-white/90 shadow-xl z-50 pointer-events-none">
+          <p className="font-semibold text-white mb-0.5 flex items-center gap-1.5">
+            {config.icon}
+            <span>{config.label}</span>
           </p>
           {explanation}
         </span>
@@ -59,3 +61,4 @@ export const QualityBadge: React.FC<QualityBadgeProps> = ({
     </div>
   );
 };
+

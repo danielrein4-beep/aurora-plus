@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   MOCK_KPIS,
   MOCK_CASH_BALANCES,
@@ -12,25 +12,99 @@ import { VentasComprasFinanciero } from '../components/finanzas/VentasComprasFin
 import { CostosFinanciero } from '../components/finanzas/CostosFinanciero';
 import { DocumentosFinancieros } from '../components/finanzas/DocumentosFinancieros';
 import { VerticalCoverageCard } from '../components/finanzas/VerticalCoverageCard';
+import {
+  AuroraGradientDef,
+  IconChart,
+  IconRefresh,
+  IconScale,
+  IconFileText,
+  IconCloud
+} from '../Icons';
 
 type ActiveTab = 'resumen' | 'ventas-compras' | 'costos' | 'documentos' | 'cobertura';
 
+interface TabItem {
+  id: ActiveTab;
+  label: string;
+  shortLabel: string;
+  renderIcon: (active: boolean) => React.ReactNode;
+}
+
 export const CentroFinanciero: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('resumen');
+  const activeContentRef = useRef<HTMLDivElement>(null);
 
-  const tabs: { id: ActiveTab; label: string; icon: string }[] = [
-    { id: 'resumen', label: 'Resumen General', icon: '📊' },
-    { id: 'ventas-compras', label: 'Ventas y Compras', icon: '🔄' },
-    { id: 'costos', label: 'Estructura de Costos', icon: '📉' },
-    { id: 'documentos', label: 'Documentos', icon: '📋' },
-    { id: 'cobertura', label: 'Cobertura por Vertical', icon: '🌐' }
+  const tabs: TabItem[] = [
+    {
+      id: 'resumen',
+      label: 'Resumen General',
+      shortLabel: 'Resumen',
+      renderIcon: (active) => (
+        <IconChart size={18} className={active ? 'text-[#051322]' : 'text-white/70'} />
+      )
+    },
+    {
+      id: 'ventas-compras',
+      label: 'Ventas y Compras',
+      shortLabel: 'Ventas',
+      renderIcon: (active) => (
+        <IconRefresh size={18} className={active ? 'text-[#051322]' : 'text-white/70'} />
+      )
+    },
+    {
+      id: 'costos',
+      label: 'Estructura de Costos',
+      shortLabel: 'Costos',
+      renderIcon: (active) => (
+        <IconScale size={18} className={active ? 'text-[#051322]' : 'text-white/70'} />
+      )
+    },
+    {
+      id: 'documentos',
+      label: 'Documentos',
+      shortLabel: 'Docs',
+      renderIcon: (active) => (
+        <IconFileText size={18} className={active ? 'text-[#051322]' : 'text-white/70'} />
+      )
+    },
+    {
+      id: 'cobertura',
+      label: 'Cobertura por Vertical',
+      shortLabel: 'Cobertura',
+      renderIcon: (active) => (
+        <IconCloud size={18} className={active ? 'text-[#051322]' : 'text-white/70'} />
+      )
+    }
   ];
 
+  // Cambia de pestaña y hace el contenido activo inmediatamente visible
+  const handleTabChange = (tabId: ActiveTab) => {
+    setActiveTab(tabId);
+    requestAnimationFrame(() => {
+      const navElement = document.getElementById('finance-tabs-nav');
+      if (navElement) {
+        const top = navElement.getBoundingClientRect().top + window.pageYOffset - 16;
+        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+      }
+    });
+  };
+
+  useEffect(() => {
+    // Al cambiar la pestaña (incluso por links internos), enfoca la vista al contenido activo
+    const navElement = document.getElementById('finance-tabs-nav');
+    if (navElement && window.pageYOffset > navElement.offsetTop) {
+      window.scrollTo({ top: navElement.offsetTop - 16, behavior: 'smooth' });
+    }
+  }, [activeTab]);
+
   return (
-    <div className="min-h-screen bg-[#051322] text-white selection:bg-[#00FFC2]/30 selection:text-white pb-20">
+    <div className="min-h-screen bg-[#051322] text-white selection:bg-[#35d7c3]/30 selection:text-white pb-24 overflow-x-hidden w-full max-w-full font-['IBM_Plex_Sans',sans-serif]">
+      {/* Definición compartida SVG para compatibilidad */}
+      <AuroraGradientDef />
+
       {/* Banner Superior de Modo Demostración Explícito */}
-      <div className="bg-gradient-to-r from-amber-500/20 via-[#0b2341] to-amber-500/20 border-b border-amber-500/30 px-4 py-2.5 text-center text-xs font-medium text-amber-300 flex flex-wrap items-center justify-center gap-2">
-        <span className="font-bold bg-amber-500/30 px-2 py-0.5 rounded border border-amber-500/40">
+      <div className="bg-[#0b2341] border-b border-amber-500/30 px-3 sm:px-4 py-2 text-center text-xs font-medium text-amber-300 flex flex-wrap items-center justify-center gap-2">
+        <span className="font-bold bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30 font-['IBM_Plex_Mono',monospace] text-[11px]">
           [DEMO / DATOS DE EJEMPLO]
         </span>
         <span>
@@ -45,12 +119,12 @@ export const CentroFinanciero: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00FFC2] to-[#00C9A7] flex items-center justify-center text-[#051322] font-black text-xl shadow-[0_0_15px_rgba(0,255,194,0.4)]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#35d7c3] flex items-center justify-center text-[#051322] font-black text-xl shrink-0 font-['IBM_Plex_Sans',sans-serif]">
                 A+
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
                   Centro Financiero Aurora Plus
                 </h1>
                 <p className="text-xs text-white/60">
@@ -61,54 +135,55 @@ export const CentroFinanciero: React.FC = () => {
           </div>
 
           {/* Selector de Período y Estado de Sincronización */}
-          <div className="flex items-center gap-3">
-            <div className="bg-[#0b2341] border border-white/10 rounded-xl px-3.5 py-1.5 text-xs text-white/80">
-              Período: <span className="text-[#00FFC2] font-semibold">Marzo 2026 (En Curso)</span>
+          <div className="flex flex-wrap items-center gap-2 mt-2 md:mt-0">
+            <div className="bg-[#0b2341] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/80 font-['IBM_Plex_Mono',monospace]">
+              Período: <span className="text-[#35d7c3] font-semibold">Marzo 2026</span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl">
+            <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-medium">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>Sincronizado</span>
             </div>
           </div>
         </div>
 
-        {/* Tarjeta de Cobertura Rápida en Cabecera */}
-        <div className="mt-6">
-          <VerticalCoverageCard coverageList={MOCK_COVERAGE} />
+        {/* Barra de Navegación de Pestañas Activas (Desktop y Móvil) */}
+        <div 
+          id="finance-tabs-nav"
+          className="mt-6 flex items-center gap-1.5 p-1.5 bg-[#0b2341] rounded-2xl border border-white/10 overflow-x-auto scrollbar-none max-w-full"
+        >
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  isActive
+                    ? 'bg-[#35d7c3] text-[#051322]'
+                    : 'text-white/70 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span>{tab.renderIcon(isActive)}</span>
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Barra de Navegación de Pestañas Activas */}
-        <div className="mt-6 flex items-center gap-2 p-1.5 bg-[#0b2341]/90 rounded-2xl border border-white/10 overflow-x-auto scrollbar-none">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'bg-[#00FFC2] text-[#051322] shadow-[0_0_15px_rgba(0,255,194,0.3)]'
-                  : 'text-white/70 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Contenido de la Pestaña Activa */}
-        <div className="mt-6">
+        {/* Contenido de la Pestaña Activa (Inmediatamente visible al cambiar) */}
+        <div ref={activeContentRef} className="mt-6">
           {activeTab === 'resumen' && (
             <ResumenFinanciero
               kpis={MOCK_KPIS}
               cashBalances={MOCK_CASH_BALANCES}
-              onNavigateToDocuments={() => setActiveTab('documentos')}
+              onNavigateToDocuments={() => handleTabChange('documentos')}
             />
           )}
 
           {activeTab === 'ventas-compras' && (
             <VentasComprasFinanciero
               transactions={MOCK_TRANSACTIONS}
-              onSelectDocReference={() => setActiveTab('documentos')}
+              onSelectDocReference={() => handleTabChange('documentos')}
             />
           )}
 
@@ -122,7 +197,7 @@ export const CentroFinanciero: React.FC = () => {
 
           {activeTab === 'cobertura' && (
             <div className="space-y-4">
-              <div className="bg-[#0b2341]/80 border border-white/10 rounded-2xl p-5 backdrop-blur-xl">
+              <div className="bg-[#0b2341] border border-white/10 rounded-2xl p-4 sm:p-5">
                 <h3 className="text-base font-semibold text-white">
                   Detalle de Integración de Fuentes por Vertical
                 </h3>
@@ -136,24 +211,36 @@ export const CentroFinanciero: React.FC = () => {
         </div>
       </div>
 
-      {/* Barra de Navegación Móvil Inferior Fija (Mobile Dock) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#071a2e]/95 backdrop-blur-xl border-t border-white/10 px-2 py-1.5 flex justify-around items-center">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex flex-col items-center gap-0.5 p-1.5 rounded-xl text-[10px] font-medium transition-all ${
-              activeTab === tab.id
-                ? 'text-[#00FFC2]'
-                : 'text-white/50'
-            }`}
-          >
-            <span className="text-base">{tab.icon}</span>
-            <span className="truncate max-w-[55px]">{tab.label.split(' ')[0]}</span>
-          </button>
-        ))}
+      {/* Barra de Navegación Móvil Inferior Fija (Mobile Dock) sin overflow en 390px */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#071a2e] border-t border-white/10 px-1 py-1.5 flex justify-between items-center w-full max-w-full">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-1 px-0.5 rounded-xl transition-colors ${
+                isActive
+                  ? 'text-[#35d7c3]'
+                  : 'text-white/50 hover:text-white/70'
+              }`}
+            >
+              <span className="flex items-center justify-center">
+                {tab.id === 'resumen' && <IconChart size={16} className={isActive ? 'text-[#35d7c3]' : 'text-white/50'} />}
+                {tab.id === 'ventas-compras' && <IconRefresh size={16} className={isActive ? 'text-[#35d7c3]' : 'text-white/50'} />}
+                {tab.id === 'costos' && <IconScale size={16} className={isActive ? 'text-[#35d7c3]' : 'text-white/50'} />}
+                {tab.id === 'documentos' && <IconFileText size={16} className={isActive ? 'text-[#35d7c3]' : 'text-white/50'} />}
+                {tab.id === 'cobertura' && <IconCloud size={16} className={isActive ? 'text-[#35d7c3]' : 'text-white/50'} />}
+              </span>
+              <span className="truncate text-[10px] font-medium w-full text-center leading-tight">
+                {tab.shortLabel}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 };
 export default CentroFinanciero;
+

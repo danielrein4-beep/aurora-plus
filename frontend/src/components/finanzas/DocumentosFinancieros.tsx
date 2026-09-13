@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NonFiscalDocument, NonFiscalDocType, SupportedCurrency } from './types';
 import { QualityBadge } from './QualityBadge';
+import { IconFileText } from '../../Icons';
 
 interface DocumentosFinancierosProps {
   documents: NonFiscalDocument[];
@@ -36,13 +37,13 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-['IBM_Plex_Sans',sans-serif]">
       {/* Banner Explicativo de Documentación No Fiscal */}
-      <div className="bg-gradient-to-r from-blue-950/40 via-[#0b2341]/60 to-[#071a2e]/40 border border-[#00FFC2]/20 rounded-2xl p-5 backdrop-blur-md">
+      <div className="bg-[#0b2341] border border-[#35d7c3]/30 rounded-2xl p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-base">📋</span>
+              <IconFileText size={18} className="text-[#35d7c3]" />
               <h3 className="text-base font-semibold text-white">
                 Vista Consolidada de Documentos Operativos
               </h3>
@@ -52,28 +53,28 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
             </p>
           </div>
 
-          <div className="shrink-0 bg-amber-500/10 border border-amber-500/30 px-3.5 py-1.5 rounded-xl">
-            <span className="text-xs font-bold text-amber-300 tracking-wide uppercase">
+          <div className="shrink-0 bg-amber-500/10 border border-amber-500/30 px-3.5 py-1.5 rounded-xl self-start sm:self-auto">
+            <span className="text-xs font-bold font-['IBM_Plex_Mono',monospace] text-amber-300 tracking-wide uppercase">
               DOCUMENTO NO FISCAL
             </span>
           </div>
         </div>
 
-        {/* Filtros de Tipo, Origen Vertical y Moneda */}
+        {/* Filtros de Tipo, Origen Vertical y Moneda con corrección de overflow para 390px */}
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mt-4 pt-4 border-t border-white/10">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 p-1 bg-[#071a2e] rounded-xl border border-white/10">
+          <div className="flex flex-wrap items-center gap-2 max-w-full">
+            <div className="flex items-center gap-1 p-1 bg-[#071a2e] rounded-xl border border-white/10 overflow-x-auto max-w-full scrollbar-none">
               {(['ALL', 'NOTA_ENTREGA', 'DOCUMENTO_VENTA_NO_FISCAL'] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => setSelectedType(type)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
                     selectedType === type
-                      ? 'bg-[#00FFC2] text-[#051322] shadow-[0_0_10px_rgba(0,255,194,0.3)]'
+                      ? 'bg-[#35d7c3] text-[#051322]'
                       : 'text-white/60 hover:text-white'
                   }`}
                 >
-                  {type === 'ALL' ? 'Todos los Documentos' : type === 'NOTA_ENTREGA' ? 'Notas de Entrega' : 'Ventas No Fiscales'}
+                  {type === 'ALL' ? 'Todos' : type === 'NOTA_ENTREGA' ? 'Notas de Entrega' : 'Ventas No Fiscales'}
                 </button>
               ))}
             </div>
@@ -81,7 +82,7 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
             <select
               value={selectedVertical}
               onChange={(e) => setSelectedVertical(e.target.value)}
-              className="bg-[#071a2e] border border-white/10 text-white text-xs rounded-xl px-3 py-2 outline-none cursor-pointer"
+              className="bg-[#071a2e] border border-white/10 text-white text-xs rounded-xl px-3 py-2 outline-none cursor-pointer max-w-full"
             >
               <option value="ALL">Todas las Verticales</option>
               {verticals.map((v) => (
@@ -89,18 +90,18 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
               ))}
             </select>
 
-            <div className="flex items-center gap-1 p-1 bg-[#071a2e] rounded-xl border border-white/10">
+            <div className="flex items-center gap-1 p-1 bg-[#071a2e] rounded-xl border border-white/10 overflow-x-auto max-w-full scrollbar-none">
               {(['ALL', 'USD', 'VES', 'COP'] as const).map((curr) => (
                 <button
                   key={curr}
                   onClick={() => setSelectedCurrency(curr)}
-                  className={`px-2 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs font-semibold font-['IBM_Plex_Mono',monospace] rounded-lg transition-colors cursor-pointer ${
                     selectedCurrency === curr
-                      ? 'bg-[#00FFC2]/20 text-[#00FFC2] border border-[#00FFC2]/30'
+                      ? 'bg-[#35d7c3]/20 text-[#35d7c3] border border-[#35d7c3]/40'
                       : 'text-white/50 hover:text-white'
                   }`}
                 >
-                  {curr === 'ALL' ? 'Monedas' : curr}
+                  {curr === 'ALL' ? 'Todas' : curr}
                 </button>
               ))}
             </div>
@@ -108,16 +109,16 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
 
           <input
             type="text"
-            placeholder="Buscar por referencia interna o cliente..."
+            placeholder="Buscar por referencia o cliente..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full lg:w-64 bg-[#071a2e] border border-white/10 focus:border-[#00FFC2]/50 text-white placeholder-white/35 text-xs rounded-xl px-3.5 py-2 outline-none transition-all"
+            className="w-full lg:w-64 bg-[#071a2e] border border-white/10 focus:border-[#35d7c3] text-white placeholder-white/35 text-xs rounded-xl px-3.5 py-2 outline-none transition-colors"
           />
         </div>
       </div>
 
       {/* Listado de Documentos Consolidado */}
-      <div className="bg-[#0b2341]/80 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-xl shadow-lg">
+      <div className="bg-[#0b2341] border border-white/10 rounded-2xl overflow-hidden">
         <div className="hidden lg:grid grid-cols-12 gap-4 px-5 py-3 text-[11px] font-semibold text-white/50 border-b border-white/10 uppercase tracking-wider bg-[#071a2e]/50">
           <div className="col-span-3">Referencia Interna / Tipo</div>
           <div className="col-span-3">Vertical de Origen / Receptor</div>
@@ -138,25 +139,25 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
               return (
                 <div
                   key={doc.id}
-                  className="p-4 lg:px-5 lg:py-3.5 hover:bg-white/[0.03] transition-all flex flex-col lg:grid lg:grid-cols-12 lg:gap-4 lg:items-center gap-2 group"
+                  className="p-3.5 sm:p-4 lg:px-5 lg:py-3.5 hover:bg-white/[0.02] transition-colors flex flex-col lg:grid lg:grid-cols-12 lg:gap-4 lg:items-center gap-2 group"
                 >
                   {/* Referencia Interna y Etiqueta No Fiscal */}
                   <div className="lg:col-span-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-[#00FFC2]">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-['IBM_Plex_Mono',monospace] text-xs font-bold text-[#35d7c3]">
                         {doc.referenciaInterna}
                       </span>
-                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">
+                      <span className="text-[10px] uppercase font-['IBM_Plex_Mono',monospace] tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 font-semibold">
                         {doc.nonFiscalNotice}
                       </span>
                     </div>
                     <div className="text-[11px] text-white/60 mt-1 flex items-center gap-2">
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                        isNotaEntrega ? 'bg-sky-500/20 text-sky-300' : 'bg-emerald-500/20 text-emerald-300'
+                        isNotaEntrega ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                       }`}>
                         {isNotaEntrega ? 'Nota de Entrega' : 'Doc. Venta No Fiscal'}
                       </span>
-                      <span>{doc.date}</span>
+                      <span className="font-['IBM_Plex_Mono',monospace]">{doc.date}</span>
                     </div>
                   </div>
 
@@ -165,7 +166,7 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
                     <div className="text-xs text-white font-medium">
                       {doc.clientOrBeneficiary}
                     </div>
-                    <div className="text-[11px] text-[#00FFC2]/80 mt-0.5">
+                    <div className="text-[11px] text-[#35d7c3]/80 mt-0.5">
                       Origen: {doc.verticalOrigin}
                     </div>
                   </div>
@@ -184,10 +185,10 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
                   <div className="lg:col-span-2 lg:text-right flex items-center justify-between lg:block">
                     <span className="lg:hidden text-xs text-white/40">Monto:</span>
                     <div>
-                      <div className="text-sm font-bold text-white">
+                      <div className="text-sm font-bold font-['IBM_Plex_Mono',monospace] text-white">
                         {formatCurrency(doc.amount, doc.currency)}
                       </div>
-                      <span className="text-[10px] text-white/50 font-mono">
+                      <span className="text-[10px] text-white/50 font-['IBM_Plex_Mono',monospace]">
                         {doc.currency}
                       </span>
                     </div>
@@ -206,3 +207,4 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
     </div>
   );
 };
+
