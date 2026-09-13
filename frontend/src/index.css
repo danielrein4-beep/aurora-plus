@@ -352,8 +352,8 @@ html.light .modal-siempre-oscuro textarea:focus {
    quitando — un solo teal sólido se ve más suave y menos "genérico de IA",
    igual que .btn-cyber-neon. text-aurora (abajo) SÍ conserva el degradado:
    ahí es texto de titular, un uso distinto y más tolerable que un botón. */
-.g-aurora   { background: #0E9C86; }
-.g-aurora-r { background: #0E9C86; }
+.g-aurora   { background: #35D7C3; color: #062323 !important; }
+.g-aurora-r { background: #35D7C3; color: #062323 !important; }
 .text-aurora {
   background: linear-gradient(135deg, #00FFC2 0%, #00C9A7 40%, #008B8B 75%, #0B3D91 100%);
   -webkit-background-clip: text;
@@ -495,27 +495,28 @@ html.light .input-horeca:hover { background: #ffffff; }
    a propósito: cada uso ya trae su propia clase de color de texto (casi
    siempre text-white), y este tono es lo bastante oscuro para que se lea bien. */
 .btn-cyber-neon {
-  background: #0E9C86;
-  box-shadow: 0 6px 20px rgba(14, 156, 134, 0.28);
+  background: #35D7C3;
+  color: #062323 !important;
+  box-shadow: 0 6px 20px rgba(53, 215, 195, 0.3);
   transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .btn-cyber-neon:hover {
-  background: #12b89e;
-  box-shadow: 0 10px 28px rgba(14, 156, 134, 0.4);
+  background: #58E3D2;
+  box-shadow: 0 10px 28px rgba(53, 215, 195, 0.45);
   transform: translateY(-1px);
 }
 
 .btn-electric-blue {
-  background: #0E9C86;
-  box-shadow: 0 6px 20px rgba(14, 156, 134, 0.28);
-  color: #fff;
+  background: #35D7C3;
+  color: #062323 !important;
+  box-shadow: 0 6px 20px rgba(53, 215, 195, 0.3);
   transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .btn-electric-blue:hover {
-  background: #12b89e;
-  box-shadow: 0 10px 28px rgba(14, 156, 134, 0.4);
+  background: #58E3D2;
+  box-shadow: 0 10px 28px rgba(53, 215, 195, 0.45);
   transform: translateY(-1px);
 }
 
