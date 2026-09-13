@@ -60,6 +60,21 @@ public class MovimientoCaja {
     @Column(length = 20)
     private String estado; // PENDIENTE | PAGADO — solo para CXC/CXP
 
+    // Trazabilidad de origen (docs/finance-contract.md, Capa 1): de qué vertical y qué
+    // venta/compra/gasto salió este movimiento. Referencia polimórfica simple (no FK
+    // física, apunta a tablas distintas según moduloOrigen) — mismo patrón que
+    // DetalleReceta.ingredienteSku hacia Articulo. Quedan null en movimientos legados
+    // (anteriores a esta migración) o "MANUAL" para movimientos de caja sin vertical
+    // asociada (ej. un retiro del dueño) — ningún reporte los atribuye a una vertical.
+    @Column(name = "modulo_origen", length = 30)
+    private String moduloOrigen;
+
+    @Column(name = "referencia_tipo", length = 60)
+    private String referenciaTipo;
+
+    @Column(name = "referencia_id")
+    private Long referenciaId;
+
     public enum TipoMovimiento { INGRESO, EGRESO, CXC, CXP }
 
     // Getters y Setters
@@ -87,4 +102,10 @@ public class MovimientoCaja {
     public void setSaldoPendiente(BigDecimal saldoPendiente) { this.saldoPendiente = saldoPendiente; }
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
+    public String getModuloOrigen() { return moduloOrigen; }
+    public void setModuloOrigen(String moduloOrigen) { this.moduloOrigen = moduloOrigen; }
+    public String getReferenciaTipo() { return referenciaTipo; }
+    public void setReferenciaTipo(String referenciaTipo) { this.referenciaTipo = referenciaTipo; }
+    public Long getReferenciaId() { return referenciaId; }
+    public void setReferenciaId(Long referenciaId) { this.referenciaId = referenciaId; }
 }

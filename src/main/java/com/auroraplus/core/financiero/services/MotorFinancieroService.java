@@ -115,6 +115,20 @@ public class MotorFinancieroService {
     @Transactional
     public MovimientoCaja registrarMovimientoMultiMoneda(Long tenantId, MovimientoCaja.TipoMovimiento tipo, BigDecimal montoBase,
                                                             String monedaPago, BigDecimal montoRecibido, String concepto) {
+        return registrarMovimientoMultiMoneda(tenantId, tipo, montoBase, monedaPago, montoRecibido, concepto, null, null, null);
+    }
+
+    /**
+     * Igual que el overload de arriba, pero con trazabilidad de origen (docs/finance-contract.md,
+     * Capa 1): qué vertical y qué venta/compra/gasto generó este movimiento. moduloOrigen/
+     * referenciaTipo/referenciaId son opcionales (null = "MANUAL" para efectos de reportes,
+     * ver EmpresaKpiService) — este overload existe para que los call-sites que SÍ quieran
+     * etiquetar su movimiento lo hagan sin forzar a los demás a cambiar su firma.
+     */
+    @Transactional
+    public MovimientoCaja registrarMovimientoMultiMoneda(Long tenantId, MovimientoCaja.TipoMovimiento tipo, BigDecimal montoBase,
+                                                            String monedaPago, BigDecimal montoRecibido, String concepto,
+                                                            String moduloOrigen, String referenciaTipo, Long referenciaId) {
         String monedaBase = obtenerMonedaBase(tenantId);
         String monedaCobro = (monedaPago != null && !monedaPago.isBlank()) ? monedaPago : monedaBase;
 
@@ -122,6 +136,9 @@ public class MotorFinancieroService {
         movimiento.setTenantId(tenantId);
         movimiento.setTipo(tipo);
         movimiento.setConcepto(concepto);
+        movimiento.setModuloOrigen(moduloOrigen);
+        movimiento.setReferenciaTipo(referenciaTipo);
+        movimiento.setReferenciaId(referenciaId);
 
         if (monedaCobro.equals(monedaBase)) {
             movimiento.setMonto(montoBase);
@@ -162,6 +179,14 @@ public class MotorFinancieroService {
     @Transactional
     public MovimientoCaja registrarMovimientoEnMoneda(Long tenantId, MovimientoCaja.TipoMovimiento tipo, BigDecimal monto,
                                                          String moneda, String concepto) {
+        return registrarMovimientoEnMoneda(tenantId, tipo, monto, moneda, concepto, null, null, null);
+    }
+
+    /** Igual que el overload de arriba, con trazabilidad de origen — ver el equivalente en registrarMovimientoMultiMoneda. */
+    @Transactional
+    public MovimientoCaja registrarMovimientoEnMoneda(Long tenantId, MovimientoCaja.TipoMovimiento tipo, BigDecimal monto,
+                                                         String moneda, String concepto,
+                                                         String moduloOrigen, String referenciaTipo, Long referenciaId) {
         String monedaBase = obtenerMonedaBase(tenantId);
 
         MovimientoCaja movimiento = new MovimientoCaja();
@@ -170,6 +195,9 @@ public class MotorFinancieroService {
         movimiento.setMonto(monto);
         movimiento.setMoneda(moneda);
         movimiento.setConcepto(concepto);
+        movimiento.setModuloOrigen(moduloOrigen);
+        movimiento.setReferenciaTipo(referenciaTipo);
+        movimiento.setReferenciaId(referenciaId);
 
         if (!moneda.equals(monedaBase)) {
             try {

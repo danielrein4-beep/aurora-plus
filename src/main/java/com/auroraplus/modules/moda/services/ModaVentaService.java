@@ -133,6 +133,10 @@ public class ModaVentaService {
             detalle.setCantidad(itemVenta.cantidad);
             detalle.setPrecioUnitario(precioUnitario);
             detalle.setSubtotal(subtotal);
+            // Costo CONGELADO al momento de la venta (docs/finance-contract.md §3.1), mismo
+            // criterio que Retail/Horeca — no se recalcula después aunque cambie el costo del
+            // producto, para que el margen histórico de este ticket no cambie retroactivamente.
+            detalle.setCostoUnitario(variante.getProducto().getCostoUnitario());
             venta.addItem(detalle);
 
             MovimientoModa movimiento = new MovimientoModa();
