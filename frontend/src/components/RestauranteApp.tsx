@@ -2263,6 +2263,27 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
   );
 }
 
+// Conversión de unidad de entrada -> unidad base del artículo, para que el costeo (que siempre
+// calcula en la unidad base del inventario, ej. kg) admita capturar el peso en la unidad en que
+// realmente se pesa en cocina (ej. 500 g en vez de tener que teclear 0.5 kg a mano).
+const FACTOR_UNIDAD: Record<string, number> = { g: 1, kg: 1000, ml: 1, l: 1000, lt: 1000, litro: 1000, litros: 1000 };
+
+function convertirCantidad(valor: number, unidadOrigen: string, unidadDestino: string): number {
+  const fo = FACTOR_UNIDAD[unidadOrigen.toLowerCase()];
+  const fd = FACTOR_UNIDAD[unidadDestino.toLowerCase()];
+  if (!fo || !fd || !isFinite(valor)) return valor;
+  return (valor * fo) / fd;
+}
+
+/** Unidades alternas que se pueden ofrecer para capturar, dado el unidadMedida real del artículo. */
+function opcionesUnidadPara(unidadBase?: string): string[] {
+  const u = (unidadBase || "").toLowerCase();
+  if (u === "kg" || u === "g") return ["g", "kg"];
+  if (["l", "lt", "litro", "litros"].includes(u)) return ["ml", "L"];
+  if (u === "ml") return ["ml", "L"];
+  return [];
+}
+
 function ModalEditarReceta({
   tenantId, escandallo, articulos, escandallos, onClose, onCambio,
 }: {
@@ -2288,6 +2309,7 @@ function ModalEditarReceta({
   // Edición en línea de una fila de ingrediente
   const [editandoDetalleId, setEditandoDetalleId] = useState<number | null>(null);
   const [editPesoNeto, setEditPesoNeto] = useState("");
+  const [editUnidad, setEditUnidad] = useState(""); // unidad en la que se está TECLEANDO (puede diferir de la unidad base del artículo)
   const [editMerma, setEditMerma] = useState("0");
   const [guardandoDetalle, setGuardandoDetalle] = useState(false);
 
@@ -2296,8 +2318,11 @@ function ModalEditarReceta({
   const [nuevoArticuloId, setNuevoArticuloId] = useState("");
   const [nuevoSubRecetaId, setNuevoSubRecetaId] = useState("");
   const [nuevoPesoNeto, setNuevoPesoNeto] = useState("");
+  const [nuevoUnidad, setNuevoUnidad] = useState(""); // ídem, unidad en la que se está tecleando
   const [nuevoMerma, setNuevoMerma] = useState("0");
   const [guardandoNuevo, setGuardandoNuevo] = useState(false);
+
+  const articuloSeleccionadoNuevo = (articulos || []).find((a) => String(a.id) === nuevoArticuloId);
 
   const cargarIngredientes = () => {
     listarIngredientesEscandallo(tenantId, escandallo.id)
@@ -2335,10 +2360,13 @@ function ModalEditarReceta({
     }
   };
 
-  // Iniciar edición en línea de un ingrediente
+  // Iniciar edición en línea de un ingrediente — arranca tecleando en la unidad base del
+  // artículo (ej. kg); el selector de al lado deja cambiar a la unidad alterna (ej. g) si aplica.
   const iniciarEdicionDetalle = (d: DetalleReceta) => {
+    const unidadBase = calcularMetricasLinea(d).unidad;
     setEditandoDetalleId(d.id);
     setEditPesoNeto(d.pesoNeto != null ? String(d.pesoNeto) : String(d.cantidadRequerida));
+    setEditUnidad(unidadBase);
     setEditMerma(d.porcentajeMerma != null ? String(d.porcentajeMerma) : "0");
     setError(null);
   };
@@ -2346,17 +2374,19 @@ function ModalEditarReceta({
   const cancelarEdicionDetalle = () => {
     setEditandoDetalleId(null);
     setEditPesoNeto("");
+    setEditUnidad("");
     setEditMerma("0");
   };
 
   // Guardar edición de un ingrediente
-  const guardarEdicionDetalle = async (detalleId: number) => {
-    const neto = parseFloat(editPesoNeto);
+  const guardarEdicionDetalle = async (detalleId: number, unidadBase: string) => {
+    const netoTecleado = parseFloat(editPesoNeto);
     const merma = parseFloat(editMerma) || 0;
-    if (isNaN(neto) || neto <= 0) {
+    if (isNaN(netoTecleado) || netoTecleado <= 0) {
       setError("La cantidad/peso debe ser mayor a cero");
       return;
     }
+    const neto = convertirCantidad(netoTecleado, editUnidad || unidadBase, unidadBase);
     setGuardandoDetalle(true);
     setError(null);
     try {
@@ -2391,10 +2421,10 @@ function ModalEditarReceta({
 
   // Agregar nuevo ingrediente directo o sub-receta
   const agregarNuevoIngrediente = async () => {
-    const neto = parseFloat(nuevoPesoNeto);
+    const netoTecleado = parseFloat(nuevoPesoNeto);
     const merma = parseFloat(nuevoMerma) || 0;
 
-    if (isNaN(neto) || neto <= 0) {
+    if (isNaN(netoTecleado) || netoTecleado <= 0) {
       setError("Indica una cantidad mayor a cero");
       return;
     }
@@ -2402,6 +2432,7 @@ function ModalEditarReceta({
     if (tipoNuevo === "articulo") {
       const art = (articulos || []).find((a) => String(a.id) === nuevoArticuloId);
       if (!art) { setError("Selecciona un insumo de inventario"); return; }
+      const neto = convertirCantidad(netoTecleado, nuevoUnidad || art.unidadMedida || "", art.unidadMedida || "");
       setGuardandoNuevo(true);
       setError(null);
       try {
@@ -2413,6 +2444,7 @@ function ModalEditarReceta({
         setReceta(actualizada);
         setNuevoArticuloId("");
         setNuevoPesoNeto("");
+        setNuevoUnidad("");
         setNuevoMerma("0");
         cargarIngredientes();
         onCambio();
@@ -2429,7 +2461,7 @@ function ModalEditarReceta({
       try {
         const actualizada = await agregarIngredienteEscandallo(tenantId, receta.id, {
           subEscandalloId: subId,
-          cantidadRequerida: neto,
+          cantidadRequerida: netoTecleado,
         });
         setReceta(actualizada);
         setNuevoSubRecetaId("");
@@ -2470,7 +2502,8 @@ function ModalEditarReceta({
     }
 
     if (isEditing) {
-      const neto = parseFloat(editPesoNeto) || 0;
+      const netoTecleado = parseFloat(editPesoNeto) || 0;
+      const neto = convertirCantidad(netoTecleado, editUnidad || unidad, unidad);
       const merma = parseFloat(editMerma) || 0;
       if (neto > 0) {
         cantBruta = merma < 100 ? neto / (1 - merma / 100) : neto;
@@ -2492,7 +2525,7 @@ function ModalEditarReceta({
 
   const desgloseLineas = useMemo(() => {
     return (ingredientes || []).map(calcularMetricasLinea);
-  }, [ingredientes, editandoDetalleId, editPesoNeto, editMerma, articulos, escandallos]);
+  }, [ingredientes, editandoDetalleId, editPesoNeto, editUnidad, editMerma, articulos, escandallos]);
 
   const costoTotalEnVivo = useMemo(() => {
     return desgloseLineas.reduce((acc, curr) => acc + curr.costoLinea, 0);
@@ -2505,23 +2538,24 @@ function ModalEditarReceta({
 
   // Vista previa de costo del nuevo insumo antes de agregarlo
   const previewNuevo = useMemo(() => {
-    const neto = parseFloat(nuevoPesoNeto) || 0;
+    const netoTecleado = parseFloat(nuevoPesoNeto) || 0;
     const merma = parseFloat(nuevoMerma) || 0;
-    if (neto <= 0) return null;
-    const cantBruta = merma < 100 ? neto / (1 - merma / 100) : neto;
+    if (netoTecleado <= 0) return null;
 
     if (tipoNuevo === "articulo") {
       const art = (articulos || []).find((a) => String(a.id) === nuevoArticuloId);
       if (!art) return null;
+      const neto = convertirCantidad(netoTecleado, nuevoUnidad || art.unidadMedida || "", art.unidadMedida || "");
+      const cantBruta = merma < 100 ? neto / (1 - merma / 100) : neto;
       const unit = Number(art.costoUnitario || 0);
       return { cantBruta, unit, costo: cantBruta * unit, unidad: art.unidadMedida };
     } else {
       const sub = (escandallos || []).find((s) => String(s.id) === nuevoSubRecetaId);
       if (!sub) return null;
       const unit = Number(sub.costoTotalProduccion || 0);
-      return { cantBruta: neto, unit, costo: neto * unit, unidad: "ración" };
+      return { cantBruta: netoTecleado, unit, costo: netoTecleado * unit, unidad: "ración" };
     }
-  }, [tipoNuevo, nuevoArticuloId, nuevoSubRecetaId, nuevoPesoNeto, nuevoMerma, articulos, escandallos]);
+  }, [tipoNuevo, nuevoArticuloId, nuevoSubRecetaId, nuevoPesoNeto, nuevoUnidad, nuevoMerma, articulos, escandallos]);
 
   return (
     <Modal onClose={onClose} titulo={`Editar Receta & Escandallo — ${receta.nombrePlato}`} ancho="max-w-4xl">
@@ -2561,61 +2595,51 @@ function ModalEditarReceta({
           </label>
         </div>
 
-        {/* 2. SECCIÓN: TABLERO DE COSTEO EN VIVO (HOJA DE CÁLCULO) */}
-        <div className="bg-slate-900/80 border border-slate-700/60 rounded-2xl p-4 shadow-xl text-white">
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Costeo en Tiempo Real</span>
-            </div>
-            <span className="text-[11px] text-slate-400 font-mono">
-              {tieneIngredientes ? `${desgloseLineas.length} insumo(s) costeados` : "Sin ingredientes"}
+        {/* 2. SECCIÓN: COSTEO DE LA RECETA */}
+        <div className="apple-glass rounded-2xl p-4">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/10 dark:border-white/10">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white/40">Costeo de la receta</span>
+            <span className="text-[11px] text-slate-400 dark:text-white/40">
+              {tieneIngredientes ? `${desgloseLineas.length} insumo(s)` : "Sin ingredientes"}
             </span>
           </div>
 
           {!tieneIngredientes ? (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl flex items-center justify-between gap-3">
               <div>
-                <strong className="text-amber-300 text-sm block">Costo: sin calcular · falta cargar ingredientes</strong>
-                <span className="text-xs text-slate-300">Agrega abajo los ingredientes del inventario para ver el costo exacto y margen en vivo.</span>
+                <strong className="text-amber-700 dark:text-amber-300 text-sm block">Costo sin calcular todavía</strong>
+                <span className="text-xs text-slate-500 dark:text-white/50">Agrega los ingredientes de inventario abajo para ver el costo y margen exactos.</span>
               </div>
-              <span className="text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full font-mono">Margen pendiente</span>
+              <span className="text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full font-medium shrink-0">Margen pendiente</span>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Costo Total */}
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700">
-                <span className="text-[11px] text-slate-400 uppercase font-semibold block">Costo de Producción</span>
-                <div className="text-xl font-bold font-mono text-white mt-1">
-                  ${costoTotalEnVivo.toFixed(2)}
-                </div>
-                <span className="text-[10px] text-slate-400">Calculado desde inventario real</span>
+              <div className="rounded-xl p-3 border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/[0.03]">
+                <span className="text-[11px] text-slate-500 dark:text-white/40 uppercase font-semibold block">Costo de producción</span>
+                <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">${costoTotalEnVivo.toFixed(2)}</div>
+                <span className="text-[10px] text-slate-400 dark:text-white/35">Calculado desde el inventario</span>
               </div>
 
-              {/* Precio de Venta */}
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700">
-                <span className="text-[11px] text-slate-400 uppercase font-semibold block">Precio de Venta</span>
-                <div className="text-xl font-bold font-mono text-sky-400 mt-1">
-                  ${precioNumEnVivo.toFixed(2)}
-                </div>
-                <span className="text-[10px] text-slate-400">Definido en el plato</span>
+              <div className="rounded-xl p-3 border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/[0.03]">
+                <span className="text-[11px] text-slate-500 dark:text-white/40 uppercase font-semibold block">Precio de venta</span>
+                <div className="text-xl font-bold text-teal-600 dark:text-teal-400 mt-1">${precioNumEnVivo.toFixed(2)}</div>
+                <span className="text-[10px] text-slate-400 dark:text-white/35">Definido en el plato</span>
               </div>
 
-              {/* Margen Resultante */}
               <div className={`rounded-xl p-3 border ${
                 margenEnVivo >= 0
-                  ? (margenPctEnVivo >= 40 ? "bg-emerald-950/40 border-emerald-500/40" : "bg-amber-950/40 border-amber-500/40")
-                  : "bg-red-950/40 border-red-500/40"
+                  ? (margenPctEnVivo >= 40 ? "bg-emerald-500/10 border-emerald-500/25" : "bg-amber-500/10 border-amber-500/25")
+                  : "bg-red-500/10 border-red-500/25"
               }`}>
-                <span className="text-[11px] text-slate-300 uppercase font-semibold block">Margen de Ganancia</span>
-                <div className={`text-xl font-bold font-mono mt-1 flex items-baseline gap-2 ${
-                  margenEnVivo >= 0 ? (margenPctEnVivo >= 40 ? "text-emerald-400" : "text-amber-400") : "text-red-400"
+                <span className="text-[11px] uppercase font-semibold block text-slate-500 dark:text-white/40">Margen de ganancia</span>
+                <div className={`text-xl font-bold mt-1 flex items-baseline gap-2 ${
+                  margenEnVivo >= 0 ? (margenPctEnVivo >= 40 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400") : "text-red-600 dark:text-red-400"
                 }`}>
                   <span>${margenEnVivo.toFixed(2)}</span>
                   <span className="text-xs font-semibold">({margenPctEnVivo.toFixed(1)}%)</span>
                 </div>
-                <span className="text-[10px] text-slate-300">
-                  {margenEnVivo < 0 ? "⚠️ El costo supera el precio de venta" : "Margen bruto por ración"}
+                <span className="text-[10px] text-slate-500 dark:text-white/40">
+                  {margenEnVivo < 0 ? "El costo supera el precio de venta" : "Margen bruto por ración"}
                 </span>
               </div>
             </div>
@@ -2674,10 +2698,17 @@ function ModalEditarReceta({
                         <td className="py-2.5 px-3">
                           {isEditing ? (
                             <div className="flex items-center gap-2">
-                              <div>
+                              <div className="flex items-end gap-1">
                                 <input value={editPesoNeto} onChange={(e) => setEditPesoNeto(e.target.value)}
                                   type="number" step="0.001" className="input-horeca w-20 py-1 text-xs font-mono" placeholder="Cant" />
-                                <span className="text-[9px] text-slate-400 block">Neto ({met.unidad})</span>
+                                {!met.esSubReceta && opcionesUnidadPara(met.unidad).length > 0 ? (
+                                  <select value={editUnidad || met.unidad} onChange={(e) => setEditUnidad(e.target.value)}
+                                    className="input-horeca py-1 text-xs w-14">
+                                    {opcionesUnidadPara(met.unidad).map((u) => <option key={u} value={u}>{u}</option>)}
+                                  </select>
+                                ) : (
+                                  <span className="text-[9px] text-slate-400 pb-2">{met.unidad}</span>
+                                )}
                               </div>
                               {!met.esSubReceta && (
                                 <div>
@@ -2713,7 +2744,7 @@ function ModalEditarReceta({
                         <td className="py-2.5 px-3 text-center">
                           {isEditing ? (
                             <div className="flex items-center justify-center gap-1">
-                              <button onClick={() => guardarEdicionDetalle(d.id)} disabled={guardandoDetalle}
+                              <button onClick={() => guardarEdicionDetalle(d.id, met.unidad)} disabled={guardandoDetalle}
                                 title="Guardar cantidad"
                                 className="text-emerald-500 hover:text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-500/10 cursor-pointer disabled:opacity-40">
                                 <IconCheck size={14} />
@@ -2773,7 +2804,9 @@ function ModalEditarReceta({
           {tipoNuevo === "articulo" ? (
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
               <div className="sm:col-span-2">
-                <select value={nuevoArticuloId} onChange={(e) => setNuevoArticuloId(e.target.value)} className="input-horeca w-full text-xs">
+                <select value={nuevoArticuloId}
+                  onChange={(e) => { setNuevoArticuloId(e.target.value); setNuevoUnidad(""); }}
+                  className="input-horeca w-full text-xs">
                   <option value="">— Elegir insumo de inventario —</option>
                   {(articulos || []).map((a) => (
                     <option key={a.id} value={a.id}>
@@ -2782,9 +2815,15 @@ function ModalEditarReceta({
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="flex gap-1.5">
                 <input value={nuevoPesoNeto} onChange={(e) => setNuevoPesoNeto(e.target.value)}
                   type="number" step="0.001" placeholder="Peso neto / cantidad" className="input-horeca w-full text-xs" />
+                {opcionesUnidadPara(articuloSeleccionadoNuevo?.unidadMedida || "").length > 0 && (
+                  <select value={nuevoUnidad || articuloSeleccionadoNuevo?.unidadMedida || ""} onChange={(e) => setNuevoUnidad(e.target.value)}
+                    className="input-horeca text-xs w-16 flex-shrink-0" title="Unidad en la que estás capturando esta cantidad">
+                    {opcionesUnidadPara(articuloSeleccionadoNuevo?.unidadMedida || "").map((u) => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                )}
               </div>
               <div>
                 <input value={nuevoMerma} onChange={(e) => setNuevoMerma(e.target.value)}
