@@ -38,7 +38,7 @@ public class RetailCosteoProvider implements CosteoProvider {
         LocalDateTime desdeInicio = desde.atStartOfDay();
         LocalDateTime hastaFin = hasta.plusDays(1).atStartOfDay();
 
-        List<ItemVentaRetail> items = itemVentaRetailRepository.findByTenantIdAndVenta_FechaRegistroBetween(
+        List<ItemVentaRetail> items = itemVentaRetailRepository.findByTenantIdAndVenta_FechaRegistroGreaterThanEqualAndVenta_FechaRegistroLessThan(
             tenantId, desdeInicio, hastaFin);
 
         BigDecimal ventasBrutas = BigDecimal.ZERO;

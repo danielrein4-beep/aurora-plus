@@ -22,6 +22,6 @@ public interface ItemComandaRepository extends JpaRepository<ItemComanda, Long> 
 
     // Base de HorecaCosteoProvider (docs/finance-contract.md §3): solo comandas ya PAGADAS
     // dentro del período — una comanda ABIERTA no es venta todavía, y ANULADA no debe sumar.
-    List<ItemComanda> findByTenantIdAndComanda_EstadoAndComanda_FechaCierreBetween(
-        Long tenantId, Comanda.EstadoComanda estado, LocalDateTime desde, LocalDateTime hasta);
+    List<ItemComanda> findByTenantIdAndComanda_EstadoAndComanda_FechaCierreGreaterThanEqualAndComanda_FechaCierreLessThan(
+        Long tenantId, Comanda.EstadoComanda estado, LocalDateTime desde, LocalDateTime hastaExclusivo);
 }

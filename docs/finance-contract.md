@@ -16,6 +16,7 @@
 8. **Catálogo de verticales corregido** — el borrador anterior mezclaba 6 verticales públicas con 7 proveedores de costeo. Ver §1.1 para la evidencia y la resolución.
 9. **Trazabilidad con porcentaje explícito** de movimientos identificados vs. `MANUAL`/sin referencia — nunca se atribuye un movimiento sin origen a ninguna vertical. Ver §2.2.
 10. **Pruebas nuevas**: aislamiento entre tenants, concurrencia, redondeo monetario, períodos sin datos. Ver §8.
+11. **Cierre de revisión Codex:** el KPI queda restringido a roles administrativos, solo ejecuta proveedores correspondientes a módulos activos del tenant, excluye `MODA` de la cobertura pública, usa rangos `[desde, hasta + 1 día)` y devuelve únicamente la moneda base congelada por las operaciones; no reconvierte históricos con la tasa vigente.
 
 ---
 
@@ -194,29 +195,22 @@ Mientras cualquier vertical conectada tenga cobertura menor al 100% (Horeca, por
     { "modulo": "HORECA", "ventasBrutas": 8900.50, "costoVentas": 4200.00, "margenBruto": 4700.50, "coberturaPct": 84.3 },
     { "modulo": "RETAIL", "ventasBrutas": 5200.00, "costoVentas": 2200.00, "margenBruto": 3000.00, "coberturaPct": 100.0 }
   ],
-  "verticalesNoConectadas": ["GANADERIA", "REPUESTOS", "MINERIA", "SALUD", "MODA"],
-  "trazabilidad": { "movimientosTotales": 340, "movimientosIdentificados": 62, "porcentajeIdentificado": 18.2 },
-  "cajaYFlujo": {
-    "montoEsperadoEnCaja": 12400.00,
-    "cxcPendiente": 1800.00,
-    "cxpPendiente": 950.00
-  }
+  "verticalesNoConectadas": ["GANADERIA", "REPUESTOS", "MINERIA", "SALUD"],
+  "trazabilidad": { "movimientosTotales": 340, "movimientosIdentificados": 62, "porcentajeIdentificado": 18.2 }
 }
 ```
 
-`verticalesNoConectadas` se lista explícitamente en la respuesta — nunca se omiten en silencio, para que quien lea el KPI sepa que "resultado estimado" es de las verticales activas, no de la empresa completa.
-
-`cajaYFlujo` se llena **reusando** `TesoreriaController` / `resumen-periodo-abierto` y `listarMovimientos(tipo=CXC/CXP)` ya existentes — no se duplica esa lógica.
+`verticalesNoConectadas` incluye únicamente verticales activas del tenant que todavía no tienen `CosteoProvider`. No muestra verticales que el negocio no contrató ni `MODA`, que aún no forma parte del catálogo público.
 
 **Este endpoint es nuevo y aditivo.** No reemplaza `/api/financiero/tesoreria/resumen-periodo-abierto` ni `/api/financiero/movimientos` — el Hub sigue funcionando exactamente igual hasta que alguien decida conectarlo (fuera de alcance de esta fase, `Dashboard.tsx` no se toca).
 
 ### 3.3 El tenant nunca viaja en la URL
 
 ```
-GET /api/empresa/kpis?desde=2026-09-01&hasta=2026-09-30&moneda=USD
+GET /api/empresa/kpis?desde=2026-09-01&hasta=2026-09-30
 ```
 
-**Sin `tenantId` como parámetro.** El controlador resuelve `Long tenantId = TenantContext.getCurrentTenant();` igual que cualquier otro controlador del proyecto — el JWT ya lo trae verificado, y aceptar un `tenantId` de query permitiría a cualquier usuario autenticado pedir el KPI de OTRO negocio con solo cambiar el número. `desde`/`hasta` son obligatorios (sin default silencioso a "todo el histórico", que sería lentísimo y ambiguo); `moneda` es opcional, default a la moneda base del tenant (`MotorFinancieroService.obtenerMonedaBase`).
+**Sin `tenantId` ni moneda destino como parámetros.** El controlador resuelve `Long tenantId = TenantContext.getCurrentTenant();` desde el JWT verificado. `desde`/`hasta` son obligatorios y el resultado se expresa en la moneda base en la que cada vertical congeló precios y costos al registrar la operación. Esta fase no reconvierte períodos históricos con la tasa vigente. El endpoint queda restringido a `DUENO_ADMIN` y al rol `MEDICO` que hoy recibe el propietario inicial de una cuenta de Salud.
 
 ---
 

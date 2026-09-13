@@ -40,7 +40,7 @@ public class HorecaCosteoProvider implements CosteoProvider {
         LocalDateTime desdeInicio = desde.atStartOfDay();
         LocalDateTime hastaFin = hasta.plusDays(1).atStartOfDay();
 
-        List<ItemComanda> items = itemComandaRepository.findByTenantIdAndComanda_EstadoAndComanda_FechaCierreBetween(
+        List<ItemComanda> items = itemComandaRepository.findByTenantIdAndComanda_EstadoAndComanda_FechaCierreGreaterThanEqualAndComanda_FechaCierreLessThan(
             tenantId, Comanda.EstadoComanda.PAGADA, desdeInicio, hastaFin);
 
         BigDecimal ventasBrutas = BigDecimal.ZERO;
