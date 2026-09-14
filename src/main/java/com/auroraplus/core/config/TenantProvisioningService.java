@@ -31,6 +31,9 @@ public class TenantProvisioningService {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private AdvisoryLock advisoryLock;
+
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -64,12 +67,20 @@ public class TenantProvisioningService {
         // terminara su transacción, y ambas terminaran usando el MISMO
         // tenant_id — dos negocios distintos mezclando datos y usuarios bajo
         // un solo tenant, la peor violación posible de aislamiento. El
-        // advisory lock (mismo patrón ya usado en IdempotenciaService) obliga
-        // a que las altas de tenant se serialicen: la segunda espera a que la
-        // primera termine su transacción completa antes de calcular su propio
-        // MAX+1. El UNIQUE en licencias_tenant.tenant_id (ver migración V2) es
-        // el candado de base de datos por si este código se vuelve a romper.
-        entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(445566)").getResultList();
+        // advisory lock (mismo patrón ya usado en IdempotenciaService, ver
+        // AdvisoryLock) obliga a que las altas de tenant se serialicen: la
+        // segunda espera a que la primera termine su transacción completa
+        // antes de calcular su propio MAX+1. El UNIQUE en
+        // licencias_tenant.tenant_id (ver migración V2) es el candado de base
+        // de datos por si este código se vuelve a romper. En Postgres real
+        // usa el lock nativo; en H2 (tests, ver AdvisoryLock) cae a un mutex
+        // en memoria con el mismo alcance transaccional — pg_advisory_xact_lock
+        // no existe en H2.
+        if (advisoryLock.esPostgres(entityManager)) {
+            entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(445566)").getResultList();
+        } else {
+            advisoryLock.tomarBloqueoEnMemoria("tenant-provisioning");
+        }
         Long nuevoTenantId = licenciaTenantRepository.buscarMaximoTenantId() + 1;
         int meses = request.mesesVigencia != null ? request.mesesVigencia : 1;
 

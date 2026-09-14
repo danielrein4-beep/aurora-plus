@@ -1,5 +1,6 @@
 package com.auroraplus.core.sync;
 
+import com.auroraplus.core.config.AdvisoryLock;
 import com.auroraplus.core.sync.entities.OperacionIdempotente;
 import com.auroraplus.core.sync.repositories.OperacionIdempotenteRepository;
 import jakarta.persistence.EntityManager;
@@ -26,6 +27,9 @@ public class IdempotenciaService {
     @Autowired
     private OperacionIdempotenteRepository operacionIdempotenteRepository;
 
+    @Autowired
+    private AdvisoryLock advisoryLock;
+
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -49,9 +53,16 @@ public class IdempotenciaService {
         }
 
         String clavePlena = tenantId + ":" + claveIdempotencia;
-        entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(778899, hashtext(:clave))")
-            .setParameter("clave", clavePlena)
-            .getResultList();
+        // En Postgres real, el lock nativo. En H2 (tests, ver AdvisoryLock) cae a un
+        // mutex en memoria con el mismo alcance transaccional — pg_advisory_xact_lock
+        // no existe en H2.
+        if (advisoryLock.esPostgres(entityManager)) {
+            entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(778899, hashtext(:clave))")
+                .setParameter("clave", clavePlena)
+                .getResultList();
+        } else {
+            advisoryLock.tomarBloqueoEnMemoria("idempotencia:" + clavePlena);
+        }
 
         return operacionIdempotenteRepository.findByTenantIdAndClaveIdempotencia(tenantId, claveIdempotencia)
             .map(OperacionIdempotente::getEntidadId);
