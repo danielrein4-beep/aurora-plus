@@ -63,12 +63,6 @@ CREATE TABLE turnos_personal (
 );
 CREATE INDEX idx_turnos_personal_tenant ON turnos_personal(tenant_id);
 
--- marcador_entrada_abierta (hardening de asistencia/concurrencia, revisión pre-piloto): vale
--- empleado_id mientras el registro sigue abierto (fecha_hora_salida IS NULL) y NULL en cuanto se
--- cierra. El UNIQUE sobre (tenant_id, marcador_entrada_abierta) es la garantía real contra dos
--- entradas abiertas simultáneas del mismo empleado bajo solicitudes concurrentes — un UNIQUE
--- estándar trata cada NULL como distinto de cualquier otro, así que los registros ya cerrados
--- nunca compiten entre sí. Ver AsistenciaService.registrarEntrada.
 CREATE TABLE personal_registros_asistencia (
     id BIGSERIAL PRIMARY KEY,
     tenant_id BIGINT NOT NULL,
@@ -76,9 +70,7 @@ CREATE TABLE personal_registros_asistencia (
     turno_id BIGINT REFERENCES turnos_personal(id),
     fecha_hora_entrada TIMESTAMP NOT NULL,
     fecha_hora_salida TIMESTAMP,
-    origen VARCHAR(20) NOT NULL DEFAULT 'MANUAL',
-    marcador_entrada_abierta BIGINT,
-    CONSTRAINT uq_personal_asistencia_entrada_abierta UNIQUE (tenant_id, marcador_entrada_abierta)
+    origen VARCHAR(20) NOT NULL DEFAULT 'MANUAL'
 );
 CREATE INDEX idx_personal_registros_asistencia_tenant_empleado ON personal_registros_asistencia(tenant_id, empleado_id);
 
