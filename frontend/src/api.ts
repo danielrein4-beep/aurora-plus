@@ -2964,6 +2964,42 @@ export interface PeriodoNominaApi {
   fechaAprobacion: string | null;
 }
 
+export interface DetallePeriodoNominaApi {
+  periodo: PeriodoNominaApi;
+  recibos: Array<{
+    id: number;
+    empleadoId: number;
+    empleadoNombre: string;
+    cargo: string | null;
+    estado: string;
+    totalAsignaciones: number;
+    totalDeducciones: number;
+    totalAportesPatronales: number;
+    netoCalculado: number;
+    netoEfectivo: number;
+    moneda: "USD" | "VES" | "COP";
+    lineas: Array<{
+      id: number;
+      descripcion: string;
+      tipo: "ASIGNACION" | "DEDUCCION" | "APORTE_PATRONAL";
+      cantidad: number;
+      montoUnitario: number;
+      montoTotal: number;
+      moneda: "USD" | "VES" | "COP";
+      conceptoId: number;
+      reglaAplicadaId: number | null;
+    }>;
+    ajustes: Array<{
+      id: number;
+      tipo: "CORRECCION" | "REVERSO";
+      motivo: string;
+      montoAjuste: number;
+      moneda: "USD" | "VES" | "COP";
+      fecha: string;
+    }>;
+  }>;
+}
+
 export function listarDirectorioPersonal(): Promise<EntradaDirectorioPersonalApi[]> {
   return request("/api/personal/directorio");
 }
@@ -2984,6 +3020,10 @@ export function listarMetasPersonal(): Promise<MetaPersonalApi[]> {
 
 export function listarPeriodosNomina(): Promise<PeriodoNominaApi[]> {
   return request("/api/personal/nomina/periodos");
+}
+
+export function obtenerDetallePeriodoNomina(periodoId: number): Promise<DetallePeriodoNominaApi> {
+  return request(`/api/personal/nomina/periodos/${periodoId}/detalle`);
 }
 
 

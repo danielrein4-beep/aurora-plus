@@ -34,19 +34,19 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Banner de Datos Simulados */}
+      {/* Estado de las fuentes del módulo */}
       <div className="p-3 bg-[#131c2e] border border-[#1e2d48] rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2">
           <span className="px-2 py-0.5 rounded bg-[#35d7c3]/15 text-[#35d7c3] font-mono font-semibold border border-[#35d7c3]/30">
-            [DEMO]
+            EN LÍNEA
           </span>
           <span className="text-[#94a3b8]">
-            Entorno referencial de gestión de personal (Salud, Horeca y Agropecuaria).
+            Datos autorizados del tenant actual para Salud, Horeca y Ganadería.
           </span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#35d7c3] animate-pulse" />
-          <span className="text-[#f8fafc] font-medium font-mono">Personal & Nómina Hub v2.4</span>
+          <span className="text-[#f8fafc] font-medium font-mono">Personal & Nómina</span>
         </div>
       </div>
 
@@ -70,7 +70,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             <span className="text-2xl sm:text-3xl font-bold font-mono text-[#f8fafc]">
               {empleados.length}
             </span>
-            <span className="text-xs text-[#64748b]">en nómina [DEMO]</span>
+            <span className="text-xs text-[#64748b]">registrados</span>
           </div>
           <div className="mt-2 text-xs text-[#94a3b8] flex items-center gap-2">
             <span className="text-[#35d7c3]">&bull;</span>
@@ -100,9 +100,11 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
           </div>
           <div className="mt-2 text-xs text-[#94a3b8] flex items-center gap-2">
             {retardoHoy > 0 ? (
-              <span className="text-[#fbbf24] font-medium">{retardoHoy} con retardo justificado</span>
+              <span className="text-[#fbbf24] font-medium">{retardoHoy} con retardo registrado</span>
+            ) : asistenciasHoy.length > 0 ? (
+              <span className="text-[#35d7c3]">Sin retardos registrados</span>
             ) : (
-              <span className="text-[#35d7c3]">100% puntualidad de inicio</span>
+              <span className="text-[#64748b]">Sin marcajes en el período consultado</span>
             )}
           </div>
         </div>

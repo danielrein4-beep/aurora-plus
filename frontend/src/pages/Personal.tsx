@@ -5,6 +5,7 @@ import {
   listarMetasPersonal,
   listarPeriodosNomina,
   listarTurnosPersonal,
+  obtenerDetallePeriodoNomina,
   obtenerCapacidadesPersonal,
   type CapacidadesPersonal,
   type EntradaDirectorioPersonalApi,
@@ -167,14 +168,42 @@ export const PersonalPage: React.FC = () => {
             estado: vencida ? 'VENCIDA' : 'EN_PROGRESO', esNoPunitiva: true,
           };
         }));
-        setPeriodosNomina(periodosApi.map((periodo) => ({
-          id: String(periodo.id), codigoPeriodo: `NOM-${periodo.id}`, nombre: periodo.nombre,
-          fechaInicio: periodo.fechaInicio, fechaFin: periodo.fechaFin,
-          fechaTentativaPago: periodo.fechaPagoPlanificada || periodo.fechaFin,
-          estado: periodo.estado === 'CALCULADA' ? 'EN_REVISION' : periodo.estado === 'PAGADA' ? 'APROBADA' : periodo.estado,
-          totalEmpleados: 0, montoTotalBruto: 0, montoTotalDeducciones: 0, montoTotalNeto: 0,
-          monedaPrincipal: periodo.moneda, recibos: [], historialAjustes: [], fechaAprobacion: periodo.fechaAprobacion || undefined,
-        })));
+        const detallesNomina = await Promise.all(periodosApi.map((periodo) => obtenerDetallePeriodoNomina(periodo.id)));
+        if (!activo) return;
+        setPeriodosNomina(detallesNomina.map(({ periodo, recibos }) => {
+          const recibosMapeados = recibos.map((recibo) => {
+            const empleado = porId.get(String(recibo.empleadoId));
+            return {
+              id: String(recibo.id), empleadoId: String(recibo.empleadoId), empleadoNombre: recibo.empleadoNombre,
+              empleadoCargo: recibo.cargo || 'Sin cargo vigente',
+              departamento: empleado?.departamento || departamentoDe(null), diasTrabajados: 0, horasExtrasTotal: 0,
+              totalPercepciones: recibo.totalAsignaciones, totalDeducciones: recibo.totalDeducciones,
+              montoNetoPagar: recibo.netoEfectivo, moneda: recibo.moneda,
+              conceptosDesglosados: recibo.lineas.filter((linea) => linea.tipo !== 'APORTE_PATRONAL').map((linea) => ({
+                concepto: linea.descripcion, tipo: linea.tipo === 'ASIGNACION' ? 'PERCEPCION' as const : 'DEDUCCION' as const,
+                baseCalculo: `${linea.cantidad} × ${linea.montoUnitario}`, reglaAplicada: linea.reglaAplicadaId ? `Regla ${linea.reglaAplicadaId}` : 'Cálculo directo',
+                vigencia: periodo.fechaFin, monto: linea.montoTotal, moneda: linea.moneda,
+              })),
+            };
+          });
+          const ajustes = recibos.flatMap((recibo) => recibo.ajustes.map((ajuste) => ({
+            id: String(ajuste.id), fecha: ajuste.fecha,
+            tipoAccion: ajuste.tipo === 'REVERSO' ? 'REVERSO_TOTAL' as const : 'AJUSTE_POSTERIOR' as const,
+            autor: 'Usuario autorizado', motivoJustificado: ajuste.motivo,
+          })));
+          return {
+            id: String(periodo.id), codigoPeriodo: `NOM-${periodo.id}`, nombre: periodo.nombre,
+            fechaInicio: periodo.fechaInicio, fechaFin: periodo.fechaFin,
+            fechaTentativaPago: periodo.fechaPagoPlanificada || periodo.fechaFin,
+            estado: periodo.estado === 'CALCULADA' ? 'EN_REVISION' : periodo.estado === 'PAGADA' ? 'APROBADA' : periodo.estado,
+            totalEmpleados: recibos.length,
+            montoTotalBruto: recibos.reduce((total, recibo) => total + recibo.totalAsignaciones, 0),
+            montoTotalDeducciones: recibos.reduce((total, recibo) => total + recibo.totalDeducciones, 0),
+            montoTotalNeto: recibos.reduce((total, recibo) => total + recibo.netoEfectivo, 0),
+            monedaPrincipal: periodo.moneda, recibos: recibosMapeados, historialAjustes: ajustes,
+            fechaAprobacion: periodo.fechaAprobacion || undefined,
+          };
+        }));
       } catch (error) {
         if (activo) setErrorDatos(error instanceof Error ? error.message : 'No pudimos cargar Personal');
       } finally {
@@ -209,7 +238,7 @@ export const PersonalPage: React.FC = () => {
                 Gestión de Personal & Aurora Nómina
               </h1>
               <span className="px-2 py-0.5 rounded bg-[#35d7c3]/15 text-[#35d7c3] font-mono text-xs font-semibold border border-[#35d7c3]/30">
-                [DEMO]
+                PILOTO
               </span>
             </div>
             <p className="text-xs sm:text-sm text-[#94a3b8]">
