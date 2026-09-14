@@ -76,7 +76,7 @@ public class GanaderiaCompraService {
             if (item.costo == null || item.costo.compareTo(BigDecimal.ZERO) < 0) {
                 throw new RuntimeException("El costo no puede ser negativo");
             }
-            if (animalRepository.findByArete(item.arete).isPresent()) {
+            if (animalRepository.findByAreteAndTenantId(item.arete, tenantId).isPresent()) {
                 throw new RuntimeException("Ya existe un animal con el arete: " + item.arete);
             }
 

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.BajaAnimal;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
@@ -30,14 +31,18 @@ public class BajaAnimalController {
         public String observaciones;
     }
 
+    // ── P0: tenant NUNCA viene por query/body/header — siempre de TenantContext/JWT ──
+
     @GetMapping
     public List<BajaAnimal> listar() {
-        return bajaAnimalRepository.findAll();
+        Long tenantId = TenantContext.getCurrentTenant();
+        return bajaAnimalRepository.findByTenantId(tenantId);
     }
 
     @PostMapping
     @Transactional
-    public ResponseEntity<BajaAnimal> registrar(@RequestParam Long tenantId, @RequestBody BajaRequest request) {
+    public ResponseEntity<BajaAnimal> registrar(@RequestBody BajaRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Animal animal = animalRepository.findById(request.animalId)
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         if (!animal.getTenantId().equals(tenantId)) {

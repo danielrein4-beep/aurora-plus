@@ -8,4 +8,6 @@ import java.util.List;
 @Repository
 public interface CompraAnimalRepository extends JpaRepository<CompraAnimal, Long> {
     List<CompraAnimal> findAllByOrderByFechaCompraDesc();
+    // ── Método tenant-scoped (P0) ──
+    List<CompraAnimal> findByTenantIdOrderByFechaCompraDesc(Long tenantId);
 }

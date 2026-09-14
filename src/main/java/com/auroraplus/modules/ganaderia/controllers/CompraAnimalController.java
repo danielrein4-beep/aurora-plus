@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.CompraAnimal;
 import com.auroraplus.modules.ganaderia.repositories.CompraAnimalRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaCompraService;
@@ -25,13 +26,17 @@ public class CompraAnimalController {
         public List<GanaderiaCompraService.ItemCompraAnimal> items;
     }
 
+    // ── P0: tenant NUNCA viene por query/body/header — siempre de TenantContext/JWT ──
+
     @GetMapping
     public List<CompraAnimal> listar() {
-        return compraAnimalRepository.findAllByOrderByFechaCompraDesc();
+        Long tenantId = TenantContext.getCurrentTenant();
+        return compraAnimalRepository.findByTenantIdOrderByFechaCompraDesc(tenantId);
     }
 
     @PostMapping
-    public ResponseEntity<CompraAnimal> registrar(@RequestParam Long tenantId, @RequestBody CompraRequest request) {
+    public ResponseEntity<CompraAnimal> registrar(@RequestBody CompraRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(ganaderiaCompraService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, request.items));
     }
 }

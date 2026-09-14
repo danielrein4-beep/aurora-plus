@@ -584,7 +584,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       try {
         const [resGastos, resVentasAnimales] = await Promise.allSettled([
           listarGastosGanaderia(tenantId),
-          listarVentasGanaderia(tenantId),
+          listarVentasGanaderia(),
         ]);
         if (resGastos.status === "fulfilled" && resGastos.value) {
           setGastos(resGastos.value ?? []);
@@ -756,11 +756,11 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         datos.estadoProductivo = formEditarAnimal.estadoProductivo;
       }
 
-      const actualizado = await actualizarAnimalGanaderia(modalEditarAnimal.id, tenantId, datos);
+      const actualizado = await actualizarAnimalGanaderia(modalEditarAnimal.id, datos);
 
       const potreroCambio = formEditarAnimal.potreroId && formEditarAnimal.potreroId !== modalEditarAnimal.potrero?.id;
       if (potreroCambio) {
-        await moverAnimalGanaderia(modalEditarAnimal.id, tenantId, Number(formEditarAnimal.potreroId), "Edición de ficha del animal");
+        await moverAnimalGanaderia(modalEditarAnimal.id, Number(formEditarAnimal.potreroId), "Edición de ficha del animal");
         const potreroNuevo = potreros.find(p => p.id === Number(formEditarAnimal.potreroId));
         actualizado.potrero = potreroNuevo;
       }
@@ -804,13 +804,13 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     try {
       // 1. Si se registró nuevo peso en báscula antes del despacho (solo modo individual), actualizar peso del animal
       if (ventaModo === "INDIVIDUAL" && formVenta.pesoSalida && Number(formVenta.pesoSalida) > 0) {
-        await actualizarAnimalGanaderia(formVenta.animalId, tenantId, { pesoActual: Number(formVenta.pesoSalida) });
+        await actualizarAnimalGanaderia(formVenta.animalId, { pesoActual: Number(formVenta.pesoSalida) });
       }
 
       // 2. Registrar la venta oficial en el backend con VentaAnimalController (guarda comprador, precio,
       // ticket y marca cada animal como VENDIDO en un solo servicio transaccional — soporta lote completo)
       const ticket = `VTA-${Date.now().toString().slice(-6)}`;
-      const ventaCreada = await registrarVentaGanaderia(tenantId, {
+      const ventaCreada = await registrarVentaGanaderia({
         numeroTicket: ticket,
         comprador: `${formVenta.comprador.trim()} [${formVenta.motivo}]`,
         items: idsVenta.map(id => ({
