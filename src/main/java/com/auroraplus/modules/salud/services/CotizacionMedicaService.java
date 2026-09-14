@@ -1,6 +1,5 @@
 package com.auroraplus.modules.salud.services;
 
-import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.CotizacionMedica;
 import com.auroraplus.modules.salud.repositories.CotizacionMedicaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,8 +14,8 @@ public class CotizacionMedicaService {
     @Autowired
     private CotizacionMedicaRepository cotizacionMedicaRepository;
 
-    public List<CotizacionMedica> listar() {
-        return cotizacionMedicaRepository.findAllByOrderByCreadoEnDesc();
+    public List<CotizacionMedica> listar(Long tenantId) {
+        return cotizacionMedicaRepository.findByTenantIdOrderByCreadoEnDesc(tenantId);
     }
 
     @Transactional
@@ -27,25 +26,20 @@ public class CotizacionMedicaService {
     }
 
     /** findById() no respeta el filtro de tenant (ver hallazgo en ConsultaMedicaService). */
-    private CotizacionMedica obtenerCotizacionPropia(Long id) {
-        Long tenantId = TenantContext.getCurrentTenant();
-        CotizacionMedica cotizacion = cotizacionMedicaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Cotización no encontrada con ID: " + id));
-        if (tenantId == null || !tenantId.equals(cotizacion.getTenantId())) {
-            throw new RuntimeException("Violación de seguridad: la cotización no pertenece a este tenant");
-        }
-        return cotizacion;
+    private CotizacionMedica obtenerCotizacionPropia(Long tenantId, Long id) {
+        return cotizacionMedicaRepository.findByTenantIdAndId(tenantId, id)
+            .orElseThrow(() -> new RuntimeException("Cotización no encontrada (o no pertenece a este tenant)"));
     }
 
     @Transactional
-    public CotizacionMedica actualizarEstado(Long id, CotizacionMedica.EstadoCotizacion nuevoEstado) {
-        CotizacionMedica cotizacion = obtenerCotizacionPropia(id);
+    public CotizacionMedica actualizarEstado(Long tenantId, Long id, CotizacionMedica.EstadoCotizacion nuevoEstado) {
+        CotizacionMedica cotizacion = obtenerCotizacionPropia(tenantId, id);
         cotizacion.setEstado(nuevoEstado);
         return cotizacionMedicaRepository.save(cotizacion);
     }
 
     @Transactional
-    public void eliminar(Long id) {
-        cotizacionMedicaRepository.delete(obtenerCotizacionPropia(id));
+    public void eliminar(Long tenantId, Long id) {
+        cotizacionMedicaRepository.delete(obtenerCotizacionPropia(tenantId, id));
     }
 }

@@ -22,14 +22,13 @@ public class CierreCajaController {
 
     @GetMapping
     public List<CierreCaja> listarHistorial() {
-        return cierreCajaService.listarHistorial();
+        return cierreCajaService.listarHistorial(TenantContext.getCurrentTenant());
     }
 
     @PostMapping
     public ResponseEntity<CierreCaja> registrarCierre(
-            @RequestParam(required = false) Long tenantId,
             @RequestBody CierreCaja cierre) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }
@@ -38,7 +37,7 @@ public class CierreCajaController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarCierre(@PathVariable Long id) {
-        cierreCajaService.eliminarCierre(id);
+        cierreCajaService.eliminarCierre(TenantContext.getCurrentTenant(), id);
         return ResponseEntity.noContent().build();
     }
 }

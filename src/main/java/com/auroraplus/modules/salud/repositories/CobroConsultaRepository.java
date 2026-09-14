@@ -11,9 +11,9 @@ import java.util.Optional;
 @Repository
 public interface CobroConsultaRepository extends JpaRepository<CobroConsulta, Long> {
 
-    Optional<CobroConsulta> findByClaveIdempotencia(String claveIdempotencia);
+    Optional<CobroConsulta> findByTenantIdAndClaveIdempotencia(Long tenantId, String claveIdempotencia);
 
-    List<CobroConsulta> findByPacienteIdOrderByFechaHoraDesc(Long pacienteId);
+    List<CobroConsulta> findByTenantIdAndPacienteIdOrderByFechaHoraDesc(Long tenantId, Long pacienteId);
 
-    List<CobroConsulta> findByFechaHoraBetweenOrderByFechaHoraDesc(LocalDateTime inicio, LocalDateTime fin);
+    List<CobroConsulta> findByTenantIdAndFechaHoraBetweenOrderByFechaHoraDesc(Long tenantId, LocalDateTime inicio, LocalDateTime fin);
 }

@@ -9,7 +9,8 @@ import java.util.List;
 @Repository
 public interface CotizacionMedicaRepository extends JpaRepository<CotizacionMedica, Long> {
 
-    List<CotizacionMedica> findAllByOrderByCreadoEnDesc();
+    List<CotizacionMedica> findByTenantIdOrderByCreadoEnDesc(Long tenantId);
+    java.util.Optional<CotizacionMedica> findByTenantIdAndId(Long tenantId, Long id);
 
     List<CotizacionMedica> findByPacienteIdOrderByCreadoEnDesc(Long pacienteId);
 }

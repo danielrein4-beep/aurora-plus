@@ -55,7 +55,7 @@ public class SaludFinanzasService {
         }
 
         // 1. Idempotencia: Verificar si ya existe este cobro registrado
-        Optional<CobroConsulta> existente = cobroConsultaRepository.findByClaveIdempotencia(req.claveIdempotencia);
+        Optional<CobroConsulta> existente = cobroConsultaRepository.findByTenantIdAndClaveIdempotencia(tenantId, req.claveIdempotencia);
         if (existente.isPresent()) {
             return existente.get(); // Reintento seguro (Offline-First): retorna el cobro ya procesado
         }
@@ -106,11 +106,11 @@ public class SaludFinanzasService {
         return cobroConsultaRepository.save(cobro);
     }
 
-    public List<CobroConsulta> historialPorPaciente(Long pacienteId) {
-        return cobroConsultaRepository.findByPacienteIdOrderByFechaHoraDesc(pacienteId);
+    public List<CobroConsulta> historialPorPaciente(Long tenantId, Long pacienteId) {
+        return cobroConsultaRepository.findByTenantIdAndPacienteIdOrderByFechaHoraDesc(tenantId, pacienteId);
     }
 
-    public List<CobroConsulta> listarPorRangoFechas(LocalDateTime inicio, LocalDateTime fin) {
-        return cobroConsultaRepository.findByFechaHoraBetweenOrderByFechaHoraDesc(inicio, fin);
+    public List<CobroConsulta> listarPorRangoFechas(Long tenantId, LocalDateTime inicio, LocalDateTime fin) {
+        return cobroConsultaRepository.findByTenantIdAndFechaHoraBetweenOrderByFechaHoraDesc(tenantId, inicio, fin);
     }
 }

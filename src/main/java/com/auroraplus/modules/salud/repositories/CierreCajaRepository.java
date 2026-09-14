@@ -9,5 +9,6 @@ import java.util.List;
 @Repository
 public interface CierreCajaRepository extends JpaRepository<CierreCaja, Long> {
 
-    List<CierreCaja> findAllByOrderByCreadoEnDesc();
+    List<CierreCaja> findByTenantIdOrderByCreadoEnDesc(Long tenantId);
+    java.util.Optional<CierreCaja> findByTenantIdAndId(Long tenantId, Long id);
 }

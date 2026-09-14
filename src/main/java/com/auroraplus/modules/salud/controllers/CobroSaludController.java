@@ -26,10 +26,9 @@ public class CobroSaludController {
 
     @PostMapping
     public ResponseEntity<CobroConsulta> procesarCobro(
-            @RequestParam(required = false) Long tenantId,
             @RequestBody SaludFinanzasService.CobroRequest req) {
 
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }
@@ -52,13 +51,13 @@ public class CobroSaludController {
 
     @GetMapping("/paciente/{pacienteId}")
     public List<CobroConsulta> historialPorPaciente(@PathVariable Long pacienteId) {
-        return saludFinanzasService.historialPorPaciente(pacienteId);
+        return saludFinanzasService.historialPorPaciente(TenantContext.getCurrentTenant(), pacienteId);
     }
 
     @GetMapping("/reporte")
     public List<CobroConsulta> reporteCobros(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fin) {
-        return saludFinanzasService.listarPorRangoFechas(inicio, fin);
+        return saludFinanzasService.listarPorRangoFechas(TenantContext.getCurrentTenant(), inicio, fin);
     }
 }

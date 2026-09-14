@@ -406,8 +406,8 @@ function generarClaveIdempotencia(): string {
 /** Registra un cobro real en el backend (tabla salud_cobros_consulta) — idempotente: reintentar
  * con la misma claveIdempotencia (generada una vez por intento de cobro, no por request) nunca
  * duplica el movimiento de caja. */
-export function procesarCobro(tenantId: number, datos: NuevoCobro, claveIdempotencia?: string): Promise<CobroConsulta> {
-  return request<CobroConsulta>(`/api/salud/cobros?tenantId=${tenantId}`, {
+export function procesarCobro(datos: NuevoCobro, claveIdempotencia?: string): Promise<CobroConsulta> {
+  return request<CobroConsulta>(`/api/salud/cobros`, {
     method: "POST",
     body: JSON.stringify({
       claveIdempotencia: claveIdempotencia || generarClaveIdempotencia(),
@@ -441,8 +441,8 @@ export function listarCierresCaja(): Promise<CierreCajaRegistro[]> {
   return request<CierreCajaRegistro[]>(`/api/salud/cierres-caja`);
 }
 
-export function registrarCierreCaja(tenantId: number, datos: Omit<CierreCajaRegistro, "id">): Promise<CierreCajaRegistro> {
-  return request<CierreCajaRegistro>(`/api/salud/cierres-caja?tenantId=${tenantId}`, {
+export function registrarCierreCaja(datos: Omit<CierreCajaRegistro, "id">): Promise<CierreCajaRegistro> {
+  return request<CierreCajaRegistro>(`/api/salud/cierres-caja`, {
     method: "POST",
     body: JSON.stringify(datos),
   });
@@ -532,8 +532,8 @@ export function listarCotizaciones(): Promise<CotizacionMedicaApi[]> {
   return request<CotizacionMedicaApi[]>(`/api/salud/cotizaciones`);
 }
 
-export function crearCotizacion(tenantId: number, datos: NuevaCotizacion): Promise<CotizacionMedicaApi> {
-  return request<CotizacionMedicaApi>(`/api/salud/cotizaciones?tenantId=${tenantId}`, {
+export function crearCotizacion(datos: NuevaCotizacion): Promise<CotizacionMedicaApi> {
+  return request<CotizacionMedicaApi>(`/api/salud/cotizaciones`, {
     method: "POST",
     body: JSON.stringify({ paciente: { id: datos.pacienteId }, ...datos }),
   });

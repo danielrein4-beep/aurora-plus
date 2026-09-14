@@ -4381,7 +4381,7 @@ function Procedimientos({
       // registrado (la tabla exige un paciente real — un prospecto sin ficha se queda
       // como registro local hasta que se le cree su ficha).
       if (pacienteSeleccionado) {
-        crearCotizacion(tenantId, {
+        crearCotizacion({
           pacienteId: pacienteSeleccionado.id,
           procedimientoNombre: nombreProcedimiento.trim(),
           descripcion: descripcionClinica.trim() || undefined,
@@ -5376,7 +5376,7 @@ function SalaEspera({
         };
         onAgregarCobro(cobroItem);
         try {
-          await procesarCobro(tenantId, {
+          await procesarCobro({
             pacienteId: admitirPacienteId ? Number(admitirPacienteId) : undefined,
             concepto: admitirMotivo.trim() || "Consulta Médica",
             montoTotal: montoNum,
@@ -5487,7 +5487,7 @@ function SalaEspera({
       };
       onAgregarCobro(cobroItem);
       try {
-        await procesarCobro(tenantId, {
+        await procesarCobro({
           pacienteId: modalPago.pacienteId ?? undefined,
           concepto: modalPago.motivo || "Consulta Médica",
           montoTotal: montoNum,
@@ -5550,7 +5550,7 @@ function SalaEspera({
     onAgregarCierre(dataCierre);
     setMostrarModalCierre(false);
     try {
-      await registrarCierreCaja(tenantId, {
+      await registrarCierreCaja({
         fecha: dataCierre.fecha,
         horaCierre: dataCierre.horaCierre,
         responsableNombre: dataCierre.responsableNombre,

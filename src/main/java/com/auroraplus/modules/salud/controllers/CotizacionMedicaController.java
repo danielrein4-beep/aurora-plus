@@ -18,14 +18,13 @@ public class CotizacionMedicaController {
 
     @GetMapping
     public List<CotizacionMedica> listar() {
-        return cotizacionMedicaService.listar();
+        return cotizacionMedicaService.listar(TenantContext.getCurrentTenant());
     }
 
     @PostMapping
     public ResponseEntity<CotizacionMedica> crear(
-            @RequestParam(required = false) Long tenantId,
             @RequestBody CotizacionMedica cotizacion) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }
@@ -36,12 +35,12 @@ public class CotizacionMedicaController {
     public ResponseEntity<CotizacionMedica> actualizarEstado(
             @PathVariable Long id,
             @RequestParam CotizacionMedica.EstadoCotizacion estado) {
-        return ResponseEntity.ok(cotizacionMedicaService.actualizarEstado(id, estado));
+        return ResponseEntity.ok(cotizacionMedicaService.actualizarEstado(TenantContext.getCurrentTenant(), id, estado));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        cotizacionMedicaService.eliminar(id);
+        cotizacionMedicaService.eliminar(TenantContext.getCurrentTenant(), id);
         return ResponseEntity.noContent().build();
     }
 }
