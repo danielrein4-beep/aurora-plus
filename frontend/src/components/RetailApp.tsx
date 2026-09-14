@@ -390,7 +390,7 @@ function Inventario({ tenantId, vertical, monedaBaseTenant, articulos, onCambio 
     setGuardando(true);
     setError(null);
     try {
-      await crearArticulo(tenantId, {
+      await crearArticulo({
         sku: form.sku.trim(),
         nombre: form.nombre.trim(),
         unidadMedida: form.unidadMedida,
@@ -464,7 +464,7 @@ function Inventario({ tenantId, vertical, monedaBaseTenant, articulos, onCambio 
                         <button onClick={() => setCruceDeArticulo(a)} title="Catálogo de cruce (OEM/vehículos)" className="w-7 h-7 rounded-full bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-300 flex items-center justify-center cursor-pointer"><IconRefresh size={13} /></button>
                       )}
                       <button onClick={() => setArticuloEditando(a)} title="Editar" className="w-7 h-7 rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 flex items-center justify-center cursor-pointer"><IconCheckCircle size={13} /></button>
-                      <button onClick={() => { if (confirm(`¿Eliminar "${a.nombre}"?`)) eliminarArticulo(tenantId, a.id).then(onCambio).catch((e) => alert(e.message)); }}
+                      <button onClick={() => { if (confirm(`¿Eliminar "${a.nombre}"?`)) eliminarArticulo(a.id).then(onCambio).catch((e) => alert(e.message)); }}
                         title="Eliminar" className="w-7 h-7 rounded-full bg-red-50 dark:bg-red-500/10 text-red-500 flex items-center justify-center cursor-pointer"><IconTrash size={13} /></button>
                     </div>
                   </td>
@@ -534,7 +534,7 @@ function EditarArticuloModal({ tenantId, vertical, articulo, onClose, onGuardado
     setGuardando(true);
     setError(null);
     try {
-      await editarArticulo(tenantId, articulo.id, {
+      await editarArticulo(articulo.id, {
         nombre: nombre.trim(),
         precioVenta: Number(precioVenta),
         stockMinimo: stockMinimo ? Number(stockMinimo) : undefined,
@@ -585,7 +585,7 @@ function ReabastecerModal({ tenantId, monedaBaseTenant, articulo, onClose, onGua
     setGuardando(true);
     setError(null);
     try {
-      await entradaArticulo(tenantId, articulo.id, {
+      await entradaArticulo(articulo.id, {
         cantidad: Number(cantidad), costoUnitario: Number(costoUnitario), moneda, metodoPago,
         motivo: "Reabastecimiento",
       });

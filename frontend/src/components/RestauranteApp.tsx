@@ -3211,7 +3211,7 @@ function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
     setGuardando(true);
     setError(null);
     try {
-      const actualizado = await editarArticulo(tenantId, articulo.id, {
+      const actualizado = await editarArticulo(articulo.id, {
         nombre: form.nombre.trim(), categoria: form.categoria.trim(), unidadMedida: form.unidadMedida.trim(),
         costoUnitario: Number(form.costoUnitario), precioVenta: Number(form.precioVenta),
         sku: form.sku.trim() || undefined,
@@ -3314,7 +3314,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
       // del tenant antes de guardarlo.
       const monedaCompra = Number(form.cantidadInicial) > 0 && form.registrarGasto ? form.moneda : monedaBaseTenant;
       const costoIngresado = Number(form.costoUnitario);
-      const nuevo = await crearArticulo(tenantId, {
+      const nuevo = await crearArticulo({
         sku: generarSku(form.nombre),
         nombre: form.nombre.trim(),
         unidadMedida: form.unidadMedida,
@@ -3324,7 +3324,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
         monedaCosto: monedaCompra,
       });
       if (form.cantidadInicial && Number(form.cantidadInicial) > 0) {
-        await entradaArticulo(tenantId, nuevo.id, {
+        await entradaArticulo(nuevo.id, {
           cantidad: Number(form.cantidadInicial),
           costoUnitario: costoIngresado,
           motivo: "Carga inicial de inventario",
@@ -3579,7 +3579,7 @@ function ModalImportarInventario({ tenantId, onClose, onImportado }: { tenantId:
     setProcesando(true);
     setError(null);
     try {
-      const res = await importarArticulosLote(tenantId, filas);
+      const res = await importarArticulosLote(filas);
       setResultado(res);
       onImportado();
     } catch (e) {
@@ -3702,7 +3702,7 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
     setGuardando(true);
     setError(null);
     try {
-      await ajustarStockArticulo(tenantId, articulo.id, { stockReal: Number(stockReal) });
+      await ajustarStockArticulo(articulo.id, { stockReal: Number(stockReal) });
       setModo("ver");
       onCambio();
     } catch (e) {
@@ -3717,7 +3717,7 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
     setGuardando(true);
     setError(null);
     try {
-      await eliminarArticulo(tenantId, articulo.id);
+      await eliminarArticulo(articulo.id);
       onCambio();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo eliminar");
@@ -3841,7 +3841,7 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
       // El costo se manda tal cual lo tecleó el usuario junto con `moneda` — es
       // el backend (ArticuloController) el que lo convierte a la moneda base
       // del tenant antes de guardarlo.
-      await entradaArticulo(tenantId, articulo.id, {
+      await entradaArticulo(articulo.id, {
         cantidad: Number(cantidad), costoUnitario: Number(costoUnitario),
         motivo: "Reabastecimiento rápido", fechaVencimiento: fechaVencimiento || undefined,
         metodoPago, moneda,
@@ -3851,7 +3851,7 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
       // corregir de una vez artículos que quedaron sin precio (ej. cargados
       // por Excel sin esa columna).
       if (Number(precioVenta) !== Number(articulo.precioVenta ?? 0)) {
-        await editarArticulo(tenantId, articulo.id, { precioVenta: Number(precioVenta) });
+        await editarArticulo(articulo.id, { precioVenta: Number(precioVenta) });
       }
       onReabastecido();
     } catch (e) {
@@ -5689,7 +5689,7 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
   const buscar = () => {
     setCargando(true);
     setError(null);
-    reporteTickets(tenantId, {
+    reporteTickets({
       fechaInicio: fechaInicio || undefined, fechaFin: fechaFin || undefined,
       metodoPago: metodoPago || undefined, estado: estado || undefined,
     })
@@ -5879,11 +5879,11 @@ function ResumenGeneral({ tenantId }: { tenantId: number }) {
     lunes.setDate(hoy.getDate() - ((diaSemana + 6) % 7));
     const lunesStr = fmtFechaLocal(lunes);
 
-    reporteTickets(tenantId, { fechaInicio: hoyStr, fechaFin: hoyStr, estado: "PAGADA" })
+    reporteTickets({ fechaInicio: hoyStr, fechaFin: hoyStr, estado: "PAGADA" })
       .then((lista) => { setVentasHoy(lista.reduce((s, t) => s + Number(t.totalUsd), 0)); setTicketsHoy(lista.length); })
       .catch(() => { setVentasHoy(0); setTicketsHoy(0); });
 
-    reporteTickets(tenantId, { fechaInicio: lunesStr, fechaFin: hoyStr, estado: "PAGADA" })
+    reporteTickets({ fechaInicio: lunesStr, fechaFin: hoyStr, estado: "PAGADA" })
       .then((lista) => setVentasSemana(lista.reduce((s, t) => s + Number(t.totalUsd), 0)))
       .catch(() => setVentasSemana(0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5891,7 +5891,7 @@ function ResumenGeneral({ tenantId }: { tenantId: number }) {
 
   useEffect(() => {
     setTicketsDia(null);
-    reporteTickets(tenantId, { fechaInicio: fechaSel, fechaFin: fechaSel, estado: "PAGADA" })
+    reporteTickets({ fechaInicio: fechaSel, fechaFin: fechaSel, estado: "PAGADA" })
       .then(setTicketsDia)
       .catch(() => setTicketsDia([]));
   }, [tenantId, fechaSel]);
@@ -6075,7 +6075,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
     setError(null);
 
     Promise.all([
-      reporteTickets(tenantId, { fechaInicio, fechaFin, estado: "PAGADA" }),
+      reporteTickets({ fechaInicio, fechaFin, estado: "PAGADA" }),
       listarMovimientos(tenantId, "EGRESO"),
     ])
       .then(async ([ticketsLista, egresosLista]) => {

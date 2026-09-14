@@ -21,7 +21,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** CRUD de artículos de inventario base (Fase 1.4) — no existía ningún controller para esto todavía. */
+/**
+ * CRUD de artículos de inventario base (Fase 1.4) — no existía ningún controller para esto todavía.
+ *
+ * Hardening de seguridad pre-piloto: casi todos los endpoints recibían tenantId por
+ * @RequestParam y lo usaban directo para filtrar o para el chequeo "el artículo pertenece a este
+ * tenant" — un chequeo así es una falsa sensación de seguridad cuando el propio tenantId contra
+ * el que se compara viene del mismo request que un atacante controla (si mando el id de un
+ * artículo ajeno junto con SU tenantId, el chequeo "pasa" porque ambos números salen de la misma
+ * fuente no confiable). Ahora el tenant sale exclusivamente de TenantContext (JWT verificado) en
+ * los 10 endpoints del controller.
+ */
 @RestController
 @RequestMapping("/api/inventario/articulos")
 public class ArticuloController {
@@ -52,7 +62,8 @@ public class ArticuloController {
     }
 
     @GetMapping("/{id}")
-    public Articulo obtener(@PathVariable Long id, @RequestParam Long tenantId) {
+    public Articulo obtener(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
         if (!articulo.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
@@ -61,13 +72,15 @@ public class ArticuloController {
     }
 
     @GetMapping("/sku/{sku}")
-    public Articulo buscarPorSku(@PathVariable String sku, @RequestParam Long tenantId) {
+    public Articulo buscarPorSku(@PathVariable String sku) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return articuloRepository.findBySkuAndTenantId(sku, tenantId)
             .orElseThrow(() -> new RuntimeException("Artículo no encontrado para el SKU: " + sku));
     }
 
     @PostMapping
-    public ResponseEntity<Articulo> crear(@RequestParam Long tenantId, @RequestBody Articulo articulo) {
+    public ResponseEntity<Articulo> crear(@RequestBody Articulo articulo) {
+        Long tenantId = TenantContext.getCurrentTenant();
         articulo.setTenantId(tenantId);
         // porcentajeImpuesto y categoria son NOT NULL en la base — sin un valor
         // por defecto acá, cualquier alta que no los mande (ej. el formulario
@@ -121,7 +134,8 @@ public class ArticuloController {
 
     /** Corrige datos del artículo (nombre, categoría, unidad, costo, precio de venta, stock mínimo) — NO toca stockActual, que solo cambia vía Kardex (entrada/salida/ajuste) para no perder el rastro de auditoría. */
     @PutMapping("/{id}")
-    public ResponseEntity<Articulo> editar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody EditarArticuloRequest request) {
+    public ResponseEntity<Articulo> editar(@PathVariable Long id, @RequestBody EditarArticuloRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
         if (!articulo.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
@@ -150,7 +164,8 @@ public class ArticuloController {
      * queda auditado por qué cambió el stock, no solo el número nuevo.
      */
     @PostMapping("/{id}/ajustar-stock")
-    public ResponseEntity<Articulo> ajustarStock(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody AjustarStockRequest request) {
+    public ResponseEntity<Articulo> ajustarStock(@PathVariable Long id, @RequestBody AjustarStockRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
         if (!articulo.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
@@ -172,7 +187,8 @@ public class ArticuloController {
 
     /** Elimina un artículo (ej. duplicado creado por error). Si ya tiene movimientos, compras o se usa en una receta, la base lo rechaza — se traduce a un error claro. */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
         if (!articulo.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
@@ -189,8 +205,8 @@ public class ArticuloController {
 
     /** Insumos por debajo de su umbral de reposición — para alertar antes de que se agote un ingrediente crítico. */
     @GetMapping("/alertas-stock-minimo")
-    public List<Articulo> alertasStockMinimo(@RequestParam Long tenantId) {
-        return articuloRepository.findConStockBajoMinimo(tenantId);
+    public List<Articulo> alertasStockMinimo() {
+        return articuloRepository.findConStockBajoMinimo(TenantContext.getCurrentTenant());
     }
 
     public static class EntradaRequest {
@@ -215,7 +231,8 @@ public class ArticuloController {
 
     /** Entrada de stock (compra/reposición) — actualiza también el costo unitario vigente del artículo. */
     @PostMapping("/{id}/entrada")
-    public ResponseEntity<Kardex> registrarEntrada(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody EntradaRequest request) {
+    public ResponseEntity<Kardex> registrarEntrada(@PathVariable Long id, @RequestBody EntradaRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
         if (!articulo.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
@@ -273,7 +290,8 @@ public class ArticuloController {
     }
 
     @GetMapping("/{id}/kardex")
-    public List<Kardex> kardex(@PathVariable Long id, @RequestParam Long tenantId) {
+    public List<Kardex> kardex(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
         if (!articulo.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
@@ -314,7 +332,8 @@ public class ArticuloController {
      */
     @PostMapping("/importar-lote")
     @Transactional
-    public ResponseEntity<ResultadoImportacion> importarLote(@RequestParam Long tenantId, @RequestBody List<ItemImportacion> items) {
+    public ResponseEntity<ResultadoImportacion> importarLote(@RequestBody List<ItemImportacion> items) {
+        Long tenantId = TenantContext.getCurrentTenant();
         ResultadoImportacion resultado = new ResultadoImportacion();
         for (int i = 0; i < items.size(); i++) {
             ItemImportacion item = items.get(i);

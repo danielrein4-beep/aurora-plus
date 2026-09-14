@@ -1,5 +1,7 @@
 package com.auroraplus.modules.horeca.services;
 
+import com.auroraplus.core.config.entities.LicenciaTenant;
+import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.core.inventario.entities.Articulo;
 import com.auroraplus.core.inventario.repositories.ArticuloRepository;
 import com.auroraplus.modules.horeca.entities.Comanda;
@@ -10,6 +12,7 @@ import com.auroraplus.modules.horeca.repositories.DetalleRecetaRepository;
 import com.auroraplus.modules.horeca.repositories.EscandalloRecetaRepository;
 import com.auroraplus.modules.horeca.repositories.FastBarTragoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -19,6 +22,22 @@ import java.math.RoundingMode;
  * operativo completo de un establecimiento piloto tipo "L'Apéritif": apertura de
  * comandas para tablas de charcutería (con descuento fraccionado de escandallo)
  * y transacciones de barra rápida (Fast-Bar), midiendo estabilidad bajo volumen.
+ *
+ * Hardening de seguridad pre-piloto: esto inserta comandas, ventas y movimientos de inventario
+ * REALES en la base de datos (no es data demo visual, son transacciones sintéticas de verdad).
+ * Antes no tenía ningún guard — si alguna vez se conecta a un controlador o se invoca a mano
+ * contra el tenant equivocado, contamina las ventas/inventario reales de un negocio piloto sin
+ * ningún aviso. Ahora exige DOS condiciones explícitas antes de escribir una sola fila:
+ * 1) la propiedad app.simulacion-piloto.habilitada=true (ausente/false por defecto — nunca se
+ *    activa "sin querer" en producción, solo un ambiente que lo declare a propósito);
+ * 2) que el tenant destino NO tenga NINGÚN registro en LicenciaTenant — ni activo ni inactivo.
+ *    Una licencia inactiva (vencida, trial expirado) sigue siendo un negocio real que alguna vez
+ *    se dio de alta: sus datos históricos (comandas, inventario) son reales y no deben mezclarse
+ *    con transacciones sintéticas solo porque el pago esté al día o no. El único tenant elegible
+ *    es uno que JAMÁS pasó por alta de licencia — un sandbox de verdad.
+ * Ambas validaciones corren ANTES de tocar prepararDatosPiloto (que es lo que empieza a
+ * insertar) — nunca se llega a escribir nada si alguna falla. No borra ni altera ninguna
+ * transacción existente: solo lee (orElseGet) o crea filas nuevas, igual que antes.
  */
 @Service
 public class SimulacionHorecaPilotoService {
@@ -44,7 +63,27 @@ public class SimulacionHorecaPilotoService {
     @Autowired
     private FastBarTragoRepository fastBarTragoRepository;
 
+    @Autowired
+    private LicenciaTenantRepository licenciaTenantRepository;
+
+    @Value("${app.simulacion-piloto.habilitada:false}")
+    private boolean simulacionHabilitada;
+
     public ResultadoSimulacionHoreca ejecutarSimulacionPiloto(Long tenantId, int cantidadTransacciones) {
+        if (!simulacionHabilitada) {
+            throw new IllegalStateException(
+                "Simulación de piloto deshabilitada — active 'app.simulacion-piloto.habilitada=true' "
+                + "solo en un ambiente seguro (nunca en producción) antes de ejecutarla");
+        }
+        java.util.Optional<LicenciaTenant> licencia = licenciaTenantRepository.findByTenantId(tenantId);
+        if (licencia.isPresent()) {
+            String estado = licencia.get().isActiva() ? "activa" : "inactiva/vencida";
+            throw new IllegalStateException(
+                "No se puede ejecutar la simulación de piloto contra el tenant " + tenantId
+                + ": tiene una licencia registrada (" + estado + ") — es o fue un negocio real, "
+                + "generaría comandas, ventas e inventario sintéticos mezclados con datos reales");
+        }
+
         DatosPiloto datos = prepararDatosPiloto(tenantId);
         ResultadoSimulacionHoreca resultado = new ResultadoSimulacionHoreca();
 

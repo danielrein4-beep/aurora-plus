@@ -1,5 +1,6 @@
 package com.auroraplus.core.inventario.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.repositories.MovimientoCajaRepository;
 import com.auroraplus.core.financiero.services.MotorFinancieroService;
@@ -8,7 +9,6 @@ import com.auroraplus.core.inventario.repositories.ArticuloRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
@@ -19,6 +19,10 @@ import java.time.LocalDateTime;
  * cuatro cifras que le importan al dueño del negocio de un vistazo (caja de
  * hoy, capital inmovilizado en bodega, utilidad proyectada si se vendiera
  * todo el stock, y cuántos artículos necesitan reposición ya).
+ *
+ * Hardening de seguridad pre-piloto: antes recibía tenantId por query — cualquier usuario
+ * autenticado de CUALQUIER negocio podía pedir el KPI de otro tenant con solo cambiar el número
+ * en la URL. Ahora el tenant sale exclusivamente de TenantContext (JWT verificado).
  */
 @RestController
 @RequestMapping("/api/inventario")
@@ -34,7 +38,8 @@ public class InventarioKpiController {
     private MotorFinancieroService motorFinancieroService;
 
     @GetMapping("/kpis")
-    public InventarioKpiDTO obtenerKpis(@RequestParam Long tenantId) {
+    public InventarioKpiDTO obtenerKpis() {
+        Long tenantId = TenantContext.getCurrentTenant();
         ArticuloRepository.InventarioAgregadoProjection agregados = articuloRepository.calcularAgregadosInventario(tenantId);
 
         // "Caja hoy" es el NETO de hoy (ingresos - egresos), no solo lo que

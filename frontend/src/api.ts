@@ -739,10 +739,10 @@ export interface ReporteTicket {
 }
 
 /** Reportes Operativos: listado de tickets con filtros dinámicos (todos opcionales) — motor de solo lectura, aparte del flujo del POS. */
-export function reporteTickets(tenantId: number, filtros: {
+export function reporteTickets(filtros: {
   fechaInicio?: string; fechaFin?: string; metodoPago?: string; estado?: "ABIERTA" | "PAGADA" | "ANULADA";
 }): Promise<ReporteTicket[]> {
-  const params = new URLSearchParams({ tenantId: String(tenantId) });
+  const params = new URLSearchParams();
   if (filtros.fechaInicio) params.set("fechaInicio", filtros.fechaInicio);
   if (filtros.fechaFin) params.set("fechaFin", filtros.fechaFin);
   if (filtros.metodoPago) params.set("metodoPago", filtros.metodoPago);
@@ -964,19 +964,19 @@ export function listarArticulos(): Promise<Articulo[]> {
 // costoUnitario va tal cual lo tecleó el usuario en `monedaCosto` (o en la
 // moneda base del tenant si se omite) — el backend lo convierte a la
 // moneda base antes de guardar.
-export function crearArticulo(tenantId: number, datos: { sku: string; nombre: string; unidadMedida?: string; categoria?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; monedaCosto?: string; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
-  return request(`/api/inventario/articulos?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+export function crearArticulo(datos: { sku: string; nombre: string; unidadMedida?: string; categoria?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; monedaCosto?: string; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
+  return request(`/api/inventario/articulos`, { method: "POST", body: JSON.stringify(datos) });
 }
 
 // costoUnitario va tal cual lo tecleó el usuario en `moneda` (o en la moneda
 // base del tenant si se omite) — el backend lo convierte a la moneda base
 // antes de guardar.
-export function entradaArticulo(tenantId: number, articuloId: number, datos: { cantidad: number; costoUnitario?: number; motivo?: string; fechaVencimiento?: string; metodoPago?: string; moneda?: string }): Promise<unknown> {
-  return request(`/api/inventario/articulos/${articuloId}/entrada?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+export function entradaArticulo(articuloId: number, datos: { cantidad: number; costoUnitario?: number; motivo?: string; fechaVencimiento?: string; metodoPago?: string; moneda?: string }): Promise<unknown> {
+  return request(`/api/inventario/articulos/${articuloId}/entrada`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function editarArticulo(tenantId: number, articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; sku?: string; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
-  return request(`/api/inventario/articulos/${articuloId}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+export function editarArticulo(articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; sku?: string; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
+  return request(`/api/inventario/articulos/${articuloId}`, { method: "PUT", body: JSON.stringify(datos) });
 }
 
 // --- Presentaciones de artículo (six-pack, caja x24, etc.) ---
@@ -1115,12 +1115,12 @@ export function eliminarCruceRepuesto(id: number, tenantId: number): Promise<voi
 }
 
 /** Corrección de inventario: indicá el stock REAL contado y el sistema calcula/ audita la diferencia solo. */
-export function ajustarStockArticulo(tenantId: number, articuloId: number, datos: { stockReal: number; motivo?: string }): Promise<Articulo> {
-  return request(`/api/inventario/articulos/${articuloId}/ajustar-stock?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+export function ajustarStockArticulo(articuloId: number, datos: { stockReal: number; motivo?: string }): Promise<Articulo> {
+  return request(`/api/inventario/articulos/${articuloId}/ajustar-stock`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function eliminarArticulo(tenantId: number, articuloId: number): Promise<void> {
-  return request(`/api/inventario/articulos/${articuloId}?tenantId=${tenantId}`, { method: "DELETE" });
+export function eliminarArticulo(articuloId: number): Promise<void> {
+  return request(`/api/inventario/articulos/${articuloId}`, { method: "DELETE" });
 }
 
 export interface ItemImportacionArticulo {
@@ -1142,8 +1142,8 @@ export interface ResultadoImportacionArticulos {
 }
 
 /** Carga masiva de artículos (desde Excel/CSV parseado en el navegador con SheetJS) — crea o actualiza por SKU. */
-export function importarArticulosLote(tenantId: number, items: ItemImportacionArticulo[]): Promise<ResultadoImportacionArticulos> {
-  return request(`/api/inventario/articulos/importar-lote?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(items) });
+export function importarArticulosLote(items: ItemImportacionArticulo[]): Promise<ResultadoImportacionArticulos> {
+  return request(`/api/inventario/articulos/importar-lote`, { method: "POST", body: JSON.stringify(items) });
 }
 
 export interface ItemCompraInsumo {
@@ -1232,8 +1232,8 @@ export interface InventarioKpis {
 }
 
 /** Panel de KPIs financieros de Inventario — caja neta de hoy, capital inmovilizado en bodega, utilidad proyectada y artículos que necesitan reposición. */
-export function kpisInventario(tenantId: number): Promise<InventarioKpis> {
-  return request(`/api/inventario/kpis?tenantId=${tenantId}`);
+export function kpisInventario(): Promise<InventarioKpis> {
+  return request(`/api/inventario/kpis`);
 }
 
 // --- Comandas: historial e ítems (antes solo se podía crear/modificar, no consultar) ---
