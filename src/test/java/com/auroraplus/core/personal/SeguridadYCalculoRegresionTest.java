@@ -197,11 +197,18 @@ class SeguridadYCalculoRegresionTest {
     void usuarioSinPermisoPersonalNoAccedeANada() {
         long tenantId = 81003L;
         activarFlag(tenantId, PersonalAccessService.FLAG_PERSONAL);
+        activarFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA);
+        activarFlag(tenantId, PersonalAccessService.FLAG_METAS);
+        Empleado empleado = crearEmpleadoBasico(tenantId, "Empleado protegido");
         crearUsuarioConRol(tenantId, "sinrol81003", null); // usuario real, SIN PermisoPersonal
         autenticarComo(tenantId, "sinrol81003");
 
         assertThrows(PersonalAccessService.AccesoPersonalDenegadoException.class,
             () -> empleadoService.listar(tenantId));
+        assertThrows(PersonalAccessService.AccesoPersonalDenegadoException.class,
+            () -> asistenciaService.listarDeEmpleado(tenantId, empleado.getId()));
+        assertThrows(PersonalAccessService.AccesoPersonalDenegadoException.class,
+            () -> metaPersonalService.listarDeEmpleado(tenantId, empleado.getId()));
     }
 
     @Test

@@ -93,6 +93,8 @@ export const PersonalPage: React.FC = () => {
       setCapacidades(null);
       setNominaHabilitada(false);
       setOcultarSueldo(true);
+      setErrorDatos('No pudimos verificar tus permisos de Personal');
+      setCargandoDatos(false);
     });
   }, []);
 
@@ -233,7 +235,7 @@ export const PersonalPage: React.FC = () => {
         {/* Cabecera Superior del Módulo */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#1e2d48]">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#35d7c3]" />
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#f8fafc]">
                 Gestión de Personal & Aurora Nómina
@@ -302,7 +304,7 @@ export const PersonalPage: React.FC = () => {
               No pudimos cargar los datos reales: {errorDatos}
             </div>
           )}
-          {seccionActiva === 'resumen' && (
+          {!cargandoDatos && !errorDatos && seccionActiva === 'resumen' && (
             <ResumenEquipo
               empleados={empleados}
               periodoActual={periodosNomina[0] || PERIODO_VACIO}
@@ -314,7 +316,7 @@ export const PersonalPage: React.FC = () => {
             />
           )}
 
-          {seccionActiva === 'empleados' && (
+          {!cargandoDatos && !errorDatos && seccionActiva === 'empleados' && (
             <ListaEmpleados
               empleados={empleados}
               onSeleccionarEmpleado={(emp) => setEmpleadoSeleccionado(emp)}
@@ -323,7 +325,7 @@ export const PersonalPage: React.FC = () => {
             />
           )}
 
-          {seccionActiva === 'turnos' && (
+          {!cargandoDatos && !errorDatos && seccionActiva === 'turnos' && (
             <TurnosPersonal
               turnosHorarios={MOCK_TURNOS_HORARIOS}
               asignaciones={turnosAsignados}
@@ -342,7 +344,7 @@ export const PersonalPage: React.FC = () => {
             />
           )}
 
-          {seccionActiva === 'asistencia' && (
+          {!cargandoDatos && !errorDatos && seccionActiva === 'asistencia' && (
             <AsistenciaPersonal
               asistencias={asistencias}
               empleados={empleados}
@@ -350,14 +352,14 @@ export const PersonalPage: React.FC = () => {
             />
           )}
 
-          {seccionActiva === 'metas' && (
+          {!cargandoDatos && !errorDatos && seccionActiva === 'metas' && (
             <MetasPersonal
               metas={metas}
               onAgregarMeta={(nueva) => setMetas([nueva, ...metas])}
             />
           )}
 
-          {seccionActiva === 'nomina' && periodosNomina.length > 0 && (
+          {!cargandoDatos && !errorDatos && seccionActiva === 'nomina' && periodosNomina.length > 0 && (
             <NominaPersonal
               periodos={periodosNomina}
               ocultarSueldo={ocultarSueldo}
@@ -367,7 +369,7 @@ export const PersonalPage: React.FC = () => {
               }}
             />
           )}
-          {seccionActiva === 'nomina' && periodosNomina.length === 0 && !cargandoDatos && (
+          {!errorDatos && seccionActiva === 'nomina' && periodosNomina.length === 0 && !cargandoDatos && (
             <div className="rounded-2xl border border-white/10 bg-[#0b2341] p-8 text-center">
               <h2 className="font-semibold text-white">Aún no hay períodos de nómina</h2>
               <p className="mt-2 text-sm text-white/60">Crea y calcula el primer período cuando la empresa decida activar Aurora Nómina.</p>

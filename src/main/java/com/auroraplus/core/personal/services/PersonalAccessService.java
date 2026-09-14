@@ -143,6 +143,17 @@ public class PersonalAccessService {
             .orElse(null);
     }
 
+    /** Permite consultar datos operativos de un empleado al dueño/equipo autorizado o al propio empleado. */
+    public void exigirVerDatosDeEmpleado(Long tenantId, Long empleadoId) {
+        if (esDuenoAdmin()) return;
+        PermisoPersonal permiso = obtenerPermisoPersonalActual(tenantId)
+            .orElseThrow(() -> new AccesoPersonalDenegadoException("Este usuario no tiene permisos asignados en Personal/Nómina"));
+        if (PUEDEN_VER_DIRECTORIO_PERSONAL.contains(permiso.getRol())) return;
+        if (permiso.getRol() == PermisoPersonal.RolPersonal.EMPLEADO
+                && empleadoId != null && empleadoId.equals(permiso.getEmpleadoId())) return;
+        throw new AccesoPersonalDenegadoException("No tienes permiso para consultar los datos de este empleado");
+    }
+
     public static class AccesoPersonalDenegadoException extends RuntimeException {
         public AccesoPersonalDenegadoException(String mensaje) { super(mensaje); }
     }

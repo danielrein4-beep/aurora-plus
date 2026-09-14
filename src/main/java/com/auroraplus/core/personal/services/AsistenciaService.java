@@ -65,10 +65,9 @@ public class AsistenciaService {
     /** Un EMPLEADO solo puede ver SU PROPIA asistencia — nunca la de otro (contrato §1.2). */
     public List<RegistroAsistencia> listarDeEmpleado(Long tenantId, Long empleadoId) {
         accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA);
-        Long empleadoPropio = accessService.empleadoIdPropioSiAplica(tenantId);
-        if (empleadoPropio != null && !empleadoPropio.equals(empleadoId)) {
-            throw new PersonalAccessService.AccesoPersonalDenegadoException("No puedes consultar la asistencia de otro empleado");
-        }
+        accessService.exigirVerDatosDeEmpleado(tenantId, empleadoId);
+        empleadoRepository.findByTenantIdAndId(tenantId, empleadoId)
+            .orElseThrow(() -> new RuntimeException("Empleado no encontrado (o no pertenece a este tenant)"));
         return registroAsistenciaRepository.findByTenantIdAndEmpleadoId(tenantId, empleadoId);
     }
 

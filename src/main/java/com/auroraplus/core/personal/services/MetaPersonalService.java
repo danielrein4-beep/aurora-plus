@@ -44,10 +44,9 @@ public class MetaPersonalService {
 
     public List<MetaPersonal> listarDeEmpleado(Long tenantId, Long empleadoId) {
         accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_METAS);
-        Long empleadoPropio = accessService.empleadoIdPropioSiAplica(tenantId);
-        if (empleadoPropio != null && !empleadoPropio.equals(empleadoId)) {
-            throw new PersonalAccessService.AccesoPersonalDenegadoException("No puedes consultar las metas de otro empleado");
-        }
+        accessService.exigirVerDatosDeEmpleado(tenantId, empleadoId);
+        empleadoRepository.findByTenantIdAndId(tenantId, empleadoId)
+            .orElseThrow(() -> new RuntimeException("Empleado no encontrado (o no pertenece a este tenant)"));
         return metaPersonalRepository.findByTenantIdAndEmpleadoId(tenantId, empleadoId);
     }
 
