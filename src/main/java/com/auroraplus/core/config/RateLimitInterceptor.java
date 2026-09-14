@@ -2,6 +2,9 @@ package com.auroraplus.core.config;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -42,8 +45,20 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private final ConcurrentHashMap<String, Contador> contadores = new ConcurrentHashMap<>();
     private final AtomicLong peticionesTotales = new AtomicLong(0);
 
+    @Autowired
+    private Environment environment;
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
+        // Perfil test: los @SpringBootTest de integración reutilizan el mismo
+        // contexto (y por tanto este mismo bean, con sus contadores) entre
+        // clases de test distintas, y varios de ellos registran más de 5
+        // clínicas/logins en la misma corrida — el límite pensado para
+        // frenar fuerza bruta real contra producción no aplica aquí. Fuera
+        // de este perfil el límite sigue activo tal cual.
+        if (environment.acceptsProfiles(Profiles.of("test"))) {
+            return true;
+        }
         limpiarOportunistamente();
 
         String clave = ipCliente(request) + ":" + request.getRequestURI();
