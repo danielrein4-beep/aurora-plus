@@ -265,10 +265,10 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
           aria-modal="true"
           aria-labelledby="modal-marcaje-titulo"
         >
-          <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
+          <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <h3 id="modal-marcaje-titulo" className="text-base font-bold text-[#f8fafc]">
-                Marcaje de Asistencia [DEMO]
+                Marcaje de asistencia
               </h3>
               <button
                 ref={btnCerrarModalRef}
