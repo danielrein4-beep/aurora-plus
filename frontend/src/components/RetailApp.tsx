@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+﻿import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   IconRetail, IconHardware, IconPrescription, IconBox, IconSearch, IconUsers, IconUser,
@@ -248,7 +248,7 @@ function PuntoDeVenta({ tenantId, vertical, monedaBaseTenant, clientes, onVenta 
               vertical === "farmacia" ? "Código de barras, nombre o principio activo…" :
               "Código de barras, nombre o SKU…"
             }
-            className="input-horeca w-full pl-10 text-sm py-3"
+            className="input-horeca has-icon w-full pl-10 text-sm py-3"
             autoFocus
           />
           <IconSearch size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />

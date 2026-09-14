@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, Fragment } from "react";
+﻿import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { createPortal } from "react-dom";
 import {
   AuroraGradientDef,
@@ -3000,8 +3000,8 @@ function Clientes({ tenantId }: { tenantId: number }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="relative w-full sm:w-80">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={14} /></span>
-          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o cédula/RIF…" className="input-horeca w-full pl-8" />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 pointer-events-none flex items-center justify-center"><IconSearch size={16} className="text-slate-400 dark:text-slate-400" /></span>
+          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o cédula/RIF…" className="input-horeca has-icon w-full pl-10" />
         </div>
         <button onClick={() => setMostrarForm((v) => !v)} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
           {mostrarForm ? "Cancelar" : "+ Nuevo cliente"}
@@ -3367,8 +3367,8 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
 
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="relative w-full sm:w-72">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={14} /></span>
-          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o SKU…" className="input-horeca w-full pl-8" />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 pointer-events-none flex items-center justify-center"><IconSearch size={16} className="text-slate-400 dark:text-slate-400" /></span>
+          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o SKU…" className="input-horeca has-icon w-full pl-10" />
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setMostrarImportar(true)} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5">
@@ -5061,7 +5061,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
         {/* PANEL IZQUIERDO — CATÁLOGO */}
         <div className={`${vistaMobile === "catalogo" ? "flex" : "hidden"} lg:flex lg:col-span-6 flex-1 min-w-0 min-h-0 flex-col p-4 gap-3 overflow-hidden`}>
           <div className="relative shrink-0">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={15} /></span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 pointer-events-none flex items-center justify-center"><IconSearch size={16} className="text-slate-400 dark:text-slate-400" /></span>
             <input
               ref={busquedaRef}
               value={busqueda}
@@ -5072,7 +5072,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 if (catalogoFiltrado.length >= 1) agregarDesdeTarjeta(catalogoFiltrado[0]);
               }}
               placeholder="Buscar o escanear código de barras… ej. Torta de Queso, Doritos, Mojito"
-              className="input-horeca w-full pl-9 pr-8"
+              className="input-horeca has-icon w-full pl-10 pr-8"
             />
             {busqueda && (
               <button type="button" onClick={() => setBusqueda("")}

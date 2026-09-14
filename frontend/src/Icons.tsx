@@ -322,10 +322,11 @@ export function IconUser({ size = 24 }: IconProps) {
   );
 }
 
-export function IconClose({ size = 24 }: IconProps) {
+export function IconClose({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M6 6l12 12M18 6L6 18" {...s} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M6 6l12 12M18 6L6 18" {...st} />
     </svg>
   );
 }
@@ -473,11 +474,12 @@ export function IconInstagram({ size = 24, className }: IconProps) {
   );
 }
 
-export function IconSearch({ size = 24 }: IconProps) {
+export function IconSearch({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <circle cx="11" cy="11" r="7" {...s} />
-      <path d="M20 20l-4.35-4.35" {...s} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="11" cy="11" r="7" {...st} />
+      <path d="M20 20l-4.35-4.35" {...st} />
     </svg>
   );
 }

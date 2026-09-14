@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import 'tailwindcss';
 @custom-variant dark (&:where(.dark, .dark *));
@@ -470,6 +470,20 @@ html.light .input-horeca {
   color: #0f172a;
 }
 html.light .input-horeca:hover { background: #ffffff; }
+
+/* Evitar colisiones de texto con iconos a la izquierda o derecha en inputs */
+.input-horeca.has-icon,
+.input-horeca-icon,
+.input-horeca.pl-8,
+.input-horeca.pl-9,
+.input-horeca.pl-10 {
+  padding-left: 2.6rem !important;
+}
+.input-horeca.pr-8,
+.input-horeca.pr-9,
+.input-horeca.pr-10 {
+  padding-right: 2.5rem !important;
+}
 
 /* Apple Liquid Glass Button */
 .apple-glass-btn {
