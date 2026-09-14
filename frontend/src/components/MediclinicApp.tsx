@@ -795,7 +795,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const recargarTodo = () => {
     cargarContadorLab();
     listarPacientes().then(setPacientes).catch(() => setPacientes([]));
-    listarCitasDelDia(tenantId, hoy()).then(setCitasHoy).catch(() => setCitasHoy([]));
+    listarCitasDelDia(hoy()).then(setCitasHoy).catch(() => setCitasHoy([]));
     listarSalaEspera().then(setSalaEspera).catch(() => setSalaEspera([]));
     listarProcedimientos(tenantId).then(setProcedimientos).catch(() => setProcedimientos([]));
     listarCobrosDelDia(`${hoy()}T00:00:00`, `${hoy()}T23:59:59`)
@@ -6466,7 +6466,7 @@ function AgendaMedica({
   // una por una, agrupándolas todas en un solo lugar apenas abre la Agenda.
   const [citasMañana, setCitasMañana] = useState<CitaAgendaItem[]>([]);
   const cargarCitasDeMañana = () => {
-    listarCitasDelDia(tenantId, mañana())
+    listarCitasDelDia(mañana())
       .then((lista) => setCitasMañana(lista.filter((c) => c.estado !== "CANCELADA" && c.estado !== "NO_ASISTIO").map(mapCitaMedicaAAgendaItem)))
       .catch(() => setCitasMañana([]));
   };
@@ -6481,7 +6481,7 @@ function AgendaMedica({
     const inicio = `${añoActual}-${String(mesActual + 1).padStart(2, "0")}-01`;
     const fin = `${añoActual}-${String(mesActual + 1).padStart(2, "0")}-${String(diasEnMes).padStart(2, "0")}`;
     setCargandoCitas(true);
-    listarCitasPorRango(tenantId, inicio, fin)
+    listarCitasPorRango(inicio, fin)
       .then((lista) => setCitas(lista.map(mapCitaMedicaAAgendaItem)))
       .catch(() => dispararToast("⚠️ No se pudieron cargar las citas del mes — revisa tu conexión."))
       .finally(() => setCargandoCitas(false));
@@ -6713,7 +6713,7 @@ function AgendaMedica({
     try {
       const pacienteId = await resolverPacienteId();
       const horaInicio24 = horaAmPmA24(formHora);
-      await agendarCita(tenantId, {
+      await agendarCita({
         pacienteId,
         fecha: fechaSeleccionada,
         horaInicio: horaInicio24,

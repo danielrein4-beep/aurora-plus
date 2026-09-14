@@ -561,7 +561,7 @@ export default function Dashboard() {
       // 6. Mediclinic Vet: pacientes, citas, cobros y sala de atención
       Promise.allSettled([
         listarPacientes(),
-        listarCitasDelDia(tid, hoy),
+        listarCitasDelDia(hoy),
         listarCobrosDelDia(`${hoy}T00:00:00`, `${hoy}T23:59:59`),
         listarSalaEspera(),
       ]).then(([resPac, resCit, resCob, resSal]) => {
@@ -608,7 +608,7 @@ export default function Dashboard() {
       // 7. Clínica & Salud (default): pacientes, citas, cobros y sala de espera
       Promise.allSettled([
         listarPacientes(),
-        listarCitasDelDia(tid, hoy),
+        listarCitasDelDia(hoy),
         listarCobrosDelDia(`${hoy}T00:00:00`, `${hoy}T23:59:59`),
         listarSalaEspera(),
       ]).then(([resPac, resCit, resCob, resSal]) => {

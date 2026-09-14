@@ -297,13 +297,13 @@ export interface CitaMedica {
   estado: string;
 }
 
-export async function listarCitasDelDia(tenantId: number, fecha: string): Promise<CitaMedica[]> {
-  return request<CitaMedica[]>(`/api/salud/agenda?tenantId=${tenantId}&fecha=${fecha}`);
+export async function listarCitasDelDia(fecha: string): Promise<CitaMedica[]> {
+  return request<CitaMedica[]>(`/api/salud/agenda?fecha=${fecha}`);
 }
 
 /** Citas de un rango de fechas (ej. el mes visible en el calendario) — una sola llamada en vez de una por día. */
-export async function listarCitasPorRango(tenantId: number, fechaInicio: string, fechaFin: string): Promise<CitaMedica[]> {
-  return request<CitaMedica[]>(`/api/salud/agenda?tenantId=${tenantId}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
+export async function listarCitasPorRango(fechaInicio: string, fechaFin: string): Promise<CitaMedica[]> {
+  return request<CitaMedica[]>(`/api/salud/agenda?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
 }
 
 export interface NuevaCita {
@@ -316,8 +316,8 @@ export interface NuevaCita {
   estado?: string;
 }
 
-export async function agendarCita(tenantId: number, datos: NuevaCita): Promise<CitaMedica> {
-  return request<CitaMedica>(`/api/salud/agenda/citas?tenantId=${tenantId}`, {
+export async function agendarCita(datos: NuevaCita): Promise<CitaMedica> {
+  return request<CitaMedica>(`/api/salud/agenda/citas`, {
     method: "POST",
     body: JSON.stringify({
       paciente: { id: datos.pacienteId },
@@ -355,8 +355,8 @@ export interface BloqueoAgenda {
 }
 
 /** Bloquea un día (o rango) completo de la agenda de un médico — ej. día no laborable, feriado, congreso. */
-export function registrarBloqueoAgenda(tenantId: number, datos: { fechaInicio: string; fechaFin: string; motivo: string }): Promise<BloqueoAgenda> {
-  return request<BloqueoAgenda>(`/api/salud/agenda/bloqueos?tenantId=${tenantId}`, {
+export function registrarBloqueoAgenda(datos: { fechaInicio: string; fechaFin: string; motivo: string }): Promise<BloqueoAgenda> {
+  return request<BloqueoAgenda>(`/api/salud/agenda/bloqueos`, {
     method: "POST",
     body: JSON.stringify(datos),
   });

@@ -2,9 +2,12 @@ package com.auroraplus.modules.salud;
 
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.ConsultaMedica;
+import com.auroraplus.modules.salud.entities.CitaMedica;
+import com.auroraplus.modules.salud.entities.BloqueoAgenda;
 import com.auroraplus.modules.salud.entities.Paciente;
 import com.auroraplus.modules.salud.entities.SalaEspera;
 import com.auroraplus.modules.salud.services.ConsultaMedicaService;
+import com.auroraplus.modules.salud.services.AgendaMedicaService;
 import com.auroraplus.modules.salud.services.PacienteService;
 import com.auroraplus.modules.salud.services.SalaEsperaService;
 import org.junit.jupiter.api.AfterEach;
@@ -14,6 +17,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.*;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 /**
  * Hardening de aislamiento por tenant (piloto P0, docs/auditoría tenantId) — PacienteController,
@@ -32,6 +37,7 @@ class SaludTenantIsolationP0Test {
     @Autowired private PacienteService pacienteService;
     @Autowired private ConsultaMedicaService consultaMedicaService;
     @Autowired private SalaEsperaService salaEsperaService;
+    @Autowired private AgendaMedicaService agendaMedicaService;
 
     @AfterEach
     void limpiarContexto() {
@@ -209,5 +215,56 @@ class SaludTenantIsolationP0Test {
         ref.setId(paciente.getId());
         entrada.setPaciente(ref);
         return entrada;
+    }
+
+    // ── Agenda Médica ──────────────────────────────────────────────────────────────────────
+
+    @Test
+    void tenantBNoPuedeVerAgendaNiHistorialDeCitasDeA() {
+        long tenantA = 97025L, tenantB = 97026L;
+        Paciente pA = pacienteService.crear(tenantA, nuevoPaciente("V-13001", "Paciente Agenda A"));
+        CitaMedica citaA = agendaMedicaService.agendarCita(tenantA, nuevaCita(pA, 601L));
+
+        assertTrue(agendaMedicaService.listarPorFecha(tenantA, citaA.getFecha()).stream().anyMatch(c -> c.getId().equals(citaA.getId())));
+        assertTrue(agendaMedicaService.listarPorFecha(tenantB, citaA.getFecha()).isEmpty());
+        assertTrue(agendaMedicaService.listarPorMedicoYFecha(tenantB, 601L, citaA.getFecha()).isEmpty());
+        assertTrue(agendaMedicaService.historialPorPaciente(tenantB, pA.getId()).isEmpty());
+    }
+
+    @Test
+    void tenantBNoPuedeAgendarCitaConPacienteDeA() {
+        long tenantA = 97027L, tenantB = 97028L;
+        Paciente pA = pacienteService.crear(tenantA, nuevoPaciente("V-14001", "Paciente Agenda A"));
+
+        assertThrows(RuntimeException.class, () -> agendaMedicaService.agendarCita(tenantB, nuevaCita(pA, 602L)));
+    }
+
+    @Test
+    void tenantBNoPuedeModificarCitaNiBloqueoDeA() {
+        long tenantA = 97029L, tenantB = 97030L;
+        Paciente pA = pacienteService.crear(tenantA, nuevoPaciente("V-15001", "Paciente Agenda A"));
+        CitaMedica citaA = agendaMedicaService.agendarCita(tenantA, nuevaCita(pA, 603L));
+        BloqueoAgenda bloqueo = new BloqueoAgenda();
+        bloqueo.setMedicoId(603L);
+        bloqueo.setFechaInicio(LocalDate.of(2026, 10, 1));
+        bloqueo.setFechaFin(LocalDate.of(2026, 10, 1));
+        bloqueo.setMotivo("Reunión");
+        bloqueo = agendaMedicaService.registrarBloqueo(tenantA, bloqueo);
+
+        assertThrows(RuntimeException.class, () -> agendaMedicaService.actualizarEstado(tenantB, citaA.getId(), CitaMedica.EstadoCita.CANCELADA));
+        assertThrows(RuntimeException.class, () -> agendaMedicaService.reprogramarCita(tenantB, citaA.getId(), LocalDate.of(2026, 10, 2), LocalTime.of(10, 0), LocalTime.of(10, 30)));
+        assertThrows(RuntimeException.class, () -> agendaMedicaService.eliminarBloqueo(tenantB, bloqueo.getId()));
+    }
+
+    private CitaMedica nuevaCita(Paciente paciente, Long medicoId) {
+        CitaMedica cita = new CitaMedica();
+        Paciente ref = new Paciente();
+        ref.setId(paciente.getId());
+        cita.setPaciente(ref);
+        cita.setMedicoId(medicoId);
+        cita.setFecha(LocalDate.of(2026, 10, 1));
+        cita.setHoraInicio(LocalTime.of(9, 0));
+        cita.setHoraFin(LocalTime.of(9, 30));
+        return cita;
     }
 }

@@ -51,54 +51,54 @@ public class AgendaMedicaController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
 
         if (fechaInicio != null && fechaFin != null) {
-            return agendaMedicaService.listarPorRango(fechaInicio, fechaFin);
+            return agendaMedicaService.listarPorRango(TenantContext.getCurrentTenant(), fechaInicio, fechaFin);
         }
         LocalDate f = (fecha != null) ? fecha : LocalDate.now();
         if (medicoId != null) {
-            return agendaMedicaService.listarPorMedicoYFecha(medicoId, f);
+            return agendaMedicaService.listarPorMedicoYFecha(TenantContext.getCurrentTenant(), medicoId, f);
         }
-        return agendaMedicaService.listarPorFecha(f);
+        return agendaMedicaService.listarPorFecha(TenantContext.getCurrentTenant(), f);
     }
 
     @GetMapping("/paciente/{pacienteId}")
     public List<CitaMedica> historialPorPaciente(@PathVariable Long pacienteId) {
-        return agendaMedicaService.historialPorPaciente(pacienteId);
+        return agendaMedicaService.historialPorPaciente(TenantContext.getCurrentTenant(), pacienteId);
     }
 
     @PostMapping("/citas")
-    public ResponseEntity<CitaMedica> agendarCita(@RequestParam(required = false) Long tenantId, @RequestBody CitaMedica cita) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<CitaMedica> agendarCita(@RequestBody CitaMedica cita) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         autocompletarMedico(tenantActivo, cita);
         return ResponseEntity.ok(agendaMedicaService.agendarCita(tenantActivo, cita));
     }
 
     @PatchMapping("/citas/{id}/estado")
     public ResponseEntity<CitaMedica> actualizarEstado(@PathVariable Long id, @RequestParam CitaMedica.EstadoCita estado) {
-        return ResponseEntity.ok(agendaMedicaService.actualizarEstado(id, estado));
+        return ResponseEntity.ok(agendaMedicaService.actualizarEstado(TenantContext.getCurrentTenant(), id, estado));
     }
 
     public record ReprogramarCitaRequest(java.time.LocalDate fecha, java.time.LocalTime horaInicio, java.time.LocalTime horaFin) {}
 
     @PatchMapping("/citas/{id}/reprogramar")
     public ResponseEntity<CitaMedica> reprogramarCita(@PathVariable Long id, @RequestBody ReprogramarCitaRequest datos) {
-        return ResponseEntity.ok(agendaMedicaService.reprogramarCita(id, datos.fecha(), datos.horaInicio(), datos.horaFin()));
+        return ResponseEntity.ok(agendaMedicaService.reprogramarCita(TenantContext.getCurrentTenant(), id, datos.fecha(), datos.horaInicio(), datos.horaFin()));
     }
 
     @PostMapping("/bloqueos")
-    public ResponseEntity<BloqueoAgenda> registrarBloqueo(@RequestParam(required = false) Long tenantId, @RequestBody BloqueoAgenda bloqueo) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<BloqueoAgenda> registrarBloqueo(@RequestBody BloqueoAgenda bloqueo) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         autocompletarMedico(tenantActivo, bloqueo);
         return ResponseEntity.ok(agendaMedicaService.registrarBloqueo(tenantActivo, bloqueo));
     }
 
     @GetMapping("/bloqueos/medico/{medicoId}")
     public List<BloqueoAgenda> listarBloqueosPorMedico(@PathVariable Long medicoId) {
-        return agendaMedicaService.listarBloqueosPorMedico(medicoId);
+        return agendaMedicaService.listarBloqueosPorMedico(TenantContext.getCurrentTenant(), medicoId);
     }
 
     @DeleteMapping("/bloqueos/{id}")
     public ResponseEntity<Void> eliminarBloqueo(@PathVariable Long id) {
-        agendaMedicaService.eliminarBloqueo(id);
+        agendaMedicaService.eliminarBloqueo(TenantContext.getCurrentTenant(), id);
         return ResponseEntity.noContent().build();
     }
 }
