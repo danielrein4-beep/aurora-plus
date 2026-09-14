@@ -234,8 +234,8 @@ export interface Paciente {
   contactoEmergenciaTelefono?: string | null;
 }
 
-export async function listarPacientes(tenantId: number): Promise<Paciente[]> {
-  return request<Paciente[]>(`/api/salud/pacientes?tenantId=${tenantId}`);
+export async function listarPacientes(): Promise<Paciente[]> {
+  return request<Paciente[]>(`/api/salud/pacientes`);
 }
 
 export interface NuevoPaciente {
@@ -259,23 +259,23 @@ export interface NuevoPaciente {
   contactoEmergenciaTelefono?: string;
 }
 
-export async function crearPaciente(tenantId: number, datos: NuevoPaciente): Promise<Paciente> {
-  return request<Paciente>(`/api/salud/pacientes?tenantId=${tenantId}`, {
+export async function crearPaciente(datos: NuevoPaciente): Promise<Paciente> {
+  return request<Paciente>(`/api/salud/pacientes`, {
     method: "POST",
     body: JSON.stringify(datos),
   });
 }
 
-export async function actualizarPaciente(tenantId: number, id: number, datos: NuevoPaciente): Promise<Paciente> {
-  return request<Paciente>(`/api/salud/pacientes/${id}?tenantId=${tenantId}`, {
+export async function actualizarPaciente(id: number, datos: NuevoPaciente): Promise<Paciente> {
+  return request<Paciente>(`/api/salud/pacientes/${id}`, {
     method: "PUT",
     body: JSON.stringify(datos),
   });
 }
 
-export async function buscarPacientePorIdentificacion(tenantId: number, identificacion: string): Promise<Paciente | null> {
+export async function buscarPacientePorIdentificacion(identificacion: string): Promise<Paciente | null> {
   try {
-    return await request<Paciente>(`/api/salud/pacientes/identificacion/${encodeURIComponent(identificacion)}?tenantId=${tenantId}`);
+    return await request<Paciente>(`/api/salud/pacientes/identificacion/${encodeURIComponent(identificacion)}`);
   } catch (err) {
     if (err instanceof ApiError && /404/.test(err.message)) return null;
     throw err;
@@ -460,23 +460,22 @@ export interface SalaEsperaEntrada {
   horaLlegada: string;
 }
 
-export async function listarSalaEspera(tenantId: number = 1): Promise<SalaEsperaEntrada[]> {
-  return request<SalaEsperaEntrada[]>(`/api/salud/sala-espera?tenantId=${tenantId}`);
+export async function listarSalaEspera(): Promise<SalaEsperaEntrada[]> {
+  return request<SalaEsperaEntrada[]>(`/api/salud/sala-espera`);
 }
 
 export async function registrarLlegadaSalaEspera(
-  tenantId: number,
   pacienteId: number,
   consultorio?: string
 ): Promise<SalaEsperaEntrada> {
-  return request<SalaEsperaEntrada>(`/api/salud/sala-espera/check-in?tenantId=${tenantId}`, {
+  return request<SalaEsperaEntrada>(`/api/salud/sala-espera/check-in`, {
     method: "POST",
     body: JSON.stringify({ paciente: { id: pacienteId }, consultorio }),
   });
 }
 
-export async function finalizarAtencionSalaEspera(id: number, tenantId: number = 1): Promise<SalaEsperaEntrada> {
-  return request(`/api/salud/sala-espera/${id}/finalizar?tenantId=${tenantId}`, { method: "POST" });
+export async function finalizarAtencionSalaEspera(id: number): Promise<SalaEsperaEntrada> {
+  return request(`/api/salud/sala-espera/${id}/finalizar`, { method: "POST" });
 }
 
 export interface ProcedimientoMedico {
@@ -573,22 +572,20 @@ export async function historialConsultasPaciente(pacienteId: number): Promise<Co
 }
 
 export async function registrarConsulta(
-  tenantId: number,
   pacienteId: number,
   datos: Partial<ConsultaMedica>
 ): Promise<ConsultaMedica> {
-  return request<ConsultaMedica>(`/api/salud/consultas?tenantId=${tenantId}`, {
+  return request<ConsultaMedica>(`/api/salud/consultas`, {
     method: "POST",
     body: JSON.stringify({ paciente: { id: pacienteId }, ...datos }),
   });
 }
 
 export async function eliminarConsulta(
-  tenantId: number,
   _pacienteId: number,
   consultaId: number
 ): Promise<void> {
-  await request(`/api/salud/consultas/${consultaId}?tenantId=${tenantId}`, {
+  await request(`/api/salud/consultas/${consultaId}`, {
     method: "DELETE",
   });
 }

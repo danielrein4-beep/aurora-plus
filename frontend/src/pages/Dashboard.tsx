@@ -560,7 +560,7 @@ export default function Dashboard() {
     } else if (userIndustry === "veterinaria") {
       // 6. Mediclinic Vet: pacientes, citas, cobros y sala de atención
       Promise.allSettled([
-        listarPacientes(tid),
+        listarPacientes(),
         listarCitasDelDia(tid, hoy),
         listarCobrosDelDia(`${hoy}T00:00:00`, `${hoy}T23:59:59`),
         listarSalaEspera(),
@@ -607,7 +607,7 @@ export default function Dashboard() {
     } else {
       // 7. Clínica & Salud (default): pacientes, citas, cobros y sala de espera
       Promise.allSettled([
-        listarPacientes(tid),
+        listarPacientes(),
         listarCitasDelDia(tid, hoy),
         listarCobrosDelDia(`${hoy}T00:00:00`, `${hoy}T23:59:59`),
         listarSalaEspera(),

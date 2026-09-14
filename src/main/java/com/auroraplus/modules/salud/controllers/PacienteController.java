@@ -11,6 +11,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Hardening de aislamiento por tenant (piloto P0, docs auditoría tenantId): antes cada endpoint
+ * aceptaba un tenantId opcional por query que GANABA sobre TenantContext si el cliente lo
+ * mandaba — un usuario autenticado del tenant B podía leer/crear/editar/desactivar pacientes de
+ * CUALQUIER tenant con solo mandar el tenantId ajeno en la URL. Ahora el tenant sale
+ * EXCLUSIVAMENTE de TenantContext (JWT verificado), sin excepción ni fallback silencioso.
+ */
 @RestController
 @RequestMapping("/api/salud/pacientes")
 public class PacienteController {
@@ -21,60 +28,51 @@ public class PacienteController {
     @Autowired
     private EntityManager entityManager;
 
-    // El filtro de Hibernate habilitado en TenantInterceptor no persiste hasta
-    // la sesión que ejecuta la query real (hallazgo de seguridad — un tenant
-    // podía ver pacientes de TODOS los demás tenants). Se re-habilita aquí
-    // explícitamente antes de cualquier lectura.
+    // El filtro de Hibernate habilitado en TenantInterceptor no persiste hasta la sesión que
+    // ejecuta la query real — se re-habilita aquí explícitamente antes de cualquier lectura,
+    // como defensa adicional (aunque los métodos de PacienteService ya filtran explícitamente
+    // por tenantId en cada query, sin depender de este filtro).
     private void asegurarFiltroTenant() {
         entityManager.unwrap(Session.class).enableFilter("tenantFilter")
             .setParameter("tenantId", TenantContext.getCurrentTenant());
     }
 
     @GetMapping
-    public List<Paciente> listar(@RequestParam(required = false) Long tenantId, @RequestParam(required = false) String buscar) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public List<Paciente> listar(@RequestParam(required = false) String buscar) {
         asegurarFiltroTenant();
-        return pacienteService.buscar(tenantActivo, buscar);
+        return pacienteService.buscar(TenantContext.getCurrentTenant(), buscar);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Paciente> obtener(@PathVariable Long id, @RequestParam(required = false) Long tenantId) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<Paciente> obtener(@PathVariable Long id) {
         asegurarFiltroTenant();
-        return pacienteService.obtenerPorId(tenantActivo, id)
+        return pacienteService.obtenerPorId(TenantContext.getCurrentTenant(), id)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/identificacion/{identificacion}")
-    public ResponseEntity<Paciente> buscarPorIdentificacion(@PathVariable String identificacion, @RequestParam(required = false) Long tenantId) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<Paciente> buscarPorIdentificacion(@PathVariable String identificacion) {
         asegurarFiltroTenant();
-        return pacienteService.obtenerPorIdentificacion(tenantActivo, identificacion)
+        return pacienteService.obtenerPorIdentificacion(TenantContext.getCurrentTenant(), identificacion)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<Paciente> registrar(@RequestParam(required = false) Long tenantId, @RequestBody Paciente paciente) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
-        if (tenantActivo == null) {
-            throw new RuntimeException("Tenant no identificado en la sesión");
-        }
-        return ResponseEntity.ok(pacienteService.registrarOActualizar(tenantActivo, paciente));
+    public ResponseEntity<Paciente> registrar(@RequestBody Paciente paciente) {
+        return ResponseEntity.ok(pacienteService.crear(TenantContext.getCurrentTenant(), paciente));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Paciente> actualizar(@PathVariable Long id, @RequestParam(required = false) Long tenantId, @RequestBody Paciente datos) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
-        datos.setId(id);
-        return ResponseEntity.ok(pacienteService.registrarOActualizar(tenantActivo, datos));
+    public ResponseEntity<Paciente> actualizar(@PathVariable Long id, @RequestBody Paciente datos) {
+        return ResponseEntity.ok(pacienteService.actualizar(TenantContext.getCurrentTenant(), id, datos));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> desactivar(@PathVariable Long id) {
         asegurarFiltroTenant();
-        pacienteService.desactivar(id);
+        pacienteService.desactivar(TenantContext.getCurrentTenant(), id);
         return ResponseEntity.noContent().build();
     }
 }

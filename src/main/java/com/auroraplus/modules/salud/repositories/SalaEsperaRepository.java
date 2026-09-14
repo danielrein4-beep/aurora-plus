@@ -10,9 +10,10 @@ import java.util.Optional;
 @Repository
 public interface SalaEsperaRepository extends JpaRepository<SalaEspera, Long> {
 
-    List<SalaEspera> findByEstado(SalaEspera.EstadoEspera estado);
-
-    List<SalaEspera> findByEstadoInOrderByHoraLlegadaAsc(List<SalaEspera.EstadoEspera> estados);
+    // Hardening piloto P0: findByEstadoInOrderByHoraLlegadaAsc sin tenant se eliminó —
+    // exponía en tiempo real la cola de espera (nombres de pacientes) de TODAS las
+    // clínicas mezcladas. findByEstado(estado) único sin caller real también se quitó.
+    List<SalaEspera> findByTenantIdAndEstadoInOrderByHoraLlegadaAsc(Long tenantId, List<SalaEspera.EstadoEspera> estados);
 
     Optional<SalaEspera> findByCitaId(Long citaId);
 }
