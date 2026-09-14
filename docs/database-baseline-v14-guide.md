@@ -1,6 +1,6 @@
 # Guía de Bootstrap de Base de Datos Reproducible (Baseline v14)
 
-Este documento describe el procedimiento oficial para inicializar una base de datos PostgreSQL vacía para **Aurora Plus** (desarrollo, staging o producción en Hetzner) sin depender de `ddl-auto=create` en caliente y manteniendo la compatibilidad absoluta con Flyway.
+Este documento describe el procedimiento oficial y seguro para inicializar una base de datos PostgreSQL vacía para **Aurora Plus** (desarrollo, staging o producción en Hetzner) sin depender de `ddl-auto=create` en caliente y manteniendo la compatibilidad absoluta con Flyway.
 
 ---
 
@@ -12,54 +12,45 @@ Este documento describe el procedimiento oficial para inicializar una base de da
 
 ---
 
-## 2. Procedimiento de Inicialización
+## 2. Seguridad Operativa Incorporada
+
+1. **Cero contraseñas por defecto**: No se asumen claves en texto plano. Los scripts exigen que la variable `PGPASSWORD` esté definida o se pase de forma explícita.
+2. **Sin base de datos por defecto**: El parámetro de base de datos es estrictamente obligatorio para evitar apuntar accidentalmente a bases existentes o de producción (`auroraplus_db`, etc.).
+3. **Protección contra sobreescritura**: Si la base de datos indicada ya existe, el script **aborta inmediatamente**, salvo que se invoque con el flag de verificación no destructiva (`-VerifyOnly` / `--verify-only`).
+4. **Fallo inmediato ante errores SQL**: Todas las llamadas a `psql` utilizan `-v ON_ERROR_STOP=1`. Si una sentencia DDL falla, la ejecución se detiene en el acto.
+
+---
+
+## 3. Procedimiento de Inicialización
 
 ### En Windows (PowerShell)
 ```powershell
-# Ejecutar desde la raíz del proyecto
+# 1. Definir contraseña de forma segura
+$env:PGPASSWORD = "tu_password_seguro"
+
+# 2. Ejecutar inicialización de base limpia
 .\scripts\init-baseline-v14.ps1 -DbName "aurora_produccion" -DbUser "postgres" -DbHost "localhost" -DbPort 5432
+
+# (Opcional) Verificación no destructiva sobre una base ya inicializada:
+.\scripts\init-baseline-v14.ps1 -DbName "aurora_produccion" -VerifyOnly
 ```
 
 ### En Linux / Hetzner (Bash)
 ```bash
+# 1. Definir contraseña de forma segura
+export PGPASSWORD="tu_password_seguro"
+
+# 2. Ejecutar inicialización de base limpia
 chmod +x scripts/init-baseline-v14.sh
 ./scripts/init-baseline-v14.sh "aurora_produccion" "postgres" "localhost" 5432
+
+# (Opcional) Verificación no destructiva sobre una base ya inicializada:
+./scripts/init-baseline-v14.sh "aurora_produccion" "postgres" "localhost" 5432 --verify-only
 ```
-
-### Paso a paso manual (si se prefiere psql puro)
-1. Crear la base vacía con codificación UTF-8:
-   ```sql
-   CREATE DATABASE aurora_produccion ENCODING 'UTF8';
-   ```
-2. Cargar el esquema canónico:
-   ```bash
-   psql -U postgres -d aurora_produccion -f docs/schema-baseline-v14.sql
-   ```
-3. Registrar la versión baseline 14 en Flyway:
-   ```sql
-   CREATE TABLE IF NOT EXISTS public.flyway_schema_history (
-       installed_rank integer NOT NULL,
-       version character varying(50),
-       description character varying(200) NOT NULL,
-       type character varying(20) NOT NULL,
-       script character varying(1000) NOT NULL,
-       checksum integer,
-       installed_by character varying(100) NOT NULL,
-       installed_on timestamp without time zone DEFAULT now() NOT NULL,
-       execution_time integer NOT NULL,
-       success boolean NOT NULL,
-       CONSTRAINT flyway_schema_history_pk PRIMARY KEY (installed_rank)
-   );
-   CREATE INDEX IF NOT EXISTS flyway_schema_history_s_idx ON public.flyway_schema_history (success);
-
-   INSERT INTO public.flyway_schema_history (
-       installed_rank, version, description, type, script, checksum, installed_by, installed_on, execution_time, success
-   ) VALUES (1, '14', 'Baseline v14 esquema canonico', 'BASELINE', '<< Flyway Baseline >>', NULL, 'postgres', now(), 0, true);
-   ```
 
 ---
 
-## 3. Configuración del Backend para Arranque
+## 4. Configuración del Backend para Arranque
 
 Una vez inicializada la base con el baseline v14, el backend Spring Boot arranca con las configuraciones estándar de producción:
 
@@ -77,7 +68,7 @@ spring.flyway.enabled=true
 
 ---
 
-## 4. Evolución Futura de Esquema (V15 en adelante)
+## 5. Evolución Futura de Esquema (V15 en adelante)
 
 * A partir de este baseline, cualquier nueva alteración de base de datos se agregará en:
   `src/main/resources/db/migration/V15__descripcion_del_cambio.sql`
