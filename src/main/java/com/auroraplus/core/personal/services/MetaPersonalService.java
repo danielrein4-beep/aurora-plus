@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -62,6 +63,23 @@ public class MetaPersonalService {
             .orElseThrow(() -> new RuntimeException("Meta no encontrada"));
         accessService.exigirVerDatosDeEmpleado(tenantId, meta.getEmpleadoId());
         return seguimientoMetaRepository.findByTenantIdAndMetaIdOrderByFechaAscIdAsc(tenantId, metaId);
+    }
+
+    /**
+     * El progreso VIGENTE de una meta es el último seguimiento cronológico (por fecha, y por id
+     * como desempate si dos seguimientos comparten fecha) — NUNCA la suma de todos los
+     * seguimientos. Cada SeguimientoMeta ya representa el valor acumulado alcanzado a esa fecha
+     * (ej. "300kg producidos este mes"), no un incremento puntual; sumarlos multiplicaría el
+     * avance real cada vez que alguien reporta el mismo acumulado de nuevo.
+     */
+    public BigDecimal obtenerProgresoVigente(Long tenantId, Long metaId) {
+        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_METAS);
+        MetaPersonal meta = metaPersonalRepository.findByTenantIdAndId(tenantId, metaId)
+            .orElseThrow(() -> new RuntimeException("Meta no encontrada"));
+        accessService.exigirVerDatosDeEmpleado(tenantId, meta.getEmpleadoId());
+        List<SeguimientoMeta> seguimientos = seguimientoMetaRepository.findByTenantIdAndMetaIdOrderByFechaAscIdAsc(tenantId, metaId);
+        if (seguimientos.isEmpty()) return BigDecimal.ZERO;
+        return seguimientos.get(seguimientos.size() - 1).getValorAlcanzado();
     }
 
     @Transactional

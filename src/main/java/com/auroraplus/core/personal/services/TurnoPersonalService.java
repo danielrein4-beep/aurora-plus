@@ -39,12 +39,15 @@ public class TurnoPersonalService {
         return turnoPersonalRepository.save(turno);
     }
 
+    /**
+     * Hallazgo del hardening pre-piloto: usaba empleadoIdPropioSiAplica, que devuelve null tanto
+     * para el dueño (sin restricción, correcto) como para un usuario SIN NINGÚN PermisoPersonal
+     * asignado (incorrecto — eso lo dejaba pasar sin restricción, exactamente lo que el contrato
+     * prohíbe). exigirVerDatosDeEmpleado exige que exista un permiso real antes de decidir nada.
+     */
     public List<TurnoPersonal> listarDeEmpleado(Long tenantId, Long empleadoId) {
         accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA);
-        Long empleadoPropio = accessService.empleadoIdPropioSiAplica(tenantId);
-        if (empleadoPropio != null && !empleadoPropio.equals(empleadoId)) {
-            throw new PersonalAccessService.AccesoPersonalDenegadoException("No puedes consultar los turnos de otro empleado");
-        }
+        accessService.exigirVerDatosDeEmpleado(tenantId, empleadoId);
         return turnoPersonalRepository.findByTenantIdAndEmpleadoId(tenantId, empleadoId);
     }
 
