@@ -151,16 +151,17 @@ function EstiloClasico() {
       .horeca-clasico .dark\\:text-white\\/30 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
       .horeca-clasico .dark\\:text-white { color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; }
       .horeca-clasico .btn-cyber-neon {
-        background: linear-gradient(135deg, #0ea5e9, #0d9488 65%, #8b5cf6) !important;
-        box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
-        color: #fff !important;
+        background: #35d7c3 !important;
+        border: 1px solid rgba(53, 215, 195, .72) !important;
+        box-shadow: 0 2px 7px rgba(2, 35, 42, .18) !important;
+        color: #062323 !important;
       }
       .horeca-clasico .text-teal-600, .horeca-clasico .text-teal-500,
       .horeca-clasico .text-teal-300, .horeca-clasico .text-teal-400 { color: #0d9488 !important; -webkit-text-fill-color: #0d9488 !important; }
       .horeca-clasico .text-aurora {
-        background: linear-gradient(90deg, #0ea5e9, #0d9488 70%, #8b5cf6) !important;
-        -webkit-background-clip: text !important; background-clip: text !important;
-        color: transparent !important; -webkit-text-fill-color: transparent !important;
+        background: none !important;
+        color: #0d9488 !important;
+        -webkit-text-fill-color: currentColor !important;
       }
       .horeca-clasico .bg-teal-500\\/15 { background-color: rgba(14,165,233,0.12) !important; }
       .horeca-clasico .border-teal-500\\/30, .horeca-clasico .border-teal-400\\/60 { border-color: rgba(13,148,136,0.4) !important; }
