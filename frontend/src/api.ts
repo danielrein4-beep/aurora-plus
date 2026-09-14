@@ -671,11 +671,11 @@ export function mapaDeMesas(): Promise<MapaMesaEntrada[]> {
   return request(`/api/horeca/mesas-fisicas/mapa`);
 }
 
-export function abrirComanda(tenantId: number, datos: {
+export function abrirComanda(datos: {
   numeroMesa?: number; mesero: string; canal?: string; nombreCliente?: string;
   telefonoCliente?: string; direccionEntrega?: string; mensajero?: string; clienteId?: number;
 }): Promise<Comanda> {
-  const params = new URLSearchParams({ tenantId: String(tenantId), mesero: datos.mesero });
+  const params = new URLSearchParams({ mesero: datos.mesero });
   if (datos.numeroMesa != null) params.set("numeroMesa", String(datos.numeroMesa));
   if (datos.canal) params.set("canal", datos.canal);
   if (datos.nombreCliente) params.set("nombreCliente", datos.nombreCliente);
@@ -686,10 +686,10 @@ export function abrirComanda(tenantId: number, datos: {
   return request(`/api/horeca/mesas/comandas/abrir?${params}`, { method: "POST" });
 }
 
-export function agregarItemComanda(tenantId: number, comandaId: number, datos: {
+export function agregarItemComanda(comandaId: number, datos: {
   escandalloId?: number; articuloId?: number; fastBarTragoId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number; notas?: string;
 }): Promise<ItemComanda> {
-  const params = new URLSearchParams({ tenantId: String(tenantId), cantidad: String(datos.cantidad) });
+  const params = new URLSearchParams({ cantidad: String(datos.cantidad) });
   if (datos.escandalloId != null) params.set("escandalloId", String(datos.escandalloId));
   if (datos.articuloId != null) params.set("articuloId", String(datos.articuloId));
   if (datos.fastBarTragoId != null) params.set("fastBarTragoId", String(datos.fastBarTragoId));
@@ -700,12 +700,12 @@ export function agregarItemComanda(tenantId: number, comandaId: number, datos: {
   return request(`/api/horeca/mesas/comandas/${comandaId}/items?${params}`, { method: "POST" });
 }
 
-export function actualizarEstadoItem(tenantId: number, itemId: number, nuevoEstado: EstadoItemComanda): Promise<ItemComanda> {
-  return request(`/api/horeca/mesas/items/${itemId}/estado?tenantId=${tenantId}&nuevoEstado=${nuevoEstado}`, { method: "PATCH" });
+export function actualizarEstadoItem(itemId: number, nuevoEstado: EstadoItemComanda): Promise<ItemComanda> {
+  return request(`/api/horeca/mesas/items/${itemId}/estado?nuevoEstado=${nuevoEstado}`, { method: "PATCH" });
 }
 
-export function obtenerTableroKds(tenantId: number, estacionCocina: string): Promise<ItemComanda[]> {
-  return request(`/api/horeca/mesas/kds/${encodeURIComponent(estacionCocina)}?tenantId=${tenantId}`);
+export function obtenerTableroKds(estacionCocina: string): Promise<ItemComanda[]> {
+  return request(`/api/horeca/mesas/kds/${encodeURIComponent(estacionCocina)}`);
 }
 
 export interface ResumenUtilidadProducto {
@@ -747,14 +747,14 @@ export function reporteTickets(filtros: {
   return request(`/api/horeca/reportes/tickets?${params}`);
 }
 
-export function dividirCuenta(tenantId: number, comandaId: number, numeroPersonas: number): Promise<number[]> {
-  return request(`/api/horeca/mesas/comandas/${comandaId}/dividir?tenantId=${tenantId}&numeroPersonas=${numeroPersonas}`, { method: "POST" });
+export function dividirCuenta(comandaId: number, numeroPersonas: number): Promise<number[]> {
+  return request(`/api/horeca/mesas/comandas/${comandaId}/dividir?numeroPersonas=${numeroPersonas}`, { method: "POST" });
 }
 
-export function cerrarComanda(tenantId: number, comandaId: number, datos: {
+export function cerrarComanda(comandaId: number, datos: {
   metodoPago: string; monedaPago?: string; montoRecibido?: number;
 }): Promise<Comanda> {
-  const params = new URLSearchParams({ tenantId: String(tenantId), metodoPago: datos.metodoPago });
+  const params = new URLSearchParams({ metodoPago: datos.metodoPago });
   if (datos.monedaPago) params.set("monedaPago", datos.monedaPago);
   if (datos.montoRecibido != null) params.set("montoRecibido", String(datos.montoRecibido));
   return request(`/api/horeca/mesas/comandas/${comandaId}/cerrar?${params}`, { method: "POST" });
@@ -789,8 +789,8 @@ export interface ResultadoCobroMixto {
 }
 
 /** Cobro mixto: cierra la comanda con varias líneas de pago simultáneas (ej. parte USD efectivo + resto Bs Pago Móvil). */
-export function cerrarComandaMixto(tenantId: number, comandaId: number, pagos: PagoParcial[], monedaVuelto?: string): Promise<ResultadoCobroMixto> {
-  const params = new URLSearchParams({ tenantId: String(tenantId) });
+export function cerrarComandaMixto(comandaId: number, pagos: PagoParcial[], monedaVuelto?: string): Promise<ResultadoCobroMixto> {
+  const params = new URLSearchParams();
   if (monedaVuelto) params.set("monedaVuelto", monedaVuelto);
   return request(`/api/horeca/mesas/comandas/${comandaId}/cerrar-mixto?${params}`, {
     method: "POST",
@@ -799,8 +799,8 @@ export function cerrarComandaMixto(tenantId: number, comandaId: number, pagos: P
 }
 
 /** Anula una comanda ABIERTA o PAGADA: revierte inventario/recetas y, si ya estaba cobrada, también la caja. Nunca borra nada. */
-export function anularComanda(tenantId: number, comandaId: number, datos: { motivo: string; usuario?: string }): Promise<Comanda> {
-  const params = new URLSearchParams({ tenantId: String(tenantId), motivo: datos.motivo });
+export function anularComanda(comandaId: number, datos: { motivo: string; usuario?: string }): Promise<Comanda> {
+  const params = new URLSearchParams({ motivo: datos.motivo });
   if (datos.usuario) params.set("usuario", datos.usuario);
   return request(`/api/horeca/mesas/comandas/${comandaId}/anular?${params}`, { method: "POST" });
 }

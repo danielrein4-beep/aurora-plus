@@ -470,7 +470,7 @@ export default function Dashboard() {
       Promise.allSettled([
         mapaDeMesas(),
         resumenPeriodoAbierto(tid, "USD"),
-        obtenerTableroKds(tid, "COCINA"),
+        obtenerTableroKds("COCINA"),
       ]).then(([resMapa, resTes, resKds]) => {
         const mapa = resMapa.status === "fulfilled" && Array.isArray(resMapa.value) ? resMapa.value : [];
         setMapaReales(mapa);
