@@ -20,6 +20,14 @@ interface IconProps { size?: number; className?: string; stroke?: string }
 
 const s = { stroke: `url(#${GRAD})`, strokeWidth: 1.75, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, fill: "none" };
 
+const getStyle = (className?: string, stroke?: string) => ({
+  stroke: stroke || (className ? "currentColor" : `url(#${GRAD})`),
+  strokeWidth: 1.75,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  fill: "none"
+});
+
 export function IconVet({ size = 24 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -115,10 +123,11 @@ export function IconCustomize({ size = 24 }: IconProps) {
   );
 }
 
-export function IconChart({ size = 24 }: IconProps) {
+export function IconChart({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" {...s} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" {...st} />
     </svg>
   );
 }
@@ -133,10 +142,11 @@ export function IconLink({ size = 24 }: IconProps) {
   );
 }
 
-export function IconCloud({ size = 24 }: IconProps) {
+export function IconCloud({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" {...s} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" {...st} />
     </svg>
   );
 }
@@ -281,12 +291,13 @@ export function IconKey({ size = 24 }: IconProps) {
   );
 }
 
-export function IconHourglass({ size = 24 }: IconProps) {
+export function IconHourglass({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M6 3h12M6 21h12" {...s} />
-      <path d="M7 3c0 4 3 6 5 8 2-2 5-4 5-8" {...s} />
-      <path d="M7 21c0-4 3-6 5-8 2 2 5 4 5 8" {...s} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M6 3h12M6 21h12" {...st} />
+      <path d="M7 3c0 4 3 6 5 8 2-2 5-4 5-8" {...st} />
+      <path d="M7 21c0-4 3-6 5-8 2 2 5 4 5 8" {...st} />
     </svg>
   );
 }
@@ -319,21 +330,23 @@ export function IconClose({ size = 24 }: IconProps) {
   );
 }
 
-export function IconCheckCircle({ size = 24 }: IconProps) {
+export function IconCheckCircle({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="9" {...s} />
-      <path d="M8 12.5l2.5 2.5L16 9.5" {...s} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="9" {...st} />
+      <path d="M8 12.5l2.5 2.5L16 9.5" {...st} />
     </svg>
   );
 }
 
-export function IconBank({ size = 24 }: IconProps) {
+export function IconBank({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M3 10l9-6 9 6" {...s} />
-      <path d="M4.5 10.5v8M9.5 10.5v8M14.5 10.5v8M19.5 10.5v8" {...s} />
-      <path d="M2.5 21h19" {...s} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M3 10l9-6 9 6" {...st} />
+      <path d="M4.5 10.5v8M9.5 10.5v8M14.5 10.5v8M19.5 10.5v8" {...st} />
+      <path d="M2.5 21h19" {...st} />
     </svg>
   );
 }
@@ -356,20 +369,33 @@ export function IconConstruction({ size = 24 }: IconProps) {
   );
 }
 
-export function IconWarning({ size = 24 }: IconProps) {
+export function IconWarning({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M12 3l10 18H2L12 3z" {...s} />
-      <path d="M12 10v4" {...s} />
-      <circle cx="12" cy="17.3" r="0.6" fill={`url(#${GRAD})`} stroke="none" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 3l10 18H2L12 3z" {...st} />
+      <path d="M12 10v4" {...st} />
+      <circle cx="12" cy="17.3" r="0.6" fill={st.stroke} stroke="none" />
     </svg>
   );
 }
 
-export function IconCheck({ size = 24 }: IconProps) {
+export function IconCheck({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M5 12.5l4.5 4.5L19 7" {...s} strokeWidth={2.25} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M5 12.5l4.5 4.5L19 7" {...st} strokeWidth={2.25} />
+    </svg>
+  );
+}
+
+export function IconInfo({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="9" {...st} />
+      <line x1="12" y1="8" x2="12.01" y2="8" strokeWidth={2.5} stroke={st.stroke} strokeLinecap="round" />
+      <line x1="12" y1="12" x2="12" y2="16" {...st} />
     </svg>
   );
 }
@@ -467,12 +493,13 @@ export function IconTrash({ size = 24 }: IconProps) {
   );
 }
 
-export function IconRefresh({ size = 24 }: IconProps) {
+export function IconRefresh({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M4 4v6h6" {...s} />
-      <path d="M20 20v-6h-6" {...s} />
-      <path d="M5.5 9a7 7 0 0112.4-2.5M18.5 15a7 7 0 01-12.4 2.5" {...s} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M4 4v6h6" {...st} />
+      <path d="M20 20v-6h-6" {...st} />
+      <path d="M5.5 9a7 7 0 0112.4-2.5M18.5 15a7 7 0 01-12.4 2.5" {...st} />
     </svg>
   );
 }
@@ -493,12 +520,13 @@ export function IconChevronRight({ size = 24 }: IconProps) {
   );
 }
 
-export function IconFileText({ size = 24 }: IconProps) {
+export function IconFileText({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M6 2h8l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" {...s} />
-      <path d="M14 2v5h5" {...s} />
-      <path d="M8 13h8M8 17h5" {...s} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M6 2h8l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" {...st} />
+      <path d="M14 2v5h5" {...st} />
+      <path d="M8 13h8M8 17h5" {...st} />
     </svg>
   );
 }

@@ -1,8 +1,10 @@
 package com.auroraplus.modules.horeca.repositories;
 
+import com.auroraplus.modules.horeca.entities.Comanda;
 import com.auroraplus.modules.horeca.entities.ItemComanda;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -17,4 +19,9 @@ public interface ItemComandaRepository extends JpaRepository<ItemComanda, Long> 
     List<ItemComanda> findByTenantIdAndEstacionCocinaAndEstadoItemNot(Long tenantId, String estacionCocina, ItemComanda.EstadoItem estadoItem);
 
     List<ItemComanda> findByComandaId(Long comandaId);
+
+    // Base de HorecaCosteoProvider (docs/finance-contract.md §3): solo comandas ya PAGADAS
+    // dentro del período — una comanda ABIERTA no es venta todavía, y ANULADA no debe sumar.
+    List<ItemComanda> findByTenantIdAndComanda_EstadoAndComanda_FechaCierreGreaterThanEqualAndComanda_FechaCierreLessThan(
+        Long tenantId, Comanda.EstadoComanda estado, LocalDateTime desde, LocalDateTime hastaExclusivo);
 }

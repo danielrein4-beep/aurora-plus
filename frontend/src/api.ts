@@ -2846,4 +2846,38 @@ export function listarVentasGanaderia(tenantId?: number): Promise<VentaGanaderia
   return request(`/api/ganaderia/ventas${q}`);
 }
 
+// Centro Financiero de empresa. El tenant se obtiene exclusivamente del JWT;
+// nunca se envía por URL ni se reconvierten importes históricos en el cliente.
+export interface EmpresaKpiResponse {
+  periodo: { desde: string; hasta: string };
+  moneda: "USD" | "VES" | "COP";
+  consolidado: {
+    ventasBrutas: number;
+    costoVentas: number;
+    margenBruto: number;
+    margenBrutoPct: number;
+    gastosOperativos: number;
+    resultadoEstimado: number;
+    coberturaPromedioPonderada: number;
+  };
+  porModulo: Array<{
+    modulo: string;
+    ventasBrutas: number;
+    costoVentas: number;
+    margenBruto: number;
+    coberturaPct: number;
+  }>;
+  verticalesNoConectadas: string[];
+  trazabilidad: {
+    movimientosTotales: number;
+    movimientosIdentificados: number;
+    porcentajeIdentificado: number;
+  };
+}
+
+export function obtenerEmpresaKpis(desde: string, hasta: string): Promise<EmpresaKpiResponse> {
+  const params = new URLSearchParams({ desde, hasta });
+  return request(`/api/empresa/kpis?${params.toString()}`);
+}
+
 
