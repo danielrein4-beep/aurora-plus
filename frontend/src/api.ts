@@ -1374,7 +1374,7 @@ export async function descargarNotaEntregaVentaAnimalPdf(tenantId: number, venta
   const sesion = leerSesion();
   const headers: Record<string, string> = {};
   if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
-  const res = await fetch(`/api/ganaderia/ventas/${ventaId}/pdf?tenantId=${tenantId}`, { headers });
+  const res = await fetch(`/api/ganaderia/ventas/${ventaId}/pdf`, { headers });
   if (res.status === 401) {
     manejarSesionVencida();
     throw new ApiError("Sesión vencida — redirigiendo al login");
@@ -2547,27 +2547,27 @@ export function crearAnimalGanaderia(tenantId: number, datos: {
   estadoReproductivo?: string;
   estadoProductivo?: string;
 }): Promise<AnimalGanaderia> {
-  return request(`/api/ganaderia/animales?tenantId=${tenantId}`, {
+  return request(`/api/ganaderia/animales`, {
     method: "POST",
     body: JSON.stringify(datos),
   });
 }
 
-export function actualizarAnimalGanaderia(id: number, tenantId: number, datos: Partial<AnimalGanaderia>): Promise<AnimalGanaderia> {
-  return request(`/api/ganaderia/animales/${id}?tenantId=${tenantId}`, {
+export function actualizarAnimalGanaderia(id: number, datos: Partial<AnimalGanaderia>): Promise<AnimalGanaderia> {
+  return request(`/api/ganaderia/animales/${id}`, {
     method: "PUT",
     body: JSON.stringify(datos),
   });
 }
 
-export function moverAnimalGanaderia(id: number, tenantId: number, potreroDestinoId: number, motivo?: string) {
-  return request(`/api/ganaderia/animales/${id}/mover?tenantId=${tenantId}`, {
+export function moverAnimalGanaderia(id: number, potreroDestinoId: number, motivo?: string) {
+  return request(`/api/ganaderia/animales/${id}/mover`, {
     method: "POST",
     body: JSON.stringify({ potreroDestinoId, motivo }),
   });
 }
 
-export function registrarVentaGanaderia(tenantId: number, datos: {
+export function registrarVentaGanaderia(datos: {
   numeroTicket?: string;
   comprador: string;
   items: Array<{
@@ -2578,7 +2578,7 @@ export function registrarVentaGanaderia(tenantId: number, datos: {
   montoRecibido?: number;
   claveIdempotencia?: string;
 }): Promise<any> {
-  return request(`/api/ganaderia/ventas?tenantId=${tenantId}`, {
+  return request(`/api/ganaderia/ventas`, {
     method: "POST",
     body: JSON.stringify(datos),
   });
@@ -2838,9 +2838,8 @@ export interface VentaGanaderiaResumen {
   items?: any[];
 }
 
-export function listarVentasGanaderia(tenantId?: number): Promise<VentaGanaderiaResumen[]> {
-  const q = tenantId ? `?tenantId=${tenantId}` : "";
-  return request(`/api/ganaderia/ventas${q}`);
+export function listarVentasGanaderia(): Promise<VentaGanaderiaResumen[]> {
+  return request(`/api/ganaderia/ventas`);
 }
 
 // Centro Financiero de empresa. El tenant se obtiene exclusivamente del JWT;

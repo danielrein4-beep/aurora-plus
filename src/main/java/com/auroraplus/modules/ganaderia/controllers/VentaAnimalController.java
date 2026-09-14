@@ -41,16 +41,17 @@ public class VentaAnimalController {
         public String claveIdempotencia; // opcional, ver IdempotenciaService
     }
 
+    // ── P0: tenant NUNCA viene por query/body/header — siempre de TenantContext/JWT ──
+
     @GetMapping
-    public List<VentaAnimal> listar(@RequestParam(required = false) Long tenantId) {
-        if (tenantId != null) {
-            return ventaAnimalRepository.findByTenantIdOrderByFechaDesc(tenantId);
-        }
-        return ventaAnimalRepository.findAllByOrderByFechaDesc();
+    public List<VentaAnimal> listar() {
+        Long tenantId = TenantContext.getCurrentTenant();
+        return ventaAnimalRepository.findByTenantIdOrderByFechaDesc(tenantId);
     }
 
     @PostMapping
-    public ResponseEntity<VentaAnimal> registrar(@RequestParam Long tenantId, @RequestBody VentaRequest request) {
+    public ResponseEntity<VentaAnimal> registrar(@RequestBody VentaRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(ganaderiaVentaService.registrarVenta(tenantId, request.numeroTicket, request.comprador,
             request.items, request.monedaPago, request.montoRecibido, request.claveIdempotencia));
     }
