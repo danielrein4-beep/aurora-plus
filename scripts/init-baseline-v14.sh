@@ -42,8 +42,8 @@ echo " Base de datos: ${DB_NAME} en ${DB_HOST}:${DB_PORT} (usuario: ${DB_USER})"
 echo " Modo: $([ "$VERIFY_ONLY" = true ] && echo "VERIFICACIÓN NO DESTRUCTIVA" || echo "INICIALIZACIÓN NUEVA")"
 echo "================================================================"
 
-# Comprobar si la base de datos ya existe
-DB_EXISTS=$(psql -v ON_ERROR_STOP=1 -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d postgres -t -A -c "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}';" || true)
+# Comprobar si la base de datos ya existe (un error de conexión aborta inmediatamente por set -e)
+DB_EXISTS=$(psql -v ON_ERROR_STOP=1 -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d postgres -t -A -c "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}';")
 
 if [ "$VERIFY_ONLY" = true ]; then
     if [ "${DB_EXISTS}" != "1" ]; then
