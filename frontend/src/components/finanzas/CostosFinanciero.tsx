@@ -18,6 +18,15 @@ export const CostosFinanciero: React.FC<CostosFinancieroProps> = ({ costs }) => 
     }
   };
 
+  // Totales derivados de los costos recibidos por props; nunca cifras fijas.
+  const totalsByCurrency = costs.reduce<Partial<Record<SupportedCurrency, number>>>((acc, item) => {
+    item.balances.forEach((b) => {
+      acc[b.currency] = (acc[b.currency] ?? 0) + b.amount;
+    });
+    return acc;
+  }, {});
+  const totalEntries = Object.entries(totalsByCurrency) as [SupportedCurrency, number][];
+
   return (
     <div className="space-y-6 font-['IBM_Plex_Sans',sans-serif]">
       {/* Alerta de Costeo Incompleto / Contexto de Escandallo */}
@@ -46,8 +55,15 @@ export const CostosFinanciero: React.FC<CostosFinancieroProps> = ({ costs }) => 
               Desglose por Moneda
             </div>
             <div className="mt-2 space-y-1 font-['IBM_Plex_Mono',monospace]">
-              <div className="text-xl font-bold text-[#35d7c3]">$9,500.00 USD</div>
-              <div className="text-sm text-white/70">Bs. 140,000.00 VES</div>
+              {totalEntries.length === 0 ? (
+                <div className="text-sm text-white/50">Sin costos registrados en el período.</div>
+              ) : (
+                totalEntries.map(([currency, amount], idx) => (
+                  <div key={currency} className={idx === 0 ? 'text-xl font-bold text-[#35d7c3]' : 'text-sm text-white/70'}>
+                    {formatCurrency(amount, currency)}
+                  </div>
+                ))
+              )}
             </div>
             <p className="text-xs text-white/60 mt-3 leading-relaxed">
               Representa el consumo operativo de insumos y nómina registrado en el período. Mantener los costos directos de materia prima controlados es clave para la rentabilidad de tu negocio.
@@ -55,18 +71,16 @@ export const CostosFinanciero: React.FC<CostosFinancieroProps> = ({ costs }) => 
           </div>
 
           <div className="mt-6 pt-4 border-t border-white/10 space-y-2">
-            <div className="flex justify-between text-xs text-white/70">
-              <span>Costo Materia Prima:</span>
-              <span className="font-semibold text-white font-['IBM_Plex_Mono',monospace]">51.0%</span>
-            </div>
-            <div className="flex justify-between text-xs text-white/70">
-              <span>Nómina Operativa:</span>
-              <span className="font-semibold text-white font-['IBM_Plex_Mono',monospace]">27.4%</span>
-            </div>
-            <div className="flex justify-between text-xs text-white/70">
-              <span>Gastos Fijos & Servicios:</span>
-              <span className="font-semibold text-white font-['IBM_Plex_Mono',monospace]">21.6%</span>
-            </div>
+            {costs.length === 0 ? (
+              <p className="text-xs text-white/50">Aún no hay categorías de costo con datos para este período.</p>
+            ) : (
+              costs.map((item) => (
+                <div key={item.id} className="flex justify-between text-xs text-white/70">
+                  <span className="truncate pr-2">{item.category}:</span>
+                  <span className="font-semibold text-white font-['IBM_Plex_Mono',monospace] shrink-0">{item.percentageOfTotal}%</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
