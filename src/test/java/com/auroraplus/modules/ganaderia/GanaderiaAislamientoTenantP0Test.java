@@ -16,6 +16,11 @@ import com.auroraplus.modules.ganaderia.repositories.ProveedorGanaderiaRepositor
 import com.auroraplus.modules.ganaderia.repositories.VentaAnimalRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaCompraService;
 import com.auroraplus.modules.ganaderia.services.GanaderiaVentaService;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +28,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -107,19 +113,49 @@ class GanaderiaAislamientoTenantP0Test {
     @Test
     void tenantBNoPuedeExportarExcelAnimalesDeA() throws Exception {
         long tenantA = 88003L, tenantB = 88004L;
-        crearAnimal(tenantA, "ARETE-EXPORT-A");
+        String areteA = "ARETE-EXPORT-A";
+        crearAnimal(tenantA, areteA);
 
+        // 1. Tenant A exporta y se abre el XLSX: ARETE-EXPORT-A DEBE estar presente
         TenantContext.setCurrentTenant(tenantA);
         ResponseEntity<byte[]> exportA = animalController.listarExcel(null);
         assertNotNull(exportA.getBody());
         assertTrue(exportA.getBody().length > 0, "Tenant A debe generar reporte Excel");
 
+        boolean encontradoEnA = false;
+        try (ByteArrayInputStream inA = new ByteArrayInputStream(exportA.getBody());
+             XSSFWorkbook wbA = new XSSFWorkbook(inA)) {
+            Sheet sheetA = wbA.getSheetAt(0);
+            for (Row row : sheetA) {
+                for (Cell cell : row) {
+                    if (cell.getCellType() == CellType.STRING && areteA.equals(cell.getStringCellValue())) {
+                        encontradoEnA = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assertTrue(encontradoEnA, "El Excel de Tenant A sí debe contener ARETE-EXPORT-A");
+
+        // 2. Tenant B exporta y se abre el XLSX: ARETE-EXPORT-A NO DEBE aparecer
         TenantContext.setCurrentTenant(tenantB);
         ResponseEntity<byte[]> exportB = animalController.listarExcel(null);
         assertNotNull(exportB.getBody());
-        // El listado de B en base de datos para este tenant está vacío, su excel no incluye datos de A
-        List<Animal> animalesB = animalRepository.findByTenantId(tenantB);
-        assertTrue(animalesB.isEmpty(), "Tenant B no tiene animales de A");
+
+        boolean encontradoEnB = false;
+        try (ByteArrayInputStream inB = new ByteArrayInputStream(exportB.getBody());
+             XSSFWorkbook wbB = new XSSFWorkbook(inB)) {
+            Sheet sheetB = wbB.getSheetAt(0);
+            for (Row row : sheetB) {
+                for (Cell cell : row) {
+                    if (cell.getCellType() == CellType.STRING && areteA.equals(cell.getStringCellValue())) {
+                        encontradoEnB = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assertFalse(encontradoEnB, "El XLSX generado para Tenant B NO debe contener el arete de A (ARETE-EXPORT-A)");
     }
 
     // ─────────────────────────────────────────────────────────────────
