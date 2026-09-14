@@ -2,24 +2,38 @@
 # Script: init-baseline-v14.ps1
 # Objetivo: Bootstrap reproducible para una base de datos Aurora Plus nueva.
 # Carga el esquema canónico v14 y registra el baseline en flyway_schema_history.
+# Seguridad:
+# - Rechaza contraseñas vacías (exige PGPASSWORD o -DbPassword).
+# - No tiene nombre de base por defecto (parámetro obligatorio).
+# - Falla inmediatamente ante cualquier error SQL (ON_ERROR_STOP=1).
+# - Rechaza y aborta si la base de datos ya existe, salvo con -VerifyOnly.
 # ==============================================================================
 
 param (
-    [string]$DbName = "aurora_baseline_verify",
+    [string]$DbName,
     [string]$DbUser = "postgres",
     [string]$DbHost = "localhost",
     [int]$DbPort = 5432,
-    [string]$DbPassword = $env:PGPASSWORD
+    [string]$DbPassword,
+    [switch]$VerifyOnly
 )
-
-if (-not $DbPassword) {
-    $DbPassword = "1234"
-}
-$env:PGPASSWORD = $DbPassword
 
 $ErrorActionPreference = "Stop"
 
-# Buscar psql si no está en PATH
+if (-not $DbName) {
+    Write-Error "Seguridad operativa: Debe especificar el parámetro -DbName con el nombre de la base de datos destino."
+    exit 1
+}
+
+# 1. Seguridad de credenciales: rechazar contraseñas por defecto / no provistas
+if ($DbPassword) {
+    $env:PGPASSWORD = $DbPassword
+} elseif (-not $env:PGPASSWORD) {
+    Write-Error "Seguridad operativa: No se detectó contraseña de PostgreSQL. Defina la variable de entorno PGPASSWORD o use el parámetro -DbPassword."
+    exit 1
+}
+
+# 2. Localizar psql
 $psqlPath = "psql"
 if (-not (Get-Command psql -ErrorAction SilentlyContinue)) {
     $found = Get-ChildItem "C:\Program Files\PostgreSQL" -Recurse -Filter "psql.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -34,31 +48,64 @@ if (-not (Get-Command psql -ErrorAction SilentlyContinue)) {
 Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host " Bootstrap Aurora Plus - Baseline v14" -ForegroundColor Cyan
 Write-Host " Base de datos: $DbName en ${DbHost}:${DbPort} (usuario: $DbUser)" -ForegroundColor Cyan
+Write-Host " Modo: $(if ($VerifyOnly) { 'VERIFICACIÓN NO DESTRUCTIVA' } else { 'INICIALIZACIÓN NUEVA' })" -ForegroundColor Cyan
 Write-Host "================================================================" -ForegroundColor Cyan
 
-# 1. Crear base de datos vacía si no existe
-Write-Host "[1/3] Verificando / creando base de datos '$DbName'..." -ForegroundColor Yellow
-$dbExists = & $psqlPath -h $DbHost -p $DbPort -U $DbUser -d postgres -t -c "SELECT 1 FROM pg_database WHERE datname='$DbName';"
-if (-not $dbExists -or $dbExists.Trim() -ne "1") {
-    & $psqlPath -h $DbHost -p $DbPort -U $DbUser -d postgres -c "CREATE DATABASE $DbName ENCODING 'UTF8';"
-    Write-Host "  > Base de datos '$DbName' creada exitosamente." -ForegroundColor Green
-} else {
-    Write-Host "  > Base de datos '$DbName' ya existe." -ForegroundColor Gray
+# 3. Comprobar existencia previa de la base de datos
+$dbExistsRaw = & $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d postgres -t -A -c "SELECT 1 FROM pg_database WHERE datname='$DbName';"
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Error al conectar con PostgreSQL en ${DbHost}:${DbPort}"
+    exit 1
+}
+$dbExists = ($null -ne $dbExistsRaw -and "$dbExistsRaw".Trim() -eq "1")
+
+# Si se solicitó solo verificación no destructiva
+if ($VerifyOnly) {
+    if (-not $dbExists) {
+        Write-Error "Modo verificación: La base de datos '$DbName' no existe."
+        exit 1
+    }
+    Write-Host "[Verificación] Comprobando estado de '$DbName'..." -ForegroundColor Yellow
+    $tableCount = (& $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d $DbName -t -A -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';").Trim()
+    $flywayStatus = (& $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d $DbName -t -A -c "SELECT version || ' (' || success || ')' FROM public.flyway_schema_history WHERE version='14' ORDER BY installed_rank DESC LIMIT 1;" 2>$null)
+    Write-Host "  > Tablas base en 'public': $tableCount" -ForegroundColor Green
+    Write-Host "  > Estado Flyway baseline: $(if ($flywayStatus) { $flywayStatus.Trim() } else { 'NO REGISTRADO' })" -ForegroundColor Green
+    Write-Host "Verificación no destructiva completada exitosamente." -ForegroundColor Cyan
+    exit 0
 }
 
-# 2. Cargar esquema canónico v14
+# 4. Seguridad contra sobreescritura: rechazar bases existentes
+if ($dbExists) {
+    Write-Error "Seguridad operativa: La base de datos '$DbName' YA EXISTE en ${DbHost}:${DbPort}. Este script rechaza bases existentes para proteger datos. Si solo desea verificar su estado use el parámetro -VerifyOnly."
+    exit 1
+}
+
+# 5. Crear la base de datos vacía
+Write-Host "[1/3] Creando base de datos limpia '$DbName'..." -ForegroundColor Yellow
+& $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d postgres -c "CREATE DATABASE $DbName ENCODING 'UTF8';"
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Fallo al crear la base de datos '$DbName'."
+    exit 1
+}
+Write-Host "  > Base de datos creada exitosamente." -ForegroundColor Green
+
+# 6. Cargar esquema canónico con ON_ERROR_STOP
 $schemaFile = Join-Path (Get-Location) "docs\schema-baseline-v14.sql"
 if (-not (Test-Path $schemaFile)) {
     Write-Error "No se encontró el archivo de esquema: $schemaFile"
     exit 1
 }
 
-Write-Host "[2/3] Cargando esquema canónico desde docs/schema-baseline-v14.sql..." -ForegroundColor Yellow
-& $psqlPath -h $DbHost -p $DbPort -U $DbUser -d $DbName -f $schemaFile 2>&1 | Out-Null
-$tableCount = & $psqlPath -h $DbHost -p $DbPort -U $DbUser -d $DbName -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';"
-Write-Host "  > Esquema cargado exitosamente ($($tableCount.Trim()) tablas generadas)." -ForegroundColor Green
+Write-Host "[2/3] Aplicando esquema canónico (docs/schema-baseline-v14.sql) con ON_ERROR_STOP..." -ForegroundColor Yellow
+& $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d $DbName -f $schemaFile
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Fallo crítico al aplicar el DDL en '$DbName'. La ejecución se detuvo inmediatamente."
+    exit 1
+}
+$tableCount = (& $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d $DbName -t -A -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';").Trim()
+Write-Host "  > DDL aplicado exitosamente ($tableCount tablas generadas)." -ForegroundColor Green
 
-# 3. Registrar Baseline en flyway_schema_history
+# 7. Registrar Baseline en flyway_schema_history
 Write-Host "[3/3] Registrando baseline v14 en flyway_schema_history..." -ForegroundColor Yellow
 $flywayBaselineSql = @"
 CREATE TABLE IF NOT EXISTS public.flyway_schema_history (
@@ -83,9 +130,13 @@ SELECT 1, '14', 'Baseline v14 esquema canonico', 'BASELINE', '<< Flyway Baseline
 WHERE NOT EXISTS (SELECT 1 FROM public.flyway_schema_history WHERE version = '14' OR installed_rank = 1);
 "@
 
-& $psqlPath -h $DbHost -p $DbPort -U $DbUser -d $DbName -c $flywayBaselineSql
+& $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d $DbName -c $flywayBaselineSql
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Fallo al registrar el baseline de Flyway en '$DbName'."
+    exit 1
+}
 Write-Host "  > Baseline v14 registrado. Flyway no aplicará migraciones anteriores a V15." -ForegroundColor Green
 
 Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host " Base de datos '$DbName' lista para arrancar con ddl-auto=validate" -ForegroundColor Green
+Write-Host " Base de datos '$DbName' lista para producción con ddl-auto=validate" -ForegroundColor Green
 Write-Host "================================================================" -ForegroundColor Cyan
