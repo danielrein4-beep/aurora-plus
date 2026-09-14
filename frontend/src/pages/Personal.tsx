@@ -5,6 +5,7 @@ import {
   listarMetasPersonal,
   listarPeriodosNomina,
   listarTurnosPersonal,
+  crearTurnoPersonal,
   obtenerDetallePeriodoNomina,
   obtenerCapacidadesPersonal,
   type CapacidadesPersonal,
@@ -327,7 +328,17 @@ export const PersonalPage: React.FC = () => {
               turnosHorarios={MOCK_TURNOS_HORARIOS}
               asignaciones={turnosAsignados}
               empleados={empleados}
-              onAgregarAsignacion={(nueva) => setTurnosAsignados([nueva, ...turnosAsignados])}
+              onAgregarAsignacion={async (nueva) => {
+                const horario = MOCK_TURNOS_HORARIOS.find((turno) => turno.id === nueva.turnoId);
+                if (!horario) throw new Error('El horario seleccionado ya no está disponible');
+                const guardado = await crearTurnoPersonal({
+                  empleadoId: Number(nueva.empleadoId), fecha: nueva.fecha,
+                  horaInicio: horario.horaInicio, horaFin: horario.horaFin,
+                });
+                const asignacionGuardada = { ...nueva, id: String(guardado.id) };
+                setTurnosAsignados((actuales) => [asignacionGuardada, ...actuales]);
+                return asignacionGuardada;
+              }}
             />
           )}
 

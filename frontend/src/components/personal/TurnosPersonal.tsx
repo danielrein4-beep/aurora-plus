@@ -5,7 +5,7 @@ interface TurnosPersonalProps {
   turnosHorarios: TurnoHorario[];
   asignaciones: AsignacionTurno[];
   empleados: Empleado[];
-  onAgregarAsignacion?: (nueva: AsignacionTurno) => void;
+  onAgregarAsignacion?: (nueva: AsignacionTurno) => Promise<AsignacionTurno>;
 }
 
 export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
@@ -21,6 +21,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<string>(empleados[0]?.id || '');
   const [turnoSeleccionado, setTurnoSeleccionado] = useState<string>(turnosHorarios[0]?.id || '');
   const [toastMensaje, setToastMensaje] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   const btnCerrarModalRef = useRef<HTMLButtonElement | null>(null);
   const elementoPrevioRef = useRef<HTMLElement | null>(null);
@@ -53,7 +54,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
     setTimeout(() => setToastMensaje(null), 3500);
   };
 
-  const handleCrearAsignacion = () => {
+  const handleCrearAsignacion = async () => {
     const emp = empleados.find((e) => e.id === empleadoSeleccionado);
     const trn = turnosHorarios.find((t) => t.id === turnoSeleccionado);
 
@@ -72,12 +73,18 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
       estado: 'PROGRAMADO',
     };
 
-    setAsignaciones([nueva, ...asignaciones]);
-    if (onAgregarAsignacion) {
-      onAgregarAsignacion(nueva);
+    if (!onAgregarAsignacion) return;
+    setGuardando(true);
+    try {
+      const guardada = await onAgregarAsignacion(nueva);
+      setAsignaciones([guardada, ...asignaciones]);
+      setModalAsignarAbierto(false);
+      mostrarNotificacion(`Turno programado para ${emp.nombre}`);
+    } catch (error) {
+      mostrarNotificacion(error instanceof Error ? error.message : 'No se pudo programar el turno');
+    } finally {
+      setGuardando(false);
     }
-    setModalAsignarAbierto(false);
-    mostrarNotificacion(`Turno programado exitosamente para ${emp.nombre} [DEMO]`);
   };
 
   const asignacionesFiltradas = asignaciones.filter((a) => {
@@ -310,9 +317,10 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
               </button>
               <button
                 onClick={handleCrearAsignacion}
+                disabled={guardando}
                 className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs"
               >
-                Confirmar Asignación
+                {guardando ? 'Guardando…' : 'Confirmar asignación'}
               </button>
             </div>
           </div>

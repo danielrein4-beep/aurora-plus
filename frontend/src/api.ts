@@ -3009,6 +3009,15 @@ export function listarTurnosPersonal(desde: string, hasta: string): Promise<Turn
   return request(`/api/personal/turnos?${params.toString()}`);
 }
 
+export function crearTurnoPersonal(datos: {
+  empleadoId: number;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+}): Promise<TurnoPersonalApi> {
+  return request("/api/personal/turnos", { method: "POST", body: JSON.stringify(datos) });
+}
+
 export function listarAsistenciaPersonal(desde: string, hasta: string): Promise<AsistenciaPersonalApi[]> {
   const params = new URLSearchParams({ desde, hasta });
   return request(`/api/personal/asistencia?${params.toString()}`);
