@@ -5,11 +5,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 // Bean nombrado explícitamente: ya existe core.rrhh.repositories.RegistroAsistenciaRepository.
 @Repository("personalRegistroAsistenciaRepository")
 public interface RegistroAsistenciaRepository extends JpaRepository<RegistroAsistencia, Long> {
     List<RegistroAsistencia> findByTenantIdAndEmpleadoId(Long tenantId, Long empleadoId);
+
+    Optional<RegistroAsistencia> findFirstByTenantIdAndEmpleadoIdAndFechaHoraSalidaIsNullOrderByFechaHoraEntradaDesc(
+        Long tenantId, Long empleadoId);
 
     List<RegistroAsistencia> findByTenantIdAndEmpleadoIdAndFechaHoraEntradaGreaterThanEqualAndFechaHoraEntradaLessThan(
         Long tenantId, Long empleadoId, LocalDateTime desde, LocalDateTime hastaExclusivo);

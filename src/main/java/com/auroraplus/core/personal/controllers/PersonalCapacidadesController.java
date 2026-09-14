@@ -21,6 +21,8 @@ public class PersonalCapacidadesController {
         boolean nominaAvanzada,
         boolean puedeVerDirectorio,
         boolean puedeVerMontosNomina,
+        boolean puedeRegistrarAsistencia,
+        boolean puedeGestionarMetas,
         String rolPersonal,
         Long empleadoId
     ) {}
@@ -37,6 +39,8 @@ public class PersonalCapacidadesController {
             accessService.tieneFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA),
             accessService.puedeVerDirectorio(tenantId),
             accessService.puedeVerMontosGenerales(tenantId),
+            accessService.tieneFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA) && accessService.puedeGestionarOperacion(tenantId),
+            accessService.tieneFlag(tenantId, PersonalAccessService.FLAG_METAS) && accessService.puedeGestionarOperacion(tenantId),
             dueno ? "DUENO_ADMIN" : permiso == null ? null : permiso.getRol().name(),
             permiso == null ? null : permiso.getEmpleadoId()
         );

@@ -97,6 +97,10 @@ public class PersonalAccessService {
     private static final Set<PermisoPersonal.RolPersonal> PUEDEN_VER_MONTOS_DE_CUALQUIERA =
         EnumSet.of(PermisoPersonal.RolPersonal.NOMINA, PermisoPersonal.RolPersonal.AUDITOR);
 
+    private static final Set<PermisoPersonal.RolPersonal> PUEDEN_GESTIONAR_OPERACION =
+        EnumSet.of(PermisoPersonal.RolPersonal.RRHH, PermisoPersonal.RolPersonal.NOMINA,
+            PermisoPersonal.RolPersonal.SUPERVISOR);
+
     /** Directorio de personal (nombres/cargos, SIN montos) — RRHH/NOMINA/SUPERVISOR/AUDITOR, nunca EMPLEADO ni un usuario sin permiso. */
     public void exigirVerDirectorioPersonal(Long tenantId) {
         exigirRol(tenantId, PUEDEN_VER_DIRECTORIO_PERSONAL);
@@ -131,6 +135,10 @@ public class PersonalAccessService {
 
     public boolean puedeVerMontosGenerales(Long tenantId) {
         return tieneRol(tenantId, PUEDEN_VER_MONTOS_DE_CUALQUIERA);
+    }
+
+    public boolean puedeGestionarOperacion(Long tenantId) {
+        return tieneRol(tenantId, PUEDEN_GESTIONAR_OPERACION);
     }
 
     /** Para que un EMPLEADO solo pueda leer su propia asistencia/metas (no montos de nómina), nunca la de otro. */

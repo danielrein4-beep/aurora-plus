@@ -15,6 +15,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 @RequestMapping("/api/personal/asistencia")
 public class AsistenciaController {
 
+    public record RegistrarSalidaRequest(LocalDateTime fechaHoraSalida) {}
+
     @Autowired
     private AsistenciaService asistenciaService;
 
@@ -24,8 +26,8 @@ public class AsistenciaController {
     }
 
     @PatchMapping("/{id}/salida")
-    public RegistroAsistencia registrarSalida(@PathVariable Long id, @RequestBody LocalDateTime salida) {
-        return asistenciaService.registrarSalida(TenantContext.getCurrentTenant(), id, salida);
+    public RegistroAsistencia registrarSalida(@PathVariable Long id, @RequestBody RegistrarSalidaRequest request) {
+        return asistenciaService.registrarSalida(TenantContext.getCurrentTenant(), id, request.fechaHoraSalida());
     }
 
     @GetMapping("/empleado/{empleadoId}")

@@ -15,7 +15,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
   onAgregarAsignacion,
 }) => {
   const [asignaciones, setAsignaciones] = useState<AsignacionTurno[]>(initialAsignaciones);
-  const [fechaSeleccionada, setFechaSeleccionada] = useState('2026-09-15');
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(() => new Date().toISOString().slice(0, 10));
   const [deptoFiltro, setDeptoFiltro] = useState<string>('TODOS');
   const [modalAsignarAbierto, setModalAsignarAbierto] = useState(false);
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<string>(empleados[0]?.id || '');
@@ -30,6 +30,10 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
   useEffect(() => {
     setAsignaciones(initialAsignaciones);
   }, [initialAsignaciones]);
+
+  useEffect(() => {
+    if (!empleadoSeleccionado && empleados[0]) setEmpleadoSeleccionado(empleados[0].id);
+  }, [empleados, empleadoSeleccionado]);
 
   // Accesibilidad: Guardar foco, capturar y restaurar foco, y cerrar modal con Escape
   useEffect(() => {

@@ -613,6 +613,33 @@ class SeguridadYCalculoRegresionTest {
     }
 
     @Test
+    void asistenciaImpideEntradaDuplicadaYSalidaInvalida() {
+        long tenantId = 88003L;
+        activarFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA);
+        crearUsuarioConRol(tenantId, "rrhh88003", PermisoPersonal.RolPersonal.RRHH);
+        autenticarComo(tenantId, "rrhh88003");
+        Empleado empleado = crearEmpleadoBasico(tenantId, "Empleado asistencia segura");
+
+        RegistroAsistencia entrada = new RegistroAsistencia();
+        entrada.setEmpleadoId(empleado.getId());
+        entrada.setFechaHoraEntrada(java.time.LocalDateTime.of(2026, 9, 14, 8, 0));
+        entrada.setOrigen(RegistroAsistencia.Origen.MANUAL);
+        RegistroAsistencia guardada = asistenciaService.registrarEntrada(tenantId, entrada);
+
+        RegistroAsistencia duplicada = new RegistroAsistencia();
+        duplicada.setEmpleadoId(empleado.getId());
+        duplicada.setFechaHoraEntrada(java.time.LocalDateTime.of(2026, 9, 14, 8, 1));
+        duplicada.setOrigen(RegistroAsistencia.Origen.MANUAL);
+        assertThrows(IllegalStateException.class, () -> asistenciaService.registrarEntrada(tenantId, duplicada));
+        assertThrows(IllegalArgumentException.class, () -> asistenciaService.registrarSalida(
+            tenantId, guardada.getId(), java.time.LocalDateTime.of(2026, 9, 14, 7, 59)));
+
+        asistenciaService.registrarSalida(tenantId, guardada.getId(), java.time.LocalDateTime.of(2026, 9, 14, 16, 0));
+        assertThrows(IllegalStateException.class, () -> asistenciaService.registrarSalida(
+            tenantId, guardada.getId(), java.time.LocalDateTime.of(2026, 9, 14, 16, 1)));
+    }
+
+    @Test
     void crearReglaParaConceptoDeOtroTenantSeRechaza() {
         long tenantId = 89001L;
         long otroTenant = 89002L;

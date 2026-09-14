@@ -8,7 +8,10 @@ import {
   crearTurnoPersonal,
   obtenerDetallePeriodoNomina,
   obtenerCapacidadesPersonal,
+  registrarEntradaPersonal,
+  registrarSalidaPersonal,
   type CapacidadesPersonal,
+  type AsistenciaPersonalApi,
   type EntradaDirectorioPersonalApi,
 } from '../api';
 import {
@@ -65,6 +68,18 @@ const mapearEmpleado = (entrada: EntradaDirectorioPersonalApi): Empleado => ({
   moneda: entrada.monedaSalario || 'USD',
   modalidadPago: entrada.tipoSalario === 'POR_JORNADA' ? 'POR_JORNAL' : 'MENSUAL',
   turnoAsignado: 'Consultar planificación',
+});
+
+const mapearAsistencia = (registro: AsistenciaPersonalApi, empleado?: Empleado): RegistroAsistencia => ({
+  id: String(registro.id), empleadoId: String(registro.empleadoId),
+  empleadoNombre: empleado?.nombre || `Empleado ${registro.empleadoId}`,
+  departamento: empleado?.departamento || 'Administración & Finanzas',
+  fecha: registro.fechaHoraEntrada.slice(0, 10), horaEntradaProgramada: '--:--', horaSalidaProgramada: '--:--',
+  horaEntradaReal: registro.fechaHoraEntrada.slice(11, 16), horaSalidaReal: registro.fechaHoraSalida?.slice(11, 16),
+  minutosRetardo: 0, horasTrabajadas: registro.horasTrabajadas || 0, horasExtras: 0,
+  estado: 'PRESENTE',
+  metodoMarcaje: registro.origen === 'MANUAL' ? 'REGISTRO_SUPERVISOR'
+    : registro.origen === 'TERMINAL_PIN' ? 'PIN_TERMINAL' : 'PLANILLA_DIGITAL',
 });
 
 const PERIODO_VACIO: PeriodoNomina = {
@@ -144,21 +159,7 @@ export const PersonalPage: React.FC = () => {
             tipoTurno: hora < 12 ? 'MANANA' : hora < 18 ? 'TARDE' : 'NOCHE', estado: 'PROGRAMADO',
           };
         }));
-        setAsistencias(asistenciasApi.map((registro) => {
-          const empleado = porId.get(String(registro.empleadoId));
-          return {
-            id: String(registro.id), empleadoId: String(registro.empleadoId),
-            empleadoNombre: empleado?.nombre || `Empleado ${registro.empleadoId}`,
-            departamento: empleado?.departamento || 'Administración & Finanzas',
-            fecha: registro.fechaHoraEntrada.slice(0, 10), horaEntradaProgramada: '--:--', horaSalidaProgramada: '--:--',
-            horaEntradaReal: registro.fechaHoraEntrada.slice(11, 16),
-            horaSalidaReal: registro.fechaHoraSalida?.slice(11, 16), minutosRetardo: 0,
-            horasTrabajadas: registro.horasTrabajadas || 0, horasExtras: 0,
-            estado: registro.fechaHoraSalida ? 'PRESENTE' : 'RETARDO',
-            metodoMarcaje: registro.origen === 'MANUAL' ? 'REGISTRO_SUPERVISOR'
-              : registro.origen === 'TERMINAL_PIN' ? 'PIN_TERMINAL' : 'PLANILLA_DIGITAL',
-          };
-        }));
+        setAsistencias(asistenciasApi.map((registro) => mapearAsistencia(registro, porId.get(String(registro.empleadoId)))));
         setMetas(metasApi.map((meta) => {
           const empleado = porId.get(String(meta.empleadoId));
           const vencida = meta.periodoHasta < new Date().toISOString().slice(0, 10);
@@ -348,7 +349,28 @@ export const PersonalPage: React.FC = () => {
             <AsistenciaPersonal
               asistencias={asistencias}
               empleados={empleados}
-              onAgregarAsistencia={(nueva) => setAsistencias([nueva, ...asistencias])}
+              puedeRegistrar={Boolean(capacidades?.puedeRegistrarAsistencia)}
+              onRegistrarMarcaje={async ({ empleadoId, tipo, fecha, hora, metodo }) => {
+                const fechaHora = `${fecha}T${hora}:00`;
+                let guardado: AsistenciaPersonalApi;
+                if (tipo === 'ENTRADA') {
+                  guardado = await registrarEntradaPersonal({
+                    empleadoId: Number(empleadoId), fechaHoraEntrada: fechaHora,
+                    origen: metodo === 'PIN_TERMINAL' ? 'TERMINAL_PIN'
+                      : metodo === 'REGISTRO_SUPERVISOR' ? 'MANUAL' : 'PLANILLA_DIGITAL',
+                  });
+                } else {
+                  const abierto = asistencias.find((item) => item.empleadoId === empleadoId && !item.horaSalidaReal);
+                  if (!abierto) throw new Error('Este empleado no tiene una entrada abierta');
+                  guardado = await registrarSalidaPersonal(Number(abierto.id), fechaHora);
+                }
+                const empleado = empleados.find((item) => item.id === empleadoId);
+                const asistenciaGuardada = mapearAsistencia(guardado, empleado);
+                setAsistencias((actuales) => tipo === 'SALIDA'
+                  ? actuales.map((item) => item.id === asistenciaGuardada.id ? asistenciaGuardada : item)
+                  : [asistenciaGuardada, ...actuales]);
+                return asistenciaGuardada;
+              }}
             />
           )}
 

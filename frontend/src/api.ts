@@ -2889,6 +2889,8 @@ export interface CapacidadesPersonal {
   nominaAvanzada: boolean;
   puedeVerDirectorio: boolean;
   puedeVerMontosNomina: boolean;
+  puedeRegistrarAsistencia: boolean;
+  puedeGestionarMetas: boolean;
   rolPersonal: "DUENO_ADMIN" | "RRHH" | "NOMINA" | "SUPERVISOR" | "EMPLEADO" | "AUDITOR" | null;
   empleadoId: number | null;
 }
@@ -3021,6 +3023,22 @@ export function crearTurnoPersonal(datos: {
 export function listarAsistenciaPersonal(desde: string, hasta: string): Promise<AsistenciaPersonalApi[]> {
   const params = new URLSearchParams({ desde, hasta });
   return request(`/api/personal/asistencia?${params.toString()}`);
+}
+
+export function registrarEntradaPersonal(datos: {
+  empleadoId: number;
+  turnoId?: number | null;
+  fechaHoraEntrada: string;
+  origen: AsistenciaPersonalApi["origen"];
+}): Promise<AsistenciaPersonalApi> {
+  return request("/api/personal/asistencia/entrada", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function registrarSalidaPersonal(id: number, fechaHoraSalida: string): Promise<AsistenciaPersonalApi> {
+  return request(`/api/personal/asistencia/${id}/salida`, {
+    method: "PATCH",
+    body: JSON.stringify({ fechaHoraSalida }),
+  });
 }
 
 export function listarMetasPersonal(): Promise<MetaPersonalApi[]> {

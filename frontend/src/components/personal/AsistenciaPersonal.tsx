@@ -4,24 +4,32 @@ import { RegistroAsistencia, Empleado, DepartamentoPersonal, MetodoMarcaje } fro
 interface AsistenciaPersonalProps {
   asistencias: RegistroAsistencia[];
   empleados: Empleado[];
-  onAgregarAsistencia?: (nueva: RegistroAsistencia) => void;
+  puedeRegistrar: boolean;
+  onRegistrarMarcaje?: (datos: {
+    empleadoId: string;
+    tipo: 'ENTRADA' | 'SALIDA';
+    fecha: string;
+    hora: string;
+    metodo: MetodoMarcaje;
+  }) => Promise<RegistroAsistencia>;
 }
 
 export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
   asistencias: initialAsistencias,
   empleados,
-  onAgregarAsistencia,
+  puedeRegistrar,
+  onRegistrarMarcaje,
 }) => {
   const [asistencias, setAsistencias] = useState<RegistroAsistencia[]>(initialAsistencias);
-  const [fechaFiltro, setFechaFiltro] = useState('2026-09-15');
+  const [fechaFiltro, setFechaFiltro] = useState(() => new Date().toISOString().slice(0, 10));
   const [deptoFiltro, setDeptoFiltro] = useState<string>('TODOS');
   const [modalMarcajeAbierto, setModalMarcajeAbierto] = useState(false);
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<string>(empleados[0]?.id || '');
   const [tipoMarcaje, setTipoMarcaje] = useState<'ENTRADA' | 'SALIDA'>('ENTRADA');
   const [horaMarcaje, setHoraMarcaje] = useState('07:00');
   const [metodoSeleccionado, setMetodoSeleccionado] = useState<MetodoMarcaje>('PIN_TERMINAL');
-  const [observacionMarcaje, setObservacionMarcaje] = useState('');
   const [toastMensaje, setToastMensaje] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   const btnCerrarModalRef = useRef<HTMLButtonElement | null>(null);
   const elementoPrevioRef = useRef<HTMLElement | null>(null);
@@ -30,6 +38,10 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
   useEffect(() => {
     setAsistencias(initialAsistencias);
   }, [initialAsistencias]);
+
+  useEffect(() => {
+    if (!empleadoSeleccionado && empleados[0]) setEmpleadoSeleccionado(empleados[0].id);
+  }, [empleados, empleadoSeleccionado]);
 
   // Accesibilidad: Guardar foco, capturar y restaurar foco, y cerrar modal con Escape
   useEffect(() => {
@@ -54,35 +66,25 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
     setTimeout(() => setToastMensaje(null), 3500);
   };
 
-  const handleRegistrarMarcaje = () => {
+  const handleRegistrarMarcaje = async () => {
     const emp = empleados.find((e) => e.id === empleadoSeleccionado);
-    if (!emp) return;
-
-    const nueva: RegistroAsistencia = {
-      id: `AST-${Date.now()}`,
-      empleadoId: emp.id,
-      empleadoNombre: `${emp.nombre} ${emp.apellidos}`,
-      departamento: emp.departamento,
-      fecha: fechaFiltro,
-      horaEntradaProgramada: '07:00',
-      horaSalidaProgramada: '15:00',
-      horaEntradaReal: tipoMarcaje === 'ENTRADA' ? horaMarcaje : '07:00',
-      horaSalidaReal: tipoMarcaje === 'SALIDA' ? horaMarcaje : undefined,
-      minutosRetardo: tipoMarcaje === 'ENTRADA' && horaMarcaje > '07:05' ? 15 : 0,
-      horasTrabajadas: 8.0,
-      horasExtras: 0,
-      estado: tipoMarcaje === 'ENTRADA' && horaMarcaje > '07:05' ? 'RETARDO' : 'PRESENTE',
-      justificacion: observacionMarcaje ? `${observacionMarcaje} [DEMO]` : undefined,
-      metodoMarcaje: metodoSeleccionado,
-    };
-
-    setAsistencias([nueva, ...asistencias]);
-    if (onAgregarAsistencia) {
-      onAgregarAsistencia(nueva);
+    if (!emp || !onRegistrarMarcaje) return;
+    setGuardando(true);
+    try {
+      const guardada = await onRegistrarMarcaje({
+        empleadoId: emp.id, tipo: tipoMarcaje, fecha: fechaFiltro,
+        hora: horaMarcaje, metodo: metodoSeleccionado,
+      });
+      setAsistencias((actuales) => tipoMarcaje === 'SALIDA'
+        ? actuales.map((item) => item.id === guardada.id ? guardada : item)
+        : [guardada, ...actuales]);
+      setModalMarcajeAbierto(false);
+      mostrarNotificacion(`Marcaje de ${tipoMarcaje.toLowerCase()} registrado para ${emp.nombre}`);
+    } catch (error) {
+      mostrarNotificacion(error instanceof Error ? error.message : 'No se pudo registrar el marcaje');
+    } finally {
+      setGuardando(false);
     }
-    setModalMarcajeAbierto(false);
-    setObservacionMarcaje('');
-    mostrarNotificacion(`Marcaje de ${tipoMarcaje.toLowerCase()} registrado correctamente para ${emp.nombre} [DEMO]`);
   };
 
   const departamentos: (DepartamentoPersonal | 'TODOS')[] = [
@@ -163,12 +165,12 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
           </div>
         </div>
 
-        <button
+        {puedeRegistrar && <button
           onClick={() => setModalMarcajeAbierto(true)}
           className="px-3.5 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white"
         >
-          ⏱️ Registrar Marcaje en Terminal [DEMO]
-        </button>
+          ⏱️ Registrar marcaje
+        </button>}
       </div>
 
       {/* Tabla de Registros de Asistencia */}
@@ -342,20 +344,8 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                     <option value="PIN_TERMINAL">Terminal PIN</option>
                     <option value="REGISTRO_SUPERVISOR">Supervisor</option>
                     <option value="PLANILLA_DIGITAL">Planilla Digital</option>
-                    <option value="HORARIO_ASIGNADO">Horario Asignado</option>
                   </select>
                 </div>
-              </div>
-
-              <div>
-                <label className="text-[#94a3b8] block mb-1">Observación / Justificación:</label>
-                <input
-                  type="text"
-                  value={observacionMarcaje}
-                  onChange={(e) => setObservacionMarcaje(e.target.value)}
-                  placeholder="Ej. Tráfico matutino, soporte especial..."
-                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
-                />
               </div>
             </div>
 
@@ -368,9 +358,10 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
               </button>
               <button
                 onClick={handleRegistrarMarcaje}
+                disabled={guardando}
                 className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs"
               >
-                Confirmar Registro
+                {guardando ? 'Guardando…' : 'Confirmar registro'}
               </button>
             </div>
           </div>
