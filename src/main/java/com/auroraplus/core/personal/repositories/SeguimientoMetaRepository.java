@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface SeguimientoMetaRepository extends JpaRepository<SeguimientoMeta, Long> {
     List<SeguimientoMeta> findByTenantIdAndMetaId(Long tenantId, Long metaId);
+    List<SeguimientoMeta> findByTenantIdAndMetaIdOrderByFechaAscIdAsc(Long tenantId, Long metaId);
 }

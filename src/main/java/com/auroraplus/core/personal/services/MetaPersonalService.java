@@ -56,6 +56,14 @@ public class MetaPersonalService {
         return metaPersonalRepository.findByTenantIdOrderByPeriodoHastaDesc(tenantId);
     }
 
+    public List<SeguimientoMeta> listarSeguimientos(Long tenantId, Long metaId) {
+        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_METAS);
+        MetaPersonal meta = metaPersonalRepository.findByTenantIdAndId(tenantId, metaId)
+            .orElseThrow(() -> new RuntimeException("Meta no encontrada"));
+        accessService.exigirVerDatosDeEmpleado(tenantId, meta.getEmpleadoId());
+        return seguimientoMetaRepository.findByTenantIdAndMetaIdOrderByFechaAscIdAsc(tenantId, metaId);
+    }
+
     @Transactional
     public SeguimientoMeta registrarAvance(Long tenantId, Long metaId, SeguimientoMeta seguimiento) {
         accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_METAS);

@@ -281,7 +281,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                           <p className="text-[#94a3b8] text-xs mt-0.5">{m.descripcion}</p>
                         </div>
                         <span className="font-mono text-[#35d7c3] font-bold">
-                          {m.progresoActual} / {m.metaValor} {m.unidadMedida}
+                          {m.progresoActual == null ? 'Sin seguimiento' : `${m.progresoActual} / ${m.metaValor} ${m.unidadMedida}`}
                         </span>
                       </div>
 
@@ -289,7 +289,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                         <div
                           className="bg-[#35d7c3] h-full rounded-full transition-all duration-300"
                           style={{
-                            width: `${Math.min(100, Math.round((m.progresoActual / m.metaValor) * 100))}%`,
+                            width: `${m.progresoActual == null || m.metaValor <= 0 ? 0 : Math.min(100, Math.round((m.progresoActual / m.metaValor) * 100))}%`,
                           }}
                         />
                       </div>

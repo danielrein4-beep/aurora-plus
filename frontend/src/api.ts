@@ -2955,6 +2955,14 @@ export interface MetaPersonalApi {
   periodoHasta: string;
 }
 
+export interface SeguimientoMetaApi {
+  id: number;
+  metaId: number;
+  fecha: string;
+  valorAlcanzado: number;
+  nota: string | null;
+}
+
 export interface PeriodoNominaApi {
   id: number;
   nombre: string;
@@ -3043,6 +3051,26 @@ export function registrarSalidaPersonal(id: number, fechaHoraSalida: string): Pr
 
 export function listarMetasPersonal(): Promise<MetaPersonalApi[]> {
   return request("/api/personal/metas");
+}
+
+export function listarMetasDeEmpleado(empleadoId: number): Promise<MetaPersonalApi[]> {
+  return request(`/api/personal/metas/empleado/${empleadoId}`);
+}
+
+export function crearMetaPersonal(datos: {
+  empleadoId: number;
+  nombre: string;
+  descripcion?: string;
+  valorObjetivo: number;
+  unidad: string;
+  periodoDesde: string;
+  periodoHasta: string;
+}): Promise<MetaPersonalApi> {
+  return request("/api/personal/metas", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function listarSeguimientosMeta(metaId: number): Promise<SeguimientoMetaApi[]> {
+  return request(`/api/personal/metas/${metaId}/seguimientos`);
 }
 
 export function listarPeriodosNomina(): Promise<PeriodoNominaApi[]> {

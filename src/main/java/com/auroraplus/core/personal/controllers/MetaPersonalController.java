@@ -31,6 +31,11 @@ public class MetaPersonalController {
         return metaPersonalService.listarDeEmpleado(TenantContext.getCurrentTenant(), empleadoId);
     }
 
+    @GetMapping("/{id}/seguimientos")
+    public List<SeguimientoMeta> listarSeguimientos(@PathVariable Long id) {
+        return metaPersonalService.listarSeguimientos(TenantContext.getCurrentTenant(), id);
+    }
+
     @PostMapping("/{id}/seguimientos")
     public SeguimientoMeta registrarAvance(@PathVariable Long id, @RequestBody SeguimientoMeta seguimiento) {
         return metaPersonalService.registrarAvance(TenantContext.getCurrentTenant(), id, seguimiento);

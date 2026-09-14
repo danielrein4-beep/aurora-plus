@@ -113,7 +113,7 @@ export interface MetaPersonal {
   empleadoAsignadoNombre?: string;
   metaValor: number;
   unidadMedida: string;
-  progresoActual: number;
+  progresoActual: number | null;
   fechaInicio: string;
   fechaLimite: string;
   estado: 'EN_PROGRESO' | 'COMPLETADA' | 'EN_RIESGO' | 'VENCIDA';

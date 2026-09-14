@@ -1,14 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MetaPersonal, DepartamentoPersonal, TipoMeta, CategoriaMeta } from './types';
+import { MetaPersonal, DepartamentoPersonal, TipoMeta, Empleado } from './types';
 
 interface MetasPersonalProps {
   metas: MetaPersonal[];
-  onAgregarMeta?: (nueva: MetaPersonal) => void;
+  empleados: Empleado[];
+  puedeGestionar: boolean;
+  onCrearMeta?: (datos: {
+    empleadoId: string; titulo: string; descripcion: string; valor: number;
+    unidad: string; fechaInicio: string; fechaLimite: string;
+  }) => Promise<MetaPersonal>;
 }
 
 export const MetasPersonal: React.FC<MetasPersonalProps> = ({
   metas: initialMetas,
-  onAgregarMeta,
+  empleados,
+  puedeGestionar,
+  onCrearMeta,
 }) => {
   const [metas, setMetas] = useState<MetaPersonal[]>(initialMetas);
   const [tipoFiltro, setTipoFiltro] = useState<'TODAS' | TipoMeta>('TODAS');
@@ -16,12 +23,13 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
   const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
   const [nuevoTitulo, setNuevoTitulo] = useState('');
   const [nuevaDescripcion, setNuevaDescripcion] = useState('');
-  const [nuevoDepto, setNuevoDepto] = useState<DepartamentoPersonal>('Atención & Salud');
-  const [nuevaCategoria, setNuevaCategoria] = useState<CategoriaMeta>('CALIDAD_SERVICIO');
-  const [nuevoTipo, setNuevoTipo] = useState<TipoMeta>('MANUAL');
+  const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState('');
   const [nuevoValor, setNuevoValor] = useState(100);
   const [nuevaUnidad, setNuevaUnidad] = useState('%');
+  const [fechaInicio, setFechaInicio] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fechaLimite, setFechaLimite] = useState(() => new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
   const [toastMensaje, setToastMensaje] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   // Referencias para gestión real del foco
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
@@ -30,6 +38,10 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
   useEffect(() => {
     setMetas(initialMetas);
   }, [initialMetas]);
+
+  useEffect(() => {
+    if (!empleadoSeleccionado && empleados[0]) setEmpleadoSeleccionado(empleados[0].id);
+  }, [empleados, empleadoSeleccionado]);
 
   // Gestión de foco al abrir/cerrar modal
   useEffect(() => {
@@ -61,39 +73,28 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
     setTimeout(() => setToastMensaje(null), 3500);
   };
 
-  const handleCrearMeta = () => {
-    if (!nuevoTitulo.trim()) {
-      alert('Debe indicar un título para la meta formativa.');
+  const handleCrearMeta = async () => {
+    if (!nuevoTitulo.trim() || !empleadoSeleccionado || !nuevaUnidad.trim() || nuevoValor <= 0 || fechaInicio > fechaLimite) {
+      mostrarNotificacion('Completa empleado, título, objetivo y un período válido');
       return;
     }
-
-    const nueva: MetaPersonal = {
-      id: `MET-${Date.now()}`,
-      titulo: `${nuevoTitulo} [DEMO]`,
-      descripcion: nuevaDescripcion || 'Meta de desarrollo y excelencia operativa.',
-      categoria: nuevaCategoria,
-      tipo: nuevoTipo,
-      origenMetrica: nuevoTipo === 'AUTOMATICA' ? 'Módulo central ERP' : 'Supervisión de área',
-      departamentoObjetivo: nuevoDepto,
-      verticalObjetivo: 'TODAS',
-      metaValor: nuevoValor,
-      unidadMedida: nuevaUnidad,
-      progresoActual: 0,
-      fechaInicio: '2026-09-01',
-      fechaLimite: '2026-09-30',
-      estado: 'EN_PROGRESO',
-      esNoPunitiva: true,
-      reconocimiento: 'Reconocimiento al equipo por cumplimiento [DEMO]',
-    };
-
-    setMetas([nueva, ...metas]);
-    if (onAgregarMeta) {
-      onAgregarMeta(nueva);
+    if (!onCrearMeta) return;
+    setGuardando(true);
+    try {
+      const guardada = await onCrearMeta({
+        empleadoId: empleadoSeleccionado, titulo: nuevoTitulo.trim(), descripcion: nuevaDescripcion.trim(),
+        valor: nuevoValor, unidad: nuevaUnidad.trim(), fechaInicio, fechaLimite,
+      });
+      setMetas((actuales) => [guardada, ...actuales]);
+      setModalCrearAbierto(false);
+      setNuevoTitulo('');
+      setNuevaDescripcion('');
+      mostrarNotificacion('Meta formativa creada correctamente');
+    } catch (error) {
+      mostrarNotificacion(error instanceof Error ? error.message : 'No se pudo crear la meta');
+    } finally {
+      setGuardando(false);
     }
-    setModalCrearAbierto(false);
-    setNuevoTitulo('');
-    setNuevaDescripcion('');
-    mostrarNotificacion('Meta formativa creada y registrada en el ciclo actual [DEMO]');
   };
 
   const departamentos: (DepartamentoPersonal | 'TODOS')[] = [
@@ -187,18 +188,19 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
           </div>
         </div>
 
-        <button
+        {puedeGestionar && <button
           onClick={() => setModalCrearAbierto(true)}
           className="px-3.5 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white"
         >
-          + Crear Meta Formativa [DEMO]
-        </button>
+          + Crear meta formativa
+        </button>}
       </div>
 
       {/* Grid de Metas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filtradas.map((meta) => {
-          const porcentaje = Math.min(100, Math.round((meta.progresoActual / meta.metaValor) * 100));
+          const porcentaje = meta.progresoActual == null || meta.metaValor <= 0
+            ? null : Math.min(100, Math.round((meta.progresoActual / meta.metaValor) * 100));
           const esAutomatica = meta.tipo === 'AUTOMATICA';
 
           return (
@@ -244,7 +246,9 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-[#64748b]">Progreso computado:</span>
                   <span className="font-mono font-bold text-[#35d7c3]">
-                    {meta.progresoActual} / {meta.metaValor} {meta.unidadMedida} ({porcentaje}%)
+                    {meta.progresoActual == null
+                      ? `Sin seguimiento · objetivo ${meta.metaValor} ${meta.unidadMedida}`
+                      : `${meta.progresoActual} / ${meta.metaValor} ${meta.unidadMedida} (${porcentaje}%)`}
                   </span>
                 </div>
 
@@ -253,7 +257,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                     className={`h-full rounded-full transition-all duration-300 ${
                       meta.estado === 'COMPLETADA' ? 'bg-[#35d7c3]' : 'bg-[#38bdf8]'
                     }`}
-                    style={{ width: `${porcentaje}%` }}
+                    style={{ width: `${porcentaje ?? 0}%` }}
                   />
                 </div>
 
@@ -285,7 +289,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
           <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <h3 id="modal-crear-meta-titulo" className="text-base font-bold text-[#f8fafc]">
-                Nueva Meta Formativa [DEMO]
+                Nueva meta formativa
               </h3>
               <button
                 ref={btnCerrarModalRef}
@@ -320,30 +324,26 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                 />
               </div>
 
+              <div>
+                <label htmlFor="meta-empleado" className="text-[#94a3b8] block mb-1">Empleado:</label>
+                <select id="meta-empleado" value={empleadoSeleccionado} onChange={(e) => setEmpleadoSeleccionado(e.target.value)}
+                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]">
+                  {empleados.map((empleado) => <option key={empleado.id} value={empleado.id}>{empleado.nombre} · {empleado.cargo}</option>)}
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[#94a3b8] block mb-1">Departamento:</label>
-                  <select
-                    value={nuevoDepto}
-                    onChange={(e) => setNuevoDepto(e.target.value as any)}
+                  <label htmlFor="meta-desde" className="text-[#94a3b8] block mb-1">Desde:</label>
+                  <input id="meta-desde" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)}
                     className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
-                  >
-                    <option value="Atención & Salud">Atención & Salud</option>
-                    <option value="Cocina & Restauración">Cocina & Restauración</option>
-                    <option value="Operaciones & Campo">Operaciones & Campo</option>
-                    <option value="Administración & Finanzas">Administración & Finanzas</option>
-                  </select>
+                  />
                 </div>
                 <div>
-                  <label className="text-[#94a3b8] block mb-1">Tipo de Meta:</label>
-                  <select
-                    value={nuevoTipo}
-                    onChange={(e) => setNuevoTipo(e.target.value as any)}
+                  <label htmlFor="meta-hasta" className="text-[#94a3b8] block mb-1">Hasta:</label>
+                  <input id="meta-hasta" type="date" value={fechaLimite} onChange={(e) => setFechaLimite(e.target.value)}
                     className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
-                  >
-                    <option value="MANUAL">Manual (Supervisión)</option>
-                    <option value="AUTOMATICA">Automática (ERP)</option>
-                  </select>
+                  />
                 </div>
               </div>
 
@@ -379,9 +379,10 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
               </button>
               <button
                 onClick={handleCrearMeta}
+                disabled={guardando}
                 className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs focus:outline-none focus:ring-2 focus:ring-white"
               >
-                Crear Meta Formativa
+                {guardando ? 'Guardando…' : 'Crear meta formativa'}
               </button>
             </div>
           </div>

@@ -3,6 +3,9 @@ import {
   listarAsistenciaPersonal,
   listarDirectorioPersonal,
   listarMetasPersonal,
+  listarMetasDeEmpleado,
+  listarSeguimientosMeta,
+  crearMetaPersonal,
   listarPeriodosNomina,
   listarTurnosPersonal,
   crearTurnoPersonal,
@@ -13,6 +16,7 @@ import {
   type CapacidadesPersonal,
   type AsistenciaPersonalApi,
   type EntradaDirectorioPersonalApi,
+  type MetaPersonalApi,
 } from '../api';
 import {
   MOCK_TURNOS_HORARIOS,
@@ -82,6 +86,19 @@ const mapearAsistencia = (registro: AsistenciaPersonalApi, empleado?: Empleado):
     : registro.origen === 'TERMINAL_PIN' ? 'PIN_TERMINAL' : 'PLANILLA_DIGITAL',
 });
 
+const mapearMeta = (meta: MetaPersonalApi, empleado?: Empleado, progreso: number | null = null): MetaPersonal => {
+  const vencida = meta.periodoHasta < new Date().toISOString().slice(0, 10);
+  return {
+    id: String(meta.id), titulo: meta.nombre, descripcion: meta.descripcion || '', categoria: 'EFICIENCIA_PROCESOS',
+    tipo: 'MANUAL', origenMetrica: 'Seguimiento registrado en Aurora',
+    departamentoObjetivo: empleado?.departamento || 'TODOS', verticalObjetivo: empleado?.verticalPrincipal || 'TODAS',
+    empleadoAsignadoId: String(meta.empleadoId), empleadoAsignadoNombre: empleado?.nombre,
+    metaValor: meta.valorObjetivo, unidadMedida: meta.unidad, progresoActual: progreso,
+    fechaInicio: meta.periodoDesde, fechaLimite: meta.periodoHasta,
+    estado: vencida ? 'VENCIDA' : 'EN_PROGRESO', esNoPunitiva: true,
+  };
+};
+
 const PERIODO_VACIO: PeriodoNomina = {
   id: 'sin-periodo', codigoPeriodo: 'SIN-PERIODO', nombre: 'Sin períodos calculados',
   fechaInicio: '', fechaFin: '', fechaTentativaPago: '', estado: 'BORRADOR',
@@ -141,7 +158,9 @@ export const PersonalPage: React.FC = () => {
         const [turnosApi, asistenciasApi, metasApi, periodosApi] = await Promise.all([
           capacidades.asistencia && capacidades.puedeVerDirectorio ? listarTurnosPersonal(desde, hasta) : Promise.resolve([]),
           capacidades.asistencia && capacidades.puedeVerDirectorio ? listarAsistenciaPersonal(desde, hasta) : Promise.resolve([]),
-          capacidades.metas && capacidades.puedeVerDirectorio ? listarMetasPersonal() : Promise.resolve([]),
+          capacidades.metas && capacidades.puedeVerDirectorio ? listarMetasPersonal()
+            : capacidades.metas && capacidades.rolPersonal === 'EMPLEADO' && capacidades.empleadoId
+              ? listarMetasDeEmpleado(capacidades.empleadoId) : Promise.resolve([]),
           capacidades.nominaAvanzada && capacidades.puedeVerMontosNomina ? listarPeriodosNomina() : Promise.resolve([]),
         ]);
         if (!activo) return;
@@ -160,17 +179,12 @@ export const PersonalPage: React.FC = () => {
           };
         }));
         setAsistencias(asistenciasApi.map((registro) => mapearAsistencia(registro, porId.get(String(registro.empleadoId)))));
-        setMetas(metasApi.map((meta) => {
-          const empleado = porId.get(String(meta.empleadoId));
-          const vencida = meta.periodoHasta < new Date().toISOString().slice(0, 10);
-          return {
-            id: String(meta.id), titulo: meta.nombre, descripcion: meta.descripcion || '', categoria: 'EFICIENCIA_PROCESOS',
-            tipo: 'MANUAL', origenMetrica: 'Seguimiento registrado en Aurora', departamentoObjetivo: empleado?.departamento || 'TODOS',
-            verticalObjetivo: empleado?.verticalPrincipal || 'TODAS', empleadoAsignadoId: String(meta.empleadoId),
-            empleadoAsignadoNombre: empleado?.nombre, metaValor: meta.valorObjetivo, unidadMedida: meta.unidad,
-            progresoActual: 0, fechaInicio: meta.periodoDesde, fechaLimite: meta.periodoHasta,
-            estado: vencida ? 'VENCIDA' : 'EN_PROGRESO', esNoPunitiva: true,
-          };
+        const seguimientos = await Promise.all(metasApi.map((meta) => listarSeguimientosMeta(meta.id)));
+        if (!activo) return;
+        setMetas(metasApi.map((meta, indice) => {
+          const historial = seguimientos[indice];
+          const ultimo = historial.length > 0 ? historial[historial.length - 1] : null;
+          return mapearMeta(meta, porId.get(String(meta.empleadoId)), ultimo?.valorAlcanzado ?? null);
         }));
         const detallesNomina = await Promise.all(periodosApi.map((periodo) => obtenerDetallePeriodoNomina(periodo.id)));
         if (!activo) return;
@@ -377,7 +391,18 @@ export const PersonalPage: React.FC = () => {
           {!cargandoDatos && !errorDatos && seccionActiva === 'metas' && (
             <MetasPersonal
               metas={metas}
-              onAgregarMeta={(nueva) => setMetas([nueva, ...metas])}
+              empleados={empleados}
+              puedeGestionar={Boolean(capacidades?.puedeGestionarMetas)}
+              onCrearMeta={async (datos) => {
+                const guardada = await crearMetaPersonal({
+                  empleadoId: Number(datos.empleadoId), nombre: datos.titulo,
+                  descripcion: datos.descripcion || undefined, valorObjetivo: datos.valor,
+                  unidad: datos.unidad, periodoDesde: datos.fechaInicio, periodoHasta: datos.fechaLimite,
+                });
+                const metaGuardada = mapearMeta(guardada, empleados.find((item) => item.id === datos.empleadoId));
+                setMetas((actuales) => [metaGuardada, ...actuales]);
+                return metaGuardada;
+              }}
             />
           )}
 
