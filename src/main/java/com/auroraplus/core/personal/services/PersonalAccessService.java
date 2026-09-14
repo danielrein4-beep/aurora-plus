@@ -141,16 +141,6 @@ public class PersonalAccessService {
         return tieneRol(tenantId, PUEDEN_GESTIONAR_OPERACION);
     }
 
-    /** Para que un EMPLEADO solo pueda leer su propia asistencia/metas (no montos de nómina), nunca la de otro. */
-    public Long empleadoIdPropioSiAplica(Long tenantId) {
-        if (esDuenoAdmin()) return null; // sin restricción
-        Long usuarioId = resolverUsuarioIdActual(tenantId);
-        return permisoPersonalRepository.findByTenantIdAndUsuarioId(tenantId, usuarioId)
-            .filter(p -> p.getRol() == PermisoPersonal.RolPersonal.EMPLEADO)
-            .map(PermisoPersonal::getEmpleadoId)
-            .orElse(null);
-    }
-
     /** Permite consultar datos operativos de un empleado al dueño/equipo autorizado o al propio empleado. */
     public void exigirVerDatosDeEmpleado(Long tenantId, Long empleadoId) {
         if (esDuenoAdmin()) return;

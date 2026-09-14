@@ -7,6 +7,7 @@ import com.auroraplus.core.personal.services.MetaPersonalService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -34,6 +35,12 @@ public class MetaPersonalController {
     @GetMapping("/{id}/seguimientos")
     public List<SeguimientoMeta> listarSeguimientos(@PathVariable Long id) {
         return metaPersonalService.listarSeguimientos(TenantContext.getCurrentTenant(), id);
+    }
+
+    /** El último seguimiento cronológico, nunca la suma de todos — ver MetaPersonalService.obtenerProgresoVigente. */
+    @GetMapping("/{id}/progreso")
+    public BigDecimal progresoVigente(@PathVariable Long id) {
+        return metaPersonalService.obtenerProgresoVigente(TenantContext.getCurrentTenant(), id);
     }
 
     @PostMapping("/{id}/seguimientos")
