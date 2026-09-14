@@ -5,6 +5,7 @@ import com.auroraplus.modules.salud.entities.CitaMedica;
 import com.auroraplus.modules.salud.entities.ConsultaMedica;
 import com.auroraplus.modules.salud.repositories.CitaMedicaRepository;
 import com.auroraplus.modules.salud.repositories.ConsultaMedicaRepository;
+import com.auroraplus.modules.salud.repositories.PacienteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,12 +22,24 @@ public class ConsultaMedicaService {
     @Autowired
     private CitaMedicaRepository citaMedicaRepository;
 
-    public List<ConsultaMedica> historialPorPaciente(Long pacienteId) {
-        return consultaMedicaRepository.findByPacienteIdOrderByFechaHoraDesc(pacienteId);
+    @Autowired
+    private PacienteRepository pacienteRepository;
+
+    /**
+     * Hardening piloto P0: antes filtraba solo por pacienteId, sin tenant — cualquier tenant
+     * autenticado podía leer el historial clínico completo de un paciente de OTRA clínica con
+     * solo adivinar/enumerar su id. Ahora exige tenantId explícito (de TenantContext, nunca del
+     * request — ver ConsultaMedicaController).
+     */
+    public List<ConsultaMedica> historialPorPaciente(Long tenantId, Long pacienteId) {
+        exigirTenant(tenantId);
+        return consultaMedicaRepository.findByTenantIdAndPacienteIdOrderByFechaHoraDesc(tenantId, pacienteId);
     }
 
-    public List<ConsultaMedica> listarPorMedico(Long medicoId) {
-        return consultaMedicaRepository.findByMedicoIdOrderByFechaHoraDesc(medicoId);
+    /** Mismo hallazgo que historialPorPaciente(), para la agenda de un médico. */
+    public List<ConsultaMedica> listarPorMedico(Long tenantId, Long medicoId) {
+        exigirTenant(tenantId);
+        return consultaMedicaRepository.findByTenantIdAndMedicoIdOrderByFechaHoraDesc(tenantId, medicoId);
     }
 
     /**
@@ -48,12 +61,18 @@ public class ConsultaMedicaService {
 
     @Transactional
     public ConsultaMedica registrarConsulta(Long tenantId, ConsultaMedica consulta) {
+        exigirTenant(tenantId);
         if (consulta.getPaciente() == null || consulta.getPaciente().getId() == null) {
             throw new IllegalArgumentException("La consulta médica debe estar asociada a un paciente.");
         }
         if (consulta.getMotivoConsulta() == null || consulta.getMotivoConsulta().isBlank()) {
             throw new IllegalArgumentException("El motivo de consulta es obligatorio.");
         }
+        // Hardening piloto P0: antes no se validaba que el paciente referenciado perteneciera a
+        // este tenant — una clínica podía crear una consulta apuntando al pacienteId de OTRA
+        // clínica, mezclando historiales clínicos entre tenants.
+        pacienteRepository.findByTenantIdAndId(tenantId, consulta.getPaciente().getId())
+            .orElseThrow(() -> new RuntimeException("Paciente no encontrado (o no pertenece a este tenant)"));
 
         consulta.setTenantId(tenantId);
         consulta.calcularImc();
@@ -86,5 +105,11 @@ public class ConsultaMedicaService {
             throw new RuntimeException("Violación de seguridad: la consulta no pertenece a este tenant");
         }
         consultaMedicaRepository.delete(consulta);
+    }
+
+    private void exigirTenant(Long tenantId) {
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant no identificado en la sesión");
+        }
     }
 }

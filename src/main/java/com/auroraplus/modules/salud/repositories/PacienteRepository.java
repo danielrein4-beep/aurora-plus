@@ -12,20 +12,15 @@ import java.util.Optional;
 @Repository
 public interface PacienteRepository extends JpaRepository<Paciente, Long> {
 
-    Optional<Paciente> findByIdentificacion(String identificacion);
-
-    List<Paciente> findByActivoTrue();
+    // findByActivoTrue()/findByIdentificacion(String) sin tenant se eliminaron (hardening
+    // piloto P0) — eran las queries detrás de las sobrecargas sin tenantId de PacienteService,
+    // sin ningún caso de uso real fuera de ese código ya removido.
 
     List<Paciente> findByTenantIdAndActivoTrue(Long tenantId);
 
     Optional<Paciente> findByTenantIdAndId(Long tenantId, Long id);
 
     Optional<Paciente> findByTenantIdAndIdentificacion(Long tenantId, String identificacion);
-
-    @Query("SELECT p FROM Paciente p WHERE LOWER(p.nombres) LIKE LOWER(CONCAT('%', :query, '%')) " +
-           "OR LOWER(p.apellidos) LIKE LOWER(CONCAT('%', :query, '%')) " +
-           "OR LOWER(p.identificacion) LIKE LOWER(CONCAT('%', :query, '%'))")
-    List<Paciente> buscarPorFiltro(@Param("query") String query);
 
     @Query("SELECT p FROM Paciente p WHERE p.tenantId = :tenantId AND p.activo = true AND (" +
            "LOWER(p.nombres) LIKE LOWER(CONCAT('%', :query, '%')) " +

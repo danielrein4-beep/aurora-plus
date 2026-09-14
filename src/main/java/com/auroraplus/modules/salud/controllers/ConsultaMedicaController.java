@@ -18,6 +18,11 @@ import java.util.List;
  * El acceso a los diagnósticos y fichas clínicas está restringido EXCLUSIVAMENTE
  * a personal con rol MEDICO o DUENO_ADMIN / SUPER_ADMIN. Personal de caja/recepción
  * recibe 403 Forbidden para garantizar la privacidad y confidencialidad médica.
+ *
+ * Hardening de aislamiento por tenant (piloto P0): historialPorPaciente/listarPorMedico no
+ * filtraban por tenant en absoluto (fuga total de historia clínica entre clínicas);
+ * registrarConsulta aceptaba un tenantId opcional por query que ganaba sobre TenantContext.
+ * Ahora el tenant sale EXCLUSIVAMENTE de TenantContext (JWT verificado) en todos los endpoints.
  */
 @RestController
 @RequestMapping("/api/salud/consultas")
@@ -56,13 +61,13 @@ public class ConsultaMedicaController {
     @GetMapping("/paciente/{pacienteId}")
     public List<ConsultaMedica> historialPorPaciente(@PathVariable Long pacienteId) {
         validarPermisoClinico();
-        return consultaMedicaService.historialPorPaciente(pacienteId);
+        return consultaMedicaService.historialPorPaciente(TenantContext.getCurrentTenant(), pacienteId);
     }
 
     @GetMapping("/medico/{medicoId}")
     public List<ConsultaMedica> listarPorMedico(@PathVariable Long medicoId) {
         validarPermisoClinico();
-        return consultaMedicaService.listarPorMedico(medicoId);
+        return consultaMedicaService.listarPorMedico(TenantContext.getCurrentTenant(), medicoId);
     }
 
     @GetMapping("/{id}")
@@ -74,12 +79,10 @@ public class ConsultaMedicaController {
     }
 
     @PostMapping
-    public ResponseEntity<ConsultaMedica> registrarConsulta(
-            @RequestParam(required = false) Long tenantId,
-            @RequestBody ConsultaMedica consulta) {
+    public ResponseEntity<ConsultaMedica> registrarConsulta(@RequestBody ConsultaMedica consulta) {
         validarPermisoClinico();
 
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }
@@ -89,9 +92,7 @@ public class ConsultaMedicaController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminarConsulta(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long tenantId) {
+    public ResponseEntity<Void> eliminarConsulta(@PathVariable Long id) {
         validarPermisoClinico();
         consultaMedicaService.eliminarConsulta(id);
         return ResponseEntity.noContent().build();

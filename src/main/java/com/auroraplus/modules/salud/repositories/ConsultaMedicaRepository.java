@@ -12,9 +12,13 @@ import java.util.Optional;
 @Repository
 public interface ConsultaMedicaRepository extends JpaRepository<ConsultaMedica, Long> {
 
-    List<ConsultaMedica> findByPacienteIdOrderByFechaHoraDesc(Long pacienteId);
+    // Hardening piloto P0: las versiones sin tenantId (findByPacienteIdOrderByFechaHoraDesc /
+    // findByMedicoIdOrderByFechaHoraDesc) se eliminaron — exponían el historial clínico de
+    // CUALQUIER paciente/médico de CUALQUIER tenant, sin ningún filtro (ver
+    // ConsultaMedicaService). Sin otros llamadores fuera de esta clase (confirmado por grep).
+    List<ConsultaMedica> findByTenantIdAndPacienteIdOrderByFechaHoraDesc(Long tenantId, Long pacienteId);
 
-    List<ConsultaMedica> findByMedicoIdOrderByFechaHoraDesc(Long medicoId);
+    List<ConsultaMedica> findByTenantIdAndMedicoIdOrderByFechaHoraDesc(Long tenantId, Long medicoId);
 
     Optional<ConsultaMedica> findByCitaId(Long citaId);
 

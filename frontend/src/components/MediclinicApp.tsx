@@ -794,9 +794,9 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   const recargarTodo = () => {
     cargarContadorLab();
-    listarPacientes(tenantId).then(setPacientes).catch(() => setPacientes([]));
+    listarPacientes().then(setPacientes).catch(() => setPacientes([]));
     listarCitasDelDia(tenantId, hoy()).then(setCitasHoy).catch(() => setCitasHoy([]));
-    listarSalaEspera(tenantId).then(setSalaEspera).catch(() => setSalaEspera([]));
+    listarSalaEspera().then(setSalaEspera).catch(() => setSalaEspera([]));
     listarProcedimientos(tenantId).then(setProcedimientos).catch(() => setProcedimientos([]));
     listarCobrosDelDia(`${hoy()}T00:00:00`, `${hoy()}T23:59:59`)
       .then((c) => {
@@ -2074,8 +2074,8 @@ function GestionPacientes({
         contactoEmergenciaTelefono: form.contactoEmergenciaTelefono.trim() || undefined,
       };
       const guardado = pacienteEditandoId
-        ? await actualizarPaciente(tenantId, pacienteEditandoId, datos)
-        : await crearPaciente(tenantId, datos);
+        ? await actualizarPaciente(pacienteEditandoId, datos)
+        : await crearPaciente(datos);
       setForm(formVacio);
       setPacienteEditandoId(null);
       setMostrarForm(false);
@@ -2971,7 +2971,7 @@ function HistoriasClinicas({
     setError(null);
     setGuardando(true);
     try {
-      const res = await registrarConsulta(tenantId, Number(pacienteSeleccionado.id), {
+      const res = await registrarConsulta(Number(pacienteSeleccionado.id), {
         motivoConsulta: form.motivoConsulta,
         descripcionDiagnostico: form.descripcionDiagnostico,
         diagnosticoPrincipalCIE10: form.diagnosticoPrincipalCIE10 || undefined,
@@ -3187,7 +3187,7 @@ function HistoriasClinicas({
       return;
     }
     try {
-      await eliminarConsulta(tenantId, Number(pacienteSeleccionado.id), Number(c.id));
+      await eliminarConsulta(Number(pacienteSeleccionado.id), Number(c.id));
       setHistorial((prev) => (prev || []).filter((item) => item.id !== c.id));
       if (consultaDetalle && consultaDetalle.id === c.id) {
         setConsultaDetalle(null);
@@ -5393,7 +5393,7 @@ function SalaEspera({
 
       // Backend sync
       if (admitirPacienteId && tenantId) {
-        registrarLlegadaSalaEspera(tenantId, Number(admitirPacienteId), admitirConsultorio).catch((err) => {
+        registrarLlegadaSalaEspera(Number(admitirPacienteId), admitirConsultorio).catch((err) => {
           dispararToast(`⚠️ El paciente quedó en la sala de espera local, pero no se pudo registrar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
         });
       }
@@ -6684,10 +6684,10 @@ function AgendaMedica({
       if (match) return match.id;
     }
     if (cedula) {
-      const encontrado = await buscarPacientePorIdentificacion(tenantId, cedula);
+      const encontrado = await buscarPacientePorIdentificacion(cedula);
       if (encontrado) return encontrado.id;
     }
-    const creado = await crearPaciente(tenantId, {
+    const creado = await crearPaciente({
       identificacion: cedula || `SC-${Date.now()}`,
       nombres: formNombres.trim(),
       apellidos: formApellidos.trim(),

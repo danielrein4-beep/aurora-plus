@@ -4,6 +4,7 @@ import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.CitaMedica;
 import com.auroraplus.modules.salud.entities.SalaEspera;
 import com.auroraplus.modules.salud.repositories.CitaMedicaRepository;
+import com.auroraplus.modules.salud.repositories.PacienteRepository;
 import com.auroraplus.modules.salud.repositories.SalaEsperaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -21,14 +22,30 @@ public class SalaEsperaService {
     @Autowired
     private CitaMedicaRepository citaMedicaRepository;
 
-    public List<SalaEspera> listarColaActiva() {
-        return salaEsperaRepository.findByEstadoInOrderByHoraLlegadaAsc(
-            List.of(SalaEspera.EstadoEspera.EN_ESPERA, SalaEspera.EstadoEspera.EN_CONSULTA)
+    @Autowired
+    private PacienteRepository pacienteRepository;
+
+    /**
+     * Hardening piloto P0: antes no filtraba por tenant en absoluto — la cola de espera en
+     * tiempo real (con nombres de pacientes) mezclaba TODAS las clínicas del sistema.
+     */
+    public List<SalaEspera> listarColaActiva(Long tenantId) {
+        exigirTenant(tenantId);
+        return salaEsperaRepository.findByTenantIdAndEstadoInOrderByHoraLlegadaAsc(
+            tenantId, List.of(SalaEspera.EstadoEspera.EN_ESPERA, SalaEspera.EstadoEspera.EN_CONSULTA)
         );
     }
 
     @Transactional
     public SalaEspera checkIn(Long tenantId, SalaEspera entrada) {
+        exigirTenant(tenantId);
+        if (entrada.getPaciente() == null || entrada.getPaciente().getId() == null) {
+            throw new IllegalArgumentException("El check-in debe estar asociado a un paciente.");
+        }
+        // Hardening piloto P0: antes no se validaba que el paciente referenciado perteneciera a
+        // este tenant — una clínica podía hacer check-in de un paciente de OTRA clínica.
+        pacienteRepository.findByTenantIdAndId(tenantId, entrada.getPaciente().getId())
+            .orElseThrow(() -> new RuntimeException("Paciente no encontrado (o no pertenece a este tenant)"));
         entrada.setTenantId(tenantId);
         entrada.setHoraLlegada(LocalDateTime.now());
         entrada.setEstado(SalaEspera.EstadoEspera.EN_ESPERA);
@@ -101,5 +118,11 @@ public class SalaEsperaService {
         entrada.setHoraFinalizacion(LocalDateTime.now());
 
         return salaEsperaRepository.save(entrada);
+    }
+
+    private void exigirTenant(Long tenantId) {
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant no identificado en la sesión");
+        }
     }
 }

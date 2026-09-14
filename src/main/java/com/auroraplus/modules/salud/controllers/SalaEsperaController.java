@@ -10,6 +10,12 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Hardening de aislamiento por tenant (piloto P0): listarColaActiva no filtraba por tenant en
+ * absoluto (exponía en tiempo real la cola de espera de todas las clínicas); checkIn aceptaba un
+ * tenantId opcional por query que ganaba sobre TenantContext. Ahora el tenant sale
+ * EXCLUSIVAMENTE de TenantContext (JWT verificado).
+ */
 @RestController
 @RequestMapping("/api/salud/sala-espera")
 public class SalaEsperaController {
@@ -22,12 +28,12 @@ public class SalaEsperaController {
 
     @GetMapping
     public List<SalaEspera> listarColaActiva() {
-        return salaEsperaService.listarColaActiva();
+        return salaEsperaService.listarColaActiva(TenantContext.getCurrentTenant());
     }
 
     @PostMapping("/check-in")
-    public ResponseEntity<SalaEspera> checkIn(@RequestParam(required = false) Long tenantId, @RequestBody SalaEspera entrada) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<SalaEspera> checkIn(@RequestBody SalaEspera entrada) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         // Un solo médico por tenant: se sabe desde el check-in quién atiende, no hace
         // falta esperar a "llamar" para asignarlo (ver MedicoTenantResolver).
         if (entrada.getMedicoId() == null) {
