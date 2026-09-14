@@ -129,7 +129,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
             <p className="text-xs text-[#64748b]">Esquemas horarios adaptados a salud, gastronomía y campo</p>
           </div>
           <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#131c2e] text-[#35d7c3] border border-[#1e2d48]">
-            [DEMO]
+            PLANTILLAS
           </span>
         </div>
 
@@ -194,7 +194,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
           onClick={() => setModalAsignarAbierto(true)}
           className="px-3.5 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white"
         >
-          + Asignar Turno Manual [DEMO]
+          + Asignar turno
         </button>
       </div>
 
@@ -234,12 +234,6 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
                     <span className="text-[11px] text-[#64748b] font-mono">Estado: {asg.estado}</span>
                   </div>
 
-                  <button
-                    onClick={() => mostrarNotificacion(`Solicitud de cambio de turno registrada para ${asg.empleadoNombre} [DEMO]`)}
-                    className="px-2.5 py-1.5 rounded bg-[#0b111e] border border-[#1e293b] text-xs text-[#cbd5e1] hover:text-[#f8fafc] hover:border-[#35d7c3]/40 transition-colors"
-                  >
-                    Reasignar
-                  </button>
                 </div>
               </div>
             ))}
@@ -255,10 +249,10 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
           aria-modal="true"
           aria-labelledby="modal-asignar-turno-titulo"
         >
-          <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
+          <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <h3 id="modal-asignar-turno-titulo" className="text-base font-bold text-[#f8fafc]">
-                Asignar Turno de Trabajo [DEMO]
+                Asignar turno de trabajo
               </h3>
               <button
                 ref={btnCerrarModalRef}

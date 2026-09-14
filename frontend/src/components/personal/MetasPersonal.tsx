@@ -286,7 +286,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
           aria-modal="true"
           aria-labelledby="modal-crear-meta-titulo"
         >
-          <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
+          <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <h3 id="modal-crear-meta-titulo" className="text-base font-bold text-[#f8fafc]">
                 Nueva meta formativa

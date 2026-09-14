@@ -83,7 +83,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Buscar por nombre, cargo, cédula o código [DEMO]..."
+            placeholder="Buscar por nombre, cargo, cédula o código..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#f8fafc] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
@@ -171,7 +171,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
                 <span className="text-[#cbd5e1] truncate block">{emp.departamento}</span>
               </div>
               <div>
-                <span className="text-[#64748b] block text-[10px]">Sueldo Ref. [DEMO]</span>
+                <span className="text-[#64748b] block text-[10px]">Sueldo pactado</span>
                 <span className="font-mono font-medium text-[#35d7c3]">
                   {ocultarSueldo ? '••••••' : formatearMoneda(emp.salarioBaseReferencial, emp.moneda)}
                 </span>
@@ -202,7 +202,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
                 <th className="py-3 px-4">Departamento / Cargo</th>
                 <th className="py-3 px-4">Turno Asignado</th>
                 <th className="py-3 px-4">Estado</th>
-                <th className="py-3 px-4 text-right">Sueldo Ref. [DEMO]</th>
+                <th className="py-3 px-4 text-right">Sueldo pactado</th>
                 <th className="py-3 px-4 text-center">Acción</th>
               </tr>
             </thead>

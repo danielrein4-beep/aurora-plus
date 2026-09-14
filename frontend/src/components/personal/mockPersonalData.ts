@@ -10,7 +10,7 @@ import {
 export const MOCK_TURNOS_HORARIOS: TurnoHorario[] = [
   {
     id: 'TRN-01',
-    nombre: 'Mañana Estándar [DEMO]',
+    nombre: 'Mañana estándar',
     tipo: 'MANANA',
     horaInicio: '07:00',
     horaFin: '15:00',
@@ -20,7 +20,7 @@ export const MOCK_TURNOS_HORARIOS: TurnoHorario[] = [
   },
   {
     id: 'TRN-02',
-    nombre: 'Tarde / Servicio [DEMO]',
+    nombre: 'Tarde / servicio',
     tipo: 'TARDE',
     horaInicio: '13:00',
     horaFin: '21:00',
@@ -30,7 +30,7 @@ export const MOCK_TURNOS_HORARIOS: TurnoHorario[] = [
   },
   {
     id: 'TRN-03',
-    nombre: 'Guardia Nocturna [DEMO]',
+    nombre: 'Guardia nocturna',
     tipo: 'NOCHE',
     horaInicio: '21:00',
     horaFin: '07:00',
@@ -40,7 +40,7 @@ export const MOCK_TURNOS_HORARIOS: TurnoHorario[] = [
   },
   {
     id: 'TRN-04',
-    nombre: 'Jornada Continua Campo [DEMO]',
+    nombre: 'Jornada continua de campo',
     tipo: 'JORNADA_CONTINUA',
     horaInicio: '06:00',
     horaFin: '14:00',
@@ -50,7 +50,7 @@ export const MOCK_TURNOS_HORARIOS: TurnoHorario[] = [
   },
   {
     id: 'TRN-05',
-    nombre: 'Día de Descanso Programado [DEMO]',
+    nombre: 'Día de descanso programado',
     tipo: 'LIBRE',
     horaInicio: '--:--',
     horaFin: '--:--',

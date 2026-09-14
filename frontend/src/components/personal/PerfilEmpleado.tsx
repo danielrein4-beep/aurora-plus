@@ -165,7 +165,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
               {/* Condiciones Laborales y Salario */}
               <div className="space-y-3">
                 <h4 className="font-semibold text-[#f8fafc] text-xs uppercase tracking-wider text-[#94a3b8]">
-                  Condiciones Laborales y Remuneración [DEMO]
+                  Condiciones laborales y remuneración
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-[#0f172a] rounded-xl border border-[#1e293b]">
                   <div>
@@ -181,7 +181,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                     <span className="text-[#38bdf8] font-medium">{empleado.turnoAsignado}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-[#64748b] block">Sueldo Base Referencial [DEMO]</span>
+                    <span className="text-xs text-[#64748b] block">Sueldo pactado</span>
                     <span className="font-mono text-[#35d7c3] font-bold text-sm sm:text-base">
                       {ocultarSueldo
                         ? '••••••'
@@ -189,7 +189,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                     </span>
                   </div>
                   <div>
-                    <span className="text-xs text-[#64748b] block">Entidad Bancaria [DEMO]</span>
+                    <span className="text-xs text-[#64748b] block">Entidad bancaria</span>
                     <span className="text-[#cbd5e1]">{ocultarSueldo ? '••••••' : (empleado.bancoReferencial || 'No configurado')}</span>
                   </div>
                   <div>
@@ -204,7 +204,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
           {pestanaActiva === 'asistencia' && (
             <div className="space-y-3">
               <h4 className="font-semibold text-xs uppercase tracking-wider text-[#94a3b8]">
-                Historial Reciente de Marcaciones [DEMO]
+                Historial reciente de marcaciones
               </h4>
               {asistenciasEmpleado.length === 0 ? (
                 <div className="p-6 text-center text-[#94a3b8] bg-[#0f172a] rounded-xl border border-[#1e293b]">

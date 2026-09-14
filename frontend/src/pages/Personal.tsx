@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   listarAsistenciaPersonal,
   listarDirectorioPersonal,
@@ -247,6 +248,9 @@ export const PersonalPage: React.FC = () => {
     <div className="min-h-screen bg-[#0b111e] text-[#f8fafc] font-sans antialiased selection:bg-[#35d7c3] selection:text-black">
       {/* Contenedor Principal Responsive (desde 360px) */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
+        <Link to="/dashboard" className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium text-[#94a3b8] hover:text-[#35d7c3] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]">
+          ← Volver al Hub
+        </Link>
         {/* Cabecera Superior del Módulo */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#1e2d48]">
           <div className="space-y-1">
@@ -282,12 +286,16 @@ export const PersonalPage: React.FC = () => {
         </div>
 
         {/* Barra de Navegación de Secciones (Scroll Horizontal Fluido en Móvil) */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-[#1e2d48] no-scrollbar">
+        <div role="tablist" aria-label="Secciones de Personal" className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-[#1e2d48] no-scrollbar">
           {pestanas.filter((p) => p.id !== 'nomina' || capacidades?.puedeVerMontosNomina).map((p) => {
             const esActiva = seccionActiva === p.id;
             return (
               <button
                 key={p.id}
+                id={`tab-personal-${p.id}`}
+                role="tab"
+                aria-selected={esActiva}
+                aria-controls={`panel-personal-${p.id}`}
                 onClick={() => setSeccionActiva(p.id)}
                 className={`flex items-center gap-2 px-3.5 py-2.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors focus:outline-none focus:ring-2 focus:ring-[#35d7c3] ${
                   esActiva
@@ -295,7 +303,7 @@ export const PersonalPage: React.FC = () => {
                     : 'text-[#94a3b8] hover:text-[#f8fafc] hover:bg-[#131c2e]/50'
                 }`}
               >
-                <span>{p.icono}</span>
+                <span aria-hidden="true">{p.icono}</span>
                 <span>{p.etiqueta}</span>
                 {p.id === 'nomina' && (
                   <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#f59e0b]/20 text-[#fbbf24] font-mono">
@@ -308,7 +316,7 @@ export const PersonalPage: React.FC = () => {
         </div>
 
         {/* Renderizado de la Sección Activa */}
-        <main className="space-y-6">
+        <main id={`panel-personal-${seccionActiva}`} role="tabpanel" aria-labelledby={`tab-personal-${seccionActiva}`} className="space-y-6">
           {cargandoDatos && (
             <div className="rounded-xl border border-white/10 bg-[#0b2341] p-4 font-mono text-xs text-[#35d7c3]">
               Cargando datos autorizados de Personal…

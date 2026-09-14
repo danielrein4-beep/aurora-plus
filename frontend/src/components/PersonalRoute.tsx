@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { ApiError, obtenerCapacidadesPersonal, type CapacidadesPersonal } from "../api";
 
 export default function PersonalRoute({ children }: { children: React.ReactNode }) {
@@ -24,7 +24,7 @@ export default function PersonalRoute({ children }: { children: React.ReactNode 
           <p className="font-['IBM_Plex_Mono'] text-xs uppercase tracking-widest text-[#35d7c3]">Acceso protegido</p>
           <h1 className="mt-3 font-['IBM_Plex_Sans'] text-xl font-semibold">Personal no está disponible</h1>
           <p className="mt-2 text-sm text-white/65">{error}</p>
-          <a href="/dashboard" className="mt-5 inline-flex rounded-lg bg-[#35d7c3] px-4 py-2 text-sm font-semibold text-[#051322]">Volver al Hub</a>
+          <Link to="/dashboard" className="mt-5 inline-flex rounded-lg bg-[#35d7c3] px-4 py-2 text-sm font-semibold text-[#051322]">Volver al Hub</Link>
         </section>
       </main>
     );

@@ -18,6 +18,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
   onToggleNominaHabilitada,
   onActualizarPeriodos,
 }) => {
+  const accionesNominaConectadas = false;
   const [periodos, setPeriodos] = useState<PeriodoNomina[]>(initialPeriodos);
   const [periodoActivo, setPeriodoActivo] = useState<PeriodoNomina>(initialPeriodos[0]);
   const [reciboDetalle, setReciboDetalle] = useState<ReciboNominaEmpleado | null>(null);
@@ -167,9 +168,8 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 MÓDULO OPCIONAL
               </span>
               <span className="px-2 py-0.5 rounded bg-[#1e293b] text-[#94a3b8] font-mono text-[11px]">
-                Desactivado por Defecto
+                {nominaHabilitada ? 'ACTIVO' : 'DESACTIVADO'}
               </span>
-              <span className="text-[11px] font-mono text-[#35d7c3]">[DEMO]</span>
             </div>
             <h3 className="text-base font-bold text-[#f8fafc]">
               Aurora Nómina: Liquidación Referencial & Control Interno
@@ -178,24 +178,9 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
 
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#94a3b8]">Estado del módulo:</span>
-            <button
-              disabled={!onToggleNominaHabilitada}
-              onClick={() => {
-                const nuevoEstado = !nominaHabilitada;
-                if (onToggleNominaHabilitada) {
-                  onToggleNominaHabilitada(nuevoEstado);
-                }
-                mostrarNotificacion(`Módulo de nómina ${nuevoEstado ? 'habilitado' : 'desactivado'} para este espacio [DEMO]`);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#35d7c3] disabled:cursor-not-allowed disabled:opacity-60 ${
-                nominaHabilitada
-                  ? 'bg-[#35d7c3] text-black hover:bg-[#28b8a6]'
-                  : 'bg-[#1e293b] text-[#94a3b8] border border-[#334155] hover:text-[#f8fafc]'
-              }`}
-              title={!onToggleNominaHabilitada ? 'La activación se administra desde la configuración del negocio' : undefined}
-            >
-              {nominaHabilitada ? '✓ Habilitado' : 'Desactivado'}
-            </button>
+            <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1e293b] text-[#cbd5e1] border border-[#334155]">
+              Se administra desde la configuración del negocio
+            </span>
           </div>
         </div>
 
@@ -210,21 +195,9 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
           <div className="flex items-center gap-2">
             <span>⚠️</span>
             <span>
-              <strong>Módulo en modo lectura:</strong> Para revisar, liquidar, aprobar o ajustar períodos, active el interruptor superior &quot;Habilitar Módulo&quot;.
+              <strong>Módulo desactivado:</strong> Solicita su activación al administrador del negocio para comenzar a calcular períodos.
             </span>
           </div>
-          <button
-            disabled={!onToggleNominaHabilitada}
-            onClick={() => {
-              if (onToggleNominaHabilitada) {
-                onToggleNominaHabilitada(true);
-              }
-              mostrarNotificacion('Módulo de nómina habilitado [DEMO]');
-            }}
-            className="px-3 py-1.5 rounded bg-[#f59e0b]/20 hover:bg-[#f59e0b]/30 text-[#fbbf24] font-semibold text-xs border border-[#f59e0b]/40 whitespace-nowrap self-start sm:self-auto disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Activar Ahora
-          </button>
         </div>
       )}
 
@@ -285,7 +258,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             </div>
 
             {/* Controles de Estado de Nómina */}
-            <div className="flex items-center gap-2">
+            {accionesNominaConectadas && <div className="flex items-center gap-2">
               {periodoActivo.estado === 'BORRADOR' || periodoActivo.estado === 'EN_REVISION' ? (
                 <button
                   disabled={!nominaHabilitada}
@@ -317,7 +290,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                   </button>
                 </div>
               )}
-            </div>
+            </div>}
           </div>
 
           {/* Totales de Liquidación */}
@@ -419,7 +392,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-[#1e2d48]">
               <div>
                 <h3 id="modal-desglose-recibo-titulo" className="text-base font-bold text-[#f8fafc]">
-                  Inspección Analítica de Recibo [DEMO]
+                  Inspección analítica de recibo
                 </h3>
                 <p className="text-xs text-[#94a3b8]">Desglose de bases de cálculo y reglas aplicadas</p>
               </div>
@@ -448,7 +421,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
       )}
 
       {/* Modal de Pre-Revisión antes de Aprobación */}
-      {modalRevisionAbierto && (
+      {accionesNominaConectadas && modalRevisionAbierto && (
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
@@ -530,7 +503,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
       )}
 
       {/* Modal de Registro de Ajuste o Reverso */}
-      {modalAjusteAbierto && (
+      {accionesNominaConectadas && modalAjusteAbierto && (
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
