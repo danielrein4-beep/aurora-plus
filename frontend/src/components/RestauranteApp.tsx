@@ -271,7 +271,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     tasaVigente(tenantId, "USD", "VES").then(setTasaBcv).catch(() => setTasaBcv(null));
     tasaVigente(tenantId, "USD", "COP").then(setTasaCop).catch(() => setTasaCop(null));
     cargarVentasHoy();
-    Promise.all(ESTACIONES.map((e) => obtenerTableroKds(tenantId, e).catch(() => [])))
+    Promise.all(ESTACIONES.map((e) => obtenerTableroKds(e).catch(() => [])))
       .then((listas) => setKdsCounts(listas.reduce((sum, l) => sum + l.filter((i) => i.estadoItem !== "ENTREGADO").length, 0)))
       .catch(() => setKdsCounts(0));
   };
@@ -1207,7 +1207,7 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
     setGuardando(true);
     setError(null);
     try {
-      const comanda = await abrirComanda(tenantId, {
+      const comanda = await abrirComanda({
         numeroMesa: abriendo.mesa.numero,
         mesero: formApertura.mesero.trim(),
         canal: formApertura.canal,
@@ -1849,7 +1849,7 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
     if (!escandallo && !nombrePlato.trim()) { setError("Elige una receta o escribe el nombre del plato"); return; }
     setAgregando(true);
     try {
-      const item = await agregarItemComanda(tenantId, comanda.id, {
+      const item = await agregarItemComanda(comanda.id, {
         escandalloId: escandallo?.id,
         nombrePlato: escandallo ? escandallo.nombrePlato : nombrePlato.trim(),
         estacionCocina: escandallo ? escandallo.estacionCocina : estacionManual,
@@ -1867,7 +1867,7 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
 
   const handleDividir = async () => {
     try {
-      const partes = await dividirCuenta(tenantId, comanda.id, parseInt(numeroPersonas, 10) || 1);
+      const partes = await dividirCuenta(comanda.id, parseInt(numeroPersonas, 10) || 1);
       setDivision(partes);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo dividir la cuenta");
@@ -1878,7 +1878,7 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
     setCerrando(true);
     setErrorCierre(null);
     try {
-      const resultado = await cerrarComandaMixto(tenantId, comanda.id, pagos, monedaVuelto);
+      const resultado = await cerrarComandaMixto(comanda.id, pagos, monedaVuelto);
       try {
         const blob = await descargarTicketComanda(tenantId, comanda.id);
         const url = URL.createObjectURL(blob);
@@ -1971,7 +1971,7 @@ function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void
   const [ahora, setAhora] = useState(() => Date.now());
 
   const cargar = () => {
-    obtenerTableroKds(tenantId, estacion).then(setItems).catch(() => setItems([]));
+    obtenerTableroKds(estacion).then(setItems).catch(() => setItems([]));
   };
   useEffect(() => { cargar(); }, [estacion, tenantId]);
   // Repinta el temporizador de cada tarjeta sin tener que re-consultar el backend.
@@ -1994,7 +1994,7 @@ function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void
     const next = siguiente[item.estadoItem];
     if (!next) return;
     try {
-      await actualizarEstadoItem(item.tenantId, item.id, next);
+      await actualizarEstadoItem(item.id, next);
       cargar();
       onCambio();
     } catch {}
@@ -4841,7 +4841,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     setError(null);
     setProcesando(true);
     try {
-      const comanda = await abrirComanda(tenantId, {
+      const comanda = await abrirComanda({
         mesero: canalVenta === "SALON" ? (mesaNumero ? `Mesa ${mesaNumero}` : "Salón") : "Mostrador",
         canal: canalVenta,
         numeroMesa: canalVenta === "SALON" && mesaNumero ? Number(mesaNumero) : undefined,
@@ -4852,7 +4852,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
         clienteId: clienteSel?.id,
       });
       for (const linea of lineasParaCobrar) {
-        await agregarItemComanda(tenantId, comanda.id, {
+        await agregarItemComanda(comanda.id, {
           escandalloId: linea.escandalloId,
           articuloId: linea.articuloId,
           fastBarTragoId: linea.fastBarTragoId,
@@ -4863,7 +4863,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
           notas: linea.notas,
         });
       }
-      const resultado = await cerrarComandaMixto(tenantId, comanda.id, pagos, monedaVuelto);
+      const resultado = await cerrarComandaMixto(comanda.id, pagos, monedaVuelto);
       const metodoResumen = resultado.comanda.metodoPago || "MIXTO";
       onVenta(total, metodoResumen);
       setRecibo({
@@ -5675,7 +5675,7 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
     setProcesandoAnulacion(true);
     setError(null);
     try {
-      await anularComanda(tenantId, comandaId, { motivo: motivoAnular.trim(), usuario: user?.nombre });
+      await anularComanda(comandaId, { motivo: motivoAnular.trim(), usuario: user?.nombre });
       setAnulandoId(null);
       setMotivoAnular("");
       buscar();

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.horeca.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.horeca.entities.Comanda;
 import com.auroraplus.modules.horeca.entities.ItemComanda;
 import com.auroraplus.modules.horeca.repositories.ItemComandaRepository;
@@ -36,7 +37,6 @@ public class HorecaController {
 
     @PostMapping("/comandas/abrir")
     public ResponseEntity<Comanda> abrirComanda(
-            @RequestParam Long tenantId,
             @RequestParam(required = false) Integer numeroMesa,
             @RequestParam String mesero,
             @RequestParam(required = false) String canal,
@@ -46,6 +46,7 @@ public class HorecaController {
             @RequestParam(required = false) String mensajero,
             @RequestParam(required = false) String claveIdempotencia,
             @RequestParam(required = false) Long clienteId) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(horecaService.aperturarComanda(
             tenantId, numeroMesa, mesero, canal, nombreCliente, telefonoCliente, direccionEntrega, mensajero, claveIdempotencia, clienteId));
     }
@@ -53,64 +54,60 @@ public class HorecaController {
     @PostMapping("/comandas/{comandaId}/consumo")
     public ResponseEntity<Comanda> agregarConsumo(
             @PathVariable Long comandaId,
-            @RequestParam Long tenantId,
             @RequestParam BigDecimal montoItem) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(horecaService.agregarConsumo(comandaId, tenantId, montoItem));
     }
 
     @PostMapping("/comandas/{comandaId}/mesero")
     public ResponseEntity<Comanda> reasignarMesero(
             @PathVariable Long comandaId,
-            @RequestParam Long tenantId,
             @RequestParam String nuevoMesero) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(horecaService.asignarMesero(comandaId, tenantId, nuevoMesero));
     }
 
     @PostMapping("/comandas/{comandaId}/dividir")
     public ResponseEntity<List<BigDecimal>> dividirCuenta(
             @PathVariable Long comandaId,
-            @RequestParam Long tenantId,
             @RequestParam int numeroPersonas) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(horecaService.dividirCuenta(comandaId, tenantId, numeroPersonas));
     }
 
     @PostMapping("/comandas/{comandaId}/cerrar")
     public ResponseEntity<Comanda> cerrarComanda(
             @PathVariable Long comandaId,
-            @RequestParam Long tenantId,
             @RequestParam String metodoPago,
             @RequestParam(required = false) String monedaPago,
             @RequestParam(required = false) BigDecimal montoRecibido,
             @RequestParam(required = false) String claveIdempotencia) {
-        return ResponseEntity.ok(horecaService.cerrarComanda(comandaId, tenantId, metodoPago, monedaPago, montoRecibido, claveIdempotencia));
+        return ResponseEntity.ok(horecaService.cerrarComanda(comandaId, TenantContext.getCurrentTenant(), metodoPago, monedaPago, montoRecibido, claveIdempotencia));
     }
 
     /** Cobro mixto: la comanda se cierra con varias líneas de pago a la vez (ej. parte USD efectivo + resto Bs Pago Móvil). */
     @PostMapping("/comandas/{comandaId}/cerrar-mixto")
     public ResponseEntity<ResultadoCobroMixto> cerrarComandaMixto(
             @PathVariable Long comandaId,
-            @RequestParam Long tenantId,
             @RequestParam(required = false) String monedaVuelto,
             @RequestParam(required = false) String claveIdempotencia,
             @RequestBody List<HorecaService.PagoParcialRequest> pagos) {
-        return ResponseEntity.ok(horecaService.cerrarComandaMixto(comandaId, tenantId, pagos, monedaVuelto, claveIdempotencia));
+        return ResponseEntity.ok(horecaService.cerrarComandaMixto(comandaId, TenantContext.getCurrentTenant(), pagos, monedaVuelto, claveIdempotencia));
     }
 
     /** Anula una comanda ABIERTA o PAGADA: revierte inventario/recetas y, si ya estaba cobrada, también la caja. Nunca borra nada. */
     @PostMapping("/comandas/{comandaId}/anular")
     public ResponseEntity<Comanda> anularComanda(
             @PathVariable Long comandaId,
-            @RequestParam Long tenantId,
             @RequestParam String motivo,
             @RequestParam(required = false) String usuario,
             @RequestParam(required = false) String claveIdempotencia) {
-        return ResponseEntity.ok(horecaService.anularComanda(comandaId, tenantId, motivo, usuario, claveIdempotencia));
+        return ResponseEntity.ok(horecaService.anularComanda(comandaId, TenantContext.getCurrentTenant(), motivo, usuario, claveIdempotencia));
     }
 
     @PostMapping("/comandas/{comandaId}/items")
     public ResponseEntity<ItemComanda> agregarItem(
             @PathVariable Long comandaId,
-            @RequestParam Long tenantId,
             @RequestParam(required = false) Long escandalloId,
             @RequestParam(required = false) Long articuloId,
             @RequestParam(required = false) Long fastBarTragoId,
@@ -121,32 +118,31 @@ public class HorecaController {
             @RequestParam(required = false) String claveIdempotencia,
             @RequestParam(required = false) String notas) {
         return ResponseEntity.ok(horecaService.agregarItemComanda(
-            comandaId, tenantId, escandalloId, articuloId, fastBarTragoId, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia, notas));
+            comandaId, TenantContext.getCurrentTenant(), escandalloId, articuloId, fastBarTragoId, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia, notas));
     }
 
     @PatchMapping("/items/{itemId}/estado")
     public ResponseEntity<ItemComanda> actualizarEstadoItem(
             @PathVariable Long itemId,
-            @RequestParam Long tenantId,
             @RequestParam ItemComanda.EstadoItem nuevoEstado) {
-        return ResponseEntity.ok(horecaService.actualizarEstadoItem(itemId, tenantId, nuevoEstado));
+        return ResponseEntity.ok(horecaService.actualizarEstadoItem(itemId, TenantContext.getCurrentTenant(), nuevoEstado));
     }
 
     @GetMapping("/kds/{estacionCocina}")
-    public ResponseEntity<List<ItemComanda>> obtenerTableroKds(@PathVariable String estacionCocina, @RequestParam Long tenantId) {
-        return ResponseEntity.ok(horecaService.obtenerTableroKds(tenantId, estacionCocina));
+    public ResponseEntity<List<ItemComanda>> obtenerTableroKds(@PathVariable String estacionCocina) {
+        return ResponseEntity.ok(horecaService.obtenerTableroKds(TenantContext.getCurrentTenant(), estacionCocina));
     }
 
     /** Utilidad por producto del día (o de la fecha indicada) — para el resumen diario de Administración. */
     @GetMapping("/reportes/utilidad-diaria")
     public ResponseEntity<List<ResumenUtilidadProducto>> utilidadDiaria(
-            @RequestParam Long tenantId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
-        return ResponseEntity.ok(horecaService.obtenerUtilidadDiaria(tenantId, fecha));
+        return ResponseEntity.ok(horecaService.obtenerUtilidadDiaria(TenantContext.getCurrentTenant(), fecha));
     }
 
     @GetMapping(value = "/comandas/{comandaId}/ticket", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> ticket(@PathVariable Long comandaId, @RequestParam Long tenantId) throws Exception {
+    public ResponseEntity<byte[]> ticket(@PathVariable Long comandaId) throws Exception {
+        Long tenantId = TenantContext.getCurrentTenant();
         Comanda comanda = horecaService.obtenerComanda(comandaId);
         if (!comanda.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Comanda no pertenece a este tenant");
@@ -166,7 +162,8 @@ public class HorecaController {
      * navegador, sin pasar por el diálogo de impresión del sistema operativo.
      */
     @GetMapping(value = "/comandas/{comandaId}/ticket-escpos", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    public ResponseEntity<byte[]> ticketEscPos(@PathVariable Long comandaId, @RequestParam Long tenantId) throws Exception {
+    public ResponseEntity<byte[]> ticketEscPos(@PathVariable Long comandaId) throws Exception {
+        Long tenantId = TenantContext.getCurrentTenant();
         Comanda comanda = horecaService.obtenerComanda(comandaId);
         if (!comanda.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Comanda no pertenece a este tenant");

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.horeca.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.horeca.entities.Comanda;
 import com.auroraplus.modules.horeca.entities.ItemComanda;
 import com.auroraplus.modules.horeca.repositories.ComandaRepository;
@@ -31,15 +32,16 @@ public class ComandaController {
 
     /** Historial de comandas del tenant, más recientes primero. Filtra por estado si se indica. */
     @GetMapping
-    public List<Comanda> listar(@RequestParam Long tenantId,
-                                 @RequestParam(required = false) Comanda.EstadoComanda estado) {
+    public List<Comanda> listar(@RequestParam(required = false) Comanda.EstadoComanda estado) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return estado != null
             ? comandaRepository.findByTenantIdAndEstadoOrderByFechaAperturaDesc(tenantId, estado)
             : comandaRepository.findByTenantIdOrderByFechaAperturaDesc(tenantId);
     }
 
     @GetMapping("/{id}")
-    public Comanda obtener(@PathVariable Long id, @RequestParam Long tenantId) {
+    public Comanda obtener(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Comanda comanda = comandaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
         if (!comanda.getTenantId().equals(tenantId)) {
@@ -50,7 +52,8 @@ public class ComandaController {
 
     /** Ítems de una comanda puntual — lo que el ticket PDF ya leía internamente, ahora también disponible para refrescar la UI. */
     @GetMapping("/{id}/items")
-    public List<ItemComanda> items(@PathVariable Long id, @RequestParam Long tenantId) {
+    public List<ItemComanda> items(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Comanda comanda = comandaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
         if (!comanda.getTenantId().equals(tenantId)) {
