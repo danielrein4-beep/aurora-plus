@@ -166,16 +166,17 @@ function EstiloClasico() {
       .mediclinic-clasico .text-slate-900 { color: #0f172a !important; }
       .mediclinic-clasico .text-slate-500, .mediclinic-clasico .text-slate-600 { color: #64748b !important; }
       .mediclinic-clasico .btn-electric-blue {
-        background: linear-gradient(135deg, #0ea5e9, #0d9488 65%, #8b5cf6) !important;
-        box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
-        color: #fff !important;
+        background: #35d7c3 !important;
+        border: 1px solid rgba(53, 215, 195, .72) !important;
+        box-shadow: 0 2px 7px rgba(2, 35, 42, .18) !important;
+        color: #062323 !important;
       }
       .mediclinic-clasico .text-teal-600, .mediclinic-clasico .text-teal-500,
       .mediclinic-clasico .text-teal-300, .mediclinic-clasico .text-teal-400 { color: #0d9488 !important; -webkit-text-fill-color: #0d9488 !important; }
       .mediclinic-clasico .text-aurora {
-        background: linear-gradient(90deg, #0ea5e9, #0d9488 70%, #8b5cf6) !important;
-        -webkit-background-clip: text !important; background-clip: text !important;
-        color: transparent !important; -webkit-text-fill-color: transparent !important;
+        background: none !important;
+        color: #0d9488 !important;
+        -webkit-text-fill-color: currentColor !important;
       }
       .mediclinic-clasico .bg-teal-500\\/15 { background-color: rgba(14,165,233,0.12) !important; }
       .mediclinic-clasico .border-teal-500\\/30, .mediclinic-clasico .border-teal-400\\/60 { border-color: rgba(13,148,136,0.4) !important; }
