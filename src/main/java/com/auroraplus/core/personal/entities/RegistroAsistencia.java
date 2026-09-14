@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class RegistroAsistencia {
 
-    public enum Origen { MANUAL, BIOMETRICO, APP }
+    public enum Origen { MANUAL, TERMINAL_PIN, PLANILLA_DIGITAL, APP }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

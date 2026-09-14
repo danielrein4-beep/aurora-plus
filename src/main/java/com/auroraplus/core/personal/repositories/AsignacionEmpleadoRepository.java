@@ -12,6 +12,7 @@ import java.util.Optional;
 @Repository
 public interface AsignacionEmpleadoRepository extends JpaRepository<AsignacionEmpleado, Long> {
     List<AsignacionEmpleado> findByTenantIdAndEmpleadoId(Long tenantId, Long empleadoId);
+    List<AsignacionEmpleado> findByTenantIdAndVigenciaHastaIsNull(Long tenantId);
 
     Optional<AsignacionEmpleado> findByTenantIdAndEmpleadoIdAndVigenciaHastaIsNull(Long tenantId, Long empleadoId);
 

@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { obtenerCapacidadesPersonal, type CapacidadesPersonal } from '../api';
 import {
-  MOCK_EMPLEADOS,
+  listarAsistenciaPersonal,
+  listarDirectorioPersonal,
+  listarMetasPersonal,
+  listarPeriodosNomina,
+  listarTurnosPersonal,
+  obtenerCapacidadesPersonal,
+  type CapacidadesPersonal,
+  type EntradaDirectorioPersonalApi,
+} from '../api';
+import {
   MOCK_TURNOS_HORARIOS,
-  MOCK_ASIGNACIONES_TURNOS,
-  MOCK_REGISTROS_ASISTENCIA,
-  MOCK_METAS_PERSONAL,
-  MOCK_PERIODOS_NOMINA,
 } from '../components/personal/mockPersonalData';
 import {
   SeccionPersonal,
@@ -23,6 +27,50 @@ import { AsistenciaPersonal } from '../components/personal/AsistenciaPersonal';
 import { MetasPersonal } from '../components/personal/MetasPersonal';
 import { NominaPersonal } from '../components/personal/NominaPersonal';
 import { PerfilEmpleado } from '../components/personal/PerfilEmpleado';
+
+const departamentoDe = (modulo?: string | null): Empleado['departamento'] => {
+  const valor = (modulo || '').toLowerCase();
+  if (valor.includes('salud') || valor.includes('clinic')) return 'Atención & Salud';
+  if (valor.includes('horeca') || valor.includes('restaurant')) return 'Cocina & Restauración';
+  if (valor.includes('ganader') || valor.includes('finca')) return 'Operaciones & Campo';
+  return 'Administración & Finanzas';
+};
+
+const verticalDe = (modulo?: string | null): Empleado['verticalPrincipal'] => {
+  const valor = (modulo || '').toLowerCase();
+  if (valor.includes('salud') || valor.includes('clinic')) return 'salud';
+  if (valor.includes('horeca') || valor.includes('restaurant')) return 'horeca';
+  if (valor.includes('ganader') || valor.includes('finca')) return 'ganaderia';
+  return 'general';
+};
+
+const mapearEmpleado = (entrada: EntradaDirectorioPersonalApi): Empleado => ({
+  id: String(entrada.id),
+  codigoEmpleado: `EMP-${entrada.id}`,
+  nombre: entrada.nombreCompleto,
+  apellidos: '',
+  email: '',
+  telefono: '',
+  identificacion: entrada.documentoIdentidad,
+  cargo: entrada.cargo || 'Sin cargo vigente',
+  departamento: departamentoDe(entrada.moduloOrigen),
+  verticalPrincipal: verticalDe(entrada.moduloOrigen),
+  tipoContrato: entrada.tipoSalario === 'POR_HORA' || entrada.tipoSalario === 'POR_JORNADA'
+    ? 'POR_JORNAL_GUARDIA' : 'TIEMPO_COMPLETO',
+  estado: entrada.fechaEgreso ? 'INACTIVO' : 'ACTIVO',
+  fechaIngreso: entrada.fechaIngreso,
+  salarioBaseReferencial: entrada.salarioPactado ?? 0,
+  moneda: entrada.monedaSalario || 'USD',
+  modalidadPago: entrada.tipoSalario === 'POR_JORNADA' ? 'POR_JORNAL' : 'MENSUAL',
+  turnoAsignado: 'Consultar planificación',
+});
+
+const PERIODO_VACIO: PeriodoNomina = {
+  id: 'sin-periodo', codigoPeriodo: 'SIN-PERIODO', nombre: 'Sin períodos calculados',
+  fechaInicio: '', fechaFin: '', fechaTentativaPago: '', estado: 'BORRADOR',
+  totalEmpleados: 0, montoTotalBruto: 0, montoTotalDeducciones: 0, montoTotalNeto: 0,
+  monedaPrincipal: 'USD', recibos: [], historialAjustes: [],
+};
 
 export const PersonalPage: React.FC = () => {
   const [seccionActiva, setSeccionActiva] = useState<SeccionPersonal>('resumen');
@@ -47,13 +95,95 @@ export const PersonalPage: React.FC = () => {
   }, []);
 
   // Estado unificado en sesión para que las acciones conserven sus cambios en tiempo real
-  const [empleados] = useState<Empleado[]>(MOCK_EMPLEADOS);
-  const [turnosAsignados, setTurnosAsignados] = useState<AsignacionTurno[]>(MOCK_ASIGNACIONES_TURNOS);
-  const [asistencias, setAsistencias] = useState<RegistroAsistencia[]>(MOCK_REGISTROS_ASISTENCIA);
-  const [metas, setMetas] = useState<MetaPersonal[]>(MOCK_METAS_PERSONAL);
-  const [periodosNomina, setPeriodosNomina] = useState<PeriodoNomina[]>(MOCK_PERIODOS_NOMINA);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [turnosAsignados, setTurnosAsignados] = useState<AsignacionTurno[]>([]);
+  const [asistencias, setAsistencias] = useState<RegistroAsistencia[]>([]);
+  const [metas, setMetas] = useState<MetaPersonal[]>([]);
+  const [periodosNomina, setPeriodosNomina] = useState<PeriodoNomina[]>([]);
+  const [cargandoDatos, setCargandoDatos] = useState(true);
+  const [errorDatos, setErrorDatos] = useState<string | null>(null);
 
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<Empleado | null>(null);
+
+  useEffect(() => {
+    if (!capacidades?.accesoPersonal) return;
+    let activo = true;
+    const hoy = new Date();
+    const desde = new Date(hoy.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+    const hasta = new Date(hoy.getTime() + 30 * 86400000).toISOString().slice(0, 10);
+
+    const cargar = async () => {
+      setCargandoDatos(true);
+      setErrorDatos(null);
+      try {
+        const directorio = capacidades.puedeVerDirectorio ? await listarDirectorioPersonal() : [];
+        const empleadosMapeados = directorio.map(mapearEmpleado);
+        const porId = new Map(empleadosMapeados.map((empleado) => [empleado.id, empleado]));
+        const [turnosApi, asistenciasApi, metasApi, periodosApi] = await Promise.all([
+          capacidades.asistencia && capacidades.puedeVerDirectorio ? listarTurnosPersonal(desde, hasta) : Promise.resolve([]),
+          capacidades.asistencia && capacidades.puedeVerDirectorio ? listarAsistenciaPersonal(desde, hasta) : Promise.resolve([]),
+          capacidades.metas && capacidades.puedeVerDirectorio ? listarMetasPersonal() : Promise.resolve([]),
+          capacidades.nominaAvanzada && capacidades.puedeVerMontosNomina ? listarPeriodosNomina() : Promise.resolve([]),
+        ]);
+        if (!activo) return;
+        setEmpleados(empleadosMapeados);
+        setTurnosAsignados(turnosApi.map((turno) => {
+          const empleado = porId.get(String(turno.empleadoId));
+          const hora = Number(turno.horaInicio.slice(0, 2));
+          return {
+            id: String(turno.id), empleadoId: String(turno.empleadoId),
+            empleadoNombre: empleado?.nombre || `Empleado ${turno.empleadoId}`,
+            empleadoCargo: empleado?.cargo || 'Sin cargo vigente',
+            departamento: empleado?.departamento || 'Administración & Finanzas',
+            fecha: turno.fecha, turnoId: String(turno.id),
+            turnoNombre: `${turno.horaInicio} - ${turno.horaFin}`,
+            tipoTurno: hora < 12 ? 'MANANA' : hora < 18 ? 'TARDE' : 'NOCHE', estado: 'PROGRAMADO',
+          };
+        }));
+        setAsistencias(asistenciasApi.map((registro) => {
+          const empleado = porId.get(String(registro.empleadoId));
+          return {
+            id: String(registro.id), empleadoId: String(registro.empleadoId),
+            empleadoNombre: empleado?.nombre || `Empleado ${registro.empleadoId}`,
+            departamento: empleado?.departamento || 'Administración & Finanzas',
+            fecha: registro.fechaHoraEntrada.slice(0, 10), horaEntradaProgramada: '--:--', horaSalidaProgramada: '--:--',
+            horaEntradaReal: registro.fechaHoraEntrada.slice(11, 16),
+            horaSalidaReal: registro.fechaHoraSalida?.slice(11, 16), minutosRetardo: 0,
+            horasTrabajadas: registro.horasTrabajadas || 0, horasExtras: 0,
+            estado: registro.fechaHoraSalida ? 'PRESENTE' : 'RETARDO',
+            metodoMarcaje: registro.origen === 'MANUAL' ? 'REGISTRO_SUPERVISOR'
+              : registro.origen === 'TERMINAL_PIN' ? 'PIN_TERMINAL' : 'PLANILLA_DIGITAL',
+          };
+        }));
+        setMetas(metasApi.map((meta) => {
+          const empleado = porId.get(String(meta.empleadoId));
+          const vencida = meta.periodoHasta < new Date().toISOString().slice(0, 10);
+          return {
+            id: String(meta.id), titulo: meta.nombre, descripcion: meta.descripcion || '', categoria: 'EFICIENCIA_PROCESOS',
+            tipo: 'MANUAL', origenMetrica: 'Seguimiento registrado en Aurora', departamentoObjetivo: empleado?.departamento || 'TODOS',
+            verticalObjetivo: empleado?.verticalPrincipal || 'TODAS', empleadoAsignadoId: String(meta.empleadoId),
+            empleadoAsignadoNombre: empleado?.nombre, metaValor: meta.valorObjetivo, unidadMedida: meta.unidad,
+            progresoActual: 0, fechaInicio: meta.periodoDesde, fechaLimite: meta.periodoHasta,
+            estado: vencida ? 'VENCIDA' : 'EN_PROGRESO', esNoPunitiva: true,
+          };
+        }));
+        setPeriodosNomina(periodosApi.map((periodo) => ({
+          id: String(periodo.id), codigoPeriodo: `NOM-${periodo.id}`, nombre: periodo.nombre,
+          fechaInicio: periodo.fechaInicio, fechaFin: periodo.fechaFin,
+          fechaTentativaPago: periodo.fechaPagoPlanificada || periodo.fechaFin,
+          estado: periodo.estado === 'CALCULADA' ? 'EN_REVISION' : periodo.estado === 'PAGADA' ? 'APROBADA' : periodo.estado,
+          totalEmpleados: 0, montoTotalBruto: 0, montoTotalDeducciones: 0, montoTotalNeto: 0,
+          monedaPrincipal: periodo.moneda, recibos: [], historialAjustes: [], fechaAprobacion: periodo.fechaAprobacion || undefined,
+        })));
+      } catch (error) {
+        if (activo) setErrorDatos(error instanceof Error ? error.message : 'No pudimos cargar Personal');
+      } finally {
+        if (activo) setCargandoDatos(false);
+      }
+    };
+    cargar();
+    return () => { activo = false; };
+  }, [capacidades]);
 
   const pestanas: { id: SeccionPersonal; etiqueta: string; icono: string }[] = [
     { id: 'resumen', etiqueta: 'Resumen', icono: '📊' },
@@ -132,10 +262,20 @@ export const PersonalPage: React.FC = () => {
 
         {/* Renderizado de la Sección Activa */}
         <main className="space-y-6">
+          {cargandoDatos && (
+            <div className="rounded-xl border border-white/10 bg-[#0b2341] p-4 font-mono text-xs text-[#35d7c3]">
+              Cargando datos autorizados de Personal…
+            </div>
+          )}
+          {errorDatos && (
+            <div role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200">
+              No pudimos cargar los datos reales: {errorDatos}
+            </div>
+          )}
           {seccionActiva === 'resumen' && (
             <ResumenEquipo
               empleados={empleados}
-              periodoActual={periodosNomina[0]}
+              periodoActual={periodosNomina[0] || PERIODO_VACIO}
               asistenciasHoy={asistencias}
               turnosHoy={turnosAsignados}
               onNavegarSeccion={(sec) => setSeccionActiva(sec)}
@@ -177,7 +317,7 @@ export const PersonalPage: React.FC = () => {
             />
           )}
 
-          {seccionActiva === 'nomina' && (
+          {seccionActiva === 'nomina' && periodosNomina.length > 0 && (
             <NominaPersonal
               periodos={periodosNomina}
               ocultarSueldo={ocultarSueldo}
@@ -186,6 +326,12 @@ export const PersonalPage: React.FC = () => {
                 setPeriodosNomina(actualizados);
               }}
             />
+          )}
+          {seccionActiva === 'nomina' && periodosNomina.length === 0 && !cargandoDatos && (
+            <div className="rounded-2xl border border-white/10 bg-[#0b2341] p-8 text-center">
+              <h2 className="font-semibold text-white">Aún no hay períodos de nómina</h2>
+              <p className="mt-2 text-sm text-white/60">Crea y calcula el primer período cuando la empresa decida activar Aurora Nómina.</p>
+            </div>
           )}
         </main>
 

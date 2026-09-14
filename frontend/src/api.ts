@@ -2911,4 +2911,79 @@ export function listarEmpleadosPersonal(): Promise<EmpleadoPersonalApi[]> {
   return request("/api/personal/empleados");
 }
 
+export interface EntradaDirectorioPersonalApi {
+  id: number;
+  nombreCompleto: string;
+  documentoIdentidad: string;
+  fechaIngreso: string;
+  fechaEgreso: string | null;
+  cargo: string | null;
+  moduloOrigen: string | null;
+  tipoSalario: "FIJO_MENSUAL" | "DIARIO" | "POR_HORA" | "POR_JORNADA" | null;
+  salarioPactado: number | null;
+  monedaSalario: "USD" | "VES" | "COP" | null;
+}
+
+export interface TurnoPersonalApi {
+  id: number;
+  empleadoId: number;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+}
+
+export interface AsistenciaPersonalApi {
+  id: number;
+  empleadoId: number;
+  turnoId: number | null;
+  fechaHoraEntrada: string;
+  fechaHoraSalida: string | null;
+  origen: "MANUAL" | "TERMINAL_PIN" | "PLANILLA_DIGITAL" | "APP";
+  horasTrabajadas: number;
+}
+
+export interface MetaPersonalApi {
+  id: number;
+  empleadoId: number;
+  nombre: string;
+  descripcion: string | null;
+  valorObjetivo: number;
+  unidad: string;
+  periodoDesde: string;
+  periodoHasta: string;
+}
+
+export interface PeriodoNominaApi {
+  id: number;
+  nombre: string;
+  fechaInicio: string;
+  fechaFin: string;
+  fechaPagoPlanificada: string | null;
+  moneda: "USD" | "VES" | "COP";
+  estado: "BORRADOR" | "CALCULADA" | "EN_REVISION" | "APROBADA" | "PAGADA" | "REVERSADA";
+  fechaAprobacion: string | null;
+}
+
+export function listarDirectorioPersonal(): Promise<EntradaDirectorioPersonalApi[]> {
+  return request("/api/personal/directorio");
+}
+
+export function listarTurnosPersonal(desde: string, hasta: string): Promise<TurnoPersonalApi[]> {
+  const params = new URLSearchParams({ desde, hasta });
+  return request(`/api/personal/turnos?${params.toString()}`);
+}
+
+export function listarAsistenciaPersonal(desde: string, hasta: string): Promise<AsistenciaPersonalApi[]> {
+  const params = new URLSearchParams({ desde, hasta });
+  return request(`/api/personal/asistencia?${params.toString()}`);
+}
+
+export function listarMetasPersonal(): Promise<MetaPersonalApi[]> {
+  return request("/api/personal/metas");
+}
+
+export function listarPeriodosNomina(): Promise<PeriodoNominaApi[]> {
+  return request("/api/personal/nomina/periodos");
+}
+
 
