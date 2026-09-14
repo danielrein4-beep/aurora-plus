@@ -12,6 +12,7 @@ import { VentasComprasFinanciero } from '../components/finanzas/VentasComprasFin
 import { CostosFinanciero } from '../components/finanzas/CostosFinanciero';
 import { DocumentosFinancieros } from '../components/finanzas/DocumentosFinancieros';
 import { VerticalCoverageCard } from '../components/finanzas/VerticalCoverageCard';
+import { EmptyFinanceState } from '../components/finanzas/EmptyFinanceState';
 import type { KpiCardData, SupportedCurrency, VerticalCoverage } from '../components/finanzas/types';
 import { ApiError, EmpresaKpiResponse, obtenerEmpresaKpis } from '../api';
 import {
@@ -251,16 +252,16 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       {/* La procedencia de los datos siempre queda visible. */}
       <div className={`bg-[#0b2341] border-b px-3 sm:px-4 py-2 text-center text-xs font-medium flex flex-wrap items-center justify-center gap-2 ${isDemoTab ? 'border-amber-500/30 text-amber-300' : 'border-[#35d7c3]/30 text-[#35d7c3]'}`}>
         <span className={`font-bold px-2 py-0.5 rounded border font-['IBM_Plex_Mono',monospace] text-[11px] ${isDemoTab ? 'bg-amber-500/20 border-amber-500/30' : 'bg-[#35d7c3]/10 border-[#35d7c3]/30'}`}>
-          {isDemoTab ? '[DEMO / DATOS DE EJEMPLO]' : '[DATOS DEL NEGOCIO]'}
+          {isDemoTab ? '[SIN CONEXIÓN DE DATOS]' : '[DATOS DEL NEGOCIO]'}
         </span>
         <span>
           {isDemoTab
-            ? 'Esta pestaña es una maqueta funcional y todavía no está conectada al backend.'
+            ? 'Esta sección todavía no tiene una fuente de datos real conectada.'
             : 'Resumen y cobertura obtenidos de las fuentes operativas conectadas.'}
         </span>
         <span className="text-white/60 text-[11px] hidden sm:inline">
           {isDemoTab
-            ? '(Sin tasas inventadas • Documentación no fiscal)'
+            ? '(Sin cifras inventadas • Documentación no fiscal)'
             : financeData ? `(Moneda base: ${financeData.moneda} • Período ${financeData.periodo.desde} al ${financeData.periodo.hasta})` : '(Cargando fuente real…)'}
         </span>
       </div>
@@ -319,7 +320,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
               >
                 <span>{tab.renderIcon(isActive)}</span>
                 <span>{tab.label}</span>
-                {tab.demo && <span className={`rounded px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${isActive ? 'bg-[#051322]/15' : 'bg-amber-500/15 text-amber-300'}`}>Demo</span>}
+                {tab.demo && <span className={`rounded px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${isActive ? 'bg-[#051322]/15' : 'bg-amber-500/15 text-amber-300'}`}>Sin datos</span>}
               </button>
             );
           })}
@@ -351,18 +352,39 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
           )}
 
           {activeTab === 'ventas-compras' && (
-            <VentasComprasFinanciero
-              transactions={MOCK_TRANSACTIONS}
-              onSelectDocReference={() => handleTabChange('documentos')}
-            />
+            previewMode ? (
+              <VentasComprasFinanciero
+                transactions={MOCK_TRANSACTIONS}
+                onSelectDocReference={() => handleTabChange('documentos')}
+              />
+            ) : (
+              <EmptyFinanceState
+                title="Aún no hay ventas ni compras conectadas"
+                description="Cuando tu vertical reporte operaciones al Centro Financiero, aquí verás el detalle real de ventas, compras y gastos por período."
+              />
+            )
           )}
 
           {activeTab === 'costos' && (
-            <CostosFinanciero costs={MOCK_COSTS} />
+            previewMode ? (
+              <CostosFinanciero costs={MOCK_COSTS} />
+            ) : (
+              <EmptyFinanceState
+                title="Aún no hay costos operativos conectados"
+                description="La estructura de costos aparecerá aquí en cuanto tu vertical reporte costeo para el período seleccionado."
+              />
+            )
           )}
 
           {activeTab === 'documentos' && (
-            <DocumentosFinancieros documents={MOCK_NON_FISCAL_DOCS} />
+            previewMode ? (
+              <DocumentosFinancieros documents={MOCK_NON_FISCAL_DOCS} />
+            ) : (
+              <EmptyFinanceState
+                title="Aún no hay documentos comerciales no fiscales conectados"
+                description="Las notas de entrega y documentos de venta no fiscales generados por tu vertical aparecerán aquí, cada uno con su referencia interna."
+              />
+            )
           )}
 
           {activeTab === 'cobertura' && (previewMode || (!loading && !error && financeData)) && (
