@@ -250,10 +250,11 @@ class SaludTenantIsolationP0Test {
         bloqueo.setFechaFin(LocalDate.of(2026, 10, 1));
         bloqueo.setMotivo("Reunión");
         bloqueo = agendaMedicaService.registrarBloqueo(tenantA, bloqueo);
+        Long bloqueoId = bloqueo.getId();
 
         assertThrows(RuntimeException.class, () -> agendaMedicaService.actualizarEstado(tenantB, citaA.getId(), CitaMedica.EstadoCita.CANCELADA));
         assertThrows(RuntimeException.class, () -> agendaMedicaService.reprogramarCita(tenantB, citaA.getId(), LocalDate.of(2026, 10, 2), LocalTime.of(10, 0), LocalTime.of(10, 30)));
-        assertThrows(RuntimeException.class, () -> agendaMedicaService.eliminarBloqueo(tenantB, bloqueo.getId()));
+        assertThrows(RuntimeException.class, () -> agendaMedicaService.eliminarBloqueo(tenantB, bloqueoId));
     }
 
     private CitaMedica nuevaCita(Paciente paciente, Long medicoId) {
