@@ -471,6 +471,20 @@ html.light .input-horeca {
 }
 html.light .input-horeca:hover { background: #ffffff; }
 
+/* Evitar colisiones de texto con iconos a la izquierda o derecha en inputs */
+.input-horeca.has-icon,
+.input-horeca-icon,
+.input-horeca.pl-8,
+.input-horeca.pl-9,
+.input-horeca.pl-10 {
+  padding-left: 2.6rem !important;
+}
+.input-horeca.pr-8,
+.input-horeca.pr-9,
+.input-horeca.pr-10 {
+  padding-right: 2.5rem !important;
+}
+
 /* Apple Liquid Glass Button */
 .apple-glass-btn {
   background: linear-gradient(135deg, rgba(11, 61, 145, 0.25) 0%, rgba(5, 19, 34, 0.40) 100%);
@@ -497,28 +511,26 @@ html.light .input-horeca:hover { background: #ffffff; }
 .btn-cyber-neon {
   background: #35D7C3;
   color: #062323 !important;
-  border: 1px solid rgba(53, 215, 195, 0.72);
-  box-shadow: 0 2px 7px rgba(2, 35, 42, 0.18);
-  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 6px 20px rgba(53, 215, 195, 0.3);
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .btn-cyber-neon:hover {
-  background: #2dc6b3;
-  border-color: #2dc6b3;
+  background: #58E3D2;
+  box-shadow: 0 10px 28px rgba(53, 215, 195, 0.45);
   transform: translateY(-1px);
 }
 
 .btn-electric-blue {
   background: #35D7C3;
   color: #062323 !important;
-  border: 1px solid rgba(53, 215, 195, 0.72);
-  box-shadow: 0 2px 7px rgba(2, 35, 42, 0.18);
-  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 6px 20px rgba(53, 215, 195, 0.3);
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .btn-electric-blue:hover {
-  background: #2dc6b3;
-  border-color: #2dc6b3;
+  background: #58E3D2;
+  box-shadow: 0 10px 28px rgba(53, 215, 195, 0.45);
   transform: translateY(-1px);
 }
 
@@ -1082,57 +1094,3 @@ html.light .aurora-access-page .text-white { color: #f8f6ef !important; }
   animation: fadeInSmooth 0.5s ease-out forwards;
 }
 
-/* Módulos compartidos dentro de una vertical clara.
-   Finanzas y Personal nacieron como pantallas oscuras independientes; este
-   scope los convierte en áreas de trabajo Aurora sin contaminar sus rutas
-   autónomas ni los modales globales. */
-.aurora-embedded-light {
-  color: #172033;
-  background: transparent;
-}
-
-.aurora-embedded-light [class*="bg-[#0b2341]"],
-.aurora-embedded-light [class*="bg-[#131c2e]"] {
-  background-color: #ffffff !important;
-}
-
-.aurora-embedded-light [class*="bg-[#071a2e]"],
-.aurora-embedded-light [class*="bg-[#0b111e]"],
-.aurora-embedded-light [class*="bg-[#0f172a]"] {
-  background-color: #f7fafb !important;
-}
-
-.aurora-embedded-light [class*="bg-white/5"] {
-  background-color: #f1f5f6 !important;
-}
-
-.aurora-embedded-light [class*="border-white"],
-.aurora-embedded-light [class*="border-[#1e2"],
-.aurora-embedded-light [class*="border-[#334155]"] {
-  border-color: #d9e3e7 !important;
-}
-
-.aurora-embedded-light [class*="text-white"],
-.aurora-embedded-light [class*="text-[#f8fafc]"] {
-  color: #172033 !important;
-  -webkit-text-fill-color: currentColor;
-}
-
-.aurora-embedded-light [class*="text-[#94a3b8]"],
-.aurora-embedded-light [class*="text-[#64748b]"] {
-  color: #617187 !important;
-  -webkit-text-fill-color: currentColor;
-}
-
-.aurora-embedded-light input,
-.aurora-embedded-light select,
-.aurora-embedded-light textarea {
-  color: #172033 !important;
-  background: #ffffff !important;
-  border-color: #cfdce1 !important;
-  color-scheme: light !important;
-}
-
-.aurora-embedded-light [class*="shadow-2xl"] {
-  box-shadow: 0 14px 32px rgba(15, 35, 50, 0.10) !important;
-}

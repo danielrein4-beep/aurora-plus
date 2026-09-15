@@ -12,8 +12,6 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useAuth } from "../context/AuthContext";
-import { CentroFinanciero } from "../pages/CentroFinanciero";
-import { PersonalPage } from "../pages/Personal";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
   dividirCuenta, cerrarComandaMixto, anularComanda, listarEscandallos, crearEscandallo, editarEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo, editarIngredienteEscandallo, eliminarIngredienteEscandallo, recalcularCostoEscandallo,
@@ -35,7 +33,7 @@ import {
   type FacturaExtraidaOcr,
 } from "../api";
 
-type Pagina = "general" | "resumen" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion" | "finanzas" | "personal";
+type Pagina = "general" | "resumen" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
 
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
@@ -63,8 +61,6 @@ const NAV_GRUPOS: NavGrupo[] = [
       { id: "administracion", label: "Administración", Icon: IconBank },
       { id: "reportes", label: "Reportes Operativos", Icon: IconChart },
       { id: "estadisticas", label: "Estadísticas", Icon: IconRocket },
-      { id: "finanzas", label: "Finanzas", Icon: IconBank },
-      { id: "personal", label: "Personal & Nómina", Icon: IconUsers },
       { id: "configuracion", label: "Configuración", Icon: IconCustomize },
     ],
   },
@@ -155,17 +151,16 @@ function EstiloClasico() {
       .horeca-clasico .dark\\:text-white\\/30 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
       .horeca-clasico .dark\\:text-white { color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; }
       .horeca-clasico .btn-cyber-neon {
-        background: #35d7c3 !important;
-        border: 1px solid rgba(53, 215, 195, .72) !important;
-        box-shadow: 0 2px 7px rgba(2, 35, 42, .18) !important;
-        color: #062323 !important;
+        background: linear-gradient(135deg, #0ea5e9, #0d9488 65%, #8b5cf6) !important;
+        box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
+        color: #fff !important;
       }
       .horeca-clasico .text-teal-600, .horeca-clasico .text-teal-500,
       .horeca-clasico .text-teal-300, .horeca-clasico .text-teal-400 { color: #0d9488 !important; -webkit-text-fill-color: #0d9488 !important; }
       .horeca-clasico .text-aurora {
-        background: none !important;
-        color: #0d9488 !important;
-        -webkit-text-fill-color: currentColor !important;
+        background: linear-gradient(90deg, #0ea5e9, #0d9488 70%, #8b5cf6) !important;
+        -webkit-background-clip: text !important; background-clip: text !important;
+        color: transparent !important; -webkit-text-fill-color: transparent !important;
       }
       .horeca-clasico .bg-teal-500\\/15 { background-color: rgba(14,165,233,0.12) !important; }
       .horeca-clasico .border-teal-500\\/30, .horeca-clasico .border-teal-400\\/60 { border-color: rgba(13,148,136,0.4) !important; }
@@ -436,15 +431,8 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "resumen" && <ResumenGeneral tenantId={tenantId} />}
           {pagina === "salon" && (esPremium("salon")
             ? <BloqueoPremium modulo="Salón & Mesas" />
-            : tasaValida
-              ? <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
-                  escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
-              : (
-                <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
-                  <IconWarning size={28} />
-                  <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar el salón.</p>
-                </div>
-              )
+            : <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
+                escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
           )}
           {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} />)}
           {pagina === "recetas" && (recetasActivas
@@ -469,8 +457,6 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "clientes" && <Clientes tenantId={tenantId} />}
           {pagina === "administracion" && <Administracion tenantId={tenantId} monedasActivas={{ ...MONEDAS_POR_DEFECTO, ...(config.monedasActivas || {}) }} />}
           {pagina === "estadisticas" && <ResumenFinanciero tenantId={tenantId} />}
-          {pagina === "finanzas" && <CentroFinanciero embedded />}
-          {pagina === "personal" && <PersonalPage embedded />}
           {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
         </div>
@@ -3007,8 +2993,8 @@ function Clientes({ tenantId }: { tenantId: number }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="relative w-full sm:w-80">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={14} /></span>
-          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o cédula/RIF…" className="input-horeca w-full pl-8" />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 pointer-events-none flex items-center justify-center"><IconSearch size={16} className="text-slate-400 dark:text-slate-400" /></span>
+          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o cédula/RIF…" className="input-horeca has-icon w-full pl-10" />
         </div>
         <button onClick={() => setMostrarForm((v) => !v)} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
           {mostrarForm ? "Cancelar" : "+ Nuevo cliente"}
@@ -3165,10 +3151,17 @@ function calcularMargen(costo: number, precio: number): number | null {
 // guardar — así solo hay un lugar haciendo esa conversión (antes el
 // frontend convertía a USD fijo acá mismo, lo que rompía en cuanto un
 // negocio configuraba una moneda base distinta a USD).
-/** "$4.50" en USD, "COP 4.500,00" en cualquier otra moneda — para mostrar un costo en la moneda en que de verdad se compró. */
-function fmtCostoEnMoneda(monto: number, moneda: string): string {
-  if (moneda === "USD" || !moneda) return `$${monto.toFixed(2)}`;
-  return `${moneda} ${monto.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** Formato unificado con separador de miles en puntos y código al final: "60.000 COP", "200 USD", "100.000 BS". Muestra decimales solo si los tiene (ej. "1.250,50 COP"). */
+function fmtCostoEnMoneda(monto: number | null | undefined, moneda?: string | null): string {
+  const num = Number(monto) || 0;
+  const m = (moneda || "USD").toUpperCase().trim();
+  const etiqueta = (m === "VES" || m === "BS") ? "BS" : m;
+  const tieneDecimales = num % 1 !== 0;
+  const str = num.toLocaleString("es-CO", {
+    minimumFractionDigits: tieneDecimales ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
+  return `${str} ${etiqueta}`;
 }
 
 /**
@@ -3209,6 +3202,8 @@ function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
   const [error, setError] = useState<string | null>(null);
 
   const margen = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
+  const monedaArticulo = (articulo.monedaCosto || "USD").toUpperCase();
+  const etiquetaMoneda = (monedaArticulo === "VES" || monedaArticulo === "BS") ? "BS" : monedaArticulo;
 
   const guardar = async () => {
     if (!form.nombre.trim()) { setError("El nombre no puede quedar vacío"); return; }
@@ -3248,11 +3243,11 @@ function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
           </Campo>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Campo label="Costo de adquisición $">
-            <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Costo unitario $" />
+          <Campo label={`Costo de adquisición (${etiquetaMoneda})`}>
+            <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder={`Costo unitario (${etiquetaMoneda})`} />
           </Campo>
-          <Campo label="Precio de venta $">
-            <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Precio de venta $" />
+          <Campo label={`Precio de venta (${etiquetaMoneda})`}>
+            <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder={`Precio de venta (${etiquetaMoneda})`} />
           </Campo>
         </div>
         <Campo label="Código de barras / SKU">
@@ -3319,7 +3314,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
       // asume tecleado en la moneda base del negocio) — se manda tal cual, es
       // el backend (ArticuloController) el que lo convierte a la moneda base
       // del tenant antes de guardarlo.
-      const monedaCompra = Number(form.cantidadInicial) > 0 && form.registrarGasto ? form.moneda : monedaBaseTenant;
+      const monedaArticulo = form.moneda || monedaBaseTenant || "COP";
       const costoIngresado = Number(form.costoUnitario);
       const nuevo = await crearArticulo({
         sku: generarSku(form.nombre),
@@ -3328,7 +3323,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
         categoria: form.categoria.trim(),
         costoUnitario: costoIngresado,
         precioVenta: Number(form.precioVenta),
-        monedaCosto: monedaCompra,
+        monedaCosto: monedaArticulo,
       });
       if (form.cantidadInicial && Number(form.cantidadInicial) > 0) {
         await entradaArticulo(nuevo.id, {
@@ -3337,10 +3332,10 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
           motivo: "Carga inicial de inventario",
           fechaVencimiento: form.fechaVencimiento || undefined,
           metodoPago: form.registrarGasto ? form.metodoPago : undefined,
-          moneda: form.registrarGasto ? form.moneda : undefined,
+          moneda: form.registrarGasto ? monedaArticulo : undefined,
         });
       }
-      setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "", registrarGasto: true, metodoPago: "EFECTIVO", moneda: monedaBaseTenant });
+      setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "", registrarGasto: true, metodoPago: "EFECTIVO", moneda: monedaArticulo });
       setMostrarForm(false);
       onCambio();
     } catch (e) {
@@ -3361,21 +3356,37 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     });
   }, [articulos, categoriaFiltro, busqueda]);
 
-  const valorTotalInventario = (articulos || []).reduce((s, a) => s + Number(a.costoUnitario) * Number(a.stockActual), 0);
+  const valorInventarioPorMoneda = useMemo(() => {
+    const totales: Record<string, number> = {};
+    for (const a of articulos || []) {
+      const m = (a.monedaCosto || monedaBaseTenant || "USD").toUpperCase();
+      const costo = a.costoUnitarioOriginal != null ? Number(a.costoUnitarioOriginal) : Number(a.costoUnitario);
+      const stock = Number(a.stockActual) || 0;
+      totales[m] = (totales[m] || 0) + (costo * stock);
+    }
+    return totales;
+  }, [articulos, monedaBaseTenant]);
+
+  const textoValorTotal = useMemo(() => {
+    const monedas = Object.keys(valorInventarioPorMoneda);
+    if (monedas.length === 0) return fmtCostoEnMoneda(0, monedaBaseTenant);
+    return monedas.map((m) => fmtCostoEnMoneda(valorInventarioPorMoneda[m], m)).join(" · ");
+  }, [valorInventarioPorMoneda, monedaBaseTenant]);
+
   const alertasStock = (articulos || []).filter((a) => Number(a.stockActual) <= 0 || (a.stockMinimo != null && Number(a.stockActual) <= Number(a.stockMinimo))).length;
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiCard label="Valor Total en Inventario" val={`$${valorTotalInventario.toFixed(2)}`} sub="Costo × stock actual" color="#0ea5e9" />
+        <KpiCard label="Valor Total en Inventario" val={textoValorTotal} sub="Costo × stock actual" color="#0ea5e9" />
         <KpiCard label="Total de Ítems" val={String((articulos || []).length)} sub={`${categorias.length} categoría${categorias.length === 1 ? "" : "s"}`} color="#a855f7" />
         <KpiCard label="Alertas de Stock" val={String(alertasStock)} sub="Bajo mínimo o agotado" color={alertasStock > 0 ? "#ef4444" : "#64748b"} />
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="relative w-full sm:w-72">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={14} /></span>
-          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o SKU…" className="input-horeca w-full pl-8" />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 pointer-events-none flex items-center justify-center"><IconSearch size={16} className="text-slate-400 dark:text-slate-400" /></span>
+          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o SKU…" className="input-horeca has-icon w-full pl-10" />
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setMostrarImportar(true)} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5">
@@ -3417,16 +3428,23 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
               <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} placeholder="Ej. Insumos secos" className="input-horeca" />
             </Campo>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-300/50 dark:border-white/10">
-            <Campo label={`Costo unitario (${Number(form.cantidadInicial) > 0 && form.registrarGasto ? form.moneda : monedaBaseTenant})`}>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-300/50 dark:border-white/10">
+            <Campo label="Moneda del artículo">
+              <select value={form.moneda} onChange={(e) => setForm({ ...form, moneda: e.target.value })} className="input-horeca">
+                <option value="COP">COP (Pesos colombianos)</option>
+                <option value="USD">USD (Dólares)</option>
+                <option value="VES">BS (Bolívares VES)</option>
+              </select>
+            </Campo>
+            <Campo label={`Costo unitario (${form.moneda === "VES" ? "BS" : form.moneda})`}>
               <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
-            <Campo label={`Precio de venta (siempre en ${monedaBaseTenant})`}>
+            <Campo label={`Precio de venta (${form.moneda === "VES" ? "BS" : form.moneda})`}>
               <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
-            <Campo label={`Cantidad a ingresar ahora (${form.unidadMedida})`}>
+            <Campo label={`Cantidad inicial (${form.unidadMedida})`}>
               <input value={form.cantidadInicial} onChange={(e) => setForm({ ...form, cantidadInicial: e.target.value })} type="number" step="0.001" min="0" placeholder="0" className="input-horeca" />
-              <p className="text-[10px] text-slate-400 mt-1">Cuánto tenés físicamente de este producto ahora mismo. Podés dejarlo en 0 y cargar stock después con "Reabastecer".</p>
+              <p className="text-[10px] text-slate-400 mt-1">Físicamente en stock ahora mismo.</p>
             </Campo>
           </div>
           {Number(form.cantidadInicial) > 0 && (
@@ -3445,9 +3463,11 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
                       <option value="BILLETERA_DIGITAL">Billetera digital</option>
                     </select>
                   </Campo>
-                  <Campo label="Moneda">
+                  <Campo label="Moneda del pago">
                     <select value={form.moneda} onChange={(e) => setForm({ ...form, moneda: e.target.value })} className="input-horeca">
-                      {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+                      <option value="COP">COP</option>
+                      <option value="USD">USD</option>
+                      <option value="VES">BS</option>
                     </select>
                   </Campo>
                 </div>
@@ -3756,7 +3776,7 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
             tabla puede estar en cero; que compitan visualmente con los
             datos reales solo agrega ruido. */}
         <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${costoEnMoneda === 0 ? "text-slate-300 dark:text-white/15" : "text-slate-600 dark:text-white/60"}`}>{fmtCostoEnMoneda(costoEnMoneda, monedaCosto)}</td>
-        <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${Number(articulo.precioVenta ?? 0) === 0 ? "text-slate-300 dark:text-white/15" : "text-slate-600 dark:text-white/60"}`}>${Number(articulo.precioVenta ?? 0).toFixed(2)}</td>
+        <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${Number(articulo.precioVenta ?? 0) === 0 ? "text-slate-300 dark:text-white/15" : "text-slate-600 dark:text-white/60"}`}>{fmtCostoEnMoneda(Number(articulo.precioVenta ?? 0), monedaCosto)}</td>
         <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${valorInventario === 0 ? "text-slate-300 dark:text-white/15 font-semibold" : "text-slate-800 dark:text-white/80 font-semibold"}`}>{fmtCostoEnMoneda(valorInventario, monedaCosto)}</td>
         <td className="py-2.5 pl-2 pr-3">
           {/* Color permanente por acción (no solo al hover) — con 4 íconos
@@ -3819,19 +3839,18 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
   tenantId: number; articulo: Articulo; onClose: () => void; onReabastecido: () => void;
 }) {
   const [cantidad, setCantidad] = useState("");
-  const [costoUnitario, setCostoUnitario] = useState(String(articulo.costoUnitario));
+  const [costoUnitario, setCostoUnitario] = useState(String(articulo.costoUnitarioOriginal ?? articulo.costoUnitario));
   const [precioVenta, setPrecioVenta] = useState(String(articulo.precioVenta ?? 0));
   const [metodoPago, setMetodoPago] = useState("EFECTIVO");
-  // Moneda base real del negocio — el selector arranca acá (no en USD fijo)
-  // en cuanto se conoce, salvo que el usuario ya haya elegido otra a mano.
-  const [monedaBaseTenant, setMonedaBaseTenant] = useState("USD");
-  const [moneda, setMoneda] = useState("USD");
+  // Moneda base real del negocio — arranca en la moneda del artículo o moneda base
+  const [monedaBaseTenant, setMonedaBaseTenant] = useState("COP");
+  const [moneda, setMoneda] = useState(articulo.monedaCosto || "COP");
   useEffect(() => {
     monedaBase(tenantId).then((m) => {
       setMonedaBaseTenant(m);
-      setMoneda((actual) => (actual === "USD" ? m : actual));
+      if (!articulo.monedaCosto) setMoneda(m);
     }).catch(() => {});
-  }, [tenantId]);
+  }, [tenantId, articulo.monedaCosto]);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3875,14 +3894,14 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
           <Campo label={`Cantidad a sumar (${articulo.unidadMedida})`}>
             <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} type="number" step="0.001" min="0.001" placeholder="0" className="input-horeca" autoFocus />
           </Campo>
-          <Campo label={`Costo unitario (${moneda})`}>
+          <Campo label={`Costo unitario (${moneda === "VES" ? "BS" : moneda})`}>
             <input value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
           </Campo>
         </div>
         {moneda !== monedaBaseTenant && (
           <p className="text-[10px] text-slate-400">El costo se guarda convertido a {monedaBaseTenant} con la tasa vigente al momento de guardar — todo el sistema valora el inventario en esa moneda.</p>
         )}
-        <Campo label={`Precio de venta (siempre en ${monedaBaseTenant})`}>
+        <Campo label={`Precio de venta (${moneda === "VES" ? "BS" : moneda})`}>
           <input value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
         </Campo>
         <div className="flex items-center gap-2">
@@ -3900,7 +3919,9 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
           </Campo>
           <Campo label="Moneda">
             <select value={moneda} onChange={(e) => setMoneda(e.target.value)} className="input-horeca">
-              {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+              <option value="COP">COP</option>
+              <option value="USD">USD</option>
+              <option value="VES">BS</option>
             </select>
           </Campo>
         </div>
@@ -3916,7 +3937,7 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
         {cantidad && costoUnitario && (
           <p className="text-xs text-slate-500">
             Nuevo stock: <strong className="text-slate-900">{(Number(articulo.stockActual) + Number(cantidad)).toFixed(2)} {articulo.unidadMedida}</strong>
-            {" · "}Costo de esta entrada: <strong className="text-slate-900">${(Number(cantidad) * Number(costoUnitario)).toFixed(2)}</strong>
+            {" · "}Costo de esta entrada: <strong className="text-slate-900">{fmtCostoEnMoneda(Number(cantidad) * Number(costoUnitario), moneda)}</strong>
           </p>
         )}
         {error && <p className="text-xs text-red-500">{error}</p>}
@@ -4975,22 +4996,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     }
   };
 
-  if (embebido && !tasaValida) {
-    // Mismo candado financiero que ya bloqueaba Venta Rápida como overlay —
-    // embebida en la Vista General no puede saltárselo solo porque ahora
-    // vive siempre montada ahí.
-    return (
-      <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
-        <IconWarning size={28} />
-        <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar Venta Rápida.</p>
-        {onRegistrarTasa && (
-          <button onClick={onRegistrarTasa} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer">
-            Registrar tasa ahora
-          </button>
-        )}
-      </div>
-    );
-  }
+
 
   return (
     <div className={embebido
@@ -5068,7 +5074,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
         {/* PANEL IZQUIERDO — CATÁLOGO */}
         <div className={`${vistaMobile === "catalogo" ? "flex" : "hidden"} lg:flex lg:col-span-6 flex-1 min-w-0 min-h-0 flex-col p-4 gap-3 overflow-hidden`}>
           <div className="relative shrink-0">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={15} /></span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 pointer-events-none flex items-center justify-center"><IconSearch size={16} className="text-slate-400 dark:text-slate-400" /></span>
             <input
               ref={busquedaRef}
               value={busqueda}
@@ -5079,12 +5085,12 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 if (catalogoFiltrado.length >= 1) agregarDesdeTarjeta(catalogoFiltrado[0]);
               }}
               placeholder="Buscar o escanear código de barras… ej. Torta de Queso, Doritos, Mojito"
-              className="input-horeca w-full pl-9 pr-8"
+              className="input-horeca has-icon w-full pl-10 pr-8"
             />
             {busqueda && (
               <button type="button" onClick={() => setBusqueda("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 cursor-pointer">
-                <IconClose size={14} />
+                <IconClose size={14} className="text-slate-400 hover:text-red-500" />
               </button>
             )}
           </div>
