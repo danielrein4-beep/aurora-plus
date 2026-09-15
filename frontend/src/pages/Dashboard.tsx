@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconClinic, IconVet, IconHardware, IconCard, IconUsers, IconCustomize,
@@ -7,6 +7,7 @@ import {
   IconHourglass, IconUser, IconClose, IconCheckCircle, IconBank, IconChat, IconFileText,
   IconRestaurant, IconFarm,
 } from "../Icons";
+import CentroFinanciero from "./CentroFinanciero";
 import { useAuth } from "../context/AuthContext";
 import {
   listarPacientes,
@@ -244,9 +245,12 @@ const VERTICAL_METADATA: Record<string, {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, logout, trialDaysLeft, reportPayment } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"vertical" | "billing" | "team" | "settings">("vertical");
+  const [activeTab, setActiveTab] = useState<"vertical" | "finance" | "billing" | "team" | "settings">(
+    searchParams.get("tab") === "finanzas" ? "finance" : "vertical"
+  );
   const [workspaceTab, setWorkspaceTab] = useState<"kpis" | "patients" | "agenda" | "pos">("kpis");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
@@ -715,6 +719,18 @@ export default function Dashboard() {
             }`}>
             <VerticalIcon size={15} />
             <span>Mis Sistemas</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("finance")}
+            className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+              activeTab === "finance"
+                ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
+                : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
+            }`}
+          >
+            <IconBank size={15} />
+            <span>Finanzas</span>
           </button>
 
           <button
@@ -1327,6 +1343,9 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Finanzas vive dentro del Hub: mismo contexto, no una interfaz paralela. */}
+        {activeTab === "finance" && <CentroFinanciero embedded />}
 
         {/* ── PESTAÑA 3: EQUIPO Y ROLES ── */}
         {activeTab === "team" && (

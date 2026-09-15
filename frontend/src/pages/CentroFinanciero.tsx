@@ -36,6 +36,8 @@ interface TabItem {
 
 interface CentroFinancieroProps {
   previewMode?: boolean;
+  /** Se usa dentro del Hub: evita duplicar una página completa y su fondo. */
+  embedded?: boolean;
 }
 
 const formatLocalDate = (date: Date) => {
@@ -126,7 +128,7 @@ const mapCoverage = (response: EmpresaKpiResponse): VerticalCoverage[] => [
   }))
 ];
 
-export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode = false }) => {
+export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode = false, embedded = false }) => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('resumen');
   const today = new Date();
   const [desde, setDesde] = useState(() => formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 1)));
@@ -245,12 +247,12 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-[#051322] text-white selection:bg-[#35d7c3]/30 selection:text-white pb-24 overflow-x-hidden w-full max-w-full font-['IBM_Plex_Sans',sans-serif]">
+    <div className={`${embedded ? 'text-white pb-4' : 'min-h-screen bg-[#051322] text-white pb-24'} selection:bg-[#35d7c3]/30 selection:text-white overflow-x-hidden w-full max-w-full font-['IBM_Plex_Sans',sans-serif]`}>
       {/* Definición compartida SVG para compatibilidad */}
-      <AuroraGradientDef />
+      {!embedded && <AuroraGradientDef />}
 
       {/* La procedencia de los datos siempre queda visible. */}
-      <div className={`bg-[#0b2341] border-b px-3 sm:px-4 py-2 text-center text-xs font-medium flex flex-wrap items-center justify-center gap-2 ${isDemoTab ? 'border-amber-500/30 text-amber-300' : 'border-[#35d7c3]/30 text-[#35d7c3]'}`}>
+      <div className={`rounded-xl border px-3 sm:px-4 py-2 text-center text-xs font-medium flex flex-wrap items-center justify-center gap-2 ${isDemoTab ? 'border-amber-500/30 bg-amber-500/5 text-amber-300' : 'border-[#35d7c3]/25 bg-[#071518] text-[#35d7c3]'}`}>
         <span className={`font-bold px-2 py-0.5 rounded border font-['IBM_Plex_Mono',monospace] text-[11px] ${isDemoTab ? 'bg-amber-500/20 border-amber-500/30' : 'bg-[#35d7c3]/10 border-[#35d7c3]/30'}`}>
           {isDemoTab ? '[SIN CONEXIÓN DE DATOS]' : '[DATOS DEL NEGOCIO]'}
         </span>
