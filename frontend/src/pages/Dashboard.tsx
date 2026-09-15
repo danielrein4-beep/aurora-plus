@@ -748,18 +748,8 @@ export default function Dashboard() {
           </button>
         </nav>
 
-        {/* Derecha: Botón Directo a Mediclinic + Estado + Salir */}
+        {/* Derecha: Botón Directo a la vertical + Estado + Salir */}
         <div className="flex items-center gap-2.5 whitespace-nowrap">
-          {accesoPersonal && (
-            <button
-              onClick={() => navigate("/personal")}
-              className="px-3.5 py-2 rounded-full border border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300 text-xs font-bold hover:bg-teal-500/20 transition-colors flex items-center gap-2"
-              title="Abrir Gestión de Personal"
-            >
-              <IconUsers size={15} />
-              <span className="hidden xl:inline">Personal</span>
-            </button>
-          )}
           {/* Botón Destacado: Entrar a la app de la vertical activa */}
           {esVerticalReal && (
             <button

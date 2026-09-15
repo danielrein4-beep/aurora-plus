@@ -972,7 +972,7 @@ export function entradaArticulo(articuloId: number, datos: { cantidad: number; c
   return request(`/api/inventario/articulos/${articuloId}/entrada`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function editarArticulo(articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; sku?: string; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
+export function editarArticulo(articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; sku?: string; codigoBarras?: string; principioActivo?: string; monedaCosto?: string; costoUnitarioOriginal?: number }): Promise<Articulo> {
   return request(`/api/inventario/articulos/${articuloId}`, { method: "PUT", body: JSON.stringify(datos) });
 }
 
