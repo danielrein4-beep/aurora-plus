@@ -22,6 +22,7 @@ import CentroFinanciero from "./pages/CentroFinanciero";
 import Personal from "./pages/Personal";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PersonalRoute from "./components/PersonalRoute";
+import ModuleAccessBar from "./components/ModuleAccessBar";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 
@@ -31,27 +32,27 @@ function AnimatedRoute({ children }: { children: React.ReactNode }) {
 
 function MediclinicPage() {
   const navigate = useNavigate();
-  return <MediclinicApp onSalir={() => navigate("/dashboard")} />;
+  return <><ModuleAccessBar /><MediclinicApp onSalir={() => navigate("/dashboard")} /></>;
 }
 
 function RestaurantePage() {
   const navigate = useNavigate();
-  return <RestauranteApp onSalir={() => navigate("/dashboard")} />;
+  return <><ModuleAccessBar /><RestauranteApp onSalir={() => navigate("/dashboard")} /></>;
 }
 
 function RetailPage() {
   const navigate = useNavigate();
-  return <RetailApp onSalir={() => navigate("/dashboard")} />;
+  return <><ModuleAccessBar /><RetailApp onSalir={() => navigate("/dashboard")} /></>;
 }
 
 function ComercioPage() {
   const navigate = useNavigate();
-  return <ComercioApp onSalir={() => navigate("/dashboard")} />;
+  return <><ModuleAccessBar /><ComercioApp onSalir={() => navigate("/dashboard")} /></>;
 }
 
 function GanaderiaPage() {
   const navigate = useNavigate();
-  return <GanaderiaApp onSalir={() => navigate("/dashboard")} />;
+  return <><ModuleAccessBar /><GanaderiaApp onSalir={() => navigate("/dashboard")} /></>;
 }
 
 // Deep link del QR impreso de cada animal: /ganaderia/animal/:animalId
@@ -59,7 +60,7 @@ function GanaderiaAnimalPage() {
   const navigate = useNavigate();
   const { animalId } = useParams();
   const id = Number(animalId);
-  return <GanaderiaApp onSalir={() => navigate("/dashboard")} deepLinkAnimalId={Number.isFinite(id) ? id : undefined} />;
+  return <><ModuleAccessBar /><GanaderiaApp onSalir={() => navigate("/dashboard")} deepLinkAnimalId={Number.isFinite(id) ? id : undefined} /></>;
 }
 
 export default function App() {
