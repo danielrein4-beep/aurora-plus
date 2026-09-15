@@ -270,12 +270,12 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                   }`}
                   title={!nominaHabilitada ? 'Habilite el módulo de nómina para autorizar revisiones' : ''}
                 >
-                  🔍 Revisar y Aprobar Período
+                  Revisar y aprobar período
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] text-[#34d399] font-mono bg-[#10b981]/15 px-2 py-1 rounded border border-[#10b981]/30">
-                    🔒 Nómina Bloqueada
+                    Nómina bloqueada
                   </span>
                   <button
                     disabled={!nominaHabilitada}
@@ -350,7 +350,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                         {recibo.conceptosDesglosados.length} conceptos
                       </span>
                     </div>
-                    <span className="text-[#35d7c3]">🔍</span>
+                    <span className="text-[#35d7c3] font-mono">Ver</span>
                   </div>
                 </div>
               ))}

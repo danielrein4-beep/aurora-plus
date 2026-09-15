@@ -49,20 +49,41 @@ public class MotorFinancieroService {
     public BigDecimal convertirMoneda(Long tenantId, BigDecimal monto, String monedaOrigen, String monedaDestino) {
         if (monedaOrigen.equals(monedaDestino)) return monto;
 
+        BigDecimal conversionDirecta = convertirConTasaDisponible(tenantId, monto, monedaOrigen, monedaDestino, 2);
+        if (conversionDirecta != null) return conversionDirecta;
+
+        // En Venezuela es normal registrar USD→VES y USD→COP, pero no una
+        // tasa artificial VES→COP. Para una compra en bolívares de un negocio
+        // cuya moneda base sea COP (o al revés), usamos USD como puente. El
+        // resultado se calcula en la operación y queda congelado al guardarse;
+        // nunca se vuelve a convertir con la tasa de otro día.
+        if (!"USD".equals(monedaOrigen) && !"USD".equals(monedaDestino)) {
+            BigDecimal montoEnUsd = convertirConTasaDisponible(tenantId, monto, monedaOrigen, "USD", 6);
+            if (montoEnUsd != null) {
+                BigDecimal resultado = convertirConTasaDisponible(tenantId, montoEnUsd, "USD", monedaDestino, 2);
+                if (resultado != null) return resultado;
+            }
+        }
+
+        throw new RuntimeException("No hay tasa de cambio registrada entre " + monedaOrigen + " y " + monedaDestino
+            + " para este tenant. Regístrela primero en /api/financiero/tasas.");
+    }
+
+    /** Devuelve null únicamente cuando no existe una tasa directa ni inversa. */
+    private BigDecimal convertirConTasaDisponible(Long tenantId, BigDecimal monto, String monedaOrigen,
+                                                   String monedaDestino, int escala) {
         var directa = tasaCambioRepository
             .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, monedaOrigen, monedaDestino);
         if (directa.isPresent()) {
-            return monto.multiply(directa.get().getTasa()).setScale(2, RoundingMode.HALF_UP);
+            return monto.multiply(directa.get().getTasa()).setScale(escala, RoundingMode.HALF_UP);
         }
 
         var inversa = tasaCambioRepository
             .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, monedaDestino, monedaOrigen);
         if (inversa.isPresent()) {
-            return monto.divide(inversa.get().getTasa(), 2, RoundingMode.HALF_UP);
+            return monto.divide(inversa.get().getTasa(), escala, RoundingMode.HALF_UP);
         }
-
-        throw new RuntimeException("No hay tasa de cambio registrada entre " + monedaOrigen + " y " + monedaDestino
-            + " para este tenant. Regístrela primero en /api/financiero/tasas.");
+        return null;
     }
 
     /**

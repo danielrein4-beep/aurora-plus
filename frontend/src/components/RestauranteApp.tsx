@@ -151,16 +151,17 @@ function EstiloClasico() {
       .horeca-clasico .dark\\:text-white\\/30 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
       .horeca-clasico .dark\\:text-white { color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; }
       .horeca-clasico .btn-cyber-neon {
-        background: linear-gradient(135deg, #0ea5e9, #0d9488 65%, #8b5cf6) !important;
-        box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
-        color: #fff !important;
+        background: #35d7c3 !important;
+        border: 1px solid rgba(53, 215, 195, .72) !important;
+        box-shadow: 0 2px 7px rgba(2, 35, 42, .18) !important;
+        color: #062323 !important;
       }
       .horeca-clasico .text-teal-600, .horeca-clasico .text-teal-500,
       .horeca-clasico .text-teal-300, .horeca-clasico .text-teal-400 { color: #0d9488 !important; -webkit-text-fill-color: #0d9488 !important; }
       .horeca-clasico .text-aurora {
-        background: linear-gradient(90deg, #0ea5e9, #0d9488 70%, #8b5cf6) !important;
-        -webkit-background-clip: text !important; background-clip: text !important;
-        color: transparent !important; -webkit-text-fill-color: transparent !important;
+        background: none !important;
+        color: #0d9488 !important;
+        -webkit-text-fill-color: currentColor !important;
       }
       .horeca-clasico .bg-teal-500\\/15 { background-color: rgba(14,165,233,0.12) !important; }
       .horeca-clasico .border-teal-500\\/30, .horeca-clasico .border-teal-400\\/60 { border-color: rgba(13,148,136,0.4) !important; }
@@ -245,6 +246,16 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     // inventario, tanto de recetas como de artículos vendidos directo.
     recargarTodo();
   };
+
+  // Asegura que la moneda principal del negocio en el backend sea USD si estaba en COP/VES,
+  // ya que los precios y comandas de HORECA operan en dólares como moneda base.
+  useEffect(() => {
+    obtenerMonedaBaseNegocio().then((r) => {
+      if (r.monedaBase === "COP" || r.monedaBase === "VES") {
+        actualizarMonedaBaseNegocio("USD").catch(() => {});
+      }
+    }).catch(() => {});
+  }, []);
 
   const [mapa, setMapa] = useState<MapaMesaEntrada[] | null>(null);
   const [escandallos, setEscandallos] = useState<EscandalloReceta[] | null>(null);
@@ -431,15 +442,8 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "resumen" && <ResumenGeneral tenantId={tenantId} />}
           {pagina === "salon" && (esPremium("salon")
             ? <BloqueoPremium modulo="Salón & Mesas" />
-            : tasaValida
-              ? <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
-                  escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
-              : (
-                <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
-                  <IconWarning size={28} />
-                  <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar el salón.</p>
-                </div>
-              )
+            : <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
+                escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
           )}
           {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} />)}
           {pagina === "recetas" && (recetasActivas
@@ -645,7 +649,7 @@ function ModalDividirCuenta({
 
         <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-3 flex items-center justify-between">
           <span className="text-xs text-slate-500 dark:text-white/40 font-semibold">Total de la orden:</span>
-          <span className="font-mono font-bold text-lg text-slate-900 dark:text-white">${total.toFixed(2)}</span>
+          <span className="font-mono font-bold text-lg text-slate-900 dark:text-white">${fmtNumero(total, "USD")}</span>
         </div>
 
         <div>
@@ -1106,12 +1110,14 @@ function BloqueoPremium({ modulo }: { modulo: string }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-function KpiCard({ label, val, sub, color, onClick }: { label: string; val: string; sub: string; color: string; onClick?: () => void }) {
+function KpiCard({ label, val, sub, color, onClick }: { label: React.ReactNode; val: React.ReactNode; sub?: React.ReactNode; color: string; onClick?: () => void }) {
   return (
-    <div onClick={onClick} className={`apple-glass rounded-2xl p-5 border-l-4 transition-all ${onClick ? "cursor-pointer hover:scale-[1.02]" : ""}`} style={{ borderLeftColor: color }}>
-      <div className="text-xs text-slate-500 dark:text-white/40">{label}</div>
-      <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white mt-1">{val}</div>
-      <div className="text-[11px] text-slate-400 mt-0.5">{sub}</div>
+    <div onClick={onClick} className={`apple-glass rounded-2xl p-5 border-l-4 transition-all flex flex-col justify-between min-h-[115px] ${onClick ? "cursor-pointer hover:scale-[1.02]" : ""}`} style={{ borderLeftColor: color }}>
+      <div>
+        <div className="text-xs text-slate-500 dark:text-white/40 font-medium">{label}</div>
+        <div className="mt-1">{val}</div>
+      </div>
+      {sub && <div className="text-[11px] text-slate-400 mt-2">{sub}</div>}
     </div>
   );
 }
@@ -1642,8 +1648,10 @@ function nuevaFilaPago(moneda: string, auto: boolean): FilaPago {
   return { id: `${Date.now()}-${Math.random()}`, metodoPago: "EFECTIVO", moneda, monto: "", auto };
 }
 
-function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCobrar }: {
-  tenantId: number; total: number; monedaBase: string; procesando: boolean; error: string | null;
+function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, procesando, error, onCobrar }: {
+  tenantId: number; total: number; monedaBase?: string;
+  tasasExternas?: { VES?: number | null; COP?: number | null };
+  procesando: boolean; error: string | null;
   onCobrar: (pagos: PagoParcial[], monedaVuelto: string) => void;
 }) {
   // La primera fila nace "auto" y ya trae el total completo puesto — el caso
@@ -1655,8 +1663,22 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
   // en una fila, deja de seguir el pendiente y queda fija como manual.
   const otrasMonedas = Object.keys(MONEDAS_ALTERNAS).filter((m) => m !== monedaBase);
   const [filas, setFilas] = useState<FilaPago[]>(() => [nuevaFilaPago(monedaBase, true)]);
-  const [tasas, setTasas] = useState<Record<string, number | null>>({});
+  const [tasas, setTasas] = useState<Record<string, number | null>>(() => ({
+    VES: tasasExternas?.VES ?? null,
+    COP: tasasExternas?.COP ?? null,
+  }));
   const [monedaVuelto, setMonedaVuelto] = useState(monedaBase);
+
+  // Sincronizar tasas externas si se pasan desde el padre (evita delay o valores null)
+  useEffect(() => {
+    if (tasasExternas) {
+      setTasas((prev) => ({
+        ...prev,
+        VES: tasasExternas.VES ?? prev.VES,
+        COP: tasasExternas.COP ?? prev.COP,
+      }));
+    }
+  }, [tasasExternas?.VES, tasasExternas?.COP]);
 
   useEffect(() => {
     otrasMonedas.forEach((moneda) => {
@@ -1666,6 +1688,16 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, monedaBase]);
+
+  // Si cambia monedaBase o total y la primera fila es auto, mantener sincronizada
+  useEffect(() => {
+    setFilas((prev) => {
+      if (prev.length === 1 && prev[0].auto && prev[0].moneda !== monedaBase) {
+        return [{ ...prev[0], moneda: monedaBase, monto: total > 0.004 ? total.toFixed(2) : "" }];
+      }
+      return prev;
+    });
+  }, [monedaBase, total]);
 
   const aBase = (monto: number, moneda: string) => {
     if (!monto) return 0;
@@ -1742,6 +1774,10 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
       .map((m) => `${MONEDAS_ALTERNAS[m]} ${deBase(montoBase, m).toFixed(2)}`)
       .join(" · ");
 
+  const resumenMonedaAlterna = filas.length === 1 && filas[0].moneda !== monedaBase && Number(filas[0].monto) > 0
+    ? `${MONEDAS_ALTERNAS[filas[0].moneda] || filas[0].moneda} ${Number(filas[0].monto).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+    : null;
+
   return (
     <div className="space-y-3 pt-3 border-t border-slate-300/50 dark:border-white/10">
       <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Cobro (uno o varios métodos)</p>
@@ -1788,6 +1824,12 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
       <div className="apple-glass rounded-xl p-3.5 space-y-1.5 text-sm">
         <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Total a cobrar</span><span className="font-mono font-bold text-slate-900 dark:text-white">{simbolo}{total.toFixed(2)}</span></div>
         <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Ingresado</span><span className="font-mono text-slate-700 dark:text-white/70">{simbolo}{totalIngresadoBase.toFixed(2)}</span></div>
+        {resumenMonedaAlterna && (
+          <div className="flex justify-between text-xs text-slate-500 dark:text-white/50 pt-1 border-t border-slate-200/50 dark:border-white/5">
+            <span>En moneda seleccionada</span>
+            <span className="font-mono font-bold text-teal-600 dark:text-teal-400">{resumenMonedaAlterna}</span>
+          </div>
+        )}
         {!cubierto ? (
           <div className="flex flex-wrap justify-between gap-x-2 text-amber-600 dark:text-amber-400 font-semibold">
             <span className="flex-shrink-0">Pendiente</span>
@@ -1815,7 +1857,7 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
 
       <button onClick={handleCobrar} disabled={procesando || !cubierto}
         className="w-full btn-cyber-neon text-white text-base font-bold py-4 rounded-xl cursor-pointer disabled:opacity-50">
-        {procesando ? "Procesando…" : cubierto ? `Cobrar y Cerrar ${simbolo}${total.toFixed(2)}` : "Completa el pago para cobrar"}
+        {procesando ? "Procesando…" : cubierto ? `Cobrar y Cerrar ${simbolo}${total.toFixed(2)}${resumenMonedaAlterna ? ` · ${resumenMonedaAlterna}` : ""}` : "Completa el pago para cobrar"}
       </button>
     </div>
   );
@@ -1838,7 +1880,15 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
   const [errorCierre, setErrorCierre] = useState<string | null>(null);
   const [moneda, setMoneda] = useState("USD");
 
-  useEffect(() => { monedaBase(tenantId).then(setMoneda).catch(() => setMoneda("USD")); }, [tenantId]);
+  useEffect(() => {
+    obtenerMonedaBaseNegocio().then((r) => {
+      if (r.monedaBase === "COP" || r.monedaBase === "VES") {
+        actualizarMonedaBaseNegocio("USD").then(() => setMoneda("USD")).catch(() => setMoneda("USD"));
+      } else {
+        setMoneda(r.monedaBase || "USD");
+      }
+    }).catch(() => setMoneda("USD"));
+  }, [tenantId]);
 
   const totalLocal = items.reduce((s, i) => s + Number(i.precioUnitario) * i.cantidad, 0);
 
@@ -1955,7 +2005,7 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
 
         {/* Cerrar comanda */}
         {items.length > 0 && (
-          <PanelCobroMixto tenantId={tenantId} total={totalLocal} monedaBase={moneda} procesando={cerrando} error={errorCierre} onCobrar={handleCerrar} />
+          <PanelCobroMixto tenantId={tenantId} total={totalLocal} monedaBase="USD" procesando={cerrando} error={errorCierre} onCobrar={handleCerrar} />
         )}
       </div>
     </Modal>
@@ -3000,8 +3050,26 @@ function Clientes({ tenantId }: { tenantId: number }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="relative w-full sm:w-80">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={14} /></span>
-          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o cédula/RIF…" className="input-horeca w-full pl-8" />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 pointer-events-none flex items-center justify-center">
+            <IconSearch size={16} className="text-slate-400" />
+          </span>
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre o cédula/RIF…"
+            className="input-horeca w-full text-xs"
+            style={{ paddingLeft: "2.75rem", paddingRight: busqueda ? "2.25rem" : "0.875rem" }}
+          />
+          {busqueda && (
+            <button
+              type="button"
+              onClick={() => setBusqueda("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer p-1"
+              title="Limpiar búsqueda"
+            >
+              <IconClose size={14} />
+            </button>
+          )}
         </div>
         <button onClick={() => setMostrarForm((v) => !v)} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">
           {mostrarForm ? "Cancelar" : "+ Nuevo cliente"}
@@ -3158,10 +3226,28 @@ function calcularMargen(costo: number, precio: number): number | null {
 // guardar — así solo hay un lugar haciendo esa conversión (antes el
 // frontend convertía a USD fijo acá mismo, lo que rompía en cuanto un
 // negocio configuraba una moneda base distinta a USD).
-/** "$4.50" en USD, "COP 4.500,00" en cualquier otra moneda — para mostrar un costo en la moneda en que de verdad se compró. */
-function fmtCostoEnMoneda(monto: number, moneda: string): string {
-  if (moneda === "USD" || !moneda) return `$${monto.toFixed(2)}`;
-  return `${moneda} ${monto.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** Formato puramente numérico con separador de miles en punto (ej. "60.000" para COP, "10.700", "20" o "20,50" para USD/VES). */
+function fmtNumero(monto: number | null | undefined, moneda?: string | null): string {
+  const num = Number(monto) || 0;
+  const m = (moneda || "").toUpperCase().trim();
+  const tieneDecimales = m === "COP" ? false : (num % 1 !== 0);
+  return num.toLocaleString("es-CO", {
+    minimumFractionDigits: tieneDecimales ? 2 : 0,
+    maximumFractionDigits: tieneDecimales ? 2 : 0,
+  });
+}
+
+/** Formato unificado con separador de miles en puntos y código al final: "60.000 COP", "200 USD", "100.000 BS". Muestra decimales solo si los tiene (ej. "1.250,50 COP"). Para COP nunca muestra centavos. */
+function fmtCostoEnMoneda(monto: number | null | undefined, moneda?: string | null): string {
+  const num = Number(monto) || 0;
+  const m = (moneda || "USD").toUpperCase().trim();
+  const etiqueta = (m === "VES" || m === "BS") ? "BS" : m;
+  const tieneDecimales = m === "COP" ? false : (num % 1 !== 0);
+  const str = num.toLocaleString("es-CO", {
+    minimumFractionDigits: tieneDecimales ? 2 : 0,
+    maximumFractionDigits: tieneDecimales ? 2 : 0,
+  });
+  return `${str} ${etiqueta}`;
 }
 
 /**
@@ -3202,6 +3288,8 @@ function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
   const [error, setError] = useState<string | null>(null);
 
   const margen = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
+  const monedaArticulo = (articulo.monedaCosto || "USD").toUpperCase();
+  const etiquetaMoneda = (monedaArticulo === "VES" || monedaArticulo === "BS") ? "BS" : monedaArticulo;
 
   const guardar = async () => {
     if (!form.nombre.trim()) { setError("El nombre no puede quedar vacío"); return; }
@@ -3241,11 +3329,11 @@ function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
           </Campo>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Campo label="Costo de adquisición $">
-            <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Costo unitario $" />
+          <Campo label={`Costo de adquisición (${etiquetaMoneda})`}>
+            <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder={`Costo unitario (${etiquetaMoneda})`} />
           </Campo>
-          <Campo label="Precio de venta $">
-            <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder="Precio de venta $" />
+          <Campo label={`Precio de venta (${etiquetaMoneda})`}>
+            <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder={`Precio de venta (${etiquetaMoneda})`} />
           </Campo>
         </div>
         <Campo label="Código de barras / SKU">
@@ -3281,7 +3369,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     // Al cargar cantidad inicial, por defecto se asume que fue una compra
     // real (el caso más común al operar el día a día) — el dueño puede
     // destildarlo si en realidad está solo digitalizando stock que ya tenía.
-    registrarGasto: true, metodoPago: "EFECTIVO", moneda: "USD",
+    registrarGasto: true, metodoPago: "EFECTIVO", moneda: "USD", tasaCambioAplicada: "",
   });
   // El selector de moneda de la compra arranca en la moneda base real del
   // negocio en cuanto se conoce (en vez de asumir USD) — solo la primera vez,
@@ -3298,6 +3386,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     : null;
 
   const margenForm = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
+  const esParBsCop = (form.moneda === "VES" && monedaBaseTenant === "COP") || (form.moneda === "COP" && monedaBaseTenant === "VES");
 
   const crear = async () => {
     if (!form.nombre.trim()) { setError("El nombre del artículo es obligatorio"); return; }
@@ -3312,8 +3401,11 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
       // asume tecleado en la moneda base del negocio) — se manda tal cual, es
       // el backend (ArticuloController) el que lo convierte a la moneda base
       // del tenant antes de guardarlo.
-      const monedaCompra = Number(form.cantidadInicial) > 0 && form.registrarGasto ? form.moneda : monedaBaseTenant;
+      const monedaArticulo = form.moneda || monedaBaseTenant || "COP";
       const costoIngresado = Number(form.costoUnitario);
+      const tasaCompra = form.tasaCambioAplicada && Number(form.tasaCambioAplicada) > 0
+        ? Number(form.tasaCambioAplicada)
+        : undefined;
       const nuevo = await crearArticulo({
         sku: generarSku(form.nombre),
         nombre: form.nombre.trim(),
@@ -3321,7 +3413,8 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
         categoria: form.categoria.trim(),
         costoUnitario: costoIngresado,
         precioVenta: Number(form.precioVenta),
-        monedaCosto: monedaCompra,
+        monedaCosto: monedaArticulo,
+        tasaCambioAplicada: tasaCompra,
       });
       if (form.cantidadInicial && Number(form.cantidadInicial) > 0) {
         await entradaArticulo(nuevo.id, {
@@ -3330,10 +3423,11 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
           motivo: "Carga inicial de inventario",
           fechaVencimiento: form.fechaVencimiento || undefined,
           metodoPago: form.registrarGasto ? form.metodoPago : undefined,
-          moneda: form.registrarGasto ? form.moneda : undefined,
+          moneda: form.registrarGasto ? monedaArticulo : undefined,
+          tasaCambioAplicada: tasaCompra,
         });
       }
-      setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "", registrarGasto: true, metodoPago: "EFECTIVO", moneda: monedaBaseTenant });
+      setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "", registrarGasto: true, metodoPago: "EFECTIVO", moneda: monedaArticulo, tasaCambioAplicada: "" });
       setMostrarForm(false);
       onCambio();
     } catch (e) {
@@ -3354,21 +3448,123 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     });
   }, [articulos, categoriaFiltro, busqueda]);
 
-  const valorTotalInventario = (articulos || []).reduce((s, a) => s + Number(a.costoUnitario) * Number(a.stockActual), 0);
+  const valorInventarioPorMoneda = useMemo(() => {
+    const totales: Record<string, number> = {};
+    for (const a of articulos || []) {
+      const m = (a.monedaCosto || monedaBaseTenant || "USD").toUpperCase();
+      const costo = a.costoUnitarioOriginal != null ? Number(a.costoUnitarioOriginal) : Number(a.costoUnitario);
+      const stock = Number(a.stockActual) || 0;
+      totales[m] = (totales[m] || 0) + (costo * stock);
+    }
+    return totales;
+  }, [articulos, monedaBaseTenant]);
+
+  const renderValorTotal = useMemo(() => {
+    const monedas = Object.keys(valorInventarioPorMoneda);
+    if (monedas.length === 0) {
+      const mDef = (monedaBaseTenant || "COP").toUpperCase();
+      return (
+        <div className="flex items-center gap-2">
+          <span className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">0</span>
+          <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+            {(mDef === "VES" || mDef === "BS") ? "BS" : mDef}
+          </span>
+        </div>
+      );
+    }
+
+    if (monedas.length === 1) {
+      const m = monedas[0];
+      const num = valorInventarioPorMoneda[m] || 0;
+      const tieneDec = num % 1 !== 0;
+      const str = num.toLocaleString("es-CO", {
+        minimumFractionDigits: tieneDec ? 2 : 0,
+        maximumFractionDigits: 2,
+      });
+      const etiqueta = (m === "VES" || m === "BS") ? "BS" : m;
+      const badgeStyle =
+        etiqueta === "COP"
+          ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30"
+          : etiqueta === "USD"
+          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+          : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30";
+
+      return (
+        <div className="flex items-center gap-2.5">
+          <span className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white tracking-tight">
+            {str}
+          </span>
+          <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-md border tracking-wider uppercase ${badgeStyle}`}>
+            {etiqueta}
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1.5 pt-0.5">
+        {monedas.map((m) => {
+          const num = valorInventarioPorMoneda[m] || 0;
+          const tieneDec = num % 1 !== 0;
+          const str = num.toLocaleString("es-CO", {
+            minimumFractionDigits: tieneDec ? 2 : 0,
+            maximumFractionDigits: 2,
+          });
+          const etiqueta = (m === "VES" || m === "BS") ? "BS" : m;
+          const badgeStyle =
+            etiqueta === "COP"
+              ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30"
+              : etiqueta === "USD"
+              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+              : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30";
+
+          return (
+            <div key={m} className="flex items-center justify-between gap-3 bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-1.5 border border-slate-200/50 dark:border-white/5">
+              <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white tracking-tight">
+                {str}
+              </span>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border tracking-wider uppercase ${badgeStyle}`}>
+                {etiqueta}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }, [valorInventarioPorMoneda, monedaBaseTenant]);
+
   const alertasStock = (articulos || []).filter((a) => Number(a.stockActual) <= 0 || (a.stockMinimo != null && Number(a.stockActual) <= Number(a.stockMinimo))).length;
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiCard label="Valor Total en Inventario" val={`$${valorTotalInventario.toFixed(2)}`} sub="Costo × stock actual" color="#0ea5e9" />
-        <KpiCard label="Total de Ítems" val={String((articulos || []).length)} sub={`${categorias.length} categoría${categorias.length === 1 ? "" : "s"}`} color="#a855f7" />
+        <KpiCard label="Valor Total en Inventario" val={renderValorTotal} sub="Costo × stock actual" color="#0ea5e9" />
+        <KpiCard label="Total de Ítems" val={String((articulos || []).length)} sub={`${categorias.length} categoría${categorias.length === 1 ? "" : "s"}`} color="#35d7c3" />
         <KpiCard label="Alertas de Stock" val={String(alertasStock)} sub="Bajo mínimo o agotado" color={alertasStock > 0 ? "#ef4444" : "#64748b"} />
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="relative w-full sm:w-72">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={14} /></span>
-          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o SKU…" className="input-horeca w-full pl-8" />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 pointer-events-none flex items-center justify-center">
+            <IconSearch size={16} className="text-slate-400" />
+          </span>
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre o SKU…"
+            className="input-horeca w-full text-xs"
+            style={{ paddingLeft: "2.75rem", paddingRight: busqueda ? "2.25rem" : "0.875rem" }}
+          />
+          {busqueda && (
+            <button
+              type="button"
+              onClick={() => setBusqueda("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer p-1"
+              title="Limpiar búsqueda"
+            >
+              <IconClose size={14} />
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setMostrarImportar(true)} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5">
@@ -3410,18 +3606,33 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
               <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} placeholder="Ej. Insumos secos" className="input-horeca" />
             </Campo>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-300/50 dark:border-white/10">
-            <Campo label={`Costo unitario (${Number(form.cantidadInicial) > 0 && form.registrarGasto ? form.moneda : monedaBaseTenant})`}>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-300/50 dark:border-white/10">
+            <Campo label="Moneda del artículo">
+              <select value={form.moneda} onChange={(e) => setForm({ ...form, moneda: e.target.value })} className="input-horeca">
+                <option value="COP">COP (Pesos colombianos)</option>
+                <option value="USD">USD (Dólares)</option>
+                <option value="VES">BS (Bolívares VES)</option>
+              </select>
+            </Campo>
+            <Campo label={`Costo unitario (${form.moneda === "VES" ? "BS" : form.moneda})`}>
               <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
-            <Campo label={`Precio de venta (siempre en ${monedaBaseTenant})`}>
+            <Campo label={`Precio de venta (${form.moneda === "VES" ? "BS" : form.moneda})`}>
               <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
-            <Campo label={`Cantidad a ingresar ahora (${form.unidadMedida})`}>
+            <Campo label={`Cantidad inicial (${form.unidadMedida})`}>
               <input value={form.cantidadInicial} onChange={(e) => setForm({ ...form, cantidadInicial: e.target.value })} type="number" step="0.001" min="0" placeholder="0" className="input-horeca" />
-              <p className="text-[10px] text-slate-400 mt-1">Cuánto tenés físicamente de este producto ahora mismo. Podés dejarlo en 0 y cargar stock después con "Reabastecer".</p>
+              <p className="text-[10px] text-slate-400 mt-1">Físicamente en stock ahora mismo.</p>
             </Campo>
           </div>
+          {form.moneda !== monedaBaseTenant && (
+            <div className="rounded-xl border border-teal-500/20 bg-teal-500/[0.06] px-4 py-2.5 flex items-center gap-2.5 text-xs text-slate-700 dark:text-white/80">
+              <span className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0"></span>
+              <span>
+                Registro en <strong className="text-teal-700 dark:text-teal-300 font-bold">{form.moneda === "VES" ? "Bolívares (BS)" : form.moneda}</strong>: Se aplica automáticamente la tasa de cambio vigente del sistema para la equivalencia contable.
+              </span>
+            </div>
+          )}
           {Number(form.cantidadInicial) > 0 && (
             <div className="space-y-2 pt-2 border-t border-slate-300/50 dark:border-white/10">
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-white/60 cursor-pointer">
@@ -3438,9 +3649,11 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
                       <option value="BILLETERA_DIGITAL">Billetera digital</option>
                     </select>
                   </Campo>
-                  <Campo label="Moneda">
+                  <Campo label="Moneda del pago">
                     <select value={form.moneda} onChange={(e) => setForm({ ...form, moneda: e.target.value })} className="input-horeca">
-                      {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+                      <option value="COP">COP</option>
+                      <option value="USD">USD</option>
+                      <option value="VES">BS</option>
                     </select>
                   </Campo>
                 </div>
@@ -3487,6 +3700,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
                   <th className="py-2 px-2 font-semibold text-right">Cantidad</th>
                   <th className="py-2 px-2 font-semibold text-right">Costo</th>
                   <th className="py-2 px-2 font-semibold text-right">Precio</th>
+                  <th className="py-2 px-2 font-semibold text-right">Margen / Ganancia</th>
                   <th className="py-2 px-2 font-semibold text-right">Valor en inventario</th>
                   <th className="py-2 pl-2 pr-3 font-semibold text-right">Acciones</th>
                 </tr>
@@ -3687,15 +3901,14 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const margenActual = calcularMargen(Number(articulo.costoUnitario), Number(articulo.precioVenta ?? 0));
-  const sinStock = Number(articulo.stockActual) <= 0;
-  const stockBajo = !sinStock && articulo.stockMinimo != null && Number(articulo.stockActual) <= Number(articulo.stockMinimo);
-  // Costo/Valor se muestran en la moneda en que de verdad se compró (ej.
-  // "COP 4.500,00"), no forzados a dólares — costoUnitario en USD sigue
-  // siendo la fuente de verdad para margen/kardex, esto es solo visual.
   const monedaCosto = articulo.monedaCosto || "USD";
   const costoEnMoneda = articulo.costoUnitarioOriginal ?? Number(articulo.costoUnitario);
+  const precioVenta = Number(articulo.precioVenta ?? 0);
   const valorInventario = costoEnMoneda * Number(articulo.stockActual);
+  const margenActual = calcularMargen(costoEnMoneda, precioVenta);
+  const gananciaUnitaria = precioVenta > 0 && costoEnMoneda > 0 ? (precioVenta - costoEnMoneda) : 0;
+  const sinStock = Number(articulo.stockActual) <= 0;
+  const stockBajo = !sinStock && articulo.stockMinimo != null && Number(articulo.stockActual) <= Number(articulo.stockMinimo);
 
   const guardarAjuste = async () => {
     if (stockReal === "" || Number(stockReal) < 0) { setError("Indicá el stock real contado"); return; }
@@ -3749,13 +3962,33 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
             tabla puede estar en cero; que compitan visualmente con los
             datos reales solo agrega ruido. */}
         <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${costoEnMoneda === 0 ? "text-slate-300 dark:text-white/15" : "text-slate-600 dark:text-white/60"}`}>{fmtCostoEnMoneda(costoEnMoneda, monedaCosto)}</td>
-        <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${Number(articulo.precioVenta ?? 0) === 0 ? "text-slate-300 dark:text-white/15" : "text-slate-600 dark:text-white/60"}`}>${Number(articulo.precioVenta ?? 0).toFixed(2)}</td>
+        <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${precioVenta === 0 ? "text-slate-300 dark:text-white/15" : "text-slate-600 dark:text-white/60"}`}>{fmtCostoEnMoneda(precioVenta, monedaCosto)}</td>
+        <td className="py-2.5 px-2 text-right whitespace-nowrap">
+          {margenActual !== null ? (
+            <div className="inline-flex flex-col items-end">
+              <span className={`inline-flex items-center font-mono font-black text-xs px-2 py-0.5 rounded-lg border ${
+                margenActual >= 30
+                  ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30"
+                  : margenActual >= 15
+                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                  : margenActual > 0
+                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                  : "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30"
+              }`}>
+                {margenActual >= 0 ? `+${margenActual.toFixed(1)}%` : `${margenActual.toFixed(1)}%`}
+              </span>
+              {gananciaUnitaria !== 0 && (
+                <span className="text-[10px] font-mono text-slate-400 dark:text-white/40 mt-0.5 font-medium">
+                  {gananciaUnitaria > 0 ? `+${fmtCostoEnMoneda(gananciaUnitaria, monedaCosto)}` : fmtCostoEnMoneda(gananciaUnitaria, monedaCosto)}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-[10px] text-slate-400 dark:text-white/30 italic">Sin precio</span>
+          )}
+        </td>
         <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${valorInventario === 0 ? "text-slate-300 dark:text-white/15 font-semibold" : "text-slate-800 dark:text-white/80 font-semibold"}`}>{fmtCostoEnMoneda(valorInventario, monedaCosto)}</td>
         <td className="py-2.5 pl-2 pr-3">
-          {/* Color permanente por acción (no solo al hover) — con 4 íconos
-              finos del mismo gris eran indistinguibles a simple vista; ahora
-              cada uno tiene su propio color + fondo, se leen como 4 botones
-              distintos en vez de una fila de trazos iguales. */}
           <div className="flex items-center justify-end gap-1.5">
             <button onClick={() => setModo("reabastecer")} title="Añadir inventario (reabastecer)"
               className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 cursor-pointer transition-colors"><IconDownload size={16} /></button>
@@ -3770,7 +4003,7 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
       </tr>
       {modo === "ver" && error && (
         <tr className="border-b border-slate-100 dark:border-white/5 bg-red-50 dark:bg-red-500/5">
-          <td colSpan={7} className="px-3 py-2 flex items-center justify-between gap-3">
+          <td colSpan={8} className="px-3 py-2 flex items-center justify-between gap-3">
             <span className="text-[11px] text-red-600 dark:text-red-400">{error}</span>
             <button onClick={() => setError(null)} className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 cursor-pointer flex-shrink-0">Cerrar</button>
           </td>
@@ -3778,7 +4011,7 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
       )}
       {modo === "ajustar" && (
         <tr className="border-b border-slate-200/50 dark:border-white/5 bg-slate-50 dark:bg-white/5">
-          <td colSpan={7} className="px-3 py-2">
+          <td colSpan={8} className="px-3 py-2">
             <p className="text-[10px] text-slate-500 dark:text-white/40 mb-1.5">Sistema dice: {Number(articulo.stockActual)} {articulo.unidadMedida}. Escribí lo que realmente hay contado.</p>
             <div className="flex gap-2 max-w-md">
               <input value={stockReal} onChange={(e) => setStockReal(e.target.value)} type="number" step="0.001" min="0" className="input-horeca text-sm font-bold flex-1" placeholder="Stock real" autoFocus />
@@ -3812,19 +4045,18 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
   tenantId: number; articulo: Articulo; onClose: () => void; onReabastecido: () => void;
 }) {
   const [cantidad, setCantidad] = useState("");
-  const [costoUnitario, setCostoUnitario] = useState(String(articulo.costoUnitario));
+  const [costoUnitario, setCostoUnitario] = useState(String(articulo.costoUnitarioOriginal ?? articulo.costoUnitario));
   const [precioVenta, setPrecioVenta] = useState(String(articulo.precioVenta ?? 0));
   const [metodoPago, setMetodoPago] = useState("EFECTIVO");
-  // Moneda base real del negocio — el selector arranca acá (no en USD fijo)
-  // en cuanto se conoce, salvo que el usuario ya haya elegido otra a mano.
+  // Moneda base real del negocio — arranca en la moneda del artículo o moneda base
   const [monedaBaseTenant, setMonedaBaseTenant] = useState("USD");
-  const [moneda, setMoneda] = useState("USD");
+  const [moneda, setMoneda] = useState(articulo.monedaCosto || "COP");
   useEffect(() => {
     monedaBase(tenantId).then((m) => {
       setMonedaBaseTenant(m);
-      setMoneda((actual) => (actual === "USD" ? m : actual));
+      if (!articulo.monedaCosto) setMoneda(m);
     }).catch(() => {});
-  }, [tenantId]);
+  }, [tenantId, articulo.monedaCosto]);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3868,14 +4100,14 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
           <Campo label={`Cantidad a sumar (${articulo.unidadMedida})`}>
             <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} type="number" step="0.001" min="0.001" placeholder="0" className="input-horeca" autoFocus />
           </Campo>
-          <Campo label={`Costo unitario (${moneda})`}>
+          <Campo label={`Costo unitario (${moneda === "VES" ? "BS" : moneda})`}>
             <input value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
           </Campo>
         </div>
         {moneda !== monedaBaseTenant && (
           <p className="text-[10px] text-slate-400">El costo se guarda convertido a {monedaBaseTenant} con la tasa vigente al momento de guardar — todo el sistema valora el inventario en esa moneda.</p>
         )}
-        <Campo label={`Precio de venta (siempre en ${monedaBaseTenant})`}>
+        <Campo label={`Precio de venta (${moneda === "VES" ? "BS" : moneda})`}>
           <input value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
         </Campo>
         <div className="flex items-center gap-2">
@@ -3893,7 +4125,9 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
           </Campo>
           <Campo label="Moneda">
             <select value={moneda} onChange={(e) => setMoneda(e.target.value)} className="input-horeca">
-              {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+              <option value="COP">COP</option>
+              <option value="USD">USD</option>
+              <option value="VES">BS</option>
             </select>
           </Campo>
         </div>
@@ -3909,7 +4143,7 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
         {cantidad && costoUnitario && (
           <p className="text-xs text-slate-500">
             Nuevo stock: <strong className="text-slate-900">{(Number(articulo.stockActual) + Number(cantidad)).toFixed(2)} {articulo.unidadMedida}</strong>
-            {" · "}Costo de esta entrada: <strong className="text-slate-900">${(Number(cantidad) * Number(costoUnitario)).toFixed(2)}</strong>
+            {" · "}Costo de esta entrada: <strong className="text-slate-900">{fmtCostoEnMoneda(Number(cantidad) * Number(costoUnitario), moneda)}</strong>
           </p>
         )}
         {error && <p className="text-xs text-red-500">{error}</p>}
@@ -4658,9 +4892,30 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     // como respaldo en artículos viejos que todavía no tienen un precio de
     // venta cargado, para no mostrar una tarjeta en $0.00.
     const insumos: ItemCatalogo[] = (articulos || [])
-      .map((a) => ({ key: `articulo-${a.id}`, tipo: "articulo", id: a.id, nombre: a.nombre, precio: Number(a.precioVenta) > 0 ? Number(a.precioVenta) : Number(a.costoUnitario), categoria: a.categoria || "General", unidadMedida: a.unidadMedida || "unidad", stockActual: Number(a.stockActual), sku: a.sku }));
+      .map((a) => {
+        const valVenta = Number(a.precioVenta) > 0 ? Number(a.precioVenta) : Number(a.costoUnitario);
+        const esCop = (a.monedaCosto || "").toUpperCase() === "COP";
+        const esVes = (a.monedaCosto || "").toUpperCase() === "VES";
+        let precioUsd = valVenta;
+        if (esCop && tasaCop && Number(tasaCop.tasa) > 0 && valVenta > 50) {
+          precioUsd = valVenta / Number(tasaCop.tasa);
+        } else if (esVes && tasaBcv && Number(tasaBcv.tasa) > 0 && valVenta > 100) {
+          precioUsd = valVenta / Number(tasaBcv.tasa);
+        }
+        return {
+          key: `articulo-${a.id}`,
+          tipo: "articulo",
+          id: a.id,
+          nombre: a.nombre,
+          precio: Number(precioUsd.toFixed(2)),
+          categoria: a.categoria || "General",
+          unidadMedida: a.unidadMedida || "unidad",
+          stockActual: Number(a.stockActual),
+          sku: a.sku,
+        };
+      });
     return [...recetas, ...tragos, ...insumos];
-  }, [escandallos, fastbar, articulos]);
+  }, [escandallos, fastbar, articulos, tasaCop, tasaBcv]);
 
   const categoriasTabs = useMemo(() => {
     const tabs: { key: string | null; label: string }[] = [{ key: null, label: "Todas" }];
@@ -4968,22 +5223,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     }
   };
 
-  if (embebido && !tasaValida) {
-    // Mismo candado financiero que ya bloqueaba Venta Rápida como overlay —
-    // embebida en la Vista General no puede saltárselo solo porque ahora
-    // vive siempre montada ahí.
-    return (
-      <div className="apple-glass rounded-2xl p-8 text-center space-y-3">
-        <IconWarning size={28} />
-        <p className="text-sm font-semibold text-slate-700 dark:text-white/70">Falta registrar la tasa BCV del día para operar Venta Rápida.</p>
-        {onRegistrarTasa && (
-          <button onClick={onRegistrarTasa} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer">
-            Registrar tasa ahora
-          </button>
-        )}
-      </div>
-    );
-  }
+
 
   return (
     <div className={embebido
@@ -5061,7 +5301,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
         {/* PANEL IZQUIERDO — CATÁLOGO */}
         <div className={`${vistaMobile === "catalogo" ? "flex" : "hidden"} lg:flex lg:col-span-6 flex-1 min-w-0 min-h-0 flex-col p-4 gap-3 overflow-hidden`}>
           <div className="relative shrink-0">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"><IconSearch size={15} /></span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 pointer-events-none flex items-center justify-center"><IconSearch size={16} className="text-slate-400 dark:text-slate-400" /></span>
             <input
               ref={busquedaRef}
               value={busqueda}
@@ -5072,12 +5312,13 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 if (catalogoFiltrado.length >= 1) agregarDesdeTarjeta(catalogoFiltrado[0]);
               }}
               placeholder="Buscar o escanear código de barras… ej. Torta de Queso, Doritos, Mojito"
-              className="input-horeca w-full pl-9 pr-8"
+              className="input-horeca w-full text-xs"
+              style={{ paddingLeft: "2.75rem", paddingRight: busqueda ? "2.25rem" : "0.875rem" }}
             />
             {busqueda && (
               <button type="button" onClick={() => setBusqueda("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 cursor-pointer">
-                <IconClose size={14} />
+                <IconClose size={14} className="text-slate-400 hover:text-red-500" />
               </button>
             )}
           </div>
@@ -5414,7 +5655,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               </div>
               {tasaBcv && Number(tasaBcv.tasa) > 0 && (
                 <div className="flex items-center justify-between text-sm text-teal-600 dark:text-teal-400 font-mono font-bold mt-0.5">
-                  <span className="text-[11px] font-semibold text-slate-400">≈ Bs</span><span>{(total * Number(tasaBcv.tasa)).toFixed(2)}</span>
+                  <span className="text-[11px] font-semibold text-slate-400">≈ Bs</span><span>{fmtNumero(total * Number(tasaBcv.tasa), "VES")}</span>
                 </div>
               )}
               {tasaCop && Number(tasaCop.tasa) > 0 && (
@@ -5437,7 +5678,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                     <span>Dividir Cuenta</span>
                   </button>
                 </div>
-                <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
+                <PanelCobroMixto tenantId={tenantId} total={total} monedaBase="USD" tasasExternas={{ VES: tasaBcv ? Number(tasaBcv.tasa) : null, COP: tasaCop ? Number(tasaCop.tasa) : null }} procesando={procesando} error={error} onCobrar={cobrar} />
               </>
             )}
           </div>
@@ -5503,7 +5744,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               </div>
               {tasaBcv && Number(tasaBcv.tasa) > 0 && (
                 <div className="flex items-center justify-between text-xs text-teal-600 dark:text-teal-400 font-mono mt-0.5">
-                  <span>≈ Bs</span><span>{(recibo.total * Number(tasaBcv.tasa)).toFixed(2)}</span>
+                  <span>≈ Bs</span><span>{fmtNumero(recibo.total * Number(tasaBcv.tasa), "VES")}</span>
                 </div>
               )}
               {tasaCop && Number(tasaCop.tasa) > 0 && (
@@ -5522,7 +5763,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             )}
             {recibo.vuelto != null && recibo.vuelto > 0.004 && (
               <div className="text-sm font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2">
-                Vuelto entregado: <span className="font-mono">{recibo.vuelto.toFixed(2)} {recibo.monedaVuelto}</span>
+                Vuelto entregado: <span className="font-mono">{fmtCostoEnMoneda(recibo.vuelto, recibo.monedaVuelto)}</span>
               </div>
             )}
 
@@ -5794,8 +6035,8 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                     <tr className="border-b border-slate-200/50 dark:border-white/5">
                       <td className="py-2 pr-3 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fecha).toLocaleString()}</td>
                       <td className="py-2 px-3 font-mono font-semibold text-slate-800 dark:text-white/80">{t.numeroTicket}</td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white/80">${Number(t.totalUsd).toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.totalBs != null ? `Bs ${Number(t.totalBs).toFixed(2)}` : "—"}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white/80">${fmtNumero(t.totalUsd, "USD")}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.totalBs != null ? `Bs ${fmtNumero(t.totalBs, "VES")}` : "—"}</td>
                       <td className="py-2 px-3 text-slate-600 dark:text-white/60">{(t.metodoPago || "-").replace("_", " ")}</td>
                       <td className="py-2 px-3">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -5839,8 +6080,8 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
               <tfoot>
                 <tr className="font-bold text-slate-900 dark:text-white border-t-2 border-slate-300/60 dark:border-white/10">
                   <td className="py-2 pr-3" colSpan={2}>Total</td>
-                  <td className="py-2 px-3 text-right font-mono">${totales.usd.toFixed(2)}</td>
-                  <td className="py-2 px-3 text-right font-mono">Bs {totales.bs.toFixed(2)}</td>
+                  <td className="py-2 px-3 text-right font-mono">${fmtNumero(totales.usd, "USD")}</td>
+                  <td className="py-2 px-3 text-right font-mono">Bs {fmtNumero(totales.bs, "VES")}</td>
                   <td colSpan={3}></td>
                 </tr>
               </tfoot>
@@ -6788,7 +7029,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-300">ABIERTO</span>
             </div>
             <p className="text-xs text-slate-500 dark:text-white/40">Cajero: {turno.idCajero} · Desde {new Date(turno.fechaApertura).toLocaleString()}</p>
-            <p className="text-xs text-slate-500 dark:text-white/40">Monto base: {Number(turno.montoBase).toFixed(2)} {moneda}</p>
+            <p className="text-xs text-slate-500 dark:text-white/40">Monto base: {fmtCostoEnMoneda(turno.montoBase, moneda)}</p>
           </div>
 
           <div className="apple-glass rounded-2xl p-5 space-y-3">
@@ -6922,7 +7163,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
                     Total declarado acumulado:
                   </span>
                   <span className="font-mono font-black text-base text-teal-600 dark:text-teal-400">
-                    {totalDesgloseCalculado.toFixed(2)} {moneda}
+                    {fmtCostoEnMoneda(totalDesgloseCalculado, moneda)}
                   </span>
                 </div>
               </div>
@@ -6944,7 +7185,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
               disabled={cerrando}
               className="btn-cyber-neon text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer disabled:opacity-60 w-full shadow-lg"
             >
-              {cerrando ? "Cerrando turno y auditando…" : `Cerrar turno y generar Cierre Z (${montoDeclaradoFinal.toFixed(2)} ${moneda})`}
+              {cerrando ? "Cerrando turno y auditando…" : `Cerrar turno y generar Cierre Z (${fmtCostoEnMoneda(montoDeclaradoFinal, moneda)})`}
             </button>
           </div>
         </div>
@@ -6954,8 +7195,8 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
         <Modal onClose={() => setUltimoCierre(null)} titulo="Cierre Z registrado">
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-slate-500 dark:text-white/40 text-xs">Esperado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{Number(ultimoCierre.montoEsperado).toFixed(2)} {ultimoCierre.moneda}</div></div>
-              <div><span className="text-slate-500 dark:text-white/40 text-xs">Declarado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{Number(ultimoCierre.montoDeclarado).toFixed(2)} {ultimoCierre.moneda}</div></div>
+              <div><span className="text-slate-500 dark:text-white/40 text-xs">Esperado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{fmtCostoEnMoneda(ultimoCierre.montoEsperado, ultimoCierre.moneda)}</div></div>
+              <div><span className="text-slate-500 dark:text-white/40 text-xs">Declarado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{fmtCostoEnMoneda(ultimoCierre.montoDeclarado, ultimoCierre.moneda)}</div></div>
             </div>
             <div className={`rounded-xl p-3 text-center font-mono font-bold ${
               Number(ultimoCierre.descuadre) === 0 ? "bg-teal-500/15 text-teal-600 dark:text-teal-300"
@@ -6963,8 +7204,8 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
               : "bg-red-500/15 text-red-500"
             }`}>
               {Number(ultimoCierre.descuadre) === 0 ? "Caja cuadrada exacta"
-                : Number(ultimoCierre.descuadre) > 0 ? `Sobrante: +${Number(ultimoCierre.descuadre).toFixed(2)} ${ultimoCierre.moneda}`
-                : `Faltante: ${Number(ultimoCierre.descuadre).toFixed(2)} ${ultimoCierre.moneda}`}
+                : Number(ultimoCierre.descuadre) > 0 ? `Sobrante: +${fmtCostoEnMoneda(ultimoCierre.descuadre, ultimoCierre.moneda)}`
+                : `Faltante: ${fmtCostoEnMoneda(ultimoCierre.descuadre, ultimoCierre.moneda)}`}
             </div>
             <button onClick={() => setUltimoCierre(null)} className="w-full apple-glass-btn text-xs font-semibold py-3 rounded-xl cursor-pointer">Cerrar</button>
           </div>
@@ -6993,13 +7234,13 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
                     <td className="py-2 pr-2 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fechaApertura).toLocaleString()}</td>
                     <td className="py-2 px-2 text-slate-600 dark:text-white/60">{t.idCajero}</td>
                     <td className="py-2 px-2 text-slate-600 dark:text-white/60">{t.moneda}</td>
-                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{Number(t.montoBase).toFixed(2)}</td>
-                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{t.montoEsperado != null ? Number(t.montoEsperado).toFixed(2) : "—"}</td>
-                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{t.montoDeclarado != null ? Number(t.montoDeclarado).toFixed(2) : "—"}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{fmtNumero(t.montoBase, t.moneda)}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{t.montoEsperado != null ? fmtNumero(t.montoEsperado, t.moneda) : "—"}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{t.montoDeclarado != null ? fmtNumero(t.montoDeclarado, t.moneda) : "—"}</td>
                     <td className={`py-2 pl-2 text-right font-mono font-bold ${
                       t.descuadre == null ? "text-slate-400" : Number(t.descuadre) === 0 ? "text-teal-600 dark:text-teal-400" : "text-red-500"
                     }`}>
-                      {t.descuadre != null ? Number(t.descuadre).toFixed(2) : (t.estado === "ABIERTO" ? "Abierto" : "—")}
+                      {t.descuadre != null ? fmtNumero(t.descuadre, t.moneda) : (t.estado === "ABIERTO" ? "Abierto" : "—")}
                     </td>
                   </tr>
                 ))}
@@ -7163,15 +7404,15 @@ function CierreDeCaja({ tenantId }: { tenantId: number }) {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
               <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Ingresos</div>
-              <div className="font-['Outfit'] font-black text-lg text-teal-600 dark:text-teal-400">{Number(resumen.totalIngresos).toFixed(2)}</div>
+              <div className="font-['Outfit'] font-black text-lg text-teal-600 dark:text-teal-400">{fmtNumero(resumen.totalIngresos, moneda)}</div>
             </div>
             <div className="bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
               <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Egresos</div>
-              <div className="font-['Outfit'] font-black text-lg text-red-500">{Number(resumen.totalEgresos).toFixed(2)}</div>
+              <div className="font-['Outfit'] font-black text-lg text-red-500">{fmtNumero(resumen.totalEgresos, moneda)}</div>
             </div>
             <div className="bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
               <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Esperado en caja</div>
-              <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{Number(resumen.montoEsperadoEnCaja).toFixed(2)}</div>
+              <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{fmtNumero(resumen.montoEsperadoEnCaja, moneda)}</div>
             </div>
           </div>
         )}
@@ -7206,8 +7447,8 @@ function CierreDeCaja({ tenantId }: { tenantId: number }) {
                   {a.idCajero} · {new Date(a.fechaArqueo).toLocaleString()}
                 </div>
                 <div className={`text-[11px] mt-0.5 ${a.diferencia == null || Number(a.diferencia) === 0 ? "text-teal-600 dark:text-teal-400" : "text-amber-500"}`}>
-                  Declarado: {Number(a.montoDeclarado).toFixed(2)} {a.moneda} · Esperado: {a.montoEsperado != null ? Number(a.montoEsperado).toFixed(2) : "—"} {a.moneda}
-                  {a.diferencia != null && Number(a.diferencia) !== 0 && ` · Diferencia: ${Number(a.diferencia).toFixed(2)}`}
+                  Declarado: {fmtCostoEnMoneda(a.montoDeclarado, a.moneda)} · Esperado: {a.montoEsperado != null ? fmtCostoEnMoneda(a.montoEsperado, a.moneda) : "—"}
+                  {a.diferencia != null && Number(a.diferencia) !== 0 && ` · Diferencia: ${fmtCostoEnMoneda(a.diferencia, a.moneda)}`}
                 </div>
               </div>
               <button onClick={() => descargarPdf(a.id)} disabled={descargandoId === a.id}
@@ -7281,7 +7522,7 @@ function Finanzas({ tenantId, monedasActivas }: { tenantId: number; monedasActiv
             {monedasConMovimiento.map((moneda) => (
               <div key={moneda} className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-slate-400 dark:text-white/30">{moneda}</span>
-                <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{(ingresosPorMoneda[moneda] || 0).toFixed(2)}</span>
+                <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{fmtNumero(ingresosPorMoneda[moneda] || 0, moneda)}</span>
               </div>
             ))}
           </div>
@@ -7292,7 +7533,7 @@ function Finanzas({ tenantId, monedasActivas }: { tenantId: number; monedasActiv
             {monedasConMovimiento.map((moneda) => (
               <div key={moneda} className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-slate-400 dark:text-white/30">{moneda}</span>
-                <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{(egresosPorMoneda[moneda] || 0).toFixed(2)}</span>
+                <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{fmtNumero(egresosPorMoneda[moneda] || 0, moneda)}</span>
               </div>
             ))}
           </div>
@@ -7336,7 +7577,7 @@ function Finanzas({ tenantId, monedasActivas }: { tenantId: number; monedasActiv
                 <div className="text-[10px] text-slate-400">{new Date(m.fechaRegistro).toLocaleString()}</div>
               </div>
               <span className={`font-mono text-sm font-bold ${m.tipo === "INGRESO" ? "text-teal-600 dark:text-teal-400" : "text-red-500"}`}>
-                {m.tipo === "INGRESO" ? "+" : "−"}{Number(m.monto).toFixed(2)} {m.moneda}
+                {m.tipo === "INGRESO" ? "+" : "−"}{fmtCostoEnMoneda(m.monto, m.moneda)}
               </span>
             </div>
           ))
@@ -7398,7 +7639,7 @@ function CuentasPorCobrarPagar({ tenantId }: { tenantId: number }) {
           {Object.entries(totalesPorMoneda).map(([moneda, total]) => (
             <div key={moneda} className="apple-glass rounded-xl px-5 py-3">
               <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Pendiente en {moneda}</div>
-              <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{total.toFixed(2)}</div>
+              <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{fmtNumero(total, moneda)}</div>
             </div>
           ))}
         </div>
@@ -7424,12 +7665,12 @@ function CuentasPorCobrarPagar({ tenantId }: { tenantId: number }) {
                   <div className="text-[10px] text-slate-400">
                     {new Date(m.fechaRegistro).toLocaleString()}
                     {m.estado === "PAGADO" && " · Saldada"}
-                    {pagadoParcial && ` · Abonado ${(Number(m.monto) - saldo).toFixed(2)} de ${Number(m.monto).toFixed(2)}`}
+                    {pagadoParcial && ` · Abonado ${fmtCostoEnMoneda(Number(m.monto) - saldo, m.moneda)} de ${fmtCostoEnMoneda(m.monto, m.moneda)}`}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">
-                    {m.estado === "PAGADO" ? Number(m.monto).toFixed(2) : saldo.toFixed(2)} {m.moneda}
+                    {fmtCostoEnMoneda(m.estado === "PAGADO" ? m.monto : saldo, m.moneda)}
                   </span>
                   {m.estado !== "PAGADO" && (
                     <button onClick={() => setAbonando(m)} className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-500 px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap">
@@ -7477,7 +7718,7 @@ function ModalAbonarCuenta({ tenantId, cuenta, tipoLabel, onClose, onAbonado }: 
     <Modal onClose={onClose} titulo="Registrar abono">
       <div className="space-y-3">
         <p className="text-xs text-slate-500">{cuenta.concepto}</p>
-        <p className="text-xs text-slate-500">Saldo pendiente: <strong className="text-slate-900">{saldo.toFixed(2)} {cuenta.moneda}</strong></p>
+        <p className="text-xs text-slate-500">Saldo pendiente: <strong className="text-slate-900">{fmtCostoEnMoneda(saldo, cuenta.moneda)}</strong></p>
         <div className="grid grid-cols-2 gap-3">
           <Campo label={`Monto que le pagás al ${tipoLabel} ahora`}>
             <input value={monto} onChange={(e) => setMonto(e.target.value)} type="number" step="0.01" min="0.01" className="input-horeca" autoFocus />

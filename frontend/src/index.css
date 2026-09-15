@@ -471,6 +471,23 @@ html.light .input-horeca {
 }
 html.light .input-horeca:hover { background: #ffffff; }
 
+/* Evitar colisiones de texto con iconos a la izquierda o derecha en inputs */
+.input-horeca.has-icon,
+.input-horeca-icon,
+.input-horeca.pl-8,
+.input-horeca.pl-9,
+.input-horeca.pl-10,
+.input-horeca[class*="pl-"],
+input[class*="pl-10"] {
+  padding-left: 2.75rem !important;
+}
+.input-horeca.pr-8,
+.input-horeca.pr-9,
+.input-horeca.pr-10,
+.input-horeca[class*="pr-"] {
+  padding-right: 2.5rem !important;
+}
+
 /* Apple Liquid Glass Button */
 .apple-glass-btn {
   background: linear-gradient(135deg, rgba(11, 61, 145, 0.25) 0%, rgba(5, 19, 34, 0.40) 100%);

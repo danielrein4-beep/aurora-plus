@@ -99,7 +99,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                 : 'border-transparent hover:text-[#f8fafc]'
             }`}
           >
-            📋 Información & Contrato
+            Información & Contrato
           </button>
           <button
             onClick={() => setPestanaActiva('asistencia')}
@@ -119,7 +119,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                 : 'border-transparent hover:text-[#f8fafc]'
             }`}
           >
-            🎯 Metas ({metasEmpleado.length})
+            Metas ({metasEmpleado.length})
           </button>
           <button
             onClick={() => setPestanaActiva('recibos')}
@@ -129,7 +129,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                 : 'border-transparent hover:text-[#f8fafc]'
             }`}
           >
-            💵 Recibos de Nómina ({recibosEmpleado.length})
+            Recibos de Nómina ({recibosEmpleado.length})
           </button>
         </div>
 
