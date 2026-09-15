@@ -29,6 +29,9 @@ public class MotorFinancieroService {
      * conservar el historial de fluctuación).
      */
     public TasaCambio actualizarTasa(Long tenantId, String monedaOrigen, String monedaDestino, BigDecimal tasa, String origen) {
+        validarMoneda(monedaOrigen);
+        validarMoneda(monedaDestino);
+        if (tasa == null || tasa.signum() <= 0) throw new IllegalArgumentException("La tasa debe ser mayor a cero");
         TasaCambio nueva = new TasaCambio();
         nueva.setTenantId(tenantId);
         nueva.setMonedaOrigen(monedaOrigen);
@@ -47,9 +50,26 @@ public class MotorFinancieroService {
      * sentidos, sin obligar a cargar cada tasa dos veces.
      */
     public BigDecimal convertirMoneda(Long tenantId, BigDecimal monto, String monedaOrigen, String monedaDestino) {
-        if (monedaOrigen.equals(monedaDestino)) return monto;
+        return convertirConPrecision(tenantId, monto, monedaOrigen, monedaDestino, 2);
+    }
 
-        BigDecimal conversionDirecta = convertirConTasaDisponible(tenantId, monto, monedaOrigen, monedaDestino, 2);
+    /** Costos por kg/g/ml conservan cuatro decimales; el cobro se redondea al final. */
+    public BigDecimal convertirCostoAMonedaBase(Long tenantId, BigDecimal monto, String monedaOrigen) {
+        return convertirConPrecision(tenantId, monto, monedaOrigen, obtenerMonedaBase(tenantId), 4);
+    }
+
+    private static void validarMoneda(String moneda) {
+        if (!java.util.Set.of("USD", "VES", "COP").contains(moneda == null ? "" : moneda))
+            throw new IllegalArgumentException("Seleccione USD, VES o COP");
+    }
+
+    private BigDecimal convertirConPrecision(Long tenantId, BigDecimal monto, String monedaOrigen, String monedaDestino, int escala) {
+        validarMoneda(monedaOrigen);
+        validarMoneda(monedaDestino);
+        if (monto == null) throw new IllegalArgumentException("Indique el monto");
+        if (monedaOrigen.equals(monedaDestino)) return monto.setScale(escala, RoundingMode.HALF_UP);
+
+        BigDecimal conversionDirecta = convertirConTasaDisponible(tenantId, monto, monedaOrigen, monedaDestino, escala);
         if (conversionDirecta != null) return conversionDirecta;
 
         // En Venezuela es normal registrar USD→VES y USD→COP, pero no una
@@ -60,18 +80,36 @@ public class MotorFinancieroService {
         if (!"USD".equals(monedaOrigen) && !"USD".equals(monedaDestino)) {
             BigDecimal montoEnUsd = convertirConTasaDisponible(tenantId, monto, monedaOrigen, "USD", 6);
             if (montoEnUsd != null) {
-                BigDecimal resultado = convertirConTasaDisponible(tenantId, montoEnUsd, "USD", monedaDestino, 2);
+                BigDecimal resultado = convertirConTasaDisponible(tenantId, montoEnUsd, "USD", monedaDestino, escala);
                 if (resultado != null) return resultado;
             }
         }
 
         throw new RuntimeException("No hay tasa de cambio registrada entre " + monedaOrigen + " y " + monedaDestino
-            + " para este tenant. Regístrela primero en /api/financiero/tasas.");
+            + ". Registre la tasa en Configuración → Tasas de cambio.");
+    }
+
+    /** Factor de alta precisión para que el POS use exactamente la misma conversión. */
+    public BigDecimal factorConversion(Long tenantId, String origen, String destino) {
+        return convertirConPrecision(tenantId, BigDecimal.ONE, origen, destino, 12);
     }
 
     /** Devuelve null únicamente cuando no existe una tasa directa ni inversa. */
     private BigDecimal convertirConTasaDisponible(Long tenantId, BigDecimal monto, String monedaOrigen,
                                                    String monedaDestino, int escala) {
+        if (("USD".equals(monedaOrigen) && "VES".equals(monedaDestino))
+                || ("VES".equals(monedaOrigen) && "USD".equals(monedaDestino))) {
+            var licencia = licenciaTenantRepository.findByTenantId(tenantId);
+            if (licencia.isPresent()) {
+                var seleccionada = tasaCambioRepository.findTopByTenantIdAndMonedaOrigenAndMonedaDestinoAndOrigenApiOrderByFechaActualizacionDesc(
+                    tenantId, "USD", "VES", licencia.get().getOrigenTasaActiva());
+                if (seleccionada.isPresent() && seleccionada.get().getTasa().signum() > 0) {
+                    return "USD".equals(monedaOrigen)
+                        ? monto.multiply(seleccionada.get().getTasa()).setScale(escala, RoundingMode.HALF_UP)
+                        : monto.divide(seleccionada.get().getTasa(), escala, RoundingMode.HALF_UP);
+                }
+            }
+        }
         var directa = tasaCambioRepository
             .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, monedaOrigen, monedaDestino);
         if (directa.isPresent()) {
@@ -112,6 +150,27 @@ public class MotorFinancieroService {
 
         String monedaBase = licenciaTenantRepository.findByTenantId(tenantId).map(t -> t.getMonedaBase()).orElse("USD");
         return convertirMoneda(tenantId, saldoPendienteBase, monedaBase, monedaSaldoRestante);
+    }
+
+    @Transactional
+    public MovimientoCaja registrarCompraConEquivalencia(Long tenantId, BigDecimal monto, String moneda,
+                                                          BigDecimal equivalente, String concepto, Long articuloId) {
+        validarMoneda(moneda);
+        if (monto == null || monto.signum() <= 0 || equivalente == null || equivalente.signum() < 0)
+            throw new IllegalArgumentException("Importe de compra inválido");
+        MovimientoCaja m = new MovimientoCaja();
+        m.setTenantId(tenantId);
+        m.setTipo(MovimientoCaja.TipoMovimiento.EGRESO);
+        m.setMonto(monto);
+        m.setMoneda(moneda);
+        m.setMontoEquivalenteBase(equivalente.setScale(2, RoundingMode.HALF_UP));
+        m.setMonedaBaseEquivalente(obtenerMonedaBase(tenantId));
+        m.setTasaAplicada(equivalente.divide(monto, 10, RoundingMode.HALF_UP));
+        m.setConcepto(concepto);
+        m.setModuloOrigen("INVENTARIO");
+        m.setReferenciaTipo("Articulo");
+        m.setReferenciaId(articuloId);
+        return movimientoCajaRepository.save(m);
     }
 
     public String obtenerMonedaBase(Long tenantId) {

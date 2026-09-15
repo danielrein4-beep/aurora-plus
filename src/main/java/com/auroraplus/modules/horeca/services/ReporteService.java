@@ -1,6 +1,8 @@
 package com.auroraplus.modules.horeca.services;
 
-import com.auroraplus.core.financiero.entities.TasaCambio;
+import com.auroraplus.modules.horeca.entities.PagoVenta;
+import com.auroraplus.modules.horeca.repositories.PagoVentaRepository;
+import java.util.stream.Collectors;
 import com.auroraplus.core.financiero.repositories.TasaCambioRepository;
 import com.auroraplus.core.financiero.services.MotorFinancieroService;
 import com.auroraplus.modules.horeca.entities.Comanda;
@@ -33,7 +35,7 @@ public class ReporteService {
     private ComandaRepository comandaRepository;
 
     @Autowired
-    private TasaCambioRepository tasaCambioRepository;
+    private PagoVentaRepository pagoVentaRepository;
 
     @Autowired
     private MotorFinancieroService motorFinancieroService;
@@ -59,10 +61,9 @@ public class ReporteService {
 
         List<Comanda> comandas = comandaRepository.findAll(filtro, Sort.by(Sort.Direction.DESC, "fechaCierre"));
 
-        String monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
-        // Cache de tasas ya resueltas en esta corrida — evita repetir la
-        // misma consulta de tasa histórica para tickets del mismo día.
-        Map<LocalDate, Optional<TasaCambio>> tasaPorDia = new HashMap<>();
+        Map<Long, List<PagoVenta>> pagos = comandas.isEmpty() ? Map.of() : pagoVentaRepository
+            .findByTenantIdAndComandaIdInOrderByFechaPagoAsc(tenantId, comandas.stream().map(Comanda::getId).toList())
+            .stream().collect(Collectors.groupingBy(p -> p.getComanda().getId()));
 
         return comandas.stream().map(c -> {
             ReporteTicketDTO dto = new ReporteTicketDTO();
@@ -75,12 +76,14 @@ public class ReporteService {
             dto.canal = c.getCanal();
             dto.numeroMesa = c.getNumeroMesa();
 
-            if (dto.fecha != null) {
-                Optional<TasaCambio> tasa = tasaPorDia.computeIfAbsent(dto.fecha.toLocalDate(), dia ->
-                    tasaCambioRepository.findTopByTenantIdAndMonedaOrigenAndMonedaDestinoAndFechaActualizacionLessThanEqualOrderByFechaActualizacionDesc(
-                        tenantId, monedaBase, "VES", dia.atTime(23, 59, 59)));
-                dto.totalBs = tasa.map(t -> c.getTotalConsumo().multiply(t.getTasa())).orElse(null);
-            }
+            dto.totalBase = c.getTotalConsumo();
+            dto.monedaBase = c.getMonedaTotal();
+            dto.monedaVuelto = c.getMonedaVuelto();
+            dto.vuelto = c.getVueltoMonto();
+            dto.pagos = pagos.getOrDefault(c.getId(), List.of()).stream()
+                .map(p -> new ReporteTicketDTO.PagoResumen(p.getMoneda(), p.getMonto(), p.getMetodoPago(),
+                    p.getMontoEquivalenteBase(), p.getTasaAplicada())).toList();
+            // totalBs se conserva nullable por compatibilidad: no se inventa un equivalente histórico.
 
             return dto;
         }).toList();

@@ -19,7 +19,7 @@ import {
   listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
-  obtenerMonedaBaseNegocio, actualizarMonedaBaseNegocio,
+  obtenerMonedaBaseNegocio, actualizarMonedaBaseNegocio, cotizacionCobro,
   obtenerOrigenTasaActiva, actualizarOrigenTasaActiva, type OrigenTasaActiva,
   extraerFacturaOcr,
   tasaVigente, actualizarTasa, actualizarTasaExterna, ApiError, registrarMovimiento, listarMovimientos, abonarMovimiento,
@@ -277,15 +277,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     recargarTodo();
   };
 
-  // Asegura que la moneda principal del negocio en el backend sea USD si estaba en COP/VES,
-  // ya que los precios y comandas de HORECA operan en dólares como moneda base.
-  useEffect(() => {
-    obtenerMonedaBaseNegocio().then((r) => {
-      if (r.monedaBase === "COP" || r.monedaBase === "VES") {
-        actualizarMonedaBaseNegocio("USD").catch(() => {});
-      }
-    }).catch(() => {});
-  }, []);
+  // Abrir el módulo nunca cambia la moneda ni reinterpreta el inventario.
 
   const [mapa, setMapa] = useState<MapaMesaEntrada[] | null>(null);
   const [escandallos, setEscandallos] = useState<EscandalloReceta[] | null>(null);
@@ -1658,7 +1650,7 @@ function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, o
 // ══════════════════════════════════════════════════════════════════════════
 interface FilaPago { id: string; metodoPago: string; moneda: string; monto: string; auto: boolean }
 
-const MONEDAS_ALTERNAS: Record<string, string> = { VES: "Bs", COP: "COP" };
+const MONEDAS_ALTERNAS: Record<string, string> = { USD: "USD", VES: "Bs", COP: "COP" };
 
 function nuevaFilaPago(moneda: string, auto: boolean): FilaPago {
   return { id: `${Date.now()}-${Math.random()}`, metodoPago: "EFECTIVO", moneda, monto: "", auto };
@@ -1685,25 +1677,18 @@ function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, p
   }));
   const [monedaVuelto, setMonedaVuelto] = useState(monedaBase);
 
-  // Sincronizar tasas externas si se pasan desde el padre (evita delay o valores null)
+  const [errorTasas, setErrorTasas] = useState<string | null>(null);
   useEffect(() => {
-    if (tasasExternas) {
-      setTasas((prev) => ({
-        ...prev,
-        VES: tasasExternas.VES ?? prev.VES,
-        COP: tasasExternas.COP ?? prev.COP,
-      }));
-    }
-  }, [tasasExternas?.VES, tasasExternas?.COP]);
-
-  useEffect(() => {
-    otrasMonedas.forEach((moneda) => {
-      tasaVigente(tenantId, monedaBase, moneda)
-        .then((t) => setTasas((prev) => ({ ...prev, [moneda]: Number(t.tasa) })))
-        .catch(() => setTasas((prev) => ({ ...prev, [moneda]: null })));
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, monedaBase]);
+    let vigente = true;
+    setTasas({});
+    cotizacionCobro().then((r) => {
+      if (!vigente) return;
+      if (r.monedaBase !== monedaBase) throw new Error("Cambió la moneda del negocio. Recarga la venta.");
+      setTasas(r.factores);
+      setErrorTasas(null);
+    }).catch((e) => { if (vigente) setErrorTasas(e.message || "No se pudo consultar la tasa"); });
+    return () => { vigente = false; };
+  }, [tenantId, monedaBase, tasasExternas?.VES, tasasExternas?.COP]);
 
   // Si cambia monedaBase o total y la primera fila es auto, mantener sincronizada
   useEffect(() => {
@@ -1724,7 +1709,7 @@ function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, p
   const deBase = (montoBase: number, moneda: string) => {
     if (moneda === monedaBase) return montoBase;
     const tasa = tasas[moneda];
-    return tasa ? montoBase * tasa : montoBase;
+    return tasa ? montoBase * tasa : 0;
   };
 
   // Recalcula en vivo las filas "auto" con lo que falta, cada vez que cambia
@@ -1746,7 +1731,7 @@ function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, p
       let cambio = false;
       const siguiente = prev.map((f) => {
         if (!f.auto) return f;
-        const valor = faltaBase > 0.004 ? deBase(faltaBase, f.moneda).toFixed(2) : "";
+        const valor = faltaBase > 0.004 && (f.moneda === monedaBase || Number(tasas[f.moneda]) > 0) ? deBase(faltaBase, f.moneda).toFixed(2) : "";
         if (valor === f.monto) return f;
         cambio = true;
         return { ...f, monto: valor };
@@ -1759,24 +1744,27 @@ function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, p
   const totalIngresadoBase = filas.reduce((s, f) => s + aBase(Number(f.monto) || 0, f.moneda), 0);
   const pendienteBase = Math.max(0, total - totalIngresadoBase);
   const vueltoBase = Math.max(0, totalIngresadoBase - total);
-  const cubierto = total > 0 && totalIngresadoBase >= total - 0.005;
+  const sinTasa = filas.some(f => f.moneda !== monedaBase && !(Number(tasas[f.moneda]) > 0))
+    || (vueltoBase > 0.004 && monedaVuelto !== monedaBase && !(Number(tasas[monedaVuelto]) > 0));
+  const cubierto = !errorTasas && !sinTasa && total > 0 && totalIngresadoBase >= total - 0.005;
 
   const actualizarMonto = (id: string, monto: string) =>
     setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, monto, auto: false } : f)));
   const actualizarMetodo = (id: string, metodoPago: string) =>
     setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, metodoPago } : f)));
   const actualizarMoneda = (id: string, moneda: string) =>
-    setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, moneda } : f)));
+    setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, moneda, monto: "", auto: true } : { ...f, auto: false })));
   const agregarFila = () => setFilas((prev) => {
     // La fila nueva nace en la primera moneda alterna disponible que ninguna otra fila ya esté usando (típicamente Bs).
     const enUso = new Set(prev.map((f) => f.moneda));
     const monedaSugerida = otrasMonedas.find((m) => !enUso.has(m)) || otrasMonedas[0] || monedaBase;
-    return [...prev, nuevaFilaPago(monedaSugerida, true)];
+    return [...prev.map(f => ({ ...f, auto: false })), nuevaFilaPago(monedaSugerida, true)];
   });
   const quitarFila = (id: string) => setFilas((prev) => (prev.length > 1 ? prev.filter((f) => f.id !== id) : prev));
   const completarConPendiente = (id: string) => setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, auto: true } : { ...f, auto: false })));
 
   const handleCobrar = () => {
+    if (!cubierto || procesando) return;
     const pagos: PagoParcial[] = filas
       .filter((f) => Number(f.monto) > 0)
       .map((f) => ({ metodoPago: f.metodoPago, moneda: f.moneda, monto: Number(f.monto) }));
@@ -1791,12 +1779,13 @@ function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, p
       .join(" · ");
 
   const resumenMonedaAlterna = filas.length === 1 && filas[0].moneda !== monedaBase && Number(filas[0].monto) > 0
-    ? `${MONEDAS_ALTERNAS[filas[0].moneda] || filas[0].moneda} ${Number(filas[0].monto).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+    ? `${MONEDAS_ALTERNAS[filas[0].moneda] || filas[0].moneda} ${Number(filas[0].monto).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : null;
 
   return (
     <div className="space-y-3 pt-3 border-t border-slate-300/50 dark:border-white/10">
       <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Cobro (uno o varios métodos)</p>
+      {(errorTasas || sinTasa) && <p role="alert" className="text-xs text-amber-700">{errorTasas || "Falta una tasa para la moneda seleccionada. Regístrala en Configuración antes de cobrar."}</p>}
 
       <div className="space-y-2">
         {filas.map((f) => (
@@ -1838,8 +1827,8 @@ function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, p
       <button type="button" onClick={agregarFila} className="text-sm text-teal-600 dark:text-teal-300 font-semibold cursor-pointer">+ Agregar otro método de pago</button>
 
       <div className="apple-glass rounded-xl p-3.5 space-y-1.5 text-sm">
-        <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Total a cobrar</span><span className="font-mono font-bold text-slate-900 dark:text-white">{simbolo}{total.toFixed(2)}</span></div>
-        <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Ingresado</span><span className="font-mono text-slate-700 dark:text-white/70">{simbolo}{totalIngresadoBase.toFixed(2)}</span></div>
+        <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Total a cobrar</span><span className="font-mono font-bold text-slate-900 dark:text-white">{simbolo}{fmtNumero(total, monedaBase)}</span></div>
+        <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Ingresado</span><span className="font-mono text-slate-700 dark:text-white/70">{simbolo}{fmtNumero(totalIngresadoBase, monedaBase)}</span></div>
         {resumenMonedaAlterna && (
           <div className="flex justify-between text-xs text-slate-500 dark:text-white/50 pt-1 border-t border-slate-200/50 dark:border-white/5">
             <span>En moneda seleccionada</span>
@@ -1849,12 +1838,12 @@ function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, p
         {!cubierto ? (
           <div className="flex flex-wrap justify-between gap-x-2 text-amber-600 dark:text-amber-400 font-semibold">
             <span className="flex-shrink-0">Pendiente</span>
-            <span className="font-mono text-right">{simbolo}{pendienteBase.toFixed(2)}{formatearEnOtras(pendienteBase) ? ` · ${formatearEnOtras(pendienteBase)}` : ""}</span>
+            <span className="font-mono text-right">{simbolo}{fmtNumero(pendienteBase, monedaBase)}{formatearEnOtras(pendienteBase) ? ` · ${formatearEnOtras(pendienteBase)}` : ""}</span>
           </div>
         ) : (
           <div className="flex flex-wrap justify-between gap-x-2 text-teal-600 dark:text-teal-400 font-semibold">
             <span className="flex-shrink-0">Vuelto</span>
-            <span className="font-mono text-right">{simbolo}{vueltoBase.toFixed(2)}{formatearEnOtras(vueltoBase) ? ` · ${formatearEnOtras(vueltoBase)}` : ""}</span>
+            <span className="font-mono text-right">{simbolo}{fmtNumero(vueltoBase, monedaBase)}{formatearEnOtras(vueltoBase) ? ` · ${formatearEnOtras(vueltoBase)}` : ""}</span>
           </div>
         )}
       </div>
@@ -1873,7 +1862,7 @@ function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, p
 
       <button onClick={handleCobrar} disabled={procesando || !cubierto}
         className="w-full btn-cyber-neon text-white text-base font-bold py-4 rounded-xl cursor-pointer disabled:opacity-50">
-        {procesando ? "Procesando…" : cubierto ? `Cobrar y Cerrar ${simbolo}${total.toFixed(2)}${resumenMonedaAlterna ? ` · ${resumenMonedaAlterna}` : ""}` : "Completa el pago para cobrar"}
+        {procesando ? "Procesando…" : cubierto ? `Cobrar y Cerrar ${simbolo}${fmtNumero(total, monedaBase)}${resumenMonedaAlterna ? ` · ${resumenMonedaAlterna}` : ""}` : "Completa el pago para cobrar"}
       </button>
     </div>
   );
@@ -1897,13 +1886,7 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
   const [moneda, setMoneda] = useState("USD");
 
   useEffect(() => {
-    obtenerMonedaBaseNegocio().then((r) => {
-      if (r.monedaBase === "COP" || r.monedaBase === "VES") {
-        actualizarMonedaBaseNegocio("USD").then(() => setMoneda("USD")).catch(() => setMoneda("USD"));
-      } else {
-        setMoneda(r.monedaBase || "USD");
-      }
-    }).catch(() => setMoneda("USD"));
+    obtenerMonedaBaseNegocio().then((r) => setMoneda(r.monedaBase)).catch(() => setError("No se pudo consultar la moneda del negocio"));
   }, [tenantId]);
 
   const totalLocal = items.reduce((s, i) => s + Number(i.precioUnitario) * i.cantidad, 0);
@@ -2021,7 +2004,7 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
 
         {/* Cerrar comanda */}
         {items.length > 0 && (
-          <PanelCobroMixto tenantId={tenantId} total={totalLocal} monedaBase="USD" procesando={cerrando} error={errorCierre} onCobrar={handleCerrar} />
+          <PanelCobroMixto tenantId={tenantId} total={totalLocal} monedaBase={moneda} procesando={cerrando} error={errorCierre} onCobrar={handleCerrar} />
         )}
       </div>
     </Modal>
@@ -2116,6 +2099,8 @@ function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void
 // RECETAS & ESCANDALLO
 // ══════════════════════════════════════════════════════════════════════════
 function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: number; escandallos: EscandalloReceta[] | null; articulos: Articulo[] | null; onCambio: () => void }) {
+  const [monedaReceta, setMonedaReceta] = useState("");
+  useEffect(() => { obtenerMonedaBaseNegocio().then(r => setMonedaReceta(r.monedaBase)); }, [tenantId]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [form, setForm] = useState({ nombrePlato: "", estacionCocina: "COCINA", precioVenta: "", requiereCocina: true });
   const [guardando, setGuardando] = useState(false);
@@ -2208,7 +2193,7 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
             <select value={form.estacionCocina} onChange={(e) => setForm({ ...form, estacionCocina: e.target.value })} className="input-horeca">
               {ESTACIONES.map((e) => <option key={e} value={e}>{e.replace("_", " ")}</option>)}
             </select>
-            <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" placeholder="Precio de venta $" className="input-horeca" />
+            <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" placeholder={`Precio de venta (${monedaReceta || "cargando"})`} className="input-horeca" />
           </div>
           <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-white/60 cursor-pointer w-fit">
             <input type="checkbox" checked={form.requiereCocina} onChange={(e) => setForm({ ...form, requiereCocina: e.target.checked })} className="cursor-pointer" />
@@ -2339,6 +2324,9 @@ function ModalEditarReceta({
   onClose: () => void;
   onCambio: () => void;
 }) {
+  const [monedaReceta, setMonedaReceta] = useState("");
+  const [articuloCosteando, setArticuloCosteando] = useState<Articulo | null>(null);
+  useEffect(() => { obtenerMonedaBaseNegocio().then(r => setMonedaReceta(r.monedaBase)).catch(() => setError("No se pudo consultar la moneda de costeo")); }, [tenantId]);
   const [receta, setReceta] = useState<EscandalloReceta>(escandallo);
   const [ingredientes, setIngredientes] = useState<DetalleReceta[] | null>(null);
 
@@ -2521,6 +2509,7 @@ function ModalEditarReceta({
     let unidad = "";
     let nombre = "";
     let esSubReceta = false;
+    let articuloOrigen: Articulo | undefined;
 
     if (d.subReceta) {
       esSubReceta = true;
@@ -2530,6 +2519,7 @@ function ModalEditarReceta({
       nombre = sub?.nombrePlato || "Sub-receta";
     } else {
       const art = (articulos || []).find((a) => a.sku === d.ingredienteSku);
+      articuloOrigen = art;
       unitCost = Number(art?.costoUnitario || 0);
       unidad = art?.unidadMedida || "ud";
       nombre = art?.nombre || d.ingredienteSku || "Artículo";
@@ -2552,6 +2542,7 @@ function ModalEditarReceta({
       cantBruta,
       costoLinea,
       esSubReceta,
+      articuloOrigen,
       isEditing,
     };
   };
@@ -2564,6 +2555,7 @@ function ModalEditarReceta({
     return desgloseLineas.reduce((acc, curr) => acc + curr.costoLinea, 0);
   }, [desgloseLineas]);
 
+  const costosRevisados = !!monedaReceta && desgloseLineas.every(l => l.esSubReceta || l.articuloOrigen?.monedaValoracion === monedaReceta);
   const precioNumEnVivo = parseFloat(precioVenta) || 0;
   const margenEnVivo = precioNumEnVivo - costoTotalEnVivo;
   const margenPctEnVivo = precioNumEnVivo > 0 ? (margenEnVivo / precioNumEnVivo) * 100 : 0;
@@ -2592,6 +2584,7 @@ function ModalEditarReceta({
   return (
     <Modal onClose={onClose} titulo={`Editar Receta & Escandallo — ${receta.nombrePlato}`} ancho="max-w-4xl">
       <div className="space-y-5">
+        {articuloCosteando && <ModalEditarArticulo tenantId={tenantId} articulo={articuloCosteando} onClose={() => setArticuloCosteando(null)} onGuardado={() => { setArticuloCosteando(null); onCambio(); }} />}
         {/* Notificaciones */}
         {error && <div className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">{error}</div>}
         {mensajeExito && <div className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">{mensajeExito}</div>}
@@ -2617,7 +2610,7 @@ function ModalEditarReceta({
               </select>
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 dark:text-white/50 mb-1">Precio de venta ($)</label>
+              <label className="block text-[11px] font-semibold text-slate-500 dark:text-white/50 mb-1">Precio de venta ({monedaReceta || "cargando"})</label>
               <input value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} type="number" step="0.01" className="input-horeca w-full font-bold" placeholder="0.00" />
             </div>
           </div>
@@ -2628,11 +2621,11 @@ function ModalEditarReceta({
         </div>
 
         {/* 2. SECCIÓN: TABLERO DE COSTEO EN VIVO (HOJA DE CÁLCULO) */}
-        <div className="bg-slate-900/80 border border-slate-700/60 rounded-2xl p-4 shadow-xl text-white">
+        <div className="bg-slate-900/80 border border-slate-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-xl text-white">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Costeo en Tiempo Real</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Costeo en Tiempo Real</span>
             </div>
             <span className="text-[11px] text-slate-400 font-mono">
               {tieneIngredientes ? `${desgloseLineas.length} insumo(s) costeados` : "Sin ingredientes"}
@@ -2643,26 +2636,26 @@ function ModalEditarReceta({
             <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between">
               <div>
                 <strong className="text-amber-300 text-sm block">Costo: sin calcular · falta cargar ingredientes</strong>
-                <span className="text-xs text-slate-300">Agrega abajo los ingredientes del inventario para ver el costo exacto y margen en vivo.</span>
+                <span className="text-xs text-slate-600 dark:text-slate-300">Agrega abajo los ingredientes del inventario para ver el costo exacto y margen en vivo.</span>
               </div>
               <span className="text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full font-mono">Margen pendiente</span>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Costo Total */}
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700">
+              <div className="bg-white dark:bg-slate-800/80 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
                 <span className="text-[11px] text-slate-400 uppercase font-semibold block">Costo de Producción</span>
-                <div className="text-xl font-bold font-mono text-white mt-1">
-                  ${costoTotalEnVivo.toFixed(2)}
+                <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+                  {costosRevisados ? fmtCostoEnMoneda(costoTotalEnVivo, monedaReceta) : "Revisar costos"}
                 </div>
                 <span className="text-[10px] text-slate-400">Calculado desde inventario real</span>
               </div>
 
               {/* Precio de Venta */}
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700">
+              <div className="bg-white dark:bg-slate-800/80 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
                 <span className="text-[11px] text-slate-400 uppercase font-semibold block">Precio de Venta</span>
                 <div className="text-xl font-bold font-mono text-teal-400 mt-1">
-                  ${precioNumEnVivo.toFixed(2)}
+                  {fmtCostoEnMoneda(precioNumEnVivo, monedaReceta)}
                 </div>
                 <span className="text-[10px] text-slate-400">Definido en el plato</span>
               </div>
@@ -2670,18 +2663,18 @@ function ModalEditarReceta({
               {/* Margen Resultante */}
               <div className={`rounded-xl p-3 border ${
                 margenEnVivo >= 0
-                  ? (margenPctEnVivo >= 40 ? "bg-emerald-950/40 border-emerald-500/40" : "bg-amber-950/40 border-amber-500/40")
-                  : "bg-red-950/40 border-red-500/40"
+                  ? (margenPctEnVivo >= 40 ? "bg-teal-50 dark:bg-emerald-950/40 border-emerald-500/40" : "bg-amber-50 dark:bg-amber-950/40 border-amber-500/40")
+                  : "bg-red-50 dark:bg-red-950/40 border-red-500/40"
               }`}>
-                <span className="text-[11px] text-slate-300 uppercase font-semibold block">Margen de Ganancia</span>
+                <span className="text-[11px] text-slate-600 dark:text-slate-300 uppercase font-semibold block">Margen de Ganancia</span>
                 <div className={`text-xl font-bold font-mono mt-1 flex items-baseline gap-2 ${
                   margenEnVivo >= 0 ? (margenPctEnVivo >= 40 ? "text-emerald-400" : "text-amber-400") : "text-red-400"
                 }`}>
-                  <span>${margenEnVivo.toFixed(2)}</span>
-                  <span className="text-xs font-semibold">({margenPctEnVivo.toFixed(1)}%)</span>
+                  <span>{costosRevisados ? fmtCostoEnMoneda(margenEnVivo, monedaReceta) : "Pendiente"}</span>
+                  <span className="text-xs font-semibold">{costosRevisados ? `(${fmtNumero(margenPctEnVivo)}%)` : ""}</span>
                 </div>
-                <span className="text-[10px] text-slate-300">
-                  {margenEnVivo < 0 ? "⚠️ El costo supera el precio de venta" : "Margen bruto por ración"}
+                <span className="text-[10px] text-slate-600 dark:text-slate-300">
+                  {!costosRevisados ? "Confirma la moneda y tasa de los ingredientes" : margenEnVivo < 0 ? "El costo supera el precio de venta" : "Margen bruto por ración"}
                 </span>
               </div>
             </div>
@@ -2733,7 +2726,12 @@ function ModalEditarReceta({
 
                         {/* Costo unitario */}
                         <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-white/60">
-                          ${met.unitCost.toFixed(3)} / {met.unidad}
+                          {met.articuloOrigen?.costoUnitarioOriginal != null
+                            ? fmtCostoEnMoneda(met.articuloOrigen.costoUnitarioOriginal, met.articuloOrigen.monedaCosto)
+                            : fmtCostoEnMoneda(met.unitCost, monedaReceta)} / {met.unidad}
+                          <div className="text-[10px] text-slate-500 mt-1">{met.esSubReceta || met.articuloOrigen?.monedaValoracion === monedaReceta
+                            ? `Valorado en ${fmtCostoEnMoneda(met.unitCost, monedaReceta)}` : "Moneda de valoración por confirmar"}</div>
+                          {met.articuloOrigen && <button type="button" className="text-teal-700 underline text-xs mt-1" onClick={() => setArticuloCosteando(met.articuloOrigen!)}>Revisar costo y tasa</button>}
                         </td>
 
                         {/* Cantidad requerida (modo vista o modo edición) */}
@@ -2772,7 +2770,7 @@ function ModalEditarReceta({
 
                         {/* Costo de la línea en vivo */}
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                          ${met.costoLinea.toFixed(2)}
+                          {met.esSubReceta || met.articuloOrigen?.monedaValoracion === monedaReceta ? fmtCostoEnMoneda(met.costoLinea, monedaReceta) : "Por revisar"}
                         </td>
 
                         {/* Acciones */}
@@ -2844,7 +2842,7 @@ function ModalEditarReceta({
                   <option value="">— Elegir insumo de inventario —</option>
                   {(articulos || []).map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.nombre} (${Number(a.costoUnitario || 0).toFixed(3)} / {a.unidadMedida})
+                      {a.nombre} ({fmtCostoEnMoneda(a.costoUnitarioOriginal ?? a.costoUnitario, a.monedaCosto || monedaReceta)} / {a.unidadMedida})
                     </option>
                   ))}
                 </select>
@@ -2868,7 +2866,7 @@ function ModalEditarReceta({
                   <option value="">— Elegir sub-receta —</option>
                   {(escandallos || []).filter((s) => s.id !== receta.id).map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.nombrePlato} (Costo ración: ${Number(s.costoTotalProduccion || 0).toFixed(2)})
+                      {s.nombrePlato} (Costo ración: {fmtCostoEnMoneda(s.costoTotalProduccion, monedaReceta)})
                     </option>
                   ))}
                 </select>
@@ -2888,7 +2886,7 @@ function ModalEditarReceta({
                 Cálculo previo: <strong>{previewNuevo.cantBruta.toFixed(3)} {previewNuevo.unidad}</strong> × ${previewNuevo.unit.toFixed(3)}
               </span>
               <span className="font-mono font-bold">
-                Impacto en costo: +${previewNuevo.costo.toFixed(2)}
+                Impacto en costo: +{fmtCostoEnMoneda(previewNuevo.costo, monedaReceta)}
               </span>
             </div>
           )}
@@ -3251,10 +3249,10 @@ function calcularMargen(costo: number, precio: number): number | null {
 function fmtNumero(monto: number | null | undefined, moneda?: string | null): string {
   const num = Number(monto) || 0;
   const m = (moneda || "").toUpperCase().trim();
-  const tieneDecimales = m === "COP" ? false : (num % 1 !== 0);
+  const tieneDecimales = num % 1 !== 0;
   return num.toLocaleString("es-CO", {
-    minimumFractionDigits: tieneDecimales ? 2 : 0,
-    maximumFractionDigits: tieneDecimales ? 2 : 0,
+    minimumFractionDigits: moneda ? 2 : (tieneDecimales ? 2 : 0),
+    maximumFractionDigits: moneda ? 2 : (tieneDecimales ? 3 : 0),
   });
 }
 
@@ -3263,10 +3261,10 @@ function fmtCostoEnMoneda(monto: number | null | undefined, moneda?: string | nu
   const num = Number(monto) || 0;
   const m = (moneda || "USD").toUpperCase().trim();
   const etiqueta = (m === "VES" || m === "BS") ? "BS" : m;
-  const tieneDecimales = m === "COP" ? false : (num % 1 !== 0);
+  const tieneDecimales = num % 1 !== 0;
   const str = num.toLocaleString("es-CO", {
-    minimumFractionDigits: tieneDecimales ? 2 : 0,
-    maximumFractionDigits: tieneDecimales ? 2 : 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
   });
   return `${str} ${etiqueta}`;
 }
@@ -3302,27 +3300,42 @@ function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
 }) {
   const [form, setForm] = useState({
     nombre: articulo.nombre, categoria: articulo.categoria || "", unidadMedida: articulo.unidadMedida || "unidad",
-    costoUnitario: String(articulo.costoUnitario), precioVenta: String(articulo.precioVenta ?? 0),
+    costoUnitario: String(articulo.costoUnitarioOriginal ?? articulo.costoUnitario), precioVenta: String(articulo.precioVenta ?? 0),
     sku: articulo.sku || "",
   });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const margen = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
+  const [base, setBase] = useState("");
+  const [monedaCompra, setMonedaCompra] = useState(articulo.monedaCosto || "");
+  const [tasaCompra, setTasaCompra] = useState("");
+  useEffect(() => {
+    obtenerMonedaBaseNegocio().then(r => {
+      setBase(r.monedaBase);
+      if (!monedaCompra) setMonedaCompra(r.monedaBase);
+      if (articulo.monedaValoracion === r.monedaBase && Number(articulo.costoUnitario) > 0 && articulo.costoUnitarioOriginal != null)
+        setTasaCompra(String(Number(articulo.costoUnitarioOriginal) / Number(articulo.costoUnitario)));
+    }).catch(() => setError("No se pudo consultar la moneda principal"));
+  }, [tenantId]);
+  const costoBase = monedaCompra === base ? Number(form.costoUnitario)
+    : Number(tasaCompra) > 0 ? Number(form.costoUnitario) / Number(tasaCompra) : null;
+  const margen = costoBase == null ? null : calcularMargen(costoBase, Number(form.precioVenta) || 0);
   const monedaArticulo = (articulo.monedaCosto || "USD").toUpperCase();
-  const etiquetaMoneda = (monedaArticulo === "VES" || monedaArticulo === "BS") ? "BS" : monedaArticulo;
+  const etiquetaMoneda = monedaCompra === "VES" ? "Bs." : monedaCompra;
 
   const guardar = async () => {
     if (!form.nombre.trim()) { setError("El nombre no puede quedar vacío"); return; }
     if (!form.categoria.trim()) { setError("La categoría no puede quedar vacía"); return; }
     if (!form.costoUnitario || Number(form.costoUnitario) < 0) { setError("El costo unitario es obligatorio"); return; }
     if (!form.precioVenta || Number(form.precioVenta) <= 0) { setError("El precio de venta es obligatorio"); return; }
+    if (!base || costoBase == null) { setError("Indica la moneda y la tasa de adquisición para calcular el costo"); return; }
     setGuardando(true);
     setError(null);
     try {
       const actualizado = await editarArticulo(articulo.id, {
         nombre: form.nombre.trim(), categoria: form.categoria.trim(), unidadMedida: form.unidadMedida.trim(),
-        costoUnitario: Number(form.costoUnitario), precioVenta: Number(form.precioVenta),
+        costoUnitario: Number(form.costoUnitario), monedaCosto: monedaCompra,
+        unidadesOrigenPorBase: monedaCompra === base ? 1 : Number(tasaCompra), precioVenta: Number(form.precioVenta),
         sku: form.sku.trim() || undefined,
       });
       onGuardado(actualizado);
@@ -3353,9 +3366,21 @@ function ModalEditarArticulo({ tenantId, articulo, onClose, onGuardado }: {
           <Campo label={`Costo de adquisición (${etiquetaMoneda})`}>
             <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder={`Costo unitario (${etiquetaMoneda})`} />
           </Campo>
-          <Campo label={`Precio de venta (${etiquetaMoneda})`}>
+          <Campo label={`Precio de venta (${base || "cargando"})`}>
             <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" className="input-horeca text-xs" placeholder={`Precio de venta (${etiquetaMoneda})`} />
           </Campo>
+        </div>
+        <div className="rounded-xl border border-teal-500/20 bg-teal-500/5 p-3 space-y-2">
+          <Campo label="Moneda de adquisición">
+            <select className="input-horeca" value={monedaCompra} onChange={e => { setMonedaCompra(e.target.value); setTasaCompra(""); }}>
+              {["USD", "COP", "VES"].map(m => <option key={m} value={m}>{m === "VES" ? "Bs." : m}</option>)}
+            </select>
+          </Campo>
+          {base && monedaCompra !== base && <Campo label={`1 ${base} equivale a cuántos ${monedaCompra}`}>
+            <input type="number" min="0.000001" step="any" className="input-horeca" value={tasaCompra} onChange={e => setTasaCompra(e.target.value)} />
+          </Campo>}
+          <p className="text-xs text-slate-600">Costo para recetas: {costoBase == null ? "Indica la tasa de compra" : fmtCostoEnMoneda(costoBase, base)} por {form.unidadMedida}.</p>
+          <p className="text-xs text-slate-500">La corrección queda registrada en el historial de inventario. Las ventas anteriores conservan sus importes.</p>
         </div>
         <Campo label="Código de barras / SKU">
           <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="input-horeca text-xs font-mono" placeholder="Código de barras / SKU" />
@@ -3406,7 +3431,11 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     ? (articulos || []).find((a) => a.nombre.trim().toLowerCase() === form.nombre.trim().toLowerCase())
     : null;
 
-  const margenForm = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
+  const [factoresCompra, setFactoresCompra] = useState<Record<string, number | null>>({});
+  useEffect(() => { cotizacionCobro().then(r => { setMonedaBaseTenant(r.monedaBase); setFactoresCompra(r.factores); }).catch(() => setError("No se pudo consultar la tasa de compra")); }, [tenantId]);
+  const factorCompra = form.moneda === monedaBaseTenant ? 1 : Number(form.tasaCambioAplicada) || Number(factoresCompra[form.moneda]);
+  const costoNormalizado = factorCompra > 0 ? Number(form.costoUnitario) / factorCompra : null;
+  const margenForm = costoNormalizado == null ? null : calcularMargen(costoNormalizado, Number(form.precioVenta) || 0);
   const esParBsCop = (form.moneda === "VES" && monedaBaseTenant === "COP") || (form.moneda === "COP" && monedaBaseTenant === "VES");
 
   const crear = async () => {
@@ -3414,6 +3443,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     if (!form.categoria.trim()) { setError("La categoría es obligatoria"); return; }
     if (!form.costoUnitario || Number(form.costoUnitario) < 0) { setError("El costo unitario es obligatorio"); return; }
     if (!form.precioVenta || Number(form.precioVenta) <= 0) { setError("El precio de venta es obligatorio"); return; }
+    if (!(factorCompra > 0)) { setError("Indica la tasa de esta compra antes de guardar"); return; }
     setGuardando(true);
     setError(null);
     try {
@@ -3435,19 +3465,11 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
         costoUnitario: costoIngresado,
         precioVenta: Number(form.precioVenta),
         monedaCosto: monedaArticulo,
-        tasaCambioAplicada: tasaCompra,
+        unidadesOrigenPorBase: factorCompra,
+        cantidadInicial: Number(form.cantidadInicial) || 0,
+        metodoPagoInicial: form.registrarGasto ? form.metodoPago : undefined,
+        fechaVencimientoInicial: form.fechaVencimiento || undefined,
       });
-      if (form.cantidadInicial && Number(form.cantidadInicial) > 0) {
-        await entradaArticulo(nuevo.id, {
-          cantidad: Number(form.cantidadInicial),
-          costoUnitario: costoIngresado,
-          motivo: "Carga inicial de inventario",
-          fechaVencimiento: form.fechaVencimiento || undefined,
-          metodoPago: form.registrarGasto ? form.metodoPago : undefined,
-          moneda: form.registrarGasto ? monedaArticulo : undefined,
-          tasaCambioAplicada: tasaCompra,
-        });
-      }
       setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "", registrarGasto: true, metodoPago: "EFECTIVO", moneda: monedaArticulo, tasaCambioAplicada: "" });
       setMostrarForm(false);
       onCambio();
@@ -3628,7 +3650,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
             </Campo>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-300/50 dark:border-white/10">
-            <Campo label="Moneda del artículo">
+            <Campo label="Moneda de compra">
               <select value={form.moneda} onChange={(e) => setForm({ ...form, moneda: e.target.value })} className="input-horeca">
                 <option value="COP">COP (Pesos colombianos)</option>
                 <option value="USD">USD (Dólares)</option>
@@ -3638,7 +3660,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
             <Campo label={`Costo unitario (${form.moneda === "VES" ? "BS" : form.moneda})`}>
               <input value={form.costoUnitario} onChange={(e) => setForm({ ...form, costoUnitario: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
-            <Campo label={`Precio de venta (${form.moneda === "VES" ? "BS" : form.moneda})`}>
+            <Campo label={`Precio de venta (${monedaBaseTenant})`}>
               <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
             </Campo>
             <Campo label={`Cantidad inicial (${form.unidadMedida})`}>
@@ -3647,11 +3669,13 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
             </Campo>
           </div>
           {form.moneda !== monedaBaseTenant && (
-            <div className="rounded-xl border border-teal-500/20 bg-teal-500/[0.06] px-4 py-2.5 flex items-center gap-2.5 text-xs text-slate-700 dark:text-white/80">
-              <span className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0"></span>
-              <span>
-                Registro en <strong className="text-teal-700 dark:text-teal-300 font-bold">{form.moneda === "VES" ? "Bolívares (BS)" : form.moneda}</strong>: Se aplica automáticamente la tasa de cambio vigente del sistema para la equivalencia contable.
-              </span>
+            <div className="rounded-xl border border-teal-500/20 bg-teal-500/5 p-3 space-y-2">
+              <Campo label={`Tasa de compra: 1 ${monedaBaseTenant} = X ${form.moneda}`}>
+                <input type="number" step="any" min="0.000001" className="input-horeca"
+                  value={form.tasaCambioAplicada} placeholder={factoresCompra[form.moneda] ? String(factoresCompra[form.moneda]) : "Indica la tasa"}
+                  onChange={e => setForm({ ...form, tasaCambioAplicada: e.target.value })} />
+              </Campo>
+              <p className="text-xs text-slate-600">Costo para recetas: {costoNormalizado == null ? "Falta tasa" : fmtCostoEnMoneda(costoNormalizado, monedaBaseTenant)}. Se divide el costo de compra entre esta tasa.</p>
             </div>
           )}
           {Number(form.cantidadInicial) > 0 && (
@@ -3671,11 +3695,8 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
                     </select>
                   </Campo>
                   <Campo label="Moneda del pago">
-                    <select value={form.moneda} onChange={(e) => setForm({ ...form, moneda: e.target.value })} className="input-horeca">
-                      <option value="COP">COP</option>
-                      <option value="USD">USD</option>
-                      <option value="VES">BS</option>
-                    </select>
+                    <p className="input-horeca">{form.moneda === "VES" ? "Bs." : form.moneda}</p>
+                    <p className="text-xs text-slate-500">Se registra el importe pagado en la moneda de compra.</p>
                   </Campo>
                 </div>
               )}
@@ -4128,7 +4149,7 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
         {moneda !== monedaBaseTenant && (
           <p className="text-[10px] text-slate-400">El costo se guarda convertido a {monedaBaseTenant} con la tasa vigente al momento de guardar — todo el sistema valora el inventario en esa moneda.</p>
         )}
-        <Campo label={`Precio de venta (${moneda === "VES" ? "BS" : moneda})`}>
+        <Campo label={`Precio de venta (${monedaBaseTenant})`}>
           <input value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
         </Campo>
         <div className="flex items-center gap-2">
@@ -4934,7 +4955,9 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   const [recibo, setRecibo] = useState<ReciboVenta | null>(null);
   const [abriendoTicket, setAbriendoTicket] = useState(false);
   const [imprimiendoEscPos, setImprimiendoEscPos] = useState(false);
-  const [moneda, setMoneda] = useState("USD");
+  const [moneda, setMoneda] = useState("");
+  const [factoresVenta, setFactoresVenta] = useState<Record<string, number | null>>({});
+  useEffect(() => { cotizacionCobro().then(r => { setMoneda(r.monedaBase); setFactoresVenta(r.factores); }).catch(() => setError("No se pudo consultar la moneda y las tasas de cobro")); }, [tenantId, tasaBcv, tasaCop]);
   const [mostrarProductoLibre, setMostrarProductoLibre] = useState(false);
   const [articuloEditando, setArticuloEditando] = useState<Articulo | null>(null);
   const [nombreLibre, setNombreLibre] = useState("");
@@ -4959,7 +4982,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   const [buscandoCliente, setBuscandoCliente] = useState(false);
   const [guardandoCliente, setGuardandoCliente] = useState(false);
 
-  useEffect(() => { monedaBase(tenantId).then(setMoneda).catch(() => setMoneda("USD")); }, [tenantId]);
+
   // Estado del turno de caja para el header operativo — solo lectura acá,
   // la apertura/cierre real sigue viviendo en Administración > Control de Caja.
   useEffect(() => { turnoAbierto(tenantId, moneda).then(setTurno).catch(() => setTurno(null)); }, [tenantId, moneda]);
@@ -4980,15 +5003,9 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     // venta cargado, para no mostrar una tarjeta en $0.00.
     const insumos: ItemCatalogo[] = (articulos || [])
       .map((a) => {
-        const valVenta = Number(a.precioVenta) > 0 ? Number(a.precioVenta) : Number(a.costoUnitario);
-        const esCop = (a.monedaCosto || "").toUpperCase() === "COP";
-        const esVes = (a.monedaCosto || "").toUpperCase() === "VES";
-        let precioUsd = valVenta;
-        if (esCop && tasaCop && Number(tasaCop.tasa) > 0 && valVenta > 50) {
-          precioUsd = valVenta / Number(tasaCop.tasa);
-        } else if (esVes && tasaBcv && Number(tasaBcv.tasa) > 0 && valVenta > 100) {
-          precioUsd = valVenta / Number(tasaBcv.tasa);
-        }
+        const valVenta = Number(a.precioVenta);
+        // precioVenta es el precio configurado en la moneda principal.
+        const precioUsd = valVenta;
         return {
           key: `articulo-${a.id}`,
           tipo: "articulo",
@@ -5179,7 +5196,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
   const total = subtotalConCargos + impuestosLineas.reduce((s, l) => s + l.precio, 0);
 
   const cobrar = async (pagos: PagoParcial[], monedaVuelto: string) => {
-    if (carrito.length === 0) return;
+    if (carrito.length === 0 || !moneda) return;
     setError(null);
     setProcesando(true);
     try {
@@ -5257,10 +5274,10 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     });
     y += 2; doc.line(140, y, 196, y); y += 7;
     doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-    doc.text("Total:", 150, y, { align: "right" }); doc.text(`$${total.toFixed(2)}`, 196, y, { align: "right" });
+    doc.text("Total:", 150, y, { align: "right" }); doc.text(`${fmtCostoEnMoneda(total, moneda)}`, 196, y, { align: "right" });
     if (tasaBcv && Number(tasaBcv.tasa) > 0) {
       y += 6; doc.setFontSize(9); doc.setFont("helvetica", "normal");
-      doc.text(`≈ Bs. ${(total * Number(tasaBcv.tasa)).toFixed(2)} (tasa BCV ${Number(tasaBcv.tasa).toFixed(2)})`, 196, y, { align: "right" });
+      doc.text(`≈ Bs. ${(total * Number(factoresVenta.VES)).toFixed(2)} (tasa BCV ${Number(tasaBcv.tasa).toFixed(2)})`, 196, y, { align: "right" });
     }
     doc.setFontSize(8); doc.setTextColor(120);
     doc.text("Esta cotización no constituye una venta ni afecta inventario o caja — los precios pueden variar según el tipo de cambio vigente al momento de la compra.", 14, 285, { maxWidth: 182 });
@@ -5355,7 +5372,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               <div className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-white/30 font-semibold">Tasa</div>
               <div className="text-[11px] font-bold font-mono text-emerald-500">
                 {tasaBcv && Number(tasaBcv.tasa) > 0 ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa"}
-                {tasaCop && Number(tasaCop.tasa) > 0 && ` · COP ${Number(tasaCop.tasa).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                {tasaCop && Number(tasaCop.tasa) > 0 && ` · COP ${Number(tasaCop.tasa).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               </div>
             </div>
             <div className="text-right">
@@ -5377,7 +5394,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
         <button type="button" onClick={() => setVistaMobile("carrito")}
           className={`flex-1 py-2.5 text-xs font-bold cursor-pointer transition-colors ${
             vistaMobile === "carrito" ? "text-teal-600 dark:text-teal-400 border-b-2 border-teal-600" : "text-slate-400 dark:text-white/40 border-b-2 border-transparent"
-          }`}>Comanda{carrito.length > 0 && ` · ${carrito.length} · $${total.toFixed(2)}`}</button>
+          }`}>Comanda{carrito.length > 0 && ` · ${carrito.length} · ${fmtCostoEnMoneda(total, moneda)}`}</button>
       </div>
 
       {/* CUERPO: grid de 12 columnas en pantallas grandes — catálogo (7) +
@@ -5451,7 +5468,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                         }`}>{item.tipo === "receta" ? "RECETA" : item.tipo === "fastbar" ? "FAST-BAR" : "INVENTARIO"}</div>
                         <div className="text-xs font-semibold text-slate-900 dark:text-white leading-snug line-clamp-2 min-h-[2.2em] pr-4">{item.nombre}</div>
                         <div className="flex items-center justify-between mt-2">
-                          <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">${item.precio.toFixed(2)}</span>
+                          <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">{fmtCostoEnMoneda(item.precio, moneda)}</span>
                           {item.tipo === "articulo" && (
                             <span className={`text-[9px] font-mono ${sinStock ? "text-red-500" : "text-slate-400 dark:text-white/40"}`}>
                               {sinStock ? "Sin stock" : `${item.stockActual} ${item.unidadMedida}`}
@@ -5738,16 +5755,16 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 </div>
               )}
               <div className="flex items-center justify-between font-black text-2xl text-slate-900 dark:text-white">
-                <span className="text-sm font-bold text-slate-500 dark:text-white/40">Total</span><span className="font-mono">${total.toFixed(2)}</span>
+                <span className="text-sm font-bold text-slate-500 dark:text-white/40">Total</span><span className="font-mono">{fmtCostoEnMoneda(total, moneda)}</span>
               </div>
-              {tasaBcv && Number(tasaBcv.tasa) > 0 && (
+              {Number(factoresVenta.VES) > 0 && moneda !== "VES" && (
                 <div className="flex items-center justify-between text-sm text-teal-600 dark:text-teal-400 font-mono font-bold mt-0.5">
-                  <span className="text-[11px] font-semibold text-slate-400">≈ Bs</span><span>{fmtNumero(total * Number(tasaBcv.tasa), "VES")}</span>
+                  <span className="text-[11px] font-semibold text-slate-400">≈ Bs</span><span>{fmtNumero(total * Number(factoresVenta.VES), "VES")}</span>
                 </div>
               )}
-              {tasaCop && Number(tasaCop.tasa) > 0 && (
+              {Number(factoresVenta.COP) > 0 && moneda !== "COP" && (
                 <div className="flex items-center justify-between text-sm text-sky-600 dark:text-sky-400 font-mono font-bold mt-0.5">
-                  <span className="text-[11px] font-semibold text-slate-400">≈ COP</span><span>{(total * Number(tasaCop.tasa)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="text-[11px] font-semibold text-slate-400">≈ COP</span><span>{(total * Number(factoresVenta.COP)).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               )}
             </div>
@@ -5765,7 +5782,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                     <span>Dividir Cuenta</span>
                   </button>
                 </div>
-                <PanelCobroMixto tenantId={tenantId} total={total} monedaBase="USD" tasasExternas={{ VES: tasaBcv ? Number(tasaBcv.tasa) : null, COP: tasaCop ? Number(tasaCop.tasa) : null }} procesando={procesando} error={error} onCobrar={cobrar} />
+                <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} tasasExternas={{ VES: tasaBcv ? Number(tasaBcv.tasa) : null, COP: tasaCop ? Number(tasaCop.tasa) : null }} procesando={procesando} error={error} onCobrar={cobrar} />
               </>
             )}
           </div>
@@ -5827,16 +5844,16 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
 
             <div className="pt-2 border-t border-slate-300/50 dark:border-white/10">
               <div className="flex items-center justify-between font-bold text-slate-900 dark:text-white">
-                <span>Total</span><span className="font-mono">${recibo.total.toFixed(2)}</span>
+                <span>Total</span><span className="font-mono">{fmtCostoEnMoneda(recibo.total, moneda)}</span>
               </div>
-              {tasaBcv && Number(tasaBcv.tasa) > 0 && (
+              {Number(factoresVenta.VES) > 0 && moneda !== "VES" && (
                 <div className="flex items-center justify-between text-xs text-teal-600 dark:text-teal-400 font-mono mt-0.5">
-                  <span>≈ Bs</span><span>{fmtNumero(recibo.total * Number(tasaBcv.tasa), "VES")}</span>
+                  <span>≈ Bs</span><span>{fmtNumero(recibo.total * Number(factoresVenta.VES), "VES")}</span>
                 </div>
               )}
-              {tasaCop && Number(tasaCop.tasa) > 0 && (
+              {Number(factoresVenta.COP) > 0 && moneda !== "COP" && (
                 <div className="flex items-center justify-between text-xs text-sky-600 dark:text-sky-400 font-mono mt-0.5">
-                  <span>≈ COP</span><span>{(recibo.total * Number(tasaCop.tasa)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span>≈ COP</span><span>{(recibo.total * Number(factoresVenta.COP)).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               )}
             </div>
@@ -5846,7 +5863,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 lo que el cajero de verdad hizo — un hueco contable grave para
                 el arqueo de caja del día. */}
             {recibo.totalRecibido != null && (
-              <div className="text-xs text-slate-700 dark:text-white/80 font-medium">Recibido: <span className="font-bold text-slate-900 dark:text-white font-mono">${recibo.totalRecibido.toFixed(2)}</span></div>
+              <div className="text-xs text-slate-700 dark:text-white/80 font-medium">Recibido: <span className="font-bold text-slate-900 dark:text-white font-mono">{fmtCostoEnMoneda(recibo.totalRecibido, moneda)}</span></div>
             )}
             {recibo.vuelto != null && recibo.vuelto > 0.004 && (
               <div className="text-sm font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2">
@@ -5860,8 +5877,8 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               <button
                 onClick={() => {
                   if (!recibo) return;
-                  const tBs = tasaBcv && Number(tasaBcv.tasa) > 0 ? recibo.total * Number(tasaBcv.tasa) : undefined;
-                  const tCop = tasaCop && Number(tasaCop.tasa) > 0 ? recibo.total * Number(tasaCop.tasa) : undefined;
+                  const tBs = tasaBcv && Number(tasaBcv.tasa) > 0 ? recibo.total * Number(factoresVenta.VES) : undefined;
+                  const tCop = tasaCop && Number(tasaCop.tasa) > 0 ? recibo.total * Number(factoresVenta.COP) : undefined;
                   imprimirTicketTermicoDirecto({
                     nombreLocal,
                     comandaId: recibo.comandaId,
@@ -6027,10 +6044,11 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
   };
   useEffect(() => { buscar(); }, [tenantId]);
 
-  const totales = (tickets || []).reduce(
-    (acc, t) => ({ usd: acc.usd + Number(t.totalUsd), bs: acc.bs + Number(t.totalBs || 0) }),
-    { usd: 0, bs: 0 }
-  );
+  const totales = (tickets || []).filter(t => t.estado === "PAGADA").reduce((acc, t) => {
+    for (const p of t.pagos || []) acc[p.moneda] = (acc[p.moneda] || 0) + Number(p.monto);
+    if (t.monedaVuelto && t.vuelto) acc[t.monedaVuelto] = (acc[t.monedaVuelto] || 0) - Number(t.vuelto);
+    return acc;
+  }, {} as Record<string, number>);
 
   // Toma el JSON YA renderizado en la tabla (no vuelve a pedirle nada al
   // backend) y arma el .xlsx en el navegador — el servidor no sabe que esto
@@ -6040,8 +6058,12 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
     const filas = tickets.map((t) => ({
       "Fecha": new Date(t.fecha).toLocaleString(),
       "Nro. Ticket": t.numeroTicket,
-      "Total USD": Number(t.totalUsd),
-      "Total Bs": t.totalBs != null ? Number(t.totalBs) : "",
+      "Total ticket": Number(t.totalBase ?? t.totalUsd),
+      "Moneda ticket": t.monedaBase || "Por confirmar",
+      "Recibido": (t.pagos || []).map(p => fmtCostoEnMoneda(p.monto, p.moneda)).join(" + ") || "Sin desglose histórico",
+      "Vuelto": t.vuelto != null ? Number(t.vuelto) : "",
+      "Moneda vuelto": t.monedaVuelto || "",
+
       "Método de Pago": (t.metodoPago || "-").replace("_", " "),
       "Estado": t.estado,
       "Canal": t.canal,
@@ -6097,6 +6119,7 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
         {error && <p className="text-xs text-red-500">{error}</p>}
       </div>
 
+      <p className="text-xs text-slate-500">Recibido muestra la moneda entregada por el cliente. El vuelto se descuenta al calcular los cobros netos. Los registros antiguos sin moneda confirmada requieren revisión.</p>
       <div className="apple-glass rounded-2xl p-5">
         {tickets === null ? (
           <p className="text-xs text-slate-400">Cargando…</p>
@@ -6109,8 +6132,8 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                 <tr className="text-left text-slate-400 dark:text-white/40 uppercase text-[10px] tracking-wider border-b border-slate-300/50 dark:border-white/10">
                   <th className="py-2 pr-3">Fecha</th>
                   <th className="py-2 px-3">Nro. Ticket</th>
-                  <th className="py-2 px-3 text-right">Total USD</th>
-                  <th className="py-2 px-3 text-right">Total Bs</th>
+                  <th className="py-2 px-3 text-right">Total del ticket</th>
+                  <th className="py-2 px-3 text-right">Recibido / vuelto</th>
                   <th className="py-2 px-3">Método de Pago</th>
                   <th className="py-2 px-3">Estado</th>
                   <th className="py-2 pl-3 text-right">Acciones</th>
@@ -6122,8 +6145,12 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                     <tr className="border-b border-slate-200/50 dark:border-white/5">
                       <td className="py-2 pr-3 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fecha).toLocaleString()}</td>
                       <td className="py-2 px-3 font-mono font-semibold text-slate-800 dark:text-white/80">{t.numeroTicket}</td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white/80">${fmtNumero(t.totalUsd, "USD")}</td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.totalBs != null ? `Bs ${fmtNumero(t.totalBs, "VES")}` : "—"}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white/80">{fmtCostoEnMoneda(t.totalBase ?? t.totalUsd, t.monedaBase || "moneda por confirmar")}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.pagos?.length ? <div className="space-y-1">{t.pagos.map((p, i) => <div key={i}>
+                        <span>{fmtCostoEnMoneda(p.monto, p.moneda)}</span>
+                        <span className="block text-[10px]">{p.metodoPago.replaceAll("_", " ")}</span>
+                        {t.monedaBase && p.moneda !== t.monedaBase && <span className="block text-[10px] text-slate-500">Equivalente guardado: {fmtCostoEnMoneda(p.equivalenteBase, t.monedaBase)}</span>}
+                      </div>)}{Number(t.vuelto) > 0 && <div className="text-amber-700">Vuelto: {fmtCostoEnMoneda(t.vuelto, t.monedaVuelto)}</div>}</div> : <span>Sin desglose histórico</span>}</td>
                       <td className="py-2 px-3 text-slate-600 dark:text-white/60">{(t.metodoPago || "-").replace("_", " ")}</td>
                       <td className="py-2 px-3">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -6165,11 +6192,8 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                 ))}
               </tbody>
               <tfoot>
-                <tr className="font-bold text-slate-900 dark:text-white border-t-2 border-slate-300/60 dark:border-white/10">
-                  <td className="py-2 pr-3" colSpan={2}>Total</td>
-                  <td className="py-2 px-3 text-right font-mono">${fmtNumero(totales.usd, "USD")}</td>
-                  <td className="py-2 px-3 text-right font-mono">Bs {fmtNumero(totales.bs, "VES")}</td>
-                  <td colSpan={3}></td>
+                <tr className="border-t font-semibold text-slate-800 dark:text-white">
+                  <td colSpan={7} className="py-3">Cobros netos por moneda (ventas pagadas): {Object.entries(totales).map(([m, v]) => fmtCostoEnMoneda(v, m)).join(" · ") || "Sin desglose disponible"}</td>
                 </tr>
               </tfoot>
             </table>

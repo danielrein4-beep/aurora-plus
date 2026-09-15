@@ -14,4 +14,10 @@ public class ReporteTicketDTO {
     public String estado;
     public String canal;
     public Integer numeroMesa;
+    public String monedaBase;
+    public BigDecimal totalBase;
+    public String monedaVuelto;
+    public BigDecimal vuelto;
+    public java.util.List<PagoResumen> pagos = java.util.List.of();
+    public record PagoResumen(String moneda, BigDecimal monto, String metodoPago, BigDecimal equivalenteBase, BigDecimal tasaAplicada) { }
 }

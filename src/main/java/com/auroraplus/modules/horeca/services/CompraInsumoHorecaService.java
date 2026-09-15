@@ -128,7 +128,7 @@ public class CompraInsumoHorecaService {
             // Inventario, margen, costeo de recetas) asume que costoUnitario del
             // artículo siempre está en la moneda base.
             BigDecimal costoUnitarioEntrada = (item.monedaCosto != null && !item.monedaCosto.isBlank())
-                ? motorFinancieroService.convertirAMonedaBase(tenantId, item.costoUnitario, item.monedaCosto)
+                ? motorFinancieroService.convertirCostoAMonedaBase(tenantId, item.costoUnitario, item.monedaCosto)
                 : item.costoUnitario;
 
             // Si se compró por presentación (six-pack, bolsa x30, etc.), se convierte
@@ -154,6 +154,7 @@ public class CompraInsumoHorecaService {
             // El costo vigente se actualiza al último precio de compra — es lo que
             // alimenta el costeo dinámico de las recetas (EscandalloService.recalcularCosto).
             articulo.setCostoUnitario(costoUnitarioBase);
+            articulo.setMonedaValoracion(motorFinancieroService.obtenerMonedaBase(tenantId));
             articuloRepository.save(articulo);
 
             inventarioService.registrarMovimientoKardex(articulo.getId(), tenantId, Kardex.TipoOperacion.ENTRADA,

@@ -173,6 +173,7 @@ public class HorecaService {
             comanda.setCliente(cliente);
         }
 
+        comanda.setMonedaTotal(motorFinancieroService.obtenerMonedaBase(tenantId));
         Comanda guardada = comandaRepository.save(comanda);
         idempotenciaService.registrar(tenantId, claveIdempotencia, "abrir_comanda_horeca", guardada.getId());
         return guardada;
@@ -228,40 +229,19 @@ public class HorecaService {
     @Transactional
     public Comanda cerrarComanda(Long comandaId, Long tenantId, String metodoPago, String monedaPago, BigDecimal montoRecibido,
                                   String claveIdempotencia) {
-        java.util.Optional<Long> existente = idempotenciaService.obtenerSiYaProcesada(tenantId, claveIdempotencia);
-        if (existente.isPresent()) {
-            return comandaRepository.findById(existente.get())
-                .orElseThrow(() -> new RuntimeException("Operación idempotente inconsistente: comanda " + existente.get() + " no encontrada"));
-        }
-
         Comanda comanda = comandaRepository.findById(comandaId)
             .orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
-
-        if (!comanda.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Comanda no pertenece a este tenant");
-        }
-        if (comanda.getEstado() != Comanda.EstadoComanda.ABIERTA) {
-            throw new RuntimeException("Solo se puede cerrar una comanda que está ABIERTA");
-        }
-        if (metodoPago == null || !METODOS_PAGO_VALIDOS.contains(metodoPago)) {
-            throw new RuntimeException("Método de pago inválido. Use: " + METODOS_PAGO_VALIDOS);
-        }
-
-        comanda.setEstado(Comanda.EstadoComanda.PAGADA);
-        comanda.setMetodoPago(metodoPago);
-        comanda.setFechaCierre(LocalDateTime.now());
-        Comanda cerrada = comandaRepository.save(comanda);
-
-        if (cerrada.getTotalConsumo().compareTo(BigDecimal.ZERO) > 0) {
-            motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
-                cerrada.getTotalConsumo(), monedaPago, montoRecibido,
-                "Comanda " + descripcionComanda(cerrada) + " (" + metodoPago + ")");
-        }
-
-        idempotenciaService.registrar(tenantId, claveIdempotencia, "cierre_comanda_horeca", cerrada.getId());
-
-        return cerrada;
+        if (!tenantId.equals(comanda.getTenantId())) throw new RuntimeException("Comanda no pertenece a este tenant");
+        String base = motorFinancieroService.obtenerMonedaBase(tenantId);
+        String moneda = monedaPago == null || monedaPago.isBlank() ? base : monedaPago;
+        PagoParcialRequest pago = new PagoParcialRequest();
+        pago.metodoPago = metodoPago;
+        pago.moneda = moneda;
+        pago.monto = montoRecibido != null ? montoRecibido
+            : motorFinancieroService.convertirMoneda(tenantId, comanda.getTotalConsumo(), base, moneda);
+        return cerrarComandaMixto(comandaId, tenantId, List.of(pago), moneda, claveIdempotencia).comanda;
     }
+
 
     public static class PagoParcialRequest {
         public String metodoPago;
@@ -293,7 +273,7 @@ public class HorecaService {
             resultado.comanda = comandaExistente;
             resultado.pagos = pagoVentaRepository.findByComandaIdOrderByFechaPagoAsc(comandaExistente.getId());
             resultado.totalBase = comandaExistente.getTotalConsumo();
-            resultado.monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
+            resultado.monedaBase = comandaExistente.getMonedaTotal();
             resultado.totalRecibidoBase = comandaExistente.getTotalRecibidoBase();
             resultado.vueltoBase = comandaExistente.getVueltoBase();
             resultado.monedaVuelto = comandaExistente.getMonedaVuelto();
@@ -325,6 +305,9 @@ public class HorecaService {
         }
 
         String monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
+        if (comanda.getMonedaTotal() != null && !monedaBase.equals(comanda.getMonedaTotal()))
+            throw new IllegalStateException("Cambió la moneda principal desde que abrió la venta. Revise la configuración antes de cobrar.");
+        comanda.setMonedaTotal(monedaBase);
         BigDecimal totalBase = comanda.getTotalConsumo();
         BigDecimal totalRecibidoBase = BigDecimal.ZERO;
         List<PagoVenta> guardados = new ArrayList<>();

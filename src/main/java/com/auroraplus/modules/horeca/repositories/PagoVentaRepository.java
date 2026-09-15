@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface PagoVentaRepository extends JpaRepository<PagoVenta, Long> {
     List<PagoVenta> findByComandaIdOrderByFechaPagoAsc(Long comandaId);
+    List<PagoVenta> findByTenantIdAndComandaIdInOrderByFechaPagoAsc(Long tenantId, List<Long> comandaIds);
 }

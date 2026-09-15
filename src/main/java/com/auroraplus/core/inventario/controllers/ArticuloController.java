@@ -79,8 +79,10 @@ public class ArticuloController {
     }
 
     @PostMapping
+    @Transactional
     public ResponseEntity<Articulo> crear(@RequestBody Articulo articulo) {
         Long tenantId = TenantContext.getCurrentTenant();
+        articulo.setId(null);
         articulo.setTenantId(tenantId);
         // porcentajeImpuesto y categoria son NOT NULL en la base — sin un valor
         // por defecto acá, cualquier alta que no los mande (ej. el formulario
@@ -102,11 +104,24 @@ public class ArticuloController {
                 ? articulo.getMonedaCosto() : motorFinancieroService.obtenerMonedaBase(tenantId);
             registrarTasaDeCompraSiAplica(tenantId, monedaCosto, articulo.getTasaCambioAplicada());
             BigDecimal costoOriginal = articulo.getCostoUnitario();
-            articulo.setCostoUnitario(motorFinancieroService.convertirAMonedaBase(tenantId, costoOriginal, monedaCosto));
+            articulo.setCostoUnitario(costoCompra(tenantId, costoOriginal, monedaCosto, articulo.getUnidadesOrigenPorBase()));
             articulo.setMonedaCosto(monedaCosto);
             articulo.setCostoUnitarioOriginal(costoOriginal);
+            articulo.setMonedaValoracion(motorFinancieroService.obtenerMonedaBase(tenantId));
         }
-        return ResponseEntity.ok(articuloRepository.save(articulo));
+        Articulo guardado = articuloRepository.save(articulo);
+        if (articulo.getCantidadInicial() != null && articulo.getCantidadInicial().signum() != 0) {
+            EntradaRequest entrada = new EntradaRequest();
+            entrada.cantidad = articulo.getCantidadInicial();
+            entrada.costoUnitario = articulo.getCostoUnitarioOriginal();
+            entrada.moneda = articulo.getMonedaCosto();
+            entrada.unidadesOrigenPorBase = articulo.getUnidadesOrigenPorBase();
+            entrada.metodoPago = articulo.getMetodoPagoInicial();
+            entrada.fechaVencimiento = articulo.getFechaVencimientoInicial();
+            entrada.motivo = "Compra / carga inicial";
+            registrarEntrada(guardado.getId(), entrada);
+        }
+        return ResponseEntity.ok(guardado);
     }
 
     @PutMapping("/{id}/stock-minimo")
@@ -128,6 +143,8 @@ public class ArticuloController {
         public BigDecimal precioVenta;
         public BigDecimal stockMinimo;
         public String sku;
+        public String monedaCosto; // Si se indica, costoUnitario está expresado en esta moneda.
+        public BigDecimal unidadesOrigenPorBase; // 1 moneda base = X moneda de compra.
         // Aurora Retail — opcionales, ignorados por las demás verticales.
         public String codigoBarras;
         public String principioActivo;
@@ -135,6 +152,7 @@ public class ArticuloController {
 
     /** Corrige datos del artículo (nombre, categoría, unidad, costo, precio de venta, stock mínimo) — NO toca stockActual, que solo cambia vía Kardex (entrada/salida/ajuste) para no perder el rastro de auditoría. */
     @PutMapping("/{id}")
+    @Transactional
     public ResponseEntity<Articulo> editar(@PathVariable Long id, @RequestBody EditarArticuloRequest request) {
         Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
@@ -144,7 +162,39 @@ public class ArticuloController {
         if (request.nombre != null && !request.nombre.isBlank()) articulo.setNombre(request.nombre.trim());
         if (request.categoria != null) articulo.setCategoria(request.categoria.isBlank() ? "General" : request.categoria.trim());
         if (request.unidadMedida != null && !request.unidadMedida.isBlank()) articulo.setUnidadMedida(request.unidadMedida.trim());
-        if (request.costoUnitario != null) articulo.setCostoUnitario(request.costoUnitario);
+        if (request.costoUnitario != null) {
+            if (request.costoUnitario.signum() < 0) throw new IllegalArgumentException("El costo no puede ser negativo");
+            if (request.monedaCosto == null) {
+                articulo.setCostoUnitario(request.costoUnitario);
+            } else {
+                String base = motorFinancieroService.obtenerMonedaBase(tenantId);
+                BigDecimal anterior = articulo.getCostoUnitario();
+                BigDecimal normalizado;
+                if (base.equals(request.monedaCosto)) normalizado = request.costoUnitario;
+                else {
+                    if (request.unidadesOrigenPorBase == null || request.unidadesOrigenPorBase.signum() <= 0)
+                        throw new IllegalArgumentException("Indique cuántas unidades de la moneda de compra equivalen a 1 " + base);
+                    normalizado = request.costoUnitario.divide(request.unidadesOrigenPorBase, 4, java.math.RoundingMode.HALF_UP);
+                }
+                if (!List.of("USD", "COP", "VES").contains(request.monedaCosto)) throw new IllegalArgumentException("Moneda inválida");
+                articulo.setCostoUnitario(normalizado);
+                articulo.setMonedaValoracion(base);
+                articulo.setCostoUnitarioOriginal(request.costoUnitario);
+                articulo.setMonedaCosto(request.monedaCosto);
+                if (anterior == null || anterior.compareTo(normalizado) != 0) {
+                    Kardex auditoria = new Kardex();
+                    auditoria.setTenantId(tenantId);
+                    auditoria.setArticulo(articulo);
+                    auditoria.setTipoOperacion(Kardex.TipoOperacion.ENTRADA);
+                    auditoria.setCantidad(BigDecimal.ZERO);
+                    auditoria.setCostoUnitario(normalizado);
+                    auditoria.setMotivo("Corrección de costo: " + anterior + " → " + normalizado + " " + base
+                        + "; original " + request.costoUnitario + " " + request.monedaCosto
+                        + "; 1 " + base + " = " + (request.unidadesOrigenPorBase == null ? BigDecimal.ONE : request.unidadesOrigenPorBase) + " " + request.monedaCosto);
+                    kardexRepository.save(auditoria);
+                }
+            }
+        }
         if (request.precioVenta != null) articulo.setPrecioVenta(request.precioVenta);
         if (request.stockMinimo != null) articulo.setStockMinimo(request.stockMinimo);
         if (request.sku != null && !request.sku.isBlank()) articulo.setSku(request.sku.trim());
@@ -231,16 +281,20 @@ public class ArticuloController {
         // Tasa concreta indicada por el proveedor para ESTA compra, expresada
         // como 1 unidad de moneda -> moneda base del negocio.
         public BigDecimal tasaCambioAplicada;
+        public BigDecimal unidadesOrigenPorBase;
     }
 
     /** Entrada de stock (compra/reposición) — actualiza también el costo unitario vigente del artículo. */
     @PostMapping("/{id}/entrada")
+    @Transactional
     public ResponseEntity<Kardex> registrarEntrada(@PathVariable Long id, @RequestBody EntradaRequest request) {
         Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
         if (!articulo.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
         }
+        if (request.cantidad == null || request.cantidad.signum() <= 0) throw new IllegalArgumentException("La cantidad debe ser mayor a cero");
+        if (request.costoUnitario != null && request.costoUnitario.signum() < 0) throw new IllegalArgumentException("El costo no puede ser negativo");
         String monedaBaseTenant = motorFinancieroService.obtenerMonedaBase(tenantId);
         // costoUnitario del request viene tal cual lo tecleó el usuario, en
         // request.moneda (o ya en la moneda base si no la mandó) — se convierte acá
@@ -254,9 +308,10 @@ public class ArticuloController {
             String monedaCosto = (request.moneda != null && !request.moneda.isBlank()) ? request.moneda : monedaBaseTenant;
             registrarTasaDeCompraSiAplica(tenantId, monedaCosto, request.tasaCambioAplicada);
             BigDecimal costoOriginal = request.costoUnitario;
-            articulo.setCostoUnitario(motorFinancieroService.convertirAMonedaBase(tenantId, costoOriginal, monedaCosto));
+            articulo.setCostoUnitario(costoCompra(tenantId, costoOriginal, monedaCosto, request.unidadesOrigenPorBase));
             articulo.setMonedaCosto(monedaCosto);
             articulo.setCostoUnitarioOriginal(costoOriginal);
+            articulo.setMonedaValoracion(monedaBaseTenant);
             articuloRepository.save(articulo);
         }
         BigDecimal costoAplicado = articulo.getCostoUnitario();
@@ -272,10 +327,12 @@ public class ArticuloController {
             BigDecimal montoGastoBase = costoAplicado.multiply(request.cantidad);
             if (montoGastoBase.compareTo(BigDecimal.ZERO) > 0) {
                 String monedaGasto = (request.moneda != null && !request.moneda.isBlank()) ? request.moneda : monedaBaseTenant;
-                BigDecimal montoGasto = monedaGasto.equals(monedaBaseTenant) ? montoGastoBase
+                // Conservar exactamente lo pagado: reconvertir el costo redondeado altera el egreso.
+                BigDecimal montoGasto = request.costoUnitario != null
+                    ? request.costoUnitario.multiply(request.cantidad).setScale(2, java.math.RoundingMode.HALF_UP)
                     : motorFinancieroService.convertirMoneda(tenantId, montoGastoBase, monedaBaseTenant, monedaGasto);
-                motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
-                    montoGasto, monedaGasto, "Reabastecimiento: " + articulo.getNombre() + " (" + request.metodoPago + ")");
+                motorFinancieroService.registrarCompraConEquivalencia(tenantId, montoGasto, monedaGasto, montoGastoBase,
+                    "Reabastecimiento: " + articulo.getNombre() + " (" + request.metodoPago + ")", id);
             }
         }
 
@@ -292,6 +349,15 @@ public class ArticuloController {
         }
 
         return ResponseEntity.ok(movimiento);
+    }
+
+    private BigDecimal costoCompra(Long tenant, BigDecimal original, String moneda, BigDecimal unidadesPorBase) {
+        if (original == null || original.signum() < 0) throw new IllegalArgumentException("El costo no puede ser negativo");
+        if (!List.of("USD", "COP", "VES").contains(moneda)) throw new IllegalArgumentException("Moneda inválida");
+        if (unidadesPorBase == null) return motorFinancieroService.convertirCostoAMonedaBase(tenant, original, moneda);
+        if (unidadesPorBase.signum() <= 0) throw new IllegalArgumentException("La tasa debe ser mayor a cero");
+        if (moneda.equals(motorFinancieroService.obtenerMonedaBase(tenant))) return original;
+        return original.divide(unidadesPorBase, 4, java.math.RoundingMode.HALF_UP);
     }
 
     private void registrarTasaDeCompraSiAplica(Long tenantId, String monedaOrigen, BigDecimal tasaAplicada) {

@@ -34,6 +34,18 @@ public class TasaCambioController {
     @Autowired
     private TasaExternaService tasaExternaService;
 
+    @GetMapping("/cotizacion-cobro")
+    public java.util.Map<String, Object> cotizacionCobro() {
+        Long tenant = com.auroraplus.core.config.TenantContext.getCurrentTenant();
+        String base = motorFinancieroService.obtenerMonedaBase(tenant);
+        java.util.Map<String, BigDecimal> factores = new java.util.LinkedHashMap<>();
+        for (String moneda : List.of("USD", "VES", "COP")) {
+            try { factores.put(moneda, motorFinancieroService.factorConversion(tenant, base, moneda)); }
+            catch (RuntimeException sinTasa) { factores.put(moneda, null); }
+        }
+        return java.util.Map.of("monedaBase", base, "factores", factores);
+    }
+
     public static class ActualizarTasaRequest {
         public String monedaOrigen;
         public String monedaDestino;
