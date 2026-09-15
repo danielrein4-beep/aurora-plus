@@ -3620,6 +3620,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
                   <th className="py-2 px-2 font-semibold text-right">Cantidad</th>
                   <th className="py-2 px-2 font-semibold text-right">Costo</th>
                   <th className="py-2 px-2 font-semibold text-right">Precio</th>
+                  <th className="py-2 px-2 font-semibold text-right">Margen / Ganancia</th>
                   <th className="py-2 px-2 font-semibold text-right">Valor en inventario</th>
                   <th className="py-2 pl-2 pr-3 font-semibold text-right">Acciones</th>
                 </tr>
@@ -3820,15 +3821,14 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const margenActual = calcularMargen(Number(articulo.costoUnitario), Number(articulo.precioVenta ?? 0));
-  const sinStock = Number(articulo.stockActual) <= 0;
-  const stockBajo = !sinStock && articulo.stockMinimo != null && Number(articulo.stockActual) <= Number(articulo.stockMinimo);
-  // Costo/Valor se muestran en la moneda en que de verdad se compró (ej.
-  // "COP 4.500,00"), no forzados a dólares — costoUnitario en USD sigue
-  // siendo la fuente de verdad para margen/kardex, esto es solo visual.
   const monedaCosto = articulo.monedaCosto || "USD";
   const costoEnMoneda = articulo.costoUnitarioOriginal ?? Number(articulo.costoUnitario);
+  const precioVenta = Number(articulo.precioVenta ?? 0);
   const valorInventario = costoEnMoneda * Number(articulo.stockActual);
+  const margenActual = calcularMargen(costoEnMoneda, precioVenta);
+  const gananciaUnitaria = precioVenta > 0 && costoEnMoneda > 0 ? (precioVenta - costoEnMoneda) : 0;
+  const sinStock = Number(articulo.stockActual) <= 0;
+  const stockBajo = !sinStock && articulo.stockMinimo != null && Number(articulo.stockActual) <= Number(articulo.stockMinimo);
 
   const guardarAjuste = async () => {
     if (stockReal === "" || Number(stockReal) < 0) { setError("Indicá el stock real contado"); return; }
@@ -3882,13 +3882,33 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
             tabla puede estar en cero; que compitan visualmente con los
             datos reales solo agrega ruido. */}
         <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${costoEnMoneda === 0 ? "text-slate-300 dark:text-white/15" : "text-slate-600 dark:text-white/60"}`}>{fmtCostoEnMoneda(costoEnMoneda, monedaCosto)}</td>
-        <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${Number(articulo.precioVenta ?? 0) === 0 ? "text-slate-300 dark:text-white/15" : "text-slate-600 dark:text-white/60"}`}>{fmtCostoEnMoneda(Number(articulo.precioVenta ?? 0), monedaCosto)}</td>
+        <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${precioVenta === 0 ? "text-slate-300 dark:text-white/15" : "text-slate-600 dark:text-white/60"}`}>{fmtCostoEnMoneda(precioVenta, monedaCosto)}</td>
+        <td className="py-2.5 px-2 text-right whitespace-nowrap">
+          {margenActual !== null ? (
+            <div className="inline-flex flex-col items-end">
+              <span className={`inline-flex items-center font-mono font-black text-xs px-2 py-0.5 rounded-lg border ${
+                margenActual >= 30
+                  ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30"
+                  : margenActual >= 15
+                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                  : margenActual > 0
+                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                  : "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30"
+              }`}>
+                {margenActual >= 0 ? `+${margenActual.toFixed(1)}%` : `${margenActual.toFixed(1)}%`}
+              </span>
+              {gananciaUnitaria !== 0 && (
+                <span className="text-[10px] font-mono text-slate-400 dark:text-white/40 mt-0.5 font-medium">
+                  {gananciaUnitaria > 0 ? `+${fmtCostoEnMoneda(gananciaUnitaria, monedaCosto)}` : fmtCostoEnMoneda(gananciaUnitaria, monedaCosto)}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-[10px] text-slate-400 dark:text-white/30 italic">Sin precio</span>
+          )}
+        </td>
         <td className={`py-2.5 px-2 text-right font-mono whitespace-nowrap ${valorInventario === 0 ? "text-slate-300 dark:text-white/15 font-semibold" : "text-slate-800 dark:text-white/80 font-semibold"}`}>{fmtCostoEnMoneda(valorInventario, monedaCosto)}</td>
         <td className="py-2.5 pl-2 pr-3">
-          {/* Color permanente por acción (no solo al hover) — con 4 íconos
-              finos del mismo gris eran indistinguibles a simple vista; ahora
-              cada uno tiene su propio color + fondo, se leen como 4 botones
-              distintos en vez de una fila de trazos iguales. */}
           <div className="flex items-center justify-end gap-1.5">
             <button onClick={() => setModo("reabastecer")} title="Añadir inventario (reabastecer)"
               className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 cursor-pointer transition-colors"><IconDownload size={16} /></button>
@@ -3903,7 +3923,7 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
       </tr>
       {modo === "ver" && error && (
         <tr className="border-b border-slate-100 dark:border-white/5 bg-red-50 dark:bg-red-500/5">
-          <td colSpan={7} className="px-3 py-2 flex items-center justify-between gap-3">
+          <td colSpan={8} className="px-3 py-2 flex items-center justify-between gap-3">
             <span className="text-[11px] text-red-600 dark:text-red-400">{error}</span>
             <button onClick={() => setError(null)} className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 cursor-pointer flex-shrink-0">Cerrar</button>
           </td>
@@ -3911,7 +3931,7 @@ function FilaArticuloCompacta({ tenantId, articulo, onCambio }: { tenantId: numb
       )}
       {modo === "ajustar" && (
         <tr className="border-b border-slate-200/50 dark:border-white/5 bg-slate-50 dark:bg-white/5">
-          <td colSpan={7} className="px-3 py-2">
+          <td colSpan={8} className="px-3 py-2">
             <p className="text-[10px] text-slate-500 dark:text-white/40 mb-1.5">Sistema dice: {Number(articulo.stockActual)} {articulo.unidadMedida}. Escribí lo que realmente hay contado.</p>
             <div className="flex gap-2 max-w-md">
               <input value={stockReal} onChange={(e) => setStockReal(e.target.value)} type="number" step="0.001" min="0" className="input-horeca text-sm font-bold flex-1" placeholder="Stock real" autoFocus />
