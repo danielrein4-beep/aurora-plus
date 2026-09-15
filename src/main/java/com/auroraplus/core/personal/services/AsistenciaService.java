@@ -41,7 +41,7 @@ public class AsistenciaService {
      * de la entidad: si dos transacciones intentan abrir entrada para el mismo empleado a la vez,
      * la base de datos deja pasar la primera y revienta la segunda con
      * DataIntegrityViolationException, que acá se traduce al mismo mensaje de negocio que el
-     * camino feliz — ver RegistroAsistencia y V13__nucleo_personal_y_nomina.sql.
+     * camino feliz — ver RegistroAsistencia y V16__nucleo_personal_y_nomina.sql.
      */
     @Transactional
     public RegistroAsistencia registrarEntrada(Long tenantId, RegistroAsistencia registro) {

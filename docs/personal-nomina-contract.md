@@ -190,7 +190,7 @@ src/main/java/com/auroraplus/core/personal/controllers/
   ConceptoNominaController.java, ReglaNominaController.java,
   PeriodoNominaController.java, NominaEmpleadoController.java, AjusteNominaController.java
 
-src/main/resources/db/migration/V13__nucleo_personal_y_nomina.sql
+src/main/resources/db/migration/V16__nucleo_personal_y_nomina.sql
 
 src/test/java/com/auroraplus/core/personal/  (ver §7)
 ```

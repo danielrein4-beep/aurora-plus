@@ -13,6 +13,7 @@ import { CostosFinanciero } from '../components/finanzas/CostosFinanciero';
 import { DocumentosFinancieros } from '../components/finanzas/DocumentosFinancieros';
 import { VerticalCoverageCard } from '../components/finanzas/VerticalCoverageCard';
 import { EmptyFinanceState } from '../components/finanzas/EmptyFinanceState';
+import { TasaCambioWidget } from '../components/finanzas/TasaCambioWidget';
 import type { KpiCardData, SupportedCurrency, VerticalCoverage } from '../components/finanzas/types';
 import { ApiError, EmpresaKpiResponse, obtenerEmpresaKpis } from '../api';
 import {
@@ -343,12 +344,15 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
           )}
 
           {activeTab === 'resumen' && (previewMode || (!loading && !error && realKpis)) && (
-            <ResumenFinanciero
-              kpis={previewMode ? MOCK_KPIS : realKpis!}
-              cashBalances={previewMode ? MOCK_CASH_BALANCES : []}
-              dataMode={previewMode ? 'demo' : 'real'}
-              onNavigateToDocuments={() => handleTabChange('documentos')}
-            />
+            <div className="space-y-4">
+              {!previewMode && <TasaCambioWidget />}
+              <ResumenFinanciero
+                kpis={previewMode ? MOCK_KPIS : realKpis!}
+                cashBalances={previewMode ? MOCK_CASH_BALANCES : []}
+                dataMode={previewMode ? 'demo' : 'real'}
+                onNavigateToDocuments={() => handleTabChange('documentos')}
+              />
+            </div>
           )}
 
           {activeTab === 'ventas-compras' && (

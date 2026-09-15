@@ -21,11 +21,15 @@ import {
   listarComprasRepuesto,
   registrarCompraRepuesto,
   listarMovimientos,
+  tasaVigente, actualizarTasa, actualizarTasaExterna, ApiError,
+  obtenerOrigenTasaActiva, actualizarOrigenTasaActiva,
   type RepuestoItem,
   type PresentacionRepuesto,
   type MovimientoRepuesto,
   type ProveedorRepuesto,
   type MovimientoCaja,
+  type TasaCambio,
+  type OrigenTasaActiva,
 } from "../api";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -400,25 +404,96 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     user?.industry === "repuestos" ? "repuestos" :
     "ferreteria";
 
-  // Motor Multi-Tasa Fronterizo (USDT / BCV / COP / Propia)
-  const [tipoTasaActiva, setTipoTasaActiva] = useState<"USDT" | "BCV" | "PERSONALIZADA">(() => {
-    try { return (localStorage.getItem("aurora_tipo_tasa_activa") as any) || "USDT"; } catch { return "USDT"; }
+  // Motor Multi-Tasa Fronterizo (USDT / BCV / COP / Propia) — todo esto vivía SOLO en
+  // localStorage del navegador y nunca tocaba el backend (ni siquiera el botón "Aplicar"
+  // hacía nada): un negocio con dos cajas veía tasas distintas e inventadas en cada una.
+  // Ahora BCV y USDT se consultan en vivo de su fuente pública real y todo se persiste
+  // en tasas_cambio, igual que en Aurora Horeca (ver TasaBadge en RestauranteApp.tsx).
+  const tenantId = user?.tenantId;
+  const [tasaPorOrigen, setTasaPorOrigen] = useState<Record<"BCV" | "USDT" | "PERSONALIZADA", TasaCambio | null>>({
+    BCV: null, USDT: null, PERSONALIZADA: null
   });
-  const [tasaUsdtVal, setTasaUsdtVal] = useState(() => {
-    try { return localStorage.getItem("aurora_tasa_usdt_val") || "65.50"; } catch { return "65.50"; }
-  });
-  const [tasaBcvVal, setTasaBcvVal] = useState("56.80");
-  const [tasaCopVal, setTasaCopVal] = useState("4180");
-  const [tasaPersVal, setTasaPersVal] = useState("");
+  const [tasaCopReal, setTasaCopReal] = useState<TasaCambio | null>(null);
+  const [tipoTasaActiva, setTipoTasaActivaState] = useState<OrigenTasaActiva>("USDT");
   const [popoverTasa, setPopoverTasa] = useState(false);
+  const [tasaCopVal, setTasaCopVal] = useState("");
+  const [tasaPersVal, setTasaPersVal] = useState("");
+  const [actualizandoExterna, setActualizandoExterna] = useState<"BCV" | "USDT" | null>(null);
+  const [guardandoTasa, setGuardandoTasa] = useState(false);
+  const [errorTasa, setErrorTasa] = useState<string | null>(null);
 
-  const tasaActivaBs = useMemo(() => {
-    if (tipoTasaActiva === "USDT") return Number(tasaUsdtVal) || 65.50;
-    if (tipoTasaActiva === "BCV") return Number(tasaBcvVal) || 56.80;
-    return Number(tasaPersVal) || Number(tasaUsdtVal) || 65.50;
-  }, [tipoTasaActiva, tasaUsdtVal, tasaBcvVal, tasaPersVal]);
+  useEffect(() => {
+    if (!tenantId) return;
+    (["BCV", "USDT", "PERSONALIZADA"] as const).forEach((origen) => {
+      tasaVigente(tenantId, "USD", "VES", origen)
+        .then((t) => setTasaPorOrigen((prev) => ({ ...prev, [origen]: t })))
+        .catch(() => setTasaPorOrigen((prev) => ({ ...prev, [origen]: null })));
+    });
+    tasaVigente(tenantId, "USD", "COP").then(setTasaCopReal).catch(() => setTasaCopReal(null));
+    obtenerOrigenTasaActiva().then((r) => setTipoTasaActivaState(r.origenTasaActiva)).catch(() => {});
+  }, [tenantId]);
 
-  const tasaCop = Number(tasaCopVal) || 4180;
+  useEffect(() => {
+    if (!popoverTasa) return;
+    setTasaPersVal(tasaPorOrigen.PERSONALIZADA ? String(Number(tasaPorOrigen.PERSONALIZADA.tasa)) : "");
+    setTasaCopVal(tasaCopReal ? String(Number(tasaCopReal.tasa)) : "");
+    setErrorTasa(null);
+  }, [popoverTasa, tasaPorOrigen, tasaCopReal]);
+
+  const cambiarTipoTasaActiva = async (tipo: OrigenTasaActiva) => {
+    setTipoTasaActivaState(tipo);
+    try { await actualizarOrigenTasaActiva(tipo); } catch { /* revierte visualmente en el próximo fetch si falla */ }
+  };
+
+  const refrescarTasaExterna = async (tipo: "BCV" | "USDT") => {
+    if (!tenantId) return;
+    setActualizandoExterna(tipo);
+    setErrorTasa(null);
+    try {
+      const fuente = tipo === "USDT" ? "BINANCE" : "BCV";
+      const nueva = await actualizarTasaExterna(fuente, "VES");
+      setTasaPorOrigen((prev) => ({
+        ...prev,
+        [tipo]: {
+          id: nueva.id, tenantId, monedaOrigen: nueva.monedaOrigen, monedaDestino: nueva.monedaDestino,
+          tasa: nueva.tasa, origen: nueva.origenApi, fechaActualizacion: nueva.fechaActualizacion
+        }
+      }));
+    } catch (e) {
+      setErrorTasa(e instanceof ApiError ? e.message : "No se pudo consultar la tasa pública.");
+    } finally {
+      setActualizandoExterna(null);
+    }
+  };
+
+  const guardarTasaManual = async () => {
+    if (!tenantId) return;
+    const vCop = Number(tasaCopVal);
+    const vPers = Number(tasaPersVal);
+    if (vCop <= 0 && vPers <= 0) { setErrorTasa("Ingresa al menos una tasa mayor a cero"); return; }
+    setGuardandoTasa(true);
+    setErrorTasa(null);
+    try {
+      const tareas: Promise<void>[] = [];
+      if (vPers > 0) {
+        tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: vPers, origen: "PERSONALIZADA" })
+          .then((t) => setTasaPorOrigen((prev) => ({ ...prev, PERSONALIZADA: t }))));
+      }
+      if (vCop > 0) {
+        tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: vCop, origen: "MANUAL" })
+          .then(setTasaCopReal));
+      }
+      await Promise.all(tareas);
+      setPopoverTasa(false);
+    } catch (e) {
+      setErrorTasa(e instanceof Error ? e.message : "No se pudo actualizar la tasa");
+    } finally {
+      setGuardandoTasa(false);
+    }
+  };
+
+  const tasaActivaBs = tasaPorOrigen[tipoTasaActiva] ? Number(tasaPorOrigen[tipoTasaActiva]!.tasa) : 0;
+  const tasaCop = tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
   const [tab, setTab] = useState<"general" | "pos" | "inventario" | "clientes" | "cierre">("general");
@@ -925,8 +1000,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               title="Cambiar tasa activa (USDT / BCV / COP)"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-teal-400">{tipoTasaActiva}: Bs. {tasaActivaBs.toFixed(2)}</span>
-              <span className="text-slate-500 dark:text-slate-400 text-[10px]">· COP {tasaCop.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+              <span className="text-teal-400">{tipoTasaActiva}: {tasaActivaBs > 0 ? `Bs. ${tasaActivaBs.toFixed(2)}` : "Sin tasa"}</span>
+              <span className="text-slate-500 dark:text-slate-400 text-[10px]">· COP {tasaCop > 0 ? tasaCop.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—"}</span>
               <span className="text-slate-500 dark:text-slate-400 text-[9px]">▼</span>
             </button>
 
@@ -939,41 +1014,54 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
                 <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs">
                   <button
-                    onClick={() => { setTipoTasaActiva("USDT"); try { localStorage.setItem("aurora_tipo_tasa_activa", "USDT"); } catch {} }}
+                    onClick={() => void cambiarTipoTasaActiva("USDT")}
                     className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "USDT" ? "bg-emerald-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
                   >💎 USDT</button>
                   <button
-                    onClick={() => { setTipoTasaActiva("BCV"); try { localStorage.setItem("aurora_tipo_tasa_activa", "BCV"); } catch {} }}
+                    onClick={() => void cambiarTipoTasaActiva("BCV")}
                     className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "BCV" ? "bg-teal-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
                   >🏛️ BCV</button>
                   <button
-                    onClick={() => { setTipoTasaActiva("PERSONALIZADA"); try { localStorage.setItem("aurora_tipo_tasa_activa", "PERSONALIZADA"); } catch {} }}
+                    onClick={() => void cambiarTipoTasaActiva("PERSONALIZADA")}
                     className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "PERSONALIZADA" ? "bg-amber-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
                   >✏️ Propia</button>
                 </div>
 
+                {/* USDT/P2P y BCV Oficial son cifras públicas que el negocio no controla — se
+                    consultan en vivo con un clic, nunca se tipean. */}
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Tasa USDT ($):</span>
-                    <input
-                      type="number" step="0.01" value={tasaUsdtVal}
-                      onChange={(e) => { setTasaUsdtVal(e.target.value); try { localStorage.setItem("aurora_tasa_usdt_val", e.target.value); } catch {} }}
-                      className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-right text-xs"
-                    />
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Tasa USDT (Bs):</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold text-slate-800 dark:text-white">
+                        {tasaPorOrigen.USDT ? Number(tasaPorOrigen.USDT.tasa).toFixed(2) : "Sin consultar"}
+                      </span>
+                      <button type="button" onClick={() => void refrescarTasaExterna("USDT")} disabled={actualizandoExterna !== null}
+                        title="Consultar en vivo (Binance P2P)"
+                        className="p-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 disabled:opacity-50 cursor-pointer">
+                        <IconRefresh size={11} className={actualizandoExterna === "USDT" ? "animate-spin" : ""} />
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Tasa BCV ($):</span>
-                    <input
-                      type="number" step="0.01" value={tasaBcvVal}
-                      onChange={(e) => setTasaBcvVal(e.target.value)}
-                      className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-right text-xs"
-                    />
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Tasa BCV (Bs):</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold text-slate-800 dark:text-white">
+                        {tasaPorOrigen.BCV ? Number(tasaPorOrigen.BCV.tasa).toFixed(2) : "Sin consultar"}
+                      </span>
+                      <button type="button" onClick={() => void refrescarTasaExterna("BCV")} disabled={actualizandoExterna !== null}
+                        title="Consultar en vivo (BCV oficial)"
+                        className="p-1 rounded-md bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 disabled:opacity-50 cursor-pointer">
+                        <IconRefresh size={11} className={actualizandoExterna === "BCV" ? "animate-spin" : ""} />
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] text-slate-500 dark:text-slate-400">Pesos COP:</span>
                     <input
                       type="number" step="1" value={tasaCopVal}
                       onChange={(e) => setTasaCopVal(e.target.value)}
+                      placeholder="Ej. 4180"
                       className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-right text-xs"
                     />
                   </div>
@@ -988,10 +1076,12 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     </div>
                   )}
                 </div>
+                {errorTasa && <p className="text-[10px] text-red-500">{errorTasa}</p>}
                 <button
-                  onClick={() => setPopoverTasa(false)}
-                  className="w-full py-1.5 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400"
-                >Aplicar tasas al POS</button>
+                  onClick={() => void guardarTasaManual()}
+                  disabled={guardandoTasa}
+                  className="w-full py-1.5 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400 disabled:opacity-60"
+                >{guardandoTasa ? "Guardando…" : "Guardar COP / Propia"}</button>
               </div>
             )}
           </div>

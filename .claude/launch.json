@@ -2,11 +2,11 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "aurora-frontend",
+      "name": "aurora-frontend-claude",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
-      "port": 8443,
-      "autoPort": true
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev", "--", "--port", "8445", "--strictPort"],
+      "port": 8445,
+      "autoPort": false
     }
   ]
 }
