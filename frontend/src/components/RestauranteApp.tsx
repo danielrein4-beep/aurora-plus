@@ -447,7 +447,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           )}
           {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} />)}
           {pagina === "recetas" && (recetasActivas
-            ? <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} onCambio={recargarTodo} />
+            ? <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} tasaCop={tasaCop} tasaBcv={tasaBcv} onCambio={recargarTodo} />
             : (
               <div className="apple-glass rounded-2xl p-10 text-center space-y-3">
                 <IconFileText size={28} />
@@ -2099,7 +2099,16 @@ function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void
 // ══════════════════════════════════════════════════════════════════════════
 // RECETAS & ESCANDALLO
 // ══════════════════════════════════════════════════════════════════════════
-function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: number; escandallos: EscandalloReceta[] | null; articulos: Articulo[] | null; onCambio: () => void }) {
+function Recetas({
+  tenantId, escandallos, articulos, onCambio, tasaCop, tasaBcv,
+}: {
+  tenantId: number;
+  escandallos: EscandalloReceta[] | null;
+  articulos: Articulo[] | null;
+  onCambio: () => void;
+  tasaCop?: TasaCambio | null;
+  tasaBcv?: TasaCambio | null;
+}) {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [form, setForm] = useState({ nombrePlato: "", estacionCocina: "COCINA", precioVenta: "", requiereCocina: true });
   const [guardando, setGuardando] = useState(false);
@@ -2305,6 +2314,8 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
           escandallo={editandoReceta}
           articulos={articulos}
           escandallos={escandallos}
+          tasaCop={tasaCop}
+          tasaBcv={tasaBcv}
           onClose={() => setEditandoReceta(null)}
           onCambio={onCambio}
         />
@@ -2314,7 +2325,7 @@ function Recetas({ tenantId, escandallos, articulos, onCambio }: { tenantId: num
 }
 
 function ModalEditarReceta({
-  tenantId, escandallo, articulos, escandallos, onClose, onCambio,
+  tenantId, escandallo, articulos, escandallos, onClose, onCambio, tasaCop, tasaBcv,
 }: {
   tenantId: number;
   escandallo: EscandalloReceta;
@@ -2322,9 +2333,78 @@ function ModalEditarReceta({
   escandallos: EscandalloReceta[] | null;
   onClose: () => void;
   onCambio: () => void;
+  tasaCop?: TasaCambio | null;
+  tasaBcv?: TasaCambio | null;
 }) {
   const [receta, setReceta] = useState<EscandalloReceta>(escandallo);
   const [ingredientes, setIngredientes] = useState<DetalleReceta[] | null>(null);
+
+  // Tasas de cambio activas para conversión lógica (USD base del plato)
+  const [tasaCopEstado, setTasaCopEstado] = useState<number>(() => {
+    if (tasaCop && Number(tasaCop.tasa) > 0) return Number(tasaCop.tasa);
+    try {
+      const g = localStorage.getItem("aurora_tasa_cop_val");
+      if (g && Number(g) > 0) return Number(g);
+    } catch {}
+    return 4000;
+  });
+
+  const [tasaVesEstado, setTasaVesEstado] = useState<number>(() => {
+    if (tasaBcv && Number(tasaBcv.tasa) > 0) return Number(tasaBcv.tasa);
+    try {
+      const g = localStorage.getItem("aurora_tasa_usdt_val");
+      if (g && Number(g) > 0) return Number(g);
+    } catch {}
+    return 60;
+  });
+
+  useEffect(() => {
+    if (tasaCop && Number(tasaCop.tasa) > 0) {
+      setTasaCopEstado(Number(tasaCop.tasa));
+    } else {
+      tasaVigente(tenantId, "USD", "COP")
+        .then((t) => { if (t && Number(t.tasa) > 0) setTasaCopEstado(Number(t.tasa)); })
+        .catch(() => {});
+    }
+    if (tasaBcv && Number(tasaBcv.tasa) > 0) {
+      setTasaVesEstado(Number(tasaBcv.tasa));
+    } else {
+      tasaVigente(tenantId, "USD", "VES")
+        .then((t) => { if (t && Number(t.tasa) > 0) setTasaVesEstado(Number(t.tasa)); })
+        .catch(() => {});
+    }
+  }, [tenantId, tasaCop, tasaBcv]);
+
+  // Detección inteligente de la moneda de compra del insumo
+  const detectarMonedaInsumo = (art: Articulo): "COP" | "USD" | "VES" => {
+    const m = (art.monedaCosto || "").toUpperCase().trim();
+    if (m === "COP" || m === "VES" || m === "USD") return m as any;
+    const cost = Number(art.costoUnitarioOriginal || art.costoUnitario || 0);
+    if (cost >= 100) return "COP";
+    return "USD";
+  };
+
+  // Normalizar monto en COP (si se guardó con punto de miles como 1.450 en vez de 1450)
+  const normalizarMontoInsumo = (art: Articulo, moneda: "COP" | "USD" | "VES"): number => {
+    let val = Number(art.costoUnitarioOriginal || art.costoUnitario || 0);
+    if (moneda === "COP" && val > 0 && val < 50) {
+      val = Math.round(val * 1000);
+    }
+    return val;
+  };
+
+  // Convertir costo a la moneda del plato (USD) dividiendo lógicamente entre la tasa de cambio
+  const convertirCostoAMonedaPlato = (montoOriginal: number, moneda: "COP" | "USD" | "VES"): number => {
+    if (moneda === "COP") {
+      const tasa = tasaCopEstado > 0 ? tasaCopEstado : 4000;
+      return montoOriginal / tasa;
+    }
+    if (moneda === "VES") {
+      const tasa = tasaVesEstado > 0 ? tasaVesEstado : 60;
+      return montoOriginal / tasa;
+    }
+    return montoOriginal;
+  };
 
   // Formulario de edición de datos de la receta
   const [nombrePlato, setNombrePlato] = useState(escandallo.nombrePlato || "");
@@ -2344,10 +2424,25 @@ function ModalEditarReceta({
   // Formulario para nuevo ingrediente
   const [tipoNuevo, setTipoNuevo] = useState<"articulo" | "subreceta">("articulo");
   const [nuevoArticuloId, setNuevoArticuloId] = useState("");
+  const [monedaCompraSel, setMonedaCompraSel] = useState<"COP" | "USD" | "VES">("COP");
+  const [costoCompraSel, setCostoCompraSel] = useState<string>("");
   const [nuevoSubRecetaId, setNuevoSubRecetaId] = useState("");
   const [nuevoPesoNeto, setNuevoPesoNeto] = useState("");
   const [nuevoMerma, setNuevoMerma] = useState("0");
   const [guardandoNuevo, setGuardandoNuevo] = useState(false);
+
+  const onSelectArticulo = (artId: string) => {
+    setNuevoArticuloId(artId);
+    const art = (articulos || []).find((a) => String(a.id) === artId);
+    if (art) {
+      const m = detectarMonedaInsumo(art);
+      setMonedaCompraSel(m);
+      const val = normalizarMontoInsumo(art, m);
+      setCostoCompraSel(String(val));
+    } else {
+      setCostoCompraSel("");
+    }
+  };
 
   const cargarIngredientes = () => {
     listarIngredientesEscandallo(tenantId, escandallo.id)
@@ -2455,6 +2550,20 @@ function ModalEditarReceta({
       setGuardandoNuevo(true);
       setError(null);
       try {
+        const costoCompraNum = parseFloat(costoCompraSel) || normalizarMontoInsumo(art, monedaCompraSel);
+        const unitUsd = convertirCostoAMonedaPlato(costoCompraNum, monedaCompraSel);
+
+        // Si la moneda o costo difiere de lo que tenía el insumo, sincronizarlo
+        if (art.monedaCosto !== monedaCompraSel || Number(art.costoUnitario) !== unitUsd) {
+          editarArticulo(art.id, {
+            costoUnitario: unitUsd,
+            monedaCosto: monedaCompraSel,
+          }).catch(() => {});
+          art.monedaCosto = monedaCompraSel;
+          art.costoUnitario = unitUsd;
+          art.costoUnitarioOriginal = costoCompraNum;
+        }
+
         const actualizada = await agregarIngredienteEscandallo(tenantId, receta.id, {
           ingredienteSku: art.sku,
           pesoNeto: neto,
@@ -2464,6 +2573,7 @@ function ModalEditarReceta({
         setNuevoArticuloId("");
         setNuevoPesoNeto("");
         setNuevoMerma("0");
+        setCostoCompraSel("");
         cargarIngredientes();
         onCambio();
       } catch (e) {
@@ -2505,6 +2615,8 @@ function ModalEditarReceta({
     let unidad = "";
     let nombre = "";
     let esSubReceta = false;
+    let etiquetaCompraOriginal = "";
+    let tasaTexto = "";
 
     if (d.subReceta) {
       esSubReceta = true;
@@ -2512,11 +2624,28 @@ function ModalEditarReceta({
       unitCost = Number(sub?.costoTotalProduccion || 0);
       unidad = "ración/unidad";
       nombre = sub?.nombrePlato || "Sub-receta";
+      etiquetaCompraOriginal = `$${unitCost.toFixed(2)} USD`;
     } else {
       const art = (articulos || []).find((a) => a.sku === d.ingredienteSku);
-      unitCost = Number(art?.costoUnitario || 0);
       unidad = art?.unidadMedida || "ud";
       nombre = art?.nombre || d.ingredienteSku || "Artículo";
+
+      if (art) {
+        const mon = detectarMonedaInsumo(art);
+        const valNorm = normalizarMontoInsumo(art, mon);
+        unitCost = convertirCostoAMonedaPlato(valNorm, mon);
+        if (mon === "COP") {
+          etiquetaCompraOriginal = `${fmtNumero(valNorm, "COP")} COP`;
+          tasaTexto = `÷ ${(tasaCopEstado || 4000).toLocaleString("es-CO")}`;
+        } else if (mon === "VES") {
+          etiquetaCompraOriginal = `Bs. ${valNorm.toFixed(2)}`;
+          tasaTexto = `÷ ${(tasaVesEstado || 60).toFixed(2)}`;
+        } else {
+          etiquetaCompraOriginal = `$${valNorm.toFixed(2)} USD`;
+        }
+      } else {
+        unitCost = 0;
+      }
     }
 
     if (isEditing) {
@@ -2537,12 +2666,14 @@ function ModalEditarReceta({
       costoLinea,
       esSubReceta,
       isEditing,
+      etiquetaCompraOriginal,
+      tasaTexto,
     };
   };
 
   const desgloseLineas = useMemo(() => {
     return (ingredientes || []).map(calcularMetricasLinea);
-  }, [ingredientes, editandoDetalleId, editPesoNeto, editMerma, articulos, escandallos]);
+  }, [ingredientes, editandoDetalleId, editPesoNeto, editMerma, articulos, escandallos, tasaCopEstado, tasaVesEstado]);
 
   const costoTotalEnVivo = useMemo(() => {
     return desgloseLineas.reduce((acc, curr) => acc + curr.costoLinea, 0);
@@ -2563,15 +2694,30 @@ function ModalEditarReceta({
     if (tipoNuevo === "articulo") {
       const art = (articulos || []).find((a) => String(a.id) === nuevoArticuloId);
       if (!art) return null;
-      const unit = Number(art.costoUnitario || 0);
-      return { cantBruta, unit, costo: cantBruta * unit, unidad: art.unidadMedida };
+      const costoCompraNum = parseFloat(costoCompraSel) || normalizarMontoInsumo(art, monedaCompraSel);
+      const unitUsd = convertirCostoAMonedaPlato(costoCompraNum, monedaCompraSel);
+      return {
+        cantBruta,
+        unit: unitUsd,
+        costo: cantBruta * unitUsd,
+        unidad: art.unidadMedida || "ud",
+        monedaCompra: monedaCompraSel,
+        costoCompra: costoCompraNum,
+      };
     } else {
       const sub = (escandallos || []).find((s) => String(s.id) === nuevoSubRecetaId);
       if (!sub) return null;
       const unit = Number(sub.costoTotalProduccion || 0);
-      return { cantBruta: neto, unit, costo: neto * unit, unidad: "ración" };
+      return {
+        cantBruta: neto,
+        unit,
+        costo: neto * unit,
+        unidad: "ración",
+        monedaCompra: "USD" as const,
+        costoCompra: unit,
+      };
     }
-  }, [tipoNuevo, nuevoArticuloId, nuevoSubRecetaId, nuevoPesoNeto, nuevoMerma, articulos, escandallos]);
+  }, [tipoNuevo, nuevoArticuloId, nuevoSubRecetaId, nuevoPesoNeto, nuevoMerma, articulos, escandallos, costoCompraSel, monedaCompraSel, tasaCopEstado, tasaVesEstado]);
 
   return (
     <Modal onClose={onClose} titulo={`Editar Receta & Escandallo — ${receta.nombrePlato}`} ancho="max-w-4xl">
@@ -2717,7 +2863,12 @@ function ModalEditarReceta({
 
                         {/* Costo unitario */}
                         <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-white/60">
-                          ${met.unitCost.toFixed(3)} / {met.unidad}
+                          <div>${met.unitCost.toFixed(3)} USD / {met.unidad}</div>
+                          {met.etiquetaCompraOriginal && met.tasaTexto && (
+                            <span className="text-[10px] text-teal-600 dark:text-teal-400 block font-sans">
+                              ({met.etiquetaCompraOriginal} {met.tasaTexto})
+                            </span>
+                          )}
                         </td>
 
                         {/* Cantidad requerida (modo vista o modo edición) */}
@@ -2756,7 +2907,7 @@ function ModalEditarReceta({
 
                         {/* Costo de la línea en vivo */}
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                          ${met.costoLinea.toFixed(2)}
+                          ${met.costoLinea.toFixed(2)} USD
                         </td>
 
                         {/* Acciones */}
@@ -2821,25 +2972,131 @@ function ModalEditarReceta({
           </div>
 
           {tipoNuevo === "articulo" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-              <div className="sm:col-span-2">
-                <select value={nuevoArticuloId} onChange={(e) => setNuevoArticuloId(e.target.value)} className="input-horeca w-full text-xs">
-                  <option value="">— Elegir insumo de inventario —</option>
-                  {(articulos || []).map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.nombre} (${Number(a.costoUnitario || 0).toFixed(3)} / {a.unidadMedida})
-                    </option>
-                  ))}
-                </select>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-white/50 mb-1">Insumo del inventario</label>
+                  <select
+                    value={nuevoArticuloId}
+                    onChange={(e) => onSelectArticulo(e.target.value)}
+                    className="input-horeca w-full text-xs font-medium"
+                  >
+                    <option value="">— Elegir insumo de inventario —</option>
+                    {(articulos || []).map((a) => {
+                      const mon = detectarMonedaInsumo(a);
+                      const valNorm = normalizarMontoInsumo(a, mon);
+                      const valUsd = convertirCostoAMonedaPlato(valNorm, mon);
+                      const etiquetaCompra = mon === "COP"
+                        ? `${fmtNumero(valNorm, "COP")} COP`
+                        : mon === "VES"
+                        ? `Bs. ${valNorm.toFixed(2)}`
+                        : `$${valNorm.toFixed(2)} USD`;
+                      return (
+                        <option key={a.id} value={a.id}>
+                          {a.nombre} ({etiquetaCompra} / {a.unidadMedida} {mon !== "USD" ? `→ ~$${valUsd.toFixed(3)} USD` : ""})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-white/50 mb-1">Peso neto / cant.</label>
+                  <input value={nuevoPesoNeto} onChange={(e) => setNuevoPesoNeto(e.target.value)}
+                    type="number" step="0.001" placeholder="Ej. 0.500" className="input-horeca w-full text-xs" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-white/50 mb-1">% Merma cocina</label>
+                  <input value={nuevoMerma} onChange={(e) => setNuevoMerma(e.target.value)}
+                    type="number" step="0.1" placeholder="% Merma" className="input-horeca w-full text-xs" />
+                </div>
               </div>
-              <div>
-                <input value={nuevoPesoNeto} onChange={(e) => setNuevoPesoNeto(e.target.value)}
-                  type="number" step="0.001" placeholder="Peso neto / cantidad" className="input-horeca w-full text-xs" />
-              </div>
-              <div>
-                <input value={nuevoMerma} onChange={(e) => setNuevoMerma(e.target.value)}
-                  type="number" step="0.1" placeholder="% Merma" className="input-horeca w-full text-xs" />
-              </div>
+
+              {/* Panel interactivo: Moneda de compra y división lógica automática */}
+              {nuevoArticuloId && (() => {
+                const artSel = (articulos || []).find((a) => String(a.id) === nuevoArticuloId);
+                if (!artSel) return null;
+                const costoCompraNum = parseFloat(costoCompraSel) || 0;
+                const unitUsd = convertirCostoAMonedaPlato(costoCompraNum, monedaCompraSel);
+                const unidad = artSel.unidadMedida || "ud";
+
+                return (
+                  <div className="bg-slate-100/80 dark:bg-white/5 border border-slate-300/60 dark:border-white/10 rounded-xl p-3 space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-slate-700 dark:text-white/80">
+                        Moneda en que compramos este insumo:
+                      </span>
+                      {/* Selector de Moneda de Compra */}
+                      <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-white/10 p-0.5 rounded-lg text-xs">
+                        {(["COP", "USD", "VES"] as const).map((mon) => (
+                          <button
+                            key={mon}
+                            type="button"
+                            onClick={() => {
+                              setMonedaCompraSel(mon);
+                              if (mon === "COP" && Number(costoCompraSel) < 50 && Number(costoCompraSel) > 0) {
+                                setCostoCompraSel(String(Math.round(Number(costoCompraSel) * 1000)));
+                              }
+                            }}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                              monedaCompraSel === mon
+                                ? "bg-teal-600 text-white shadow-xs"
+                                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
+                            }`}
+                          >
+                            {mon === "VES" ? "BS (VES)" : mon}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/50 mb-1">
+                          Costo de compra en {monedaCompraSel} ({unidad}):
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step={monedaCompraSel === "COP" ? "1" : "0.01"}
+                            value={costoCompraSel}
+                            onChange={(e) => setCostoCompraSel(e.target.value)}
+                            placeholder={monedaCompraSel === "COP" ? "Ej. 1450" : "Ej. 1.45"}
+                            className="input-horeca w-full text-xs font-mono font-bold"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">
+                            {monedaCompraSel} / {unidad}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white/60 dark:bg-black/20 p-2.5 rounded-lg border border-slate-200 dark:border-white/5 text-[11px] space-y-1">
+                        <div className="text-slate-500 dark:text-white/50 font-medium">Conversión lógica a moneda del plato (USD):</div>
+                        <div className="font-mono font-bold text-teal-600 dark:text-teal-400">
+                          {monedaCompraSel === "COP" && (
+                            <>
+                              {fmtNumero(costoCompraNum, "COP")} COP ÷ {tasaCopEstado.toLocaleString("es-CO")} = <strong>${unitUsd.toFixed(3)} USD / {unidad}</strong>
+                            </>
+                          )}
+                          {monedaCompraSel === "VES" && (
+                            <>
+                              Bs. {costoCompraNum.toFixed(2)} ÷ {tasaVesEstado.toFixed(2)} = <strong>${unitUsd.toFixed(3)} USD / {unidad}</strong>
+                            </>
+                          )}
+                          {monedaCompraSel === "USD" && (
+                            <>
+                              <strong>${unitUsd.toFixed(3)} USD / {unidad}</strong> (misma moneda del plato)
+                            </>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {monedaCompraSel === "COP" && `Tasa activa aplicada: 1 USD = ${tasaCopEstado.toLocaleString("es-CO")} COP`}
+                          {monedaCompraSel === "VES" && `Tasa activa aplicada: 1 USD = ${tasaVesEstado.toFixed(2)} Bs`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -2862,12 +3119,15 @@ function ModalEditarReceta({
 
           {/* Vista previa en tiempo real antes de guardar */}
           {previewNuevo && (
-            <div className="flex items-center justify-between text-xs bg-sky-500/10 border border-sky-500/20 rounded-xl px-3 py-2 text-sky-700 dark:text-sky-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs bg-sky-500/10 border border-sky-500/20 rounded-xl px-3 py-2 text-sky-700 dark:text-sky-300">
               <span>
-                Cálculo previo: <strong>{previewNuevo.cantBruta.toFixed(3)} {previewNuevo.unidad}</strong> × ${previewNuevo.unit.toFixed(3)}
+                Cálculo previo: <strong>{previewNuevo.cantBruta.toFixed(3)} {previewNuevo.unidad}</strong> × ${previewNuevo.unit.toFixed(3)} USD
+                {previewNuevo.monedaCompra !== "USD" && (
+                  <span className="opacity-80 font-normal"> ({previewNuevo.monedaCompra === "COP" ? `${fmtNumero(previewNuevo.costoCompra, "COP")} COP` : `Bs. ${previewNuevo.costoCompra}`} convertidos)</span>
+                )}
               </span>
               <span className="font-mono font-bold">
-                Impacto en costo: +${previewNuevo.costo.toFixed(2)}
+                Impacto en costo del plato: +${previewNuevo.costo.toFixed(2)} USD
               </span>
             </div>
           )}
