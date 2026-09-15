@@ -993,7 +993,7 @@ export function crearArticulo(datos: { sku: string; nombre: string; unidadMedida
 // costoUnitario va tal cual lo tecleó el usuario en `moneda` (o en la moneda
 // base del tenant si se omite) — el backend lo convierte a la moneda base
 // antes de guardar.
-export function entradaArticulo(articuloId: number, datos: { cantidad: number; costoUnitario?: number; motivo?: string; fechaVencimiento?: string; metodoPago?: string; moneda?: string; tasaCambioAplicada?: number }): Promise<unknown> {
+export function entradaArticulo(articuloId: number, datos: { cantidad: number; costoUnitario?: number; motivo?: string; fechaVencimiento?: string; metodoPago?: string; moneda?: string; tasaCambioAplicada?: number; unidadesOrigenPorBase?: number }): Promise<unknown> {
   return request(`/api/inventario/articulos/${articuloId}/entrada`, { method: "POST", body: JSON.stringify(datos) });
 }
 

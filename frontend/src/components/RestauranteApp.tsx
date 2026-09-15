@@ -4101,6 +4101,7 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
     }).catch(() => {});
   }, [tenantId, articulo.monedaCosto]);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
+  const [tasaPropiaCompra, setTasaPropiaCompra] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -4115,11 +4116,15 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
     try {
       // El costo se manda tal cual lo tecleó el usuario junto con `moneda` — es
       // el backend (ArticuloController) el que lo convierte a la moneda base
-      // del tenant antes de guardarlo.
+      // del tenant antes de guardarlo. unidadesOrigenPorBase es opcional: si el
+      // proveedor cobró a una tasa negociada distinta de la tasa registrada del
+      // sistema, se puede fijar acá para ESTA compra puntual; si se omite, usa
+      // la tasa vigente registrada (comportamiento de siempre).
       await entradaArticulo(articulo.id, {
         cantidad: Number(cantidad), costoUnitario: Number(costoUnitario),
         motivo: "Reabastecimiento rápido", fechaVencimiento: fechaVencimiento || undefined,
         metodoPago, moneda,
+        unidadesOrigenPorBase: tasaPropiaCompra ? Number(tasaPropiaCompra) : undefined,
       });
       // El precio de venta no es parte del movimiento de stock — se actualiza
       // aparte solo si cambió, así el reabastecimiento sirve también para
@@ -4148,7 +4153,12 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
           </Campo>
         </div>
         {moneda !== monedaBaseTenant && (
-          <p className="text-[10px] text-slate-400">El costo se guarda convertido a {monedaBaseTenant} con la tasa vigente al momento de guardar — todo el sistema valora el inventario en esa moneda.</p>
+          <div className="space-y-1.5">
+            <p className="text-[10px] text-slate-400">El costo se guarda convertido a {monedaBaseTenant} — por defecto con la tasa vigente registrada. Si el proveedor te cobró a otra tasa negociada, indícala aquí solo para esta compra:</p>
+            <Campo label={`Tasa de esta compra (1 ${monedaBaseTenant} = ? ${moneda === "VES" ? "BS" : moneda}) — opcional`}>
+              <input value={tasaPropiaCompra} onChange={(e) => setTasaPropiaCompra(e.target.value)} type="number" step="0.0001" min="0" placeholder="Usar tasa vigente registrada" className="input-horeca" />
+            </Campo>
+          </div>
         )}
         <Campo label={`Precio de venta (${monedaBaseTenant})`}>
           <input value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className="input-horeca" />
@@ -6205,7 +6215,7 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                       <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white/80">{fmtCostoEnMoneda(t.totalBase ?? t.totalUsd, t.monedaBase || "moneda por confirmar")}</td>
                       <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.pagos?.length ? <div className="space-y-1">{t.pagos.map((p, i) => <div key={i}>
                         <span>{fmtCostoEnMoneda(p.monto, p.moneda)}</span>
-                        <span className="block text-[10px]">{p.metodoPago.replaceAll("_", " ")}</span>
+                        <span className="block text-[10px]">{p.metodoPago.replace(/_/g, " ")}</span>
                         {t.monedaBase && p.moneda !== t.monedaBase && <span className="block text-[10px] text-slate-500">Equivalente guardado: {fmtCostoEnMoneda(p.equivalenteBase, t.monedaBase)}</span>}
                       </div>)}{Number(t.vuelto) > 0 && <div className="text-amber-700">Vuelto: {fmtCostoEnMoneda(t.vuelto, t.monedaVuelto)}</div>}</div> : <span>Sin desglose histórico</span>}</td>
                       <td className="py-2 px-3 text-slate-600 dark:text-white/60">{(t.metodoPago || "-").replace("_", " ")}</td>
