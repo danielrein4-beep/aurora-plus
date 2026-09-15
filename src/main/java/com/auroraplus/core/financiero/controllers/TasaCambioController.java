@@ -5,6 +5,7 @@ import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.core.financiero.entities.TasaCambio;
 import com.auroraplus.core.financiero.repositories.TasaCambioRepository;
 import com.auroraplus.core.financiero.services.MotorFinancieroService;
+import com.auroraplus.core.financiero.services.TasaExternaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +31,9 @@ public class TasaCambioController {
     @Autowired
     private LicenciaTenantRepository licenciaTenantRepository;
 
+    @Autowired
+    private TasaExternaService tasaExternaService;
+
     public static class ActualizarTasaRequest {
         public String monedaOrigen;
         public String monedaDestino;
@@ -47,9 +51,54 @@ public class TasaCambioController {
             tenantId, request.monedaOrigen, request.monedaDestino, request.tasa, request.origen));
     }
 
-    /** Tasa vigente (la más reciente) entre dos monedas para este tenant. */
+    /**
+     * Refresca la tasa USD/VES consultando en vivo una fuente pública — BCV
+     * oficial o Binance P2P — y la registra como tasa nueva. Ninguna de las
+     * dos la escribe el negocio a mano: son cifras que vienen de afuera, a
+     * diferencia de la tasa "PERSONALIZADA" (esa sí la define el negocio). Si
+     * la fuente falla, no se escribe nada: la tasa vigente sigue siendo la
+     * última registrada.
+     *
+     * `fuente` decide qué API externa se consulta (BCV o BINANCE); el origen
+     * que queda guardado es el concepto de negocio, no el nombre del
+     * proveedor de datos — BINANCE se guarda con origen "USDT" (la tasa
+     * paralela vía P2P, como la conoce el negocio), no "BINANCE".
+     *
+     * Este refresco es bajo demanda; TasaBcvAutomaticaJob (en
+     * feature/astra-hero-redesign al momento de escribir esto) además
+     * refresca la serie "BCV" sola una vez al día por tenant — son dos
+     * caminos de escritura sobre la misma serie, no duplicados.
+     */
+    @PostMapping("/actualizar-externa")
+    public ResponseEntity<TasaCambio> actualizarExterna(@RequestParam Long tenantId, @RequestParam String fuente,
+                                                          @RequestParam(defaultValue = "VES") String monedaDestino) {
+        String origenGuardado;
+        BigDecimal tasa;
+        switch (fuente.toUpperCase()) {
+            case "BCV" -> { tasa = tasaExternaService.obtenerBcv(); origenGuardado = "BCV"; }
+            case "BINANCE" -> { tasa = tasaExternaService.obtenerBinance(); origenGuardado = "USDT"; }
+            default -> throw new RuntimeException("Fuente de tasa externa no soportada: " + fuente + " (use BCV o BINANCE)");
+        }
+        return ResponseEntity.ok(motorFinancieroService.actualizarTasa(tenantId, "USD", monedaDestino, tasa, origenGuardado));
+    }
+
+    /**
+     * Tasa vigente (la más reciente) entre dos monedas para este tenant. Con
+     * `origen` (BCV, USDT, PERSONALIZADA...) filtra a la más reciente de ESE
+     * origen específico — cada origen se rastrea como una serie propia, para
+     * que un negocio pueda mantener, por ejemplo, su tasa BCV de referencia y
+     * su tasa USDT de cobro en el POS simultáneamente, sin que guardar una
+     * pise la lectura de la otra. Sin `origen`, mantiene el comportamiento
+     * histórico: la más reciente sin importar de qué origen vino.
+     */
     @GetMapping("/vigente")
-    public TasaCambio vigente(@RequestParam Long tenantId, @RequestParam String monedaOrigen, @RequestParam String monedaDestino) {
+    public TasaCambio vigente(@RequestParam Long tenantId, @RequestParam String monedaOrigen, @RequestParam String monedaDestino,
+                               @RequestParam(required = false) String origen) {
+        if (origen != null && !origen.isBlank()) {
+            return tasaCambioRepository.findTopByTenantIdAndMonedaOrigenAndMonedaDestinoAndOrigenApiOrderByFechaActualizacionDesc(
+                    tenantId, monedaOrigen, monedaDestino, origen)
+                .orElseThrow(() -> new RuntimeException("No hay tasa " + origen + " registrada entre " + monedaOrigen + " y " + monedaDestino));
+        }
         return tasaCambioRepository.findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(
                 tenantId, monedaOrigen, monedaDestino)
             .orElseThrow(() -> new RuntimeException("No hay tasa registrada entre " + monedaOrigen + " y " + monedaDestino));

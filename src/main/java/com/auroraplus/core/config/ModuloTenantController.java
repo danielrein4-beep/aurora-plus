@@ -182,6 +182,47 @@ public class ModuloTenantController {
         return new MonedaBaseResponse(licencia.getMonedaBase());
     }
 
+    // --- Cuál tasa gobierna el cobro en el POS (BCV / USDT / PERSONALIZADA): decisión de
+    // negocio, no una preferencia de cada navegador — antes vivía en localStorage y se
+    // desincronizaba entre terminales. BCV y USDT no las escribe el negocio (se consultan
+    // en vivo de su fuente pública, ver TasaExternaService); PERSONALIZADA sí.
+
+    private static final List<String> ORIGENES_TASA_VALIDOS = List.of("BCV", "USDT", "PERSONALIZADA");
+
+    public static class OrigenTasaResponse {
+        public String origenTasaActiva;
+        public OrigenTasaResponse(String origenTasaActiva) { this.origenTasaActiva = origenTasaActiva; }
+    }
+
+    @GetMapping("/mi-negocio/origen-tasa")
+    public OrigenTasaResponse obtenerOrigenTasa() {
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        return new OrigenTasaResponse(licencia.getOrigenTasaActiva());
+    }
+
+    public static class ActualizarOrigenTasaRequest {
+        public String origenTasaActiva;
+    }
+
+    @PutMapping("/mi-negocio/origen-tasa")
+    public OrigenTasaResponse actualizarOrigenTasa(@RequestBody ActualizarOrigenTasaRequest request) {
+        String rol = AuthContext.getRol();
+        if (!"DUENO_ADMIN".equals(rol)) {
+            throw new RuntimeException("Solo el Dueño/Administrador puede cambiar qué tasa gobierna el cobro");
+        }
+        if (request.origenTasaActiva == null || !ORIGENES_TASA_VALIDOS.contains(request.origenTasaActiva)) {
+            throw new RuntimeException("Origen de tasa inválido. Use uno de: " + ORIGENES_TASA_VALIDOS);
+        }
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        licencia.setOrigenTasaActiva(request.origenTasaActiva);
+        licenciaTenantRepository.save(licencia);
+        return new OrigenTasaResponse(licencia.getOrigenTasaActiva());
+    }
+
     // --- Datos fiscales opcionales (RIF, razón social, domicilio fiscal) — se
     // estampan en notas de entrega/recibos de venta y despacho cuando el dueño
     // los llena; nunca bloquean la operación si quedan vacíos.

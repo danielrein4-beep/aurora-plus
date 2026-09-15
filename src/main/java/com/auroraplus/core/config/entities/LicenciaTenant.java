@@ -49,6 +49,14 @@ public class LicenciaTenant {
     @Column(name = "moneda_base", nullable = false, length = 3)
     private String monedaBase = "USD";
 
+    // Qué serie de tasa USD/VES gobierna el cobro en el POS de este negocio: BCV (oficial,
+    // se refresca de bcv.org.ve vía dolarapi.com), USDT (P2P, se refresca de Binance) o
+    // PERSONALIZADA (la única que el negocio escribe a mano). BCV y USDT NO son editables
+    // por el negocio — es una decisión de negocio (Dueño/Administrador), por eso vive acá y
+    // no en localStorage del navegador, que se desincroniza entre terminales/dispositivos.
+    @Column(name = "origen_tasa_activa", nullable = false, length = 20)
+    private String origenTasaActiva = "USDT";
+
     @Column(name = "fecha_alta", nullable = false)
     private LocalDate fechaAlta = LocalDate.now();
 
@@ -102,6 +110,8 @@ public class LicenciaTenant {
     public void setFechaAlta(LocalDate fechaAlta) { this.fechaAlta = fechaAlta; }
     public String getMonedaBase() { return monedaBase; }
     public void setMonedaBase(String monedaBase) { this.monedaBase = monedaBase; }
+    public String getOrigenTasaActiva() { return origenTasaActiva; }
+    public void setOrigenTasaActiva(String origenTasaActiva) { this.origenTasaActiva = origenTasaActiva; }
     public String getLogoBase64() { return logoBase64; }
     public void setLogoBase64(String logoBase64) { this.logoBase64 = logoBase64; }
     public String getHierroBase64() { return hierroBase64; }

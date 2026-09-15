@@ -20,8 +20,9 @@ import {
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
   registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
   obtenerMonedaBaseNegocio, actualizarMonedaBaseNegocio,
+  obtenerOrigenTasaActiva, actualizarOrigenTasaActiva, type OrigenTasaActiva,
   extraerFacturaOcr,
-  tasaVigente, actualizarTasa, registrarMovimiento, listarMovimientos, abonarMovimiento,
+  tasaVigente, actualizarTasa, actualizarTasaExterna, ApiError, registrarMovimiento, listarMovimientos, abonarMovimiento,
   cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria, reporteTickets,
   abrirTurno, turnoAbierto, historialTurnos, registrarEgresoTurno, cerrarTurno,
   listarClientes, crearCliente, editarCliente, eliminarCliente, metricasCliente, ticketsCliente,
@@ -150,21 +151,50 @@ function EstiloClasico() {
       .horeca-clasico .dark\\:text-white\\/40 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
       .horeca-clasico .dark\\:text-white\\/30 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
       .horeca-clasico .dark\\:text-white { color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; }
+      /* Un solo tono sólido de marca (#35d7c3), sin el degradado azul→verde→morado
+         de antes — ese era exactamente el look genérico de "app de IA" que ya se
+         quitó del resto del sitio (ver .btn-cyber-neon en index.css). */
       .horeca-clasico .btn-cyber-neon {
-        background: #35d7c3 !important;
+        background: #35D7C3 !important;
         border: 1px solid rgba(53, 215, 195, .72) !important;
-        box-shadow: 0 2px 7px rgba(2, 35, 42, .18) !important;
+        box-shadow: 0 4px 14px rgba(53,215,195,0.35) !important;
         color: #062323 !important;
       }
       .horeca-clasico .text-teal-600, .horeca-clasico .text-teal-500,
       .horeca-clasico .text-teal-300, .horeca-clasico .text-teal-400 { color: #0d9488 !important; -webkit-text-fill-color: #0d9488 !important; }
       .horeca-clasico .text-aurora {
-        background: none !important;
         color: #0d9488 !important;
-        -webkit-text-fill-color: currentColor !important;
+        background: none !important; -webkit-background-clip: unset !important; background-clip: unset !important;
+        -webkit-text-fill-color: #0d9488 !important;
       }
       .horeca-clasico .bg-teal-500\\/15 { background-color: rgba(14,165,233,0.12) !important; }
       .horeca-clasico .border-teal-500\\/30, .horeca-clasico .border-teal-400\\/60 { border-color: rgba(13,148,136,0.4) !important; }
+
+      /* Los <Modal> (ModalEditarReceta, etc.) viven bajo <body> vía portal y
+         siempre deben verse oscuro/Aurora — ver Modal en este mismo archivo —
+         sin importar si Modo Clásico está activo. Estos contra-overrides
+         cancelan los de arriba SOLO dentro de .aurora-modal-dark, con mayor
+         especificidad (tres clases vs. dos) para ganarles pase lo que pase. */
+      .horeca-clasico .aurora-modal-dark.dark\\:text-white,
+      .horeca-clasico .aurora-modal-dark .dark\\:text-white,
+      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/90 { color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; }
+      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/80 { color: rgba(255,255,255,0.80) !important; -webkit-text-fill-color: rgba(255,255,255,0.80) !important; }
+      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/70 { color: rgba(255,255,255,0.70) !important; -webkit-text-fill-color: rgba(255,255,255,0.70) !important; }
+      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/60 { color: rgba(255,255,255,0.60) !important; -webkit-text-fill-color: rgba(255,255,255,0.60) !important; }
+      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/50 { color: rgba(255,255,255,0.50) !important; -webkit-text-fill-color: rgba(255,255,255,0.50) !important; }
+      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/40 { color: rgba(255,255,255,0.40) !important; -webkit-text-fill-color: rgba(255,255,255,0.40) !important; }
+      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/30 { color: rgba(255,255,255,0.30) !important; -webkit-text-fill-color: rgba(255,255,255,0.30) !important; }
+      .horeca-clasico .aurora-modal-dark .text-slate-900,
+      .horeca-clasico .aurora-modal-dark h1, .horeca-clasico .aurora-modal-dark h2,
+      .horeca-clasico .aurora-modal-dark h3, .horeca-clasico .aurora-modal-dark h4,
+      .horeca-clasico .aurora-modal-dark strong { color: #ffffff !important; }
+      .horeca-clasico .aurora-modal-dark input,
+      .horeca-clasico .aurora-modal-dark select,
+      .horeca-clasico .aurora-modal-dark textarea {
+        background: rgba(255,255,255,0.04) !important;
+        border-color: rgba(255,255,255,0.10) !important;
+        color: #ffffff !important;
+      }
     `}</style>
   );
 }
@@ -271,6 +301,18 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const [kdsCounts, setKdsCounts] = useState<number>(0);
   const [tasaBcv, setTasaBcv] = useState<TasaCambio | null>(null);
   const [tasaCop, setTasaCop] = useState<TasaCambio | null>(null);
+  // Cada origen (BCV, USDT, PERSONALIZADA) es una serie independiente en el backend —
+  // se consulta por separado para que el toggle de TasaBadge muestre lo que de verdad
+  // quedó guardado en cada una, no un valor en caché local que puede desincronizarse.
+  const [tasaPorOrigen, setTasaPorOrigen] = useState<Record<"BCV" | "USDT" | "PERSONALIZADA", TasaCambio | null>>({
+    BCV: null, USDT: null, PERSONALIZADA: null
+  });
+  // Cuál de las tres gobierna el cobro en el POS: decisión de negocio (Configuración >
+  // Tasa activa para el POS), no una preferencia de este navegador.
+  const [origenTasaActiva, setOrigenTasaActiva] = useState<OrigenTasaActiva>("USDT");
+  useEffect(() => {
+    obtenerOrigenTasaActiva().then((r) => setOrigenTasaActiva(r.origenTasaActiva)).catch(() => {});
+  }, [tenantId]);
 
   const recargarTodo = () => {
     mapaDeMesas().then(setMapa).catch(() => setMapa([]));
@@ -281,6 +323,11 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     alertasVencimiento(tenantId, 7).then(setLotesPorVencer).catch(() => setLotesPorVencer([]));
     tasaVigente(tenantId, "USD", "VES").then(setTasaBcv).catch(() => setTasaBcv(null));
     tasaVigente(tenantId, "USD", "COP").then(setTasaCop).catch(() => setTasaCop(null));
+    (["BCV", "USDT", "PERSONALIZADA"] as const).forEach((origen) => {
+      tasaVigente(tenantId, "USD", "VES", origen)
+        .then((t) => setTasaPorOrigen((prev) => ({ ...prev, [origen]: t })))
+        .catch(() => setTasaPorOrigen((prev) => ({ ...prev, [origen]: null })));
+    });
     cargarVentasHoy();
     Promise.all(ESTACIONES.map((e) => obtenerTableroKds(e).catch(() => [])))
       .then((listas) => setKdsCounts(listas.reduce((sum, l) => sum + l.filter((i) => i.estadoItem !== "ENTREGADO").length, 0)))
@@ -412,7 +459,14 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             <div className="text-xs text-right hidden sm:block">
               <div className="font-bold text-slate-900 dark:text-white">{config.nombreLocal}</div>
             </div>
-            <TasaBadge tenantId={tenantId} tasaBcv={tasaBcv} tasaCop={tasaCop} onActualizadaBcv={setTasaBcv} onActualizadaCop={setTasaCop} />
+            <TasaBadge
+              tenantId={tenantId}
+              tasaPorOrigen={tasaPorOrigen}
+              tasaCop={tasaCop}
+              origenTasaActiva={origenTasaActiva}
+              onActualizadaPorOrigen={(origen, t) => setTasaPorOrigen((prev) => ({ ...prev, [origen]: t }))}
+              onActualizadaCop={setTasaCop}
+            />
             <button onClick={recargarTodo} className="p-2 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
               <IconRefresh size={16} />
             </button>
@@ -729,38 +783,35 @@ function ModalDividirCuenta({
 // ══════════════════════════════════════════════════════════════════════════
 // MULTI-TASA BADGE (BCV / USDT / COP / PERSONALIZADA)
 // ══════════════════════════════════════════════════════════════════════════
-function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizadaCop }: {
-  tenantId: number; tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null;
-  onActualizadaBcv: (t: TasaCambio) => void; onActualizadaCop: (t: TasaCambio) => void;
+function TasaBadge({ tenantId, tasaPorOrigen, tasaCop, origenTasaActiva, onActualizadaPorOrigen, onActualizadaCop }: {
+  tenantId: number;
+  tasaPorOrigen: Record<"BCV" | "USDT" | "PERSONALIZADA", TasaCambio | null>;
+  tasaCop: TasaCambio | null;
+  // Cuál gobierna el cobro en el POS: decisión de negocio (Configuración > Tasa activa),
+  // no una preferencia de este navegador — así todas las terminales del mismo negocio
+  // ven y cobran con la misma tasa.
+  origenTasaActiva: "USDT" | "BCV" | "PERSONALIZADA";
+  onActualizadaPorOrigen: (origen: "BCV" | "USDT" | "PERSONALIZADA", t: TasaCambio) => void;
+  onActualizadaCop: (t: TasaCambio) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
-  const [tipoActivo, setTipoActivo] = useState<"USDT" | "BCV" | "PERSONALIZADA">(() => {
-    try {
-      const guardado = localStorage.getItem("aurora_tipo_tasa_activa");
-      return (guardado as "USDT" | "BCV" | "PERSONALIZADA") || "USDT";
-    } catch {
-      return "USDT";
-    }
-  });
+  const tipoActivo = origenTasaActiva;
 
-  const [tasaBcvVal, setTasaBcvVal] = useState("");
-  const [tasaUsdtVal, setTasaUsdtVal] = useState(() => {
-    try { return localStorage.getItem("aurora_tasa_usdt_val") || "65.50"; } catch { return "65.50"; }
-  });
   const [tasaCopVal, setTasaCopVal] = useState("");
-  const [tasaPersVal, setTasaPersVal] = useState(() => {
-    try { return localStorage.getItem("aurora_tasa_pers_val") || ""; } catch { return ""; }
-  });
+  const [tasaPersVal, setTasaPersVal] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [actualizandoExterna, setActualizandoExterna] = useState<"BCV" | "USDT" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
+  // Solo COP y Propia son campos que el negocio escribe a mano — BCV y USDT/P2P vienen de
+  // una fuente pública (ver refrescarExterna), así que se prellenan pero no se editan.
   useEffect(() => {
     if (!abierto) return;
-    setTasaBcvVal(tasaBcv ? String(Number(tasaBcv.tasa)) : "");
+    setTasaPersVal(tasaPorOrigen.PERSONALIZADA ? String(Number(tasaPorOrigen.PERSONALIZADA.tasa)) : "");
     setTasaCopVal(tasaCop ? String(Number(tasaCop.tasa)) : "");
     setError(null);
-  }, [abierto, tasaBcv, tasaCop]);
+  }, [abierto, tasaPorOrigen, tasaCop]);
 
   useEffect(() => {
     if (!abierto) return;
@@ -773,53 +824,51 @@ function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizada
     return () => { document.removeEventListener("mousedown", handler); document.removeEventListener("keydown", handlerEsc); };
   }, [abierto]);
 
-  const guardarTipoActivo = (tipo: "USDT" | "BCV" | "PERSONALIZADA") => {
-    setTipoActivo(tipo);
-    try { localStorage.setItem("aurora_tipo_tasa_activa", tipo); } catch {}
+  // Refleja SIEMPRE lo persistido en el backend para el origen activo — nunca lo que
+  // haya en los inputs del popover (esos son borrador hasta que se guarda).
+  const tasaActivaNumero = useMemo(() => {
+    const vigente = tasaPorOrigen[tipoActivo];
+    return vigente ? Number(vigente.tasa) : 0;
+  }, [tipoActivo, tasaPorOrigen]);
+
+  // BCV y USDT/P2P no las escribe el negocio: se consultan en vivo de su fuente pública real
+  // (BCV oficial / Binance P2P) y se guardan tal cual — nunca un número tecleado a mano.
+  const refrescarExterna = async (tipo: "BCV" | "USDT") => {
+    setActualizandoExterna(tipo);
+    setError(null);
+    try {
+      const fuente = tipo === "USDT" ? "BINANCE" : "BCV";
+      const nueva = await actualizarTasaExterna(fuente, "VES");
+      onActualizadaPorOrigen(tipo, {
+        id: nueva.id, tenantId, monedaOrigen: nueva.monedaOrigen, monedaDestino: nueva.monedaDestino,
+        tasa: nueva.tasa, origen: nueva.origenApi, fechaActualizacion: nueva.fechaActualizacion
+      });
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo consultar la tasa pública.");
+    } finally {
+      setActualizandoExterna(null);
+    }
   };
 
-  const tasaActivaNumero = useMemo(() => {
-    if (tipoActivo === "USDT") return Number(tasaUsdtVal) || (tasaBcv ? Number(tasaBcv.tasa) : 0);
-    if (tipoActivo === "BCV") return tasaBcv ? Number(tasaBcv.tasa) : (Number(tasaUsdtVal) || 0);
-    return Number(tasaPersVal) || (tasaBcv ? Number(tasaBcv.tasa) : 0);
-  }, [tipoActivo, tasaUsdtVal, tasaBcv, tasaPersVal]);
-
   const actualizar = async () => {
-    const vBcv = Number(tasaBcvVal);
-    const vUsdt = Number(tasaUsdtVal);
     const vCop = Number(tasaCopVal);
     const vPers = Number(tasaPersVal);
 
-    if (vBcv <= 0 && vUsdt <= 0 && vCop <= 0 && vPers <= 0) {
+    if (vCop <= 0 && vPers <= 0) {
       setError("Ingresa al menos una tasa mayor a cero");
       return;
     }
     setGuardando(true);
     setError(null);
     try {
-      try {
-        localStorage.setItem("aurora_tipo_tasa_activa", tipoActivo);
-        if (vUsdt > 0) localStorage.setItem("aurora_tasa_usdt_val", String(vUsdt));
-        if (vPers > 0) localStorage.setItem("aurora_tasa_pers_val", String(vPers));
-      } catch {}
-
       const tareas: Promise<void>[] = [];
-      const tasaPrincipal = tipoActivo === "USDT" ? (vUsdt > 0 ? vUsdt : vBcv) : (vBcv > 0 ? vBcv : vUsdt);
-      if (tasaPrincipal > 0) {
-        tareas.push(actualizarTasa(tenantId, {
-          monedaOrigen: "USD",
-          monedaDestino: "VES",
-          tasa: tasaPrincipal,
-          origen: tipoActivo
-        }).then(onActualizadaBcv));
+      if (vPers > 0) {
+        tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: vPers, origen: "PERSONALIZADA" })
+          .then((t) => onActualizadaPorOrigen("PERSONALIZADA", t)));
       }
       if (vCop > 0) {
-        tareas.push(actualizarTasa(tenantId, {
-          monedaOrigen: "USD",
-          monedaDestino: "COP",
-          tasa: vCop,
-          origen: "MANUAL"
-        }).then(onActualizadaCop));
+        tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: vCop, origen: "MANUAL" })
+          .then(onActualizadaCop));
       }
       await Promise.all(tareas);
       setAbierto(false);
@@ -835,7 +884,7 @@ function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizada
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        title="Clic para cambiar o configurar tasas (USDT / BCV / COP)"
+        title="Ver o refrescar las tasas (USDT / BCV / COP / Propia)"
         className={`flex items-center gap-2 text-[11px] font-mono font-bold px-3 py-1.5 rounded-full cursor-pointer border transition-all shadow-sm ${
           tasaActivaNumero > 0
             ? tipoActivo === "USDT"
@@ -877,66 +926,38 @@ function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizada
             </button>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 dark:text-white/40 uppercase mb-1.5">
-              Tasa activa para cobro en POS:
-            </label>
-            <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
-              <button
-                type="button"
-                onClick={() => guardarTipoActivo("USDT")}
-                className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
-                  tipoActivo === "USDT"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10"
-                }`}
-              >
-                <IconCoins size={12} />
-                <span>USDT (P2P)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => guardarTipoActivo("BCV")}
-                className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
-                  tipoActivo === "BCV"
-                    ? "bg-teal-600 text-white shadow-sm"
-                    : "text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10"
-                }`}
-              >
-                <IconBank size={12} />
-                <span>BCV Oficial</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => guardarTipoActivo("PERSONALIZADA")}
-                className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
-                  tipoActivo === "PERSONALIZADA"
-                    ? "bg-amber-600 text-white shadow-sm"
-                    : "text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10"
-                }`}
-              >
-                <IconEdit size={12} />
-                <span>Propia</span>
-              </button>
+          <div className="flex items-center justify-between gap-2 bg-slate-100 dark:bg-white/5 rounded-xl p-2.5">
+            <div>
+              <p className="text-[10px] font-bold text-slate-500 dark:text-white/40 uppercase">Gobierna el cobro en POS</p>
+              <p className="text-xs font-bold text-slate-800 dark:text-white mt-0.5">
+                {tipoActivo === "USDT" ? "USDT (P2P)" : tipoActivo === "BCV" ? "BCV Oficial" : "Propia"}
+              </p>
             </div>
+            <span className="text-[10px] text-slate-400 dark:text-white/40 text-right max-w-[130px]">
+              Se cambia en Configuración → Tasa activa para el POS
+            </span>
           </div>
 
           <div className="space-y-2 text-xs">
+            {/* USDT/P2P y BCV Oficial son cifras públicas que el negocio no controla — se
+                consultan en vivo con un clic, nunca se tipean. */}
             <div className="flex items-center gap-2">
               <span className="w-24 text-[10px] font-semibold text-slate-600 dark:text-white/70 flex items-center gap-1">
                 <IconCoins size={12} className="text-emerald-500 shrink-0" />
                 <span>USDT / P2P:</span>
               </span>
-              <input
-                value={tasaUsdtVal}
-                onChange={(e) => setTasaUsdtVal(e.target.value)}
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Ej. 65.50"
-                className="input-horeca flex-1 py-1.5 text-xs font-mono font-bold"
-              />
-              <span className="text-[10px] text-slate-400">Bs</span>
+              <span className="flex-1 font-mono font-bold text-slate-800 dark:text-white">
+                {tasaPorOrigen.USDT ? `Bs. ${fmtTasa(Number(tasaPorOrigen.USDT.tasa))}` : "Sin consultar"}
+              </span>
+              <button
+                type="button"
+                onClick={() => void refrescarExterna("USDT")}
+                disabled={actualizandoExterna !== null}
+                title="Consultar en vivo (Binance P2P)"
+                className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 disabled:opacity-50 cursor-pointer"
+              >
+                <IconRefresh size={12} className={actualizandoExterna === "USDT" ? "animate-spin" : ""} />
+              </button>
             </div>
 
             <div className="flex items-center gap-2">
@@ -944,16 +965,18 @@ function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizada
                 <IconBank size={12} className="text-teal-500 shrink-0" />
                 <span>BCV Oficial:</span>
               </span>
-              <input
-                value={tasaBcvVal}
-                onChange={(e) => setTasaBcvVal(e.target.value)}
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Ej. 56.40"
-                className="input-horeca flex-1 py-1.5 text-xs font-mono font-bold"
-              />
-              <span className="text-[10px] text-slate-400">Bs</span>
+              <span className="flex-1 font-mono font-bold text-slate-800 dark:text-white">
+                {tasaPorOrigen.BCV ? `Bs. ${fmtTasa(Number(tasaPorOrigen.BCV.tasa))}` : "Sin consultar"}
+              </span>
+              <button
+                type="button"
+                onClick={() => void refrescarExterna("BCV")}
+                disabled={actualizandoExterna !== null}
+                title="Consultar en vivo (BCV oficial)"
+                className="p-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 disabled:opacity-50 cursor-pointer"
+              >
+                <IconRefresh size={12} className={actualizandoExterna === "BCV" ? "animate-spin" : ""} />
+              </button>
             </div>
 
             <div className="flex items-center gap-2">
@@ -1000,7 +1023,7 @@ function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizada
             disabled={guardando}
             className="w-full btn-cyber-neon text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer disabled:opacity-60 shadow-md"
           >
-            {guardando ? "Actualizando tasas…" : "Guardar y aplicar tasas"}
+            {guardando ? "Guardando…" : "Guardar COP / Propia"}
           </button>
         </div>
       )}
@@ -1008,31 +1031,30 @@ function TasaBadge({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizada
   );
 }
 
-/** Tasa del día requerida para operar el POS (USDT o BCV) */
+/**
+ * Tasa del día requerida para operar el POS (USDT P2P o BCV oficial). Ninguna de las dos se
+ * tipea: son cifras públicas que el negocio no controla, así que este modal las consulta en
+ * vivo con un clic — nunca ofrece un campo numérico para "inventarlas".
+ */
 function ModalTasaRequerida({ tenantId, onCancelar, onRegistrada }: {
   tenantId: number; onCancelar: () => void; onRegistrada: () => void;
 }) {
   const [tipo, setTipo] = useState<"USDT" | "BCV">("USDT");
-  const [tasa, setTasa] = useState("65.50");
-  const [guardando, setGuardando] = useState(false);
+  const [consultando, setConsultando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const guardar = async () => {
-    const valor = Number(tasa);
-    if (!valor || valor <= 0) { setError("Ingresa una tasa válida mayor a cero"); return; }
-    setGuardando(true);
+  const consultarYAplicar = async () => {
+    setConsultando(true);
     setError(null);
     try {
-      try {
-        localStorage.setItem("aurora_tipo_tasa_activa", tipo);
-        if (tipo === "USDT") localStorage.setItem("aurora_tasa_usdt_val", String(valor));
-      } catch {}
-      await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: valor, origen: tipo });
+      await actualizarOrigenTasaActiva(tipo);
+      const fuente = tipo === "USDT" ? "BINANCE" : "BCV";
+      await actualizarTasaExterna(fuente, "VES");
       onRegistrada();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo registrar la tasa");
+      setError(e instanceof ApiError ? e.message : "No se pudo consultar la tasa pública.");
     } finally {
-      setGuardando(false);
+      setConsultando(false);
     }
   };
 
@@ -1042,14 +1064,14 @@ function ModalTasaRequerida({ tenantId, onCancelar, onRegistrada }: {
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center flex-shrink-0"><IconWarning size={20} /></div>
           <p className="text-sm text-slate-600 dark:text-white/70">
-            Para calcular totales y vueltos en bolívares, selecciona la tasa de hoy.
-            Puedes usar <strong>USDT P2P</strong> (San Cristóbal / Frontera) o <strong>BCV Oficial</strong>.
+            Para calcular totales y vueltos en bolívares, elige qué referencia pública consultar hoy:
+            <strong> USDT P2P</strong> (San Cristóbal / Frontera) o <strong>BCV Oficial</strong>.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
           <button
             type="button"
-            onClick={() => { setTipo("USDT"); if (tasa === "56.40") setTasa("65.50"); }}
+            onClick={() => setTipo("USDT")}
             className={`py-2 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
               tipo === "USDT" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 dark:text-white/60"
             }`}
@@ -1059,7 +1081,7 @@ function ModalTasaRequerida({ tenantId, onCancelar, onRegistrada }: {
           </button>
           <button
             type="button"
-            onClick={() => { setTipo("BCV"); if (tasa === "65.50") setTasa("56.40"); }}
+            onClick={() => setTipo("BCV")}
             className={`py-2 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
               tipo === "BCV" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 dark:text-white/60"
             }`}
@@ -1068,15 +1090,9 @@ function ModalTasaRequerida({ tenantId, onCancelar, onRegistrada }: {
             <span>Tasa BCV Oficial</span>
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-500 dark:text-white/40 whitespace-nowrap">1 USD =</span>
-          <input value={tasa} onChange={(e) => setTasa(e.target.value)} type="number" step="0.01" min="0" placeholder={tipo === "USDT" ? "Ej. 65.50" : "Ej. 56.40"}
-            className="input-horeca flex-1 font-mono font-bold" autoFocus onKeyDown={(e) => e.key === "Enter" && guardar()} />
-          <span className="text-xs font-semibold text-slate-500 dark:text-white/40">Bs</span>
-        </div>
         {error && <p className="text-xs text-red-500">{error}</p>}
-        <button onClick={guardar} disabled={guardando} className="w-full btn-cyber-neon text-white text-sm font-bold py-3 rounded-xl cursor-pointer disabled:opacity-60">
-          {guardando ? "Guardando…" : "Aplicar tasa y continuar"}
+        <button onClick={() => void consultarYAplicar()} disabled={consultando} className="w-full btn-cyber-neon text-white text-sm font-bold py-3 rounded-xl cursor-pointer disabled:opacity-60">
+          {consultando ? "Consultando…" : `Consultar ${tipo === "USDT" ? "Binance P2P" : "BCV oficial"} y continuar`}
         </button>
       </div>
     </Modal>
@@ -2645,7 +2661,7 @@ function ModalEditarReceta({
               {/* Precio de Venta */}
               <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700">
                 <span className="text-[11px] text-slate-400 uppercase font-semibold block">Precio de Venta</span>
-                <div className="text-xl font-bold font-mono text-sky-400 mt-1">
+                <div className="text-xl font-bold font-mono text-teal-400 mt-1">
                   ${precioNumEnVivo.toFixed(2)}
                 </div>
                 <span className="text-[10px] text-slate-400">Definido en el plato</span>
@@ -2706,7 +2722,7 @@ function ModalEditarReceta({
                     const isEditing = d.id === editandoDetalleId;
 
                     return (
-                      <tr key={d.id} className={isEditing ? "bg-sky-500/5 dark:bg-sky-500/10" : "hover:bg-slate-50 dark:hover:bg-white/5"}>
+                      <tr key={d.id} className={isEditing ? "bg-[#35d7c3]/5 dark:bg-[#35d7c3]/10" : "hover:bg-slate-50 dark:hover:bg-white/5"}>
                         {/* Nombre del insumo */}
                         <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-white">
                           <div>{met.nombre}</div>
@@ -2736,7 +2752,7 @@ function ModalEditarReceta({
                                   <span className="text-[9px] text-slate-400 block">% Merma</span>
                                 </div>
                               )}
-                              <span className="text-[10px] font-mono text-sky-500">
+                              <span className="text-[10px] font-mono text-teal-500">
                                 → Bruto: {met.cantBruta.toFixed(3)}
                               </span>
                             </div>
@@ -2778,7 +2794,7 @@ function ModalEditarReceta({
                             <div className="flex items-center justify-center gap-1">
                               <button onClick={() => iniciarEdicionDetalle(d)}
                                 title="Editar cantidad o merma"
-                                className="text-slate-400 hover:text-sky-500 p-1.5 rounded-lg hover:bg-sky-500/10 cursor-pointer">
+                                className="text-slate-400 hover:text-teal-500 p-1.5 rounded-lg hover:bg-teal-500/10 cursor-pointer">
                                 <IconEdit size={13} />
                               </button>
                               <button onClick={() => eliminarDetalle(d.id, met.nombre)}
@@ -2807,13 +2823,13 @@ function ModalEditarReceta({
             <div className="flex gap-2 text-xs">
               <button onClick={() => { setTipoNuevo("articulo"); setError(null); }}
                 className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition-colors ${
-                  tipoNuevo === "articulo" ? "bg-sky-500 text-white" : "bg-slate-200/60 dark:bg-white/10 text-slate-600 dark:text-white/60"
+                  tipoNuevo === "articulo" ? "btn-cyber-neon" : "bg-slate-200/60 dark:bg-white/10 text-slate-600 dark:text-white/60"
                 }`}>
                 Insumo de Inventario
               </button>
               <button onClick={() => { setTipoNuevo("subreceta"); setError(null); }}
                 className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition-colors ${
-                  tipoNuevo === "subreceta" ? "bg-sky-500 text-white" : "bg-slate-200/60 dark:bg-white/10 text-slate-600 dark:text-white/60"
+                  tipoNuevo === "subreceta" ? "btn-cyber-neon" : "bg-slate-200/60 dark:bg-white/10 text-slate-600 dark:text-white/60"
                 }`}>
                 Sub-receta
               </button>
@@ -2823,6 +2839,7 @@ function ModalEditarReceta({
           {tipoNuevo === "articulo" ? (
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
               <div className="sm:col-span-2">
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">Insumo del inventario</label>
                 <select value={nuevoArticuloId} onChange={(e) => setNuevoArticuloId(e.target.value)} className="input-horeca w-full text-xs">
                   <option value="">— Elegir insumo de inventario —</option>
                   {(articulos || []).map((a) => (
@@ -2833,17 +2850,20 @@ function ModalEditarReceta({
                 </select>
               </div>
               <div>
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">Peso neto / cantidad</label>
                 <input value={nuevoPesoNeto} onChange={(e) => setNuevoPesoNeto(e.target.value)}
-                  type="number" step="0.001" placeholder="Peso neto / cantidad" className="input-horeca w-full text-xs" />
+                  type="number" step="0.001" placeholder="Ej. 0.200" className="input-horeca w-full text-xs" />
               </div>
               <div>
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">% Merma</label>
                 <input value={nuevoMerma} onChange={(e) => setNuevoMerma(e.target.value)}
-                  type="number" step="0.1" placeholder="% Merma" className="input-horeca w-full text-xs" />
+                  type="number" step="0.1" placeholder="Ej. 5" className="input-horeca w-full text-xs" />
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div className="sm:col-span-2">
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">Sub-receta</label>
                 <select value={nuevoSubRecetaId} onChange={(e) => setNuevoSubRecetaId(e.target.value)} className="input-horeca w-full text-xs">
                   <option value="">— Elegir sub-receta —</option>
                   {(escandallos || []).filter((s) => s.id !== receta.id).map((s) => (
@@ -2854,15 +2874,16 @@ function ModalEditarReceta({
                 </select>
               </div>
               <div>
+                <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 mb-1">Cantidad de raciones</label>
                 <input value={nuevoPesoNeto} onChange={(e) => setNuevoPesoNeto(e.target.value)}
-                  type="number" step="0.01" placeholder="Cantidad raciones" className="input-horeca w-full text-xs" />
+                  type="number" step="0.01" placeholder="Ej. 1" className="input-horeca w-full text-xs" />
               </div>
             </div>
           )}
 
           {/* Vista previa en tiempo real antes de guardar */}
           {previewNuevo && (
-            <div className="flex items-center justify-between text-xs bg-sky-500/10 border border-sky-500/20 rounded-xl px-3 py-2 text-sky-700 dark:text-sky-300">
+            <div className="flex items-center justify-between text-xs bg-[#35d7c3]/10 border border-[#35d7c3]/25 rounded-xl px-3 py-2 text-teal-700 dark:text-teal-300">
               <span>
                 Cálculo previo: <strong>{previewNuevo.cantBruta.toFixed(3)} {previewNuevo.unidad}</strong> × ${previewNuevo.unit.toFixed(3)}
               </span>
@@ -4546,6 +4567,7 @@ function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; conf
       </div>
 
       <MonedaBaseNegocio />
+      <OrigenTasaActivaConfig />
 
       <div className="apple-glass rounded-2xl p-6 space-y-4">
         <div>
@@ -4679,6 +4701,71 @@ function MonedaBaseNegocio() {
         ))}
         {guardando && <span className="text-[11px] text-slate-400">Guardando…</span>}
         {guardado && <span className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold">✓ Guardado</span>}
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Cuál de las tres tasas gobierna el cobro en el POS: BCV oficial, USDT/P2P (ambas se
+ * consultan solas de su fuente pública, el negocio no las escribe) o Propia (la única que sí
+ * define el negocio). Antes esto vivía como un toggle en localStorage del navegador — cada
+ * terminal podía terminar cobrando con una tasa distinta. Ahora es una decisión de negocio
+ * (Dueño/Administrador), igual que la moneda principal.
+ */
+function OrigenTasaActivaConfig() {
+  const [origen, setOrigen] = useState<OrigenTasaActiva | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [guardado, setGuardado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    obtenerOrigenTasaActiva().then((r) => setOrigen(r.origenTasaActiva)).catch(() => setOrigen("USDT"));
+  }, []);
+
+  const cambiar = async (nuevo: OrigenTasaActiva) => {
+    if (nuevo === origen) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      const r = await actualizarOrigenTasaActiva(nuevo);
+      setOrigen(r.origenTasaActiva);
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cambiar la tasa activa");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const OPCIONES: { id: OrigenTasaActiva; label: string; Icon: typeof IconCoins }[] = [
+    { id: "USDT", label: "USDT / P2P", Icon: IconCoins },
+    { id: "BCV", label: "BCV Oficial", Icon: IconBank },
+    { id: "PERSONALIZADA", label: "Propia", Icon: IconEdit },
+  ];
+
+  return (
+    <div className="apple-glass rounded-2xl p-6 space-y-4">
+      <div>
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Tasa activa para el POS</h3>
+        <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">
+          Cuál referencia usa la caja para calcular totales y vueltos en bolívares. BCV y USDT/P2P se consultan solas de su fuente pública — solo Propia la define este negocio.
+        </p>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {OPCIONES.map(({ id, label, Icon }) => (
+          <button key={id} type="button" onClick={() => cambiar(id)} disabled={guardando || origen === null}
+            className={`py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+              origen === id ? "bg-teal-600 text-white" : "bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-300/60 dark:hover:bg-white/15"
+            }`}>
+            <Icon size={13} />
+            <span>{label}</span>
+          </button>
+        ))}
+        {guardando && <span className="text-[11px] text-slate-400 self-center">Guardando…</span>}
+        {guardado && <span className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold self-center">✓ Guardado</span>}
       </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
     </div>
@@ -6908,18 +6995,24 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
   const [cerrando, setCerrando] = useState(false);
   const [ultimoCierre, setUltimoCierre] = useState<Turno | null>(null);
 
+  // Tasas reales del negocio para convertir el arqueo desglosado — nunca un valor fijo
+  // inventado (65.50 / 4180 no son cifras reales, eran solo un placeholder que además
+  // podía desincronizarse de lo que en verdad se cobró en el POS).
+  const [tasaVesArqueo, setTasaVesArqueo] = useState<number | null>(null);
+  const [tasaCopArqueo, setTasaCopArqueo] = useState<number | null>(null);
+  useEffect(() => {
+    tasaVigente(tenantId, "USD", "VES").then((t) => setTasaVesArqueo(Number(t.tasa))).catch(() => setTasaVesArqueo(null));
+    tasaVigente(tenantId, "USD", "COP").then((t) => setTasaCopArqueo(Number(t.tasa))).catch(() => setTasaCopArqueo(null));
+  }, [tenantId]);
+
   const totalDesgloseCalculado = useMemo(() => {
     const usd = Number(desgloseArqueo.usd) || 0;
     const zelle = Number(desgloseArqueo.zelle) || 0;
     const ves = (Number(desgloseArqueo.ves) || 0) + (Number(desgloseArqueo.punto) || 0) + (Number(desgloseArqueo.pagoMovil) || 0);
     const cop = Number(desgloseArqueo.cop) || 0;
 
-    let tasaVes = 65.50;
-    let tasaCop = 4180;
-    try {
-      const u = localStorage.getItem("aurora_tasa_usdt_val");
-      if (u && Number(u) > 0) tasaVes = Number(u);
-    } catch {}
+    const tasaVes = tasaVesArqueo ?? 0;
+    const tasaCop = tasaCopArqueo ?? 0;
 
     if (moneda === "USD") {
       return usd + zelle + (tasaVes > 0 ? ves / tasaVes : 0) + (tasaCop > 0 ? cop / tasaCop : 0);
@@ -6928,7 +7021,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
     } else {
       return cop + (usd + zelle) * tasaCop;
     }
-  }, [desgloseArqueo, moneda]);
+  }, [desgloseArqueo, moneda, tasaVesArqueo, tasaCopArqueo]);
 
   const montoDeclaradoFinal = modoArqueo === "DESGLOSADO" ? totalDesgloseCalculado : (Number(montoDeclarado) || 0);
 
@@ -7757,18 +7850,19 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Modal({ titulo, onClose, children, ancho }: { titulo: string; onClose: () => void; children: React.ReactNode; ancho?: string }) {
-  // Fondo SIEMPRE claro y sólido a propósito, sin variante dark: en la
-  // tarjeta ni en el título — nada de apple-glass (translúcido, "casi
-  // invisible" fue el reporte exacto) ni de bg-white/dark:bg-slate-800
-  // (probado en vivo: con Modo Clásico activo, que es como corre esta
-  // vertical en la práctica, .horeca-clasico fuerza TODO texto con clase
-  // text-slate-900 — y cualquier <h1-4>/<strong> sin importar su clase —
-  // a un navy oscuro fijo por CSS global; combinado con un fondo
-  // genuinamente oscuro real (dark:bg-slate-800, activo porque <html>
-  // trae la clase "dark"), el resultado medido fue texto oscuro sobre
-  // fondo oscuro, invisible). Fijar la tarjeta a blanco/texto oscuro sin
-  // depender de dark: evita la colisión en el modo en que de verdad se
-  // usa la app.
+  // Fondo SIEMPRE oscuro Aurora (mismo look que el resto de la app: Centro
+  // Financiero, login, etc.) — antes esto estaba fijo a blanco/texto oscuro
+  // sin variante dark a propósito, porque con Modo Clásico activo
+  // (.horeca-clasico, aplicado a <body> mientras ese modo está encendido)
+  // el contenido interno usa clases dark:text-white/N que dependen de que
+  // algún ancestro tenga la clase "dark" — y el modal, aunque viva bajo
+  // <body>, no la tenía, así que ese texto se perdía. La clase "dark" de
+  // abajo la agrega LOCALMENTE este wrapper (ver @custom-variant dark en
+  // index.css: activa para .dark y sus descendientes) — así el modal
+  // siempre se ve oscuro con su texto claro, sin importar el tema global
+  // ni si Modo Clásico está prendido. Los contra-overrides específicos
+  // para cuando Modo Clásico SÍ está activo viven en EstiloClasico,
+  // scopeados a .aurora-modal-dark con mayor especificidad.
   // Portal a document.body: cualquier ancestro con backdrop-filter/filter/
   // transform (ej. .apple-glass, que trae backdrop-filter: blur(...)) crea
   // un containing block nuevo para position: fixed y "atrapa" al modal
@@ -7777,10 +7871,10 @@ function Modal({ titulo, onClose, children, ancho }: { titulo: string; onClose: 
   // importar qué ancestro lo dispare.
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className={`bg-white text-slate-900 rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-200`}>
+      <div onClick={(e) => e.stopPropagation()} className={`dark aurora-modal-dark bg-[#0b1220] text-white rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-white/10`}>
         <div className="flex items-center justify-between mb-4">
-          <div role="heading" aria-level={3} className="font-['Outfit'] font-bold text-lg text-slate-900">{titulo}</div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"><IconClose size={18} /></button>
+          <div role="heading" aria-level={3} className="font-['Outfit'] font-bold text-lg text-white">{titulo}</div>
+          <button onClick={onClose} className="text-white/40 hover:text-white cursor-pointer"><IconClose size={18} /></button>
         </div>
         {children}
       </div>

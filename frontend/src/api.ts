@@ -193,6 +193,21 @@ export function actualizarMonedaBaseNegocio(monedaBase: string): Promise<{ moned
   return request("/api/config/mi-negocio/moneda-base", { method: "PUT", body: JSON.stringify({ monedaBase }) });
 }
 
+export type OrigenTasaActiva = "BCV" | "USDT" | "PERSONALIZADA";
+
+/**
+ * Cuál tasa gobierna el cobro en el POS — decisión de negocio (Dueño/Administrador), no una
+ * preferencia por navegador. BCV y USDT no las escribe el negocio (se consultan en vivo con
+ * actualizarTasaExterna); PERSONALIZADA sí, vía actualizarTasa.
+ */
+export function obtenerOrigenTasaActiva(): Promise<{ origenTasaActiva: OrigenTasaActiva }> {
+  return request("/api/config/mi-negocio/origen-tasa");
+}
+
+export function actualizarOrigenTasaActiva(origenTasaActiva: OrigenTasaActiva): Promise<{ origenTasaActiva: OrigenTasaActiva }> {
+  return request("/api/config/mi-negocio/origen-tasa", { method: "PUT", body: JSON.stringify({ origenTasaActiva }) });
+}
+
 export interface DatosFiscalesNegocio {
   rif?: string;
   razonSocial?: string;
@@ -1425,8 +1440,15 @@ export interface TasaCambio {
   fechaActualizacion: string;
 }
 
-export function tasaVigente(tenantId: number, monedaOrigen: string, monedaDestino: string): Promise<TasaCambio> {
-  return request(`/api/financiero/tasas/vigente?tenantId=${tenantId}&monedaOrigen=${monedaOrigen}&monedaDestino=${monedaDestino}`);
+/**
+ * `origen` (BCV, USDT, PERSONALIZADA...) filtra a la tasa vigente de ESE origen
+ * específico — cada origen es una serie propia en el backend. Sin `origen`, trae
+ * la más reciente sin importar de qué origen vino (comportamiento histórico).
+ */
+export function tasaVigente(tenantId: number, monedaOrigen: string, monedaDestino: string, origen?: string): Promise<TasaCambio> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), monedaOrigen, monedaDestino });
+  if (origen) params.set("origen", origen);
+  return request(`/api/financiero/tasas/vigente?${params.toString()}`);
 }
 
 export function actualizarTasa(tenantId: number, datos: { monedaOrigen: string; monedaDestino: string; tasa: number; origen?: string }): Promise<TasaCambio> {
@@ -2874,6 +2896,51 @@ export interface EmpresaKpiResponse {
 export function obtenerEmpresaKpis(desde: string, hasta: string): Promise<EmpresaKpiResponse> {
   const params = new URLSearchParams({ desde, hasta });
   return request(`/api/empresa/kpis?${params.toString()}`);
+}
+
+// --- Tasas de cambio (USD/VES) ---
+
+// BCV y BINANCE: ambas son cifras públicas que el negocio no controla, a diferencia de una
+// tasa "PERSONALIZADA" que sí define el negocio a mano. BINANCE se guarda internamente con
+// origen "USDT" (ver TasaCambioController.actualizarExterna) — es el mismo concepto de
+// negocio que la tasa USDT/P2P del POS.
+export type FuenteTasaCambio = "BCV" | "BINANCE";
+
+export interface TasaCambioResponse {
+  id: number;
+  monedaOrigen: string;
+  monedaDestino: string;
+  tasa: number;
+  fechaActualizacion: string;
+  origenApi: string;
+  obsoleta: boolean;
+  horasSinActualizar: number;
+}
+
+/** Tasa vigente (la más reciente) entre dos monedas para el tenant en sesión. Null si aún no hay ninguna registrada. */
+export async function obtenerTasaVigente(monedaOrigen: string, monedaDestino: string): Promise<TasaCambioResponse | null> {
+  const sesion = leerSesion();
+  if (!sesion) return null;
+  const params = new URLSearchParams({ tenantId: String(sesion.tenantId), monedaOrigen, monedaDestino });
+  try {
+    return await request<TasaCambioResponse>(`/api/financiero/tasas/vigente?${params.toString()}`);
+  } catch (err) {
+    if (err instanceof ApiError && /400/.test(err.message)) return null;
+    throw err;
+  }
+}
+
+/**
+ * Refresca la tasa USD/VES consultando en vivo una fuente pública (BCV oficial
+ * o Binance P2P) y la registra como tasa nueva. Si la fuente falla, el backend
+ * no escribe nada y esta llamada lanza ApiError con el motivo real — nunca se
+ * simula un valor.
+ */
+export function actualizarTasaExterna(fuente: FuenteTasaCambio, monedaDestino: string = "VES"): Promise<TasaCambioResponse> {
+  const sesion = leerSesion();
+  if (!sesion) throw new ApiError("Sesión vencida — redirigiendo al login", 401);
+  const params = new URLSearchParams({ tenantId: String(sesion.tenantId), fuente, monedaDestino });
+  return request(`/api/financiero/tasas/actualizar-externa?${params.toString()}`, { method: "POST" });
 }
 
 // --- Personal y Aurora Nómina ---

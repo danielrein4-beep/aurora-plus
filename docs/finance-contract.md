@@ -297,7 +297,7 @@ src/main/java/com/auroraplus/core/kpi/dto/EmpresaKpiDTO.java
 ```
 src/main/java/com/auroraplus/core/financiero/entities/MovimientoCaja.java          (+3 columnas)
 src/main/java/com/auroraplus/core/financiero/services/MotorFinancieroService.java  (+overload con moduloOrigen/referenciaTipo/referenciaId)
-src/main/resources/db/migration/V12__trazabilidad_movimiento_caja_y_costo_moda.sql
+src/main/resources/db/migration/V15__trazabilidad_movimiento_caja_y_costo_moda.sql
 ```
 
 ### Se modifica ahora — Moda (§3.1)
