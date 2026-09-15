@@ -961,14 +961,14 @@ export function listarArticulos(): Promise<Articulo[]> {
 // costoUnitario va tal cual lo tecleó el usuario en `monedaCosto` (o en la
 // moneda base del tenant si se omite) — el backend lo convierte a la
 // moneda base antes de guardar.
-export function crearArticulo(datos: { sku: string; nombre: string; unidadMedida?: string; categoria?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; monedaCosto?: string; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
+export function crearArticulo(datos: { sku: string; nombre: string; unidadMedida?: string; categoria?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; monedaCosto?: string; tasaCambioAplicada?: number; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
   return request(`/api/inventario/articulos`, { method: "POST", body: JSON.stringify(datos) });
 }
 
 // costoUnitario va tal cual lo tecleó el usuario en `moneda` (o en la moneda
 // base del tenant si se omite) — el backend lo convierte a la moneda base
 // antes de guardar.
-export function entradaArticulo(articuloId: number, datos: { cantidad: number; costoUnitario?: number; motivo?: string; fechaVencimiento?: string; metodoPago?: string; moneda?: string }): Promise<unknown> {
+export function entradaArticulo(articuloId: number, datos: { cantidad: number; costoUnitario?: number; motivo?: string; fechaVencimiento?: string; metodoPago?: string; moneda?: string; tasaCambioAplicada?: number }): Promise<unknown> {
   return request(`/api/inventario/articulos/${articuloId}/entrada`, { method: "POST", body: JSON.stringify(datos) });
 }
 
