@@ -12,6 +12,8 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useAuth } from "../context/AuthContext";
+import { CentroFinanciero } from "../pages/CentroFinanciero";
+import { PersonalPage } from "../pages/Personal";
 import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
   dividirCuenta, cerrarComandaMixto, anularComanda, listarEscandallos, crearEscandallo, editarEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo, editarIngredienteEscandallo, eliminarIngredienteEscandallo, recalcularCostoEscandallo,
@@ -33,7 +35,7 @@ import {
   type FacturaExtraidaOcr,
 } from "../api";
 
-type Pagina = "general" | "resumen" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
+type Pagina = "general" | "resumen" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion" | "finanzas" | "personal";
 
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
@@ -61,6 +63,8 @@ const NAV_GRUPOS: NavGrupo[] = [
       { id: "administracion", label: "Administración", Icon: IconBank },
       { id: "reportes", label: "Reportes Operativos", Icon: IconChart },
       { id: "estadisticas", label: "Estadísticas", Icon: IconRocket },
+      { id: "finanzas", label: "Finanzas", Icon: IconBank },
+      { id: "personal", label: "Personal & Nómina", Icon: IconUsers },
       { id: "configuracion", label: "Configuración", Icon: IconCustomize },
     ],
   },
@@ -464,6 +468,8 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "clientes" && <Clientes tenantId={tenantId} />}
           {pagina === "administracion" && <Administracion tenantId={tenantId} monedasActivas={{ ...MONEDAS_POR_DEFECTO, ...(config.monedasActivas || {}) }} />}
           {pagina === "estadisticas" && <ResumenFinanciero tenantId={tenantId} />}
+          {pagina === "finanzas" && <CentroFinanciero embedded />}
+          {pagina === "personal" && <PersonalPage embedded />}
           {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
           {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
         </div>

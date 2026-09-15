@@ -107,7 +107,7 @@ const PERIODO_VACIO: PeriodoNomina = {
   monedaPrincipal: 'USD', recibos: [], historialAjustes: [],
 };
 
-export const PersonalPage: React.FC = () => {
+export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const [seccionActiva, setSeccionActiva] = useState<SeccionPersonal>('resumen');
   
   // Regla estricta: Salarios OCULTOS por defecto en la interfaz
@@ -245,12 +245,12 @@ export const PersonalPage: React.FC = () => {
   const todosRecibos = periodosNomina.flatMap((p) => p.recibos);
 
   return (
-    <div className="min-h-screen bg-[#0b111e] text-[#f8fafc] font-sans antialiased selection:bg-[#35d7c3] selection:text-black">
+    <div className={`${embedded ? 'min-h-0 bg-transparent' : 'min-h-screen bg-[#0b111e]'} text-[#f8fafc] font-sans antialiased selection:bg-[#35d7c3] selection:text-black`}>
       {/* Contenedor Principal Responsive (desde 360px) */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
-        <Link to="/dashboard" className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium text-[#94a3b8] hover:text-[#35d7c3] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]">
+        {!embedded && <Link to="/dashboard" className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium text-[#94a3b8] hover:text-[#35d7c3] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]">
           ← Volver al Hub
-        </Link>
+        </Link>}
         {/* Cabecera Superior del Módulo */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#1e2d48]">
           <div className="space-y-1">
