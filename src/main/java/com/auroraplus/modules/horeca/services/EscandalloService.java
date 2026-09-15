@@ -1,5 +1,6 @@
 package com.auroraplus.modules.horeca.services;
 
+import com.auroraplus.core.financiero.services.MotorFinancieroService;
 import com.auroraplus.core.inventario.entities.Articulo;
 import com.auroraplus.core.inventario.entities.Kardex;
 import com.auroraplus.core.inventario.repositories.ArticuloRepository;
@@ -31,6 +32,51 @@ public class EscandalloService {
 
     @Autowired
     private InventarioService inventarioService;
+
+    @Autowired(required = false)
+    private MotorFinancieroService motorFinancieroService;
+
+    /**
+     * Obtiene el costo unitario del ingrediente convertido a la moneda del plato (moneda base USD),
+     * dividiendo lógicamente entre la tasa de cambio correspondiente (ej. COP / tasaCop, VES / tasaBcv).
+     */
+    public BigDecimal obtenerCostoUnitarioParaReceta(Articulo articulo, Long tenantId) {
+        if (articulo == null || articulo.getCostoUnitario() == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal costo = articulo.getCostoUnitario();
+        String moneda = articulo.getMonedaCosto();
+
+        boolean esCop = "COP".equalsIgnoreCase(moneda);
+        if (!esCop && (moneda == null || "USD".equalsIgnoreCase(moneda))) {
+            if (costo.compareTo(new BigDecimal("100")) >= 0) {
+                esCop = true;
+            }
+        }
+
+        if (esCop) {
+            if (costo.compareTo(BigDecimal.ZERO) > 0 && costo.compareTo(new BigDecimal("50")) < 0) {
+                costo = costo.multiply(new BigDecimal("1000"));
+            }
+            if (motorFinancieroService != null) {
+                try {
+                    return motorFinancieroService.convertirAMonedaBase(tenantId, costo, "COP");
+                } catch (Exception ignored) {}
+            }
+            return costo.divide(new BigDecimal("4000"), 4, RoundingMode.HALF_UP);
+        }
+
+        if ("VES".equalsIgnoreCase(moneda) || "BS".equalsIgnoreCase(moneda)) {
+            if (motorFinancieroService != null) {
+                try {
+                    return motorFinancieroService.convertirAMonedaBase(tenantId, costo, "VES");
+                } catch (Exception ignored) {}
+            }
+            return costo.divide(new BigDecimal("60"), 4, RoundingMode.HALF_UP);
+        }
+
+        return costo;
+    }
 
     /** Calcula cantidadRequerida (bruto) a partir de pesoNeto + porcentajeMerma, si se informaron ambos. */
     public BigDecimal calcularCantidadBruta(BigDecimal pesoNeto, BigDecimal porcentajeMerma) {
@@ -82,7 +128,8 @@ public class EscandalloService {
                 } else {
                     Articulo articulo = articuloRepository.findBySkuAndTenantId(detalle.getIngredienteSku(), tenantId)
                         .orElseThrow(() -> new RuntimeException("Ingrediente no encontrado en inventario: " + detalle.getIngredienteSku()));
-                    costoTotal = costoTotal.add(detalle.getCantidadRequerida().multiply(articulo.getCostoUnitario()));
+                    BigDecimal unitCost = obtenerCostoUnitarioParaReceta(articulo, tenantId);
+                    costoTotal = costoTotal.add(detalle.getCantidadRequerida().multiply(unitCost));
                 }
             }
 
@@ -180,7 +227,8 @@ public class EscandalloService {
                     Articulo articulo = articuloRepository.findBySkuAndTenantId(detalle.getIngredienteSku(), tenantId)
                         .orElseThrow(() -> new RuntimeException("Ingrediente no encontrado en inventario: " + detalle.getIngredienteSku()));
 
-                    BigDecimal costoConsumido = cantidadEfectiva.multiply(articulo.getCostoUnitario());
+                    BigDecimal unitCost = obtenerCostoUnitarioParaReceta(articulo, tenantId);
+                    BigDecimal costoConsumido = cantidadEfectiva.multiply(unitCost);
                     costoTotal = costoTotal.add(costoConsumido);
 
                     inventarioService.registrarMovimientoKardex(
