@@ -744,12 +744,14 @@ export interface ReporteTicket {
   fecha: string;
   totalUsd: number;
   totalBs: number | null;
+  totalCop?: number | null;
+  monedaPago?: string | null;
+  montoOriginal?: number | null;
   totalBase?: number;
   monedaBase?: string | null;
   monedaVuelto?: string | null;
   vuelto?: number | null;
-  pagos?: Array<{ moneda: string; monto: number; metodoPago: string; equivalenteBase: number; tasaAplicada: number | null }>;
-  metodoPago: string | null;
+  pagos?: Array<{ moneda: string; monto: number; metodoPago: string; equivalenteBase: number; tasaAplicada: number | null }>;  metodoPago: string | null;
   estado: "ABIERTA" | "PAGADA" | "ANULADA";
   canal: string;
   numeroMesa: number | null;

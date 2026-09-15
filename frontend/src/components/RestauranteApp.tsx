@@ -459,7 +459,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           </div>
         ) : (
         <div className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6 overflow-y-auto min-h-0">
-          {pagina === "resumen" && <ResumenGeneral tenantId={tenantId} />}
+          {pagina === "resumen" && <ResumenGeneral tenantId={tenantId} tasaCop={tasaCop} tasaBcv={tasaBcv} />}
           {pagina === "salon" && (esPremium("salon")
             ? <BloqueoPremium modulo="Salón & Mesas" />
             : <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
@@ -6506,16 +6506,28 @@ const fmtFechaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1
 // ventas de hoy/semana en tiempo real + un calendario para auditar
 // cualquier día anterior sin mezclar analítica con el flujo de cobro.
 // ══════════════════════════════════════════════════════════════════════════
-function ResumenGeneral({ tenantId }: { tenantId: number }) {
-  const [ventasHoy, setVentasHoy] = useState<number | null>(null);
-  const [ticketsHoy, setTicketsHoy] = useState(0);
-  const [ventasSemana, setVentasSemana] = useState<number | null>(null);
+// RESUMEN GENERAL — división rigurosa de ventas por moneda (USD, COP, VES)
+// KPIs consolidados con conversión lógica real a USD para evitar sumar montos
+// brutos en pesos o bolívares como si fueran dólares.
+// ══════════════════════════════════════════════════════════════════════════
+function ResumenGeneral({
+  tenantId, tasaCop, tasaBcv,
+}: {
+  tenantId: number;
+  tasaCop?: TasaCambio | null;
+  tasaBcv?: TasaCambio | null;
+}) {
+  const [ticketsHoy, setTicketsHoy] = useState<ReporteTicket[] | null>(null);
+  const [ticketsSemana, setTicketsSemana] = useState<ReporteTicket[] | null>(null);
 
   const hoy = useMemo(() => new Date(), []);
   const hoyStr = fmtFechaLocal(hoy);
   const [vista, setVista] = useState(() => ({ anio: hoy.getFullYear(), mes: hoy.getMonth() }));
   const [fechaSel, setFechaSel] = useState(hoyStr);
   const [ticketsDia, setTicketsDia] = useState<ReporteTicket[] | null>(null);
+
+  const tasaCopNum = (tasaCop && Number(tasaCop.tasa) > 0) ? Number(tasaCop.tasa) : 3100;
+  const tasaBcvNum = (tasaBcv && Number(tasaBcv.tasa) > 0) ? Number(tasaBcv.tasa) : 65.5;
 
   useEffect(() => {
     const diaSemana = hoy.getDay(); // 0 = domingo
@@ -6524,12 +6536,12 @@ function ResumenGeneral({ tenantId }: { tenantId: number }) {
     const lunesStr = fmtFechaLocal(lunes);
 
     reporteTickets({ fechaInicio: hoyStr, fechaFin: hoyStr, estado: "PAGADA" })
-      .then((lista) => { setVentasHoy(lista.reduce((s, t) => s + Number(t.totalUsd), 0)); setTicketsHoy(lista.length); })
-      .catch(() => { setVentasHoy(0); setTicketsHoy(0); });
+      .then(setTicketsHoy)
+      .catch(() => setTicketsHoy([]));
 
     reporteTickets({ fechaInicio: lunesStr, fechaFin: hoyStr, estado: "PAGADA" })
-      .then((lista) => setVentasSemana(lista.reduce((s, t) => s + Number(t.totalUsd), 0)))
-      .catch(() => setVentasSemana(0));
+      .then(setTicketsSemana)
+      .catch(() => setTicketsSemana([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
@@ -6540,7 +6552,163 @@ function ResumenGeneral({ tenantId }: { tenantId: number }) {
       .catch(() => setTicketsDia([]));
   }, [tenantId, fechaSel]);
 
-  const totalDiaSel = (ticketsDia || []).reduce((s, t) => s + Number(t.totalUsd), 0);
+  const calcularMetricasMoneda = (lista: ReporteTicket[] | null) => {
+    if (!lista) return null;
+    let usd = 0;
+    let cop = 0;
+    let ves = 0;
+    let consolidadoUsd = 0;
+    let countUsd = 0;
+    let countCop = 0;
+    let countVes = 0;
+
+    lista.forEach((t) => {
+      const valUsd = Number(t.totalUsd || 0);
+
+      if (t.pagos && t.pagos.length > 0) {
+        let ticketTieneCop = false;
+        let ticketTieneUsd = false;
+        let ticketTieneVes = false;
+
+        t.pagos.forEach((p) => {
+          const m = (p.moneda || "USD").toUpperCase();
+          const monto = Number(p.monto || 0);
+          if (m === "COP") {
+            cop += monto;
+            ticketTieneCop = true;
+          } else if (m === "VES" || m === "BS") {
+            ves += monto;
+            ticketTieneVes = true;
+          } else {
+            usd += monto;
+            ticketTieneUsd = true;
+          }
+        });
+
+        if (ticketTieneCop) countCop++;
+        if (ticketTieneUsd) countUsd++;
+        if (ticketTieneVes) countVes++;
+
+        // Consolidar a USD
+        const equiv = (valUsd < 100 && valUsd > 0) ? valUsd : (t.pagos.reduce((acc, p) => {
+          const m = (p.moneda || "USD").toUpperCase();
+          if (m === "COP") return acc + (Number(p.monto || 0) / tasaCopNum);
+          if (m === "VES" || m === "BS") return acc + (Number(p.monto || 0) / tasaBcvNum);
+          return acc + Number(p.monto || 0);
+        }, 0));
+        consolidadoUsd += equiv;
+      } else {
+        const mon = (t.monedaPago || "USD").toUpperCase();
+        if (mon === "COP") {
+          const montoCop = Number(t.montoOriginal || t.totalCop || (valUsd >= 100 ? valUsd : valUsd * tasaCopNum));
+          cop += montoCop;
+          countCop++;
+          const equiv = (valUsd < 100 && valUsd > 0) ? valUsd : (montoCop / tasaCopNum);
+          consolidadoUsd += equiv;
+        } else if (mon === "VES" || mon === "BS") {
+          const montoVes = Number(t.montoOriginal || t.totalBs || valUsd * tasaBcvNum);
+          ves += montoVes;
+          countVes++;
+          const equiv = valUsd > 0 ? valUsd : (montoVes / tasaBcvNum);
+          consolidadoUsd += equiv;
+        } else {
+          usd += valUsd;
+          countUsd++;
+          consolidadoUsd += valUsd;
+        }
+      }
+    });
+
+    return {
+      usd,
+      cop,
+      ves,
+      consolidadoUsd,
+      totalTickets: lista.length,
+      countUsd,
+      countCop,
+      countVes,
+    };
+  };
+
+  const metricasHoy = useMemo(() => calcularMetricasMoneda(ticketsHoy), [ticketsHoy, tasaCopNum, tasaBcvNum]);
+  const metricasSemana = useMemo(() => calcularMetricasMoneda(ticketsSemana), [ticketsSemana, tasaCopNum, tasaBcvNum]);
+  const metricasDiaSel = useMemo(() => calcularMetricasMoneda(ticketsDia), [ticketsDia, tasaCopNum, tasaBcvNum]);
+
+  const resolverMontoTicket = (t: ReporteTicket) => {
+    const valUsd = Number(t.totalUsd || 0);
+
+    if (t.pagos && t.pagos.length === 1) {
+      const p = t.pagos[0];
+      const m = (p.moneda || "USD").toUpperCase();
+      const monto = Number(p.monto || 0);
+      if (m === "COP") {
+        const equiv = (valUsd < 100 && valUsd > 0) ? valUsd : (monto / tasaCopNum);
+        return {
+          principal: `${fmtNumero(monto, "COP")} COP`,
+          equivalente: `≈ $${equiv.toFixed(2)} USD`,
+          colorClase: "text-teal-600 dark:text-teal-400",
+          tag: "COP",
+        };
+      }
+      if (m === "VES" || m === "BS") {
+        const equiv = valUsd > 0 ? valUsd : (monto / tasaBcvNum);
+        return {
+          principal: `Bs. ${fmtNumero(monto, "VES")}`,
+          equivalente: `≈ $${equiv.toFixed(2)} USD`,
+          colorClase: "text-sky-600 dark:text-sky-400",
+          tag: "VES",
+        };
+      }
+      return {
+        principal: `$${monto.toFixed(2)} USD`,
+        equivalente: undefined,
+        colorClase: "text-slate-900 dark:text-white",
+        tag: "USD",
+      };
+    }
+
+    if (t.pagos && t.pagos.length > 1) {
+      const desglose = t.pagos.map((p) => {
+        const m = (p.moneda || "USD").toUpperCase();
+        return m === "COP" ? `${fmtNumero(p.monto, "COP")} COP` : m === "VES" ? `Bs. ${fmtNumero(p.monto, "VES")}` : `$${Number(p.monto).toFixed(2)}`;
+      }).join(" + ");
+      return {
+        principal: `$${valUsd.toFixed(2)} USD`,
+        equivalente: `Mixto: ${desglose}`,
+        colorClase: "text-purple-600 dark:text-purple-400",
+        tag: "MIXTO",
+      };
+    }
+
+    const mon = (t.monedaPago || "USD").toUpperCase();
+    if (mon === "COP") {
+      const montoCop = Number(t.montoOriginal || t.totalCop || (valUsd >= 100 ? valUsd : valUsd * tasaCopNum));
+      const equivUsd = (valUsd < 100 && valUsd > 0) ? valUsd : (montoCop / tasaCopNum);
+      return {
+        principal: `${fmtNumero(montoCop, "COP")} COP`,
+        equivalente: `≈ $${equivUsd.toFixed(2)} USD`,
+        colorClase: "text-teal-600 dark:text-teal-400",
+        tag: "COP",
+      };
+    }
+    if (mon === "VES" || mon === "BS") {
+      const montoVes = Number(t.montoOriginal || t.totalBs || valUsd * tasaBcvNum);
+      const equivUsd = valUsd > 0 ? valUsd : (montoVes / tasaBcvNum);
+      return {
+        principal: `Bs. ${fmtNumero(montoVes, "VES")}`,
+        equivalente: `≈ $${equivUsd.toFixed(2)} USD`,
+        colorClase: "text-sky-600 dark:text-sky-400",
+        tag: "VES",
+      };
+    }
+    return {
+      principal: `$${valUsd.toFixed(2)} USD`,
+      equivalente: t.totalCop ? `≈ ${fmtNumero(t.totalCop, "COP")} COP` : undefined,
+      colorClase: "text-slate-900 dark:text-white",
+      tag: "USD",
+    };
+  };
 
   const primerDiaMes = new Date(vista.anio, vista.mes, 1);
   const diasEnMes = new Date(vista.anio, vista.mes + 1, 0).getDate();
@@ -6558,9 +6726,89 @@ function ResumenGeneral({ tenantId }: { tenantId: number }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <KpiCard label="Ventas del Día" val={ventasHoy === null ? "…" : `$${ventasHoy.toFixed(2)}`} sub={`${ticketsHoy} ticket${ticketsHoy === 1 ? "" : "s"} hoy`} color="#10b981" />
-        <KpiCard label="Ventas de la Semana" val={ventasSemana === null ? "…" : `$${ventasSemana.toFixed(2)}`} sub="Lunes a hoy" color="#0ea5e9" />
+      {/* Tarjetas Superiores: Ventas divididas estrictamente por moneda */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Ventas de la Semana */}
+        <div className="apple-glass rounded-2xl p-5 space-y-3 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-white/50 uppercase tracking-wider">
+              Ventas de la Semana (Consolidado)
+            </span>
+            <span className="text-[10px] font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-400 px-2.5 py-0.5 rounded-full">
+              Lunes a hoy · {metricasSemana ? metricasSemana.totalTickets : 0} tickets
+            </span>
+          </div>
+
+          <div className="flex items-baseline gap-2">
+            <span className="font-['Outfit'] font-black text-3xl text-sky-600 dark:text-sky-400">
+              {metricasSemana ? `$${metricasSemana.consolidadoUsd.toFixed(2)}` : "…"}
+            </span>
+            <span className="text-xs text-slate-400 font-semibold">USD base</span>
+          </div>
+
+          {/* Desglose dividido por moneda */}
+          <div className="pt-2 border-t border-slate-200/60 dark:border-white/10 grid grid-cols-3 gap-2">
+            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
+              <div className="text-[10px] text-slate-400 font-bold uppercase">En Dólares</div>
+              <div className="font-mono font-bold text-xs text-slate-900 dark:text-white">
+                ${metricasSemana ? fmtNumero(metricasSemana.usd, "USD") : "0"} USD
+              </div>
+            </div>
+            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
+              <div className="text-[10px] text-teal-600 dark:text-teal-400 font-bold uppercase">En Pesos (COP)</div>
+              <div className="font-mono font-bold text-xs text-teal-700 dark:text-teal-300 truncate">
+                {metricasSemana ? fmtNumero(metricasSemana.cop, "COP") : "0"} COP
+              </div>
+            </div>
+            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
+              <div className="text-[10px] text-slate-400 font-bold uppercase">En Bolívares</div>
+              <div className="font-mono font-bold text-xs text-slate-900 dark:text-white truncate">
+                Bs. {metricasSemana ? fmtNumero(metricasSemana.ves, "VES") : "0.00"}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Ventas del Día */}
+        <div className="apple-glass rounded-2xl p-5 space-y-3 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-white/50 uppercase tracking-wider">
+              Ventas del Día (Hoy)
+            </span>
+            <span className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-0.5 rounded-full">
+              {metricasHoy ? metricasHoy.totalTickets : 0} ticket{metricasHoy?.totalTickets === 1 ? "" : "s"} hoy
+            </span>
+          </div>
+
+          <div className="flex items-baseline gap-2">
+            <span className="font-['Outfit'] font-black text-3xl text-emerald-600 dark:text-emerald-400">
+              {metricasHoy ? `$${metricasHoy.consolidadoUsd.toFixed(2)}` : "…"}
+            </span>
+            <span className="text-xs text-slate-400 font-semibold">USD base</span>
+          </div>
+
+          {/* Desglose dividido por moneda */}
+          <div className="pt-2 border-t border-slate-200/60 dark:border-white/10 grid grid-cols-3 gap-2">
+            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
+              <div className="text-[10px] text-slate-400 font-bold uppercase">En Dólares</div>
+              <div className="font-mono font-bold text-xs text-slate-900 dark:text-white">
+                ${metricasHoy ? fmtNumero(metricasHoy.usd, "USD") : "0"} USD
+              </div>
+            </div>
+            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
+              <div className="text-[10px] text-teal-600 dark:text-teal-400 font-bold uppercase">En Pesos (COP)</div>
+              <div className="font-mono font-bold text-xs text-teal-700 dark:text-teal-300 truncate">
+                {metricasHoy ? fmtNumero(metricasHoy.cop, "COP") : "0"} COP
+              </div>
+            </div>
+            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
+              <div className="text-[10px] text-slate-400 font-bold uppercase">En Bolívares</div>
+              <div className="font-mono font-bold text-xs text-slate-900 dark:text-white truncate">
+                Bs. {metricasHoy ? fmtNumero(metricasHoy.ves, "VES") : "0.00"}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start">
@@ -6597,34 +6845,84 @@ function ResumenGeneral({ tenantId }: { tenantId: number }) {
         </div>
 
         {/* Detalle del día seleccionado */}
-        <div className="apple-glass rounded-2xl p-5">
-          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base capitalize mb-4">{fechaSelLegible}</h3>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="apple-glass rounded-xl p-3.5">
-              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Total del día</div>
-              <div className="font-['Outfit'] font-black text-xl text-teal-600 dark:text-teal-400">${totalDiaSel.toFixed(2)}</div>
+        <div className="apple-glass rounded-2xl p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base capitalize">{fechaSelLegible}</h3>
+            {metricasDiaSel && metricasDiaSel.totalTickets > 0 && (
+              <span className="text-xs font-semibold text-slate-500 dark:text-white/60">
+                {metricasDiaSel.totalTickets} transacción{metricasDiaSel.totalTickets === 1 ? "" : "es"}
+              </span>
+            )}
+          </div>
+
+          {/* Cuadrícula de totales dividida por moneda para el día */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="apple-glass rounded-xl p-3">
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider font-bold">Consolidado</div>
+              <div className="font-['Outfit'] font-black text-lg text-teal-600 dark:text-teal-400">
+                ${metricasDiaSel ? metricasDiaSel.consolidadoUsd.toFixed(2) : "0.00"}
+              </div>
+              <div className="text-[9px] text-slate-400">USD base</div>
             </div>
-            <div className="apple-glass rounded-xl p-3.5">
-              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Transacciones</div>
-              <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{(ticketsDia || []).length}</div>
+            <div className="apple-glass rounded-xl p-3">
+              <div className="text-[10px] text-teal-600 dark:text-teal-400 uppercase tracking-wider font-bold">Pesos (COP)</div>
+              <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white truncate">
+                {metricasDiaSel ? fmtNumero(metricasDiaSel.cop, "COP") : "0"}
+              </div>
+              <div className="text-[9px] text-slate-400">COP recaudado</div>
+            </div>
+            <div className="apple-glass rounded-xl p-3">
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider font-bold">Dólares (USD)</div>
+              <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
+                ${metricasDiaSel ? fmtNumero(metricasDiaSel.usd, "USD") : "0"}
+              </div>
+              <div className="text-[9px] text-slate-400">USD en efectivo</div>
+            </div>
+            <div className="apple-glass rounded-xl p-3">
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider font-bold">Bolívares (VES)</div>
+              <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white truncate">
+                Bs. {metricasDiaSel ? fmtNumero(metricasDiaSel.ves, "VES") : "0.00"}
+              </div>
+              <div className="text-[9px] text-slate-400">VES recaudado</div>
             </div>
           </div>
 
+          {/* Listado de tickets del día con moneda real */}
           {ticketsDia === null ? (
             <p className="text-xs text-slate-400">Cargando…</p>
           ) : ticketsDia.length === 0 ? (
             <p className="text-xs text-slate-400">Sin ventas registradas este día.</p>
           ) : (
-            <div className="space-y-1.5 max-h-80 overflow-y-auto">
-              {ticketsDia.map((t) => (
-                <div key={t.comandaId} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2 text-xs">
-                  <div className="min-w-0">
-                    <div className="font-semibold text-slate-800 dark:text-white/80 truncate">{t.numeroTicket}</div>
-                    <div className="text-[10px] text-slate-400">{new Date(t.fecha).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })} · {(t.metodoPago || "—").replace("_", " ")}</div>
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {ticketsDia.map((t) => {
+                const infoMonto = resolverMontoTicket(t);
+                return (
+                  <div key={t.comandaId} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3.5 py-2.5 text-xs">
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-800 dark:text-white/80">{t.numeroTicket}</span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/70 uppercase">
+                          {infoMonto.tag}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {new Date(t.fecha).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })} · {(t.metodoPago || "—").replace("_", " ")}
+                      </div>
+                    </div>
+
+                    <div className="text-right flex-shrink-0">
+                      <div className={`font-mono font-bold text-sm ${infoMonto.colorClase}`}>
+                        {infoMonto.principal}
+                      </div>
+                      {infoMonto.equivalente && (
+                        <div className="text-[10px] font-mono text-slate-400">
+                          {infoMonto.equivalente}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <span className="font-mono font-semibold text-slate-900 dark:text-white flex-shrink-0">${Number(t.totalUsd).toFixed(2)}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
