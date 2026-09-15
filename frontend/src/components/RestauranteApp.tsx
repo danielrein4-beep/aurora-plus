@@ -169,32 +169,6 @@ function EstiloClasico() {
       }
       .horeca-clasico .bg-teal-500\\/15 { background-color: rgba(14,165,233,0.12) !important; }
       .horeca-clasico .border-teal-500\\/30, .horeca-clasico .border-teal-400\\/60 { border-color: rgba(13,148,136,0.4) !important; }
-
-      /* Los <Modal> (ModalEditarReceta, etc.) viven bajo <body> vía portal y
-         siempre deben verse oscuro/Aurora — ver Modal en este mismo archivo —
-         sin importar si Modo Clásico está activo. Estos contra-overrides
-         cancelan los de arriba SOLO dentro de .aurora-modal-dark, con mayor
-         especificidad (tres clases vs. dos) para ganarles pase lo que pase. */
-      .horeca-clasico .aurora-modal-dark.dark\\:text-white,
-      .horeca-clasico .aurora-modal-dark .dark\\:text-white,
-      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/90 { color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; }
-      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/80 { color: rgba(255,255,255,0.80) !important; -webkit-text-fill-color: rgba(255,255,255,0.80) !important; }
-      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/70 { color: rgba(255,255,255,0.70) !important; -webkit-text-fill-color: rgba(255,255,255,0.70) !important; }
-      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/60 { color: rgba(255,255,255,0.60) !important; -webkit-text-fill-color: rgba(255,255,255,0.60) !important; }
-      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/50 { color: rgba(255,255,255,0.50) !important; -webkit-text-fill-color: rgba(255,255,255,0.50) !important; }
-      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/40 { color: rgba(255,255,255,0.40) !important; -webkit-text-fill-color: rgba(255,255,255,0.40) !important; }
-      .horeca-clasico .aurora-modal-dark .dark\\:text-white\\/30 { color: rgba(255,255,255,0.30) !important; -webkit-text-fill-color: rgba(255,255,255,0.30) !important; }
-      .horeca-clasico .aurora-modal-dark .text-slate-900,
-      .horeca-clasico .aurora-modal-dark h1, .horeca-clasico .aurora-modal-dark h2,
-      .horeca-clasico .aurora-modal-dark h3, .horeca-clasico .aurora-modal-dark h4,
-      .horeca-clasico .aurora-modal-dark strong { color: #ffffff !important; }
-      .horeca-clasico .aurora-modal-dark input,
-      .horeca-clasico .aurora-modal-dark select,
-      .horeca-clasico .aurora-modal-dark textarea {
-        background: rgba(255,255,255,0.04) !important;
-        border-color: rgba(255,255,255,0.10) !important;
-        color: #ffffff !important;
-      }
     `}</style>
   );
 }
@@ -2597,9 +2571,9 @@ function ModalEditarReceta({
         {mensajeExito && <div className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">{mensajeExito}</div>}
 
         {/* 1. SECCIÓN: DATOS BÁSICOS DEL PLATO */}
-        <div className="apple-glass rounded-2xl p-4 space-y-3">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white/40">Datos del Plato</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Datos del Plato</span>
             <button onClick={guardarDatosPlato} disabled={guardandoPlato}
               className="btn-cyber-neon text-white text-xs font-semibold px-4 py-1.5 rounded-lg cursor-pointer disabled:opacity-50">
               {guardandoPlato ? "Guardando…" : "Guardar cambios del plato"}
@@ -2628,59 +2602,59 @@ function ModalEditarReceta({
         </div>
 
         {/* 2. SECCIÓN: TABLERO DE COSTEO EN VIVO (HOJA DE CÁLCULO) */}
-        <div className="bg-slate-900/80 border border-slate-700/60 rounded-2xl p-4 shadow-xl text-white">
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm text-slate-900">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Costeo en Tiempo Real</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Costeo en Tiempo Real</span>
             </div>
-            <span className="text-[11px] text-slate-400 font-mono">
+            <span className="text-[11px] text-slate-500 font-mono">
               {tieneIngredientes ? `${desgloseLineas.length} insumo(s) costeados` : "Sin ingredientes"}
             </span>
           </div>
 
           {!tieneIngredientes ? (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between">
+            <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between">
               <div>
-                <strong className="text-amber-300 text-sm block">Costo: sin calcular · falta cargar ingredientes</strong>
-                <span className="text-xs text-slate-300">Agrega abajo los ingredientes del inventario para ver el costo exacto y margen en vivo.</span>
+                <strong className="text-amber-700 text-sm block">Costo: sin calcular · falta cargar ingredientes</strong>
+                <span className="text-xs text-slate-600">Agrega abajo los ingredientes del inventario para ver el costo exacto y margen en vivo.</span>
               </div>
-              <span className="text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full font-mono">Margen pendiente</span>
+              <span className="text-xs bg-amber-200 text-amber-800 px-3 py-1 rounded-full font-mono">Margen pendiente</span>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Costo Total */}
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700">
-                <span className="text-[11px] text-slate-400 uppercase font-semibold block">Costo de Producción</span>
-                <div className="text-xl font-bold font-mono text-white mt-1">
+              <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm">
+                <span className="text-[11px] text-slate-500 uppercase font-semibold block">Costo de Producción</span>
+                <div className="text-xl font-bold font-mono text-slate-900 mt-1">
                   ${costoTotalEnVivo.toFixed(2)}
                 </div>
-                <span className="text-[10px] text-slate-400">Calculado desde inventario real</span>
+                <span className="text-[10px] text-slate-500">Calculado desde inventario real</span>
               </div>
 
               {/* Precio de Venta */}
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700">
-                <span className="text-[11px] text-slate-400 uppercase font-semibold block">Precio de Venta</span>
-                <div className="text-xl font-bold font-mono text-teal-400 mt-1">
+              <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm">
+                <span className="text-[11px] text-slate-500 uppercase font-semibold block">Precio de Venta</span>
+                <div className="text-xl font-bold font-mono text-teal-600 mt-1">
                   ${precioNumEnVivo.toFixed(2)}
                 </div>
-                <span className="text-[10px] text-slate-400">Definido en el plato</span>
+                <span className="text-[10px] text-slate-500">Definido en el plato</span>
               </div>
 
               {/* Margen Resultante */}
-              <div className={`rounded-xl p-3 border ${
+              <div className={`rounded-xl p-3 border shadow-sm ${
                 margenEnVivo >= 0
-                  ? (margenPctEnVivo >= 40 ? "bg-emerald-950/40 border-emerald-500/40" : "bg-amber-950/40 border-amber-500/40")
-                  : "bg-red-950/40 border-red-500/40"
+                  ? (margenPctEnVivo >= 40 ? "bg-emerald-50 border-emerald-300" : "bg-amber-50 border-amber-300")
+                  : "bg-red-50 border-red-300"
               }`}>
-                <span className="text-[11px] text-slate-300 uppercase font-semibold block">Margen de Ganancia</span>
+                <span className="text-[11px] text-slate-600 uppercase font-semibold block">Margen de Ganancia</span>
                 <div className={`text-xl font-bold font-mono mt-1 flex items-baseline gap-2 ${
-                  margenEnVivo >= 0 ? (margenPctEnVivo >= 40 ? "text-emerald-400" : "text-amber-400") : "text-red-400"
+                  margenEnVivo >= 0 ? (margenPctEnVivo >= 40 ? "text-emerald-600" : "text-amber-600") : "text-red-600"
                 }`}>
                   <span>${margenEnVivo.toFixed(2)}</span>
                   <span className="text-xs font-semibold">({margenPctEnVivo.toFixed(1)}%)</span>
                 </div>
-                <span className="text-[10px] text-slate-300">
+                <span className="text-[10px] text-slate-600">
                   {margenEnVivo < 0 ? "⚠️ El costo supera el precio de venta" : "Margen bruto por ración"}
                 </span>
               </div>
@@ -2700,7 +2674,7 @@ function ModalEditarReceta({
           {ingredientes === null ? (
             <p className="text-xs text-slate-400 py-4 text-center">Cargando escandallo…</p>
           ) : ingredientes.length === 0 ? (
-            <div className="apple-glass rounded-xl p-6 text-center text-slate-400 space-y-1">
+            <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-slate-400 space-y-1">
               <p className="text-sm font-medium">Esta receta aún no tiene ingredientes cargados.</p>
               <p className="text-xs text-slate-500">Utiliza el formulario siguiente para agregar insumos desde tu inventario.</p>
             </div>
@@ -2815,21 +2789,21 @@ function ModalEditarReceta({
         </div>
 
         {/* 4. SECCIÓN: AGREGAR NUEVO INGREDIENTE */}
-        <div className="apple-glass rounded-2xl p-4 space-y-3 border-t border-slate-300/50 dark:border-white/10">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white/40">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               + Agregar Ingrediente o Sub-receta
             </span>
             <div className="flex gap-2 text-xs">
               <button onClick={() => { setTipoNuevo("articulo"); setError(null); }}
                 className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition-colors ${
-                  tipoNuevo === "articulo" ? "btn-cyber-neon" : "bg-slate-200/60 dark:bg-white/10 text-slate-600 dark:text-white/60"
+                  tipoNuevo === "articulo" ? "btn-cyber-neon" : "bg-slate-100 text-slate-600"
                 }`}>
                 Insumo de Inventario
               </button>
               <button onClick={() => { setTipoNuevo("subreceta"); setError(null); }}
                 className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition-colors ${
-                  tipoNuevo === "subreceta" ? "btn-cyber-neon" : "bg-slate-200/60 dark:bg-white/10 text-slate-600 dark:text-white/60"
+                  tipoNuevo === "subreceta" ? "btn-cyber-neon" : "bg-slate-100 text-slate-600"
                 }`}>
                 Sub-receta
               </button>
@@ -3522,6 +3496,13 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
       );
     }
 
+    const NOMBRE_MONEDA: Record<string, string> = {
+      COP: "Insumos comprados en pesos colombianos",
+      USD: "Insumos comprados en dólares",
+      BS: "Insumos comprados en bolívares",
+      VES: "Insumos comprados en bolívares",
+    };
+
     return (
       <div className="space-y-1.5 pt-0.5">
         {monedas.map((m) => {
@@ -3540,12 +3521,18 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
               : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30";
 
           return (
-            <div key={m} className="flex items-center justify-between gap-3 bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-1.5 border border-slate-200/50 dark:border-white/5">
-              <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white tracking-tight">
-                {str}
-              </span>
-              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border tracking-wider uppercase ${badgeStyle}`}>
-                {etiqueta}
+            <div key={m} className="bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-1.5 border border-slate-200/50 dark:border-white/5 flex items-center justify-between gap-3"
+              title={NOMBRE_MONEDA[etiqueta] || `Insumos comprados en ${etiqueta}`}>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white tracking-tight">
+                  {str}
+                </span>
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md border tracking-wider uppercase ${badgeStyle}`}>
+                  {etiqueta}
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-500 dark:text-white/40 text-right truncate max-w-[45%]">
+                {NOMBRE_MONEDA[etiqueta] || `Insumos comprados en ${etiqueta}`}
               </span>
             </div>
           );
@@ -3560,7 +3547,21 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <KpiCard label="Valor Total en Inventario" val={renderValorTotal} sub="Costo × stock actual" color="#0ea5e9" />
-        <KpiCard label="Total de Ítems" val={String((articulos || []).length)} sub={`${categorias.length} categoría${categorias.length === 1 ? "" : "s"}`} color="#35d7c3" />
+        <KpiCard
+          label="Total de Artículos"
+          val={
+            <div className="flex items-center gap-2.5">
+              <span className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white tracking-tight">
+                {(articulos || []).length}
+              </span>
+              <span className="text-[11px] font-black px-2.5 py-0.5 rounded-md border tracking-wider uppercase bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30">
+                artículos
+              </span>
+            </div>
+          }
+          sub={`Artículos distintos en ${categorias.length} categoría${categorias.length === 1 ? "" : "s"}`}
+          color="#35d7c3"
+        />
         <KpiCard label="Alertas de Stock" val={String(alertasStock)} sub="Bajo mínimo o agotado" color={alertasStock > 0 ? "#ef4444" : "#64748b"} />
       </div>
 
@@ -4567,7 +4568,7 @@ function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; conf
       </div>
 
       <MonedaBaseNegocio />
-      <OrigenTasaActivaConfig />
+      <OrigenTasaActivaConfig tenantId={tenantId} />
 
       <div className="apple-glass rounded-2xl p-6 space-y-4">
         <div>
@@ -4714,15 +4715,27 @@ function MonedaBaseNegocio() {
  * terminal podía terminar cobrando con una tasa distinta. Ahora es una decisión de negocio
  * (Dueño/Administrador), igual que la moneda principal.
  */
-function OrigenTasaActivaConfig() {
+function OrigenTasaActivaConfig({ tenantId }: { tenantId: number }) {
   const [origen, setOrigen] = useState<OrigenTasaActiva | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [guardado, setGuardado] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Valor vigente de la tasa Propia — es la única de las tres que el negocio escribe a mano,
+  // así que este campo vive aquí mismo: antes solo se podía elegir "Propia" en Configuración
+  // pero el número había que ir a teclearlo en el badge del header, sin ninguna pista de que
+  // hubiera que hacerlo ahí.
+  const [tasaPropiaVal, setTasaPropiaVal] = useState("");
+  const [tasaPropiaVigente, setTasaPropiaVigente] = useState<TasaCambio | null>(null);
+  const [guardandoPropia, setGuardandoPropia] = useState(false);
+  const [guardadoPropia, setGuardadoPropia] = useState(false);
+
   useEffect(() => {
     obtenerOrigenTasaActiva().then((r) => setOrigen(r.origenTasaActiva)).catch(() => setOrigen("USDT"));
-  }, []);
+    tasaVigente(tenantId, "USD", "VES", "PERSONALIZADA")
+      .then((t) => { setTasaPropiaVigente(t); setTasaPropiaVal(String(Number(t.tasa))); })
+      .catch(() => setTasaPropiaVigente(null));
+  }, [tenantId]);
 
   const cambiar = async (nuevo: OrigenTasaActiva) => {
     if (nuevo === origen) return;
@@ -4737,6 +4750,23 @@ function OrigenTasaActivaConfig() {
       setError(e instanceof Error ? e.message : "No se pudo cambiar la tasa activa");
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const guardarTasaPropia = async () => {
+    const valor = Number(tasaPropiaVal);
+    if (!valor || valor <= 0) { setError("Ingresa una tasa propia válida mayor a cero"); return; }
+    setGuardandoPropia(true);
+    setError(null);
+    try {
+      const t = await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: valor, origen: "PERSONALIZADA" });
+      setTasaPropiaVigente(t);
+      setGuardadoPropia(true);
+      setTimeout(() => setGuardadoPropia(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la tasa propia");
+    } finally {
+      setGuardandoPropia(false);
     }
   };
 
@@ -4767,6 +4797,33 @@ function OrigenTasaActivaConfig() {
         {guardando && <span className="text-[11px] text-slate-400 self-center">Guardando…</span>}
         {guardado && <span className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold self-center">✓ Guardado</span>}
       </div>
+
+      {origen === "PERSONALIZADA" && (
+        <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-3.5 space-y-2">
+          <label className="block text-[11px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wide">
+            Tu tasa propia (1 USD = ? Bs)
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              value={tasaPropiaVal}
+              onChange={(e) => setTasaPropiaVal(e.target.value)}
+              type="number" step="0.01" min="0" placeholder="Ej. 66.00"
+              className="input-horeca flex-1 font-mono font-bold"
+            />
+            <button onClick={() => void guardarTasaPropia()} disabled={guardandoPropia}
+              className="btn-cyber-neon text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-60 whitespace-nowrap">
+              {guardandoPropia ? "Guardando…" : "Guardar tasa propia"}
+            </button>
+          </div>
+          {tasaPropiaVigente && (
+            <p className="text-[10px] text-amber-700 dark:text-amber-300/80">
+              Vigente: Bs. {Number(tasaPropiaVigente.tasa).toFixed(2)} · actualizada {new Date(tasaPropiaVigente.fechaActualizacion).toLocaleString("es-VE")}
+            </p>
+          )}
+          {guardadoPropia && <p className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold">✓ Tasa propia guardada</p>}
+        </div>
+      )}
+
       {error && <p className="text-xs text-red-500">{error}</p>}
     </div>
   );
@@ -7850,19 +7907,12 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Modal({ titulo, onClose, children, ancho }: { titulo: string; onClose: () => void; children: React.ReactNode; ancho?: string }) {
-  // Fondo SIEMPRE oscuro Aurora (mismo look que el resto de la app: Centro
-  // Financiero, login, etc.) — antes esto estaba fijo a blanco/texto oscuro
-  // sin variante dark a propósito, porque con Modo Clásico activo
-  // (.horeca-clasico, aplicado a <body> mientras ese modo está encendido)
-  // el contenido interno usa clases dark:text-white/N que dependen de que
-  // algún ancestro tenga la clase "dark" — y el modal, aunque viva bajo
-  // <body>, no la tenía, así que ese texto se perdía. La clase "dark" de
-  // abajo la agrega LOCALMENTE este wrapper (ver @custom-variant dark en
-  // index.css: activa para .dark y sus descendientes) — así el modal
-  // siempre se ve oscuro con su texto claro, sin importar el tema global
-  // ni si Modo Clásico está prendido. Los contra-overrides específicos
-  // para cuando Modo Clásico SÍ está activo viven en EstiloClasico,
-  // scopeados a .aurora-modal-dark con mayor especificidad.
+  // Fondo blanco sólido a propósito — look administrativo/profesional pedido
+  // explícitamente por el negocio (no el navy oscuro que usa el resto del
+  // sitio marketing/Centro Financiero). Sin variante dark: en la tarjeta ni
+  // en el título, para no depender del tema global ni de Modo Clásico —
+  // ver aviso anterior sobre .horeca-clasico forzando texto oscuro sobre
+  // fondo oscuro cuando este modal SÍ era dark.
   // Portal a document.body: cualquier ancestro con backdrop-filter/filter/
   // transform (ej. .apple-glass, que trae backdrop-filter: blur(...)) crea
   // un containing block nuevo para position: fixed y "atrapa" al modal
@@ -7871,10 +7921,10 @@ function Modal({ titulo, onClose, children, ancho }: { titulo: string; onClose: 
   // importar qué ancestro lo dispare.
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className={`dark aurora-modal-dark bg-[#0b1220] text-white rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-white/10`}>
+      <div onClick={(e) => e.stopPropagation()} className={`bg-white text-slate-900 rounded-3xl p-6 w-full ${ancho || "max-w-md"} max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-200`}>
         <div className="flex items-center justify-between mb-4">
-          <div role="heading" aria-level={3} className="font-['Outfit'] font-bold text-lg text-white">{titulo}</div>
-          <button onClick={onClose} className="text-white/40 hover:text-white cursor-pointer"><IconClose size={18} /></button>
+          <div role="heading" aria-level={3} className="font-['Outfit'] font-bold text-lg text-slate-900">{titulo}</div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-900 cursor-pointer"><IconClose size={18} /></button>
         </div>
         {children}
       </div>
