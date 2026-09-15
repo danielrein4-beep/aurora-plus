@@ -135,7 +135,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
             }`}
             title="Alternar modo privacidad de remuneraciones"
           >
-            <span>{ocultarSueldo ? '👁️ Sueldos Ocultos' : '🔓 Sueldos Visibles'}</span>
+            <span>{ocultarSueldo ? 'Sueldos ocultos' : 'Sueldos visibles'}</span>
           </button>
         </div>
       </div>

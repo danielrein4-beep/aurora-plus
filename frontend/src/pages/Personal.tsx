@@ -233,13 +233,13 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
     return () => { activo = false; };
   }, [capacidades]);
 
-  const pestanas: { id: SeccionPersonal; etiqueta: string; icono: string }[] = [
-    { id: 'resumen', etiqueta: 'Resumen', icono: '📊' },
-    { id: 'empleados', etiqueta: 'Empleados', icono: '👥' },
-    { id: 'turnos', etiqueta: 'Turnos', icono: '📅' },
-    { id: 'asistencia', etiqueta: 'Asistencia', icono: '⏱️' },
-    { id: 'metas', etiqueta: 'Metas', icono: '🎯' },
-    { id: 'nomina', etiqueta: 'Nómina', icono: '💵' },
+  const pestanas: { id: SeccionPersonal; etiqueta: string }[] = [
+    { id: 'resumen', etiqueta: 'Resumen' },
+    { id: 'empleados', etiqueta: 'Empleados' },
+    { id: 'turnos', etiqueta: 'Turnos' },
+    { id: 'asistencia', etiqueta: 'Asistencia' },
+    { id: 'metas', etiqueta: 'Metas' },
+    { id: 'nomina', etiqueta: 'Nómina' },
   ];
 
   const todosRecibos = periodosNomina.flatMap((p) => p.recibos);
@@ -280,7 +280,7 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
               }`}
               title="Alternar privacidad de remuneraciones"
             >
-              <span>{ocultarSueldo ? '👁️ Sueldos Ocultos' : '🔓 Sueldos Visibles'}</span>
+              <span>{ocultarSueldo ? 'Sueldos ocultos' : 'Sueldos visibles'}</span>
             </button>}
           </div>
         </div>
@@ -303,7 +303,6 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
                     : 'text-[#94a3b8] hover:text-[#f8fafc] hover:bg-[#131c2e]/50'
                 }`}
               >
-                <span aria-hidden="true">{p.icono}</span>
                 <span>{p.etiqueta}</span>
                 {p.id === 'nomina' && (
                   <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#f59e0b]/20 text-[#fbbf24] font-mono">

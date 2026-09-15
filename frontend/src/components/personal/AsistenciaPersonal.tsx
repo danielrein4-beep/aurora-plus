@@ -106,15 +106,15 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
   const getMetodoIcon = (metodo: MetodoMarcaje) => {
     switch (metodo) {
       case 'PIN_TERMINAL':
-        return '🔢 Terminal PIN';
+        return 'Terminal PIN';
       case 'REGISTRO_SUPERVISOR':
         return '✍️ Supervisor';
       case 'PLANILLA_DIGITAL':
-        return '📋 Planilla Digital';
+        return 'Planilla digital';
       case 'HORARIO_ASIGNADO':
         return '⏱️ Horario Asignado';
       default:
-        return '📝 Registro Manual';
+        return 'Registro manual';
     }
   };
 
@@ -308,7 +308,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                         : 'bg-[#0b111e] border-[#1e293b] text-[#94a3b8]'
                     }`}
                   >
-                    🟢 Entrada
+                    Registrar entrada
                   </button>
                   <button
                     type="button"
@@ -319,7 +319,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                         : 'bg-[#0b111e] border-[#1e293b] text-[#94a3b8]'
                     }`}
                   >
-                    🔴 Salida
+                    Registrar salida
                   </button>
                 </div>
               </div>

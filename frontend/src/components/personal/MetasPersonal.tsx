@@ -146,7 +146,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
         </div>
 
         <div className="flex items-center gap-2 font-mono text-[11px] text-[#cbd5e1] bg-[#0b111e] px-3 py-2 rounded-lg border border-[#1e293b] whitespace-nowrap">
-          <span>🎯 {metas.filter((m) => m.estado === 'COMPLETADA').length} de {metas.length} Logradas</span>
+          <span>{metas.filter((m) => m.estado === 'COMPLETADA').length} de {metas.length} logradas</span>
         </div>
       </div>
 
@@ -219,7 +219,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                             : 'bg-[#1e293b] text-[#cbd5e1] border-[#334155]'
                         }`}
                       >
-                        {esAutomatica ? '⚡ Automática (ERP)' : '📝 Manual (Supervisión)'}
+                        {esAutomatica ? 'Automática (ERP)' : 'Manual (Supervisión)'}
                       </span>
                       <span className="text-[10px] px-2 py-0.5 rounded bg-[#0b111e] text-[#94a3b8]">
                         {meta.departamentoObjetivo}
@@ -268,7 +268,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
 
                 {meta.reconocimiento && (
                   <div className="p-2 bg-[#0b111e] rounded-lg border border-[#1e293b] text-[11px] text-[#cbd5e1] flex items-center gap-1.5">
-                    <span>🏆</span>
+                    <span className="font-mono text-[#35d7c3]">OK</span>
                     <span>{meta.reconocimiento}</span>
                   </div>
                 )}
