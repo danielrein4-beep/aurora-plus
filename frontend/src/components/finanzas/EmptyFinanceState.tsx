@@ -6,13 +6,12 @@ interface EmptyFinanceStateProps {
   description: string;
 }
 
-// Estado honesto para secciones del Centro Financiero que aún no tienen una fuente de datos real conectada.
 export const EmptyFinanceState: React.FC<EmptyFinanceStateProps> = ({ title, description }) => (
-  <div className="bg-[#0b2341] border border-white/10 rounded-2xl p-8 sm:p-10 text-center flex flex-col items-center gap-3 font-['IBM_Plex_Sans',sans-serif]">
-    <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
-      <IconCloud size={22} className="text-white/40" />
+  <div className="apple-glass rounded-2xl p-10 sm:p-12 text-center flex flex-col items-center gap-3 border border-slate-200/60 dark:border-white/10 shadow-sm">
+    <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/25 flex items-center justify-center text-teal-600 dark:text-teal-400 shadow-inner">
+      <IconCloud size={24} />
     </div>
-    <h4 className="text-sm font-semibold text-white">{title}</h4>
-    <p className="text-xs text-white/60 max-w-md leading-relaxed">{description}</p>
+    <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">{title}</h4>
+    <p className="text-xs text-slate-500 dark:text-white/50 max-w-md leading-relaxed">{description}</p>
   </div>
 );
