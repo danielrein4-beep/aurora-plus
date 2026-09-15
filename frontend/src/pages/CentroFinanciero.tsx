@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   MOCK_KPIS,
   MOCK_CASH_BALANCES,
@@ -16,13 +17,16 @@ import { EmptyFinanceState } from '../components/finanzas/EmptyFinanceState';
 import { TasaCambioWidget } from '../components/finanzas/TasaCambioWidget';
 import type { KpiCardData, SupportedCurrency, VerticalCoverage } from '../components/finanzas/types';
 import { ApiError, EmpresaKpiResponse, obtenerEmpresaKpis } from '../api';
+import AuroraLogo from '../AuroraLogo';
 import {
   AuroraGradientDef,
   IconChart,
   IconRefresh,
   IconScale,
   IconFileText,
-  IconCloud
+  IconCloud,
+  IconBank,
+  IconCalendar
 } from '../Icons';
 
 type ActiveTab = 'resumen' | 'ventas-compras' | 'costos' | 'documentos' | 'cobertura';
@@ -49,12 +53,12 @@ const formatLocalDate = (date: Date) => {
 };
 
 const VERTICAL_NAMES: Record<string, string> = {
-  GANADERIA: 'Ganadería',
-  HORECA: 'Restaurante y Horeca',
-  RETAIL: 'Comercio y Retail',
-  REPUESTOS: 'Ferretería y Repuestos',
+  GANADERIA: 'Ganadería & Agro',
+  HORECA: 'Restaurante & Horeca',
+  RETAIL: 'Comercio & Retail',
+  REPUESTOS: 'Ferretería & Repuestos',
   MINERIA: 'Minería',
-  SALUD: 'Clínicas Médicas'
+  SALUD: 'Clínica & Salud'
 };
 
 const sourcesFor = (modulo: string) => {
@@ -130,6 +134,7 @@ const mapCoverage = (response: EmpresaKpiResponse): VerticalCoverage[] => [
 ];
 
 export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode = false, embedded = false }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<ActiveTab>('resumen');
   const today = new Date();
   const [desde, setDesde] = useState(() => formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 1)));
@@ -147,7 +152,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       label: 'Resumen General',
       shortLabel: 'Resumen',
       renderIcon: (active) => (
-        <IconChart size={18} className={active ? 'text-[#051322]' : 'text-white/70'} />
+        <IconChart size={17} className={active ? 'text-teal-600 dark:text-teal-300' : 'text-slate-500 dark:text-white/60'} />
       )
     },
     {
@@ -155,7 +160,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       label: 'Ventas y Compras',
       shortLabel: 'Ventas',
       renderIcon: (active) => (
-        <IconRefresh size={18} className={active ? 'text-[#051322]' : 'text-white/70'} />
+        <IconRefresh size={17} className={active ? 'text-teal-600 dark:text-teal-300' : 'text-slate-500 dark:text-white/60'} />
       ),
       demo: true
     },
@@ -164,7 +169,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       label: 'Estructura de Costos',
       shortLabel: 'Costos',
       renderIcon: (active) => (
-        <IconScale size={18} className={active ? 'text-[#051322]' : 'text-white/70'} />
+        <IconScale size={17} className={active ? 'text-teal-600 dark:text-teal-300' : 'text-slate-500 dark:text-white/60'} />
       ),
       demo: true
     },
@@ -173,7 +178,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       label: 'Documentos',
       shortLabel: 'Docs',
       renderIcon: (active) => (
-        <IconFileText size={18} className={active ? 'text-[#051322]' : 'text-white/70'} />
+        <IconFileText size={17} className={active ? 'text-teal-600 dark:text-teal-300' : 'text-slate-500 dark:text-white/60'} />
       ),
       demo: true
     },
@@ -182,7 +187,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       label: 'Cobertura por Vertical',
       shortLabel: 'Cobertura',
       renderIcon: (active) => (
-        <IconCloud size={18} className={active ? 'text-[#051322]' : 'text-white/70'} />
+        <IconCloud size={17} className={active ? 'text-teal-600 dark:text-teal-300' : 'text-slate-500 dark:text-white/60'} />
       )
     }
   ];
@@ -202,7 +207,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
     } catch (cause) {
       if (sequence !== requestSequence.current) return;
       if (cause instanceof ApiError && cause.status === 403) {
-        setError('Este resumen está disponible para propietarios, administradores y perfiles médicos autorizados.');
+        setError('Este resumen está disponible para propietarios, administradores y perfiles autorizados.');
       } else {
         setError(cause instanceof Error ? cause.message : 'No fue posible cargar el resumen financiero.');
       }
@@ -213,7 +218,6 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
 
   useEffect(() => {
     void loadFinanceData(appliedPeriod);
-    // Solo se ejecuta al abrir la pantalla; luego el usuario aplica el período.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -227,7 +231,6 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
   const realKpis = financeData ? mapKpis(financeData) : null;
   const realCoverage = financeData ? mapCoverage(financeData) : [];
 
-  // Cambia de pestaña y hace el contenido activo inmediatamente visible
   const handleTabChange = (tabId: ActiveTab) => {
     setActiveTab(tabId);
     requestAnimationFrame(() => {
@@ -239,75 +242,113 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
     });
   };
 
-  useEffect(() => {
-    // Al cambiar la pestaña (incluso por links internos), enfoca la vista al contenido activo
-    const navElement = document.getElementById('finance-tabs-nav');
-    if (navElement && window.pageYOffset > navElement.offsetTop) {
-      window.scrollTo({ top: navElement.offsetTop - 16, behavior: 'smooth' });
-    }
-  }, [activeTab]);
-
   return (
-    <div className={`${embedded ? 'aurora-embedded-light text-[#172033] pb-5' : 'min-h-screen bg-[#051322] text-white pb-24'} selection:bg-[#35d7c3]/30 selection:text-white overflow-x-hidden w-full max-w-full font-['IBM_Plex_Sans',sans-serif]`}>
-      {/* Definición compartida SVG para compatibilidad */}
+    <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 relative overflow-hidden flex flex-col ${embedded ? 'pb-6' : 'pb-24'}`}>
       {!embedded && <AuroraGradientDef />}
 
-      {/* La procedencia de los datos siempre queda visible. */}
-      <div className={`bg-[#0b2341] border-b px-3 sm:px-4 py-2 text-center text-xs font-medium flex flex-wrap items-center justify-center gap-2 ${isDemoTab ? 'border-amber-500/30 text-amber-300' : 'border-[#35d7c3]/30 text-[#35d7c3]'}`}>
-        <span className={`font-bold px-2 py-0.5 rounded border font-['IBM_Plex_Mono',monospace] text-[11px] ${isDemoTab ? 'bg-amber-500/20 border-amber-500/30' : 'bg-[#35d7c3]/10 border-[#35d7c3]/30'}`}>
-          {isDemoTab ? '[SIN CONEXIÓN DE DATOS]' : '[DATOS DEL NEGOCIO]'}
-        </span>
-        <span>
-          {isDemoTab
-            ? 'Esta sección todavía no tiene una fuente de datos real conectada.'
-            : 'Resumen y cobertura obtenidos de las fuentes operativas conectadas.'}
-        </span>
-        <span className="text-white/60 text-[11px] hidden sm:inline">
-          {isDemoTab
-            ? '(Sin cifras inventadas • Documentación no fiscal)'
-            : financeData ? `(Moneda base: ${financeData.moneda} • Período ${financeData.periodo.desde} al ${financeData.periodo.hasta})` : '(Cargando fuente real…)'}
-        </span>
-      </div>
+      {/* Fondos atmosféricos aurora */}
+      {!embedded && (
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="aurora-ribbon-1 -top-32 -left-20 opacity-25" />
+          <div className="aurora-ribbon-2 top-1/3 -right-20 opacity-30" />
+        </div>
+      )}
 
-      {/* Encabezado Principal */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#35d7c3] flex items-center justify-center text-[#051322] font-black text-xl shrink-0 font-['IBM_Plex_Sans',sans-serif]">
-                A+
+      {/* HEADER SUPERIOR — APPLE GLASS */}
+      {!embedded && (
+        <header className="nav-glass border-b border-slate-300/60 dark:border-white/10 px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4 relative z-30 sticky top-0 transition-colors duration-500 backdrop-blur-2xl">
+          <div className="flex items-center gap-3.5">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="apple-glass-btn text-xs font-semibold px-3 py-1.5 rounded-full text-slate-700 dark:text-white/80 hover:text-teal-500 dark:hover:text-teal-300 border border-slate-300/70 dark:border-white/15 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Regresar al Hub Principal"
+            >
+              <span>←</span>
+              <span>Volver al Hub</span>
+            </button>
+
+            <div className="h-5 w-[1px] bg-slate-300/80 dark:bg-white/15 mx-1" />
+
+            <div className="flex items-center gap-2.5">
+              <div className="p-1 rounded-xl bg-teal-500/10 border border-teal-500/20">
+                <AuroraLogo size={24} animated />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                  Centro Financiero Aurora Plus
-                </h1>
-                <p className="text-xs text-white/60">
-                  Visión operativa consolidada del negocio, diseñada para dueños sin conocimientos contables.
-                </p>
+                <div className="font-['Outfit'] font-extrabold text-base text-aurora leading-none flex items-center gap-2">
+                  <span>Aurora Finanzas</span>
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+                    Control Integral
+                  </span>
+                </div>
+                <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-medium">
+                  Visión operativa del negocio
+                </div>
               </div>
             </div>
           </div>
 
-          {/* El período se aplica de forma explícita para evitar consultas por cada tecla. */}
-          <div className="flex flex-wrap items-end gap-2 mt-2 md:mt-0">
-            <label className="text-[10px] uppercase tracking-wide text-white/50">
-              Desde
-              <input type="date" value={desde} max={hasta} onChange={(event) => setDesde(event.target.value)} className="mt-1 block rounded-lg border border-white/10 bg-[#0b2341] px-2.5 py-2 text-xs text-white [color-scheme:dark]" />
-            </label>
-            <label className="text-[10px] uppercase tracking-wide text-white/50">
-              Hasta
-              <input type="date" value={hasta} min={desde} onChange={(event) => setHasta(event.target.value)} className="mt-1 block rounded-lg border border-white/10 bg-[#0b2341] px-2.5 py-2 text-xs text-white [color-scheme:dark]" />
-            </label>
-            <button type="button" onClick={handleApplyPeriod} disabled={previewMode || loading} className="rounded-lg border border-[#35d7c3]/40 bg-[#35d7c3]/15 px-3 py-2 text-xs font-semibold text-[#35d7c3] transition-colors hover:bg-[#35d7c3]/25 disabled:cursor-not-allowed disabled:opacity-50">
-              {loading ? 'Consultando…' : 'Aplicar'}
+          {/* Rango de Fechas y Botón Aplicar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 apple-glass-pill rounded-full px-3 py-1 border border-slate-300/70 dark:border-white/15 shadow-inner">
+              <IconCalendar size={14} className="text-teal-500" />
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-slate-400 dark:text-white/40 text-[10px] uppercase font-bold">Del</span>
+                <input
+                  type="date"
+                  value={desde}
+                  max={hasta}
+                  onChange={(e) => setDesde(e.target.value)}
+                  className="bg-transparent text-slate-800 dark:text-white text-xs outline-none cursor-pointer font-medium"
+                />
+                <span className="text-slate-400 dark:text-white/40 text-[10px] uppercase font-bold">al</span>
+                <input
+                  type="date"
+                  value={hasta}
+                  min={desde}
+                  onChange={(e) => setHasta(e.target.value)}
+                  className="bg-transparent text-slate-800 dark:text-white text-xs outline-none cursor-pointer font-medium"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleApplyPeriod}
+              disabled={previewMode || loading}
+              className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-full cursor-pointer shadow-md hover:scale-105 transition-all disabled:opacity-50"
+            >
+              {loading ? 'Consultando…' : 'Consultar'}
             </button>
           </div>
-        </div>
+        </header>
+      )}
 
-        {/* Barra de Navegación de Pestañas Activas (Desktop y Móvil) */}
-        <div 
+      {/* Pill Informativa de Estado de Conexión (Aesthetics Premium) */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5">
+        <div className="apple-glass rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border border-slate-300/60 dark:border-white/10 shadow-sm text-xs">
+          <div className="flex items-center gap-2.5">
+            <span className={`w-2 h-2 rounded-full ${isDemoTab ? 'bg-amber-400 animate-pulse' : 'bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.8)]'}`} />
+            <span className="font-semibold text-slate-800 dark:text-white">
+              {isDemoTab ? 'Vista de Demostración & Estructura' : 'Fuentes Operativas Consolidadas'}
+            </span>
+            <span className="text-slate-500 dark:text-white/50 text-[11px] hidden md:inline">
+              — {isDemoTab ? 'Módulo configurado para recibir datos automáticos de tus verticales' : `Moneda base: ${financeData?.moneda || 'USD'}`}
+            </span>
+          </div>
+
+          <div className="text-[11px] font-mono text-slate-500 dark:text-white/50">
+            Período: <strong className="text-teal-600 dark:text-teal-300">{appliedPeriod.desde}</strong> al <strong className="text-teal-600 dark:text-teal-300">{appliedPeriod.hasta}</strong>
+          </div>
+        </div>
+      </div>
+
+      {/* CONTENIDO PRINCIPAL */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10 space-y-6">
+        
+        {/* Barra de Pestañas Apple Liquid Glass */}
+        <div
           id="finance-tabs-nav"
-          className="mt-6 flex items-center gap-1.5 p-1.5 bg-[#0b2341] rounded-2xl border border-white/10 overflow-x-auto scrollbar-none max-w-full"
+          className="flex items-center gap-1.5 p-1.5 apple-glass-pill rounded-full border border-slate-300/80 dark:border-white/15 bg-slate-100/90 dark:bg-white/[0.04] shadow-inner text-xs overflow-x-auto whitespace-nowrap"
         >
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -315,33 +356,46 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer whitespace-nowrap ${
                   isActive
-                    ? 'bg-[#35d7c3] text-[#051322]'
-                    : 'text-white/70 hover:text-white hover:bg-white/5'
+                    ? 'bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25'
+                    : 'text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8'
                 }`}
               >
                 <span>{tab.renderIcon(isActive)}</span>
-                <span>{tab.label}</span>
-                {tab.demo && <span className={`rounded px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${isActive ? 'bg-[#051322]/15' : 'bg-amber-500/15 text-amber-300'}`}>Sin datos</span>}
+                <span className="font-['Outfit']">{tab.label}</span>
+                {tab.demo && (
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] uppercase font-mono tracking-wide ${
+                    isActive ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300' : 'bg-amber-500/10 text-amber-600 dark:text-amber-300'
+                  }`}>
+                    Vista
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
 
-        {/* Contenido de la Pestaña Activa (Inmediatamente visible al cambiar) */}
-        <div ref={activeContentRef} className="mt-6">
+        {/* CONTENEDOR DE LA PESTAÑA ACTIVA */}
+        <div ref={activeContentRef} className="transition-all duration-300">
           {!previewMode && (activeTab === 'resumen' || activeTab === 'cobertura') && loading && (
-            <div className="rounded-2xl border border-white/10 bg-[#0b2341] p-8 text-center text-sm text-white/60">
-              Consultando las fuentes financieras del período…
+            <div className="apple-glass rounded-3xl border border-slate-300/60 dark:border-white/10 p-12 text-center text-sm text-slate-500 dark:text-white/60 space-y-3">
+              <div className="w-8 h-8 mx-auto border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+              <p className="font-semibold">Consultando las fuentes financieras en tiempo real…</p>
             </div>
           )}
 
           {!previewMode && (activeTab === 'resumen' || activeTab === 'cobertura') && !loading && error && (
-            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5 text-sm text-rose-200">
-              <p className="font-semibold">No pudimos mostrar los datos del negocio.</p>
-              <p className="mt-1 text-xs text-rose-100/75">{error}</p>
-              <button type="button" onClick={() => void loadFinanceData()} className="mt-3 rounded-lg border border-rose-300/30 px-3 py-1.5 text-xs font-semibold hover:bg-white/5">Reintentar</button>
+            <div className="apple-glass rounded-3xl border border-rose-500/30 bg-rose-500/10 p-6 text-sm text-rose-700 dark:text-rose-200 space-y-3">
+              <p className="font-bold font-['Outfit'] text-base">No pudimos mostrar los datos del negocio.</p>
+              <p className="text-xs opacity-80">{error}</p>
+              <button
+                type="button"
+                onClick={() => void loadFinanceData()}
+                className="btn-electric-blue text-white text-xs font-bold px-4 py-2 rounded-full cursor-pointer shadow-md"
+              >
+                Reintentar
+              </button>
             </div>
           )}
 
@@ -388,57 +442,59 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
             ) : (
               <EmptyFinanceState
                 title="Aún no hay documentos comerciales no fiscales conectados"
-                description="Las notas de entrega y documentos de venta no fiscales generados por tu vertical aparecerán aquí, cada uno con su referencia interna."
+                description="Las notas de entrega y comprobantes no fiscales generados por tu vertical aparecerán aquí, cada uno con su referencia interna."
               />
             )
           )}
 
           {activeTab === 'cobertura' && (previewMode || (!loading && !error && financeData)) && (
-            <div className="space-y-4">
-              <div className="bg-[#0b2341] border border-white/10 rounded-2xl p-4 sm:p-5">
-                <h3 className="text-base font-semibold text-white">
+            <div className="space-y-6">
+              <div className="apple-glass rounded-3xl p-5 sm:p-6 border border-slate-300/60 dark:border-white/10 shadow-lg">
+                <h3 className="text-base sm:text-lg font-bold font-['Outfit'] text-slate-900 dark:text-white">
                   Detalle de Integración de Fuentes por Vertical
                 </h3>
-                <p className="text-xs text-white/65 mt-1 leading-relaxed">
-                  Para que las cifras operativas reflejen la realidad de tu empresa, Aurora Plus clasifica cada área en estado cualitativo: <strong className="text-emerald-400">Con datos</strong>, <strong className="text-amber-400">Parcial</strong> o <strong className="text-rose-400">Sin conexión</strong>.
+                <p className="text-xs text-slate-500 dark:text-white/60 mt-1 leading-relaxed max-w-2xl">
+                  Para que las cifras operativas reflejen la realidad de tu empresa, Aurora Plus clasifica cada área en estado cualitativo: <strong className="text-emerald-500">Con datos</strong>, <strong className="text-amber-500">Parcial</strong> o <strong className="text-rose-500">Sin conexión</strong>.
                 </p>
               </div>
               <VerticalCoverageCard coverageList={previewMode ? MOCK_COVERAGE : realCoverage} />
             </div>
           )}
         </div>
-      </div>
+      </main>
 
-      {/* Barra de Navegación Móvil Inferior Fija (Mobile Dock) sin overflow en 390px */}
-      {!embedded && <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#071a2e] border-t border-white/10 px-1 py-1.5 flex justify-between items-center w-full max-w-full">
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-1 px-0.5 rounded-xl transition-colors ${
-                isActive
-                  ? 'text-[#35d7c3]'
-                  : 'text-white/50 hover:text-white/70'
-              }`}
-            >
-              <span className="flex items-center justify-center">
-                {tab.id === 'resumen' && <IconChart size={16} className={isActive ? 'text-[#35d7c3]' : 'text-white/50'} />}
-                {tab.id === 'ventas-compras' && <IconRefresh size={16} className={isActive ? 'text-[#35d7c3]' : 'text-white/50'} />}
-                {tab.id === 'costos' && <IconScale size={16} className={isActive ? 'text-[#35d7c3]' : 'text-white/50'} />}
-                {tab.id === 'documentos' && <IconFileText size={16} className={isActive ? 'text-[#35d7c3]' : 'text-white/50'} />}
-                {tab.id === 'cobertura' && <IconCloud size={16} className={isActive ? 'text-[#35d7c3]' : 'text-white/50'} />}
-              </span>
-              <span className="truncate text-[10px] font-medium w-full text-center leading-tight">
-                {tab.shortLabel}
-              </span>
-            </button>
-          );
-        })}
-      </div>}
+      {/* DOCK MÓVIL INFERIOR — APPLE LIQUID GLASS */}
+      {!embedded && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 apple-glass border-t border-slate-300/60 dark:border-white/10 px-2 py-2 flex justify-between items-center backdrop-blur-2xl">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-1 px-1 rounded-xl transition-all cursor-pointer ${
+                  isActive
+                    ? 'text-teal-600 dark:text-teal-300 font-bold'
+                    : 'text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <span className="flex items-center justify-center">
+                  {tab.id === 'resumen' && <IconChart size={16} />}
+                  {tab.id === 'ventas-compras' && <IconRefresh size={16} />}
+                  {tab.id === 'costos' && <IconScale size={16} />}
+                  {tab.id === 'documentos' && <IconFileText size={16} />}
+                  {tab.id === 'cobertura' && <IconCloud size={16} />}
+                </span>
+                <span className="truncate text-[10px] font-medium w-full text-center leading-tight">
+                  {tab.shortLabel}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
-export default CentroFinanciero;
 
+export default CentroFinanciero;

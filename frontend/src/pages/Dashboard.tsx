@@ -888,6 +888,118 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* ── MÓDULOS DE TU EMPRESA / ECOSISTEMA AURORA ── */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Módulos de tu Empresa</span>
+                    <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/30 font-semibold">
+                      Multi-Tenant Cloud
+                    </span>
+                  </h3>
+                  <p className="text-slate-500 dark:text-white/50 text-xs mt-0.5">
+                    Acceso directo a los módulos operativos y administrativos habilitados para tu negocio.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {/* 1. Módulo Operativo Principal (Vertical Activa) */}
+                <div 
+                  onClick={() => navigate(rutaVertical)}
+                  className="apple-glass rounded-3xl p-6 border border-slate-300/60 dark:border-white/10 hover:border-teal-400/50 transition-all duration-300 group cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="w-12 h-12 rounded-2xl bg-teal-500/10 dark:bg-teal-400/10 text-teal-600 dark:text-teal-300 flex items-center justify-center border border-teal-500/20 group-hover:scale-110 transition-transform">
+                        <VerticalIcon size={24} />
+                      </div>
+                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 uppercase">
+                        Vertical Activa
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white group-hover:text-teal-500 dark:group-hover:text-teal-300 transition-colors">
+                        {vertical.name}
+                      </h4>
+                      <p className="text-slate-500 dark:text-white/60 text-xs mt-1 leading-relaxed line-clamp-2">
+                        {vertical.desc}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-teal-600 dark:text-teal-300">
+                    <span>Entrar al Sistema</span>
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </div>
+                </div>
+
+                {/* 2. Centro Financiero & Control Contable */}
+                <div 
+                  onClick={() => navigate("/finanzas")}
+                  className="apple-glass rounded-3xl p-6 border border-slate-300/60 dark:border-white/10 hover:border-emerald-400/50 transition-all duration-300 group cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-400/10 text-emerald-600 dark:text-emerald-300 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform">
+                        <IconBank size={24} />
+                      </div>
+                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase">
+                        Finanzas & Control
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white group-hover:text-emerald-500 dark:group-hover:text-emerald-300 transition-colors">
+                        Aurora Finanzas
+                      </h4>
+                      <p className="text-slate-500 dark:text-white/60 text-xs mt-1 leading-relaxed line-clamp-2">
+                        Consolidación de ventas, margen bruto, costeo operativo, cobertura y comprobantes no fiscales.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-300">
+                    <span>Abrir Centro Financiero</span>
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </div>
+                </div>
+
+                {/* 3. Gestión de Personal & Nómina */}
+                <div 
+                  onClick={() => navigate("/personal")}
+                  className="apple-glass rounded-3xl p-6 border border-slate-300/60 dark:border-white/10 hover:border-purple-400/50 transition-all duration-300 group cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="w-12 h-12 rounded-2xl bg-purple-500/10 dark:bg-purple-400/10 text-purple-600 dark:text-purple-300 flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
+                        <IconUsers size={24} />
+                      </div>
+                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 uppercase">
+                        Talento & Nómina
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white group-hover:text-purple-500 dark:group-hover:text-purple-300 transition-colors">
+                        Gestión de Personal
+                      </h4>
+                      <p className="text-slate-500 dark:text-white/60 text-xs mt-1 leading-relaxed line-clamp-2">
+                        Control de turnos, asistencias biométricas, comisiones por venta y liquidación periódica.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-purple-600 dark:text-purple-300">
+                    <span>Abrir Gestión de Personal</span>
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* SIMULADOR EN VIVO / WORKSPACE INTEGRADO */}
             <div className="apple-glass rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-300/60 dark:border-white/10">
