@@ -52,6 +52,12 @@ public class Comanda {
     @Column(name = "total_consumo", nullable = false, precision = 18, scale = 2)
     private BigDecimal totalConsumo = BigDecimal.ZERO;
 
+    @Column(name = "moneda_total", length = 3)
+    private String monedaTotal;
+
+    public String getMonedaTotal() { return monedaTotal; }
+    public void setMonedaTotal(String monedaTotal) { this.monedaTotal = monedaTotal; }
+
     @Column(name = "fecha_apertura", nullable = false)
     private LocalDateTime fechaApertura = LocalDateTime.now();
 

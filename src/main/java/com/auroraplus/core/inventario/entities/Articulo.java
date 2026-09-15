@@ -65,11 +65,29 @@ public class Articulo {
     @Column(name = "costo_unitario_original", precision = 18, scale = 4)
     private BigDecimal costoUnitarioOriginal;
 
+    @Column(name = "moneda_valoracion", length = 3)
+    private String monedaValoracion;
+
+    public String getMonedaValoracion() { return monedaValoracion; }
+    public void setMonedaValoracion(String monedaValoracion) { this.monedaValoracion = monedaValoracion; }
+
     // Solo llega en el alta/entrada de una compra multimoneda. No es una tasa
     // global editable ni reemplaza el historial: el controlador registra una
     // fila histórica en tasas de cambio y el costo normalizado queda congelado.
     @Transient
     private BigDecimal tasaCambioAplicada;
+    @Transient private BigDecimal unidadesOrigenPorBase;
+    @Transient private BigDecimal cantidadInicial;
+    @Transient private String metodoPagoInicial;
+    @Transient private java.time.LocalDate fechaVencimientoInicial;
+    public BigDecimal getUnidadesOrigenPorBase() { return unidadesOrigenPorBase; }
+    public void setUnidadesOrigenPorBase(BigDecimal valor) { unidadesOrigenPorBase = valor; }
+    public BigDecimal getCantidadInicial() { return cantidadInicial; }
+    public void setCantidadInicial(BigDecimal valor) { cantidadInicial = valor; }
+    public String getMetodoPagoInicial() { return metodoPagoInicial; }
+    public void setMetodoPagoInicial(String valor) { metodoPagoInicial = valor; }
+    public java.time.LocalDate getFechaVencimientoInicial() { return fechaVencimientoInicial; }
+    public void setFechaVencimientoInicial(java.time.LocalDate valor) { fechaVencimientoInicial = valor; }
 
     // Campos de Aurora Retail (Ferretería/Farmacia/Repuestos) — opcionales,
     // ausentes/null para artículos de HORECA u otros módulos que no los usan.

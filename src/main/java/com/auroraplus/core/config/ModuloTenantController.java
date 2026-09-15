@@ -32,6 +32,9 @@ public class ModuloTenantController {
     @Autowired
     private ModuloTenantRepository moduloTenantRepository;
 
+    @Autowired
+    private com.auroraplus.core.inventario.repositories.ArticuloRepository articuloRepository;
+
     @GetMapping("/mis-modulos")
     public List<String> misModulos() {
         Long tenantId = TenantContext.getCurrentTenant();
@@ -177,6 +180,8 @@ public class ModuloTenantController {
         Long tenantId = TenantContext.getCurrentTenant();
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        if (!request.monedaBase.equals(licencia.getMonedaBase()) && !articuloRepository.findByTenantId(tenantId).isEmpty())
+            throw new IllegalStateException("Ya hay inventario valorado en " + licencia.getMonedaBase() + ". Cambiar la moneda requiere revisar y convertir los saldos existentes.");
         licencia.setMonedaBase(request.monedaBase);
         licenciaTenantRepository.save(licencia);
         return new MonedaBaseResponse(licencia.getMonedaBase());

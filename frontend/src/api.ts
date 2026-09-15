@@ -743,7 +743,12 @@ export interface ReporteTicket {
   numeroTicket: string;
   fecha: string;
   totalUsd: number;
-  totalBs: number | null; // null si no había tasa BCV registrada para ese día
+  totalBs: number | null;
+  totalBase?: number;
+  monedaBase?: string | null;
+  monedaVuelto?: string | null;
+  vuelto?: number | null;
+  pagos?: Array<{ moneda: string; monto: number; metodoPago: string; equivalenteBase: number; tasaAplicada: number | null }>;
   metodoPago: string | null;
   estado: "ABIERTA" | "PAGADA" | "ANULADA";
   canal: string;
@@ -773,6 +778,10 @@ export function cerrarComanda(comandaId: number, datos: {
   if (datos.monedaPago) params.set("monedaPago", datos.monedaPago);
   if (datos.montoRecibido != null) params.set("montoRecibido", String(datos.montoRecibido));
   return request(`/api/horeca/mesas/comandas/${comandaId}/cerrar?${params}`, { method: "POST" });
+}
+
+export function cotizacionCobro(): Promise<{ monedaBase: string; factores: Record<string, number | null> }> {
+  return request("/api/financiero/tasas/cotizacion-cobro");
 }
 
 export interface PagoParcial {
@@ -963,6 +972,7 @@ export interface Articulo {
   // Ausentes en artículos viejos.
   monedaCosto?: string | null;
   costoUnitarioOriginal?: number | null;
+  monedaValoracion?: string | null;
   // Aurora Retail (Ferretería/Farmacia/Repuestos) — ambos opcionales, ausentes
   // en artículos de otras verticales que no los usan.
   codigoBarras?: string | null;
@@ -976,7 +986,7 @@ export function listarArticulos(): Promise<Articulo[]> {
 // costoUnitario va tal cual lo tecleó el usuario en `monedaCosto` (o en la
 // moneda base del tenant si se omite) — el backend lo convierte a la
 // moneda base antes de guardar.
-export function crearArticulo(datos: { sku: string; nombre: string; unidadMedida?: string; categoria?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; monedaCosto?: string; tasaCambioAplicada?: number; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
+export function crearArticulo(datos: { sku: string; nombre: string; unidadMedida?: string; categoria?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; monedaCosto?: string; tasaCambioAplicada?: number; unidadesOrigenPorBase?: number; cantidadInicial?: number; metodoPagoInicial?: string; fechaVencimientoInicial?: string; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
   return request(`/api/inventario/articulos`, { method: "POST", body: JSON.stringify(datos) });
 }
 
@@ -987,7 +997,7 @@ export function entradaArticulo(articuloId: number, datos: { cantidad: number; c
   return request(`/api/inventario/articulos/${articuloId}/entrada`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function editarArticulo(articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; precioVenta?: number; stockMinimo?: number; sku?: string; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
+export function editarArticulo(articuloId: number, datos: { nombre?: string; categoria?: string; unidadMedida?: string; costoUnitario?: number; monedaCosto?: string; unidadesOrigenPorBase?: number; precioVenta?: number; stockMinimo?: number; sku?: string; codigoBarras?: string; principioActivo?: string }): Promise<Articulo> {
   return request(`/api/inventario/articulos/${articuloId}`, { method: "PUT", body: JSON.stringify(datos) });
 }
 
