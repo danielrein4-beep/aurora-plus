@@ -649,7 +649,7 @@ function ModalDividirCuenta({
 
         <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-3 flex items-center justify-between">
           <span className="text-xs text-slate-500 dark:text-white/40 font-semibold">Total de la orden:</span>
-          <span className="font-mono font-bold text-lg text-slate-900 dark:text-white">${total.toFixed(2)}</span>
+          <span className="font-mono font-bold text-lg text-slate-900 dark:text-white">${fmtNumero(total, "USD")}</span>
         </div>
 
         <div>
@@ -3226,15 +3226,26 @@ function calcularMargen(costo: number, precio: number): number | null {
 // guardar — así solo hay un lugar haciendo esa conversión (antes el
 // frontend convertía a USD fijo acá mismo, lo que rompía en cuanto un
 // negocio configuraba una moneda base distinta a USD).
-/** Formato unificado con separador de miles en puntos y código al final: "60.000 COP", "200 USD", "100.000 BS". Muestra decimales solo si los tiene (ej. "1.250,50 COP"). */
+/** Formato puramente numérico con separador de miles en punto (ej. "60.000" para COP, "10.700", "20" o "20,50" para USD/VES). */
+function fmtNumero(monto: number | null | undefined, moneda?: string | null): string {
+  const num = Number(monto) || 0;
+  const m = (moneda || "").toUpperCase().trim();
+  const tieneDecimales = m === "COP" ? false : (num % 1 !== 0);
+  return num.toLocaleString("es-CO", {
+    minimumFractionDigits: tieneDecimales ? 2 : 0,
+    maximumFractionDigits: tieneDecimales ? 2 : 0,
+  });
+}
+
+/** Formato unificado con separador de miles en puntos y código al final: "60.000 COP", "200 USD", "100.000 BS". Muestra decimales solo si los tiene (ej. "1.250,50 COP"). Para COP nunca muestra centavos. */
 function fmtCostoEnMoneda(monto: number | null | undefined, moneda?: string | null): string {
   const num = Number(monto) || 0;
   const m = (moneda || "USD").toUpperCase().trim();
   const etiqueta = (m === "VES" || m === "BS") ? "BS" : m;
-  const tieneDecimales = num % 1 !== 0;
+  const tieneDecimales = m === "COP" ? false : (num % 1 !== 0);
   const str = num.toLocaleString("es-CO", {
     minimumFractionDigits: tieneDecimales ? 2 : 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: tieneDecimales ? 2 : 0,
   });
   return `${str} ${etiqueta}`;
 }
@@ -5644,7 +5655,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               </div>
               {tasaBcv && Number(tasaBcv.tasa) > 0 && (
                 <div className="flex items-center justify-between text-sm text-teal-600 dark:text-teal-400 font-mono font-bold mt-0.5">
-                  <span className="text-[11px] font-semibold text-slate-400">≈ Bs</span><span>{(total * Number(tasaBcv.tasa)).toFixed(2)}</span>
+                  <span className="text-[11px] font-semibold text-slate-400">≈ Bs</span><span>{fmtNumero(total * Number(tasaBcv.tasa), "VES")}</span>
                 </div>
               )}
               {tasaCop && Number(tasaCop.tasa) > 0 && (
@@ -5733,7 +5744,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
               </div>
               {tasaBcv && Number(tasaBcv.tasa) > 0 && (
                 <div className="flex items-center justify-between text-xs text-teal-600 dark:text-teal-400 font-mono mt-0.5">
-                  <span>≈ Bs</span><span>{(recibo.total * Number(tasaBcv.tasa)).toFixed(2)}</span>
+                  <span>≈ Bs</span><span>{fmtNumero(recibo.total * Number(tasaBcv.tasa), "VES")}</span>
                 </div>
               )}
               {tasaCop && Number(tasaCop.tasa) > 0 && (
@@ -5752,7 +5763,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
             )}
             {recibo.vuelto != null && recibo.vuelto > 0.004 && (
               <div className="text-sm font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2">
-                Vuelto entregado: <span className="font-mono">{recibo.vuelto.toFixed(2)} {recibo.monedaVuelto}</span>
+                Vuelto entregado: <span className="font-mono">{fmtCostoEnMoneda(recibo.vuelto, recibo.monedaVuelto)}</span>
               </div>
             )}
 
@@ -6024,8 +6035,8 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                     <tr className="border-b border-slate-200/50 dark:border-white/5">
                       <td className="py-2 pr-3 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fecha).toLocaleString()}</td>
                       <td className="py-2 px-3 font-mono font-semibold text-slate-800 dark:text-white/80">{t.numeroTicket}</td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white/80">${Number(t.totalUsd).toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.totalBs != null ? `Bs ${Number(t.totalBs).toFixed(2)}` : "—"}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-800 dark:text-white/80">${fmtNumero(t.totalUsd, "USD")}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-white/60">{t.totalBs != null ? `Bs ${fmtNumero(t.totalBs, "VES")}` : "—"}</td>
                       <td className="py-2 px-3 text-slate-600 dark:text-white/60">{(t.metodoPago || "-").replace("_", " ")}</td>
                       <td className="py-2 px-3">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -6069,8 +6080,8 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
               <tfoot>
                 <tr className="font-bold text-slate-900 dark:text-white border-t-2 border-slate-300/60 dark:border-white/10">
                   <td className="py-2 pr-3" colSpan={2}>Total</td>
-                  <td className="py-2 px-3 text-right font-mono">${totales.usd.toFixed(2)}</td>
-                  <td className="py-2 px-3 text-right font-mono">Bs {totales.bs.toFixed(2)}</td>
+                  <td className="py-2 px-3 text-right font-mono">${fmtNumero(totales.usd, "USD")}</td>
+                  <td className="py-2 px-3 text-right font-mono">Bs {fmtNumero(totales.bs, "VES")}</td>
                   <td colSpan={3}></td>
                 </tr>
               </tfoot>
@@ -7018,7 +7029,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-300">ABIERTO</span>
             </div>
             <p className="text-xs text-slate-500 dark:text-white/40">Cajero: {turno.idCajero} · Desde {new Date(turno.fechaApertura).toLocaleString()}</p>
-            <p className="text-xs text-slate-500 dark:text-white/40">Monto base: {Number(turno.montoBase).toFixed(2)} {moneda}</p>
+            <p className="text-xs text-slate-500 dark:text-white/40">Monto base: {fmtCostoEnMoneda(turno.montoBase, moneda)}</p>
           </div>
 
           <div className="apple-glass rounded-2xl p-5 space-y-3">
@@ -7152,7 +7163,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
                     Total declarado acumulado:
                   </span>
                   <span className="font-mono font-black text-base text-teal-600 dark:text-teal-400">
-                    {totalDesgloseCalculado.toFixed(2)} {moneda}
+                    {fmtCostoEnMoneda(totalDesgloseCalculado, moneda)}
                   </span>
                 </div>
               </div>
@@ -7174,7 +7185,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
               disabled={cerrando}
               className="btn-cyber-neon text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer disabled:opacity-60 w-full shadow-lg"
             >
-              {cerrando ? "Cerrando turno y auditando…" : `Cerrar turno y generar Cierre Z (${montoDeclaradoFinal.toFixed(2)} ${moneda})`}
+              {cerrando ? "Cerrando turno y auditando…" : `Cerrar turno y generar Cierre Z (${fmtCostoEnMoneda(montoDeclaradoFinal, moneda)})`}
             </button>
           </div>
         </div>
@@ -7184,8 +7195,8 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
         <Modal onClose={() => setUltimoCierre(null)} titulo="Cierre Z registrado">
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-slate-500 dark:text-white/40 text-xs">Esperado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{Number(ultimoCierre.montoEsperado).toFixed(2)} {ultimoCierre.moneda}</div></div>
-              <div><span className="text-slate-500 dark:text-white/40 text-xs">Declarado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{Number(ultimoCierre.montoDeclarado).toFixed(2)} {ultimoCierre.moneda}</div></div>
+              <div><span className="text-slate-500 dark:text-white/40 text-xs">Esperado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{fmtCostoEnMoneda(ultimoCierre.montoEsperado, ultimoCierre.moneda)}</div></div>
+              <div><span className="text-slate-500 dark:text-white/40 text-xs">Declarado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{fmtCostoEnMoneda(ultimoCierre.montoDeclarado, ultimoCierre.moneda)}</div></div>
             </div>
             <div className={`rounded-xl p-3 text-center font-mono font-bold ${
               Number(ultimoCierre.descuadre) === 0 ? "bg-teal-500/15 text-teal-600 dark:text-teal-300"
@@ -7193,8 +7204,8 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
               : "bg-red-500/15 text-red-500"
             }`}>
               {Number(ultimoCierre.descuadre) === 0 ? "Caja cuadrada exacta"
-                : Number(ultimoCierre.descuadre) > 0 ? `Sobrante: +${Number(ultimoCierre.descuadre).toFixed(2)} ${ultimoCierre.moneda}`
-                : `Faltante: ${Number(ultimoCierre.descuadre).toFixed(2)} ${ultimoCierre.moneda}`}
+                : Number(ultimoCierre.descuadre) > 0 ? `Sobrante: +${fmtCostoEnMoneda(ultimoCierre.descuadre, ultimoCierre.moneda)}`
+                : `Faltante: ${fmtCostoEnMoneda(ultimoCierre.descuadre, ultimoCierre.moneda)}`}
             </div>
             <button onClick={() => setUltimoCierre(null)} className="w-full apple-glass-btn text-xs font-semibold py-3 rounded-xl cursor-pointer">Cerrar</button>
           </div>
@@ -7223,13 +7234,13 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
                     <td className="py-2 pr-2 text-slate-600 dark:text-white/60 whitespace-nowrap">{new Date(t.fechaApertura).toLocaleString()}</td>
                     <td className="py-2 px-2 text-slate-600 dark:text-white/60">{t.idCajero}</td>
                     <td className="py-2 px-2 text-slate-600 dark:text-white/60">{t.moneda}</td>
-                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{Number(t.montoBase).toFixed(2)}</td>
-                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{t.montoEsperado != null ? Number(t.montoEsperado).toFixed(2) : "—"}</td>
-                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{t.montoDeclarado != null ? Number(t.montoDeclarado).toFixed(2) : "—"}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{fmtNumero(t.montoBase, t.moneda)}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{t.montoEsperado != null ? fmtNumero(t.montoEsperado, t.moneda) : "—"}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-white/60">{t.montoDeclarado != null ? fmtNumero(t.montoDeclarado, t.moneda) : "—"}</td>
                     <td className={`py-2 pl-2 text-right font-mono font-bold ${
                       t.descuadre == null ? "text-slate-400" : Number(t.descuadre) === 0 ? "text-teal-600 dark:text-teal-400" : "text-red-500"
                     }`}>
-                      {t.descuadre != null ? Number(t.descuadre).toFixed(2) : (t.estado === "ABIERTO" ? "Abierto" : "—")}
+                      {t.descuadre != null ? fmtNumero(t.descuadre, t.moneda) : (t.estado === "ABIERTO" ? "Abierto" : "—")}
                     </td>
                   </tr>
                 ))}
@@ -7393,15 +7404,15 @@ function CierreDeCaja({ tenantId }: { tenantId: number }) {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
               <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Ingresos</div>
-              <div className="font-['Outfit'] font-black text-lg text-teal-600 dark:text-teal-400">{Number(resumen.totalIngresos).toFixed(2)}</div>
+              <div className="font-['Outfit'] font-black text-lg text-teal-600 dark:text-teal-400">{fmtNumero(resumen.totalIngresos, moneda)}</div>
             </div>
             <div className="bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
               <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Egresos</div>
-              <div className="font-['Outfit'] font-black text-lg text-red-500">{Number(resumen.totalEgresos).toFixed(2)}</div>
+              <div className="font-['Outfit'] font-black text-lg text-red-500">{fmtNumero(resumen.totalEgresos, moneda)}</div>
             </div>
             <div className="bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
               <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Esperado en caja</div>
-              <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{Number(resumen.montoEsperadoEnCaja).toFixed(2)}</div>
+              <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{fmtNumero(resumen.montoEsperadoEnCaja, moneda)}</div>
             </div>
           </div>
         )}
@@ -7436,8 +7447,8 @@ function CierreDeCaja({ tenantId }: { tenantId: number }) {
                   {a.idCajero} · {new Date(a.fechaArqueo).toLocaleString()}
                 </div>
                 <div className={`text-[11px] mt-0.5 ${a.diferencia == null || Number(a.diferencia) === 0 ? "text-teal-600 dark:text-teal-400" : "text-amber-500"}`}>
-                  Declarado: {Number(a.montoDeclarado).toFixed(2)} {a.moneda} · Esperado: {a.montoEsperado != null ? Number(a.montoEsperado).toFixed(2) : "—"} {a.moneda}
-                  {a.diferencia != null && Number(a.diferencia) !== 0 && ` · Diferencia: ${Number(a.diferencia).toFixed(2)}`}
+                  Declarado: {fmtCostoEnMoneda(a.montoDeclarado, a.moneda)} · Esperado: {a.montoEsperado != null ? fmtCostoEnMoneda(a.montoEsperado, a.moneda) : "—"}
+                  {a.diferencia != null && Number(a.diferencia) !== 0 && ` · Diferencia: ${fmtCostoEnMoneda(a.diferencia, a.moneda)}`}
                 </div>
               </div>
               <button onClick={() => descargarPdf(a.id)} disabled={descargandoId === a.id}
@@ -7511,7 +7522,7 @@ function Finanzas({ tenantId, monedasActivas }: { tenantId: number; monedasActiv
             {monedasConMovimiento.map((moneda) => (
               <div key={moneda} className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-slate-400 dark:text-white/30">{moneda}</span>
-                <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{(ingresosPorMoneda[moneda] || 0).toFixed(2)}</span>
+                <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{fmtNumero(ingresosPorMoneda[moneda] || 0, moneda)}</span>
               </div>
             ))}
           </div>
@@ -7522,7 +7533,7 @@ function Finanzas({ tenantId, monedasActivas }: { tenantId: number; monedasActiv
             {monedasConMovimiento.map((moneda) => (
               <div key={moneda} className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-slate-400 dark:text-white/30">{moneda}</span>
-                <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{(egresosPorMoneda[moneda] || 0).toFixed(2)}</span>
+                <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{fmtNumero(egresosPorMoneda[moneda] || 0, moneda)}</span>
               </div>
             ))}
           </div>
@@ -7566,7 +7577,7 @@ function Finanzas({ tenantId, monedasActivas }: { tenantId: number; monedasActiv
                 <div className="text-[10px] text-slate-400">{new Date(m.fechaRegistro).toLocaleString()}</div>
               </div>
               <span className={`font-mono text-sm font-bold ${m.tipo === "INGRESO" ? "text-teal-600 dark:text-teal-400" : "text-red-500"}`}>
-                {m.tipo === "INGRESO" ? "+" : "−"}{Number(m.monto).toFixed(2)} {m.moneda}
+                {m.tipo === "INGRESO" ? "+" : "−"}{fmtCostoEnMoneda(m.monto, m.moneda)}
               </span>
             </div>
           ))
@@ -7628,7 +7639,7 @@ function CuentasPorCobrarPagar({ tenantId }: { tenantId: number }) {
           {Object.entries(totalesPorMoneda).map(([moneda, total]) => (
             <div key={moneda} className="apple-glass rounded-xl px-5 py-3">
               <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Pendiente en {moneda}</div>
-              <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{total.toFixed(2)}</div>
+              <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{fmtNumero(total, moneda)}</div>
             </div>
           ))}
         </div>
@@ -7654,12 +7665,12 @@ function CuentasPorCobrarPagar({ tenantId }: { tenantId: number }) {
                   <div className="text-[10px] text-slate-400">
                     {new Date(m.fechaRegistro).toLocaleString()}
                     {m.estado === "PAGADO" && " · Saldada"}
-                    {pagadoParcial && ` · Abonado ${(Number(m.monto) - saldo).toFixed(2)} de ${Number(m.monto).toFixed(2)}`}
+                    {pagadoParcial && ` · Abonado ${fmtCostoEnMoneda(Number(m.monto) - saldo, m.moneda)} de ${fmtCostoEnMoneda(m.monto, m.moneda)}`}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">
-                    {m.estado === "PAGADO" ? Number(m.monto).toFixed(2) : saldo.toFixed(2)} {m.moneda}
+                    {fmtCostoEnMoneda(m.estado === "PAGADO" ? m.monto : saldo, m.moneda)}
                   </span>
                   {m.estado !== "PAGADO" && (
                     <button onClick={() => setAbonando(m)} className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-500 px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap">
@@ -7707,7 +7718,7 @@ function ModalAbonarCuenta({ tenantId, cuenta, tipoLabel, onClose, onAbonado }: 
     <Modal onClose={onClose} titulo="Registrar abono">
       <div className="space-y-3">
         <p className="text-xs text-slate-500">{cuenta.concepto}</p>
-        <p className="text-xs text-slate-500">Saldo pendiente: <strong className="text-slate-900">{saldo.toFixed(2)} {cuenta.moneda}</strong></p>
+        <p className="text-xs text-slate-500">Saldo pendiente: <strong className="text-slate-900">{fmtCostoEnMoneda(saldo, cuenta.moneda)}</strong></p>
         <div className="grid grid-cols-2 gap-3">
           <Campo label={`Monto que le pagás al ${tipoLabel} ahora`}>
             <input value={monto} onChange={(e) => setMonto(e.target.value)} type="number" step="0.01" min="0.01" className="input-horeca" autoFocus />
