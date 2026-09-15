@@ -2873,7 +2873,7 @@ function ModalEditarReceta({
 
                         {/* Costo de la línea en vivo */}
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                          ${met.costoLinea.toFixed(2)} USD
+                          {met.esSubReceta || met.articuloOrigen?.monedaValoracion === monedaReceta ? fmtCostoEnMoneda(met.costoLinea, monedaReceta) : "Por revisar"}
                         </td>
 
                         {/* Acciones */}
@@ -3026,27 +3026,27 @@ function ModalEditarReceta({
                       </div>
 
                       <div className="bg-white/60 dark:bg-black/20 p-2.5 rounded-lg border border-slate-200 dark:border-white/5 text-[11px] space-y-1">
-                        <div className="text-slate-500 dark:text-white/50 font-medium">Conversión lógica a moneda del plato (USD):</div>
+                        <div className="text-slate-500 dark:text-white/50 font-medium">Conversión lógica a moneda del plato ({monedaReceta}):</div>
                         <div className="font-mono font-bold text-teal-600 dark:text-teal-400">
                           {monedaCompraSel === "COP" && (
                             <>
-                              {fmtNumero(costoCompraNum, "COP")} COP ÷ {tasaCopEstado.toLocaleString("es-CO")} = <strong>${unitUsd.toFixed(3)} USD / {unidad}</strong>
+                              {fmtNumero(costoCompraNum, "COP")} COP ÷ {tasaCopEstado.toLocaleString("es-CO")} = <strong>{fmtCostoEnMoneda(unitUsd, monedaReceta)} / {unidad}</strong>
                             </>
                           )}
                           {monedaCompraSel === "VES" && (
                             <>
-                              Bs. {costoCompraNum.toFixed(2)} ÷ {tasaVesEstado.toFixed(2)} = <strong>${unitUsd.toFixed(3)} USD / {unidad}</strong>
+                              Bs. {costoCompraNum.toFixed(2)} ÷ {tasaVesEstado.toFixed(2)} = <strong>{fmtCostoEnMoneda(unitUsd, monedaReceta)} / {unidad}</strong>
                             </>
                           )}
-                          {monedaCompraSel === "USD" && (
+                          {monedaCompraSel === monedaReceta && (
                             <>
-                              <strong>${unitUsd.toFixed(3)} USD / {unidad}</strong> (misma moneda del plato)
+                              <strong>{fmtCostoEnMoneda(unitUsd, monedaReceta)} / {unidad}</strong> (misma moneda del plato)
                             </>
                           )}
                         </div>
                         <div className="text-[10px] text-slate-400">
-                          {monedaCompraSel === "COP" && `Tasa activa aplicada: 1 USD = ${tasaCopEstado.toLocaleString("es-CO")} COP`}
-                          {monedaCompraSel === "VES" && `Tasa activa aplicada: 1 USD = ${tasaVesEstado.toFixed(2)} Bs`}
+                          {monedaCompraSel === "COP" && `Tasa activa aplicada: 1 ${monedaReceta} = ${tasaCopEstado.toLocaleString("es-CO")} COP`}
+                          {monedaCompraSel === "VES" && `Tasa activa aplicada: 1 ${monedaReceta} = ${tasaVesEstado.toFixed(2)} Bs`}
                         </div>
                       </div>
                     </div>
@@ -3079,13 +3079,13 @@ function ModalEditarReceta({
           {previewNuevo && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs bg-teal-500/10 border border-teal-500/20 rounded-xl px-3 py-2 text-teal-700 dark:text-teal-300">
               <span>
-                Cálculo previo: <strong>{previewNuevo.cantBruta.toFixed(3)} {previewNuevo.unidad}</strong> × ${previewNuevo.unit.toFixed(3)} USD
-                {previewNuevo.monedaCompra !== "USD" && (
+                Cálculo previo: <strong>{previewNuevo.cantBruta.toFixed(3)} {previewNuevo.unidad}</strong> × {fmtCostoEnMoneda(previewNuevo.unit, monedaReceta)}
+                {previewNuevo.monedaCompra !== monedaReceta && (
                   <span className="opacity-80 font-normal"> ({previewNuevo.monedaCompra === "COP" ? `${fmtNumero(previewNuevo.costoCompra, "COP")} COP` : `Bs. ${previewNuevo.costoCompra}`} convertidos)</span>
                 )}
               </span>
               <span className="font-mono font-bold">
-                Impacto en costo del plato: +${previewNuevo.costo.toFixed(2)} USD
+                Impacto en costo del plato: +{fmtCostoEnMoneda(previewNuevo.costo, monedaReceta)}
               </span>
             </div>
           )}
