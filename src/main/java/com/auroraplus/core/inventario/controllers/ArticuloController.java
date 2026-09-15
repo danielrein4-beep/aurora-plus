@@ -100,6 +100,7 @@ public class ArticuloController {
         if (articulo.getCostoUnitario() != null) {
             String monedaCosto = (articulo.getMonedaCosto() != null && !articulo.getMonedaCosto().isBlank())
                 ? articulo.getMonedaCosto() : motorFinancieroService.obtenerMonedaBase(tenantId);
+            registrarTasaDeCompraSiAplica(tenantId, monedaCosto, articulo.getTasaCambioAplicada());
             BigDecimal costoOriginal = articulo.getCostoUnitario();
             articulo.setCostoUnitario(motorFinancieroService.convertirAMonedaBase(tenantId, costoOriginal, monedaCosto));
             articulo.setMonedaCosto(monedaCosto);
@@ -227,6 +228,9 @@ public class ArticuloController {
         // Moneda en la que el usuario tecleó costoUnitario (ej. "COP" si compró en
         // pesos). Si viene vacío, se asume que ya está en la moneda base del tenant.
         public String moneda;
+        // Tasa concreta indicada por el proveedor para ESTA compra, expresada
+        // como 1 unidad de moneda -> moneda base del negocio.
+        public BigDecimal tasaCambioAplicada;
     }
 
     /** Entrada de stock (compra/reposición) — actualiza también el costo unitario vigente del artículo. */
@@ -248,6 +252,7 @@ public class ArticuloController {
         // (frontend a USD fijo, backend a la moneda base real) puedan divergir.
         if (request.costoUnitario != null) {
             String monedaCosto = (request.moneda != null && !request.moneda.isBlank()) ? request.moneda : monedaBaseTenant;
+            registrarTasaDeCompraSiAplica(tenantId, monedaCosto, request.tasaCambioAplicada);
             BigDecimal costoOriginal = request.costoUnitario;
             articulo.setCostoUnitario(motorFinancieroService.convertirAMonedaBase(tenantId, costoOriginal, monedaCosto));
             articulo.setMonedaCosto(monedaCosto);
@@ -287,6 +292,25 @@ public class ArticuloController {
         }
 
         return ResponseEntity.ok(movimiento);
+    }
+
+    private void registrarTasaDeCompraSiAplica(Long tenantId, String monedaOrigen, BigDecimal tasaAplicada) {
+        String monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
+        if (tasaAplicada == null || monedaOrigen.equals(monedaBase)) return;
+        if (tasaAplicada.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("La tasa aplicada a la compra debe ser mayor a cero");
+        }
+        // Para el par Bs/COP la convención de Aurora siempre es única:
+        // 1 Bs = X COP. Si la compra vino en COP y la base es VES, el motor
+        // encuentra esa misma tasa en sentido inverso y DIVIDE, en vez de
+        // pedirle al usuario una segunda tasa con otra convención.
+        boolean parVesCop = ("VES".equals(monedaOrigen) && "COP".equals(monedaBase))
+            || ("COP".equals(monedaOrigen) && "VES".equals(monedaBase));
+        if (parVesCop) {
+            motorFinancieroService.actualizarTasa(tenantId, "VES", "COP", tasaAplicada, "COMPRA");
+        } else {
+            motorFinancieroService.actualizarTasa(tenantId, monedaOrigen, monedaBase, tasaAplicada, "COMPRA");
+        }
     }
 
     @GetMapping("/{id}/kardex")

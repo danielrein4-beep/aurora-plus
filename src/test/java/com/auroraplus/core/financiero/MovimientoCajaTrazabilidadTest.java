@@ -89,6 +89,19 @@ class MovimientoCajaTrazabilidadTest {
     }
 
     @Test
+    void convierteEntreVesYCopUsandoUsdComoPuenteSinExigirUnaTasaInventada() {
+        long tenantId = 91005L;
+        motorFinancieroService.actualizarTasa(tenantId, "USD", "VES", new BigDecimal("65.500000"), "TEST");
+        motorFinancieroService.actualizarTasa(tenantId, "USD", "COP", new BigDecimal("3100.000000"), "TEST");
+
+        BigDecimal enCop = motorFinancieroService.convertirMoneda(
+            tenantId, new BigDecimal("2000.00"), "VES", "COP");
+
+        assertEquals(0, new BigDecimal("94656.49").compareTo(enCop),
+            "Una compra en Bs debe poder normalizarse a COP con las dos tasas USD ya registradas");
+    }
+
+    @Test
     void concurrenciaNoPierdeNiDuplicaMovimientos() throws InterruptedException {
         long tenantId = 91004L;
         int hilos = 20;

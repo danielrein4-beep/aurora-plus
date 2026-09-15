@@ -1,0 +1,26 @@
+
+> figma-make-app@1.0.0 dev
+> vite --host 127.0.0.1 --port 8444
+
+
+  VITE v8.2.2  ready in 265 ms
+
+  ➜  Local:   http://127.0.0.1:8444/
+  ➜  press h + enter to show help
+8:39:50 p. m. [vite] (client) hmr update /src/index.css, /src/Icons.tsx
+8:39:55 p. m. [vite] (client) hmr update /src/index.css, /src/Icons.tsx
+8:40:02 p. m. [vite] (client) hmr update /src/index.css
+8:40:41 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+8:40:51 p. m. [vite] (client) hmr update /src/components/RetailApp.tsx, /src/index.css
+8:53:43 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+8:53:51 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+8:53:55 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+8:54:21 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+8:54:32 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+8:54:45 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+8:55:01 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+8:55:13 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+9:08:53 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+9:14:46 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+9:14:46 p. m. [vite] (client) hmr update /src/index.css
+9:18:36 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css

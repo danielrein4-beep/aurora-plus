@@ -1,0 +1,14 @@
+
+> figma-make-app@1.0.0 dev
+> vite --host 127.0.0.1 --port 8443
+
+
+  VITE v8.2.2  ready in 349 ms
+
+  ➜  Local:   http://127.0.0.1:8443/
+  ➜  press h + enter to show help
+8:39:50 p. m. [vite] (client) hmr update /src/index.css, /src/Icons.tsx
+8:39:55 p. m. [vite] (client) hmr update /src/index.css, /src/Icons.tsx
+8:40:02 p. m. [vite] (client) hmr update /src/index.css
+8:40:41 p. m. [vite] (client) hmr update /src/components/RestauranteApp.tsx, /src/index.css
+8:40:51 p. m. [vite] (client) hmr update /src/components/RetailApp.tsx, /src/index.css

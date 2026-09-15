@@ -65,6 +65,12 @@ public class Articulo {
     @Column(name = "costo_unitario_original", precision = 18, scale = 4)
     private BigDecimal costoUnitarioOriginal;
 
+    // Solo llega en el alta/entrada de una compra multimoneda. No es una tasa
+    // global editable ni reemplaza el historial: el controlador registra una
+    // fila histórica en tasas de cambio y el costo normalizado queda congelado.
+    @Transient
+    private BigDecimal tasaCambioAplicada;
+
     // Campos de Aurora Retail (Ferretería/Farmacia/Repuestos) — opcionales,
     // ausentes/null para artículos de HORECA u otros módulos que no los usan.
     // Un solo Articulo del core sirve a todas las verticales; cada capa solo
@@ -115,6 +121,8 @@ public class Articulo {
     public void setMonedaCosto(String monedaCosto) { this.monedaCosto = monedaCosto; }
     public BigDecimal getCostoUnitarioOriginal() { return costoUnitarioOriginal; }
     public void setCostoUnitarioOriginal(BigDecimal costoUnitarioOriginal) { this.costoUnitarioOriginal = costoUnitarioOriginal; }
+    public BigDecimal getTasaCambioAplicada() { return tasaCambioAplicada; }
+    public void setTasaCambioAplicada(BigDecimal tasaCambioAplicada) { this.tasaCambioAplicada = tasaCambioAplicada; }
     public String getCodigoBarras() { return codigoBarras; }
     public void setCodigoBarras(String codigoBarras) { this.codigoBarras = codigoBarras; }
     public String getPrincipioActivo() { return principioActivo; }
