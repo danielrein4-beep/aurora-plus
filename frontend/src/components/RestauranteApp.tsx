@@ -151,16 +151,17 @@ function EstiloClasico() {
       .horeca-clasico .dark\\:text-white\\/30 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
       .horeca-clasico .dark\\:text-white { color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; }
       .horeca-clasico .btn-cyber-neon {
-        background: linear-gradient(135deg, #0ea5e9, #0d9488 65%, #8b5cf6) !important;
-        box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
-        color: #fff !important;
+        background: #35d7c3 !important;
+        border: 1px solid rgba(53, 215, 195, .72) !important;
+        box-shadow: 0 2px 7px rgba(2, 35, 42, .18) !important;
+        color: #062323 !important;
       }
       .horeca-clasico .text-teal-600, .horeca-clasico .text-teal-500,
       .horeca-clasico .text-teal-300, .horeca-clasico .text-teal-400 { color: #0d9488 !important; -webkit-text-fill-color: #0d9488 !important; }
       .horeca-clasico .text-aurora {
-        background: linear-gradient(90deg, #0ea5e9, #0d9488 70%, #8b5cf6) !important;
-        -webkit-background-clip: text !important; background-clip: text !important;
-        color: transparent !important; -webkit-text-fill-color: transparent !important;
+        background: none !important;
+        color: #0d9488 !important;
+        -webkit-text-fill-color: currentColor !important;
       }
       .horeca-clasico .bg-teal-500\\/15 { background-color: rgba(14,165,233,0.12) !important; }
       .horeca-clasico .border-teal-500\\/30, .horeca-clasico .border-teal-400\\/60 { border-color: rgba(13,148,136,0.4) !important; }
@@ -245,6 +246,16 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     // inventario, tanto de recetas como de artículos vendidos directo.
     recargarTodo();
   };
+
+  // Asegura que la moneda principal del negocio en el backend sea USD si estaba en COP/VES,
+  // ya que los precios y comandas de HORECA operan en dólares como moneda base.
+  useEffect(() => {
+    obtenerMonedaBaseNegocio().then((r) => {
+      if (r.monedaBase === "COP" || r.monedaBase === "VES") {
+        actualizarMonedaBaseNegocio("USD").catch(() => {});
+      }
+    }).catch(() => {});
+  }, []);
 
   const [mapa, setMapa] = useState<MapaMesaEntrada[] | null>(null);
   const [escandallos, setEscandallos] = useState<EscandalloReceta[] | null>(null);
@@ -1637,8 +1648,10 @@ function nuevaFilaPago(moneda: string, auto: boolean): FilaPago {
   return { id: `${Date.now()}-${Math.random()}`, metodoPago: "EFECTIVO", moneda, monto: "", auto };
 }
 
-function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCobrar }: {
-  tenantId: number; total: number; monedaBase: string; procesando: boolean; error: string | null;
+function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, procesando, error, onCobrar }: {
+  tenantId: number; total: number; monedaBase?: string;
+  tasasExternas?: { VES?: number | null; COP?: number | null };
+  procesando: boolean; error: string | null;
   onCobrar: (pagos: PagoParcial[], monedaVuelto: string) => void;
 }) {
   // La primera fila nace "auto" y ya trae el total completo puesto — el caso
@@ -1650,8 +1663,22 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
   // en una fila, deja de seguir el pendiente y queda fija como manual.
   const otrasMonedas = Object.keys(MONEDAS_ALTERNAS).filter((m) => m !== monedaBase);
   const [filas, setFilas] = useState<FilaPago[]>(() => [nuevaFilaPago(monedaBase, true)]);
-  const [tasas, setTasas] = useState<Record<string, number | null>>({});
+  const [tasas, setTasas] = useState<Record<string, number | null>>(() => ({
+    VES: tasasExternas?.VES ?? null,
+    COP: tasasExternas?.COP ?? null,
+  }));
   const [monedaVuelto, setMonedaVuelto] = useState(monedaBase);
+
+  // Sincronizar tasas externas si se pasan desde el padre (evita delay o valores null)
+  useEffect(() => {
+    if (tasasExternas) {
+      setTasas((prev) => ({
+        ...prev,
+        VES: tasasExternas.VES ?? prev.VES,
+        COP: tasasExternas.COP ?? prev.COP,
+      }));
+    }
+  }, [tasasExternas?.VES, tasasExternas?.COP]);
 
   useEffect(() => {
     otrasMonedas.forEach((moneda) => {
@@ -1661,6 +1688,16 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, monedaBase]);
+
+  // Si cambia monedaBase o total y la primera fila es auto, mantener sincronizada
+  useEffect(() => {
+    setFilas((prev) => {
+      if (prev.length === 1 && prev[0].auto && prev[0].moneda !== monedaBase) {
+        return [{ ...prev[0], moneda: monedaBase, monto: total > 0.004 ? total.toFixed(2) : "" }];
+      }
+      return prev;
+    });
+  }, [monedaBase, total]);
 
   const aBase = (monto: number, moneda: string) => {
     if (!monto) return 0;
@@ -1737,6 +1774,10 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
       .map((m) => `${MONEDAS_ALTERNAS[m]} ${deBase(montoBase, m).toFixed(2)}`)
       .join(" · ");
 
+  const resumenMonedaAlterna = filas.length === 1 && filas[0].moneda !== monedaBase && Number(filas[0].monto) > 0
+    ? `${MONEDAS_ALTERNAS[filas[0].moneda] || filas[0].moneda} ${Number(filas[0].monto).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+    : null;
+
   return (
     <div className="space-y-3 pt-3 border-t border-slate-300/50 dark:border-white/10">
       <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Cobro (uno o varios métodos)</p>
@@ -1783,6 +1824,12 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
       <div className="apple-glass rounded-xl p-3.5 space-y-1.5 text-sm">
         <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Total a cobrar</span><span className="font-mono font-bold text-slate-900 dark:text-white">{simbolo}{total.toFixed(2)}</span></div>
         <div className="flex justify-between"><span className="text-slate-500 dark:text-white/40">Ingresado</span><span className="font-mono text-slate-700 dark:text-white/70">{simbolo}{totalIngresadoBase.toFixed(2)}</span></div>
+        {resumenMonedaAlterna && (
+          <div className="flex justify-between text-xs text-slate-500 dark:text-white/50 pt-1 border-t border-slate-200/50 dark:border-white/5">
+            <span>En moneda seleccionada</span>
+            <span className="font-mono font-bold text-teal-600 dark:text-teal-400">{resumenMonedaAlterna}</span>
+          </div>
+        )}
         {!cubierto ? (
           <div className="flex flex-wrap justify-between gap-x-2 text-amber-600 dark:text-amber-400 font-semibold">
             <span className="flex-shrink-0">Pendiente</span>
@@ -1810,7 +1857,7 @@ function PanelCobroMixto({ tenantId, total, monedaBase, procesando, error, onCob
 
       <button onClick={handleCobrar} disabled={procesando || !cubierto}
         className="w-full btn-cyber-neon text-white text-base font-bold py-4 rounded-xl cursor-pointer disabled:opacity-50">
-        {procesando ? "Procesando…" : cubierto ? `Cobrar y Cerrar ${simbolo}${total.toFixed(2)}` : "Completa el pago para cobrar"}
+        {procesando ? "Procesando…" : cubierto ? `Cobrar y Cerrar ${simbolo}${total.toFixed(2)}${resumenMonedaAlterna ? ` · ${resumenMonedaAlterna}` : ""}` : "Completa el pago para cobrar"}
       </button>
     </div>
   );
@@ -1833,7 +1880,15 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
   const [errorCierre, setErrorCierre] = useState<string | null>(null);
   const [moneda, setMoneda] = useState("USD");
 
-  useEffect(() => { monedaBase(tenantId).then(setMoneda).catch(() => setMoneda("USD")); }, [tenantId]);
+  useEffect(() => {
+    obtenerMonedaBaseNegocio().then((r) => {
+      if (r.monedaBase === "COP" || r.monedaBase === "VES") {
+        actualizarMonedaBaseNegocio("USD").then(() => setMoneda("USD")).catch(() => setMoneda("USD"));
+      } else {
+        setMoneda(r.monedaBase || "USD");
+      }
+    }).catch(() => setMoneda("USD"));
+  }, [tenantId]);
 
   const totalLocal = items.reduce((s, i) => s + Number(i.precioUnitario) * i.cantidad, 0);
 
@@ -1950,7 +2005,7 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
 
         {/* Cerrar comanda */}
         {items.length > 0 && (
-          <PanelCobroMixto tenantId={tenantId} total={totalLocal} monedaBase={moneda} procesando={cerrando} error={errorCierre} onCobrar={handleCerrar} />
+          <PanelCobroMixto tenantId={tenantId} total={totalLocal} monedaBase="USD" procesando={cerrando} error={errorCierre} onCobrar={handleCerrar} />
         )}
       </div>
     </Modal>
@@ -3303,7 +3358,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     // Al cargar cantidad inicial, por defecto se asume que fue una compra
     // real (el caso más común al operar el día a día) — el dueño puede
     // destildarlo si en realidad está solo digitalizando stock que ya tenía.
-    registrarGasto: true, metodoPago: "EFECTIVO", moneda: "USD",
+    registrarGasto: true, metodoPago: "EFECTIVO", moneda: "USD", tasaCambioAplicada: "",
   });
   // El selector de moneda de la compra arranca en la moneda base real del
   // negocio en cuanto se conoce (en vez de asumir USD) — solo la primera vez,
@@ -3320,6 +3375,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     : null;
 
   const margenForm = calcularMargen(Number(form.costoUnitario) || 0, Number(form.precioVenta) || 0);
+  const esParBsCop = (form.moneda === "VES" && monedaBaseTenant === "COP") || (form.moneda === "COP" && monedaBaseTenant === "VES");
 
   const crear = async () => {
     if (!form.nombre.trim()) { setError("El nombre del artículo es obligatorio"); return; }
@@ -3336,6 +3392,13 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
       // del tenant antes de guardarlo.
       const monedaArticulo = form.moneda || monedaBaseTenant || "COP";
       const costoIngresado = Number(form.costoUnitario);
+      const tasaCompra = form.tasaCambioAplicada ? Number(form.tasaCambioAplicada) : undefined;
+      if (monedaArticulo !== monedaBaseTenant && (!tasaCompra || tasaCompra <= 0)) {
+        setError(esParBsCop
+          ? "Indica la tasa aplicada: 1 Bs equivale a cuántos COP."
+          : `Indica la tasa aplicada: 1 ${monedaArticulo === "VES" ? "Bs" : monedaArticulo} equivale a cuántos ${monedaBaseTenant}.`);
+        return;
+      }
       const nuevo = await crearArticulo({
         sku: generarSku(form.nombre),
         nombre: form.nombre.trim(),
@@ -3344,6 +3407,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
         costoUnitario: costoIngresado,
         precioVenta: Number(form.precioVenta),
         monedaCosto: monedaArticulo,
+        tasaCambioAplicada: tasaCompra,
       });
       if (form.cantidadInicial && Number(form.cantidadInicial) > 0) {
         await entradaArticulo(nuevo.id, {
@@ -3353,9 +3417,10 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
           fechaVencimiento: form.fechaVencimiento || undefined,
           metodoPago: form.registrarGasto ? form.metodoPago : undefined,
           moneda: form.registrarGasto ? monedaArticulo : undefined,
+          tasaCambioAplicada: tasaCompra,
         });
       }
-      setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "", registrarGasto: true, metodoPago: "EFECTIVO", moneda: monedaArticulo });
+      setForm({ nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "", registrarGasto: true, metodoPago: "EFECTIVO", moneda: monedaArticulo, tasaCambioAplicada: "" });
       setMostrarForm(false);
       onCambio();
     } catch (e) {
@@ -3467,7 +3532,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <KpiCard label="Valor Total en Inventario" val={renderValorTotal} sub="Costo × stock actual" color="#0ea5e9" />
-        <KpiCard label="Total de Ítems" val={String((articulos || []).length)} sub={`${categorias.length} categoría${categorias.length === 1 ? "" : "s"}`} color="#a855f7" />
+        <KpiCard label="Total de Ítems" val={String((articulos || []).length)} sub={`${categorias.length} categoría${categorias.length === 1 ? "" : "s"}`} color="#35d7c3" />
         <KpiCard label="Alertas de Stock" val={String(alertasStock)} sub="Bajo mínimo o agotado" color={alertasStock > 0 ? "#ef4444" : "#64748b"} />
       </div>
 
@@ -3553,6 +3618,18 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
               <p className="text-[10px] text-slate-400 mt-1">Físicamente en stock ahora mismo.</p>
             </Campo>
           </div>
+          {form.moneda !== monedaBaseTenant && (
+            <div className="rounded-xl border border-teal-500/25 bg-teal-500/[0.06] px-4 py-3 grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_220px] gap-3 items-end">
+              <div>
+                <p className="text-xs font-semibold text-slate-700 dark:text-white/80">Tasa aplicada a esta compra</p>
+                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-white/45">La tasa queda registrada con esta compra; no cambia compras ni inventario anteriores.</p>
+              </div>
+              <Campo label={esParBsCop ? "1 Bs equivale a (COP)" : `1 ${form.moneda === "VES" ? "Bs" : form.moneda} equivale a (${monedaBaseTenant})`}>
+                <input value={form.tasaCambioAplicada} onChange={(e) => setForm({ ...form, tasaCambioAplicada: e.target.value })} type="number" step="0.000001" min="0" placeholder="0.00" className="input-horeca" />
+              </Campo>
+              {esParBsCop && <p className="sm:col-span-2 text-[11px] text-slate-500 dark:text-white/45">En Bs a COP se multiplica. En COP a Bs se divide por esta misma tasa.</p>}
+            </div>
+          )}
           {Number(form.cantidadInicial) > 0 && (
             <div className="space-y-2 pt-2 border-t border-slate-300/50 dark:border-white/10">
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-white/60 cursor-pointer">
@@ -3969,7 +4046,7 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
   const [precioVenta, setPrecioVenta] = useState(String(articulo.precioVenta ?? 0));
   const [metodoPago, setMetodoPago] = useState("EFECTIVO");
   // Moneda base real del negocio — arranca en la moneda del artículo o moneda base
-  const [monedaBaseTenant, setMonedaBaseTenant] = useState("COP");
+  const [monedaBaseTenant, setMonedaBaseTenant] = useState("USD");
   const [moneda, setMoneda] = useState(articulo.monedaCosto || "COP");
   useEffect(() => {
     monedaBase(tenantId).then((m) => {
@@ -4812,9 +4889,30 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     // como respaldo en artículos viejos que todavía no tienen un precio de
     // venta cargado, para no mostrar una tarjeta en $0.00.
     const insumos: ItemCatalogo[] = (articulos || [])
-      .map((a) => ({ key: `articulo-${a.id}`, tipo: "articulo", id: a.id, nombre: a.nombre, precio: Number(a.precioVenta) > 0 ? Number(a.precioVenta) : Number(a.costoUnitario), categoria: a.categoria || "General", unidadMedida: a.unidadMedida || "unidad", stockActual: Number(a.stockActual), sku: a.sku }));
+      .map((a) => {
+        const valVenta = Number(a.precioVenta) > 0 ? Number(a.precioVenta) : Number(a.costoUnitario);
+        const esCop = (a.monedaCosto || "").toUpperCase() === "COP";
+        const esVes = (a.monedaCosto || "").toUpperCase() === "VES";
+        let precioUsd = valVenta;
+        if (esCop && tasaCop && Number(tasaCop.tasa) > 0 && valVenta > 50) {
+          precioUsd = valVenta / Number(tasaCop.tasa);
+        } else if (esVes && tasaBcv && Number(tasaBcv.tasa) > 0 && valVenta > 100) {
+          precioUsd = valVenta / Number(tasaBcv.tasa);
+        }
+        return {
+          key: `articulo-${a.id}`,
+          tipo: "articulo",
+          id: a.id,
+          nombre: a.nombre,
+          precio: Number(precioUsd.toFixed(2)),
+          categoria: a.categoria || "General",
+          unidadMedida: a.unidadMedida || "unidad",
+          stockActual: Number(a.stockActual),
+          sku: a.sku,
+        };
+      });
     return [...recetas, ...tragos, ...insumos];
-  }, [escandallos, fastbar, articulos]);
+  }, [escandallos, fastbar, articulos, tasaCop, tasaBcv]);
 
   const categoriasTabs = useMemo(() => {
     const tabs: { key: string | null; label: string }[] = [{ key: null, label: "Todas" }];
@@ -5577,7 +5675,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                     <span>Dividir Cuenta</span>
                   </button>
                 </div>
-                <PanelCobroMixto tenantId={tenantId} total={total} monedaBase={moneda} procesando={procesando} error={error} onCobrar={cobrar} />
+                <PanelCobroMixto tenantId={tenantId} total={total} monedaBase="USD" tasasExternas={{ VES: tasaBcv ? Number(tasaBcv.tasa) : null, COP: tasaCop ? Number(tasaCop.tasa) : null }} procesando={procesando} error={error} onCobrar={cobrar} />
               </>
             )}
           </div>
