@@ -1099,12 +1099,14 @@ function BloqueoPremium({ modulo }: { modulo: string }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-function KpiCard({ label, val, sub, color, onClick }: { label: string; val: string; sub: string; color: string; onClick?: () => void }) {
+function KpiCard({ label, val, sub, color, onClick }: { label: React.ReactNode; val: React.ReactNode; sub?: React.ReactNode; color: string; onClick?: () => void }) {
   return (
-    <div onClick={onClick} className={`apple-glass rounded-2xl p-5 border-l-4 transition-all ${onClick ? "cursor-pointer hover:scale-[1.02]" : ""}`} style={{ borderLeftColor: color }}>
-      <div className="text-xs text-slate-500 dark:text-white/40">{label}</div>
-      <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white mt-1">{val}</div>
-      <div className="text-[11px] text-slate-400 mt-0.5">{sub}</div>
+    <div onClick={onClick} className={`apple-glass rounded-2xl p-5 border-l-4 transition-all flex flex-col justify-between min-h-[115px] ${onClick ? "cursor-pointer hover:scale-[1.02]" : ""}`} style={{ borderLeftColor: color }}>
+      <div>
+        <div className="text-xs text-slate-500 dark:text-white/40 font-medium">{label}</div>
+        <div className="mt-1">{val}</div>
+      </div>
+      {sub && <div className="text-[11px] text-slate-400 mt-2">{sub}</div>}
     </div>
   );
 }
@@ -3367,10 +3369,78 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
     return totales;
   }, [articulos, monedaBaseTenant]);
 
-  const textoValorTotal = useMemo(() => {
+  const renderValorTotal = useMemo(() => {
     const monedas = Object.keys(valorInventarioPorMoneda);
-    if (monedas.length === 0) return fmtCostoEnMoneda(0, monedaBaseTenant);
-    return monedas.map((m) => fmtCostoEnMoneda(valorInventarioPorMoneda[m], m)).join(" · ");
+    if (monedas.length === 0) {
+      const mDef = (monedaBaseTenant || "COP").toUpperCase();
+      return (
+        <div className="flex items-center gap-2">
+          <span className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">0</span>
+          <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+            {(mDef === "VES" || mDef === "BS") ? "BS" : mDef}
+          </span>
+        </div>
+      );
+    }
+
+    if (monedas.length === 1) {
+      const m = monedas[0];
+      const num = valorInventarioPorMoneda[m] || 0;
+      const tieneDec = num % 1 !== 0;
+      const str = num.toLocaleString("es-CO", {
+        minimumFractionDigits: tieneDec ? 2 : 0,
+        maximumFractionDigits: 2,
+      });
+      const etiqueta = (m === "VES" || m === "BS") ? "BS" : m;
+      const badgeStyle =
+        etiqueta === "COP"
+          ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30"
+          : etiqueta === "USD"
+          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+          : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30";
+
+      return (
+        <div className="flex items-center gap-2.5">
+          <span className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white tracking-tight">
+            {str}
+          </span>
+          <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-md border tracking-wider uppercase ${badgeStyle}`}>
+            {etiqueta}
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1.5 pt-0.5">
+        {monedas.map((m) => {
+          const num = valorInventarioPorMoneda[m] || 0;
+          const tieneDec = num % 1 !== 0;
+          const str = num.toLocaleString("es-CO", {
+            minimumFractionDigits: tieneDec ? 2 : 0,
+            maximumFractionDigits: 2,
+          });
+          const etiqueta = (m === "VES" || m === "BS") ? "BS" : m;
+          const badgeStyle =
+            etiqueta === "COP"
+              ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30"
+              : etiqueta === "USD"
+              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+              : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30";
+
+          return (
+            <div key={m} className="flex items-center justify-between gap-3 bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-1.5 border border-slate-200/50 dark:border-white/5">
+              <span className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white tracking-tight">
+                {str}
+              </span>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border tracking-wider uppercase ${badgeStyle}`}>
+                {etiqueta}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
   }, [valorInventarioPorMoneda, monedaBaseTenant]);
 
   const alertasStock = (articulos || []).filter((a) => Number(a.stockActual) <= 0 || (a.stockMinimo != null && Number(a.stockActual) <= Number(a.stockMinimo))).length;
@@ -3378,7 +3448,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiCard label="Valor Total en Inventario" val={textoValorTotal} sub="Costo × stock actual" color="#0ea5e9" />
+        <KpiCard label="Valor Total en Inventario" val={renderValorTotal} sub="Costo × stock actual" color="#0ea5e9" />
         <KpiCard label="Total de Ítems" val={String((articulos || []).length)} sub={`${categorias.length} categoría${categorias.length === 1 ? "" : "s"}`} color="#a855f7" />
         <KpiCard label="Alertas de Stock" val={String(alertasStock)} sub="Bajo mínimo o agotado" color={alertasStock > 0 ? "#ef4444" : "#64748b"} />
       </div>
