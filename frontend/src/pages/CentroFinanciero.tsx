@@ -247,7 +247,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
   }, [activeTab]);
 
   return (
-    <div className={`${embedded ? 'text-white pb-5' : 'min-h-screen bg-[#051322] text-white pb-24'} selection:bg-[#35d7c3]/30 selection:text-white overflow-x-hidden w-full max-w-full font-['IBM_Plex_Sans',sans-serif]`}>
+    <div className={`${embedded ? 'aurora-embedded-light text-[#172033] pb-5' : 'min-h-screen bg-[#051322] text-white pb-24'} selection:bg-[#35d7c3]/30 selection:text-white overflow-x-hidden w-full max-w-full font-['IBM_Plex_Sans',sans-serif]`}>
       {/* Definición compartida SVG para compatibilidad */}
       {!embedded && <AuroraGradientDef />}
 
@@ -406,7 +406,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       </div>
 
       {/* Barra de Navegación Móvil Inferior Fija (Mobile Dock) sin overflow en 390px */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#071a2e] border-t border-white/10 px-1 py-1.5 flex justify-between items-center w-full max-w-full">
+      {!embedded && <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#071a2e] border-t border-white/10 px-1 py-1.5 flex justify-between items-center w-full max-w-full">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -432,7 +432,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
             </button>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 };
