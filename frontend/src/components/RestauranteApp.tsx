@@ -3392,13 +3392,9 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
       // del tenant antes de guardarlo.
       const monedaArticulo = form.moneda || monedaBaseTenant || "COP";
       const costoIngresado = Number(form.costoUnitario);
-      const tasaCompra = form.tasaCambioAplicada ? Number(form.tasaCambioAplicada) : undefined;
-      if (monedaArticulo !== monedaBaseTenant && (!tasaCompra || tasaCompra <= 0)) {
-        setError(esParBsCop
-          ? "Indica la tasa aplicada: 1 Bs equivale a cuántos COP."
-          : `Indica la tasa aplicada: 1 ${monedaArticulo === "VES" ? "Bs" : monedaArticulo} equivale a cuántos ${monedaBaseTenant}.`);
-        return;
-      }
+      const tasaCompra = form.tasaCambioAplicada && Number(form.tasaCambioAplicada) > 0
+        ? Number(form.tasaCambioAplicada)
+        : undefined;
       const nuevo = await crearArticulo({
         sku: generarSku(form.nombre),
         nombre: form.nombre.trim(),
@@ -3619,15 +3615,11 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
             </Campo>
           </div>
           {form.moneda !== monedaBaseTenant && (
-            <div className="rounded-xl border border-teal-500/25 bg-teal-500/[0.06] px-4 py-3 grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_220px] gap-3 items-end">
-              <div>
-                <p className="text-xs font-semibold text-slate-700 dark:text-white/80">Tasa aplicada a esta compra</p>
-                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-white/45">La tasa queda registrada con esta compra; no cambia compras ni inventario anteriores.</p>
-              </div>
-              <Campo label={esParBsCop ? "1 Bs equivale a (COP)" : `1 ${form.moneda === "VES" ? "Bs" : form.moneda} equivale a (${monedaBaseTenant})`}>
-                <input value={form.tasaCambioAplicada} onChange={(e) => setForm({ ...form, tasaCambioAplicada: e.target.value })} type="number" step="0.000001" min="0" placeholder="0.00" className="input-horeca" />
-              </Campo>
-              {esParBsCop && <p className="sm:col-span-2 text-[11px] text-slate-500 dark:text-white/45">En Bs a COP se multiplica. En COP a Bs se divide por esta misma tasa.</p>}
+            <div className="rounded-xl border border-teal-500/20 bg-teal-500/[0.06] px-4 py-2.5 flex items-center gap-2.5 text-xs text-slate-700 dark:text-white/80">
+              <span className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0"></span>
+              <span>
+                Registro en <strong className="text-teal-700 dark:text-teal-300 font-bold">{form.moneda === "VES" ? "Bolívares (BS)" : form.moneda}</strong>: Se aplica automáticamente la tasa de cambio vigente del sistema para la equivalencia contable.
+              </span>
             </div>
           )}
           {Number(form.cantidadInicial) > 0 && (
