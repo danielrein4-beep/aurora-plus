@@ -729,6 +729,16 @@ export interface ReporteTicket {
   fecha: string;
   totalUsd: number;
   totalBs: number | null; // null si no había tasa BCV registrada para ese día
+  totalCop?: number | null;
+  monedaPago?: string | null;
+  montoOriginal?: number | null;
+  pagos?: {
+    moneda: string;
+    monto: number;
+    metodoPago?: string;
+    equivalenteBase?: number;
+    tasaAplicada?: number | null;
+  }[];
   metodoPago: string | null;
   estado: "ABIERTA" | "PAGADA" | "ANULADA";
   canal: string;
