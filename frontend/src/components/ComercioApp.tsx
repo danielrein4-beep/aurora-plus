@@ -1352,13 +1352,13 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     <th className="p-3">Categoría</th>
                     {perfilActivo === "farmacia" && <th className="p-3">Principio Activo</th>}
                     {perfilActivo === "farmacia" && <th className="p-3">Lote / Vence</th>}
-                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3">Unidad / Ubicación</th>}
-                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3">Escala Mayorista</th>}
+                    {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && <th className="p-3">Unidad / Ubicación</th>}
+                    {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && <th className="p-3">Escala Mayorista</th>}
                     <th className="p-3 text-right">Stock</th>
-                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3 text-right">Último Costo</th>}
+                    {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && <th className="p-3 text-right">Último Costo</th>}
                     <th className="p-3 text-right">Precio USD</th>
                     <th className="p-3 text-right">Precio Bs</th>
-                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3 text-center">Gestión</th>}
+                    {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && <th className="p-3 text-center">Gestión</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-mono">
@@ -1372,8 +1372,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       <td className="p-3 font-sans text-slate-500 dark:text-slate-400">{p.categoria}</td>
                       {perfilActivo === "farmacia" && <td className="p-3 text-emerald-400">{p.principioActivo || "—"}</td>}
                       {perfilActivo === "farmacia" && <td className="p-3 text-slate-600 dark:text-slate-300">{p.lote || "—"} ({p.fechaVencimiento || "—"})</td>}
-                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <td className="p-3 text-slate-600 dark:text-slate-300">{p.unidadMedida || "Pza"} · {p.ubicacion || "Almacén"}</td>}
-                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
+                      {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && <td className="p-3 text-slate-600 dark:text-slate-300">{p.unidadMedida || "Pza"} · {p.ubicacion || "Almacén"}</td>}
+                      {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && (
                         <td className="p-3 text-emerald-400 text-xs">
                           {p.precioMayorista && p.cantidadMinimaMayorista
                             ? `$${p.precioMayorista.toFixed(2)} (≥${p.cantidadMinimaMayorista} ${p.unidadMedida || 'u'})`
@@ -1383,14 +1383,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       <td className={`p-3 text-right font-bold ${p.stock <= p.stockMinimo ? "text-amber-400" : "text-teal-400"}`}>
                         {p.stock}
                       </td>
-                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
+                      {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && (
                         <td className="p-3 text-right text-slate-500 dark:text-slate-400 font-mono">
                           ${p.costo.toFixed(2)}
                         </td>
                       )}
                       <td className="p-3 text-right font-bold text-slate-900 dark:text-white">${p.precio.toFixed(2)}</td>
                       <td className="p-3 text-right text-slate-600 dark:text-slate-300">Bs. {(p.precio * tasaActivaBs).toFixed(2)}</td>
-                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
+                      {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && (
                         <td className="p-3 text-center space-x-1.5 whitespace-nowrap">
                           <button
                             onClick={() => setKardexModalItem(p)}
@@ -1928,7 +1928,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 </div>
               )}
 
-              {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
+              {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && (
                 <div className="space-y-3 p-3.5 bg-slate-100/60 dark:bg-slate-800/50 rounded-2xl border border-slate-300 dark:border-slate-700">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
