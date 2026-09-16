@@ -37,7 +37,7 @@ function MediclinicPage() {
 
 function RestaurantePage() {
   const navigate = useNavigate();
-  return <><ModuleAccessBar /><RestauranteApp onSalir={() => navigate("/dashboard")} /></>;
+  return <RestauranteApp onSalir={() => navigate("/dashboard")} />;
 }
 
 function RetailPage() {

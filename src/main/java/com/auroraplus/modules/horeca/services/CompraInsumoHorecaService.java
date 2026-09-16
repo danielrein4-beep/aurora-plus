@@ -79,17 +79,20 @@ public class CompraInsumoHorecaService {
 
     @Transactional
     public CompraInsumoHoreca registrarCompra(Long tenantId, Long proveedorId, String numeroFactura, List<ItemCompraInsumo> items) {
-        return registrarCompra(tenantId, proveedorId, numeroFactura, items, null, null);
+        return registrarCompra(tenantId, proveedorId, numeroFactura, items, null, null, null);
     }
 
     /**
      * @param montoPagadoAhora cuánto se le pagó al proveedor de una vez, en `monedaPago` — null/0 = factura entera
      *                         a crédito. Si es menor al total, la diferencia queda como cuenta por pagar (CXP)
      *                         normal; si cubre el total, no se crea CXP alguna (factura saldada de una).
+     * @param diasCredito      plazo de crédito pactado con el proveedor (ej. "5 días" impreso en la factura) —
+     *                         se guarda como fecha de vencimiento = hoy + diasCredito en la CXP resultante.
+     *                         Null/0 = sin plazo pactado. Sin efecto si la factura queda saldada de una vez.
      */
     @Transactional
     public CompraInsumoHoreca registrarCompra(Long tenantId, Long proveedorId, String numeroFactura, List<ItemCompraInsumo> items,
-                                               BigDecimal montoPagadoAhora, String monedaPago) {
+                                               BigDecimal montoPagadoAhora, String monedaPago, Integer diasCredito) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("La compra debe tener al menos un ítem");
         }
@@ -153,7 +156,15 @@ public class CompraInsumoHorecaService {
 
             // El costo vigente se actualiza al último precio de compra — es lo que
             // alimenta el costeo dinámico de las recetas (EscandalloService.recalcularCosto).
+            // costoUnitarioOriginal/monedaCosto quedan en la moneda TAL CUAL SE TECLEÓ
+            // (sin convertir) — es lo que usa Inventario para mostrar "Costo" (ver
+            // FilaArticuloCompacta.costoEnMoneda); sin esto quedaba en 0 (su default de
+            // BD) aunque costoUnitario (la moneda base) sí se hubiera actualizado bien.
+            String monedaCostoUsada = (item.monedaCosto != null && !item.monedaCosto.isBlank())
+                ? item.monedaCosto : motorFinancieroService.obtenerMonedaBase(tenantId);
             articulo.setCostoUnitario(costoUnitarioBase);
+            articulo.setCostoUnitarioOriginal(item.costoUnitario);
+            articulo.setMonedaCosto(monedaCostoUsada);
             articulo.setMonedaValoracion(motorFinancieroService.obtenerMonedaBase(tenantId));
             articuloRepository.save(articulo);
 
@@ -207,8 +218,13 @@ public class CompraInsumoHorecaService {
 
         BigDecimal saldoPendiente = totalCompra.subtract(montoPagadoBase).setScale(2, RoundingMode.HALF_UP);
         if (saldoPendiente.compareTo(BigDecimal.ZERO) > 0) {
+            LocalDate fechaVencimiento = (diasCredito != null && diasCredito > 0) ? LocalDate.now().plusDays(diasCredito) : null;
+            // moduloOrigen/referenciaTipo/referenciaId: sin esto no había forma de
+            // encontrar la CXP de una compra puntual (ej. para pagarla desde la
+            // ficha del proveedor) más que adivinando por texto en "concepto".
             motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.CXP,
-                saldoPendiente, null, null, "Compra de insumos factura " + numeroFactura + " — Proveedor: " + proveedor.getNombre());
+                saldoPendiente, null, null, "Compra de insumos factura " + numeroFactura + " — Proveedor: " + proveedor.getNombre(),
+                "HORECA", "CompraInsumoHoreca", guardada.getId(), fechaVencimiento);
         }
 
         return guardada;

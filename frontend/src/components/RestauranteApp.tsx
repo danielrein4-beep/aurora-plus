@@ -16,9 +16,9 @@ import {
   mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
   dividirCuenta, cerrarComandaMixto, anularComanda, listarEscandallos, crearEscandallo, editarEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo, editarIngredienteEscandallo, eliminarIngredienteEscandallo, recalcularCostoEscandallo,
   listarIngredientesEscandallo, listarFastBar,
-  listarProveedoresHoreca, crearProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
+  listarProveedoresHoreca, crearProveedorHoreca, editarProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
-  registrarCompraInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
+  registrarCompraInsumo, listarComprasInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
   obtenerMonedaBaseNegocio, actualizarMonedaBaseNegocio, cotizacionCobro,
   obtenerOrigenTasaActiva, actualizarOrigenTasaActiva, type OrigenTasaActiva,
   extraerFacturaOcr,
@@ -28,7 +28,7 @@ import {
   listarClientes, crearCliente, editarCliente, eliminarCliente, metricasCliente, ticketsCliente,
   type Mesa, type MapaMesaEntrada, type Comanda, type ItemComanda, type EstadoItemComanda,
   type EscandalloReceta, type DetalleReceta, type FastBarTrago, type ProveedorHoreca,
-  type Articulo, type ItemCompraInsumo, type LoteArticulo, type TasaCambio, type MovimientoCaja,
+  type Articulo, type ItemCompraInsumo, type CompraInsumoHoreca, type LoteArticulo, type TasaCambio, type MovimientoCaja,
   type ResumenPeriodoAbierto, type ArqueoCaja, type PagoParcial, type ResumenUtilidadProducto, type ReporteTicket, type Turno,
   type ItemImportacionArticulo, type ResultadoImportacionArticulos, type Cliente, type MetricasCliente, type InventarioKpis,
   type FacturaExtraidaOcr,
@@ -39,17 +39,15 @@ type Pagina = "general" | "resumen" | "salon" | "cocina" | "recetas" | "compras"
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
 
-// Fase actual del negocio: Salón & Mesas y Cocina (KDS) quedan en pausa
-// como módulos Premium mientras nos concentramos en Ventas, Administración,
-// Logística e Inventario — no se borra nada, solo se bloquea el acceso.
+// Salón & Mesas y Cocina (KDS) activados para el piloto.
 const NAV_GRUPOS: NavGrupo[] = [
   {
     titulo: "Operación",
     items: [
       { id: "general", label: "Vista General", Icon: IconCustomize },
       { id: "resumen", label: "Resumen General", Icon: IconChart },
-      { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant, premium: true },
-      { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass, premium: true },
+      { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant },
+      { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass },
       { id: "recetas", label: "Recetas & Escandallo", Icon: IconFileText },
     ],
   },
@@ -71,11 +69,11 @@ const NAV_GRUPOS: NavGrupo[] = [
 const NAV: NavItem[] = NAV_GRUPOS.flatMap((g) => g.items);
 
 // Plan de licencia actual del tenant. Mientras no exista todavía un plan real
-// consultado al backend, el negocio opera en Plan Base — los módulos Premium
-// (Salón & Mesas, Cocina KDS) ni siquiera se listan en el sidebar para este
-// plan, no solo se deshabilitan visualmente (ver `sidebarItemsVisibles`).
+// consultado al backend, el negocio opera en Plan Pro para el piloto — los
+// módulos Premium (Salón & Mesas, Cocina KDS) quedan visibles en el sidebar
+// (ver `sidebarItemsVisibles`).
 type PlanLicencia = "BASE" | "PRO";
-const PLAN_ACTUAL: string = "BASE" as PlanLicencia;
+const PLAN_ACTUAL: string = "PRO" as PlanLicencia;
 
 /** Entradas del sidebar visibles para el plan actual — un ítem Premium desaparece del DOM por completo en Plan Base, no queda como "entrada fantasma" bloqueada. */
 const sidebarItemsVisibles = (items: NavItem[]): NavItem[] =>
@@ -3113,6 +3111,7 @@ function ComprasProveedores({ tenantId, proveedores, articulos, onCambio }: {
   const [formProveedor, setFormProveedor] = useState({ nombre: "", rif: "", telefono: "", contacto: "" });
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [proveedorDetalle, setProveedorDetalle] = useState<ProveedorHoreca | null>(null);
 
   const crearProveedor = async () => {
     if (!formProveedor.nombre.trim()) { setError("El nombre del proveedor es obligatorio"); return; }
@@ -3181,17 +3180,260 @@ function ComprasProveedores({ tenantId, proveedores, articulos, onCambio }: {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {(proveedores || []).map((p) => (
-              <div key={p.id} className="apple-glass rounded-2xl p-5 space-y-1.5">
+              <button
+                type="button"
+                key={p.id}
+                onClick={() => setProveedorDetalle(p)}
+                className="apple-glass rounded-2xl p-5 space-y-1.5 text-left cursor-pointer hover:ring-2 hover:ring-teal-500/40 transition-shadow"
+              >
                 <h4 className="font-bold text-slate-900 dark:text-white text-sm">{p.nombre}</h4>
                 {p.rif && <div className="text-xs text-slate-500 dark:text-white/40">RIF: {p.rif}</div>}
                 {p.telefono && <div className="text-xs text-slate-500 dark:text-white/40">Tel: {p.telefono}</div>}
                 {p.contacto && <div className="text-xs text-slate-500 dark:text-white/40">Contacto: {p.contacto}</div>}
-              </div>
+                <div className="text-[10px] text-teal-600 dark:text-teal-400 font-semibold pt-1">Ver historial de compras →</div>
+              </button>
             ))}
           </div>
         </div>
       )}
+
+      {proveedorDetalle && (
+        <ModalDetalleProveedor tenantId={tenantId} proveedor={proveedorDetalle} onClose={() => setProveedorDetalle(null)} onCambio={onCambio} />
+      )}
     </div>
+  );
+}
+
+function ModalDetalleProveedor({ tenantId, proveedor, onClose, onCambio }: {
+  tenantId: number; proveedor: ProveedorHoreca; onClose: () => void; onCambio: () => void;
+}) {
+  const [compras, setCompras] = useState<CompraInsumoHoreca[] | null>(null);
+  const [editando, setEditando] = useState(false);
+  const [form, setForm] = useState({
+    nombre: proveedor.nombre, rif: proveedor.rif || "", telefono: proveedor.telefono || "",
+    contacto: proveedor.contacto || "", direccion: proveedor.direccion || "",
+  });
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+  const [errorEdicion, setErrorEdicion] = useState<string | null>(null);
+  const [proveedorActual, setProveedorActual] = useState(proveedor);
+  const [cuentasPorPagar, setCuentasPorPagar] = useState<MovimientoCaja[] | null>(null);
+  const [abonando, setAbonando] = useState<MovimientoCaja | null>(null);
+
+  // Guarda TODAS las CXP de este proveedor (pagadas o no) — el saldo real de
+  // cada compra vive acá, no en CompraInsumoHoreca.montoPagado (que es solo
+  // una foto del momento de la compra, ver comentario en esa entidad). Si no
+  // se guardaran también las ya pagadas, tras pagar una desaparecería de esta
+  // lista y el historial volvería a mostrarla como pendiente por error.
+  const cargarCxp = () => {
+    listarMovimientos(tenantId, "CXP")
+      .then((todas) => setCuentasPorPagar(todas.filter((m) =>
+        m.moduloOrigen === "HORECA" && m.referenciaTipo === "CompraInsumoHoreca"
+        && (compras || []).some((c) => c.id === m.referenciaId)
+      )))
+      .catch(() => setCuentasPorPagar([]));
+  };
+
+  const guardarEdicion = async () => {
+    if (!form.nombre.trim()) { setErrorEdicion("El nombre es obligatorio"); return; }
+    setGuardandoEdicion(true);
+    setErrorEdicion(null);
+    try {
+      const actualizado = await editarProveedorHoreca(proveedorActual.id, {
+        nombre: form.nombre.trim(),
+        rif: form.rif.trim() || undefined,
+        telefono: form.telefono.trim() || undefined,
+        contacto: form.contacto.trim() || undefined,
+        direccion: form.direccion.trim() || undefined,
+      });
+      setProveedorActual(actualizado);
+      setEditando(false);
+      onCambio();
+    } catch (e) {
+      setErrorEdicion(e instanceof Error ? e.message : "No se pudo guardar");
+    } finally {
+      setGuardandoEdicion(false);
+    }
+  };
+
+  useEffect(() => {
+    listarComprasInsumo(tenantId)
+      .then((todas) => setCompras(todas.filter((c) => c.proveedor.id === proveedorActual.id)))
+      .catch(() => setCompras([]));
+  }, [tenantId, proveedorActual.id]);
+
+  useEffect(() => {
+    if (compras === null) return;
+    cargarCxp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compras]);
+
+  // Si la compra tiene una CXP vinculada, esa es la verdad (aunque ya esté
+  // PAGADA — en ese caso el saldo es 0). Si nunca tuvo CXP (se pagó completa
+  // en el momento de la compra), se usa total - montoPagado.
+  const pendienteDeCompra = (c: CompraInsumoHoreca): number => {
+    const cxp = (cuentasPorPagar || []).find((m) => m.referenciaId === c.id);
+    if (cxp) return cxp.estado === "PAGADO" ? 0 : Number(cxp.saldoPendiente ?? 0);
+    return Number(c.total) - Number(c.montoPagado || 0);
+  };
+
+  const totalComprado = (compras || []).reduce((s, c) => s + Number(c.total), 0);
+  const totalPendiente = (compras || []).reduce((s, c) => s + pendienteDeCompra(c), 0);
+
+  // Productos que este proveedor nos ha despachado alguna vez — únicos, más recientes primero.
+  const productosDespachados = useMemo(() => {
+    const vistos = new Map<number, { nombre: string; ultimaFecha: string }>();
+    for (const c of compras || []) {
+      for (const item of c.items || []) {
+        const existente = vistos.get(item.articulo.id);
+        if (!existente || new Date(c.fechaCompra) > new Date(existente.ultimaFecha)) {
+          vistos.set(item.articulo.id, { nombre: item.articulo.nombre, ultimaFecha: c.fechaCompra });
+        }
+      }
+    }
+    return Array.from(vistos.values()).sort((a, b) => new Date(b.ultimaFecha).getTime() - new Date(a.ultimaFecha).getTime());
+  }, [compras]);
+
+  return (
+    <Modal onClose={onClose} titulo={proveedorActual.nombre} ancho="max-w-2xl">
+      <div className="space-y-4">
+        {editando ? (
+          <div className="apple-glass rounded-2xl p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Campo label="Nombre / Razón social">
+                <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="input-horeca" />
+              </Campo>
+              <Campo label="RIF">
+                <input value={form.rif} onChange={(e) => setForm({ ...form, rif: e.target.value })} placeholder="J-12345678-9" className="input-horeca" />
+              </Campo>
+              <Campo label="Teléfono">
+                <input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} className="input-horeca" />
+              </Campo>
+              <Campo label="Nombre del representante">
+                <input value={form.contacto} onChange={(e) => setForm({ ...form, contacto: e.target.value })} className="input-horeca" />
+              </Campo>
+              <Campo label="Dirección fiscal">
+                <input value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} className="input-horeca sm:col-span-2" />
+              </Campo>
+            </div>
+            {errorEdicion && <p className="text-xs text-red-500">{errorEdicion}</p>}
+            <div className="flex gap-2">
+              <button onClick={guardarEdicion} disabled={guardandoEdicion} className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer disabled:opacity-60">
+                {guardandoEdicion ? "Guardando…" : "Guardar cambios"}
+              </button>
+              <button onClick={() => setEditando(false)} className="apple-glass-btn text-xs font-semibold px-4 py-2 rounded-xl cursor-pointer">Cancelar</button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            {proveedorActual.rif && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">RIF</span><span className="text-slate-800 dark:text-white/80 font-semibold">{proveedorActual.rif}</span></div>}
+            {proveedorActual.telefono && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Teléfono</span><span className="text-slate-800 dark:text-white/80 font-semibold">{proveedorActual.telefono}</span></div>}
+            {proveedorActual.contacto && <div><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Representante</span><span className="text-slate-800 dark:text-white/80 font-semibold">{proveedorActual.contacto}</span></div>}
+            {proveedorActual.direccion && <div className="col-span-2 sm:col-span-4"><span className="block text-[10px] uppercase tracking-wider text-slate-500 dark:text-white/40">Dirección fiscal</span><span className="text-slate-800 dark:text-white/80 font-semibold">{proveedorActual.direccion}</span></div>}
+            <button type="button" onClick={() => { setForm({ nombre: proveedorActual.nombre, rif: proveedorActual.rif || "", telefono: proveedorActual.telefono || "", contacto: proveedorActual.contacto || "", direccion: proveedorActual.direccion || "" }); setEditando(true); }}
+              className="col-span-2 sm:col-span-4 text-[10px] font-semibold text-teal-600 dark:text-teal-400 text-left cursor-pointer">
+              ✎ Editar datos del proveedor
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="apple-glass rounded-xl p-3.5 text-center">
+            <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Total comprado</div>
+            <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{compras ? `$${totalComprado.toFixed(2)}` : "…"}</div>
+          </div>
+          <div className="apple-glass rounded-xl p-3.5 text-center">
+            <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Le debemos</div>
+            <div className={`font-['Outfit'] font-black text-lg ${totalPendiente > 0 ? "text-amber-500" : "text-teal-600 dark:text-teal-400"}`}>
+              {compras ? `$${totalPendiente.toFixed(2)}` : "…"}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2">Productos que nos despacha</h4>
+          {compras === null ? (
+            <p className="text-xs text-slate-400">Cargando…</p>
+          ) : productosDespachados.length === 0 ? (
+            <p className="text-xs text-slate-400">Sin compras registradas todavía.</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {productosDespachados.map((p) => (
+                <span key={p.nombre} className="text-[11px] px-2.5 py-1 rounded-full bg-slate-100/60 dark:bg-white/5 text-slate-600 dark:text-white/60">{p.nombre}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h4 className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2">Historial de facturas</h4>
+          {compras === null ? (
+            <p className="text-xs text-slate-400">Cargando…</p>
+          ) : compras.length === 0 ? (
+            <p className="text-xs text-slate-400">Sin compras registradas todavía.</p>
+          ) : (
+            <div className="max-h-64 overflow-y-auto space-y-1.5">
+              {[...compras].sort((a, b) => new Date(b.fechaCompra).getTime() - new Date(a.fechaCompra).getTime()).map((c) => {
+                const pendiente = pendienteDeCompra(c);
+                return (
+                  <div key={c.id} className="bg-slate-100/60 dark:bg-white/5 rounded-xl px-3 py-2 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 dark:text-white/60">
+                        {new Date(c.fechaCompra).toLocaleDateString("es-VE")} — Factura {c.numeroFactura || "s/n"}
+                      </span>
+                      <span className="font-mono font-semibold text-slate-900 dark:text-white">${Number(c.total).toFixed(2)}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      {(c.items || []).map((it) => `${it.articulo.nombre} x${Number(it.cantidad)}`).join(" · ") || "—"}
+                    </div>
+                    {pendiente > 0.009 ? (
+                      <div className="flex items-center justify-between">
+                        <div className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                          Debe ${pendiente.toFixed(2)}
+                          {(() => {
+                            const cxp = (cuentasPorPagar || []).find((m) => m.referenciaId === c.id);
+                            return cxp?.fechaVencimiento ? ` · vence ${new Date(cxp.fechaVencimiento + "T00:00:00").toLocaleDateString("es-VE")}` : "";
+                          })()}
+                        </div>
+                        {(() => {
+                          const cxp = (cuentasPorPagar || []).find((m) => m.referenciaId === c.id);
+                          return cxp ? (
+                            <button
+                              type="button"
+                              onClick={() => setAbonando(cxp)}
+                              className="text-teal-600 dark:text-teal-400 font-semibold cursor-pointer text-[10px]"
+                            >
+                              Pagar →
+                            </button>
+                          ) : null;
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] font-semibold text-teal-600 dark:text-teal-400">✓ Pagada</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <button onClick={onClose} className="w-full g-aurora text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer">Cerrar</button>
+      </div>
+      {abonando && (
+        <ModalAbonarCuenta
+          tenantId={tenantId}
+          cuenta={abonando}
+          tipoLabel="proveedor"
+          onClose={() => setAbonando(null)}
+          onAbonado={() => {
+            setAbonando(null);
+            listarComprasInsumo(tenantId).then((todas) => setCompras(todas.filter((c) => c.proveedor.id === proveedorActual.id)));
+            cargarCxp();
+            onCambio();
+          }}
+        />
+      )}
+    </Modal>
   );
 }
 
@@ -4436,7 +4678,55 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
   );
 }
 
-interface FilaCompra { articuloId: string; cantidad: string; costoUnitario: string; fechaVencimiento: string }
+/**
+ * Reduce el tamaño de la foto de la factura ANTES de mandarla a la IA — un
+ * teléfono moderno toma fotos de 8-15 MB en 4000px+ de ancho, y ni la subida
+ * ni la lectura de Gemini necesitan esa resolución para leer texto impreso.
+ * Achicar a ~1600px de lado máximo en JPEG calidad 82% recorta el tamaño del
+ * archivo en 80-95% típicamente, sin perder legibilidad, y acelera bastante
+ * la respuesta. No toca PDFs — solo tiene sentido para imágenes.
+ */
+async function comprimirImagenFactura(archivo: File): Promise<File> {
+  if (!archivo.type.startsWith("image/")) return archivo;
+  const LADO_MAXIMO = 1600;
+  try {
+    const bitmap = await createImageBitmap(archivo);
+    const escala = Math.min(1, LADO_MAXIMO / Math.max(bitmap.width, bitmap.height));
+    if (escala >= 1 && archivo.size < 1_500_000) return archivo; // ya es chica, no vale la pena reprocesar
+    const ancho = Math.round(bitmap.width * escala);
+    const alto = Math.round(bitmap.height * escala);
+    const canvas = document.createElement("canvas");
+    canvas.width = ancho;
+    canvas.height = alto;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return archivo;
+    ctx.drawImage(bitmap, 0, 0, ancho, alto);
+    const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+    if (!blob) return archivo;
+    return new File([blob], archivo.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    return archivo; // si algo falla comprimiendo, se sube la original tal cual
+  }
+}
+
+interface FilaCompra {
+  articuloId: string; cantidad: string; costoUnitario: string; fechaVencimiento: string;
+  // Nombre leído de la foto — SIEMPRE editable mientras no se haya vinculado
+  // (articuloId vacío) o se haya creado el artículo. La IA NUNCA decide sola
+  // qué artículo es: como mucho, propone (ver articuloSugeridoId/Nombre) y el
+  // usuario elige explícitamente usar la sugerencia o crear uno nuevo con el
+  // nombre que deje escrito acá.
+  descripcionOcr?: string;
+  // Precio de venta que el usuario teclea ahí mismo al crear el artículo nuevo
+  // (opcional — solo tiene sentido si el ítem se vende tal cual, ej. una lata
+  // de refresco; un insumo de receta se cobra vía el escandallo, no aquí).
+  precioVentaNuevo?: string;
+  // Coincidencia que la IA encontró por texto en tu inventario — solo una
+  // PROPUESTA, nunca se aplica sola. El usuario debe apretar "Usar este" para
+  // que articuloId quede vinculado a él.
+  articuloSugeridoId?: string;
+  articuloSugeridoNombre?: string;
+}
 const filaVacia = (): FilaCompra => ({ articuloId: "", cantidad: "", costoUnitario: "", fechaVencimiento: "" });
 
 /** Buscador con dropdown para elegir un artículo por nombre o SKU — reemplaza el <select> plano de una lista larga de inventario en la factura de compra. */
@@ -4498,15 +4788,70 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
 }) {
   const [proveedorId, setProveedorId] = useState("");
   const [numeroFactura, setNumeroFactura] = useState("");
+  // Moneda en la que el proveedor cobró ESTA factura (ej. proveedor que cobra en
+  // bolívares) — se aplica a todos los costos unitarios de la lista; el backend
+  // los convierte a la moneda base del tenant antes de guardar.
+  const [monedaFactura, setMonedaFactura] = useState("USD");
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
   const [montoPagadoAhora, setMontoPagadoAhora] = useState("");
   const [monedaPago, setMonedaPago] = useState("USD");
+  const [diasCredito, setDiasCredito] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [exito, setExito] = useState(false);
   const [leyendoFoto, setLeyendoFoto] = useState(false);
   const [avisoOcr, setAvisoOcr] = useState<string | null>(null);
+  // Separado de `error` a propósito: un fallo al leer la foto (ej. falta la
+  // API key de Gemini) no debe quedar pegado como si fuera un error al
+  // registrar la compra — confunde, porque aparecen en momentos distintos.
+  const [errorOcr, setErrorOcr] = useState<string | null>(null);
+  // Nombre que la IA leyó en la foto cuando no coincide con ningún proveedor ya
+  // registrado — permite crearlo sin salir de esta pantalla.
+  const [proveedorSugerido, setProveedorSugerido] = useState<string | null>(null);
+  const [creandoProveedor, setCreandoProveedor] = useState(false);
+  // Índice de la fila cuyo artículo se está creando al vuelo (null = ninguna).
+  const [creandoArticuloIdx, setCreandoArticuloIdx] = useState<number | null>(null);
   const inputFotoRef = useRef<HTMLInputElement | null>(null);
+
+  // Crea el artículo con lo mínimo indispensable (nombre + SKU autogenerado +
+  // unidad "UND" por defecto) para no frenar la carga de la factura — el
+  // usuario completa categoría, precio de venta, etc. después desde Inventario.
+  const crearArticuloDeFila = async (idx: number, descripcion: string, precioVenta: string | undefined) => {
+    setCreandoArticuloIdx(idx);
+    setError(null);
+    try {
+      const sku = `AUTO-${Date.now().toString(36).toUpperCase()}`;
+      const nuevo = await crearArticulo({
+        sku, nombre: descripcion, unidadMedida: "UND",
+        precioVenta: precioVenta && Number(precioVenta) > 0 ? Number(precioVenta) : undefined,
+      });
+      setFilas((prev) => prev.map((f, i) => (i === idx ? {
+        ...f, articuloId: String(nuevo.id), descripcionOcr: undefined, precioVentaNuevo: undefined,
+        articuloSugeridoId: undefined, articuloSugeridoNombre: undefined,
+      } : f)));
+      onCambio();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo crear el artículo");
+    } finally {
+      setCreandoArticuloIdx(null);
+    }
+  };
+
+  const crearProveedorSugerido = async () => {
+    if (!proveedorSugerido) return;
+    setCreandoProveedor(true);
+    setError(null);
+    try {
+      const nuevo = await crearProveedorHoreca(tenantId, { nombre: proveedorSugerido });
+      setProveedorId(String(nuevo.id));
+      setProveedorSugerido(null);
+      onCambio();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo crear el proveedor");
+    } finally {
+      setCreandoProveedor(false);
+    }
+  };
 
   const actualizarFila = (idx: number, campo: keyof FilaCompra, valor: string) => {
     setFilas((prev) => prev.map((f, i) => (i === idx ? { ...f, [campo]: valor } : f)));
@@ -4528,10 +4873,11 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
 
   const subirFotoFactura = async (file: File) => {
     setLeyendoFoto(true);
-    setError(null);
+    setErrorOcr(null);
     setAvisoOcr(null);
     try {
-      const datos = await extraerFacturaOcr(file);
+      const archivoOptimizado = await comprimirImagenFactura(file);
+      const datos = await extraerFacturaOcr(archivoOptimizado);
 
       if (datos.numeroFactura) setNumeroFactura(datos.numeroFactura);
 
@@ -4541,6 +4887,7 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
           (p) => p.nombre.toLowerCase() === pNombre || p.nombre.toLowerCase().includes(pNombre) || pNombre.includes(p.nombre.toLowerCase())
         );
         if (match) setProveedorId(String(match.id));
+        else setProveedorSugerido(datos.proveedor.trim());
       }
 
       const nuevasFilas: FilaCompra[] = (datos.items || [])
@@ -4548,26 +4895,30 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
         .map((it) => {
           const encontrado = buscarArticuloPorDescripcion(it.descripcion);
           return {
-            articuloId: encontrado ? String(encontrado.id) : "",
+            // Nunca se vincula solo — articuloId arranca SIEMPRE vacío; el
+            // usuario elige "Usar este" (sugerencia) o "+ Crear artículo".
+            articuloId: "",
             cantidad: it.cantidad ? String(it.cantidad) : "",
             costoUnitario: it.precioUnitario ? String(it.precioUnitario) : "",
             fechaVencimiento: "",
+            descripcionOcr: it.descripcion,
+            precioVentaNuevo: encontrado?.precioVenta ? String(encontrado.precioVenta) : undefined,
+            articuloSugeridoId: encontrado ? String(encontrado.id) : undefined,
+            articuloSugeridoNombre: encontrado ? encontrado.nombre : undefined,
           };
         });
 
       if (nuevasFilas.length === 0) {
-        setError("La foto no arrojó ítems legibles — cárgalos manualmente o probá con una foto más clara.");
+        setErrorOcr("La foto no arrojó ítems legibles — cárgalos manualmente o probá con una foto más clara.");
       } else {
         setFilas(nuevasFilas);
-        const sinMatch = nuevasFilas.filter((f) => !f.articuloId).length;
+        const conSugerencia = nuevasFilas.filter((f) => f.articuloSugeridoId).length;
         setAvisoOcr(
-          sinMatch === 0
-            ? `Se leyeron ${nuevasFilas.length} artículos y se emparejaron todos con tu inventario. Revisa cantidades y costos antes de guardar.`
-            : `Se leyeron ${nuevasFilas.length} artículos. ${sinMatch} no se pudieron emparejar con tu inventario — selecciónalos manualmente en la lista. Revisa todo antes de guardar.`
+          `Se leyeron ${nuevasFilas.length} artículos. ${conSugerencia > 0 ? `${conSugerencia} tienen una posible coincidencia en tu inventario — revísala y confírmala.` : ""} Nada se vincula ni se crea solo: revisa cada nombre, cantidad y costo antes de guardar.`
         );
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo leer la factura");
+      setErrorOcr(e instanceof Error ? e.message : "No se pudo leer la factura");
     } finally {
       setLeyendoFoto(false);
       if (inputFotoRef.current) inputFotoRef.current.value = "";
@@ -4589,6 +4940,7 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
         cantidad: Number(f.cantidad),
         costoUnitario: Number(f.costoUnitario),
         fechaVencimiento: f.fechaVencimiento || undefined,
+        monedaCosto: monedaFactura !== "USD" ? monedaFactura : undefined,
       });
     }
     if (items.length === 0) { setError("Agrega al menos un artículo con cantidad y costo"); return; }
@@ -4598,10 +4950,20 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
         proveedorId: Number(proveedorId), numeroFactura: numeroFactura.trim(), items,
         montoPagadoAhora: montoPagadoAhora ? Number(montoPagadoAhora) : undefined,
         monedaPago: montoPagadoAhora ? monedaPago : undefined,
+        diasCredito: diasCredito ? Number(diasCredito) : undefined,
       });
+      // Si el usuario tecleó/ajustó un precio de venta para algún artículo de la
+      // lista, se guarda aparte — registrarCompraInsumo solo toca costo/stock.
+      for (const f of filas) {
+        if (f.articuloId && f.precioVentaNuevo && Number(f.precioVentaNuevo) > 0) {
+          await editarArticulo(Number(f.articuloId), { precioVenta: Number(f.precioVentaNuevo) }).catch(() => {});
+        }
+      }
       setFilas([filaVacia()]);
       setNumeroFactura("");
       setMontoPagadoAhora("");
+      setDiasCredito("");
+      setMonedaFactura("USD");
       setExito(true);
       onCambio();
       setTimeout(() => setExito(false), 2500);
@@ -4639,22 +5001,171 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
         <span className="text-[10px] text-slate-400">Sube una foto o PDF y Aurora completa los artículos, cantidades y costos — siempre revisa antes de guardar.</span>
       </div>
       {avisoOcr && <p className="text-xs text-teal-600 dark:text-teal-400">{avisoOcr}</p>}
+      {errorOcr && <p className="text-xs text-red-500">{errorOcr}</p>}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)} className="input-horeca">
-          <option value="">— Selecciona proveedor —</option>
-          {(proveedores || []).map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-        </select>
-        <input value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value)} placeholder="N.º de factura" className="input-horeca" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="sm:col-span-1">
+          <label className="block text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider mb-1">Proveedor</label>
+          <select
+            value={proveedorId}
+            onChange={(e) => { setProveedorId(e.target.value); setProveedorSugerido(null); }}
+            className="input-horeca w-full"
+          >
+            <option value="">— Selecciona proveedor —</option>
+            {(proveedores || []).map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+          </select>
+          {proveedorSugerido && (
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap text-xs">
+              <span className="text-amber-600 dark:text-amber-400">
+                La foto dice "<strong>{proveedorSugerido}</strong>" — no está registrado todavía.
+              </span>
+              <button
+                type="button"
+                onClick={crearProveedorSugerido}
+                disabled={creandoProveedor}
+                className="apple-glass-btn font-semibold py-1 px-2.5 rounded-lg cursor-pointer disabled:opacity-60"
+              >
+                {creandoProveedor ? "Creando…" : `+ Crear proveedor "${proveedorSugerido}"`}
+              </button>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider mb-1">N.º de factura</label>
+          <input value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value)} placeholder="N.º de factura" className="input-horeca w-full" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider mb-1">Moneda de la factura</label>
+          <select value={monedaFactura} onChange={(e) => setMonedaFactura(e.target.value)} className="input-horeca w-full">
+            {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
       </div>
 
       <div className="space-y-2.5">
         <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Artículos comprados</p>
+        <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_1.2fr_auto] gap-2 px-0.5">
+          <span className="text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider">Artículo</span>
+          <span className="text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider">Cantidad</span>
+          <span className="text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider">Costo unitario ({monedaFactura})</span>
+          <span className="text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider">Precio de venta (opcional)</span>
+          <span className="text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider">Vencimiento (opcional)</span>
+          <span />
+        </div>
         {filas.map((f, idx) => (
-          <div key={idx} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1.2fr_auto] gap-2 items-center">
-            <BuscadorArticulo articulos={articulos} articuloId={f.articuloId} onSeleccionar={(id) => actualizarFila(idx, "articuloId", id)} />
+          <div key={idx} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1fr_1.2fr_auto] gap-2 items-center">
+            <div>
+              {f.articuloId || f.descripcionOcr === undefined ? (
+                // Ya vinculado a un artículo (elegido a mano o confirmado por el usuario),
+                // o una fila manual sin lectura de foto — el buscador es el control normal.
+                <BuscadorArticulo articulos={articulos} articuloId={f.articuloId} onSeleccionar={(id) => {
+                  const seleccionado = (articulos || []).find((a) => String(a.id) === id);
+                  setFilas((prev) => prev.map((row, i) => (i === idx ? {
+                    ...row, articuloId: id, descripcionOcr: undefined,
+                    precioVentaNuevo: seleccionado?.precioVenta ? String(seleccionado.precioVenta) : row.precioVentaNuevo,
+                  } : row)));
+                }} />
+              ) : (
+                // Recién leído de la foto y SIN vincular todavía — el nombre es un campo de
+                // texto editable de una, nunca un valor ya decidido. La IA como mucho propone
+                // (articuloSugeridoId) pero el usuario debe apretar "Usar este" para aplicarlo.
+                <input
+                  value={f.descripcionOcr}
+                  onChange={(e) => actualizarFila(idx, "descripcionOcr", e.target.value)}
+                  placeholder="Nombre del artículo"
+                  className="input-horeca w-full font-semibold"
+                />
+              )}
+              {!f.articuloId && f.descripcionOcr && f.descripcionOcr.trim().length >= 3 && (() => {
+                // Búsqueda en vivo mientras escribe — por si ya existe algo parecido
+                // en el inventario y no hace falta crear uno nuevo (evita duplicados
+                // como "LATA COCA COLA 12X355" vs "LATA COCA COLA 355ML").
+                const q = f.descripcionOcr.trim().toLowerCase();
+                const similares = (articulos || [])
+                  .filter((a) => String(a.id) !== f.articuloSugeridoId && a.nombre.toLowerCase().includes(q))
+                  .slice(0, 4);
+                if (similares.length === 0) return null;
+                return (
+                  <div className="mt-1.5 flex items-center gap-1.5 flex-wrap text-xs">
+                    <span className="text-slate-400 whitespace-nowrap">¿Ya la tienes?</span>
+                    {similares.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => {
+                          setFilas((prev) => prev.map((row, i) => (i === idx ? {
+                            ...row, articuloId: String(a.id), descripcionOcr: undefined,
+                            articuloSugeridoId: undefined, articuloSugeridoNombre: undefined,
+                            precioVentaNuevo: a.precioVenta ? String(a.precioVenta) : row.precioVentaNuevo,
+                          } : row)));
+                        }}
+                        className="apple-glass-btn font-semibold py-1 px-2 rounded-lg cursor-pointer"
+                      >
+                        {a.nombre}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+              {!f.articuloId && f.articuloSugeridoId && (
+                <div className="mt-1.5 flex items-center gap-2 flex-wrap text-xs">
+                  <span className="text-amber-600 dark:text-amber-400">¿Es este? <strong>{f.articuloSugeridoNombre}</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const seleccionado = (articulos || []).find((a) => String(a.id) === f.articuloSugeridoId);
+                      setFilas((prev) => prev.map((row, i) => (i === idx ? {
+                        ...row, articuloId: f.articuloSugeridoId!, descripcionOcr: undefined,
+                        articuloSugeridoId: undefined, articuloSugeridoNombre: undefined,
+                        precioVentaNuevo: seleccionado?.precioVenta ? String(seleccionado.precioVenta) : row.precioVentaNuevo,
+                      } : row)));
+                    }}
+                    className="text-teal-600 dark:text-teal-400 font-semibold cursor-pointer"
+                  >
+                    Usar este
+                  </button>
+                </div>
+              )}
+              {!f.articuloId && f.descripcionOcr !== undefined && (
+                <div className="mt-1.5 flex items-center gap-2 flex-wrap text-xs">
+                  <button
+                    type="button"
+                    onClick={() => crearArticuloDeFila(idx, f.descripcionOcr!.trim(), f.precioVentaNuevo)}
+                    disabled={creandoArticuloIdx === idx || !f.descripcionOcr.trim()}
+                    className="apple-glass-btn font-semibold py-1 px-2.5 rounded-lg cursor-pointer disabled:opacity-60"
+                  >
+                    {creandoArticuloIdx === idx ? "Creando…" : `+ Crear artículo "${f.descripcionOcr}"`}
+                  </button>
+                </div>
+              )}
+            </div>
             <input value={f.cantidad} onChange={(e) => actualizarFila(idx, "cantidad", e.target.value)} type="number" step="0.001" placeholder="Cantidad" className="input-horeca" />
-            <input value={f.costoUnitario} onChange={(e) => actualizarFila(idx, "costoUnitario", e.target.value)} type="number" step="0.01" placeholder="Costo unit. $" className="input-horeca" />
+            <input value={f.costoUnitario} onChange={(e) => actualizarFila(idx, "costoUnitario", e.target.value)} type="number" step="0.01" placeholder={`Costo unit. ${monedaFactura}`} className="input-horeca" />
+            <div>
+              {/* Precio de venta: SIEMPRE visible y opcional, sin importar si el artículo
+                  ya existe, se acaba de emparejar o todavía ni se ha elegido/creado —
+                  no depender de ningún otro estado de la fila para decidir si se muestra. */}
+              <input
+                value={f.precioVentaNuevo || ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "" || /^\d*\.?\d*$/.test(v)) actualizarFila(idx, "precioVentaNuevo", v);
+                }}
+                type="text" inputMode="decimal"
+                placeholder="$ (opcional)"
+                className="input-horeca w-full"
+              />
+              {f.precioVentaNuevo && Number(f.precioVentaNuevo) > 0 && f.costoUnitario && monedaFactura === "USD" && (
+                (() => {
+                  const margen = calcularMargen(Number(f.costoUnitario), Number(f.precioVentaNuevo));
+                  return margen !== null ? (
+                    <p className={`text-[10px] mt-1 font-semibold ${margen < 0 ? "text-red-500" : margen < 20 ? "text-amber-500" : "text-teal-600 dark:text-teal-400"}`}>
+                      Margen: {margen.toFixed(0)}%
+                    </p>
+                  ) : null;
+                })()
+              )}
+            </div>
             <div>
               <input value={f.fechaVencimiento} onChange={(e) => actualizarFila(idx, "fechaVencimiento", e.target.value)} type="date" className="input-horeca w-full" title="Fecha de vencimiento (opcional)" />
               {f.fechaVencimiento && (
@@ -4673,7 +5184,7 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
 
       <div className="pt-2 border-t border-slate-300/50 dark:border-white/10 space-y-3">
         <div className="text-xs text-slate-500 dark:text-white/40">
-          Total: <strong className="text-slate-900 dark:text-white">${totalCompra.toFixed(2)}</strong>
+          Total: <strong className="text-slate-900 dark:text-white">{totalCompra.toFixed(2)} {monedaFactura}</strong>
           {conVencimiento > 0 && <span className="ml-2 text-amber-500">· {conVencimiento} con fecha de vencimiento</span>}
         </div>
 
@@ -4697,6 +5208,23 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
               Queda pendiente por pagar al proveedor — se registra como Cuenta por Pagar (visible en Administración).
             </p>
           )
+        )}
+        {!(montoPagadoAhora && Number(montoPagadoAhora) >= totalCompra && monedaPago === "USD") && (
+          <div className="max-w-[200px]">
+            <label className="block text-[10px] font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1">Días de crédito (opcional)</label>
+            <input
+              value={diasCredito}
+              onChange={(e) => setDiasCredito(e.target.value)}
+              type="number" step="1" min="0"
+              placeholder="Ej. 5 — según la factura"
+              className="input-horeca"
+            />
+            {diasCredito && Number(diasCredito) > 0 && (
+              <p className="text-[10px] mt-1 text-slate-400">
+                Vence el {new Date(Date.now() + Number(diasCredito) * 86400000).toLocaleDateString("es-VE")}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -6949,15 +7477,23 @@ function sumarDiasStr(fechaStr: string, dias: number): string {
   return `${y2}-${m2}-${d2}`;
 }
 
+interface MovimientoCajaConEquivalente extends MovimientoCaja {
+  montoEquivalente?: number | null;
+  montoEquivalenteBase?: number | null;
+}
+
 function ResumenFinanciero({ tenantId }: { tenantId: number }) {
   const [rango, setRango] = useState<RangoEstadistica>("DIA");
   const [fechaSel, setFechaSel] = useState(() => hoy());
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [avisoErrorSilencioso, setAvisoErrorSilencioso] = useState<string | null>(null);
+  const [ultimaSinc, setUltimaSinc] = useState<string | null>(null);
+  const [monedaBaseNegocio, setMonedaBaseNegocio] = useState<string>("");
 
   const [ventasTotal, setVentasTotal] = useState(0);
   const [egresosTotal, setEgresosTotal] = useState(0);
-  const [utilidadTotal, setUtilidadTotal] = useState(0);
+  const [utilidadTotal, setUtilidadTotal] = useState<number | null>(null);
   const [ticketsCount, setTicketsCount] = useState(0);
 
   const [topProductos, setTopProductos] = useState<ResumenUtilidadProducto[]>([]);
@@ -6966,10 +7502,24 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
   const [horaPico, setHoraPico] = useState<{ hora: number; label: string; ventas: number; pedidos: number } | null>(null);
   const [ticketsPeriodo, setTicketsPeriodo] = useState<ReporteTicket[]>([]);
 
+  // Mecanismo de invalidación lógica:
+  // AbortController y generationRef descartan respuestas en vuelo desfasadas antes de mutar estado
+  // (invalidación lógica de renderizado; no cancela peticiones a nivel de red ya que la señal no se propaga a fetch).
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const generationRef = useRef(0);
+  const ejecucionEnCursoRef = useRef(false);
+  const datosUtilidadRef = useRef<{ utilidadTotal: number | null; topProductos: ResumenUtilidadProducto[] }>({
+    utilidadTotal: null,
+    topProductos: [],
+  });
+
   // Calcular fechas de inicio y fin según el rango activo
   const { fechaInicio, fechaFin, etiquetaPeriodo } = useMemo(() => {
     const [y, m, d] = fechaSel.split("-").map(Number);
-    const NOMBRES_MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const NOMBRES_MESES = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
 
     if (rango === "DIA") {
       const dt = new Date(y, m - 1, d);
@@ -7011,33 +7561,89 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
     };
   }, [rango, fechaSel]);
 
-  const cargarDatos = () => {
-    let cancelado = false;
-    setCargando(true);
-    setError(null);
+  // Multimoneda: totalBase para tickets; no asume USD
+  const obtenerTotalTicket = (t: ReporteTicket): number => {
+    if (t.totalBase !== undefined && t.totalBase !== null) return Number(t.totalBase);
+    return 0;
+  };
 
-    Promise.all([
-      reporteTickets({ fechaInicio, fechaFin, estado: "PAGADA" }),
-      listarMovimientos(tenantId, "EGRESO"),
-    ])
-      .then(async ([ticketsLista, egresosLista]) => {
-        if (cancelado) return;
+  // Multimoneda: montoEquivalente / montoEquivalenteBase para egresos; no mezcla nominales COP/VES/USD
+  const obtenerMontoEgreso = (m: MovimientoCajaConEquivalente, baseCur: string): number => {
+    if (m.montoEquivalente !== undefined && m.montoEquivalente !== null) return Number(m.montoEquivalente);
+    if (m.montoEquivalenteBase !== undefined && m.montoEquivalenteBase !== null) return Number(m.montoEquivalenteBase);
+    if (m.moneda && baseCur && m.moneda.toUpperCase() === baseCur.toUpperCase()) {
+      return Number(m.monto || 0);
+    }
+    return 0;
+  };
 
-        // 1. Totales de Ventas & Tickets
-        const totalV = ticketsLista.reduce((s, t) => s + Number(t.totalUsd || 0), 0);
-        setVentasTotal(totalV);
-        setTicketsCount(ticketsLista.length);
-        setTicketsPeriodo([...ticketsLista].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()));
+  const cargarDatos = (silencioso = false) => {
+    // Si es un sondeo silencioso y ya hay una solicitud en curso, omitir para no solapar
+    if (silencioso && ejecucionEnCursoRef.current) {
+      return;
+    }
 
-        // 2. Egresos en el rango
+    // Invalidación lógica de la solicitud anterior
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const currentGen = ++generationRef.current;
+
+    ejecucionEnCursoRef.current = true;
+
+    // En carga inicial o cambio de filtros (!silencioso):
+    // Limpiar indicadores inmediatamente para no mostrar datos del período anterior bajo el nuevo encabezado
+    if (!silencioso) {
+      setCargando(true);
+      setError(null);
+      setAvisoErrorSilencioso(null);
+      setVentasTotal(0);
+      setTicketsCount(0);
+      setTicketsPeriodo([]);
+      setEgresosTotal(0);
+      setHorasTopData([]);
+      setHoraPico(null);
+      setTendencia([]);
+      setTopProductos([]);
+      setUtilidadTotal(null);
+      setUltimaSinc(null);
+      datosUtilidadRef.current = { utilidadTotal: null, topProductos: [] };
+    }
+
+    (async () => {
+      try {
+        // En polling silencioso de 60s: consultar ÚNICAMENTE tickets y movimientos (sin utilidadDiaria ni tasas extra)
+        // En carga inicial/filtros: consultar también monedaBase real del tenant (sin asumir USD)
+        const ticketsPromise = reporteTickets({ fechaInicio, fechaFin, estado: "PAGADA" });
+        const egresosPromise = listarMovimientos(tenantId, "EGRESO") as Promise<MovimientoCajaConEquivalente[]>;
+        const monedaPromise = !silencioso ? monedaBase(tenantId) : Promise.resolve(monedaBaseNegocio);
+
+        const [ticketsLista, egresosLista, mBaseRes] = await Promise.all([
+          ticketsPromise,
+          egresosPromise,
+          monedaPromise,
+        ]);
+
+        if (currentGen !== generationRef.current || controller.signal.aborted) return;
+
+        const baseCur = mBaseRes || monedaBaseNegocio;
+
+        // Cálculos multimoneda en variables locales
+        const localVentasTotal = ticketsLista.reduce((s, t) => s + obtenerTotalTicket(t), 0);
+        const localTicketsCount = ticketsLista.length;
+        const localTicketsPeriodo = [...ticketsLista].sort(
+          (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
+        );
+
         const egresosFiltrados = egresosLista.filter((m) => {
           const f = m.fechaRegistro.slice(0, 10);
           return f >= fechaInicio && f <= fechaFin;
         });
-        const totalE = egresosFiltrados.reduce((s, m) => s + Number(m.monto || 0), 0);
-        setEgresosTotal(totalE);
+        const localEgresosTotal = egresosFiltrados.reduce((s, m) => s + obtenerMontoEgreso(m, baseCur), 0);
 
-        // 3. Horas Top de Venta (Picos de Venta por Hora)
+        // Horas Top de Venta
         const horasMap: Record<number, { hora: number; label: string; ventas: number; pedidos: number }> = {};
         for (let h = 0; h < 24; h++) {
           const ampm = h >= 12 ? "PM" : "AM";
@@ -7047,136 +7653,184 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
         ticketsLista.forEach((t) => {
           const h = new Date(t.fecha).getHours();
           if (horasMap[h]) {
-            horasMap[h].ventas += Number(t.totalUsd || 0);
+            horasMap[h].ventas += obtenerTotalTicket(t);
             horasMap[h].pedidos += 1;
           }
         });
+        const localHorasTopData = Object.values(horasMap)
+          .filter((h) => (h.hora >= 8 && h.hora <= 23) || h.ventas > 0)
+          .sort((a, b) => a.hora - b.hora);
 
-        // Filtrar franja comercial (ej. 8 AM a 11 PM o cualquier hora con ventas)
-        const horasArray = Object.values(horasMap).filter((h) => (h.hora >= 8 && h.hora <= 23) || h.ventas > 0);
-        horasArray.sort((a, b) => a.hora - b.hora);
-        setHorasTopData(horasArray);
+        const horasConVentas = localHorasTopData.filter((h) => h.ventas > 0);
+        const localHoraPico = horasConVentas.length > 0
+          ? [...horasConVentas].sort((a, b) => b.ventas - a.ventas)[0]
+          : null;
 
-        const horasConVentas = horasArray.filter((h) => h.ventas > 0);
-        if (horasConVentas.length > 0) {
-          const topH = [...horasConVentas].sort((a, b) => b.ventas - a.ventas)[0];
-          setHoraPico(topH);
-        } else {
-          setHoraPico(null);
-        }
-
-        // 4. Tendencia según el Rango
+        // Tendencia según el rango activo
+        let localTendencia: { etiqueta: string; ventas: number; pedidos?: number }[] = [];
         if (rango === "DIA") {
-          // En modo Día: curva horaria
-          const tendenciaHoras = horasArray.map((h) => ({
+          localTendencia = localHorasTopData.map((h) => ({
             etiqueta: h.label,
             ventas: Number(h.ventas.toFixed(2)),
             pedidos: h.pedidos,
           }));
-          setTendencia(tendenciaHoras);
         } else if (rango === "7_DIAS") {
-          // En modo 7 días: cada uno de los 7 días
-          const porDia: Record<string, number> = {};
+          const porDia: Record<string, { ventas: number; pedidos: number }> = {};
           for (let i = 0; i < 7; i++) {
             const dStr = sumarDiasStr(fechaInicio, i);
-            porDia[dStr] = 0;
+            porDia[dStr] = { ventas: 0, pedidos: 0 };
           }
           ticketsLista.forEach((t) => {
             const dia = t.fecha.slice(0, 10);
-            if (dia in porDia) porDia[dia] += Number(t.totalUsd || 0);
+            if (dia in porDia) {
+              porDia[dia].ventas += obtenerTotalTicket(t);
+              porDia[dia].pedidos += 1;
+            }
           });
-          const tend = Object.entries(porDia).map(([f, v]) => ({
+          localTendencia = Object.entries(porDia).map(([f, v]) => ({
             etiqueta: new Date(f + "T00:00:00").toLocaleDateString("es-VE", { day: "2-digit", month: "short" }),
-            ventas: Number(v.toFixed(2)),
+            ventas: Number(v.ventas.toFixed(2)),
+            pedidos: v.pedidos,
           }));
-          setTendencia(tend);
         } else if (rango === "MES") {
-          // En modo Mes: todos los días del mes
           const [yM, mM] = fechaSel.split("-").map(Number);
           const diasEnMes = new Date(yM, mM, 0).getDate();
-          const porDiaMes: Record<string, number> = {};
+          const porDiaMes: Record<string, { ventas: number; pedidos: number }> = {};
           for (let d = 1; d <= diasEnMes; d++) {
             const dStr = `${yM}-${String(mM).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-            porDiaMes[dStr] = 0;
+            porDiaMes[dStr] = { ventas: 0, pedidos: 0 };
           }
           ticketsLista.forEach((t) => {
             const dia = t.fecha.slice(0, 10);
-            if (dia in porDiaMes) porDiaMes[dia] += Number(t.totalUsd || 0);
+            if (dia in porDiaMes) {
+              porDiaMes[dia].ventas += obtenerTotalTicket(t);
+              porDiaMes[dia].pedidos += 1;
+            }
           });
-          const tend = Object.entries(porDiaMes).map(([f, v]) => ({
+          localTendencia = Object.entries(porDiaMes).map(([f, v]) => ({
             etiqueta: f.slice(8, 10),
-            ventas: Number(v.toFixed(2)),
+            ventas: Number(v.ventas.toFixed(2)),
+            pedidos: v.pedidos,
           }));
-          setTendencia(tend);
         } else {
-          // En modo Año: 12 meses
           const MESES_ABR = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-          const porMes: Record<number, number> = {};
-          for (let i = 0; i < 12; i++) porMes[i] = 0;
+          const porMes: Record<number, { ventas: number; pedidos: number }> = {};
+          for (let i = 0; i < 12; i++) porMes[i] = { ventas: 0, pedidos: 0 };
           ticketsLista.forEach((t) => {
             const mIdx = new Date(t.fecha).getMonth();
-            porMes[mIdx] = (porMes[mIdx] || 0) + Number(t.totalUsd || 0);
+            if (porMes[mIdx]) {
+              porMes[mIdx].ventas += obtenerTotalTicket(t);
+              porMes[mIdx].pedidos += 1;
+            }
           });
-          const tend = Object.entries(porMes).map(([mIdx, v]) => ({
+          localTendencia = Object.entries(porMes).map(([mIdx, v]) => ({
             etiqueta: MESES_ABR[Number(mIdx)],
-            ventas: Number(v.toFixed(2)),
+            ventas: Number(v.ventas.toFixed(2)),
+            pedidos: v.pedidos,
           }));
-          setTendencia(tend);
         }
 
-        // 5. Utilidad y Top Productos vendidos en el período
-        const fechasConTickets = [...new Set(ticketsLista.map((t) => t.fecha.slice(0, 10)))];
-        if (fechasConTickets.length > 0) {
-          try {
+        // Utilidad y Top Productos:
+        // En polling silencioso de 60s NO se ejecutan llamadas a utilidadDiaria.
+        // Se calculan únicamente durante carga inicial, cambio de filtros o refresco manual (!silencioso).
+        let localUtilidadTotal = datosUtilidadRef.current.utilidadTotal;
+        let localTopProductos = datosUtilidadRef.current.topProductos;
+
+        if (!silencioso) {
+          const fechasConTickets = [...new Set(ticketsLista.map((t) => t.fecha.slice(0, 10)))];
+          if (fechasConTickets.length > 0) {
             const utilidadesArr = await Promise.all(
-              fechasConTickets.slice(0, 31).map((f) => utilidadDiaria(tenantId, f).catch(() => []))
+              fechasConTickets.slice(0, 31).map((f) => utilidadDiaria(tenantId, f))
             );
+            if (currentGen !== generationRef.current || controller.signal.aborted) return;
+
             let uTotal = 0;
             const mapaProds: Record<string, ResumenUtilidadProducto> = {};
             utilidadesArr.flat().forEach((p) => {
-              uTotal += Number(p.utilidad || 0);
+              uTotal += p.utilidad;
               if (!mapaProds[p.nombrePlato]) {
-                mapaProds[p.nombrePlato] = { ...p, cantidadVendida: 0, ingresoTotal: 0, costoTotal: 0, utilidad: 0 };
+                mapaProds[p.nombrePlato] = { ...p };
+                return;
               }
               mapaProds[p.nombrePlato].cantidadVendida += p.cantidadVendida;
               mapaProds[p.nombrePlato].ingresoTotal += p.ingresoTotal;
               mapaProds[p.nombrePlato].costoTotal += p.costoTotal;
               mapaProds[p.nombrePlato].utilidad += p.utilidad;
             });
-            setUtilidadTotal(uTotal);
-            setTopProductos(Object.values(mapaProds).sort((a, b) => b.cantidadVendida - a.cantidadVendida).slice(0, 5));
-          } catch {
-            setUtilidadTotal(totalV * 0.4); // Estimación 40% si falla cálculo
-            setTopProductos([]);
+            localUtilidadTotal = uTotal;
+            localTopProductos = Object.values(mapaProds).sort((a, b) => b.cantidadVendida - a.cantidadVendida).slice(0, 5);
+          } else {
+            // Sin tickets en el período: estado vacío honesto, sin llamar a utilidadDiaria ni asumir datos falsos
+            localTopProductos = [];
+            localUtilidadTotal = 0;
           }
-        } else if (rango === "DIA") {
-          try {
-            const resU = await utilidadDiaria(tenantId, fechaSel).catch(() => []);
-            setTopProductos([...resU].sort((a, b) => b.cantidadVendida - a.cantidadVendida).slice(0, 5));
-            setUtilidadTotal(resU.reduce((s, p) => s + Number(p.utilidad || 0), 0));
-          } catch {
-            setTopProductos([]);
-            setUtilidadTotal(0);
-          }
-        } else {
-          setTopProductos([]);
-          setUtilidadTotal(0);
+          datosUtilidadRef.current = { utilidadTotal: localUtilidadTotal, topProductos: localTopProductos };
         }
-      })
-      .catch((e) => {
-        if (!cancelado) setError(e instanceof Error ? e.message : "No se pudieron cargar los indicadores");
-      })
-      .finally(() => {
-        if (!cancelado) setCargando(false);
-      });
 
-    return () => {
-      cancelado = true;
-    };
+        // Comprobación final de vigencia antes de aplicar estado de forma atómica
+        if (currentGen !== generationRef.current || controller.signal.aborted) return;
+
+        setMonedaBaseNegocio(baseCur);
+        setVentasTotal(localVentasTotal);
+        setTicketsCount(localTicketsCount);
+        setTicketsPeriodo(localTicketsPeriodo);
+        setEgresosTotal(localEgresosTotal);
+        setHorasTopData(localHorasTopData);
+        setHoraPico(localHoraPico);
+        setTendencia(localTendencia);
+        setTopProductos(localTopProductos);
+        setUtilidadTotal(localUtilidadTotal);
+
+        setError(null);
+        setAvisoErrorSilencioso(null);
+        setUltimaSinc(new Date().toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      } catch (e: any) {
+        if (currentGen !== generationRef.current || controller.signal.aborted) return;
+
+        if (silencioso) {
+          // En sondeo silencioso fallido: conservar datos anteriores y avisar discretamente sin vaciar
+          setAvisoErrorSilencioso("No se pudo actualizar automáticamente");
+        } else {
+          // En carga inicial o cambio de filtros fallido: limpiar indicadores para no mostrar datos del período anterior
+          setVentasTotal(0);
+          setTicketsCount(0);
+          setTicketsPeriodo([]);
+          setEgresosTotal(0);
+          setHorasTopData([]);
+          setHoraPico(null);
+          setTendencia([]);
+          setTopProductos([]);
+          setUtilidadTotal(null);
+          setUltimaSinc(null);
+          datosUtilidadRef.current = { utilidadTotal: null, topProductos: [] };
+          setError(e instanceof Error ? e.message : "No se pudieron cargar los indicadores");
+          setAvisoErrorSilencioso(null);
+        }
+      } finally {
+        if (currentGen === generationRef.current) {
+          ejecucionEnCursoRef.current = false;
+          if (!silencioso) {
+            setCargando(false);
+          }
+        }
+      }
+    })();
   };
 
+  // Carga al montar o cambiar de filtros (inmediata), y sondeo periódico cada 60 segundos
   useEffect(() => {
-    cargarDatos();
+    cargarDatos(false);
+    const interval = setInterval(() => {
+      cargarDatos(true);
+    }, 60000);
+
+    return () => {
+      clearInterval(interval);
+      generationRef.current++;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [tenantId, rango, fechaInicio, fechaFin]);
 
   // Controles de navegación de fecha
@@ -7293,49 +7947,73 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
 
           <button
             type="button"
-            onClick={cargarDatos}
-            className="p-1.5 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer"
+            onClick={() => cargarDatos(false)}
+            className="p-1.5 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer transition-transform"
             title="Actualizar datos en vivo"
           >
-            <IconRefresh size={15} />
+            <div className={cargando ? "animate-spin text-teal-500" : ""}>
+              <IconRefresh size={15} />
+            </div>
           </button>
         </div>
       </div>
 
-      {/* Subtítulo del período */}
-      <div className="flex items-center justify-between px-1">
+      {/* Subtítulo del período y badge de Actualización automática con indicador dinámico */}
+      <div className="flex items-center justify-between px-1 flex-wrap gap-2">
         <div className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-wider flex items-center gap-2">
-          <span>Vista activa:</span>
+          <span>Período:</span>
           <span className="text-teal-600 dark:text-teal-400 normal-case font-extrabold text-sm">{etiquetaPeriodo}</span>
         </div>
-        {cargando && <span className="text-xs text-teal-500 animate-pulse font-semibold">Actualizando indicadores…</span>}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`flex items-center gap-1.5 text-[11px] font-mono font-semibold px-2.5 py-1 rounded-xl border ${
+            avisoErrorSilencioso
+              ? "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20"
+              : "text-teal-600 dark:text-teal-400 bg-teal-500/10 border-teal-500/20"
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${
+              avisoErrorSilencioso ? "bg-amber-500" : "bg-teal-500 animate-pulse"
+            }`} />
+            Actualización automática
+          </span>
+          {ultimaSinc && (
+            <span className="text-[11px] text-slate-400 dark:text-white/40 font-mono">
+              Sinc: {ultimaSinc}
+            </span>
+          )}
+          {cargando && <span className="text-xs text-teal-500 animate-pulse font-semibold ml-1">Actualizando…</span>}
+          {avisoErrorSilencioso && (
+            <span className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg font-medium border border-amber-500/20">
+              {avisoErrorSilencioso}
+            </span>
+          )}
+        </div>
       </div>
 
       {error && <p className="text-xs text-red-500 bg-red-500/10 p-3 rounded-xl border border-red-500/20">{error}</p>}
 
-      {/* Tarjetas KPI del Período */}
+      {/* Tarjetas KPI del Período con soporte multimoneda */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Ventas Totales"
-          val={`$${ventasTotal.toFixed(2)}`}
-          sub={`${ticketsCount} transaccion${ticketsCount === 1 ? "" : "es"} en el período`}
+          val={monedaBaseNegocio ? `${monedaBaseNegocio} ${ventasTotal.toFixed(2)}` : `${ventasTotal.toFixed(2)}`}
+          sub={`${ticketsCount} transacción${ticketsCount === 1 ? "" : "es"} en el período`}
           color="#0ea5e9"
         />
         <KpiCard
           label="Egresos Operativos"
-          val={`$${egresosTotal.toFixed(2)}`}
+          val={monedaBaseNegocio ? `${monedaBaseNegocio} ${egresosTotal.toFixed(2)}` : `${egresosTotal.toFixed(2)}`}
           sub="Salidas de caja registradas"
           color="#ef4444"
         />
         <KpiCard
           label="Utilidad Bruta Estimada"
-          val={`$${utilidadTotal.toFixed(2)}`}
-          sub="Ganancia sobre costos de insumos"
+          val={utilidadTotal !== null ? (monedaBaseNegocio ? `${monedaBaseNegocio} ${utilidadTotal.toFixed(2)}` : `${utilidadTotal.toFixed(2)}`) : "No disponible"}
+          sub={utilidadTotal !== null ? "Ganancia sobre costos de insumos" : "Cálculo no disponible"}
           color="#22c55e"
         />
         <KpiCard
           label="Ticket Promedio"
-          val={`$${ticketPromedio.toFixed(2)}`}
+          val={monedaBaseNegocio ? `${monedaBaseNegocio} ${ticketPromedio.toFixed(2)}` : `${ticketPromedio.toFixed(2)}`}
           sub="Monto promedio por pedido"
           color="#a855f7"
         />
@@ -7356,10 +8034,10 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
                   ? "Evolución Diaria del Mes"
                   : "Facturación Mensual del Año"}
               </h3>
-              <p className="text-[11px] text-slate-400 dark:text-white/40">Total facturado en USD</p>
+              <p className="text-[11px] text-slate-400 dark:text-white/40">Total facturado en {monedaBaseNegocio || "moneda base"}</p>
             </div>
             <span className="text-xs font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-lg">
-              ${ventasTotal.toFixed(2)}
+              {monedaBaseNegocio ? `${monedaBaseNegocio} ` : ""}{ventasTotal.toFixed(2)}
             </span>
           </div>
           {tendencia.length === 0 || ventasTotal === 0 ? (
@@ -7373,7 +8051,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
                 <XAxis dataKey="etiqueta" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip
-                  formatter={((v: any) => [`$${Number(v).toFixed(2)}`, "Ventas"]) as any}
+                  formatter={((v: any) => [`${monedaBaseNegocio ? `${monedaBaseNegocio} ` : ""}${Number(v).toFixed(2)}`, "Ventas"]) as any}
                   contentStyle={{ fontSize: 11, borderRadius: 10, background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
                 />
                 <Line type="monotone" dataKey="ventas" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 3, fill: "#0ea5e9" }} activeDot={{ r: 5 }} />
@@ -7382,34 +8060,27 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
           )}
         </div>
 
-        {/* Gráfico 2: HORAS TOP DE VENTA (PICOS DE FACTURACIÓN) */}
-        <div className="apple-glass rounded-2xl p-5 border border-teal-500/20 relative overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+        {/* Gráfico 2: Horas Top de Venta */}
+        <div className="apple-glass rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
-                  Horas Top de Venta (Picos de Demanda)
-                </h3>
-              </div>
-              <p className="text-[11px] text-slate-400 dark:text-white/40">
-                Distribución de facturación y pedidos por franja horaria
-              </p>
+              <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
+                Horas Top de Venta
+              </h3>
+              <p className="text-[11px] text-slate-400 dark:text-white/40">Distribución de facturación por hora</p>
             </div>
-
             {horaPico && horaPico.ventas > 0 ? (
-              <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs px-2.5 py-1 rounded-xl font-bold">
-                <span>Pico: {horaPico.label}</span>
-                <span className="font-mono font-black">(${horaPico.ventas.toFixed(2)})</span>
-              </div>
+              <span className="text-xs font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-lg">
+                Pico: {horaPico.label} ({monedaBaseNegocio ? `${monedaBaseNegocio} ` : ""}{horaPico.ventas.toFixed(2)})
+              </span>
             ) : (
-              <span className="text-[11px] text-slate-400">Sin hora pico aún</span>
+              <span className="text-[11px] text-slate-400">Sin hora pico</span>
             )}
           </div>
 
-          {horasTopData.filter((h) => h.ventas > 0).length === 0 ? (
+          {horasTopData.length === 0 || ventasTotal === 0 ? (
             <div className="h-[220px] flex items-center justify-center text-xs text-slate-400">
-              Sin movimientos registrados en este rango horario.
+              Sin ventas registradas en este período.
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
@@ -7419,7 +8090,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip
                   formatter={((v: any, name: any, item: any) => {
-                    if (name === "ventas") return [`$${Number(v).toFixed(2)} (${item.payload.pedidos} pedidos)`, "Facturado"];
+                    if (name === "ventas") return [`${monedaBaseNegocio ? `${monedaBaseNegocio} ` : ""}${Number(v).toFixed(2)} (${item.payload.pedidos} pedidos)`, "Facturado"];
                     return [v, name];
                   }) as any}
                   contentStyle={{ fontSize: 11, borderRadius: 10, background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
@@ -7464,7 +8135,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
                 <YAxis type="category" dataKey="nombrePlato" width={110} tick={{ fontSize: 10 }} />
                 <Tooltip
                   formatter={((v: any, _name: any, item: any) => [
-                    `${v} unidades ($${(item.payload.ingresoTotal || 0).toFixed(2)})`,
+                    `${v} unidades (${monedaBaseNegocio ? `${monedaBaseNegocio} ` : ""}${(item.payload.ingresoTotal || 0).toFixed(2)})`,
                     "Vendido",
                   ]) as any}
                   contentStyle={{ fontSize: 11, borderRadius: 10, background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
@@ -7521,9 +8192,9 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
                       </div>
                       <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
                         <span>{new Date(t.fecha).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })}</span>
-                        <span>·</span>
+                        <span>•</span>
                         <span>{(t.metodoPago || "EFECTIVO").replace("_", " ")}</span>
-                        <span>·</span>
+                        <span>•</span>
                         <span>{t.canal === "DELIVERY_PROPIO" ? "Delivery" : t.canal === "SALON" ? "En Mesa" : "Para Llevar"}</span>
                       </div>
                     </div>
@@ -7531,9 +8202,9 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
 
                   <div className="text-right shrink-0">
                     <div className="font-mono font-extrabold text-slate-900 dark:text-white">
-                      ${Number(t.totalUsd).toFixed(2)}
+                      {t.monedaBase || monedaBaseNegocio || ""} {obtenerTotalTicket(t).toFixed(2)}
                     </div>
-                    {t.totalBs && (
+                    {t.totalBs && (t.monedaBase || monedaBaseNegocio) !== "VES" && (
                       <div className="text-[10px] font-mono text-teal-600 dark:text-teal-400">
                         Bs. {Number(t.totalBs).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
@@ -7549,7 +8220,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════
+
 // ADMINISTRACIÓN — ingresos/gastos + cuentas x cobrar/pagar + cierre de caja, unidos
 // ══════════════════════════════════════════════════════════════════════════
 function Administracion({ tenantId, monedasActivas }: { tenantId: number; monedasActivas: typeof MONEDAS_POR_DEFECTO }) {

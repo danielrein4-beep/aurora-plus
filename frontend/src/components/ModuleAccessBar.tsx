@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { IconBank, IconUsers } from "../Icons";
+import { useNavigate } from "react-router-dom";
+import { IconUsers } from "../Icons";
 import { obtenerCapacidadesPersonal } from "../api";
 
 /**
- * Navegación común para los portales operativos. Mantiene Finanzas disponible
- * para todas las verticales y expone Personal solamente cuando RBAC lo permite.
+ * Navegación común para los portales operativos. Expone Personal solamente
+ * cuando RBAC lo permite. Finanzas se accede desde el Dashboard, no desde aquí.
  */
 export default function ModuleAccessBar() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [puedeVerPersonal, setPuedeVerPersonal] = useState(false);
 
   useEffect(() => {
@@ -19,8 +18,6 @@ export default function ModuleAccessBar() {
       .catch(() => activo && setPuedeVerPersonal(false));
     return () => { activo = false; };
   }, []);
-
-  const enFinanzas = location.pathname === "/finanzas";
 
   return (
     <nav
@@ -36,19 +33,6 @@ export default function ModuleAccessBar() {
       </button>
 
       <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => navigate("/finanzas")}
-          className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-semibold transition-colors ${
-            enFinanzas
-              ? "border-[#35d7c3] bg-[#35d7c3] text-[#062323]"
-              : "border-white/15 bg-transparent text-white/75 hover:border-[#35d7c3]/55 hover:text-[#35d7c3]"
-          }`}
-        >
-          <IconBank size={14} />
-          <span>Finanzas</span>
-        </button>
-
         {puedeVerPersonal && (
           <button
             type="button"

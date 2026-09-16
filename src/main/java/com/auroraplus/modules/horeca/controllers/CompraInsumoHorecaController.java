@@ -37,6 +37,7 @@ public class CompraInsumoHorecaController {
         public List<ItemCompraRequest> items;
         public BigDecimal montoPagadoAhora; // opcional — null/0 = factura entera a crédito
         public String monedaPago;
+        public Integer diasCredito; // opcional — plazo pactado con el proveedor (ej. "5 días" en la factura)
     }
 
     // Sin tenantId acá, findAll() devolvía las compras de TODOS los tenants
@@ -60,6 +61,6 @@ public class CompraInsumoHorecaController {
             items.add(item);
         }
         return ResponseEntity.ok(compraInsumoHorecaService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, items,
-            request.montoPagadoAhora, request.monedaPago));
+            request.montoPagadoAhora, request.monedaPago, request.diasCredito));
     }
 }

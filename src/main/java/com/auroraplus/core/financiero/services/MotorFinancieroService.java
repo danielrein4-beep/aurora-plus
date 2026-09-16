@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Service
@@ -209,6 +210,28 @@ public class MotorFinancieroService {
     public MovimientoCaja registrarMovimientoMultiMoneda(Long tenantId, MovimientoCaja.TipoMovimiento tipo, BigDecimal montoBase,
                                                             String monedaPago, BigDecimal montoRecibido, String concepto,
                                                             String moduloOrigen, String referenciaTipo, Long referenciaId) {
+        return registrarMovimientoMultiMoneda(tenantId, tipo, montoBase, monedaPago, montoRecibido, concepto,
+            moduloOrigen, referenciaTipo, referenciaId, null);
+    }
+
+    /** Igual que el overload base, pero con `fechaVencimiento` (ver el overload completo más abajo) y sin trazabilidad de origen. */
+    @Transactional
+    public MovimientoCaja registrarMovimientoMultiMoneda(Long tenantId, MovimientoCaja.TipoMovimiento tipo, BigDecimal montoBase,
+                                                            String monedaPago, BigDecimal montoRecibido, String concepto,
+                                                            LocalDate fechaVencimiento) {
+        return registrarMovimientoMultiMoneda(tenantId, tipo, montoBase, monedaPago, montoRecibido, concepto, null, null, null, fechaVencimiento);
+    }
+
+    /**
+     * Igual que el overload de arriba, con `fechaVencimiento` — el plazo de crédito
+     * pactado con el proveedor/cliente (ej. "5 días de crédito" en la factura).
+     * Solo tiene efecto en CXC/CXP; se ignora en INGRESO/EGRESO.
+     */
+    @Transactional
+    public MovimientoCaja registrarMovimientoMultiMoneda(Long tenantId, MovimientoCaja.TipoMovimiento tipo, BigDecimal montoBase,
+                                                            String monedaPago, BigDecimal montoRecibido, String concepto,
+                                                            String moduloOrigen, String referenciaTipo, Long referenciaId,
+                                                            LocalDate fechaVencimiento) {
         String monedaBase = obtenerMonedaBase(tenantId);
         String monedaCobro = (monedaPago != null && !monedaPago.isBlank()) ? monedaPago : monedaBase;
 
@@ -240,6 +263,7 @@ public class MotorFinancieroService {
         if (tipo == MovimientoCaja.TipoMovimiento.CXC || tipo == MovimientoCaja.TipoMovimiento.CXP) {
             movimiento.setSaldoPendiente(movimiento.getMonto());
             movimiento.setEstado("PENDIENTE");
+            movimiento.setFechaVencimiento(fechaVencimiento);
         }
 
         return movimientoCajaRepository.save(movimiento);

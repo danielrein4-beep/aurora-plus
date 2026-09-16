@@ -3,6 +3,7 @@ package com.auroraplus.core.financiero.entities;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -60,6 +61,11 @@ public class MovimientoCaja {
     @Column(length = 20)
     private String estado; // PENDIENTE | PAGADO — solo para CXC/CXP
 
+    // Fecha límite del crédito otorgado (ej. "5 días de crédito" en la factura
+    // del proveedor). Solo aplica a CXC/CXP; null = sin plazo pactado.
+    @Column(name = "fecha_vencimiento")
+    private LocalDate fechaVencimiento;
+
     // Trazabilidad de origen (docs/finance-contract.md, Capa 1): de qué vertical y qué
     // venta/compra/gasto salió este movimiento. Referencia polimórfica simple (no FK
     // física, apunta a tablas distintas según moduloOrigen) — mismo patrón que
@@ -102,6 +108,8 @@ public class MovimientoCaja {
     public void setSaldoPendiente(BigDecimal saldoPendiente) { this.saldoPendiente = saldoPendiente; }
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
+    public LocalDate getFechaVencimiento() { return fechaVencimiento; }
+    public void setFechaVencimiento(LocalDate fechaVencimiento) { this.fechaVencimiento = fechaVencimiento; }
     public String getModuloOrigen() { return moduloOrigen; }
     public void setModuloOrigen(String moduloOrigen) { this.moduloOrigen = moduloOrigen; }
     public String getReferenciaTipo() { return referenciaTipo; }

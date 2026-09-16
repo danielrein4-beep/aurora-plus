@@ -954,6 +954,10 @@ export function crearProveedorHoreca(tenantId: number, datos: { nombre: string; 
   return request(`/api/horeca/proveedores?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
+export function editarProveedorHoreca(proveedorId: number, datos: { nombre?: string; rif?: string; telefono?: string; contacto?: string; direccion?: string }): Promise<ProveedorHoreca> {
+  return request(`/api/horeca/proveedores/${proveedorId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
 // --- Inventario: artículos, compras y vencimientos ---
 
 export interface Articulo {
@@ -1176,10 +1180,19 @@ export interface ItemCompraInsumo {
   costoUnitario: number;
   presentacionId?: number;
   fechaVencimiento?: string; // yyyy-MM-dd — si viene, crea un lote rastreable para alertas
+  monedaCosto?: string; // USD, VES, COP — moneda en que se escribió costoUnitario; vacío = moneda base del tenant
 }
 
-export function registrarCompraInsumo(tenantId: number, datos: { proveedorId: number; numeroFactura: string; items: ItemCompraInsumo[]; montoPagadoAhora?: number; monedaPago?: string }): Promise<CompraInsumoHoreca> {
+export function registrarCompraInsumo(tenantId: number, datos: { proveedorId: number; numeroFactura: string; items: ItemCompraInsumo[]; montoPagadoAhora?: number; monedaPago?: string; diasCredito?: number }): Promise<CompraInsumoHoreca> {
   return request(`/api/horeca/compras-insumo?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export interface DetalleCompraInsumoHoreca {
+  id: number;
+  articulo: Articulo;
+  cantidad: number;
+  costoUnitario: number;
+  subtotal: number;
 }
 
 export interface CompraInsumoHoreca {
@@ -1190,6 +1203,7 @@ export interface CompraInsumoHoreca {
   fechaCompra: string;
   total: number;
   montoPagado: number | null;
+  items: DetalleCompraInsumoHoreca[];
 }
 
 export interface ItemExtraidoFactura {
@@ -1479,6 +1493,10 @@ export interface MovimientoCaja {
   fechaRegistro: string;
   saldoPendiente: number | null;
   estado: "PENDIENTE" | "PAGADO" | null;
+  fechaVencimiento: string | null;
+  moduloOrigen: string | null;
+  referenciaTipo: string | null;
+  referenciaId: number | null;
 }
 
 export function registrarMovimiento(tenantId: number, datos: { tipo: "INGRESO" | "EGRESO"; monto: number; moneda: string; concepto: string }): Promise<MovimientoCaja> {
