@@ -903,27 +903,44 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           </div>
         </button>
 
-        {/* Navegación principal */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+        {/* Navegación principal, agrupada (Operación / Gestión) — mismo patrón que Aurora Horeca */}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-4">
           {([
-            { id: "general" as const, Icon: IconChart, etiqueta: "Vista General" },
-            { id: "pos" as const, Icon: IconCard, etiqueta: "POS Mostrador" },
-            { id: "inventario" as const, Icon: IconBox, etiqueta: "Inventario & Stock" },
-            { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
-            { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
-          ]).map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
-                tab === item.id
-                  ? "bg-teal-500 text-slate-950 shadow-md"
-                  : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              <item.Icon size={16} />
-              <span>{item.etiqueta}</span>
-            </button>
+            {
+              titulo: "Operación",
+              items: [
+                { id: "general" as const, Icon: IconChart, etiqueta: "Vista General" },
+                { id: "pos" as const, Icon: IconCard, etiqueta: "POS Mostrador" },
+                { id: "inventario" as const, Icon: IconBox, etiqueta: "Inventario & Stock" },
+              ],
+            },
+            {
+              titulo: "Gestión",
+              items: [
+                { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
+                { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
+              ],
+            },
+          ]).map((grupo) => (
+            <div key={grupo.titulo} className="space-y-1">
+              <div className="px-3.5 text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-600">
+                {grupo.titulo}
+              </div>
+              {grupo.items.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setTab(item.id)}
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+                    tab === item.id
+                      ? "bg-teal-500 text-slate-950 shadow-md"
+                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  <item.Icon size={16} />
+                  <span>{item.etiqueta}</span>
+                </button>
+              ))}
+            </div>
           ))}
 
           <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-800">
