@@ -121,7 +121,7 @@ export default function Auth() {
           if (rawU) {
             const u = JSON.parse(rawU);
             if (u.industry === "restaurante") rutaDestino = "/restaurante";
-            else if (u.industry === "ferreteria" || u.industry === "farmacia" || u.industry === "retail") rutaDestino = "/comercio";
+            else if (u.industry === "ferreteria" || u.industry === "repuestos" || u.industry === "retail" || u.industry === "comercio" || u.industry === "farmacia") rutaDestino = "/comercio";
             else if (u.industry === "clinica") rutaDestino = "/mediclinic";
             else if (u.industry === "veterinaria") rutaDestino = "/veterinaria";
           }
