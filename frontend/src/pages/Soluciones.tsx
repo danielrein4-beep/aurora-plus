@@ -30,10 +30,10 @@ const SOLUCIONES = [
   },
   {
     Icon: IconCloud,
-    title: "Nube + Modo Offline",
+    title: "Nube + Resiliente a Cortes",
     tag: "Disponibilidad",
-    desc: "Trabaja sin interrupciones. Si pierdes internet, el sistema sigue funcionando en modo local y sincroniza todo automáticamente al reconectarse.",
-    puntos: ["Acceso desde cualquier navegador", "Modo offline sin pérdida de datos", "Sincronización automática en segundo plano", "Backups diarios en la nube"],
+    desc: "Si se corta la conexión en plena operación, puedes seguir tomando pedidos y cobrando mesas ya abiertas — se guardan en el dispositivo y se sincronizan solos al reconectarse.",
+    puntos: ["Acceso desde cualquier navegador", "Sobrevive cortes breves de conexión sin perder ventas", "Sincronización automática en segundo plano", "Backups diarios en la nube"],
     color: "from-teal-400 to-blue-500",
   },
   {

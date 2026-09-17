@@ -67,7 +67,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers["Authorization"] = `Bearer ${sesion.token}`;
   }
 
-  const res = await fetch(path, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(path, { ...options, headers });
+  } catch {
+    // fetch() rechaza (no responde con un status) cuando el navegador no
+    // pudo ni siquiera contactar al servidor: sin internet, DNS caído, el
+    // backend apagado. Esto es justo lo que ApiError.status===undefined ya
+    // documentaba pero nunca se producía realmente — sin este catch, un
+    // corte de conexión salía como un TypeError crudo ("Failed to fetch")
+    // indistinguible de cualquier otro bug para quien llama. Con esto, todo
+    // el código de la app (incluida la cola offline de Horeca) puede
+    // confiar en "status === undefined" para saber "no hay conexión".
+    throw new ApiError("Sin conexión con el servidor", undefined);
+  }
   if (res.status === 401) {
     // Un 401 en un endpoint de /api/auth/ (ej. login con credenciales incorrectas) es un rechazo
     // normal del intento de autenticación, no una sesión vencida — no debe forzar la redirección a
@@ -221,6 +234,24 @@ export function obtenerDatosFiscalesNegocio(): Promise<DatosFiscalesNegocio> {
 
 export function actualizarDatosFiscalesNegocio(datos: DatosFiscalesNegocio): Promise<DatosFiscalesNegocio> {
   return request("/api/config/mi-negocio/datos-fiscales", { method: "PUT", body: JSON.stringify(datos) });
+}
+
+/** Zonas/estaciones de cocina de Horeca (ej. COCINA, PARRILLA, BAR) — cada negocio arma las suyas; sin configurar trae las 4 clásicas por defecto. */
+export function obtenerZonasCocina(): Promise<{ zonas: string[] }> {
+  return request("/api/config/mi-negocio/zonas-cocina");
+}
+
+export function actualizarZonasCocina(zonas: string[]): Promise<{ zonas: string[] }> {
+  return request("/api/config/mi-negocio/zonas-cocina", { method: "PUT", body: JSON.stringify({ zonas }) });
+}
+
+/** Zonas físicas de mesas de Horeca (ej. SALON_PRINCIPAL, TERRAZA, BARRA) — cada negocio arma las suyas; sin configurar trae las 3 clásicas por defecto. */
+export function obtenerZonasMesa(): Promise<{ zonas: string[] }> {
+  return request("/api/config/mi-negocio/zonas-mesa");
+}
+
+export function actualizarZonasMesa(zonas: string[]): Promise<{ zonas: string[] }> {
+  return request("/api/config/mi-negocio/zonas-mesa", { method: "PUT", body: JSON.stringify({ zonas }) });
 }
 
 // --- Salud / Mediclinic Pro ---
@@ -648,7 +679,7 @@ export interface MapaMesaEntrada {
   comandaAbierta: Comanda | null;
 }
 
-export type EstadoItemComanda = "PENDIENTE" | "PREPARANDO" | "LISTO" | "ENTREGADO";
+export type EstadoItemComanda = "PENDIENTE" | "PREPARANDO" | "LISTO" | "ENTREGADO" | "ANULADO";
 
 export interface ItemComanda {
   id: number;
@@ -660,6 +691,9 @@ export interface ItemComanda {
   precioUnitario: number;
   fechaCreacion: string;
   notas?: string;
+  motivoAnulacion?: string;
+  usuarioAnulacion?: string;
+  fechaAnulacion?: string;
 }
 
 export function listarMesas(): Promise<Mesa[]> {
@@ -702,7 +736,7 @@ export function abrirComanda(datos: {
 }
 
 export function agregarItemComanda(comandaId: number, datos: {
-  escandalloId?: number; articuloId?: number; fastBarTragoId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number; notas?: string;
+  escandalloId?: number; articuloId?: number; fastBarTragoId?: number; nombrePlato?: string; estacionCocina?: string; cantidad: number; precioUnitario?: number; notas?: string; claveIdempotencia?: string;
 }): Promise<ItemComanda> {
   const params = new URLSearchParams({ cantidad: String(datos.cantidad) });
   if (datos.escandalloId != null) params.set("escandalloId", String(datos.escandalloId));
@@ -712,6 +746,7 @@ export function agregarItemComanda(comandaId: number, datos: {
   if (datos.estacionCocina) params.set("estacionCocina", datos.estacionCocina);
   if (datos.precioUnitario != null) params.set("precioUnitario", String(datos.precioUnitario));
   if (datos.notas) params.set("notas", datos.notas);
+  if (datos.claveIdempotencia) params.set("claveIdempotencia", datos.claveIdempotencia);
   return request(`/api/horeca/mesas/comandas/${comandaId}/items?${params}`, { method: "POST" });
 }
 
@@ -719,7 +754,24 @@ export function actualizarEstadoItem(itemId: number, nuevoEstado: EstadoItemComa
   return request(`/api/horeca/mesas/items/${itemId}/estado?nuevoEstado=${nuevoEstado}`, { method: "PATCH" });
 }
 
-export function obtenerTableroKds(estacionCocina: string): Promise<ItemComanda[]> {
+// Ítem del tablero KDS — ya trae la mesa/mesero aplanados desde el backend
+// (antes venían null: ItemComanda.comanda es LAZY y sin JOIN FETCH el
+// Hibernate6Module global lo serializaba en null, el cocinero nunca sabía a
+// qué mesa iba cada plato).
+export interface ItemKds {
+  id: number;
+  nombrePlato: string;
+  estacionCocina: string;
+  estadoItem: EstadoItemComanda;
+  cantidad: number;
+  notas: string | null;
+  fechaCreacion: string;
+  numeroMesa: number | null;
+  mesero: string | null;
+  canal: string | null;
+}
+
+export function obtenerTableroKds(estacionCocina: string): Promise<ItemKds[]> {
   return request(`/api/horeca/mesas/kds/${encodeURIComponent(estacionCocina)}`);
 }
 
@@ -755,6 +807,8 @@ export interface ReporteTicket {
   estado: "ABIERTA" | "PAGADA" | "ANULADA";
   canal: string;
   numeroMesa: number | null;
+  mesero: string | null;
+  propina?: number | null;
 }
 
 /** Reportes Operativos: listado de tickets con filtros dinámicos (todos opcionales) — motor de solo lectura, aparte del flujo del POS. */
@@ -815,9 +869,10 @@ export interface ResultadoCobroMixto {
 }
 
 /** Cobro mixto: cierra la comanda con varias líneas de pago simultáneas (ej. parte USD efectivo + resto Bs Pago Móvil). */
-export function cerrarComandaMixto(comandaId: number, pagos: PagoParcial[], monedaVuelto?: string): Promise<ResultadoCobroMixto> {
+export function cerrarComandaMixto(comandaId: number, pagos: PagoParcial[], monedaVuelto?: string, claveIdempotencia?: string): Promise<ResultadoCobroMixto> {
   const params = new URLSearchParams();
   if (monedaVuelto) params.set("monedaVuelto", monedaVuelto);
+  if (claveIdempotencia) params.set("claveIdempotencia", claveIdempotencia);
   return request(`/api/horeca/mesas/comandas/${comandaId}/cerrar-mixto?${params}`, {
     method: "POST",
     body: JSON.stringify(pagos),
@@ -829,6 +884,12 @@ export function anularComanda(comandaId: number, datos: { motivo: string; usuari
   const params = new URLSearchParams({ motivo: datos.motivo });
   if (datos.usuario) params.set("usuario", datos.usuario);
   return request(`/api/horeca/mesas/comandas/${comandaId}/anular?${params}`, { method: "POST" });
+}
+
+export function anularItemComanda(itemId: number, datos: { motivo: string; usuario?: string }): Promise<ItemComanda> {
+  const params = new URLSearchParams({ motivo: datos.motivo });
+  if (datos.usuario) params.set("usuario", datos.usuario);
+  return request(`/api/horeca/mesas/items/${itemId}/anular?${params}`, { method: "POST" });
 }
 
 export interface EscandalloReceta {
@@ -956,6 +1017,155 @@ export function crearProveedorHoreca(tenantId: number, datos: { nombre: string; 
 
 export function editarProveedorHoreca(proveedorId: number, datos: { nombre?: string; rif?: string; telefono?: string; contacto?: string; direccion?: string }): Promise<ProveedorHoreca> {
   return request(`/api/horeca/proveedores/${proveedorId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+// --- Meseros: directorio propio del negocio (Salón & Mesas / Reportes) ---
+
+export interface MeseroHoreca {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  telefono: string | null;
+  activo: boolean;
+  empleadoId: number | null;
+}
+
+// Lo que trae GET /api/horeca/meseros: el mesero + su estado de fichaje real
+// (resuelto contra RRHH en el backend) cuando está vinculado a un empleado.
+export interface MeseroConEstado {
+  mesero: MeseroHoreca;
+  enTurno: boolean;
+  cargoEmpleado: string | null;
+}
+
+export function listarMeseros(): Promise<MeseroConEstado[]> {
+  return request(`/api/horeca/meseros`);
+}
+
+export function crearMesero(datos: { nombre: string; telefono?: string; empleadoId?: number | null }): Promise<MeseroHoreca> {
+  return request(`/api/horeca/meseros`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function editarMesero(meseroId: number, datos: { nombre?: string; telefono?: string; empleadoId?: number | null }): Promise<MeseroHoreca> {
+  return request(`/api/horeca/meseros/${meseroId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+// --- RRHH: empleados con reloj checador (para vincular con un mesero) ---
+export type TipoControlEmpleado = "POR_HORA" | "SALARIO_FIJO" | "SOLO_CONTROL";
+
+export interface EmpleadoRrhh {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  cedula: string | null;
+  cargo: string | null;
+  tipoControl: TipoControlEmpleado;
+  tarifaPorHora: number | null;
+  activo: boolean;
+}
+
+export function listarEmpleadosRrhh(): Promise<EmpleadoRrhh[]> {
+  return request(`/api/rrhh/empleados`);
+}
+
+export function editarEmpleadoRrhh(id: number, datos: Partial<EmpleadoRrhh>): Promise<EmpleadoRrhh> {
+  return request(`/api/rrhh/empleados/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export interface LineaLiquidacionRrhh {
+  empleadoId: number;
+  nombre: string;
+  tipoControl: TipoControlEmpleado;
+  horasTrabajadas: number;
+  tarifaPorHora: number | null;
+  totalPagar: number | null;
+}
+
+export interface LiquidacionPeriodoRrhh {
+  desde: string;
+  hasta: string;
+  empleados: LineaLiquidacionRrhh[];
+}
+
+export function liquidarPeriodoRrhh(tenantId: number, desde: string, hasta: string): Promise<LiquidacionPeriodoRrhh> {
+  return request(`/api/rrhh/asistencia/liquidacion?tenantId=${tenantId}&desde=${desde}&hasta=${hasta}`);
+}
+
+export function desactivarMesero(meseroId: number): Promise<void> {
+  return request(`/api/horeca/meseros/${meseroId}`, { method: "DELETE" });
+}
+
+export function reactivarMesero(meseroId: number): Promise<MeseroHoreca> {
+  return request(`/api/horeca/meseros/${meseroId}/reactivar`, { method: "PUT" });
+}
+
+// --- Reservas de mesa ---
+
+export type EstadoReserva = "PENDIENTE" | "CONFIRMADA" | "CANCELADA" | "COMPLETADA";
+
+export interface ReservaHoreca {
+  id: number;
+  tenantId: number;
+  nombreCliente: string;
+  telefono: string | null;
+  fechaHora: string; // ISO datetime
+  numeroPersonas: number;
+  numeroMesaSugerida: number | null;
+  notas: string | null;
+  estado: EstadoReserva;
+  fechaCreacion: string;
+}
+
+export interface DatosReserva {
+  nombreCliente: string;
+  telefono?: string;
+  fechaHora: string; // yyyy-MM-ddTHH:mm
+  numeroPersonas: number;
+  numeroMesaSugerida?: number;
+  notas?: string;
+}
+
+export function listarReservasDia(fecha: string): Promise<ReservaHoreca[]> {
+  return request(`/api/horeca/reservas?fecha=${fecha}`);
+}
+
+export function crearReserva(datos: DatosReserva): Promise<ReservaHoreca> {
+  return request(`/api/horeca/reservas`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function editarReserva(id: number, datos: DatosReserva): Promise<ReservaHoreca> {
+  return request(`/api/horeca/reservas/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function cambiarEstadoReserva(id: number, nuevoEstado: EstadoReserva): Promise<ReservaHoreca> {
+  return request(`/api/horeca/reservas/${id}/estado?nuevoEstado=${nuevoEstado}`, { method: "PUT" });
+}
+
+// --- Binance Pay (cobro con cripto, configurable por negocio) ---
+
+export interface EstadoBinancePay {
+  configurado: boolean;
+  activo: boolean;
+  apiKey: string | null;
+}
+
+export function obtenerEstadoBinancePay(): Promise<EstadoBinancePay> {
+  return request(`/api/config/mi-negocio/binance-pay`);
+}
+
+export function guardarBinancePay(datos: { apiKey?: string; secretKey?: string; activo: boolean }): Promise<EstadoBinancePay> {
+  return request(`/api/config/mi-negocio/binance-pay`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export interface OrdenBinancePay {
+  prepayId: string | null;
+  qrcodeLink: string | null;
+  checkoutUrl: string | null;
+  deeplink: string | null;
+}
+
+export function pagarComandaConBinance(comandaId: number): Promise<OrdenBinancePay> {
+  return request(`/api/horeca/mesas/comandas/${comandaId}/pagar-binance`, { method: "POST" });
 }
 
 // --- Inventario: artículos, compras y vencimientos ---
@@ -1260,6 +1470,10 @@ export interface LoteArticulo {
 
 export function alertasVencimiento(tenantId: number, diasAnticipacion = 7): Promise<LoteArticulo[]> {
   return request(`/api/inventario/lotes/alertas-vencimiento?tenantId=${tenantId}&diasAnticipacion=${diasAnticipacion}`);
+}
+
+export function listarTodosLotesConVencimiento(tenantId: number): Promise<LoteArticulo[]> {
+  return request(`/api/inventario/lotes/todos-con-vencimiento?tenantId=${tenantId}`);
 }
 
 export interface InventarioKpis {

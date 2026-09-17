@@ -21,6 +21,20 @@ const INDUSTRIES = [
   { Icon: IconRetail,     name: "Retail",              desc: "POS multitienda, e-commerce, fidelización de clientes y análisis de ventas por categoría." },
 ];
 
+// Mismo criterio que VERTICAL_POR_INDUSTRIA en Nav.tsx — este acceso directo
+// mandaba siempre a /mediclinic sin ver la industria real del tenant logueado
+// (un tenant de Horeca caía en el sistema de Mediclinic de otro negocio).
+const SISTEMA_POR_INDUSTRIA: Record<string, { ruta: string; label: string; nombre: string; desc: string; Icon: typeof IconClinic }> = {
+  restaurante: { ruta: "/restaurante", label: "Aurora Horeca", nombre: "Aurora Horeca", desc: "Comandas digitales, mesas, cocina en tiempo real, inventario y cierres de caja automáticos.", Icon: IconRestaurant },
+  ferreteria: { ruta: "/comercio", label: "Aurora Comercio", nombre: "Aurora Comercio", desc: "Control de stock, proveedores, ventas por mostrador, cotizaciones y reportes de rotación.", Icon: IconHardware },
+  repuestos: { ruta: "/comercio", label: "Aurora Comercio", nombre: "Aurora Comercio", desc: "Control de stock, proveedores, ventas por mostrador, cotizaciones y reportes de rotación.", Icon: IconHardware },
+  farmacia: { ruta: "/comercio", label: "Aurora Comercio", nombre: "Aurora Comercio", desc: "Control de stock, proveedores, ventas por mostrador, cotizaciones y reportes de rotación.", Icon: IconHardware },
+  retail: { ruta: "/comercio", label: "Aurora Comercio", nombre: "Aurora Comercio", desc: "POS multitienda, e-commerce, fidelización de clientes y análisis de ventas por categoría.", Icon: IconRetail },
+  finca: { ruta: "/ganaderia", label: "Aurora Ganadería", nombre: "Aurora Ganadería", desc: "Gestión integral de ganadería, rotación de potreros, registro sanitario y trazabilidad animal.", Icon: IconFarm },
+  ganaderia: { ruta: "/ganaderia", label: "Aurora Ganadería", nombre: "Aurora Ganadería", desc: "Gestión integral de ganadería, rotación de potreros, registro sanitario y trazabilidad animal.", Icon: IconFarm },
+};
+const SISTEMA_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro", nombre: "Mediclinic Pro — Espacio Clínico", desc: "Historias clínicas digitales, agenda médica, sala de espera reactiva, cotizador y caja diaria.", Icon: IconClinic };
+
 const FEATURES = [
   { Icon: IconCustomize, title: "100% Personalizable",    desc: "Cada módulo se adapta al flujo exacto de tu negocio. Sin código extra, sin consultores costosos." },
   { Icon: IconChart,     title: "Reportes en Tiempo Real", desc: "Paneles con KPIs críticos actualizados al instante. Toma decisiones con datos, no intuición." },
@@ -45,7 +59,7 @@ const PLANS = [
 
 const STATS = [
   { value: "3",       label: "Verticales con producto real" },
-  { value: "100%",    label: "Offline-first en punto de venta" },
+  { value: "100%",    label: "Resiliente a cortes de conexión" },
   { value: "3",       label: "Monedas: USD · VES · COP" },
   { value: "< 2 sem", label: "Tiempo de implementación esperado" },
 ];
@@ -252,7 +266,7 @@ export default function Home() {
           <motion.div variants={heroItem} className="mt-16 grid max-w-4xl grid-cols-2 gap-x-7 gap-y-8 border-t border-white/15 pt-8 sm:grid-cols-4">
             {[
               ["6", "industrias nativas"],
-              ["100%", "caja offline-first"],
+              ["100%", "resiliente a cortes de conexión"],
               ["3", "monedas convertidas"],
               ["RBAC", "roles estrictos"],
             ].map(([value, label]) => (
@@ -282,37 +296,40 @@ export default function Home() {
           </div>
 
           {/* ── ACCESO DIRECTO PARA USUARIOS EN SESIÓN ── */}
-          {isLoggedIn && (
+          {isLoggedIn && (() => {
+            const miSistema = SISTEMA_POR_INDUSTRIA[user?.industry || ""] || SISTEMA_POR_DEFECTO;
+            return (
             <div className="mt-8 w-full max-w-2xl rounded-2xl p-6 sm:p-7 border border-[#35d7c3]/25 bg-[#030c0f]/80">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4 text-left">
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#35d7c3", color: "#062323" }}>
-                    <IconClinic size={26} />
+                    <miSistema.Icon size={26} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#35d7c3]/15 text-[#35d7c3] border border-[#35d7c3]/25 tracking-wider uppercase font-mono">
                         Tu sistema asignado &amp; activo
                       </span>
-                      <span className="text-xs text-white/45">• {user?.empresa || "Clínica & Consultorios"}</span>
+                      <span className="text-xs text-white/45">• {user?.empresa || "Tu negocio"}</span>
                     </div>
                     <h3 className="text-lg font-bold text-[#f8f6ef] font-['IBM_Plex_Sans'] mt-1">
-                      Mediclinic Pro — Espacio Clínico de {user?.nombre || user?.email?.split("@")[0]}
+                      {miSistema.nombre} de {user?.nombre || user?.email?.split("@")[0]}
                     </h3>
                     <p className="text-xs text-white/55 mt-0.5">
-                      Historias clínicas digitales, agenda médica, sala de espera reactiva, cotizador y caja diaria.
+                      {miSistema.desc}
                     </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate("/mediclinic")}
+                  onClick={() => navigate(miSistema.ruta)}
                   className="aurora-solid-button px-6 py-3 text-sm font-semibold cursor-pointer whitespace-nowrap flex items-center gap-2">
-                  <span>Abrir Mediclinic Pro</span>
+                  <span>Abrir {miSistema.label}</span>
                   <span>→</span>
                 </button>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* ── AURORA ENGINE CORE ── */}
           <div className="mt-8 w-full max-w-2xl rounded-2xl p-6 sm:p-7 border border-white/12 bg-[#030c0f]/70">
@@ -334,7 +351,7 @@ export default function Home() {
               {[
                 { label: "Caja Central", val: "Sincronizada", Icon: IconCard },
                 { label: "Kardex e Insumos", val: "Auto-Descuento", Icon: IconBox },
-                { label: "Offline POS", val: "100% Idempotente", Icon: IconBolt },
+                { label: "Cortes de Conexión", val: "Sincronización Automática", Icon: IconBolt },
                 { label: "Roles & Privacidad", val: "RBAC Estricto", Icon: IconShield },
               ].map((n) => (
                 <div key={n.label} className="bg-white/[0.03] hover:bg-white/[0.06] rounded-xl p-3.5 border border-white/5 hover:border-[#35d7c3]/30 transition-all duration-300 cursor-default">

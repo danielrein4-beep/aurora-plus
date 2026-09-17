@@ -1,6 +1,8 @@
 package com.auroraplus.modules.horeca.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
+import com.auroraplus.core.pagos.BinancePayService;
 import com.auroraplus.modules.horeca.entities.Comanda;
 import com.auroraplus.modules.horeca.entities.ItemComanda;
 import com.auroraplus.modules.horeca.repositories.ItemComandaRepository;
@@ -34,6 +36,9 @@ public class HorecaController {
 
     @Autowired
     private ComandaEscPosService comandaEscPosService;
+
+    @Autowired
+    private BinancePayService binancePayService;
 
     @PostMapping("/comandas/abrir")
     public ResponseEntity<Comanda> abrirComanda(
@@ -95,14 +100,27 @@ public class HorecaController {
         return ResponseEntity.ok(horecaService.cerrarComandaMixto(comandaId, TenantContext.getCurrentTenant(), pagos, monedaVuelto, claveIdempotencia));
     }
 
-    /** Anula una comanda ABIERTA o PAGADA: revierte inventario/recetas y, si ya estaba cobrada, también la caja. Nunca borra nada. */
+    /** Anula una comanda ABIERTA o PAGADA: revierte inventario/recetas y, si ya estaba cobrada, también la caja. Nunca borra nada.
+     * Reservado a Dueño/Administrador y Cajero — un mesero no puede anular una venta por su cuenta. */
     @PostMapping("/comandas/{comandaId}/anular")
     public ResponseEntity<Comanda> anularComanda(
             @PathVariable Long comandaId,
             @RequestParam String motivo,
             @RequestParam(required = false) String usuario,
             @RequestParam(required = false) String claveIdempotencia) {
+        AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR");
         return ResponseEntity.ok(horecaService.anularComanda(comandaId, TenantContext.getCurrentTenant(), motivo, usuario, claveIdempotencia));
+    }
+
+    /** Anula UN ítem de una comanda todavía ABIERTA (no toda la comanda) — exige motivo y queda con usuario/fecha.
+     * Mismo criterio de permisos que anular la comanda completa: nunca un mesero solo. */
+    @PostMapping("/items/{itemId}/anular")
+    public ResponseEntity<ItemComanda> anularItem(
+            @PathVariable Long itemId,
+            @RequestParam String motivo,
+            @RequestParam(required = false) String usuario) {
+        AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR");
+        return ResponseEntity.ok(horecaService.anularItem(itemId, TenantContext.getCurrentTenant(), motivo, usuario));
     }
 
     @PostMapping("/comandas/{comandaId}/items")
@@ -129,7 +147,7 @@ public class HorecaController {
     }
 
     @GetMapping("/kds/{estacionCocina}")
-    public ResponseEntity<List<ItemComanda>> obtenerTableroKds(@PathVariable String estacionCocina) {
+    public ResponseEntity<List<com.auroraplus.modules.horeca.services.ItemKdsDTO>> obtenerTableroKds(@PathVariable String estacionCocina) {
         return ResponseEntity.ok(horecaService.obtenerTableroKds(TenantContext.getCurrentTenant(), estacionCocina));
     }
 
@@ -138,6 +156,29 @@ public class HorecaController {
     public ResponseEntity<List<ResumenUtilidadProducto>> utilidadDiaria(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
         return ResponseEntity.ok(horecaService.obtenerUtilidadDiaria(TenantContext.getCurrentTenant(), fecha));
+    }
+
+    /**
+     * Genera una orden de cobro con Binance Pay por el total ACTUAL de la
+     * comanda (no cierra nada todavía) — el cliente paga desde su app
+     * Binance, y el cierre real ocurre cuando llega el webhook de
+     * confirmación (ver BinancePayWebhookController), por el mismo camino
+     * de siempre (cerrarComandaMixto). Solo aparece disponible si el
+     * negocio activó Binance Pay en su Configuración.
+     */
+    @PostMapping("/comandas/{comandaId}/pagar-binance")
+    public ResponseEntity<BinancePayService.OrdenBinancePay> pagarConBinance(@PathVariable Long comandaId) {
+        Long tenantId = TenantContext.getCurrentTenant();
+        Comanda comanda = horecaService.obtenerComanda(comandaId);
+        if (!comanda.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Comanda no pertenece a este tenant");
+        }
+        if (comanda.getEstado() != Comanda.EstadoComanda.ABIERTA) {
+            throw new RuntimeException("Solo se puede generar un cobro Binance Pay para una comanda ABIERTA");
+        }
+        String merchantTradeNo = "HORECA-" + tenantId + "-" + comandaId + "-" + System.currentTimeMillis();
+        String descripcion = "Comanda " + (comanda.getNumeroMesa() != null ? "Mesa " + comanda.getNumeroMesa() : "#" + comandaId);
+        return ResponseEntity.ok(binancePayService.crearOrden(tenantId, merchantTradeNo, comanda.getTotalConsumo(), descripcion));
     }
 
     @GetMapping(value = "/comandas/{comandaId}/ticket", produces = MediaType.APPLICATION_PDF_VALUE)

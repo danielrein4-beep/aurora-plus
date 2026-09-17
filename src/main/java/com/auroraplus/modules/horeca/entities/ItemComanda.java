@@ -81,7 +81,26 @@ public class ItemComanda {
     @Column(name = "fecha_creacion", nullable = false, columnDefinition = "timestamp default now()")
     private LocalDateTime fechaCreacion = LocalDateTime.now();
 
-    public enum EstadoItem { PENDIENTE, PREPARANDO, LISTO, ENTREGADO }
+    public enum EstadoItem { PENDIENTE, PREPARANDO, LISTO, ENTREGADO, ANULADO }
+
+    // Solo se llenan si el ítem fue anulado individualmente (ver
+    // HorecaService.anularItem) — el mismo principio que Comanda.motivoAnulacion:
+    // nunca se borra la fila, queda marcada con quién, cuándo y por qué.
+    @Column(name = "motivo_anulacion")
+    private String motivoAnulacion;
+
+    @Column(name = "usuario_anulacion")
+    private String usuarioAnulacion;
+
+    @Column(name = "fecha_anulacion")
+    private LocalDateTime fechaAnulacion;
+
+    public String getMotivoAnulacion() { return motivoAnulacion; }
+    public void setMotivoAnulacion(String motivoAnulacion) { this.motivoAnulacion = motivoAnulacion; }
+    public String getUsuarioAnulacion() { return usuarioAnulacion; }
+    public void setUsuarioAnulacion(String usuarioAnulacion) { this.usuarioAnulacion = usuarioAnulacion; }
+    public LocalDateTime getFechaAnulacion() { return fechaAnulacion; }
+    public void setFechaAnulacion(LocalDateTime fechaAnulacion) { this.fechaAnulacion = fechaAnulacion; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

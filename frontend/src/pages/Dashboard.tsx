@@ -1350,7 +1350,7 @@ export default function Dashboard() {
                     {user?.plan || "Estándar"} ($35/mes)
                   </div>
                   <p className="text-xs text-slate-500 dark:text-white/40">
-                    Módulos ilimitados para tu clínica + versión offline y móvil.
+                    Módulos ilimitados para tu clínica + versión móvil.
                   </p>
                 </div>
 

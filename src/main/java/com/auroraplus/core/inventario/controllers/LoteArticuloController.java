@@ -30,4 +30,12 @@ public class LoteArticuloController {
         LocalDate fechaLimite = LocalDate.now().plusDays(diasAnticipacion);
         return loteArticuloRepository.alertasVencimientoConStock(tenantId, fechaLimite);
     }
+
+    // Todos los lotes perecederos con saldo, sin importar cuánto falte para
+    // vencer — la pantalla de Vencimientos los pinta todos y solo cambia el
+    // color/urgencia según cuán cerca esté cada uno.
+    @GetMapping("/todos-con-vencimiento")
+    public List<LoteArticulo> listarTodosConVencimiento(@RequestParam Long tenantId) {
+        return loteArticuloRepository.listarTodosConStock(tenantId);
+    }
 }

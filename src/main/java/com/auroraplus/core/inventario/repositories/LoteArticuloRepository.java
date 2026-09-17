@@ -33,6 +33,16 @@ public interface LoteArticuloRepository extends JpaRepository<LoteArticulo, Long
         + "ORDER BY l.fechaVencimiento ASC")
     List<LoteArticulo> alertasVencimientoConStock(@Param("tenantId") Long tenantId, @Param("fechaLimite") LocalDate fechaLimite);
 
+    // Mismo criterio que alertasVencimientoConStock pero sin límite de fecha —
+    // el dueño pidió ver TODOS los perecederos con saldo, no solo los que ya
+    // están por vencer, para que la urgencia (colores) se note por contraste
+    // contra los que aún tienen tiempo.
+    @Query("SELECT l FROM LoteArticulo l WHERE l.tenantId = :tenantId AND l.fechaVencimiento IS NOT NULL "
+        + "AND (l.cantidadActual IS NULL OR l.cantidadActual > 0) "
+        + "AND l.articulo.stockActual > 0 "
+        + "ORDER BY l.fechaVencimiento ASC")
+    List<LoteArticulo> listarTodosConStock(@Param("tenantId") Long tenantId);
+
     // FEFO: lotes con saldo, del más próximo a vencer al más lejano; los sin
     // fecha de vencimiento (no perecederos) van al final, y entre ellos se
     // desempata por el más antiguo primero (FIFO natural).

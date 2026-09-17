@@ -261,4 +261,103 @@ public class ModuloTenantController {
         licenciaTenantRepository.save(licencia);
         return obtenerDatosFiscales();
     }
+
+    // --- Zonas de cocina de Horeca: antes venían fijas en el frontend
+    // (COCINA/PARRILLA/BAR/COCINA_FRIA) — cada negocio arma las que
+    // realmente tiene (ej. un fast-food solo "COCINA", una cevichería suma
+    // "CEVICHERIA"). ItemComanda.estacionCocina ya era texto libre sin
+    // restricción, así que esto no toca nada más del backend.
+
+    private static final List<String> ZONAS_COCINA_POR_DEFECTO = List.of("COCINA", "PARRILLA", "BAR", "COCINA_FRIA");
+
+    public static class ZonasCocinaResponse {
+        public List<String> zonas;
+        public ZonasCocinaResponse(List<String> zonas) { this.zonas = zonas; }
+    }
+
+    @GetMapping("/mi-negocio/zonas-cocina")
+    public ZonasCocinaResponse obtenerZonasCocina() {
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        if (licencia.getZonasCocina() == null || licencia.getZonasCocina().isBlank()) {
+            return new ZonasCocinaResponse(ZONAS_COCINA_POR_DEFECTO);
+        }
+        return new ZonasCocinaResponse(List.of(licencia.getZonasCocina().split(",")));
+    }
+
+    public static class ActualizarZonasCocinaRequest {
+        public List<String> zonas;
+    }
+
+    @PutMapping("/mi-negocio/zonas-cocina")
+    public ZonasCocinaResponse actualizarZonasCocina(@RequestBody ActualizarZonasCocinaRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN");
+        if (request.zonas == null || request.zonas.isEmpty()) {
+            throw new RuntimeException("Debe indicar al menos una zona de cocina");
+        }
+        List<String> limpias = request.zonas.stream()
+            .map(z -> z == null ? "" : z.trim().toUpperCase().replace(" ", "_"))
+            .filter(z -> !z.isBlank())
+            .distinct()
+            .toList();
+        if (limpias.isEmpty()) {
+            throw new RuntimeException("Debe indicar al menos una zona de cocina");
+        }
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        licencia.setZonasCocina(String.join(",", limpias));
+        licenciaTenantRepository.save(licencia);
+        return new ZonasCocinaResponse(limpias);
+    }
+
+    // --- Zonas físicas de mesas de Horeca (Salón & Mesas): antes venían fijas
+    // (SALON_PRINCIPAL/TERRAZA/BARRA) — no todo negocio tiene exactamente esas
+    // 3 áreas. Mesa.zona ya era texto libre, así que esto tampoco toca nada
+    // más del backend.
+
+    private static final List<String> ZONAS_MESA_POR_DEFECTO = List.of("SALON_PRINCIPAL", "TERRAZA", "BARRA");
+
+    public static class ZonasMesaResponse {
+        public List<String> zonas;
+        public ZonasMesaResponse(List<String> zonas) { this.zonas = zonas; }
+    }
+
+    @GetMapping("/mi-negocio/zonas-mesa")
+    public ZonasMesaResponse obtenerZonasMesa() {
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        if (licencia.getZonasMesa() == null || licencia.getZonasMesa().isBlank()) {
+            return new ZonasMesaResponse(ZONAS_MESA_POR_DEFECTO);
+        }
+        return new ZonasMesaResponse(List.of(licencia.getZonasMesa().split(",")));
+    }
+
+    public static class ActualizarZonasMesaRequest {
+        public List<String> zonas;
+    }
+
+    @PutMapping("/mi-negocio/zonas-mesa")
+    public ZonasMesaResponse actualizarZonasMesa(@RequestBody ActualizarZonasMesaRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN");
+        if (request.zonas == null || request.zonas.isEmpty()) {
+            throw new RuntimeException("Debe indicar al menos una zona de mesas");
+        }
+        List<String> limpias = request.zonas.stream()
+            .map(z -> z == null ? "" : z.trim().toUpperCase().replace(" ", "_"))
+            .filter(z -> !z.isBlank())
+            .distinct()
+            .toList();
+        if (limpias.isEmpty()) {
+            throw new RuntimeException("Debe indicar al menos una zona de mesas");
+        }
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        licencia.setZonasMesa(String.join(",", limpias));
+        licenciaTenantRepository.save(licencia);
+        return new ZonasMesaResponse(limpias);
+    }
 }

@@ -7,6 +7,7 @@ import com.auroraplus.modules.horeca.entities.Comanda;
 import com.auroraplus.modules.horeca.entities.PagoVenta;
 import com.auroraplus.modules.horeca.repositories.ComandaRepository;
 import com.auroraplus.modules.horeca.repositories.ComandaSpecifications;
+import com.auroraplus.modules.horeca.repositories.ItemComandaRepository;
 import com.auroraplus.modules.horeca.repositories.PagoVentaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
@@ -41,6 +42,9 @@ public class ReporteService {
     private PagoVentaRepository pagoVentaRepository;
 
     @Autowired
+    private ItemComandaRepository itemComandaRepository;
+
+    @Autowired
     private TasaCambioRepository tasaCambioRepository;
 
     @Autowired
@@ -71,6 +75,11 @@ public class ReporteService {
             .findByTenantIdAndComandaIdInOrderByFechaPagoAsc(tenantId, comandas.stream().map(Comanda::getId).toList())
             .stream().collect(Collectors.groupingBy(p -> p.getComanda().getId()));
 
+        Map<Long, BigDecimal> propinaPorComanda = comandas.isEmpty() ? Map.of() : itemComandaRepository
+            .findPropinasPorComandaIds(tenantId, comandas.stream().map(Comanda::getId).toList())
+            .stream().collect(Collectors.groupingBy(i -> i.getComanda().getId(),
+                Collectors.reducing(BigDecimal.ZERO, i -> i.getPrecioUnitario().multiply(i.getCantidad()), BigDecimal::add)));
+
         String monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
         Map<LocalDate, Optional<TasaCambio>> tasaVesPorDia = new HashMap<>();
         Map<LocalDate, Optional<TasaCambio>> tasaCopPorDia = new HashMap<>();
@@ -85,6 +94,8 @@ public class ReporteService {
             dto.estado = c.getEstado().name();
             dto.canal = c.getCanal();
             dto.numeroMesa = c.getNumeroMesa();
+            dto.mesero = c.getMesero();
+            dto.propina = propinaPorComanda.get(c.getId());
 
             dto.totalBase = c.getTotalConsumo();
             dto.monedaBase = c.getMonedaTotal();

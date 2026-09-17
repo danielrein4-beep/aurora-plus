@@ -447,7 +447,7 @@ export default function Auth() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                  <span>Offline-First POS & caja 100% idempotente</span>
+                  <span>POS resiliente a cortes de conexión, caja 100% idempotente</span>
                 </div>
               </div>
             </div>

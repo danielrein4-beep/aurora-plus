@@ -12,15 +12,22 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useAuth } from "../context/AuthContext";
+import { generarClaveIdempotencia, encolarAccion, listarPendientes, procesarCola, esFalloDeConexion, type AccionPendienteAgregarItem, type AccionPendienteCobrarComanda } from "../offlineQueueHoreca";
+import { listarImpresoras, vincularImpresora, imprimirEnEstacion, type ImpresoraGuardada } from "../impresorasCocina";
 import {
-  mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds,
-  dividirCuenta, cerrarComandaMixto, anularComanda, listarEscandallos, crearEscandallo, editarEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo, editarIngredienteEscandallo, eliminarIngredienteEscandallo, recalcularCostoEscandallo,
+  mapaDeMesas, crearMesa, editarMesa, eliminarMesa, actualizarPosicionMesa, abrirComanda, agregarItemComanda, actualizarEstadoItem, obtenerTableroKds, type ItemKds,
+  dividirCuenta, cerrarComandaMixto, anularComanda, anularItemComanda, listarEscandallos, crearEscandallo, editarEscandallo, eliminarEscandallo, cambiarActivoEscandallo, cambiarRequiereCocinaEscandallo, agregarIngredienteEscandallo, editarIngredienteEscandallo, eliminarIngredienteEscandallo, recalcularCostoEscandallo,
   listarIngredientesEscandallo, listarFastBar,
   listarProveedoresHoreca, crearProveedorHoreca, editarProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
+  listarMeseros, crearMesero, editarMesero, desactivarMesero, reactivarMesero, type MeseroHoreca, type MeseroConEstado,
+  listarEmpleadosRrhh, type EmpleadoRrhh, editarEmpleadoRrhh, liquidarPeriodoRrhh, type TipoControlEmpleado, type LiquidacionPeriodoRrhh,
+  listarReservasDia, crearReserva, editarReserva, cambiarEstadoReserva, type ReservaHoreca, type EstadoReserva,
+  obtenerEstadoBinancePay, guardarBinancePay, pagarComandaConBinance, obtenerComanda, type EstadoBinancePay, type OrdenBinancePay,
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
-  registrarCompraInsumo, listarComprasInsumo, alertasVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
+  registrarCompraInsumo, listarComprasInsumo, alertasVencimiento, listarTodosLotesConVencimiento, obtenerItemsComanda, resumenPeriodoAbierto, monedaBase, descargarTicketComanda, descargarTicketEscPos,
   obtenerMonedaBaseNegocio, actualizarMonedaBaseNegocio, cotizacionCobro,
   obtenerOrigenTasaActiva, actualizarOrigenTasaActiva, type OrigenTasaActiva,
+  obtenerZonasCocina, actualizarZonasCocina, obtenerZonasMesa, actualizarZonasMesa,
   extraerFacturaOcr,
   tasaVigente, actualizarTasa, actualizarTasaExterna, ApiError, registrarMovimiento, listarMovimientos, abonarMovimiento,
   cerrarCaja, historialCierres, descargarCierrePdf, utilidadDiaria, reporteTickets,
@@ -34,7 +41,7 @@ import {
   type FacturaExtraidaOcr,
 } from "../api";
 
-type Pagina = "general" | "resumen" | "salon" | "cocina" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
+type Pagina = "general" | "resumen" | "salon" | "cocina" | "reservas" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
 
 interface NavItem { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; premium?: boolean }
 interface NavGrupo { titulo: string; items: NavItem[] }
@@ -48,6 +55,7 @@ const NAV_GRUPOS: NavGrupo[] = [
       { id: "resumen", label: "Resumen General", Icon: IconChart },
       { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant },
       { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass },
+      { id: "reservas", label: "Reservas", Icon: IconCalendar },
       { id: "recetas", label: "Recetas & Escandallo", Icon: IconFileText },
     ],
   },
@@ -80,7 +88,15 @@ const sidebarItemsVisibles = (items: NavItem[]): NavItem[] =>
   PLAN_ACTUAL === ("PRO" as PlanLicencia) ? items : items.filter((n) => !n.premium);
 
 const ESTACIONES = ["COCINA", "PARRILLA", "BAR", "COCINA_FRIA"];
-const hoy = () => new Date().toISOString().slice(0, 10);
+// NUNCA usar toISOString() para "hoy" — siempre da la fecha en UTC, no la
+// del negocio. En Venezuela (UTC-4), a partir de las 8pm locales ya es "de
+// madrugada" en UTC: "Hoy" terminaba apuntando al día siguiente y las ventas
+// de esa noche quedaban invisibles en Estadísticas/Reportes hasta la
+// medianoche real. Se arma con los componentes de fecha LOCALES en su lugar.
+const hoy = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 function diasParaVencer(fechaVencimiento: string): number {
   const hoy0 = new Date(); hoy0.setHours(0, 0, 0, 0);
@@ -100,7 +116,11 @@ const CONFIG_KEY = "aurora_horeca_config_perfil";
 const VENTAS_HOY_KEY = `aurora_horeca_ventas_${hoy()}`;
 const MODO_CLASICO_KEY = "aurora_horeca_modo_clasico";
 
-interface ItemLocal extends ItemComanda {}
+// pendienteSync: marca un ítem agregado mientras no había conexión —
+// todavía no tiene un id real del servidor (id negativo temporal), se
+// muestra igual en la comanda para que el mesero pueda seguir trabajando,
+// y se reconcilia con el id real apenas la cola offline logra sincronizarlo.
+interface ItemLocal extends ItemComanda { pendienteSync?: boolean }
 
 // Modo claro por defecto — mismo look "Clásico" blanco de Mediclinic Pro,
 // para que todas las verticales abran con la misma identidad visual.
@@ -278,6 +298,23 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
     obtenerOrigenTasaActiva().then((r) => setOrigenTasaActiva(r.origenTasaActiva)).catch(() => {});
   }, [tenantId]);
 
+  // Zonas/estaciones de cocina — configurables por negocio en Configuración
+  // (antes eran las mismas 4 fijas para todos). Arranca con las clásicas
+  // mientras llega la respuesta real, para no dejar la Cocina/KDS en blanco
+  // un instante.
+  const [zonasCocina, setZonasCocina] = useState<string[]>(ESTACIONES);
+  const recargarZonasCocina = () => {
+    obtenerZonasCocina().then((r) => setZonasCocina(r.zonas)).catch(() => {});
+  };
+  useEffect(() => { recargarZonasCocina(); }, [tenantId]);
+
+  // Zonas físicas de mesas (Salón & Mesas) — mismo criterio que zonasCocina arriba.
+  const [zonasMesa, setZonasMesa] = useState<string[]>(["SALON_PRINCIPAL", "TERRAZA", "BARRA"]);
+  const recargarZonasMesa = () => {
+    obtenerZonasMesa().then((r) => setZonasMesa(r.zonas)).catch(() => {});
+  };
+  useEffect(() => { recargarZonasMesa(); }, [tenantId]);
+
   const recargarTodo = () => {
     mapaDeMesas().then(setMapa).catch(() => setMapa([]));
     listarEscandallos().then(setEscandallos).catch(() => setEscandallos([]));
@@ -293,12 +330,75 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
         .catch(() => setTasaPorOrigen((prev) => ({ ...prev, [origen]: null })));
     });
     cargarVentasHoy();
-    Promise.all(ESTACIONES.map((e) => obtenerTableroKds(e).catch(() => [])))
+    Promise.all(zonasCocina.map((e) => obtenerTableroKds(e).catch(() => [])))
       .then((listas) => setKdsCounts(listas.reduce((sum, l) => sum + l.filter((i) => i.estadoItem !== "ENTREGADO").length, 0)))
       .catch(() => setKdsCounts(0));
   };
 
   useEffect(() => { recargarTodo(); }, [tenantId]);
+
+  // ── Cola offline (Salón & Mesas) ──────────────────────────────────────
+  // Ver offlineQueueHoreca.ts para el alcance exacto (agregar ítem + cobrar
+  // una mesa YA abierta). Este bloque es el "motor": detecta conexión,
+  // reintenta la cola, y reconcilia los ítems agregados sin conexión
+  // (que quedaron con un id negativo temporal) con el id real que
+  // devuelve el servidor al sincronizar.
+  const [enLineaHoreca, setEnLineaHoreca] = useState(navigator.onLine);
+  const [pendientesOffline, setPendientesOffline] = useState(0);
+  const [erroresSyncOffline, setErroresSyncOffline] = useState<{ descripcion: string; mensaje: string }[]>([]);
+  const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
+
+  const actualizarContadorPendientes = () => setPendientesOffline(listarPendientes(tenantId).length);
+  useEffect(() => { actualizarContadorPendientes(); }, [tenantId]);
+
+  const sincronizarColaOffline = async () => {
+    if (!navigator.onLine || sincronizandoOffline) return;
+    setSincronizandoOffline(true);
+    try {
+      const resultado = await procesarCola(tenantId, {
+        agregar_item: async (a: AccionPendienteAgregarItem) => {
+          const real = await agregarItemComanda(a.comandaId, { ...a.payload, claveIdempotencia: a.claveIdempotencia });
+          const tempId = Number(a.id);
+          setItemsPorComanda((prev) => ({
+            ...prev,
+            [a.comandaId]: (prev[a.comandaId] || []).map((it) => (it.id === tempId ? { ...real, pendienteSync: false } : it)),
+          }));
+          return real;
+        },
+        cobrar_comanda: async (a: AccionPendienteCobrarComanda) => {
+          const real = await cerrarComandaMixto(a.comandaId, a.payload.pagos, a.payload.monedaVuelto, a.claveIdempotencia);
+          recargarTodo();
+          return real;
+        },
+      });
+      actualizarContadorPendientes();
+      if (resultado.fallidasDefinitivo.length > 0) {
+        setErroresSyncOffline((prev) => [
+          ...prev,
+          ...resultado.fallidasDefinitivo.map((f) => ({ descripcion: f.accion.descripcion, mensaje: f.mensaje })),
+        ]);
+      }
+    } finally {
+      setSincronizandoOffline(false);
+    }
+  };
+
+  useEffect(() => {
+    const alVolverLinea = () => { setEnLineaHoreca(true); sincronizarColaOffline(); };
+    const alPerderLinea = () => setEnLineaHoreca(false);
+    window.addEventListener("online", alVolverLinea);
+    window.addEventListener("offline", alPerderLinea);
+    // Respaldo del evento "online": algunos navegadores/routers no lo
+    // disparan de forma confiable tras un corte breve — este intervalo
+    // reintenta solo, sin depender de que el evento llegue.
+    const intervalo = setInterval(() => { if (navigator.onLine) sincronizarColaOffline(); }, 20000);
+    return () => {
+      window.removeEventListener("online", alVolverLinea);
+      window.removeEventListener("offline", alPerderLinea);
+      clearInterval(intervalo);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   // Sin tasa BCV del día, un cobro mixto en Bs o el total bimoneda del
   // carrito estarían calculando con una tasa vencida o en cero — bloquea
@@ -420,6 +520,13 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             </h2>
           </div>
           <div className="flex items-center gap-4">
+            {(!enLineaHoreca || pendientesOffline > 0) && (
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${!enLineaHoreca ? "bg-red-500/15 text-red-500" : "bg-amber-500/15 text-amber-600 dark:text-amber-400"}`}
+                title={!enLineaHoreca ? "Sin conexión — tus acciones se guardan localmente" : `${pendientesOffline} acción(es) por sincronizar`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${!enLineaHoreca ? "bg-red-500" : "bg-amber-500 animate-pulse"}`} />
+                {!enLineaHoreca ? "Sin conexión" : `${pendientesOffline} por sincronizar`}
+              </div>
+            )}
             <div className="text-xs text-right hidden sm:block">
               <div className="font-bold text-slate-900 dark:text-white">{config.nombreLocal}</div>
             </div>
@@ -436,6 +543,28 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             </button>
           </div>
         </header>
+
+        {!enLineaHoreca && (
+          <div className="px-6 py-2 bg-red-500/10 border-b border-red-500/20 text-xs text-red-600 dark:text-red-300 flex items-center gap-2">
+            <IconWarning size={14} />
+            <span>Sin conexión — puedes seguir agregando platos y cobrando mesas ya abiertas; se guardan en este dispositivo y se sincronizan solos al volver la señal. Abrir una mesa nueva o anular requieren conexión.</span>
+          </div>
+        )}
+        {enLineaHoreca && pendientesOffline > 0 && (
+          <div className="px-6 py-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2"><IconRefresh size={14} className={sincronizandoOffline ? "animate-spin" : ""} /> Sincronizando {pendientesOffline} acción(es) guardadas sin conexión…</span>
+            <button onClick={sincronizarColaOffline} disabled={sincronizandoOffline} className="font-bold underline cursor-pointer disabled:opacity-50">Reintentar ahora</button>
+          </div>
+        )}
+        {erroresSyncOffline.length > 0 && (
+          <div className="px-6 py-2 bg-red-500/10 border-b border-red-500/20 text-xs text-red-600 dark:text-red-300 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="font-bold">{erroresSyncOffline.length} acción(es) guardadas sin conexión NO se pudieron aplicar — revisa manualmente:</span>
+              <button onClick={() => setErroresSyncOffline([])} className="text-[10px] font-semibold underline cursor-pointer flex-shrink-0">Descartar</button>
+            </div>
+            {erroresSyncOffline.map((e, i) => <div key={i}>• {e.descripcion}: {e.mensaje}</div>)}
+          </div>
+        )}
 
         {/* Vista General (POS puro) es la única página que gestiona su propio
             alto y scroll interno de punta a punta — el wrapper acá no le
@@ -461,11 +590,13 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "salon" && (esPremium("salon")
             ? <BloqueoPremium modulo="Salón & Mesas" />
             : <Salon tenantId={tenantId} mapa={mapa} itemsPorComanda={itemsPorComanda} setItemsPorComanda={setItemsPorComanda}
-                escandallos={escandallos} onVenta={registrarVenta} onCambio={recargarTodo} />
+                escandallos={escandallos} articulos={articulos} onVenta={registrarVenta} onCambio={recargarTodo} zonasCocina={zonasCocina} zonasMesa={zonasMesa} onZonasMesaGuardadas={recargarZonasMesa} nombreLocal={config.nombreLocal}
+                onAccionEncolada={actualizarContadorPendientes} />
           )}
-          {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} />)}
+          {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} zonasCocina={zonasCocina} onZonasCocinaGuardadas={recargarZonasCocina} nombreLocal={config.nombreLocal} />)}
+          {pagina === "reservas" && <Reservas mapa={mapa} />}
           {pagina === "recetas" && (recetasActivas
-            ? <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} tasaCop={tasaCop} tasaBcv={tasaBcv} onCambio={recargarTodo} />
+            ? <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} tasaCop={tasaCop} tasaBcv={tasaBcv} onCambio={recargarTodo} zonasCocina={zonasCocina} />
             : (
               <div className="apple-glass rounded-2xl p-10 text-center space-y-3">
                 <IconFileText size={28} />
@@ -487,7 +618,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           {pagina === "administracion" && <Administracion tenantId={tenantId} monedasActivas={{ ...MONEDAS_POR_DEFECTO, ...(config.monedasActivas || {}) }} />}
           {pagina === "estadisticas" && <ResumenFinanciero tenantId={tenantId} />}
           {pagina === "reportes" && <ReportesOperativos tenantId={tenantId} />}
-          {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} />}
+          {pagina === "configuracion" && <Configuracion tenantId={tenantId} config={config} onGuardar={guardarConfig} onZonasCocinaGuardadas={recargarZonasCocina} onZonasMesaGuardadas={recargarZonasMesa} />}
         </div>
         )}
       </main>
@@ -1138,11 +1269,17 @@ function VistaGeneral({
 // ══════════════════════════════════════════════════════════════════════════
 // SALÓN & MESAS
 // ══════════════════════════════════════════════════════════════════════════
-function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallos, onVenta, onCambio }: {
+function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallos, articulos, onVenta, onCambio, zonasCocina, zonasMesa, onZonasMesaGuardadas, nombreLocal, onAccionEncolada }: {
   tenantId: number; mapa: MapaMesaEntrada[] | null;
   itemsPorComanda: Record<number, ItemLocal[]>; setItemsPorComanda: (fn: (prev: Record<number, ItemLocal[]>) => Record<number, ItemLocal[]>) => void;
-  escandallos: EscandalloReceta[] | null; onVenta: (monto: number, metodo: string) => void; onCambio: () => void;
+  escandallos: EscandalloReceta[] | null; articulos: Articulo[] | null; onVenta: (monto: number, metodo: string) => void; onCambio: () => void; zonasCocina: string[]; zonasMesa: string[]; onZonasMesaGuardadas: () => void; nombreLocal: string;
+  onAccionEncolada: () => void;
 }) {
+  const { user } = useAuth();
+  // Editar zonas y gestionar meseros son configuración del negocio, no
+  // operación diaria — reservado al dueño, igual que el backend
+  // (ModuloTenantController/MeseroHorecaController exigen DUENO_ADMIN).
+  const esDueno = user?.rol === "DUENO_ADMIN";
   const [abriendo, setAbriendo] = useState<MapaMesaEntrada | null>(null);
   const [comandaActiva, setComandaActiva] = useState<Comanda | null>(null);
   const [formApertura, setFormApertura] = useState({ mesero: "", canal: "SALON", nombreCliente: "", telefonoCliente: "", direccionEntrega: "" });
@@ -1154,6 +1291,41 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
   const [guardandoMesa, setGuardandoMesa] = useState(false);
   const [vista, setVista] = useState<"lista" | "plano">("plano");
   const [mesaEditando, setMesaEditando] = useState<Mesa | null>(null);
+  const [subpagina, setSubpagina] = useState<"mesas" | "meseros">("mesas");
+  const [editandoZonasMesa, setEditandoZonasMesa] = useState(false);
+  const [nuevaZonaMesa, setNuevaZonaMesa] = useState("");
+  const [guardandoZonaMesa, setGuardandoZonaMesa] = useState(false);
+  const [errorZonaMesa, setErrorZonaMesa] = useState<string | null>(null);
+
+  const agregarZonaMesa = async () => {
+    const nombre = nuevaZonaMesa.trim().toUpperCase().replace(/\s+/g, "_");
+    if (!nombre || zonasMesa.includes(nombre)) { setNuevaZonaMesa(""); return; }
+    setGuardandoZonaMesa(true);
+    setErrorZonaMesa(null);
+    try {
+      await actualizarZonasMesa([...zonasMesa, nombre]);
+      onZonasMesaGuardadas();
+      setNuevaZonaMesa("");
+    } catch (e) {
+      setErrorZonaMesa(e instanceof Error ? e.message : "No se pudo agregar la zona");
+    } finally {
+      setGuardandoZonaMesa(false);
+    }
+  };
+
+  const eliminarZonaMesa = async (zona: string) => {
+    if (zonasMesa.length <= 1) { setErrorZonaMesa("Debe quedar al menos una zona"); return; }
+    setGuardandoZonaMesa(true);
+    setErrorZonaMesa(null);
+    try {
+      await actualizarZonasMesa(zonasMesa.filter((z) => z !== zona));
+      onZonasMesaGuardadas();
+    } catch (e) {
+      setErrorZonaMesa(e instanceof Error ? e.message : "No se pudo eliminar la zona");
+    } finally {
+      setGuardandoZonaMesa(false);
+    }
+  };
 
   useEffect(() => {
     if (comandaActiva?.id) {
@@ -1215,6 +1387,19 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+        {[{ id: "mesas", label: "Mesas" }, { id: "meseros", label: "Meseros" }].map((t) => (
+          <button key={t.id} onClick={() => setSubpagina(t.id as typeof subpagina)}
+            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer ${subpagina === t.id ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {subpagina === "meseros" ? (
+        <MeserosPanel />
+      ) : (
+      <>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <p className="text-sm text-slate-500 dark:text-white/40">{(mapa || []).length} mesas registradas</p>
@@ -1232,18 +1417,66 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
       {mostrarNuevaMesa && (
         <div className="apple-glass rounded-2xl p-5 space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <input value={nuevaMesa.numero} onChange={(e) => setNuevaMesa({ ...nuevaMesa, numero: e.target.value })} type="number" placeholder="Número de mesa" className="input-horeca" />
-            <input value={nuevaMesa.capacidad} onChange={(e) => setNuevaMesa({ ...nuevaMesa, capacidad: e.target.value })} type="number" placeholder="Capacidad (pax)" className="input-horeca" />
-            <select value={nuevaMesa.zona} onChange={(e) => setNuevaMesa({ ...nuevaMesa, zona: e.target.value })} className="input-horeca">
-              <option value="SALON_PRINCIPAL">Salón principal</option>
-              <option value="TERRAZA">Terraza</option>
-              <option value="BARRA">Barra</option>
-            </select>
-            <select value={nuevaMesa.forma} onChange={(e) => setNuevaMesa({ ...nuevaMesa, forma: e.target.value })} className="input-horeca">
-              <option value="RECTANGULAR">Cuadrada</option>
-              <option value="CIRCULAR">Redonda</option>
-            </select>
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider mb-1">Número</label>
+              <input value={nuevaMesa.numero} onChange={(e) => setNuevaMesa({ ...nuevaMesa, numero: e.target.value })} type="number" placeholder="Número de mesa" className="input-horeca w-full" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider mb-1">Capacidad</label>
+              <input value={nuevaMesa.capacidad} onChange={(e) => setNuevaMesa({ ...nuevaMesa, capacidad: e.target.value })} type="number" placeholder="Capacidad (pax)" className="input-horeca w-full" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider mb-1">Zona</label>
+              <select value={nuevaMesa.zona} onChange={(e) => setNuevaMesa({ ...nuevaMesa, zona: e.target.value })} className="input-horeca w-full">
+                {zonasMesa.map((z) => <option key={z} value={z}>{labelDeZona(z)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider mb-1">Forma</label>
+              <select value={nuevaMesa.forma} onChange={(e) => setNuevaMesa({ ...nuevaMesa, forma: e.target.value })} className="input-horeca w-full">
+                <option value="RECTANGULAR">Cuadrada</option>
+                <option value="CIRCULAR">Redonda</option>
+              </select>
+            </div>
           </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider">Zonas disponibles</label>
+              {esDueno && (
+                <button type="button" onClick={() => setEditandoZonasMesa((v) => !v)}
+                  className={`text-[10px] font-semibold cursor-pointer ${editandoZonasMesa ? "text-teal-600 dark:text-teal-400" : "text-slate-400 hover:text-teal-600 dark:hover:text-teal-400"}`}>
+                  {editandoZonasMesa ? "✓ Listo" : "✎ Editar zonas"}
+                </button>
+              )}
+            </div>
+            {editandoZonasMesa && esDueno && (
+              <div className="flex items-center gap-2 flex-wrap p-3 rounded-xl bg-slate-100/60 dark:bg-white/5">
+                {zonasMesa.map((z) => (
+                  <div key={z} className="flex items-center gap-1 pl-3 pr-1.5 py-1 rounded-full text-xs font-semibold bg-slate-200/60 dark:bg-white/10 text-slate-600 dark:text-white/60">
+                    {labelDeZona(z)}
+                    <button type="button" onClick={() => eliminarZonaMesa(z)} disabled={guardandoZonaMesa} title="Eliminar zona"
+                      className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-red-500/20 hover:text-red-500 cursor-pointer disabled:opacity-40">
+                      <IconClose size={10} />
+                    </button>
+                  </div>
+                ))}
+                <input
+                  value={nuevaZonaMesa}
+                  onChange={(e) => setNuevaZonaMesa(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") agregarZonaMesa(); }}
+                  placeholder="Ej. VIP"
+                  className="input-horeca text-xs !py-1.5 !w-28"
+                />
+                <button type="button" onClick={agregarZonaMesa} disabled={guardandoZonaMesa || !nuevaZonaMesa.trim()}
+                  className="apple-glass-btn text-xs font-semibold px-2.5 py-1.5 rounded-full cursor-pointer disabled:opacity-50">
+                  + Agregar
+                </button>
+              </div>
+            )}
+            {errorZonaMesa && <p className="text-xs text-red-500 mt-1">{errorZonaMesa}</p>}
+          </div>
+
           {errorMesa && <p className="text-xs text-red-500">{errorMesa}</p>}
           <button onClick={handleCrearMesa} disabled={guardandoMesa} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
             {guardandoMesa ? "Guardando…" : "Guardar mesa"}
@@ -1284,11 +1517,15 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
           ))}
         </div>
       ) : (
-        <PlanoMesas tenantId={tenantId} mapa={mapa} onAbrirMesa={setAbriendo} onVerComanda={setComandaActiva} onEditarMesa={setMesaEditando} onCambio={onCambio} />
+        <PlanoMesas tenantId={tenantId} mapa={mapa} onAbrirMesa={setAbriendo} onVerComanda={setComandaActiva} onEditarMesa={setMesaEditando} onCambio={onCambio} zonasMesa={zonasMesa}
+          editandoZonasMesa={editandoZonasMesa} setEditandoZonasMesa={setEditandoZonasMesa}
+          nuevaZonaMesa={nuevaZonaMesa} setNuevaZonaMesa={setNuevaZonaMesa}
+          agregarZonaMesa={agregarZonaMesa} eliminarZonaMesa={eliminarZonaMesa}
+          guardandoZonaMesa={guardandoZonaMesa} errorZonaMesa={errorZonaMesa} esDueno={esDueno} />
       )}
 
       {mesaEditando && (
-        <EditarMesaModal tenantId={tenantId} mesa={mesaEditando} onClose={() => setMesaEditando(null)} onCambio={onCambio} />
+        <EditarMesaModal tenantId={tenantId} mesa={mesaEditando} onClose={() => setMesaEditando(null)} onCambio={onCambio} zonasMesa={zonasMesa} />
       )}
 
       {/* Modal: abrir comanda */}
@@ -1296,8 +1533,7 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
         <Modal onClose={() => setAbriendo(null)} titulo={`Abrir Mesa ${abriendo.mesa.numero}`}>
           <div className="space-y-3">
             <Campo label="Mesero">
-              <input value={formApertura.mesero} onChange={(e) => setFormApertura({ ...formApertura, mesero: e.target.value })}
-                placeholder="Nombre del mesero" className="input-horeca" />
+              <BuscadorMesero valor={formApertura.mesero} onCambiar={(nombre) => setFormApertura({ ...formApertura, mesero: nombre })} />
             </Campo>
             <Campo label="Canal">
               <select value={formApertura.canal} onChange={(e) => setFormApertura({ ...formApertura, canal: e.target.value })} className="input-horeca">
@@ -1336,10 +1572,174 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
           comanda={comandaActiva}
           items={itemsPorComanda[comandaActiva.id] || []}
           escandallos={escandallos}
+          articulos={articulos}
+          zonasCocina={zonasCocina}
+          nombreLocal={nombreLocal}
           onAgregarItem={(item) => setItemsPorComanda((prev) => ({ ...prev, [comandaActiva.id]: [...(prev[comandaActiva.id] || []), item] }))}
-          onCerrar={(monto, metodo) => { onVenta(monto, metodo); setComandaActiva(null); onCambio(); }}
+          onActualizarItem={(item) => setItemsPorComanda((prev) => ({ ...prev, [comandaActiva.id]: (prev[comandaActiva.id] || []).map((it) => it.id === item.id ? item : it) }))}
+          onCerrar={(monto, metodo) => { onVenta(monto, metodo); onCambio(); }}
           onClose={() => setComandaActiva(null)}
+          onAccionEncolada={onAccionEncolada}
         />
+      )}
+      </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Campo de mesero al abrir una comanda — autocompleta con el directorio del
+ * negocio (datalist nativo del navegador, sin dropdown propio que mantener),
+ * pero sigue aceptando cualquier texto: Comanda.mesero es libre a propósito,
+ * así que un mesero de medio turno sin dar de alta no bloquea la venta.
+ */
+function BuscadorMesero({ valor, onCambiar }: { valor: string; onCambiar: (nombre: string) => void }) {
+  const [meseros, setMeseros] = useState<MeseroHoreca[]>([]);
+  useEffect(() => { listarMeseros().then((r) => setMeseros(r.map((e) => e.mesero).filter((m) => m.activo))).catch(() => setMeseros([])); }, []);
+  return (
+    <>
+      <input
+        value={valor}
+        onChange={(e) => onCambiar(e.target.value)}
+        placeholder="Nombre del mesero"
+        list="lista-meseros-horeca"
+        className="input-horeca"
+      />
+      <datalist id="lista-meseros-horeca">
+        {meseros.map((m) => <option key={m.id} value={m.nombre} />)}
+      </datalist>
+    </>
+  );
+}
+
+/** Alta/edición/baja de meseros — directorio propio del negocio, ver MeseroHoreca.
+ * Opcionalmente cada mesero se puede vincular a un Empleado de RRHH: cuando
+ * está vinculado, la tarjeta muestra en vivo si está fichado ahora mismo
+ * (contra el reloj checador real), sin duplicar ningún dato. */
+function MeserosPanel() {
+  const { user } = useAuth();
+  const esDueno = user?.rol === "DUENO_ADMIN";
+  const [meseros, setMeseros] = useState<MeseroConEstado[] | null>(null);
+  const [empleados, setEmpleados] = useState<EmpleadoRrhh[]>([]);
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [editando, setEditando] = useState<MeseroHoreca | null>(null);
+  const [form, setForm] = useState({ nombre: "", telefono: "", empleadoId: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  const cargar = () => listarMeseros().then(setMeseros).catch(() => setMeseros([]));
+  useEffect(() => {
+    cargar();
+    listarEmpleadosRrhh().then((r) => setEmpleados(r.filter((e) => e.activo))).catch(() => setEmpleados([]));
+  }, []);
+
+  const abrirNuevo = () => { setEditando(null); setForm({ nombre: "", telefono: "", empleadoId: "" }); setMostrarForm(true); };
+  const abrirEditar = (m: MeseroHoreca) => { setEditando(m); setForm({ nombre: m.nombre, telefono: m.telefono || "", empleadoId: m.empleadoId ? String(m.empleadoId) : "" }); setMostrarForm(true); };
+
+  const guardar = async () => {
+    if (!form.nombre.trim()) { setError("El nombre es obligatorio"); return; }
+    setGuardando(true);
+    setError(null);
+    const datos = { nombre: form.nombre.trim(), telefono: form.telefono.trim() || undefined, empleadoId: form.empleadoId ? Number(form.empleadoId) : null };
+    try {
+      if (editando) await editarMesero(editando.id, datos);
+      else await crearMesero(datos);
+      setMostrarForm(false);
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar el mesero");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const alternarActivo = async (m: MeseroHoreca) => {
+    try {
+      if (m.activo) await desactivarMesero(m.id);
+      else await reactivarMesero(m.id);
+      cargar();
+    } catch {
+      alert("No se pudo actualizar el mesero — revisa tu conexión e inténtalo de nuevo.");
+    }
+  };
+
+  const activos = (meseros || []).filter((e) => e.mesero.activo);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500 dark:text-white/40">
+          {activos.length} meseros activos
+          {activos.some((e) => e.enTurno) && <span className="ml-2 text-teal-600 dark:text-teal-400 font-semibold">· {activos.filter((e) => e.enTurno).length} en turno ahora</span>}
+        </p>
+        {esDueno && <button onClick={abrirNuevo} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">+ Nuevo mesero</button>}
+      </div>
+      {!esDueno && <p className="text-xs text-slate-400">Solo el dueño/administrador puede crear, editar o desactivar meseros.</p>}
+
+      {mostrarForm && esDueno && (
+        <div className="apple-glass rounded-2xl p-5 space-y-3">
+          <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">{editando ? "Editar mesero" : "Nuevo mesero"}</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Campo label="Nombre"><input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ej. Juan Pérez" className="input-horeca" /></Campo>
+            <Campo label="Teléfono (opcional)"><input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="0412-1234567" className="input-horeca" /></Campo>
+          </div>
+          <Campo label="Vincular con empleado de RRHH (opcional)">
+            <select value={form.empleadoId} onChange={(e) => setForm({ ...form, empleadoId: e.target.value })} className="input-horeca w-full">
+              <option value="">Sin vincular — solo directorio</option>
+              {empleados.map((e) => <option key={e.id} value={e.id}>{e.nombre}{e.cargo ? ` — ${e.cargo}` : ""}</option>)}
+            </select>
+            {empleados.length === 0 && <p className="text-[10px] text-slate-400 mt-1">No tienes empleados registrados en RRHH todavía — puedes crear el mesero igual, sin vincular.</p>}
+            {form.empleadoId && <p className="text-[10px] text-teal-600 dark:text-teal-400 mt-1">Al vincularlo, esta tarjeta mostrará en vivo si está fichado (entrada marcada) ahora mismo.</p>}
+          </Campo>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <div className="flex gap-2">
+            <button onClick={guardar} disabled={guardando} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+              {guardando ? "Guardando…" : "Guardar"}
+            </button>
+            <button onClick={() => setMostrarForm(false)} className="apple-glass-btn text-xs font-semibold px-5 py-2.5 rounded-xl cursor-pointer">Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {meseros === null ? (
+        <p className="text-xs text-slate-400">Cargando…</p>
+      ) : meseros.length === 0 ? (
+        <div className="apple-glass rounded-2xl p-8 text-center">
+          <p className="text-slate-500 dark:text-white/40 text-sm">Aún no tienes meseros registrados.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {meseros.map(({ mesero: m, enTurno, cargoEmpleado }) => (
+            <div key={m.id} className={`apple-glass rounded-2xl p-5 space-y-1.5 ${!m.activo ? "opacity-50" : ""}`}>
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="font-bold text-slate-900 dark:text-white text-sm">{m.nombre}</h4>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {m.activo && m.empleadoId && (
+                    enTurno ? (
+                      <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" /> EN TURNO
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-300/50 dark:bg-white/10 text-slate-500 dark:text-white/40">FUERA DE TURNO</span>
+                    )
+                  )}
+                  {!m.activo && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-300/60 dark:bg-white/10 text-slate-600 dark:text-white/60 uppercase">Inactivo</span>}
+                </div>
+              </div>
+              {cargoEmpleado && <div className="text-[11px] text-slate-400">{cargoEmpleado}</div>}
+              {m.telefono && <div className="text-xs text-slate-500 dark:text-white/40">Tel: {m.telefono}</div>}
+              {esDueno && (
+                <div className="flex gap-3 pt-1.5">
+                  <button onClick={() => abrirEditar(m)} className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 cursor-pointer">Editar</button>
+                  <button onClick={() => alternarActivo(m)} className="text-[11px] font-semibold text-slate-500 dark:text-white/50 hover:text-red-500 cursor-pointer">
+                    {m.activo ? "Desactivar" : "Reactivar"}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -1348,8 +1748,8 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
 // ══════════════════════════════════════════════════════════════════════════
 // EDITAR / ELIMINAR MESA
 // ══════════════════════════════════════════════════════════════════════════
-function EditarMesaModal({ tenantId, mesa, onClose, onCambio }: { tenantId: number; mesa: Mesa; onClose: () => void; onCambio: () => void }) {
-  const [form, setForm] = useState({ numero: String(mesa.numero), capacidad: mesa.capacidad != null ? String(mesa.capacidad) : "", zona: mesa.zona || "SALON_PRINCIPAL", forma: mesa.forma || "RECTANGULAR" });
+function EditarMesaModal({ tenantId, mesa, onClose, onCambio, zonasMesa }: { tenantId: number; mesa: Mesa; onClose: () => void; onCambio: () => void; zonasMesa: string[] }) {
+  const [form, setForm] = useState({ numero: String(mesa.numero), capacidad: mesa.capacidad != null ? String(mesa.capacidad) : "", zona: mesa.zona || zonasMesa[0], forma: mesa.forma || "RECTANGULAR" });
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
@@ -1399,9 +1799,7 @@ function EditarMesaModal({ tenantId, mesa, onClose, onCambio }: { tenantId: numb
           </Campo>
           <Campo label="Zona">
             <select value={form.zona} onChange={(e) => setForm({ ...form, zona: e.target.value })} className="input-horeca">
-              <option value="SALON_PRINCIPAL">Salón principal</option>
-              <option value="TERRAZA">Terraza</option>
-              <option value="BARRA">Barra</option>
+              {zonasMesa.map((z) => <option key={z} value={z}>{labelDeZona(z)}</option>)}
             </select>
           </Campo>
           <Campo label="Forma">
@@ -1440,14 +1838,27 @@ function EditarMesaModal({ tenantId, mesa, onClose, onCambio }: { tenantId: numb
 // ══════════════════════════════════════════════════════════════════════════
 // PLANO VISUAL DE MESAS — arrastrar y soltar
 // ══════════════════════════════════════════════════════════════════════════
-const ZONAS_INFO: Record<string, { label: string; color: string }> = {
-  SALON_PRINCIPAL: { label: "Salón principal", color: "#0ea5e9" },
-  TERRAZA: { label: "Terraza", color: "#22c55e" },
-  BARRA: { label: "Barra", color: "#a855f7" },
-};
+// Colores por zona de mesa, asignados por posición (no hay campo de color en
+// backend — es solo texto libre, ver Mesa.zona). Alcanza y sobra para las
+// pocas zonas que un negocio suele tener; si agrega más de 6, se repiten.
+// Sin ámbar/naranja a propósito: ese color ya está reservado para el estado
+// "Ocupada" en el plano — si una zona lo usara también, un punto naranja se
+// podría confundir con mesa ocupada en vez de con la zona.
+const PALETA_ZONAS = ["#0ea5e9", "#22c55e", "#a855f7", "#ec4899", "#ef4444", "#14b8a6", "#6366f1", "#84cc16"];
+function colorDeZona(zona: string, zonasMesa: string[]): string {
+  const idx = Math.max(0, zonasMesa.indexOf(zona));
+  return PALETA_ZONAS[idx % PALETA_ZONAS.length];
+}
+function labelDeZona(zona: string): string {
+  return zona.charAt(0) + zona.slice(1).toLowerCase().replace(/_/g, " ");
+}
 
-function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, onCambio }: {
-  tenantId: number; mapa: MapaMesaEntrada[]; onAbrirMesa: (m: MapaMesaEntrada) => void; onVerComanda: (c: Comanda) => void; onEditarMesa: (m: Mesa) => void; onCambio: () => void;
+function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, onCambio, zonasMesa,
+  editandoZonasMesa, setEditandoZonasMesa, nuevaZonaMesa, setNuevaZonaMesa, agregarZonaMesa, eliminarZonaMesa, guardandoZonaMesa, errorZonaMesa, esDueno,
+}: {
+  tenantId: number; mapa: MapaMesaEntrada[]; onAbrirMesa: (m: MapaMesaEntrada) => void; onVerComanda: (c: Comanda) => void; onEditarMesa: (m: Mesa) => void; onCambio: () => void; zonasMesa: string[];
+  editandoZonasMesa: boolean; setEditandoZonasMesa: (fn: (v: boolean) => boolean) => void; nuevaZonaMesa: string; setNuevaZonaMesa: (v: string) => void;
+  agregarZonaMesa: () => void; eliminarZonaMesa: (zona: string) => void; guardandoZonaMesa: boolean; errorZonaMesa: string | null; esDueno: boolean;
 }) {
   const ANCHO_DEFECTO = 96;
   const posicionPorDefecto = (idx: number) => ({ x: 24 + (idx % 6) * 120, y: 24 + Math.floor(idx / 6) * 120 });
@@ -1529,14 +1940,50 @@ function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, o
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/30 mb-2">Zonas</p>
-          <div className="space-y-1.5">
-            {Object.entries(ZONAS_INFO).map(([key, z]) => (
-              <div key={key} className="flex items-center gap-2 text-xs text-slate-700 dark:text-white/70">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: z.color }} /> {z.label}
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/30">Zonas</p>
+            {esDueno && (
+              <button type="button" onClick={() => setEditandoZonasMesa((v) => !v)}
+                className={`text-[10px] font-semibold cursor-pointer ${editandoZonasMesa ? "text-teal-600 dark:text-teal-400" : "text-slate-400 hover:text-teal-600 dark:hover:text-teal-400"}`}>
+                {editandoZonasMesa ? "✓ Listo" : "✎ Editar"}
+              </button>
+            )}
           </div>
+          {editandoZonasMesa && esDueno ? (
+            <div className="space-y-2">
+              {zonasMesa.map((z) => (
+                <div key={z} className="flex items-center justify-between gap-1 pl-2 pr-1 py-1 rounded-lg text-xs font-semibold bg-slate-100/60 dark:bg-white/5 text-slate-600 dark:text-white/60">
+                  <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: colorDeZona(z, zonasMesa) }} /> {labelDeZona(z)}</span>
+                  <button type="button" onClick={() => eliminarZonaMesa(z)} disabled={guardandoZonaMesa} title="Eliminar zona"
+                    className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-red-500/20 hover:text-red-500 cursor-pointer disabled:opacity-40 flex-shrink-0">
+                    <IconClose size={10} />
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={nuevaZonaMesa}
+                  onChange={(e) => setNuevaZonaMesa(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") agregarZonaMesa(); }}
+                  placeholder="Ej. BARRA VIP"
+                  className="input-horeca text-xs !py-1.5 flex-1 min-w-0"
+                />
+                <button type="button" onClick={agregarZonaMesa} disabled={guardandoZonaMesa || !nuevaZonaMesa.trim()}
+                  className="apple-glass-btn text-xs font-semibold px-2.5 py-1.5 rounded-full cursor-pointer disabled:opacity-50 flex-shrink-0">
+                  +
+                </button>
+              </div>
+              {errorZonaMesa && <p className="text-[10px] text-red-500">{errorZonaMesa}</p>}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {zonasMesa.map((z) => (
+                <div key={z} className="flex items-center gap-2 text-xs text-slate-700 dark:text-white/70">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorDeZona(z, zonasMesa) }} /> {labelDeZona(z)}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <button
           onClick={() => setModoEdicion((v) => !v)}
@@ -1573,7 +2020,7 @@ function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, o
         {mapa.map((m) => {
           const pos = posiciones[m.mesa.id] || { x: 24, y: 24 };
           const esRedonda = m.mesa.forma === "CIRCULAR";
-          const zonaColor = ZONAS_INFO[m.mesa.zona || ""]?.color || "#94a3b8";
+          const zonaColor = m.mesa.zona ? colorDeZona(m.mesa.zona, zonasMesa) : "#94a3b8";
           const ocupada = m.estado === "OCUPADA";
           return (
             <div
@@ -1595,7 +2042,7 @@ function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, o
                 (ocupada && m.comandaAbierta) ? onVerComanda(m.comandaAbierta) : onAbrirMesa(m);
               }}
             >
-              <span className="absolute top-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: zonaColor }} title={ZONAS_INFO[m.mesa.zona || ""]?.label} />
+              <span className="absolute top-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: zonaColor }} title={m.mesa.zona ? labelDeZona(m.mesa.zona) : undefined} />
               <span className="font-['Outfit'] font-black text-sm mt-1">M{m.mesa.numero}</span>
               {m.mesa.capacidad != null && <span className="text-[9px] opacity-80">{m.mesa.capacidad}p</span>}
               {modoEdicion && (
@@ -1628,11 +2075,16 @@ function nuevaFilaPago(moneda: string, auto: boolean): FilaPago {
   return { id: `${Date.now()}-${Math.random()}`, metodoPago: "EFECTIVO", moneda, monto: "", auto };
 }
 
-function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, procesando, error, onCobrar }: {
+function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, procesando, error, onCobrar, montosDivididos }: {
   tenantId: number; total: number; monedaBase?: string;
   tasasExternas?: { VES?: number | null; COP?: number | null };
   procesando: boolean; error: string | null;
   onCobrar: (pagos: PagoParcial[], monedaVuelto: string) => void;
+  // Si "Dividir cuenta" ya calculó cuánto le toca a cada quien, se usa como
+  // arranque: una fila por persona con su monto fijo — antes esa división
+  // era solo un número mostrado en pantalla, y había que retipear cada parte
+  // a mano en el cobro.
+  montosDivididos?: number[] | null;
 }) {
   // La primera fila nace "auto" y ya trae el total completo puesto — el caso
   // más común (pago 100% en efectivo, en la moneda base) queda a un solo
@@ -1642,12 +2094,26 @@ function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, p
   // que cambia cualquier otra fila. En cuanto el cajero escribe algo directo
   // en una fila, deja de seguir el pendiente y queda fija como manual.
   const otrasMonedas = Object.keys(MONEDAS_ALTERNAS).filter((m) => m !== monedaBase);
-  const [filas, setFilas] = useState<FilaPago[]>(() => [nuevaFilaPago(monedaBase, true)]);
+  const filasDeDivision = (): FilaPago[] | null =>
+    montosDivididos && montosDivididos.length > 1
+      ? montosDivididos.map((m) => ({ ...nuevaFilaPago(monedaBase, false), monto: m.toFixed(2) }))
+      : null;
+  const [filas, setFilas] = useState<FilaPago[]>(() => filasDeDivision() || [nuevaFilaPago(monedaBase, true)]);
   const [tasas, setTasas] = useState<Record<string, number | null>>(() => ({
     VES: tasasExternas?.VES ?? null,
     COP: tasasExternas?.COP ?? null,
   }));
   const [monedaVuelto, setMonedaVuelto] = useState(monedaBase);
+
+  // Si "Dividir cuenta" se calcula DESPUÉS de que este panel ya se montó
+  // (orden normal: primero se abre el cobro, luego se pide dividir), hay que
+  // reemplazar las filas cuando llega — el useState de arriba solo corre una
+  // vez al montar.
+  useEffect(() => {
+    const nuevas = filasDeDivision();
+    if (nuevas) setFilas(nuevas);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [montosDivididos]);
 
   const [errorTasas, setErrorTasas] = useState<string | null>(null);
   useEffect(() => {
@@ -1840,50 +2306,353 @@ function PanelCobroMixto({ tenantId, total, monedaBase = "USD", tasasExternas, p
   );
 }
 
-function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, onCerrar, onClose }: {
-  tenantId: number; comanda: Comanda; items: ItemLocal[]; escandallos: EscandalloReceta[] | null;
-  onAgregarItem: (item: ItemLocal) => void; onCerrar: (monto: number, metodo: string) => void; onClose: () => void;
+/**
+ * Buscador con filtro en vivo para agregar un plato a la comanda — combina
+ * recetas (escandallos) y cualquier artículo del inventario en una sola
+ * lista, filtrando a medida que se escribe (mismo patrón que BuscadorArticulo
+ * de Compras). Reemplaza el <select> plano, que no dejaba escribir para
+ * acercarse al producto en catálogos largos.
+ */
+function BuscadorPlatoComanda({ escandallos, articulos, itemSel, onSeleccionar }: {
+  escandallos: EscandalloReceta[] | null; articulos: Articulo[] | null; itemSel: string; onSeleccionar: (val: string) => void;
 }) {
-  const [escandalloSel, setEscandalloSel] = useState<string>("");
+  const [busqueda, setBusqueda] = useState("");
+  const [abierto, setAbierto] = useState(false);
+  const contenedorRef = useRef<HTMLDivElement | null>(null);
+
+  const escandallosActivos = useMemo(() => (escandallos || []).filter((e) => e.activo !== false), [escandallos]);
+  const [tipoSel, idSelStr] = itemSel.split(":");
+  const escandalloSel = tipoSel === "escandallo" ? escandallosActivos.find((e) => String(e.id) === idSelStr) : undefined;
+  const articuloSel = tipoSel === "articulo" ? (articulos || []).find((a) => String(a.id) === idSelStr) : undefined;
+  const nombreSeleccionado = escandalloSel?.nombrePlato || articuloSel?.nombre || "";
+
+  useEffect(() => {
+    if (!abierto) return;
+    const handler = (e: MouseEvent) => {
+      if (contenedorRef.current && !contenedorRef.current.contains(e.target as Node)) setAbierto(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [abierto]);
+
+  const q = busqueda.trim().toLowerCase();
+  const recetasFiltradas = useMemo(
+    () => (q ? escandallosActivos.filter((e) => e.nombrePlato.toLowerCase().includes(q)) : escandallosActivos),
+    [escandallosActivos, q]
+  );
+  const articulosFiltrados = useMemo(
+    () => (q ? (articulos || []).filter((a) => a.nombre.toLowerCase().includes(q)) : (articulos || [])),
+    [articulos, q]
+  );
+
+  return (
+    <div className="relative" ref={contenedorRef}>
+      <input
+        value={abierto ? busqueda : nombreSeleccionado}
+        onChange={(e) => { setBusqueda(e.target.value); if (!abierto) setAbierto(true); }}
+        onFocus={() => { setBusqueda(""); setAbierto(true); }}
+        placeholder="Buscar plato o artículo…"
+        className="input-horeca w-full"
+      />
+      {abierto && (
+        <div className="absolute z-20 mt-1 w-full min-w-[260px] bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-64 overflow-y-auto shadow-lg">
+          <button
+            type="button"
+            onClick={() => { onSeleccionar(""); setBusqueda(""); setAbierto(false); }}
+            className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer text-slate-500 dark:text-white/50 italic border-b border-slate-100 dark:border-white/5"
+          >
+            — Plato libre (escribir nombre) —
+          </button>
+          {recetasFiltradas.length > 0 && (
+            <>
+              <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-white/30">Recetas</p>
+              {recetasFiltradas.map((e) => (
+                <button key={`escandallo:${e.id}`} type="button"
+                  onClick={() => { onSeleccionar(`escandallo:${e.id}`); setBusqueda(""); setAbierto(false); }}
+                  className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer flex items-center justify-between gap-2">
+                  <span className="font-semibold text-slate-800 dark:text-white/80 truncate">{e.nombrePlato}</span>
+                  <span className="text-slate-400 flex-shrink-0">${Number(e.precioVenta).toFixed(2)}</span>
+                </button>
+              ))}
+            </>
+          )}
+          {articulosFiltrados.length > 0 && (
+            <>
+              <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-white/30">Inventario (cualquier artículo)</p>
+              {articulosFiltrados.map((a) => {
+                const sinStock = Number(a.stockActual) <= 0;
+                return (
+                  <button key={`articulo:${a.id}`} type="button" disabled={sinStock}
+                    onClick={() => { if (sinStock) return; onSeleccionar(`articulo:${a.id}`); setBusqueda(""); setAbierto(false); }}
+                    className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2 ${sinStock ? "opacity-40 cursor-not-allowed" : "hover:bg-teal-500/10 cursor-pointer"}`}
+                  >
+                    <span className="font-semibold text-slate-800 dark:text-white/80 truncate">{a.nombre}</span>
+                    <span className="text-slate-400 flex-shrink-0 whitespace-nowrap">
+                      ${Number(a.precioVenta || 0).toFixed(2)}{sinStock ? " · sin stock" : ` · stock ${Number(a.stockActual)}`}
+                    </span>
+                  </button>
+                );
+              })}
+            </>
+          )}
+          {recetasFiltradas.length === 0 && articulosFiltrados.length === 0 && (
+            <p className="px-3 py-2 text-xs text-slate-400">Sin resultados — usa "Plato libre" arriba.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ComandaDetalle({ tenantId, comanda, items, escandallos, articulos, onAgregarItem, onActualizarItem, onCerrar, onClose, zonasCocina, nombreLocal, onAccionEncolada }: {
+  tenantId: number; comanda: Comanda; items: ItemLocal[]; escandallos: EscandalloReceta[] | null; articulos: Articulo[] | null;
+  onAgregarItem: (item: ItemLocal) => void; onActualizarItem: (item: ItemLocal) => void; onCerrar: (monto: number, metodo: string) => void; onClose: () => void; zonasCocina: string[]; nombreLocal: string;
+  onAccionEncolada: () => void;
+}) {
+  const { user } = useAuth();
+  // Anular un ítem individual (y no solo la comanda completa) es una acción
+  // sensible — un mesero solo no puede "arreglar" la cuenta después de cobrar
+  // en efectivo. Mismo criterio que el backend (AuthContext.exigirRol).
+  const puedeAnular = user?.rol === "DUENO_ADMIN" || user?.rol === "CAJERO_VENDEDOR";
+  // "escandallo:12" (receta) | "articulo:34" (cualquier cosa del inventario,
+  // ej. una lata de refresco que no pasa por receta) | "" (plato libre a mano).
+  const [itemSel, setItemSel] = useState<string>("");
   const [nombrePlato, setNombrePlato] = useState("");
   const [precioManual, setPrecioManual] = useState("");
-  const [estacionManual, setEstacionManual] = useState(ESTACIONES[0]);
+  const [estacionManual, setEstacionManual] = useState(zonasCocina[0]);
   const [cantidad, setCantidad] = useState("1");
+  const [notaNuevoItem, setNotaNuevoItem] = useState("");
   const [agregando, setAgregando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [numeroPersonas, setNumeroPersonas] = useState("2");
   const [division, setDivision] = useState<number[] | null>(null);
+  const [modoDivision, setModoDivision] = useState<"partes_iguales" | "por_plato">("partes_iguales");
+  const [personaPorItem, setPersonaPorItem] = useState<Record<number, number>>({});
+  const [anulandoItemId, setAnulandoItemId] = useState<number | null>(null);
+  const [motivoAnularItem, setMotivoAnularItem] = useState("");
+  const [procesandoAnulacionItem, setProcesandoAnulacionItem] = useState(false);
   const [cerrando, setCerrando] = useState(false);
   const [errorCierre, setErrorCierre] = useState<string | null>(null);
   const [moneda, setMoneda] = useState("USD");
+  // Binance Pay — additivo a propósito: si el negocio no lo activó en
+  // Configuración, ninguno de estos estados se usa y el resto del cobro
+  // (efectivo/tarjeta/etc.) sigue exactamente igual que siempre.
+  const [binanceActivo, setBinanceActivo] = useState(false);
+  const [ordenBinance, setOrdenBinance] = useState<OrdenBinancePay | null>(null);
+  const [generandoBinance, setGenerandoBinance] = useState(false);
+  const [errorBinance, setErrorBinance] = useState<string | null>(null);
+  const [binancePagado, setBinancePagado] = useState(false);
+  // Confirmación tras cobrar — antes la modal se cerraba sola apenas se
+  // procesaba el pago y el PDF se abría automático (sin gesto del usuario),
+  // así que el navegador lo bloqueaba en silencio: parecía que "no dejaba
+  // cobrar" aunque el pago sí se hubiera hecho. Ahora se queda una pantalla
+  // de confirmación con botones reales para ver/imprimir el ticket.
+  const [cobroHecho, setCobroHecho] = useState<{ metodoPago: string; pendienteSync?: boolean } | null>(null);
+  const [abriendoTicket, setAbriendoTicket] = useState(false);
+  const [imprimiendoEscPos, setImprimiendoEscPos] = useState(false);
+
+  const [tasaBcvLocal, setTasaBcvLocal] = useState<TasaCambio | null>(null);
+  const [tasaCopLocal, setTasaCopLocal] = useState<TasaCambio | null>(null);
 
   useEffect(() => {
     obtenerMonedaBaseNegocio().then((r) => setMoneda(r.monedaBase)).catch(() => setError("No se pudo consultar la moneda del negocio"));
+    tasaVigente(tenantId, "USD", "VES").then(setTasaBcvLocal).catch(() => setTasaBcvLocal(null));
+    tasaVigente(tenantId, "USD", "COP").then(setTasaCopLocal).catch(() => setTasaCopLocal(null));
+    obtenerEstadoBinancePay().then((r) => setBinanceActivo(r.activo)).catch(() => setBinanceActivo(false));
   }, [tenantId]);
 
-  const totalLocal = items.reduce((s, i) => s + Number(i.precioUnitario) * i.cantidad, 0);
+  // Mientras hay una orden Binance Pay esperando, se consulta cada 4s si la
+  // comanda ya quedó PAGADA (el cierre real lo hace el webhook del backend,
+  // no este polling — esto solo actualiza la pantalla para que el cajero no
+  // tenga que estar recargando a mano).
+  useEffect(() => {
+    if (!ordenBinance || binancePagado) return;
+    const intervalo = setInterval(() => {
+      obtenerComanda(tenantId, comanda.id).then((c) => {
+        if (c.estado === "PAGADA") {
+          setBinancePagado(true);
+          onCerrar(totalLocal, "BILLETERA_DIGITAL");
+          setCobroHecho({ metodoPago: "BILLETERA_DIGITAL" });
+        }
+      }).catch(() => {});
+    }, 4000);
+    return () => clearInterval(intervalo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordenBinance, binancePagado, comanda.id, tenantId]);
+
+  const handlePagarBinance = async () => {
+    setGenerandoBinance(true);
+    setErrorBinance(null);
+    try {
+      const orden = await pagarComandaConBinance(comanda.id);
+      setOrdenBinance(orden);
+    } catch (e) {
+      setErrorBinance(e instanceof Error ? e.message : "No se pudo generar el cobro con Binance Pay");
+    } finally {
+      setGenerandoBinance(false);
+    }
+  };
+
+  // Los ítems ANULADOS quedan visibles (auditoría) pero nunca cuentan en el
+  // total a cobrar — el backend ya los descontó de comanda.totalConsumo al
+  // anularlos; acá se replica el mismo filtro para que el total mostrado y
+  // el que se le pasa al panel de cobro coincidan siempre.
+  const itemsActivos = items.filter((i) => i.estadoItem !== "ANULADO");
+  const totalLocal = itemsActivos.reduce((s, i) => s + Number(i.precioUnitario) * i.cantidad, 0);
+
+  const [tipoSel, idSelStr] = itemSel.split(":");
+  const escandallo = tipoSel === "escandallo" ? escandallos?.find((e) => String(e.id) === idSelStr) : undefined;
+  const articuloSel = tipoSel === "articulo" ? articulos?.find((a) => String(a.id) === idSelStr) : undefined;
+
+  // Núcleo compartido de "agregar un ítem a la comanda" — extraído de
+  // handleAgregar para que Propina y Descuento (más abajo) reutilicen
+  // exactamente el mismo camino (incluida la cola offline y el manejo de
+  // errores) en vez de duplicar esa lógica. Devuelve true si quedó agregado
+  // (online o encolado sin conexión), false si fue un rechazo real.
+  const agregarItemAComanda = async (datosItem: {
+    escandalloId?: number; articuloId?: number; nombrePlato: string; estacionCocina: string; cantidad: number; precioUnitario: number; notas?: string;
+  }): Promise<boolean> => {
+    const clave = generarClaveIdempotencia();
+    try {
+      const item = await agregarItemComanda(comanda.id, { ...datosItem, claveIdempotencia: clave });
+      onAgregarItem(item);
+      return true;
+    } catch (e) {
+      if (esFalloDeConexion(e)) {
+        // Sin conexión: se agrega de una vez en pantalla (con un id temporal
+        // negativo) para que el mesero pueda seguir tomando el pedido sin
+        // esperar, y se encola para mandarla en cuanto vuelva la señal — ver
+        // offlineQueueHoreca.ts.
+        const tempId = -Date.now();
+        onAgregarItem({
+          id: tempId, tenantId, nombrePlato: datosItem.nombrePlato, estacionCocina: datosItem.estacionCocina,
+          estadoItem: "PENDIENTE", cantidad: datosItem.cantidad, precioUnitario: datosItem.precioUnitario,
+          fechaCreacion: new Date().toISOString(), notas: datosItem.notas, pendienteSync: true,
+        } as ItemLocal);
+        encolarAccion(tenantId, {
+          tipo: "agregar_item", id: String(tempId), claveIdempotencia: clave, comandaId: comanda.id,
+          descripcion: `${datosItem.cantidad}× ${datosItem.nombrePlato} (Mesa ${comanda.numeroMesa ?? comanda.id})`,
+          creadaEn: Date.now(), payload: datosItem,
+        });
+        onAccionEncolada();
+        return true;
+      }
+      setError(e instanceof Error ? e.message : "No se pudo agregar el ítem");
+      return false;
+    }
+  };
 
   const handleAgregar = async () => {
     setError(null);
     const cant = parseInt(cantidad, 10) || 1;
-    const escandallo = escandallos?.find((e) => String(e.id) === escandalloSel);
-    if (!escandallo && !nombrePlato.trim()) { setError("Elige una receta o escribe el nombre del plato"); return; }
-    setAgregando(true);
-    try {
-      const item = await agregarItemComanda(comanda.id, {
-        escandalloId: escandallo?.id,
-        nombrePlato: escandallo ? escandallo.nombrePlato : nombrePlato.trim(),
-        estacionCocina: escandallo ? escandallo.estacionCocina : estacionManual,
-        cantidad: cant,
-        precioUnitario: escandallo ? escandallo.precioVenta : Number(precioManual) || 0,
-      });
-      onAgregarItem(item);
-      setEscandalloSel(""); setNombrePlato(""); setPrecioManual(""); setCantidad("1");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo agregar el ítem");
-    } finally {
-      setAgregando(false);
+    if (!escandallo && !articuloSel && !nombrePlato.trim()) { setError("Elige una receta, un artículo del inventario, o escribe el nombre del plato"); return; }
+    if (articuloSel && cant > Number(articuloSel.stockActual)) {
+      setError(`Solo hay ${Number(articuloSel.stockActual)} ${articuloSel.unidadMedida || "unidades"} de "${articuloSel.nombre}" en inventario`);
+      return;
     }
+    setAgregando(true);
+    const ok = await agregarItemAComanda({
+      escandalloId: escandallo?.id,
+      articuloId: articuloSel?.id,
+      nombrePlato: escandallo ? escandallo.nombrePlato : articuloSel ? articuloSel.nombre : nombrePlato.trim(),
+      estacionCocina: escandallo ? escandallo.estacionCocina : estacionManual,
+      cantidad: cant,
+      precioUnitario: escandallo ? escandallo.precioVenta : articuloSel ? articuloSel.precioVenta : Number(precioManual) || 0,
+      notas: notaNuevoItem.trim() || undefined,
+    });
+    if (ok) { setItemSel(""); setNombrePlato(""); setPrecioManual(""); setCantidad("1"); setNotaNuevoItem(""); }
+    setAgregando(false);
+  };
+
+  // Propina y descuento se agregan como un ítem más de la comanda (mismo
+  // mecanismo de arriba), marcado con estacionCocina "CARGOS" — el mismo
+  // valor centinela que ya usa Venta Rápida para que nunca aparezca como
+  // plato fantasma en el KDS (ver ESTACIONES). Así, sin tocar el backend,
+  // hereda gratis: aparece en el total, se puede anular con motivo, y sale
+  // en el reporte de ventas por mesonero (Resumen General) igual que
+  // cualquier otro renglón de la comanda.
+  const [mostrarPropina, setMostrarPropina] = useState(false);
+  const [tipoPropina, setTipoPropina] = useState<"porcentaje" | "monto">("porcentaje");
+  const [valorPropina, setValorPropina] = useState("10");
+  const [agregandoPropina, setAgregandoPropina] = useState(false);
+  const [mostrarDescuento, setMostrarDescuento] = useState(false);
+  const [motivoDescuento, setMotivoDescuento] = useState("");
+  const [tipoDescuento, setTipoDescuento] = useState<"porcentaje" | "monto">("porcentaje");
+  const [valorDescuento, setValorDescuento] = useState("");
+  const [agregandoDescuento, setAgregandoDescuento] = useState(false);
+
+  const handleAgregarPropina = async () => {
+    setError(null);
+    const valor = Number(valorPropina);
+    if (!valor || valor <= 0) { setError("Indica un valor de propina mayor a cero"); return; }
+    const monto = tipoPropina === "porcentaje" ? totalLocal * (valor / 100) : valor;
+    setAgregandoPropina(true);
+    const ok = await agregarItemAComanda({
+      nombrePlato: "Propina", estacionCocina: "CARGOS", cantidad: 1,
+      precioUnitario: Number(monto.toFixed(2)),
+      notas: tipoPropina === "porcentaje" ? `${valor}% del consumo` : "Monto fijo",
+    });
+    if (ok) { setMostrarPropina(false); setValorPropina("10"); }
+    setAgregandoPropina(false);
+  };
+
+  const handleAgregarDescuento = async () => {
+    setError(null);
+    const valor = Number(valorDescuento);
+    if (!valor || valor <= 0) { setError("Indica un valor de descuento mayor a cero"); return; }
+    if (!motivoDescuento.trim()) { setError("Indica el motivo del descuento"); return; }
+    const monto = tipoDescuento === "porcentaje" ? totalLocal * (valor / 100) : valor;
+    if (monto > totalLocal) { setError("El descuento no puede ser mayor al total de la comanda"); return; }
+    setAgregandoDescuento(true);
+    const ok = await agregarItemAComanda({
+      nombrePlato: `Descuento: ${motivoDescuento.trim()}`, estacionCocina: "CARGOS", cantidad: 1,
+      precioUnitario: -Number(monto.toFixed(2)),
+      notas: tipoDescuento === "porcentaje" ? `${valor}% del consumo` : "Monto fijo",
+    });
+    if (ok) { setMostrarDescuento(false); setMotivoDescuento(""); setValorDescuento(""); }
+    setAgregandoDescuento(false);
+  };
+
+  const handleAnularItem = async (itemId: number) => {
+    if (!motivoAnularItem.trim()) { setError("Indica el motivo de la anulación"); return; }
+    setProcesandoAnulacionItem(true);
+    setError(null);
+    try {
+      const actualizado = await anularItemComanda(itemId, { motivo: motivoAnularItem.trim(), usuario: user?.nombre });
+      onActualizarItem(actualizado);
+      setAnulandoItemId(null);
+      setMotivoAnularItem("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo anular el ítem");
+    } finally {
+      setProcesandoAnulacionItem(false);
+    }
+  };
+
+  // División por plato: cada quien paga exactamente lo que pidió, en vez de
+  // partes iguales — se calcula 100% en el navegador (no hay endpoint nuevo)
+  // y se alimenta al mismo PanelCobroMixto que ya sabe recibir un arreglo de
+  // montos ya divididos. El residuo de redondeo se lo lleva la última
+  // persona con ítems asignados, igual que hace el backend en dividirCuenta.
+  const handleDividirPorPlato = () => {
+    setError(null);
+    const asignados = itemsActivos.filter((it) => personaPorItem[it.id]);
+    if (asignados.length !== itemsActivos.length) {
+      setError("Asigna una persona a cada plato antes de dividir por ítem");
+      return;
+    }
+    const personas = Array.from(new Set(itemsActivos.map((it) => personaPorItem[it.id]))).sort((a, b) => a - b);
+    if (personas.length < 2) { setError("Asigna al menos 2 personas distintas para dividir por ítem"); return; }
+    const centavosPorPersona: Record<number, number> = {};
+    for (const p of personas) centavosPorPersona[p] = 0;
+    for (const it of itemsActivos) {
+      centavosPorPersona[personaPorItem[it.id]] += Math.round(Number(it.precioUnitario) * it.cantidad * 100);
+    }
+    const totalCentavos = Math.round(totalLocal * 100);
+    const sumaAsignada = Object.values(centavosPorPersona).reduce((a, b) => a + b, 0);
+    // Absorbe cualquier diferencia de redondeo (siempre debería ser 0, es solo defensivo).
+    centavosPorPersona[personas[personas.length - 1]] += totalCentavos - sumaAsignada;
+    setDivision(personas.map((p) => centavosPorPersona[p] / 100));
   };
 
   const handleDividir = async () => {
@@ -1898,23 +2667,142 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
   const handleCerrar = async (pagos: PagoParcial[], monedaVuelto: string) => {
     setCerrando(true);
     setErrorCierre(null);
+    const clave = generarClaveIdempotencia();
     try {
-      const resultado = await cerrarComandaMixto(comanda.id, pagos, monedaVuelto);
-      try {
-        const blob = await descargarTicketComanda(tenantId, comanda.id);
-        const url = URL.createObjectURL(blob);
-        window.open(url, "_blank");
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
-      } catch {
-        // El cobro ya se procesó — si el recibo falla al generarse no debe bloquear el cierre.
-      }
+      const resultado = await cerrarComandaMixto(comanda.id, pagos, monedaVuelto, clave);
       onCerrar(totalLocal, resultado.comanda.metodoPago || "MIXTO");
+      // No se abre el PDF solo ni se cierra la modal acá — eso pasaba antes
+      // "de una" (sin clic del usuario) y el navegador lo bloqueaba en
+      // silencio. Ahora queda la pantalla de confirmación con el botón real.
+      setCobroHecho({ metodoPago: resultado.comanda.metodoPago || "MIXTO" });
     } catch (e) {
-      setErrorCierre(e instanceof Error ? e.message : "No se pudo cerrar la comanda");
+      if (esFalloDeConexion(e)) {
+        // Sin conexión: el cobro NO se marca como confirmado con el servidor
+        // (la mesa sigue "ocupada" hasta sincronizar, a propósito — evita que
+        // alguien abra otra comanda en la misma mesa creyendo que ya está
+        // libre). Igual se puede imprimir/entregar el ticket ya mismo, porque
+        // el ticket se arma con los datos locales, no con la respuesta del
+        // servidor. onCerrar() (que actualiza ventas del día, etc.) se
+        // dispara recién cuando la cola logre sincronizar este cobro.
+        encolarAccion(tenantId, {
+          tipo: "cobrar_comanda", id: clave, claveIdempotencia: clave, comandaId: comanda.id,
+          descripcion: `Cobro Mesa ${comanda.numeroMesa ?? comanda.id} ($${totalLocal.toFixed(2)})`,
+          creadaEn: Date.now(), payload: { pagos, monedaVuelto },
+        });
+        onAccionEncolada();
+        setCobroHecho({ metodoPago: pagos.length === 1 ? pagos[0].metodoPago : "MIXTO", pendienteSync: true });
+      } else {
+        setErrorCierre(e instanceof Error ? e.message : "No se pudo cerrar la comanda");
+      }
     } finally {
       setCerrando(false);
     }
   };
+
+  const verTicket = async () => {
+    setAbriendoTicket(true);
+    setErrorCierre(null);
+    try {
+      const blob = await descargarTicketComanda(tenantId, comanda.id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (e) {
+      setErrorCierre(e instanceof Error ? e.message : "No se pudo generar el ticket en PDF");
+    } finally {
+      setAbriendoTicket(false);
+    }
+  };
+
+  // Impresora térmica por Web Serial — mismo patrón que VentaRapida.imprimirEscPos:
+  // requiere gesto del usuario (el clic) para pedir permiso del puerto USB/serial.
+  const imprimirEscPos = async () => {
+    setImprimiendoEscPos(true);
+    setErrorCierre(null);
+    try {
+      const nav = navigator as Navigator & { serial?: { requestPort: () => Promise<any> } };
+      if (!nav.serial) {
+        throw new Error("Este navegador no soporta impresión térmica directa (Web Serial) — usa Chrome o Edge, o imprime el PDF.");
+      }
+      const bytes = await descargarTicketEscPos(tenantId, comanda.id);
+      const port = await nav.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      const writer = port.writable.getWriter();
+      await writer.write(bytes);
+      writer.releaseLock();
+      await port.close();
+    } catch (e) {
+      setErrorCierre(e instanceof Error ? e.message : "No se pudo imprimir en la térmica");
+    } finally {
+      setImprimiendoEscPos(false);
+    }
+  };
+
+  if (cobroHecho) {
+    return (
+      <Modal onClose={onClose} titulo="Mesa cobrada">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ${cobroHecho.pendienteSync ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-teal-500/15 text-teal-600 dark:text-teal-400"}`}>
+              <IconCheckCircle size={22} />
+            </div>
+            <div>
+              <div className="font-['Outfit'] font-bold text-slate-900 dark:text-white">{cobroHecho.pendienteSync ? "Cobro guardado (sin conexión)" : "Cobro exitoso"}</div>
+              <div className="text-xs text-slate-500 dark:text-white/40">Mesa {comanda.numeroMesa ?? "s/n"} · COM-{comanda.id}</div>
+            </div>
+          </div>
+          {cobroHecho.pendienteSync && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/25 rounded-lg p-2.5 leading-relaxed">
+              Sin conexión — este cobro quedó guardado en este dispositivo y se enviará solo apenas vuelva la señal. Puedes imprimir/entregar el ticket ya mismo con total confianza.
+            </p>
+          )}
+          <div className="flex items-center justify-between font-bold text-slate-900 dark:text-white pt-2 border-t border-slate-300/50 dark:border-white/10">
+            <span>Total cobrado</span><span className="font-mono">${totalLocal.toFixed(2)}</span>
+          </div>
+          <div className="text-xs text-slate-700 dark:text-white/80 font-medium">Pagado con: <span className="font-bold text-slate-900 dark:text-white">{cobroHecho.metodoPago.replace(/_/g, " ")}</span></div>
+
+          {errorCierre && <p className="text-xs text-red-500">{errorCierre}</p>}
+
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={() => {
+                const tBs = tasaBcvLocal && Number(tasaBcvLocal.tasa) > 0 ? totalLocal * Number(tasaBcvLocal.tasa) : undefined;
+                const tCop = tasaCopLocal && Number(tasaCopLocal.tasa) > 0 ? totalLocal * Number(tasaCopLocal.tasa) : undefined;
+                imprimirTicketTermicoDirecto({
+                  nombreLocal,
+                  comandaId: comanda.id,
+                  fecha: new Date().toLocaleString("es-VE"),
+                  canal: comanda.canal,
+                  lineas: itemsActivos.map((it) => ({ nombre: it.nombrePlato, cantidad: it.cantidad, precio: Number(it.precioUnitario) })),
+                  subtotal: totalLocal,
+                  total: totalLocal,
+                  totalBs: tBs,
+                  totalCop: tCop,
+                  metodoPago: cobroHecho.metodoPago,
+                });
+              }}
+              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-3 rounded-xl cursor-pointer shadow-md flex items-center justify-center gap-1.5 transition-all"
+              title="Imprime en impresora térmica de 58mm u 80mm en 1 clic"
+            >
+              <IconPrinter size={15} />
+              <span>Ticket 80mm</span>
+            </button>
+            <button onClick={verTicket} disabled={abriendoTicket}
+              className="flex-1 g-aurora text-white text-xs font-semibold py-3 rounded-xl cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5">
+              <IconFileText size={15} />
+              <span>{abriendoTicket ? "Generando…" : "PDF"}</span>
+            </button>
+            <button onClick={imprimirEscPos} disabled={imprimiendoEscPos} title="Imprime directo a impresora térmica USB por Web Serial"
+              className="flex-1 apple-glass-btn text-xs font-semibold py-3 rounded-xl cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5">
+              <IconTerminal size={15} />
+              <span>{imprimiendoEscPos ? "Imprimiendo…" : "Térmica USB"}</span>
+            </button>
+          </div>
+          <button onClick={onClose} className="w-full btn-cyber-neon text-white text-sm font-bold py-3 rounded-xl cursor-pointer">Listo, cerrar mesa</button>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal onClose={onClose} titulo={`Comanda — Mesa ${comanda.numeroMesa ?? "s/n"} (${comanda.canal})`} ancho="max-w-2xl">
@@ -1925,15 +2813,53 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
         <div className="space-y-2">
           {items.length === 0 ? (
             <p className="text-xs text-slate-400">Sin ítems agregados todavía.</p>
-          ) : items.map((it, idx) => (
-            <div key={idx} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3.5 py-2.5 text-sm">
-              <div>
-                <span className="font-semibold text-slate-900 dark:text-white">{it.cantidad}× {it.nombrePlato}</span>
-                <span className="text-[10px] ml-2 px-1.5 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-300">{it.estadoItem}</span>
+          ) : items.map((it) => {
+            const anulado = it.estadoItem === "ANULADO";
+            const esCargo = it.estacionCocina === "CARGOS";
+            const esDescuento = esCargo && Number(it.precioUnitario) < 0;
+            const montoLinea = Number(it.precioUnitario) * it.cantidad;
+            return (
+            <div key={it.id} className={`rounded-xl px-3.5 py-2.5 text-sm ${anulado ? "bg-red-500/5 border border-red-500/20" : "bg-slate-100/60 dark:bg-white/5"}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className={anulado ? "opacity-60" : ""}>
+                  <span className={`font-semibold text-slate-900 dark:text-white ${anulado ? "line-through" : ""}`}>{esCargo ? it.nombrePlato : `${it.cantidad}× ${it.nombrePlato}`}</span>
+                  <span className={`text-[10px] ml-2 px-1.5 py-0.5 rounded-full ${anulado ? "bg-red-500/15 text-red-500" : esDescuento ? "bg-teal-500/15 text-teal-600 dark:text-teal-300" : esCargo ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-teal-500/15 text-teal-600 dark:text-teal-300"}`}>
+                    {anulado ? "ANULADO" : esDescuento ? "DESCUENTO" : esCargo ? "PROPINA" : it.estadoItem}
+                  </span>
+                  {it.pendienteSync && <span className="text-[10px] ml-1.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400" title="Guardado sin conexión, se sincroniza solo">⏳ sin sincronizar</span>}
+                  {it.notas && !anulado && <div className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">↳ {it.notas}</div>}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`font-mono ${anulado ? "line-through opacity-60 text-slate-600 dark:text-white/60" : esDescuento ? "text-teal-600 dark:text-teal-400" : "text-slate-600 dark:text-white/60"}`}>
+                    {montoLinea < 0 ? "-" : ""}${Math.abs(montoLinea).toFixed(2)}
+                  </span>
+                  {!anulado && !it.pendienteSync && puedeAnular && (
+                    <button onClick={() => { setAnulandoItemId(anulandoItemId === it.id ? null : it.id); setMotivoAnularItem(""); setError(null); }}
+                      title="Anular este ítem" className="w-6 h-6 rounded-full flex items-center justify-center text-red-400 hover:bg-red-500/15 hover:text-red-500 cursor-pointer">
+                      <IconClose size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
-              <span className="font-mono text-slate-600 dark:text-white/60">${(Number(it.precioUnitario) * it.cantidad).toFixed(2)}</span>
+              {anulado && (
+                <div className="text-[10px] text-red-500/80 mt-1">
+                  Anulado{it.usuarioAnulacion ? ` por ${it.usuarioAnulacion}` : ""}: {it.motivoAnulacion}
+                </div>
+              )}
+              {anulandoItemId === it.id && (
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-red-500/20">
+                  <input value={motivoAnularItem} onChange={(e) => setMotivoAnularItem(e.target.value)} autoFocus
+                    placeholder="Motivo de la anulación (obligatorio)" className="input-horeca text-xs flex-1 !py-1.5" />
+                  <button onClick={() => handleAnularItem(it.id)} disabled={procesandoAnulacionItem}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500 text-white cursor-pointer disabled:opacity-60 flex-shrink-0">
+                    {procesandoAnulacionItem ? "Anulando…" : "Confirmar"}
+                  </button>
+                  <button onClick={() => { setAnulandoItemId(null); setMotivoAnularItem(""); }} className="text-xs font-semibold text-slate-500 cursor-pointer flex-shrink-0">Cancelar</button>
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
           <div className="flex items-center justify-between pt-2 border-t border-slate-300/50 dark:border-white/10 font-bold text-slate-900 dark:text-white">
             <span>Total</span><span className="font-mono">${totalLocal.toFixed(2)}</span>
           </div>
@@ -1941,24 +2867,37 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
 
         {/* Agregar item */}
         <div className="apple-glass rounded-xl p-4 space-y-2.5">
-          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Agregar plato</p>
-          <select value={escandalloSel} onChange={(e) => setEscandalloSel(e.target.value)} className="input-horeca">
-            <option value="">— Plato libre (escribir nombre) —</option>
-            {(escandallos || []).filter((e) => e.activo !== false).map((e) => (
-              <option key={e.id} value={e.id}>{e.nombrePlato} · ${Number(e.precioVenta).toFixed(2)}</option>
-            ))}
-          </select>
-          {!escandalloSel && (
+          <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Agregar plato o artículo</p>
+          <Campo label="Buscar plato o artículo">
+            <BuscadorPlatoComanda escandallos={escandallos} articulos={articulos} itemSel={itemSel} onSeleccionar={setItemSel} />
+          </Campo>
+          {articuloSel && (
+            <p className="text-[10px] text-slate-400">
+              Se descuenta directo del inventario — quedan {Number(articuloSel.stockActual)} {articuloSel.unidadMedida || "unidades"} de "{articuloSel.nombre}".
+            </p>
+          )}
+          {!itemSel && (
             <div className="grid grid-cols-3 gap-2">
-              <input value={nombrePlato} onChange={(e) => setNombrePlato(e.target.value)} placeholder="Nombre del plato" className="input-horeca" />
-              <input value={precioManual} onChange={(e) => setPrecioManual(e.target.value)} placeholder="Precio $" type="number" step="0.01" className="input-horeca" />
-              <select value={estacionManual} onChange={(e) => setEstacionManual(e.target.value)} className="input-horeca" title="A qué estación de cocina va este plato">
-                {ESTACIONES.map((e) => <option key={e} value={e}>{e.replace("_", " ")}</option>)}
-              </select>
+              <Campo label="Nombre del plato">
+                <input value={nombrePlato} onChange={(e) => setNombrePlato(e.target.value)} placeholder="Nombre del plato" className="input-horeca w-full" />
+              </Campo>
+              <Campo label="Precio">
+                <input value={precioManual} onChange={(e) => setPrecioManual(e.target.value)} placeholder="Precio $" type="number" step="0.01" className="input-horeca w-full" />
+              </Campo>
+              <Campo label="Estación de cocina">
+                <select value={estacionManual} onChange={(e) => setEstacionManual(e.target.value)} className="input-horeca w-full" title="A qué estación de cocina va este plato">
+                  {zonasCocina.map((e) => <option key={e} value={e}>{e.replace(/_/g, " ")}</option>)}
+                </select>
+              </Campo>
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} type="number" min="1" className="input-horeca w-20" />
+          <Campo label="Nota para cocina (opcional)">
+            <input value={notaNuevoItem} onChange={(e) => setNotaNuevoItem(e.target.value)} placeholder='Ej. "Sin cebolla", "Término 3/4", "Extra queso"' className="input-horeca w-full" />
+          </Campo>
+          <div className="flex items-end gap-2">
+            <Campo label="Cantidad">
+              <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} type="number" min="1" className="input-horeca w-20" />
+            </Campo>
             <button onClick={handleAgregar} disabled={agregando} className="flex-1 g-aurora text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
               {agregando ? "Agregando…" : "+ Agregar a la comanda"}
             </button>
@@ -1967,16 +2906,140 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
 
         {error && <p className="text-xs text-red-500">{error}</p>}
 
-        {/* Dividir cuenta */}
-        <div className="flex items-center gap-2">
-          <input value={numeroPersonas} onChange={(e) => setNumeroPersonas(e.target.value)} type="number" min="1" className="input-horeca w-20" />
-          <button onClick={handleDividir} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">Dividir cuenta</button>
-          {division && <span className="text-xs text-teal-600 dark:text-teal-300">{division.map((d) => `$${d.toFixed(2)}`).join(" · ")}</span>}
+        {/* Propina y descuento — botones rápidos que agregan un renglón más a la comanda */}
+        <div className="flex gap-2">
+          <button type="button" onClick={() => { setMostrarPropina((v) => !v); setMostrarDescuento(false); }}
+            className={`flex-1 text-xs font-semibold py-2 rounded-xl cursor-pointer transition-all ${mostrarPropina ? "bg-teal-600 text-white" : "apple-glass-btn text-slate-700 dark:text-white/70"}`}>
+            + Propina
+          </button>
+          <button type="button" onClick={() => { setMostrarDescuento((v) => !v); setMostrarPropina(false); }}
+            className={`flex-1 text-xs font-semibold py-2 rounded-xl cursor-pointer transition-all ${mostrarDescuento ? "bg-teal-600 text-white" : "apple-glass-btn text-slate-700 dark:text-white/70"}`}>
+            + Descuento
+          </button>
         </div>
+
+        {mostrarPropina && (
+          <div className="apple-glass rounded-xl p-4 space-y-2.5">
+            <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Agregar propina</p>
+            <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+              {([{ id: "porcentaje", label: "% del consumo" }, { id: "monto", label: "Monto fijo $" }] as const).map((t) => (
+                <button key={t.id} type="button" onClick={() => setTipoPropina(t.id)}
+                  className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${tipoPropina === t.id ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            {tipoPropina === "porcentaje" && (
+              <div className="flex gap-1.5">
+                {[10, 15, 20].map((p) => (
+                  <button key={p} type="button" onClick={() => setValorPropina(String(p))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${valorPropina === String(p) ? "bg-teal-600 text-white" : "bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/60"}`}>
+                    {p}%
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <Campo label={tipoPropina === "porcentaje" ? "Porcentaje" : "Monto ($)"}>
+                <input value={valorPropina} onChange={(e) => setValorPropina(e.target.value)} type="number" min="0" step="0.01" className="input-horeca w-28" />
+              </Campo>
+              <button onClick={handleAgregarPropina} disabled={agregandoPropina} className="flex-1 g-aurora text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+                {agregandoPropina ? "Agregando…" : "Agregar propina"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mostrarDescuento && (
+          <div className="apple-glass rounded-xl p-4 space-y-2.5">
+            <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Aplicar descuento</p>
+            <Campo label="Motivo">
+              <input value={motivoDescuento} onChange={(e) => setMotivoDescuento(e.target.value)} placeholder='Ej. "Cliente frecuente", "Cortesía", "Promoción"' className="input-horeca w-full" />
+            </Campo>
+            <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+              {([{ id: "porcentaje", label: "% del consumo" }, { id: "monto", label: "Monto fijo $" }] as const).map((t) => (
+                <button key={t.id} type="button" onClick={() => setTipoDescuento(t.id)}
+                  className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${tipoDescuento === t.id ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-end gap-2">
+              <Campo label={tipoDescuento === "porcentaje" ? "Porcentaje" : "Monto ($)"}>
+                <input value={valorDescuento} onChange={(e) => setValorDescuento(e.target.value)} type="number" min="0" step="0.01" className="input-horeca w-28" />
+              </Campo>
+              <button onClick={handleAgregarDescuento} disabled={agregandoDescuento} className="flex-1 g-aurora text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+                {agregandoDescuento ? "Aplicando…" : "Aplicar descuento"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Dividir cuenta */}
+        <div className="apple-glass rounded-xl p-4 space-y-2.5">
+          <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+            {([{ id: "partes_iguales", label: "Partes iguales" }, { id: "por_plato", label: "Por plato" }] as const).map((m) => (
+              <button key={m.id} onClick={() => { setModoDivision(m.id); setDivision(null); setError(null); }}
+                className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${modoDivision === m.id ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {modoDivision === "partes_iguales" ? (
+            <div className="flex items-center gap-2">
+              <input value={numeroPersonas} onChange={(e) => setNumeroPersonas(e.target.value)} type="number" min="1" className="input-horeca w-20" />
+              <button onClick={handleDividir} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">Dividir cuenta</button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[10px] text-slate-400">Asigna un número de persona a cada plato — cada quien paga lo que pidió.</p>
+              {itemsActivos.map((it) => (
+                <div key={it.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-slate-700 dark:text-white/70 truncate">{it.cantidad}× {it.nombrePlato}</span>
+                  <input
+                    value={personaPorItem[it.id] ?? ""}
+                    onChange={(e) => setPersonaPorItem((prev) => ({ ...prev, [it.id]: parseInt(e.target.value, 10) || 0 }))}
+                    type="number" min="1" placeholder="N° persona" className="input-horeca w-24 !py-1"
+                  />
+                </div>
+              ))}
+              <button onClick={handleDividirPorPlato} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">Calcular división por plato</button>
+            </div>
+          )}
+          {division && <p className="text-xs text-teal-600 dark:text-teal-300 font-semibold">{division.map((d, i) => `Persona ${i + 1}: $${d.toFixed(2)}`).join(" · ")}</p>}
+        </div>
+
+        {/* Binance Pay — solo aparece si el negocio lo activó en Configuración. */}
+        {items.length > 0 && binanceActivo && (
+          <div className="apple-glass rounded-xl p-4 space-y-2.5 border border-amber-500/25">
+            <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider flex items-center gap-1.5">
+              <IconCoins size={14} className="text-amber-500" /> Cobrar con Binance Pay
+            </p>
+            {!ordenBinance ? (
+              <button onClick={handlePagarBinance} disabled={generandoBinance}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+                {generandoBinance ? "Generando cobro…" : `Generar cobro Binance Pay — $${totalLocal.toFixed(2)}`}
+              </button>
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-center">
+                {ordenBinance.qrcodeLink && <img src={ordenBinance.qrcodeLink} alt="QR de pago Binance" className="w-40 h-40 rounded-lg border border-slate-300/50 dark:border-white/10" />}
+                {ordenBinance.checkoutUrl && (
+                  <a href={ordenBinance.checkoutUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-amber-600 dark:text-amber-400 underline">
+                    Abrir en Binance →
+                  </a>
+                )}
+                <p className="text-[11px] text-slate-500 dark:text-white/40 flex items-center gap-1.5">
+                  <IconHourglass size={12} /> Esperando confirmación del cliente — esto se actualiza solo, no cierres esta ventana.
+                </p>
+              </div>
+            )}
+            {errorBinance && <p className="text-xs text-red-500">{errorBinance}</p>}
+          </div>
+        )}
 
         {/* Cerrar comanda */}
         {items.length > 0 && (
-          <PanelCobroMixto tenantId={tenantId} total={totalLocal} monedaBase={moneda} procesando={cerrando} error={errorCierre} onCobrar={handleCerrar} />
+          <PanelCobroMixto tenantId={tenantId} total={totalLocal} monedaBase={moneda} procesando={cerrando} error={errorCierre} onCobrar={handleCerrar} montosDivididos={division} />
         )}
       </div>
     </Modal>
@@ -1986,10 +3049,90 @@ function ComandaDetalle({ tenantId, comanda, items, escandallos, onAgregarItem, 
 // ══════════════════════════════════════════════════════════════════════════
 // COCINA (KDS)
 // ══════════════════════════════════════════════════════════════════════════
-function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void }) {
-  const [estacion, setEstacion] = useState(ESTACIONES[0]);
-  const [items, setItems] = useState<ItemComanda[] | null>(null);
+function Cocina({ tenantId, onCambio, zonasCocina, onZonasCocinaGuardadas, nombreLocal }: { tenantId: number; onCambio: () => void; zonasCocina: string[]; onZonasCocinaGuardadas: () => void; nombreLocal: string }) {
+  const { user } = useAuth();
+  const esDueno = user?.rol === "DUENO_ADMIN";
+  const [estacion, setEstacion] = useState(zonasCocina[0]);
+  const [items, setItems] = useState<ItemKds[] | null>(null);
   const [ahora, setAhora] = useState(() => Date.now());
+  // Impresión por estación (Web Serial) — ver impresorasCocina.ts. Cada
+  // zona guarda SU PROPIA impresora vinculada, para que Parrilla y Bar
+  // impriman en dispositivos físicos distintos sin que nadie tenga que
+  // andar leyendo una tablet en plena hora pico.
+  const [impresoras, setImpresoras] = useState<ImpresoraGuardada[]>([]);
+  const [imprimiendo, setImprimiendo] = useState(false);
+  const [errorImpresion, setErrorImpresion] = useState<string | null>(null);
+  useEffect(() => { setImpresoras(listarImpresoras(tenantId)); }, [tenantId, estacion]);
+  const impresoraDeEstacion = impresoras.find((i) => i.estacion === estacion);
+
+  const handleVincularImpresora = async () => {
+    setErrorImpresion(null);
+    try {
+      await vincularImpresora(tenantId, estacion);
+      setImpresoras(listarImpresoras(tenantId));
+    } catch (e) {
+      setErrorImpresion(e instanceof Error ? e.message : "No se pudo vincular la impresora");
+    }
+  };
+
+  const handleImprimirEstacion = async () => {
+    setErrorImpresion(null);
+    setImprimiendo(true);
+    try {
+      await imprimirEnEstacion(tenantId, estacion, nombreLocal, (items || []).map((i) => ({
+        cantidad: Number(i.cantidad), nombrePlato: i.nombrePlato, numeroMesa: i.numeroMesa, mesero: i.mesero, notas: i.notas,
+      })));
+    } catch (e) {
+      setErrorImpresion(e instanceof Error ? e.message : "No se pudo imprimir");
+    } finally {
+      setImprimiendo(false);
+    }
+  };
+  // Edición de zonas justo acá — antes solo vivía en Configuración, escondida
+  // de donde el dueño realmente la necesita (cada negocio tiene sus propias
+  // estaciones, "Bar" no le sirve a todo el mundo).
+  const [editandoZonas, setEditandoZonas] = useState(false);
+  const [nuevaZona, setNuevaZona] = useState("");
+  const [guardandoZona, setGuardandoZona] = useState(false);
+  const [errorZona, setErrorZona] = useState<string | null>(null);
+
+  const agregarZona = async () => {
+    const nombre = nuevaZona.trim().toUpperCase().replace(/\s+/g, "_");
+    if (!nombre || zonasCocina.includes(nombre)) { setNuevaZona(""); return; }
+    setGuardandoZona(true);
+    setErrorZona(null);
+    try {
+      await actualizarZonasCocina([...zonasCocina, nombre]);
+      onZonasCocinaGuardadas();
+      setNuevaZona("");
+    } catch (e) {
+      setErrorZona(e instanceof Error ? e.message : "No se pudo agregar la zona");
+    } finally {
+      setGuardandoZona(false);
+    }
+  };
+
+  const eliminarZona = async (zona: string) => {
+    if (zonasCocina.length <= 1) { setErrorZona("Debe quedar al menos una zona"); return; }
+    setGuardandoZona(true);
+    setErrorZona(null);
+    try {
+      await actualizarZonasCocina(zonasCocina.filter((z) => z !== zona));
+      onZonasCocinaGuardadas();
+    } catch (e) {
+      setErrorZona(e instanceof Error ? e.message : "No se pudo eliminar la zona");
+    } finally {
+      setGuardandoZona(false);
+    }
+  };
+
+  // Si las zonas configuradas cambian (ej. las trajo el fetch después del
+  // primer render, o el dueño acaba de editarlas en Configuración) y la
+  // pestaña activa ya no existe, se cae a la primera disponible.
+  useEffect(() => {
+    if (zonasCocina.length > 0 && !zonasCocina.includes(estacion)) setEstacion(zonasCocina[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zonasCocina]);
 
   const cargar = () => {
     obtenerTableroKds(estacion).then(setItems).catch(() => setItems([]));
@@ -2001,16 +3144,16 @@ function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void
     return () => clearInterval(id);
   }, []);
 
-  const minutosEnEspera = (item: ItemComanda) => Math.max(0, Math.floor((ahora - new Date(item.fechaCreacion).getTime()) / 60000));
+  const minutosEnEspera = (item: ItemKds) => Math.max(0, Math.floor((ahora - new Date(item.fechaCreacion).getTime()) / 60000));
   const estiloPorTiempo = (min: number) =>
     min >= 10 ? "bg-red-500/15 border border-red-500/40 hover:bg-red-500/25"
     : min >= 5 ? "bg-amber-500/15 border border-amber-500/40 hover:bg-amber-500/25"
     : "bg-slate-100/60 dark:bg-white/5 border border-transparent hover:bg-teal-500/10";
   const colorTexto = (min: number) => (min >= 10 ? "text-red-600 dark:text-red-300" : min >= 5 ? "text-amber-600 dark:text-amber-300" : "text-slate-500 dark:text-white/40");
 
-  const avanzar = async (item: ItemComanda) => {
+  const avanzar = async (item: ItemKds) => {
     const siguiente: Record<EstadoItemComanda, EstadoItemComanda | null> = {
-      PENDIENTE: "PREPARANDO", PREPARANDO: "LISTO", LISTO: "ENTREGADO", ENTREGADO: null,
+      PENDIENTE: "PREPARANDO", PREPARANDO: "LISTO", LISTO: "ENTREGADO", ENTREGADO: null, ANULADO: null,
     };
     const next = siguiente[item.estadoItem];
     if (!next) return;
@@ -2030,13 +3173,63 @@ function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 flex-wrap">
-        {ESTACIONES.map((e) => (
-          <button key={e} onClick={() => setEstacion(e)}
-            className={`px-4 py-2 rounded-full text-xs font-semibold cursor-pointer transition-all ${estacion === e ? "g-aurora text-white" : "bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50"}`}>
-            {e.replace("_", " ")}
-          </button>
+        {zonasCocina.map((e) => (
+          editandoZonas && esDueno ? (
+            <div key={e} className="flex items-center gap-1 pl-4 pr-1.5 py-1.5 rounded-full text-xs font-semibold bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/60">
+              {e.replace(/_/g, " ")}
+              <button type="button" onClick={() => eliminarZona(e)} disabled={guardandoZona} title="Eliminar zona"
+                className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-red-500/20 hover:text-red-500 cursor-pointer disabled:opacity-40">
+                <IconClose size={11} />
+              </button>
+            </div>
+          ) : (
+            <button key={e} onClick={() => setEstacion(e)}
+              className={`px-4 py-2 rounded-full text-xs font-semibold cursor-pointer transition-all ${estacion === e ? "g-aurora text-white" : "bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50"}`}>
+              {e.replace(/_/g, " ")}
+            </button>
+          )
         ))}
+        {editandoZonas && esDueno && (
+          <div className="flex items-center gap-1.5">
+            <input
+              value={nuevaZona}
+              onChange={(ev) => setNuevaZona(ev.target.value)}
+              onKeyDown={(ev) => { if (ev.key === "Enter") agregarZona(); }}
+              placeholder="Ej. SUSHI"
+              className="input-horeca text-xs !py-2 !w-32"
+            />
+            <button type="button" onClick={agregarZona} disabled={guardandoZona || !nuevaZona.trim()}
+              className="apple-glass-btn text-xs font-semibold px-3 py-2 rounded-full cursor-pointer disabled:opacity-50">
+              + Agregar
+            </button>
+          </div>
+        )}
+        {esDueno && (
+          <button
+            type="button"
+            onClick={() => setEditandoZonas((v) => !v)}
+            className={`px-3 py-2 rounded-full text-xs font-semibold cursor-pointer transition-all ${editandoZonas ? "bg-teal-600 text-white" : "text-teal-600 dark:text-teal-400 hover:bg-teal-500/10"}`}
+          >
+            {editandoZonas ? "✓ Listo" : "✎ Editar zonas"}
+          </button>
+        )}
       </div>
+      {errorZona && <p className="text-xs text-red-500">{errorZona}</p>}
+
+      {/* Impresión térmica de esta estación — cada zona tiene su propia
+          impresora vinculada (ver impresorasCocina.ts), para que Parrilla y
+          Bar impriman en dispositivos físicos distintos. */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button type="button" onClick={handleImprimirEstacion} disabled={imprimiendo || (items || []).length === 0}
+          className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer disabled:opacity-50">
+          <IconPrinter size={14} />
+          {imprimiendo ? "Imprimiendo…" : `Imprimir estación ${estacion.replace(/_/g, " ")}`}
+        </button>
+        <button type="button" onClick={handleVincularImpresora} className="text-[11px] font-semibold text-slate-500 dark:text-white/50 hover:text-teal-600 dark:hover:text-teal-400 cursor-pointer">
+          {impresoraDeEstacion ? `Impresora vinculada (${impresoraDeEstacion.etiqueta}) — cambiar` : "Vincular impresora a esta estación"}
+        </button>
+      </div>
+      {errorImpresion && <p className="text-xs text-red-500">{errorImpresion}</p>}
 
       {items === null ? (
         <p className="text-sm text-slate-400">Cargando tablero…</p>
@@ -2056,6 +3249,11 @@ function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void
                       <div className="font-semibold text-sm text-slate-900 dark:text-white">{i.cantidad}× {i.nombrePlato}</div>
                       <div className={`text-[10px] font-mono font-bold whitespace-nowrap ${colorTexto(min)}`}>{min} min</div>
                     </div>
+                    <div className="text-[10px] text-slate-500 dark:text-white/40 mt-0.5">
+                      {i.numeroMesa != null ? `Mesa ${i.numeroMesa}` : i.canal === "RECOGER_EN_TIENDA" ? "Mostrador" : i.canal === "DELIVERY_PROPIO" ? "Delivery" : "Sin mesa"}
+                      {i.mesero && ` · ${i.mesero}`}
+                    </div>
+                    {i.notas && <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">↳ {i.notas}</div>}
                   </button>
                 );
               })}
@@ -2068,10 +3266,188 @@ function Cocina({ tenantId, onCambio }: { tenantId: number; onCambio: () => void
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// RESERVAS DE MESA
+// ══════════════════════════════════════════════════════════════════════════
+const ESTILO_ESTADO_RESERVA: Record<EstadoReserva, string> = {
+  PENDIENTE: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  CONFIRMADA: "bg-teal-500/15 text-teal-600 dark:text-teal-400",
+  CANCELADA: "bg-red-500/15 text-red-500 line-through",
+  COMPLETADA: "bg-slate-300/50 dark:bg-white/10 text-slate-500 dark:text-white/50",
+};
+const LABEL_ESTADO_RESERVA: Record<EstadoReserva, string> = {
+  PENDIENTE: "Pendiente", CONFIRMADA: "Confirmada", CANCELADA: "Cancelada", COMPLETADA: "Completada",
+};
+
+function Reservas({ mapa }: { mapa: MapaMesaEntrada[] | null }) {
+  const [fechaSel, setFechaSel] = useState(hoy());
+  const [reservas, setReservas] = useState<ReservaHoreca[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [editando, setEditando] = useState<ReservaHoreca | null>(null);
+  const [form, setForm] = useState({ nombreCliente: "", telefono: "", hora: "20:00", numeroPersonas: "2", numeroMesaSugerida: "", notas: "" });
+  const [guardando, setGuardando] = useState(false);
+
+  const cargar = () => listarReservasDia(fechaSel).then(setReservas).catch(() => setReservas([]));
+  useEffect(() => { cargar(); }, [fechaSel]);
+
+  const abrirNueva = () => {
+    setEditando(null);
+    setForm({ nombreCliente: "", telefono: "", hora: "20:00", numeroPersonas: "2", numeroMesaSugerida: "", notas: "" });
+    setMostrarForm(true);
+  };
+  const abrirEditar = (r: ReservaHoreca) => {
+    setEditando(r);
+    const fh = new Date(r.fechaHora);
+    setForm({
+      nombreCliente: r.nombreCliente, telefono: r.telefono || "",
+      hora: `${String(fh.getHours()).padStart(2, "0")}:${String(fh.getMinutes()).padStart(2, "0")}`,
+      numeroPersonas: String(r.numeroPersonas), numeroMesaSugerida: r.numeroMesaSugerida ? String(r.numeroMesaSugerida) : "", notas: r.notas || "",
+    });
+    setMostrarForm(true);
+  };
+
+  const guardar = async () => {
+    setError(null);
+    if (!form.nombreCliente.trim()) { setError("El nombre del cliente es obligatorio"); return; }
+    if (!form.hora) { setError("Indica la hora de la reserva"); return; }
+    setGuardando(true);
+    const datos = {
+      nombreCliente: form.nombreCliente.trim(),
+      telefono: form.telefono.trim() || undefined,
+      fechaHora: `${fechaSel}T${form.hora}:00`,
+      numeroPersonas: parseInt(form.numeroPersonas, 10) || 1,
+      numeroMesaSugerida: form.numeroMesaSugerida ? parseInt(form.numeroMesaSugerida, 10) : undefined,
+      notas: form.notas.trim() || undefined,
+    };
+    try {
+      if (editando) await editarReserva(editando.id, datos);
+      else await crearReserva(datos);
+      setMostrarForm(false);
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la reserva");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const cambiarEstado = async (r: ReservaHoreca, nuevoEstado: EstadoReserva) => {
+    try {
+      await cambiarEstadoReserva(r.id, nuevoEstado);
+      cargar();
+    } catch {
+      alert("No se pudo actualizar la reserva — revisa tu conexión e inténtalo de nuevo.");
+    }
+  };
+
+  const reservasOrdenadas = (reservas || []).slice().sort((a, b) => a.fechaHora.localeCompare(b.fechaHora));
+  const fechaBonita = new Date(fechaSel + "T00:00:00").toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button type="button" onClick={() => setFechaSel((f) => sumarDiasStr(f, -1))}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-300/60 dark:border-white/10 text-xs font-bold hover:bg-white/10 text-slate-700 dark:text-white/80 cursor-pointer flex items-center gap-1">
+            <IconChevronLeft size={14} /> <span className="hidden sm:inline">Anterior</span>
+          </button>
+          <div className="relative flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-300/60 dark:border-white/10 bg-white/40 dark:bg-black/20 text-xs font-bold text-slate-800 dark:text-white">
+            <IconCalendar size={14} className="text-teal-500 shrink-0" />
+            <input type="date" value={fechaSel} onChange={(e) => e.target.value && setFechaSel(e.target.value)}
+              className="bg-transparent text-xs font-mono font-bold focus:outline-none cursor-pointer text-slate-800 dark:text-white" />
+          </div>
+          <button type="button" onClick={() => setFechaSel((f) => sumarDiasStr(f, 1))}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-300/60 dark:border-white/10 text-xs font-bold hover:bg-white/10 text-slate-700 dark:text-white/80 cursor-pointer flex items-center gap-1">
+            <span className="hidden sm:inline">Siguiente</span> <IconChevronRight size={14} />
+          </button>
+          <button type="button" onClick={() => setFechaSel(hoy())}
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-teal-600 dark:text-teal-400 hover:bg-teal-500/10 cursor-pointer">
+            Hoy
+          </button>
+        </div>
+        <button onClick={abrirNueva} className="g-aurora text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">+ Nueva reserva</button>
+      </div>
+
+      <p className="text-sm text-slate-500 dark:text-white/40 capitalize">{fechaBonita} · {reservasOrdenadas.filter((r) => r.estado !== "CANCELADA").length} reserva(s)</p>
+
+      {mostrarForm && (
+        <div className="apple-glass rounded-2xl p-5 space-y-3">
+          <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">{editando ? "Editar reserva" : "Nueva reserva"}</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Campo label="Nombre del cliente"><input value={form.nombreCliente} onChange={(e) => setForm({ ...form, nombreCliente: e.target.value })} placeholder="Ej. Familia Rodríguez" className="input-horeca" /></Campo>
+            <Campo label="Teléfono (opcional)"><input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="0412-1234567" className="input-horeca" /></Campo>
+            <Campo label="Hora"><input type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} className="input-horeca" /></Campo>
+            <Campo label="Número de personas"><input type="number" min="1" value={form.numeroPersonas} onChange={(e) => setForm({ ...form, numeroPersonas: e.target.value })} className="input-horeca" /></Campo>
+            <Campo label="Mesa sugerida (opcional)">
+              <select value={form.numeroMesaSugerida} onChange={(e) => setForm({ ...form, numeroMesaSugerida: e.target.value })} className="input-horeca w-full">
+                <option value="">Sin asignar todavía</option>
+                {(mapa || []).map((m) => <option key={m.mesa.id} value={m.mesa.numero}>Mesa {m.mesa.numero}{m.mesa.capacidad ? ` (${m.mesa.capacidad}p)` : ""}</option>)}
+              </select>
+            </Campo>
+            <Campo label="Notas (opcional)"><input value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} placeholder='Ej. "Cumpleaños, pidió torta"' className="input-horeca" /></Campo>
+          </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <div className="flex gap-2">
+            <button onClick={guardar} disabled={guardando} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+              {guardando ? "Guardando…" : "Guardar reserva"}
+            </button>
+            <button onClick={() => setMostrarForm(false)} className="apple-glass-btn text-xs font-semibold px-5 py-2.5 rounded-xl cursor-pointer">Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {reservas === null ? (
+        <p className="text-xs text-slate-400">Cargando…</p>
+      ) : reservasOrdenadas.length === 0 ? (
+        <div className="apple-glass rounded-2xl p-8 text-center">
+          <p className="text-slate-500 dark:text-white/40 text-sm">No hay reservas para este día. Usa "+ Nueva reserva" para agendar una.</p>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {reservasOrdenadas.map((r) => (
+            <div key={r.id} className={`apple-glass rounded-2xl p-4 flex items-center justify-between gap-4 flex-wrap ${r.estado === "CANCELADA" ? "opacity-60" : ""}`}>
+              <div className="flex items-center gap-4">
+                <div className="text-center flex-shrink-0 w-14">
+                  <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{new Date(r.fechaHora).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })}</div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-slate-900 dark:text-white text-sm">{r.nombreCliente}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${ESTILO_ESTADO_RESERVA[r.estado]}`}>{LABEL_ESTADO_RESERVA[r.estado]}</span>
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-white/40 flex items-center gap-2 flex-wrap mt-0.5">
+                    <span className="flex items-center gap-1"><IconUsers size={12} /> {r.numeroPersonas} pax</span>
+                    {r.telefono && <span className="flex items-center gap-1"><IconPhone size={12} /> {r.telefono}</span>}
+                    {r.numeroMesaSugerida && <span className="px-1.5 py-0.5 rounded-full bg-slate-200/60 dark:bg-white/10">Mesa {r.numeroMesaSugerida}</span>}
+                  </div>
+                  {r.notas && <div className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">↳ {r.notas}</div>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {r.estado === "PENDIENTE" && (
+                  <button onClick={() => cambiarEstado(r, "CONFIRMADA")} className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 cursor-pointer">Confirmar</button>
+                )}
+                {(r.estado === "PENDIENTE" || r.estado === "CONFIRMADA") && (
+                  <button onClick={() => cambiarEstado(r, "COMPLETADA")} className="text-[11px] font-semibold text-slate-500 dark:text-white/50 cursor-pointer">Llegó</button>
+                )}
+                {r.estado !== "CANCELADA" && r.estado !== "COMPLETADA" && (
+                  <button onClick={() => cambiarEstado(r, "CANCELADA")} className="text-[11px] font-semibold text-red-500 hover:text-red-600 cursor-pointer">Cancelar</button>
+                )}
+                <button onClick={() => abrirEditar(r)} className="text-[11px] font-semibold text-slate-500 dark:text-white/50 hover:text-slate-700 dark:hover:text-white cursor-pointer">Editar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // RECETAS & ESCANDALLO
 // ══════════════════════════════════════════════════════════════════════════
 function Recetas({
-  tenantId, escandallos, articulos, onCambio, tasaCop, tasaBcv,
+  tenantId, escandallos, articulos, onCambio, tasaCop, tasaBcv, zonasCocina,
 }: {
   tenantId: number;
   escandallos: EscandalloReceta[] | null;
@@ -2079,11 +3455,12 @@ function Recetas({
   onCambio: () => void;
   tasaCop?: TasaCambio | null;
   tasaBcv?: TasaCambio | null;
+  zonasCocina: string[];
 }) {
   const [monedaReceta, setMonedaReceta] = useState("USD");
   useEffect(() => { obtenerMonedaBaseNegocio().then(r => { if (r?.monedaBase) setMonedaReceta(r.monedaBase); }); }, [tenantId]);
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ nombrePlato: "", estacionCocina: "COCINA", precioVenta: "", requiereCocina: true });
+  const [form, setForm] = useState({ nombrePlato: "", estacionCocina: zonasCocina[0] || "COCINA", precioVenta: "", requiereCocina: true });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editandoReceta, setEditandoReceta] = useState<EscandalloReceta | null>(null);
@@ -2172,7 +3549,7 @@ function Recetas({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <input value={form.nombrePlato} onChange={(e) => setForm({ ...form, nombrePlato: e.target.value })} placeholder="Nombre del plato" className="input-horeca" />
             <select value={form.estacionCocina} onChange={(e) => setForm({ ...form, estacionCocina: e.target.value })} className="input-horeca">
-              {ESTACIONES.map((e) => <option key={e} value={e}>{e.replace("_", " ")}</option>)}
+              {zonasCocina.map((e) => <option key={e} value={e}>{e.replace(/_/g, " ")}</option>)}
             </select>
             <input value={form.precioVenta} onChange={(e) => setForm({ ...form, precioVenta: e.target.value })} type="number" step="0.01" placeholder={`Precio de venta (${monedaReceta || "cargando"})`} className="input-horeca" />
           </div>
@@ -2291,6 +3668,7 @@ function Recetas({
           tasaBcv={tasaBcv}
           onClose={() => setEditandoReceta(null)}
           onCambio={onCambio}
+          zonasCocina={zonasCocina}
         />
       )}
     </div>
@@ -2298,7 +3676,7 @@ function Recetas({
 }
 
 function ModalEditarReceta({
-  tenantId, escandallo, articulos, escandallos, onClose, onCambio, tasaCop, tasaBcv,
+  tenantId, escandallo, articulos, escandallos, onClose, onCambio, tasaCop, tasaBcv, zonasCocina,
 }: {
   tenantId: number;
   escandallo: EscandalloReceta;
@@ -2308,6 +3686,7 @@ function ModalEditarReceta({
   onCambio: () => void;
   tasaCop?: TasaCambio | null;
   tasaBcv?: TasaCambio | null;
+  zonasCocina: string[];
 }) {
   const [monedaReceta, setMonedaReceta] = useState("");
   const [articuloCosteando, setArticuloCosteando] = useState<Articulo | null>(null);
@@ -2707,7 +4086,7 @@ function ModalEditarReceta({
             <div>
               <label className="block text-[11px] font-semibold text-slate-500 dark:text-white/50 mb-1">Estación de Cocina</label>
               <select value={estacionCocina} onChange={(e) => setEstacionCocina(e.target.value)} className="input-horeca w-full">
-                {ESTACIONES.map((est) => <option key={est} value={est}>{est.replace("_", " ")}</option>)}
+                {zonasCocina.map((est) => <option key={est} value={est}>{est.replace(/_/g, " ")}</option>)}
               </select>
             </div>
             <div>
@@ -4709,6 +6088,74 @@ async function comprimirImagenFactura(archivo: File): Promise<File> {
   }
 }
 
+/**
+ * Buscador con dropdown para el proveedor de la compra — mismo patrón que
+ * BuscadorArticulo. Se puede escribir un nombre nuevo y crearlo ahí mismo
+ * (sin depender de que la IA lo haya leído de una foto): a veces el proveedor
+ * llega en persona o por teléfono, sin factura para escanear todavía.
+ */
+function BuscadorProveedor({ proveedores, proveedorId, onSeleccionar, onCrear, creando }: {
+  proveedores: ProveedorHoreca[] | null; proveedorId: string;
+  onSeleccionar: (id: string) => void; onCrear: (nombre: string) => void; creando: boolean;
+}) {
+  const [busqueda, setBusqueda] = useState("");
+  const [abierto, setAbierto] = useState(false);
+  const contenedorRef = useRef<HTMLDivElement | null>(null);
+
+  const seleccionado = (proveedores || []).find((p) => String(p.id) === proveedorId) || null;
+
+  useEffect(() => {
+    if (!abierto) return;
+    const handler = (e: MouseEvent) => {
+      if (contenedorRef.current && !contenedorRef.current.contains(e.target as Node)) setAbierto(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [abierto]);
+
+  const resultados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return (proveedores || []).slice(0, 30);
+    return (proveedores || []).filter((p) => p.nombre.toLowerCase().includes(q)).slice(0, 30);
+  }, [proveedores, busqueda]);
+
+  const nombreNuevo = busqueda.trim();
+  const yaExiste = resultados.some((p) => p.nombre.toLowerCase() === nombreNuevo.toLowerCase());
+
+  return (
+    <div className="relative" ref={contenedorRef}>
+      <input
+        value={abierto ? busqueda : (seleccionado ? seleccionado.nombre : "")}
+        onChange={(e) => { setBusqueda(e.target.value); if (!abierto) setAbierto(true); }}
+        onFocus={() => { setBusqueda(""); setAbierto(true); }}
+        placeholder="Buscar o escribir un proveedor nuevo…"
+        className="input-horeca w-full"
+      />
+      {abierto && (
+        <div className="absolute z-20 mt-1 w-full min-w-[220px] bg-white dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-white/10 max-h-52 overflow-y-auto shadow-lg">
+          {resultados.length === 0 && !nombreNuevo && (
+            <p className="px-3 py-2 text-xs text-slate-400">Sin resultados.</p>
+          )}
+          {resultados.map((p) => (
+            <button key={p.id} type="button"
+              onClick={() => { onSeleccionar(String(p.id)); setBusqueda(""); setAbierto(false); }}
+              className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer">
+              <span className="font-semibold text-slate-800 dark:text-white/80">{p.nombre}</span>
+            </button>
+          ))}
+          {nombreNuevo.length >= 2 && !yaExiste && (
+            <button type="button" disabled={creando}
+              onClick={() => { onCrear(nombreNuevo); setBusqueda(""); setAbierto(false); }}
+              className="w-full text-left px-3 py-2 hover:bg-teal-500/10 text-xs cursor-pointer text-teal-600 dark:text-teal-400 font-semibold border-t border-slate-200/60 dark:border-white/10 disabled:opacity-60">
+              {creando ? "Creando…" : `+ Crear proveedor "${nombreNuevo}"`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface FilaCompra {
   articuloId: string; cantidad: string; costoUnitario: string; fechaVencimiento: string;
   // Nombre leído de la foto — SIEMPRE editable mientras no se haya vinculado
@@ -4837,12 +6284,12 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
     }
   };
 
-  const crearProveedorSugerido = async () => {
-    if (!proveedorSugerido) return;
+  const crearProveedor = async (nombre: string) => {
+    if (!nombre.trim()) return;
     setCreandoProveedor(true);
     setError(null);
     try {
-      const nuevo = await crearProveedorHoreca(tenantId, { nombre: proveedorSugerido });
+      const nuevo = await crearProveedorHoreca(tenantId, { nombre: nombre.trim() });
       setProveedorId(String(nuevo.id));
       setProveedorSugerido(null);
       onCambio();
@@ -5006,14 +6453,13 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="sm:col-span-1">
           <label className="block text-[10px] font-semibold text-slate-400 dark:text-white/30 uppercase tracking-wider mb-1">Proveedor</label>
-          <select
-            value={proveedorId}
-            onChange={(e) => { setProveedorId(e.target.value); setProveedorSugerido(null); }}
-            className="input-horeca w-full"
-          >
-            <option value="">— Selecciona proveedor —</option>
-            {(proveedores || []).map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-          </select>
+          <BuscadorProveedor
+            proveedores={proveedores}
+            proveedorId={proveedorId}
+            onSeleccionar={(id) => { setProveedorId(id); setProveedorSugerido(null); }}
+            onCrear={crearProveedor}
+            creando={creandoProveedor}
+          />
           {proveedorSugerido && (
             <div className="mt-1.5 flex items-center gap-2 flex-wrap text-xs">
               <span className="text-amber-600 dark:text-amber-400">
@@ -5021,7 +6467,7 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
               </span>
               <button
                 type="button"
-                onClick={crearProveedorSugerido}
+                onClick={() => crearProveedor(proveedorSugerido)}
                 disabled={creandoProveedor}
                 className="apple-glass-btn font-semibold py-1 px-2.5 rounded-lg cursor-pointer disabled:opacity-60"
               >
@@ -5240,13 +6686,12 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
 // VENCIMIENTOS — alertas de lotes por caducar
 // ══════════════════════════════════════════════════════════════════════════
 function Vencimientos({ tenantId, onCambio }: { tenantId: number; onCambio: () => void }) {
-  const [dias, setDias] = useState(7);
   const [lotes, setLotes] = useState<LoteArticulo[] | null>(null);
+  const [filtro, setFiltro] = useState<"todos" | "30" | "15" | "7">("todos");
 
-  const cargar = (d: number) => {
-    alertasVencimiento(tenantId, d).then(setLotes).catch(() => setLotes([]));
-  };
-  useEffect(() => { cargar(dias); }, [dias]);
+  useEffect(() => {
+    listarTodosLotesConVencimiento(tenantId).then(setLotes).catch(() => setLotes([]));
+  }, [tenantId]);
 
   const diasRestantes = (fecha: string) => {
     const hoy0 = new Date(); hoy0.setHours(0, 0, 0, 0);
@@ -5254,41 +6699,58 @@ function Vencimientos({ tenantId, onCambio }: { tenantId: number; onCambio: () =
     return Math.round((venc.getTime() - hoy0.getTime()) / 86400000);
   };
 
-  const urgencia = (d: number) => (d < 0 ? "vencido" : d <= 3 ? "critico" : "proximo");
+  // Siempre se muestran TODOS los lotes con fecha de vencimiento — antes la
+  // pantalla solo traía lo que ya estaba por vencer en la ventana elegida
+  // (7/15/30 días) y si nada calzaba se veía "todo en orden" aunque hubiera
+  // insumos perecederos normales. Ahora la urgencia es solo un color/badge
+  // sobre la lista completa, y los botones 7/15/30 filtran esa misma lista
+  // sin ocultar el resto de los productos (el filtro "Todos" siempre existe).
+  const urgencia = (d: number) => (d < 0 ? "vencido" : d <= 7 ? "critico" : d <= 15 ? "proximo" : d <= 30 ? "atencion" : "normal");
   const estilos: Record<string, string> = {
     vencido: "border-red-500/60 bg-red-500/10 text-red-600 dark:text-red-300",
     critico: "border-amber-500/60 bg-amber-500/10 text-amber-600 dark:text-amber-300",
-    proximo: "border-teal-500/40 bg-teal-500/5 text-teal-600 dark:text-teal-300",
+    proximo: "border-yellow-500/40 bg-yellow-500/5 text-yellow-700 dark:text-yellow-300",
+    atencion: "border-teal-500/40 bg-teal-500/5 text-teal-600 dark:text-teal-300",
+    normal: "border-slate-300/40 dark:border-white/10 bg-transparent text-slate-500 dark:text-white/50",
   };
   const etiquetas: Record<string, (d: number) => string> = {
     vencido: (d) => `Vencido hace ${Math.abs(d)} día${Math.abs(d) === 1 ? "" : "s"}`,
     critico: (d) => (d === 0 ? "Vence hoy" : `Vence en ${d} día${d === 1 ? "" : "s"}`),
     proximo: (d) => `Vence en ${d} días`,
+    atencion: (d) => `Vence en ${d} días`,
+    normal: (d) => `Vence en ${d} días`,
   };
+
+  const lotesOrdenados = lotes ? [...lotes].sort((a, b) => diasRestantes(a.fechaVencimiento) - diasRestantes(b.fechaVencimiento)) : null;
+  const lotesFiltrados = lotesOrdenados?.filter((l) => {
+    if (filtro === "todos") return true;
+    const d = diasRestantes(l.fechaVencimiento);
+    return d <= Number(filtro);
+  }) ?? null;
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <p className="text-sm text-slate-500 dark:text-white/40">Lotes vencidos o próximos a vencer, ordenados por urgencia.</p>
+        <p className="text-sm text-slate-500 dark:text-white/40">Todos los insumos perecederos, ordenados del más próximo a vencer al más lejano.</p>
         <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs">
-          {[7, 15, 30].map((d) => (
-            <button key={d} onClick={() => setDias(d)} className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${dias === d ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
-              {d} días
+          {(["todos", "30", "15", "7"] as const).map((f) => (
+            <button key={f} onClick={() => setFiltro(f)} className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${filtro === f ? "bg-teal-600 text-white" : "text-slate-600 dark:text-white/60"}`}>
+              {f === "todos" ? "Todos" : `${f} días`}
             </button>
           ))}
         </div>
       </div>
 
-      {lotes === null ? (
+      {lotesFiltrados === null ? (
         <p className="text-sm text-slate-400">Cargando alertas…</p>
-      ) : lotes.length === 0 ? (
+      ) : lotesFiltrados.length === 0 ? (
         <div className="apple-glass rounded-2xl p-8 text-center flex flex-col items-center gap-2">
           <IconCheckCircle size={28} />
-          <p className="text-slate-500 dark:text-white/40 text-sm">Sin insumos por vencer en los próximos {dias} días. Todo en orden.</p>
+          <p className="text-slate-500 dark:text-white/40 text-sm">{filtro === "todos" ? "Aún no tienes insumos con fecha de vencimiento registrada." : `Sin insumos por vencer en los próximos ${filtro} días.`}</p>
         </div>
       ) : (
         <div className="space-y-2.5">
-          {lotes.map((l) => {
+          {lotesFiltrados.map((l) => {
             const d = diasRestantes(l.fechaVencimiento);
             const u = urgencia(d);
             return (
@@ -5324,7 +6786,7 @@ const IMPUESTOS_POR_DEFECTO = { ivaPct: 16, igtfPct: 3 };
 // no opera con esa moneda (ej. lejos de la frontera colombiana).
 const MONEDAS_POR_DEFECTO = { VES: true, COP: true };
 
-function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; config: any; onGuardar: (c: any) => void }) {
+function Configuracion({ tenantId, config, onGuardar, onZonasCocinaGuardadas, onZonasMesaGuardadas }: { tenantId: number; config: any; onGuardar: (c: any) => void; onZonasCocinaGuardadas: () => void; onZonasMesaGuardadas: () => void }) {
   const [form, setForm] = useState({
     ...config,
     cargosPorDefecto: { ...CARGOS_POR_DEFECTO, ...(config.cargosPorDefecto || {}) },
@@ -5353,6 +6815,9 @@ function Configuracion({ tenantId, config, onGuardar }: { tenantId: number; conf
 
       <MonedaBaseNegocio />
       <OrigenTasaActivaConfig tenantId={tenantId} />
+      <ZonasCocinaConfig onGuardado={onZonasCocinaGuardadas} />
+      <ZonasMesaConfig onGuardado={onZonasMesaGuardadas} />
+      <BinancePayConfig />
 
       <div className="apple-glass rounded-2xl p-6 space-y-4">
         <div>
@@ -5488,6 +6953,289 @@ function MonedaBaseNegocio() {
         {guardado && <span className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold">✓ Guardado</span>}
       </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Zonas/estaciones de cocina (Salón & Mesas, Cocina KDS, Recetas): antes eran fijas
+ * (COCINA/PARRILLA/BAR/COCINA_FRIA) para cualquier negocio — un fast-food con solo mostrador
+ * o una cevichería con una zona propia no tenían forma de ajustarlas. `onGuardado` refresca la
+ * copia que usan Salón/Cocina/Recetas en el componente raíz, para que el cambio se vea de una
+ * sin recargar la página entera.
+ */
+function ZonasCocinaConfig({ onGuardado }: { onGuardado: () => void }) {
+  const [zonas, setZonas] = useState<string[] | null>(null);
+  const [nueva, setNueva] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [guardado, setGuardado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    obtenerZonasCocina().then((r) => setZonas(r.zonas)).catch(() => setZonas(["COCINA", "PARRILLA", "BAR", "COCINA_FRIA"]));
+  }, []);
+
+  const guardar = async (nuevasZonas: string[]) => {
+    setGuardando(true);
+    setError(null);
+    try {
+      const r = await actualizarZonasCocina(nuevasZonas);
+      setZonas(r.zonas);
+      setGuardado(true);
+      onGuardado();
+      setTimeout(() => setGuardado(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudieron guardar las zonas");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const agregar = () => {
+    const nombre = nueva.trim().toUpperCase().replace(/\s+/g, "_");
+    if (!nombre || !zonas) return;
+    if (zonas.includes(nombre)) { setNueva(""); return; }
+    guardar([...zonas, nombre]);
+    setNueva("");
+  };
+
+  const eliminar = (zona: string) => {
+    if (!zonas) return;
+    if (zonas.length <= 1) { setError("Debe quedar al menos una zona de cocina"); return; }
+    guardar(zonas.filter((z) => z !== zona));
+  };
+
+  const renombrar = (zonaVieja: string, nombreNuevo: string) => {
+    if (!zonas) return;
+    const limpio = nombreNuevo.trim().toUpperCase().replace(/\s+/g, "_");
+    if (!limpio || limpio === zonaVieja) return;
+    guardar(zonas.map((z) => (z === zonaVieja ? limpio : z)));
+  };
+
+  return (
+    <div className="apple-glass rounded-2xl p-6 space-y-4">
+      <div>
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Zonas de cocina</h3>
+        <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">
+          Las estaciones que ves en Cocina (KDS) y al asignar un plato en Recetas — arma las que realmente tiene tu negocio, no todos tienen las mismas 4.
+        </p>
+      </div>
+      {zonas === null ? (
+        <p className="text-xs text-slate-400">Cargando…</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {zonas.map((z) => (
+            <div key={z} className="flex items-center gap-1.5 bg-slate-200/60 dark:bg-white/10 rounded-full pl-3 pr-1.5 py-1.5">
+              <input
+                defaultValue={z.replace(/_/g, " ")}
+                onBlur={(e) => renombrar(z, e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                disabled={guardando}
+                className="bg-transparent text-xs font-semibold text-slate-700 dark:text-white/80 outline-none w-24"
+              />
+              <button
+                type="button"
+                onClick={() => eliminar(z)}
+                disabled={guardando}
+                title="Eliminar zona"
+                className="w-5 h-5 rounded-full flex items-center justify-center text-slate-500 dark:text-white/50 hover:bg-red-500/20 hover:text-red-500 cursor-pointer disabled:opacity-40"
+              >
+                <IconClose size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          value={nueva}
+          onChange={(e) => setNueva(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") agregar(); }}
+          placeholder="Ej. CEVICHERIA"
+          className="input-horeca text-xs max-w-[200px]"
+        />
+        <button type="button" onClick={agregar} disabled={guardando || !nueva.trim()} className="apple-glass-btn text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer disabled:opacity-50">
+          + Agregar zona
+        </button>
+        {guardando && <span className="text-[11px] text-slate-400">Guardando…</span>}
+        {guardado && <span className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold">✓ Guardado</span>}
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+/** Igual que ZonasCocinaConfig, pero para las zonas físicas de mesas (Salón & Mesas) — ver Mesa.zona. */
+function ZonasMesaConfig({ onGuardado }: { onGuardado: () => void }) {
+  const [zonas, setZonas] = useState<string[] | null>(null);
+  const [nueva, setNueva] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [guardado, setGuardado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    obtenerZonasMesa().then((r) => setZonas(r.zonas)).catch(() => setZonas(["SALON_PRINCIPAL", "TERRAZA", "BARRA"]));
+  }, []);
+
+  const guardar = async (nuevasZonas: string[]) => {
+    setGuardando(true);
+    setError(null);
+    try {
+      const r = await actualizarZonasMesa(nuevasZonas);
+      setZonas(r.zonas);
+      setGuardado(true);
+      onGuardado();
+      setTimeout(() => setGuardado(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudieron guardar las zonas");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const agregar = () => {
+    const nombre = nueva.trim().toUpperCase().replace(/\s+/g, "_");
+    if (!nombre || !zonas) return;
+    if (zonas.includes(nombre)) { setNueva(""); return; }
+    guardar([...zonas, nombre]);
+    setNueva("");
+  };
+
+  const eliminar = (zona: string) => {
+    if (!zonas) return;
+    if (zonas.length <= 1) { setError("Debe quedar al menos una zona de mesas"); return; }
+    guardar(zonas.filter((z) => z !== zona));
+  };
+
+  const renombrar = (zonaVieja: string, nombreNuevo: string) => {
+    if (!zonas) return;
+    const limpio = nombreNuevo.trim().toUpperCase().replace(/\s+/g, "_");
+    if (!limpio || limpio === zonaVieja) return;
+    guardar(zonas.map((z) => (z === zonaVieja ? limpio : z)));
+  };
+
+  return (
+    <div className="apple-glass rounded-2xl p-6 space-y-4">
+      <div>
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Zonas de mesas</h3>
+        <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">
+          Las áreas físicas del local que ves al crear una mesa en Salón & Mesas (Salón, Terraza, Barra…) — arma las que realmente tiene tu local.
+        </p>
+      </div>
+      {zonas === null ? (
+        <p className="text-xs text-slate-400">Cargando…</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {zonas.map((z) => (
+            <div key={z} className="flex items-center gap-1.5 bg-slate-200/60 dark:bg-white/10 rounded-full pl-3 pr-1.5 py-1.5">
+              <input
+                defaultValue={z.replace(/_/g, " ")}
+                onBlur={(e) => renombrar(z, e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                disabled={guardando}
+                className="bg-transparent text-xs font-semibold text-slate-700 dark:text-white/80 outline-none w-24"
+              />
+              <button
+                type="button"
+                onClick={() => eliminar(z)}
+                disabled={guardando}
+                title="Eliminar zona"
+                className="w-5 h-5 rounded-full flex items-center justify-center text-slate-500 dark:text-white/50 hover:bg-red-500/20 hover:text-red-500 cursor-pointer disabled:opacity-40"
+              >
+                <IconClose size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          value={nueva}
+          onChange={(e) => setNueva(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") agregar(); }}
+          placeholder="Ej. VIP"
+          className="input-horeca text-xs max-w-[200px]"
+        />
+        <button type="button" onClick={agregar} disabled={guardando || !nueva.trim()} className="apple-glass-btn text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer disabled:opacity-50">
+          + Agregar zona
+        </button>
+        {guardando && <span className="text-[11px] text-slate-400">Guardando…</span>}
+        {guardado && <span className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold">✓ Guardado</span>}
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Binance Pay del negocio — cada tenant cobra a SU PROPIA cuenta Binance
+ * Merchant, Aurora Plus nunca toca el dinero. El Secret Key se guarda
+ * cifrado en el servidor y nunca se vuelve a mostrar completo una vez
+ * guardado (por eso el campo se muestra vacío al recargar: en blanco =
+ * "no cambiar el que ya está guardado").
+ */
+function BinancePayConfig() {
+  const [estado, setEstado] = useState<EstadoBinancePay | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [secretKey, setSecretKey] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
+
+  const cargar = () => obtenerEstadoBinancePay().then((r) => { setEstado(r); setApiKey(r.apiKey || ""); }).catch(() => setEstado({ configurado: false, activo: false, apiKey: null }));
+  useEffect(() => { cargar(); }, []);
+
+  const guardar = async (activo: boolean) => {
+    setGuardando(true);
+    setError(null);
+    try {
+      await guardarBinancePay({ apiKey: apiKey.trim() || undefined, secretKey: secretKey.trim() || undefined, activo });
+      setSecretKey("");
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 2000);
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la configuración de Binance Pay");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (!estado) return null;
+
+  return (
+    <div className="apple-glass rounded-2xl p-6 space-y-4">
+      <div>
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
+          <IconCoins size={18} className="text-amber-500" /> Binance Pay
+        </h3>
+        <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">
+          Cobra directo a TU cuenta Binance Merchant — Aurora Plus nunca ve ni toca el dinero. Necesitas abrir una cuenta Binance Merchant y generar tus propias credenciales API.
+        </p>
+      </div>
+      <Campo label="API Key">
+        <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Tu API Key de Binance Merchant" className="input-horeca" />
+      </Campo>
+      <Campo label={estado.configurado ? "Secret Key (dejar en blanco para no cambiarla)" : "Secret Key"}>
+        <input value={secretKey} onChange={(e) => setSecretKey(e.target.value)} type="password" placeholder={estado.configurado ? "•••••••• (ya guardada)" : "Tu Secret Key de Binance Merchant"} className="input-horeca" />
+      </Campo>
+      {estado.configurado && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className={`w-2 h-2 rounded-full ${estado.activo ? "bg-teal-500" : "bg-slate-400"}`} />
+          <span className="text-slate-600 dark:text-white/60">{estado.activo ? "Activo — el botón de cobro aparece en las comandas" : "Guardado pero inactivo"}</span>
+        </div>
+      )}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <div className="flex gap-2">
+        <button onClick={() => guardar(true)} disabled={guardando} className="btn-cyber-neon text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+          {guardando ? "Guardando…" : guardado ? "✓ Guardado" : "Guardar y activar"}
+        </button>
+        {estado.activo && (
+          <button onClick={() => guardar(false)} disabled={guardando} className="apple-glass-btn text-xs font-semibold px-5 py-2.5 rounded-xl cursor-pointer">
+            Desactivar
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -5898,18 +7646,25 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
     return () => clearTimeout(id);
   }, [tenantId, cedulaCliente, clienteSel]);
 
-  // Al salir del campo de cédula: si quedó algo escrito y no matcheó ningún
-  // cliente existente, se registra de una vez en Clientes — nombre/teléfono
-  // van con lo que haya (pueden ir vacíos).
+  // Al salir de CUALQUIERA de los tres campos (cédula, nombre o teléfono): si
+  // quedó algo escrito en al menos uno y no matcheó ningún cliente existente,
+  // se registra de una vez en Clientes — antes solo la cédula disparaba esto,
+  // dejando fuera del CRM a cualquier venta donde el cajero solo apuntara el
+  // nombre o el teléfono del cliente.
   const confirmarClienteNuevo = async () => {
     const cedula = cedulaCliente.trim();
-    if (clienteSel || !cedula) return;
+    const nombre = nombreClienteInline.trim();
+    const telefono = telefonoClienteInline.trim();
+    // Dispara con cédula o nombre (el backend exige al menos uno de los dos
+    // para dar de alta un Cliente) — teléfono solo no alcanza, se manda igual
+    // como dato adicional si cae en cualquiera de los otros dos casos.
+    if (clienteSel || (!cedula && !nombre)) return;
     setGuardandoCliente(true);
     try {
       const nuevo = await crearCliente(tenantId, {
-        nombre: nombreClienteInline.trim() || undefined,
-        identificacionRif: cedula,
-        telefono: telefonoClienteInline.trim() || undefined,
+        nombre: nombre || undefined,
+        identificacionRif: cedula || undefined,
+        telefono: telefono || undefined,
       });
       setClienteSel(nuevo);
       // No se pisa el campo con el nombre de relleno que puso el backend
@@ -6444,11 +8199,11 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 {(buscandoCliente || guardandoCliente) && !clienteSel && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">…</span>}
               </div>
               <input value={telefonoClienteInline} onChange={(e) => setTelefonoClienteInline(e.target.value)}
-                onBlur={() => { if (clienteSel) editarCliente(tenantId, clienteSel.id, { telefono: telefonoClienteInline.trim() || undefined }).then(setClienteSel).catch(() => alert("No se pudo guardar el teléfono del cliente — revisa tu conexión e inténtalo de nuevo.")); }}
+                onBlur={() => { if (clienteSel) editarCliente(tenantId, clienteSel.id, { telefono: telefonoClienteInline.trim() || undefined }).then(setClienteSel).catch(() => alert("No se pudo guardar el teléfono del cliente — revisa tu conexión e inténtalo de nuevo.")); else confirmarClienteNuevo(); }}
                 placeholder="Teléfono (opcional)" className="input-horeca w-full text-xs" />
             </div>
             <input value={nombreClienteInline} onChange={(e) => setNombreClienteInline(e.target.value)}
-              onBlur={() => { if (clienteSel && nombreClienteInline.trim()) editarCliente(tenantId, clienteSel.id, { nombre: nombreClienteInline.trim() }).then(setClienteSel).catch(() => alert("No se pudo guardar el nombre del cliente — revisa tu conexión e inténtalo de nuevo.")); }}
+              onBlur={() => { if (clienteSel && nombreClienteInline.trim()) editarCliente(tenantId, clienteSel.id, { nombre: nombreClienteInline.trim() }).then(setClienteSel).catch(() => alert("No se pudo guardar el nombre del cliente — revisa tu conexión e inténtalo de nuevo.")); else confirmarClienteNuevo(); }}
               placeholder="Nombre y apellido (opcional)" className="input-horeca w-full text-xs" />
           </div>
 
@@ -6820,9 +8575,8 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
 // ══════════════════════════════════════════════════════════════════════════
 function ReportesOperativos({ tenantId }: { tenantId: number }) {
   const { user } = useAuth();
-  const [fechaInicio, setFechaInicio] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10);
-  });
+  const puedeAnular = user?.rol === "DUENO_ADMIN" || user?.rol === "CAJERO_VENDEDOR";
+  const [fechaInicio, setFechaInicio] = useState(() => sumarDiasStr(hoy(), -7));
   const [fechaFin, setFechaFin] = useState(hoy());
   const [metodoPago, setMetodoPago] = useState("");
   const [estado, setEstado] = useState<"PAGADA" | "ABIERTA" | "ANULADA" | "">("PAGADA");
@@ -6980,7 +8734,7 @@ function ReportesOperativos({ tenantId }: { tenantId: number }) {
                         }`}>{t.estado}</span>
                       </td>
                       <td className="py-2 pl-3 text-right">
-                        {t.estado !== "ANULADA" && (
+                        {t.estado !== "ANULADA" && puedeAnular && (
                           <button
                             onClick={() => { setAnulandoId(anulandoId === t.comandaId ? null : t.comandaId); setMotivoAnular(""); setError(null); }}
                             className="text-[11px] font-semibold text-red-500 hover:text-red-600 cursor-pointer"
@@ -7047,6 +8801,7 @@ function ResumenGeneral({
 }) {
   const [ticketsHoy, setTicketsHoy] = useState<ReporteTicket[] | null>(null);
   const [ticketsSemana, setTicketsSemana] = useState<ReporteTicket[] | null>(null);
+  const [ticketDetalle, setTicketDetalle] = useState<ReporteTicket | null>(null);
 
   const hoy = useMemo(() => new Date(), []);
   const hoyStr = fmtFechaLocal(hoy);
@@ -7162,6 +8917,21 @@ function ResumenGeneral({
   const metricasHoy = useMemo(() => calcularMetricasMoneda(ticketsHoy), [ticketsHoy, tasaCopNum, tasaBcvNum]);
   const metricasSemana = useMemo(() => calcularMetricasMoneda(ticketsSemana), [ticketsSemana, tasaCopNum, tasaBcvNum]);
   const metricasDiaSel = useMemo(() => calcularMetricasMoneda(ticketsDia), [ticketsDia, tasaCopNum, tasaBcvNum]);
+
+  // Ventas por mesonero del día seleccionado — cuántos tickets cerró cada uno
+  // y cuánto sumaron, para el resumen operativo diario.
+  const ventasPorMesero = useMemo(() => {
+    const mapa = new Map<string, { tickets: number; totalUsd: number; propinas: number }>();
+    for (const t of ticketsDia || []) {
+      const nombre = t.mesero?.trim() || "Sin asignar";
+      const actual = mapa.get(nombre) || { tickets: 0, totalUsd: 0, propinas: 0 };
+      actual.tickets += 1;
+      actual.totalUsd += Number(t.totalUsd || 0);
+      actual.propinas += Number(t.propina || 0);
+      mapa.set(nombre, actual);
+    }
+    return Array.from(mapa.entries()).map(([mesero, v]) => ({ mesero, ...v })).sort((a, b) => b.totalUsd - a.totalUsd);
+  }, [ticketsDia]);
 
   const resolverMontoTicket = (t: ReporteTicket) => {
     const valUsd = Number(t.totalUsd || 0);
@@ -7375,7 +9145,33 @@ function ResumenGeneral({
         {/* Detalle del día seleccionado */}
         <div className="apple-glass rounded-2xl p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base capitalize">{fechaSelLegible}</h3>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setFechaSel((f) => sumarDiasStr(f, -1))}
+                className="apple-glass-btn text-xs font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer flex items-center gap-1"
+              >
+                <IconChevronLeft size={13} /> Anterior
+              </button>
+              <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base capitalize">{fechaSelLegible}</h3>
+              <button
+                type="button"
+                onClick={() => setFechaSel((f) => sumarDiasStr(f, 1))}
+                disabled={fechaSel >= hoyStr}
+                className="apple-glass-btn text-xs font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Siguiente <IconChevronRight size={13} />
+              </button>
+              {fechaSel !== hoyStr && (
+                <button
+                  type="button"
+                  onClick={() => setFechaSel(hoyStr)}
+                  className="text-xs font-semibold text-teal-600 dark:text-teal-400 cursor-pointer px-2"
+                >
+                  Hoy
+                </button>
+              )}
+            </div>
             {metricasDiaSel && metricasDiaSel.totalTickets > 0 && (
               <span className="text-xs font-semibold text-slate-500 dark:text-white/60">
                 {metricasDiaSel.totalTickets} transacción{metricasDiaSel.totalTickets === 1 ? "" : "es"}
@@ -7415,6 +9211,24 @@ function ResumenGeneral({
             </div>
           </div>
 
+          {ventasPorMesero.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2">Ventas por mesonero</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {ventasPorMesero.map((v) => (
+                  <div key={v.mesero} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3.5 py-2.5 text-xs">
+                    <span className="font-semibold text-slate-800 dark:text-white/80">{v.mesero}</span>
+                    <span className="text-right">
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">${v.totalUsd.toFixed(2)}</span>
+                      <span className="text-slate-400 ml-1.5">· {v.tickets} ticket{v.tickets === 1 ? "" : "s"}</span>
+                      {v.propinas > 0 && <span className="block text-teal-600 dark:text-teal-400 font-semibold mt-0.5">Propinas: ${v.propinas.toFixed(2)}</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Listado de tickets del día con moneda real */}
           {ticketsDia === null ? (
             <p className="text-xs text-slate-400">Cargando…</p>
@@ -7425,7 +9239,12 @@ function ResumenGeneral({
               {ticketsDia.map((t) => {
                 const infoMonto = resolverMontoTicket(t);
                 return (
-                  <div key={t.comandaId} className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 rounded-xl px-3.5 py-2.5 text-xs">
+                  <button
+                    type="button"
+                    key={t.comandaId}
+                    onClick={() => setTicketDetalle(t)}
+                    className="w-full flex items-center justify-between bg-slate-100/60 dark:bg-white/5 hover:bg-slate-200/60 dark:hover:bg-white/10 rounded-xl px-3.5 py-2.5 text-xs text-left cursor-pointer transition-colors"
+                  >
                     <div className="min-w-0 space-y-0.5">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-slate-800 dark:text-white/80">{t.numeroTicket}</span>
@@ -7434,8 +9253,9 @@ function ResumenGeneral({
                         </span>
                       </div>
                       <div className="text-[10px] text-slate-400">
-                        {new Date(t.fecha).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })} · {(t.metodoPago || "—").replace("_", " ")}
+                        {new Date(t.fecha).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })} · {(t.metodoPago || "—").replace("_", " ")}{t.mesero ? ` · ${t.mesero}` : ""}
                       </div>
+                      <div className="text-[10px] font-semibold text-teal-600 dark:text-teal-400">Ver detalles →</div>
                     </div>
 
                     <div className="text-right flex-shrink-0">
@@ -7448,14 +9268,66 @@ function ResumenGeneral({
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           )}
         </div>
       </div>
+      {ticketDetalle && (
+        <ModalDetalleTicket tenantId={tenantId} ticket={ticketDetalle} onClose={() => setTicketDetalle(null)} />
+      )}
     </div>
+  );
+}
+
+function ModalDetalleTicket({ tenantId, ticket, onClose }: {
+  tenantId: number; ticket: ReporteTicket; onClose: () => void;
+}) {
+  const [items, setItems] = useState<ItemComanda[] | null>(null);
+
+  useEffect(() => {
+    obtenerItemsComanda(tenantId, ticket.comandaId).then(setItems).catch(() => setItems([]));
+  }, [tenantId, ticket.comandaId]);
+
+  return (
+    <Modal onClose={onClose} titulo={ticket.numeroTicket}>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <span>{new Date(ticket.fecha).toLocaleString("es-VE")}</span>
+          <span className="font-semibold">{(ticket.canal || "—").replace(/_/g, " ")} · {(ticket.metodoPago || "—").replace(/_/g, " ")}</span>
+        </div>
+        {ticket.mesero && (
+          <p className="text-xs text-slate-500">Atendido por: <strong className="text-slate-900">{ticket.mesero}</strong></p>
+        )}
+        {items === null ? (
+          <p className="text-xs text-slate-400">Cargando…</p>
+        ) : items.length === 0 ? (
+          <p className="text-xs text-slate-400">Sin ítems registrados para esta comanda.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {items.map((it) => {
+              const anulado = it.estadoItem === "ANULADO";
+              return (
+              <div key={it.id} className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${anulado ? "bg-red-500/5" : "bg-slate-100/60"}`}>
+                <span className={anulado ? "text-red-500/70 line-through" : "text-slate-700"}>
+                  {it.nombrePlato} <span className="text-slate-400">x{Number(it.cantidad)}</span>
+                  {anulado && <span className="ml-1.5 no-underline text-[10px] font-semibold">(anulado{it.motivoAnulacion ? `: ${it.motivoAnulacion}` : ""})</span>}
+                </span>
+                <span className={`font-mono font-semibold ${anulado ? "text-red-500/70 line-through" : "text-slate-900"}`}>${(Number(it.cantidad) * Number(it.precioUnitario)).toFixed(2)}</span>
+              </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-sm font-bold text-slate-900">
+          <span>Total</span>
+          <span>${Number(ticket.totalUsd).toFixed(2)}</span>
+        </div>
+        <button onClick={onClose} className="w-full g-aurora text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer">Cerrar</button>
+      </div>
+    </Modal>
   );
 }
 
@@ -7483,6 +9355,7 @@ interface MovimientoCajaConEquivalente extends MovimientoCaja {
 }
 
 function ResumenFinanciero({ tenantId }: { tenantId: number }) {
+  const [ticketDetalle, setTicketDetalle] = useState<ReporteTicket | null>(null);
   const [rango, setRango] = useState<RangoEstadistica>("DIA");
   const [fechaSel, setFechaSel] = useState(() => hoy());
   const [cargando, setCargando] = useState(true);
@@ -8167,9 +10040,11 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
               {ticketsPeriodo.map((t) => (
-                <div
+                <button
+                  type="button"
                   key={t.comandaId}
-                  className="flex items-center justify-between bg-slate-100/60 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl px-3.5 py-2.5 text-xs transition-colors"
+                  onClick={() => setTicketDetalle(t)}
+                  className="w-full flex items-center justify-between bg-slate-100/60 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl px-3.5 py-2.5 text-xs text-left cursor-pointer transition-colors"
                 >
                   <div className="min-w-0 flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-teal-500/15 text-teal-600 dark:text-teal-300 flex items-center justify-center shrink-0 font-bold text-[11px]">
@@ -8196,6 +10071,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
                         <span>{(t.metodoPago || "EFECTIVO").replace("_", " ")}</span>
                         <span>•</span>
                         <span>{t.canal === "DELIVERY_PROPIO" ? "Delivery" : t.canal === "SALON" ? "En Mesa" : "Para Llevar"}</span>
+                        {t.mesero && <><span>•</span><span>{t.mesero}</span></>}
                       </div>
                     </div>
                   </div>
@@ -8210,12 +10086,15 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
                       </div>
                     )}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
         </div>
       </div>
+      {ticketDetalle && (
+        <ModalDetalleTicket tenantId={tenantId} ticket={ticketDetalle} onClose={() => setTicketDetalle(null)} />
+      )}
     </div>
   );
 }
@@ -8224,7 +10103,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
 // ADMINISTRACIÓN — ingresos/gastos + cuentas x cobrar/pagar + cierre de caja, unidos
 // ══════════════════════════════════════════════════════════════════════════
 function Administracion({ tenantId, monedasActivas }: { tenantId: number; monedasActivas: typeof MONEDAS_POR_DEFECTO }) {
-  const [tab, setTab] = useState<"turnos" | "finanzas" | "cuentas" | "cierre" | "resumen">("finanzas");
+  const [tab, setTab] = useState<"turnos" | "finanzas" | "cuentas" | "cierre" | "resumen" | "nomina">("finanzas");
 
   return (
     <div className="space-y-5">
@@ -8235,6 +10114,7 @@ function Administracion({ tenantId, monedasActivas }: { tenantId: number; moneda
           { id: "cuentas", label: "Cuentas x Cobrar/Pagar" },
           { id: "cierre", label: "Cierre de Caja" },
           { id: "resumen", label: "Resumen Diario" },
+          { id: "nomina", label: "Nómina de Personal" },
         ].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id as typeof tab)}
             className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === t.id ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"}`}>
@@ -8248,6 +10128,153 @@ function Administracion({ tenantId, monedasActivas }: { tenantId: number; moneda
       {tab === "cuentas" && <CuentasPorCobrarPagar tenantId={tenantId} />}
       {tab === "cierre" && <CierreDeCaja tenantId={tenantId} />}
       {tab === "resumen" && <ResumenDiario tenantId={tenantId} />}
+      {tab === "nomina" && <NominaPersonal tenantId={tenantId} />}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NÓMINA DE PERSONAL — liquida horas fichadas (reloj checador de RRHH) en un
+// período y calcula cuánto se debe pagar, según cómo se configuró CADA
+// empleado (por hora / salario fijo / solo control). No inventa un motor de
+// nómina nuevo: reutiliza RelojChecadorService.liquidarPeriodo, que ya
+// existía en RRHH pero no tenía ninguna pantalla que lo mostrara.
+// ══════════════════════════════════════════════════════════════════════════
+const LABEL_TIPO_CONTROL: Record<TipoControlEmpleado, string> = {
+  POR_HORA: "Por hora", SALARIO_FIJO: "Salario fijo", SOLO_CONTROL: "Solo control (sin pago)",
+};
+
+function NominaPersonal({ tenantId }: { tenantId: number }) {
+  const [desde, setDesde] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; });
+  const [hasta, setHasta] = useState(hoy());
+  const [empleados, setEmpleados] = useState<EmpleadoRrhh[] | null>(null);
+  const [liquidacion, setLiquidacion] = useState<LiquidacionPeriodoRrhh | null>(null);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editandoPagoId, setEditandoPagoId] = useState<number | null>(null);
+  const [formPago, setFormPago] = useState<{ tipoControl: TipoControlEmpleado; tarifaPorHora: string }>({ tipoControl: "SOLO_CONTROL", tarifaPorHora: "" });
+  const [guardandoPago, setGuardandoPago] = useState(false);
+
+  const cargarEmpleados = () => listarEmpleadosRrhh().then((r) => setEmpleados(r.filter((e) => e.activo))).catch(() => setEmpleados([]));
+  useEffect(() => { cargarEmpleados(); }, [tenantId]);
+
+  const calcular = () => {
+    setCargando(true);
+    setError(null);
+    liquidarPeriodoRrhh(tenantId, `${desde}T00:00:00`, `${hasta}T23:59:59`)
+      .then(setLiquidacion)
+      .catch((e) => setError(e instanceof Error ? e.message : "No se pudo calcular la nómina"))
+      .finally(() => setCargando(false));
+  };
+  useEffect(() => { calcular(); }, [tenantId]);
+
+  const abrirEditarPago = (emp: EmpleadoRrhh) => {
+    setEditandoPagoId(emp.id);
+    setFormPago({ tipoControl: emp.tipoControl, tarifaPorHora: emp.tarifaPorHora != null ? String(emp.tarifaPorHora) : "" });
+  };
+
+  const guardarPago = async (emp: EmpleadoRrhh) => {
+    if (formPago.tipoControl === "POR_HORA" && !formPago.tarifaPorHora) { setError("Indica la tarifa por hora"); return; }
+    setGuardandoPago(true);
+    setError(null);
+    try {
+      await editarEmpleadoRrhh(emp.id, {
+        nombre: emp.nombre, cedula: emp.cedula || undefined, cargo: emp.cargo || undefined,
+        tipoControl: formPago.tipoControl,
+        tarifaPorHora: formPago.tipoControl === "POR_HORA" ? Number(formPago.tarifaPorHora) : undefined,
+      });
+      setEditandoPagoId(null);
+      cargarEmpleados();
+      calcular();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la forma de pago");
+    } finally {
+      setGuardandoPago(false);
+    }
+  };
+
+  // Combina el directorio completo (para que salga el que aún no fichó nada
+  // en el período, con 0 horas) con lo que sí calculó la liquidación.
+  const filas = (empleados || []).map((emp) => {
+    const linea = liquidacion?.empleados.find((l) => l.empleadoId === emp.id);
+    return {
+      empleado: emp,
+      horasTrabajadas: linea?.horasTrabajadas ?? 0,
+      totalPagar: linea?.totalPagar ?? null,
+    };
+  });
+  const totalGeneral = filas.reduce((s, f) => s + (f.totalPagar || 0), 0);
+
+  return (
+    <div className="space-y-5">
+      <div className="apple-glass rounded-2xl p-5 space-y-3">
+        <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Período a liquidar</p>
+        <div className="flex items-end gap-2 flex-wrap">
+          <Campo label="Desde"><input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="input-horeca" /></Campo>
+          <Campo label="Hasta"><input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="input-horeca" /></Campo>
+          <button onClick={calcular} disabled={cargando} className="g-aurora text-white text-xs font-semibold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+            {cargando ? "Calculando…" : "Calcular"}
+          </button>
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+      </div>
+
+      {empleados === null ? (
+        <p className="text-xs text-slate-400">Cargando personal…</p>
+      ) : empleados.length === 0 ? (
+        <div className="apple-glass rounded-2xl p-8 text-center">
+          <p className="text-slate-500 dark:text-white/40 text-sm">Aún no tienes personal registrado con reloj checador (RRHH).</p>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {filas.map(({ empleado: emp, horasTrabajadas, totalPagar }) => (
+            <div key={emp.id} className="apple-glass rounded-2xl p-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="font-bold text-sm text-slate-900 dark:text-white">{emp.nombre}</div>
+                  <div className="text-xs text-slate-500 dark:text-white/40 flex items-center gap-2 flex-wrap mt-0.5">
+                    {emp.cargo && <span>{emp.cargo}</span>}
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${emp.tipoControl === "POR_HORA" ? "bg-teal-500/15 text-teal-600 dark:text-teal-400" : emp.tipoControl === "SALARIO_FIJO" ? "bg-sky-500/15 text-sky-600 dark:text-sky-400" : "bg-slate-300/50 dark:bg-white/10 text-slate-500 dark:text-white/50"}`}>
+                      {LABEL_TIPO_CONTROL[emp.tipoControl]}{emp.tipoControl === "POR_HORA" && emp.tarifaPorHora ? ` · $${Number(emp.tarifaPorHora).toFixed(2)}/h` : ""}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-slate-500 dark:text-white/40">{horasTrabajadas.toFixed(2)} horas fichadas</div>
+                  <div className="font-mono font-bold text-slate-900 dark:text-white">{totalPagar != null ? `$${totalPagar.toFixed(2)}` : "—"}</div>
+                </div>
+                <button onClick={() => abrirEditarPago(emp)} className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 cursor-pointer flex-shrink-0">
+                  Elegir cómo se le paga
+                </button>
+              </div>
+              {editandoPagoId === emp.id && (
+                <div className="mt-3 pt-3 border-t border-slate-300/50 dark:border-white/10 flex items-end gap-2 flex-wrap">
+                  <Campo label="Forma de pago">
+                    <select value={formPago.tipoControl} onChange={(e) => setFormPago({ ...formPago, tipoControl: e.target.value as TipoControlEmpleado })} className="input-horeca">
+                      <option value="POR_HORA">Por hora fichada</option>
+                      <option value="SALARIO_FIJO">Salario fijo (solo lleva control de horas)</option>
+                      <option value="SOLO_CONTROL">Solo control de asistencia (sin pago)</option>
+                    </select>
+                  </Campo>
+                  {formPago.tipoControl === "POR_HORA" && (
+                    <Campo label="Tarifa por hora ($)">
+                      <input type="number" step="0.01" min="0" value={formPago.tarifaPorHora} onChange={(e) => setFormPago({ ...formPago, tarifaPorHora: e.target.value })} className="input-horeca w-28" />
+                    </Campo>
+                  )}
+                  <button onClick={() => guardarPago(emp)} disabled={guardandoPago} className="btn-cyber-neon text-white text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
+                    {guardandoPago ? "Guardando…" : "Guardar"}
+                  </button>
+                  <button onClick={() => setEditandoPagoId(null)} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">Cancelar</button>
+                </div>
+              )}
+            </div>
+          ))}
+          <div className="apple-glass rounded-2xl p-4 flex items-center justify-between font-bold text-slate-900 dark:text-white">
+            <span>Total a pagar en el período</span>
+            <span className="font-mono">${totalGeneral.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -8634,7 +10661,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
 // Utilidad por producto del día: cuánto entró vendiendo cada plato/artículo
 // contra cuánto costó (compra o receta) — solo lo que se vendió HOY.
 function ResumenDiario({ tenantId }: { tenantId: number }) {
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => hoy());
   const [filas, setFilas] = useState<ResumenUtilidadProducto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 

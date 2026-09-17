@@ -704,10 +704,65 @@ public class HorecaService {
     }
 
     /**
-     * Tablero KDS: lista los ítems pendientes de despacho (no ENTREGADO) para una estación de cocina.
+     * Tablero KDS: lista los ítems pendientes de despacho (no ENTREGADO ni ANULADO) para una estación de cocina,
+     * ya con la mesa/mesero aplanados (ver ItemKdsDTO) para que el cocinero sepa a qué mesa va cada plato.
      */
-    public List<ItemComanda> obtenerTableroKds(Long tenantId, String estacionCocina) {
-        return itemComandaRepository.findByTenantIdAndEstacionCocinaAndEstadoItemNot(tenantId, estacionCocina, ItemComanda.EstadoItem.ENTREGADO);
+    public List<ItemKdsDTO> obtenerTableroKds(Long tenantId, String estacionCocina) {
+        return itemComandaRepository.findByTenantIdAndEstacionCocinaAndEstadoItemNotIn(
+            tenantId, estacionCocina, List.of(ItemComanda.EstadoItem.ENTREGADO, ItemComanda.EstadoItem.ANULADO))
+            .stream().map(ItemKdsDTO::desde).toList();
+    }
+
+    /**
+     * Anula UN ítem dentro de una comanda todavía ABIERTA (no la comanda
+     * completa) — devuelve su inventario/receta, descuenta su monto del total
+     * de la comanda y queda marcado con motivo/usuario/fecha, nunca borrado.
+     * Solo se permite mientras la comanda sigue ABIERTA a propósito: una vez
+     * PAGADA, la única forma de corregir un ítem es anular la comanda entera
+     * (anularComanda), que además revierte caja — así "anular un plato
+     * después de haberlo cobrado en efectivo" nunca pasa por este camino más
+     * corto y silencioso.
+     */
+    @Transactional
+    public ItemComanda anularItem(Long itemId, Long tenantId, String motivo, String usuario) {
+        ItemComanda item = itemComandaRepository.findById(itemId)
+            .orElseThrow(() -> new RuntimeException("Ítem de comanda no encontrado"));
+        if (!item.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Ítem no pertenece a este tenant");
+        }
+        if (item.getEstadoItem() == ItemComanda.EstadoItem.ANULADO) {
+            throw new RuntimeException("Este ítem ya está anulado");
+        }
+        if (motivo == null || motivo.isBlank()) {
+            throw new RuntimeException("Debe indicar el motivo de la anulación");
+        }
+        Comanda comanda = item.getComanda();
+        if (comanda.getEstado() != Comanda.EstadoComanda.ABIERTA) {
+            throw new RuntimeException("Solo se puede anular un ítem de una comanda ABIERTA — si ya se cobró, anule la comanda completa");
+        }
+
+        if (item.getEscandallo() != null) {
+            escandalloService.revertirVentaPlato(item.getEscandallo().getId(), tenantId, item.getCantidad());
+        } else if (item.getArticulo() != null) {
+            inventarioService.registrarMovimientoKardex(item.getArticulo().getId(), tenantId, Kardex.TipoOperacion.ENTRADA,
+                item.getCantidad(), item.getCostoUnitario(), "Anulación de ítem: " + item.getNombrePlato());
+        } else if (item.getFastBarTrago() != null) {
+            articuloRepository.findBySkuAndTenantId(item.getFastBarTrago().getBotellaSku(), tenantId).ifPresent(botella -> {
+                BigDecimal mililitros = item.getFastBarTrago().getMililitrosPorTrago().multiply(item.getCantidad());
+                inventarioService.registrarMovimientoKardex(botella.getId(), tenantId, Kardex.TipoOperacion.ENTRADA,
+                    mililitros, botella.getCostoUnitario(), "Anulación de ítem: " + item.getNombrePlato());
+            });
+        }
+
+        BigDecimal montoItem = item.getPrecioUnitario().multiply(item.getCantidad());
+        comanda.setTotalConsumo(comanda.getTotalConsumo().subtract(montoItem).setScale(2, RoundingMode.HALF_UP));
+        comandaRepository.save(comanda);
+
+        item.setEstadoItem(ItemComanda.EstadoItem.ANULADO);
+        item.setMotivoAnulacion(motivo);
+        item.setUsuarioAnulacion(usuario);
+        item.setFechaAnulacion(LocalDateTime.now());
+        return itemComandaRepository.save(item);
     }
 
     /**
@@ -729,6 +784,7 @@ public class HorecaService {
         for (Comanda comanda : comandas) {
             for (ItemComanda item : itemComandaRepository.findByComandaId(comanda.getId())) {
                 if (item.getCostoUnitario() == null) continue;
+                if (item.getEstadoItem() == ItemComanda.EstadoItem.ANULADO) continue;
                 ResumenUtilidadProducto r = acumulado.computeIfAbsent(item.getNombrePlato(), ResumenUtilidadProducto::new);
                 BigDecimal cant = item.getCantidad();
                 r.cantidadVendida = r.cantidadVendida.add(cant);

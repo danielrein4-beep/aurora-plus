@@ -79,6 +79,34 @@ public class LicenciaTenant {
     @Column(name = "domicilio_fiscal", columnDefinition = "TEXT")
     private String domicilioFiscal;
 
+    // Estaciones de cocina de Horeca (ej. "COCINA,PARRILLA,BAR") — antes venían
+    // fijas (COCINA/PARRILLA/BAR/COCINA_FRIA) en el frontend, pero no todos los
+    // negocios tienen esas 4 zonas exactas. Null = usa las 4 por defecto.
+    // Lista separada por comas en vez de una tabla aparte: es solo una lista de
+    // nombres de texto por tenant, sin datos ni relaciones propias.
+    @Column(name = "zonas_cocina", columnDefinition = "TEXT")
+    private String zonasCocina;
+
+    // Zonas físicas de mesas de Horeca (ej. "SALON_PRINCIPAL,TERRAZA,BARRA") — antes venían
+    // fijas a esas 3 exactas en el frontend. Mismo criterio que zonasCocina: lista de texto
+    // separada por comas, null = usa las 3 por defecto.
+    @Column(name = "zonas_mesa", columnDefinition = "TEXT")
+    private String zonasMesa;
+
+    // Binance Pay del NEGOCIO (no de Aurora Plus) — cada tenant cobra a SU
+    // PROPIA cuenta Binance Merchant, nunca a la de Aurora. El API Key no es
+    // secreto (viaja en cada request a Binance igual), pero el Secret Key sí
+    // — se guarda cifrado (ver CifradoSimetricoService), nunca en texto
+    // plano, y nunca se devuelve completo al frontend una vez guardado.
+    @Column(name = "binance_pay_api_key")
+    private String binancePayApiKey;
+
+    @Column(name = "binance_pay_secret_key_cifrado", columnDefinition = "TEXT")
+    private String binancePaySecretKeyCifrado;
+
+    @Column(name = "binance_pay_activo", nullable = false)
+    private boolean binancePayActivo = false;
+
     // Auditoría antifraude en Cierre Z: si |descuadre| supera este margen, el
     // cierre igual se procesa (no bloquea al cajero) pero queda una
     // AlertaAdmin silenciosa para el dueño (ver TesoreriaService). Cada
@@ -122,6 +150,16 @@ public class LicenciaTenant {
     public void setRazonSocial(String razonSocial) { this.razonSocial = razonSocial; }
     public String getDomicilioFiscal() { return domicilioFiscal; }
     public void setDomicilioFiscal(String domicilioFiscal) { this.domicilioFiscal = domicilioFiscal; }
+    public String getZonasCocina() { return zonasCocina; }
+    public void setZonasCocina(String zonasCocina) { this.zonasCocina = zonasCocina; }
+    public String getZonasMesa() { return zonasMesa; }
+    public void setZonasMesa(String zonasMesa) { this.zonasMesa = zonasMesa; }
+    public String getBinancePayApiKey() { return binancePayApiKey; }
+    public void setBinancePayApiKey(String binancePayApiKey) { this.binancePayApiKey = binancePayApiKey; }
+    public String getBinancePaySecretKeyCifrado() { return binancePaySecretKeyCifrado; }
+    public void setBinancePaySecretKeyCifrado(String binancePaySecretKeyCifrado) { this.binancePaySecretKeyCifrado = binancePaySecretKeyCifrado; }
+    public boolean isBinancePayActivo() { return binancePayActivo; }
+    public void setBinancePayActivo(boolean binancePayActivo) { this.binancePayActivo = binancePayActivo; }
     public BigDecimal getMargenToleranciaDescuadre() { return margenToleranciaDescuadre; }
     public void setMargenToleranciaDescuadre(BigDecimal margenToleranciaDescuadre) { this.margenToleranciaDescuadre = margenToleranciaDescuadre; }
 }

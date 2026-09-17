@@ -21,7 +21,13 @@ public class Usuario {
         CAJERO_VENDEDOR,
         ENCARGADO_INVENTARIO,
         MEDICO,
-        RECEPCIONISTA
+        RECEPCIONISTA,
+        // Mesero de Horeca: toma pedidos, abre/agrega ítems y cobra mesas como
+        // CAJERO_VENDEDOR, pero NO puede anular comandas/ítems, gestionar
+        // proveedores/compras, editar zonas ni administrar el directorio de
+        // meseros — esas acciones quedan reservadas a DUENO_ADMIN/CAJERO_VENDEDOR
+        // (ver AuthContext.exigirRol usado en los controladores de Horeca).
+        MESERO
     }
 
     @Id

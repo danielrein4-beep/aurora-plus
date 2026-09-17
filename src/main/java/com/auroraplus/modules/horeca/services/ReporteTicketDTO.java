@@ -18,6 +18,12 @@ public class ReporteTicketDTO {
     public String estado;
     public String canal;
     public Integer numeroMesa;
+    public String mesero;
+    // Suma de los renglones "Propina" de la comanda (estacionCocina="CARGOS",
+    // ver ComandaDetalle.handleAgregarPropina) — null/0 si no se agregó
+    // ninguna. Permite el reporte "Propinas por mesero" sin duplicar el
+    // concepto de propina en el backend, ya que hoy es solo un ítem más.
+    public BigDecimal propina;
 
     public BigDecimal totalBase;
     public String monedaBase;

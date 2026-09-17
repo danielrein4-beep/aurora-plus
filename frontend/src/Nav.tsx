@@ -11,11 +11,27 @@ const LINKS = [
   { label: "Nosotros",    path: "/nosotros" },
 ];
 
+// Mismo criterio que rutaVertical en Dashboard.tsx — el botón "Mis Sistemas"
+// tiene que abrir el módulo real del tenant logueado, no uno fijo. Antes
+// mandaba a /mediclinic sin importar la industria (un tenant de Horeca caía
+// en el sistema de otro negocio de Salud).
+const VERTICAL_POR_INDUSTRIA: Record<string, { ruta: string; label: string; icono: string }> = {
+  restaurante: { ruta: "/restaurante", label: "Aurora Horeca", icono: "🍽️" },
+  ferreteria: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
+  repuestos: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
+  farmacia: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
+  retail: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
+  finca: { ruta: "/ganaderia", label: "Aurora Ganadería", icono: "🐄" },
+  ganaderia: { ruta: "/ganaderia", label: "Aurora Ganadería", icono: "🐄" },
+};
+const VERTICAL_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro", icono: "🩺" };
+
 export default function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { isLoggedIn, user, logout } = useAuth();
+  const miSistema = VERTICAL_POR_INDUSTRIA[user?.industry || ""] || VERTICAL_POR_DEFECTO;
 
   return (
     <nav className="aurora-public-nav fixed top-0 left-0 right-0 z-50 transition-colors duration-500">
@@ -53,15 +69,13 @@ export default function Nav() {
         <div className="hidden md:flex items-center gap-3">
           {isLoggedIn ? (
             <div className="flex items-center gap-2.5">
-              {/* Botón directo y llamativo a Mis Sistemas */}
+              {/* Acceso directo al módulo del tenant — minimalista a propósito */}
               <button
-                onClick={() => navigate("/mediclinic")}
-                className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-full cursor-pointer flex items-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.45)] hover:scale-105 transition-all"
-                title="Abrir Mediclinic Pro"
+                onClick={() => navigate(miSistema.ruta)}
+                className="aurora-nav-outline text-[11px] font-semibold px-3 py-1.5 rounded-full cursor-pointer"
+                title={`Abrir ${miSistema.label}`}
               >
-                <span className="w-2 h-2 rounded-full bg-teal-300 animate-pulse" />
-                <span className="font-semibold text-white/90">Mis Sistemas:</span>
-                <span className="text-teal-200 font-extrabold">🩺 Mediclinic Pro →</span>
+                {miSistema.label} →
               </button>
 
               {/* Perfil del usuario (Aurora Hub) */}
@@ -128,10 +142,10 @@ export default function Nav() {
             {isLoggedIn ? (
               <>
                 <button
-                  onClick={() => { navigate("/mediclinic"); setMobileOpen(false); }}
-                  className="w-full btn-cyber-neon text-white text-sm font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md"
+                  onClick={() => { navigate(miSistema.ruta); setMobileOpen(false); }}
+                  className="aurora-nav-outline w-full text-sm font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2"
                 >
-                  <span>🩺 Entrar a Mediclinic Pro →</span>
+                  Entrar a {miSistema.label} →
                 </button>
                 <button
                   onClick={() => { navigate("/dashboard"); setMobileOpen(false); }}
