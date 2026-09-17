@@ -11,26 +11,23 @@ import GlareHover from "../components/GlareHover";
 import DepthCarousel from "../components/DepthCarousel";
 import { useAuth } from "../context/AuthContext";
 import {
-  IconClinic, IconHardware, IconMining,
-  IconRestaurant, IconFarm, IconRetail,
+  IconClinic, IconHardware,
+  IconRestaurant, IconFarm,
   IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile,
   IconLaptop, IconPhone, IconPlane, IconCheck,
 } from "../Icons";
 
 const INDUSTRIES = [
   { Icon: IconClinic,     name: "Clínicas Médicas",   desc: "Expedientes digitales, agenda de consultas, laboratorio, farmacia y cobranza integrada." },
-  { Icon: IconHardware,   name: "Ferretería",          desc: "Control de stock, proveedores, ventas por mostrador, cotizaciones y reportes de rotación." },
-  { Icon: IconMining,     name: "Minería",             desc: "Gestión de maquinaria, turnos, órdenes de trabajo, seguridad e informes regulatorios." },
+  { Icon: IconHardware,   name: "Comercio",           desc: "POS mostrador, inventario en tiempo real, código de barras, proveedores y cuentas por cobrar." },
   { Icon: IconRestaurant, name: "Restaurantes",        desc: "Comandas digitales, mesas, cocina en tiempo real, inventario y cierres de caja automáticos." },
   { Icon: IconFarm,       name: "Control de Fincas",   desc: "Gestión integral de ganadería, rotación de potreros, registro sanitario, vacunación y trazabilidad animal por lote." },
-  { Icon: IconRetail,     name: "Retail",              desc: "POS multitienda, e-commerce, fidelización de clientes y análisis de ventas por categoría." },
 ];
 
 const VERTICAL_PREVIEWS = [
   { image: "/verticales/mediclinic.png", label: "Mediclinic Pro", link: "/industrias" },
   { image: "/verticales/restaurante.png", label: "Aurora Horeca", link: "/industrias" },
-  { image: "/verticales/retail.png", label: "Aurora Retail", link: "/industrias" },
-  { image: "/verticales/comercio.png", label: "Ferretería & Repuestos", link: "/industrias" },
+  { image: "/verticales/comercio.png", label: "Aurora Comercio", link: "/industrias" },
   { image: "/verticales/ganaderia.jpg", label: "Control de Fincas", link: "/industrias" },
 ];
 
@@ -77,7 +74,7 @@ const heroItem = {
 };
 
 const previewData: Record<string, { metric: string; value: string; sub: string; color: string }[]> = {
-  "Ferretería": [
+  "Comercio": [
     { metric: "Ventas hoy",         value: "$14,820", sub: "+9% vs ayer",           color: "text-teal-500 dark:text-teal-400" },
     { metric: "Artículos en stock", value: "4,231",   sub: "12 bajo mínimo",        color: "text-slate-700 dark:text-white/70" },
     { metric: "Órdenes pendientes", value: "18",      sub: "3 urgentes",            color: "text-slate-700 dark:text-white/70" },
@@ -86,11 +83,6 @@ const previewData: Record<string, { metric: string; value: string; sub: string; 
     { metric: "Citas hoy",          value: "34",      sub: "6 cirugías",            color: "text-teal-500 dark:text-teal-400" },
     { metric: "Pacientes activos",  value: "1,820",   sub: "+12 esta semana",       color: "text-slate-700 dark:text-white/70" },
     { metric: "Stock farmacia",     value: "98%",     sub: "2 alertas",             color: "text-slate-700 dark:text-white/70" },
-  ],
-  "Minería": [
-    { metric: "Equipos activos",    value: "47/52",   sub: "5 en mantención",       color: "text-teal-500 dark:text-teal-400" },
-    { metric: "Toneladas / día",    value: "8,400 t", sub: "+3.2% vs meta",         color: "text-slate-700 dark:text-white/70" },
-    { metric: "Incidentes mes",     value: "0",       sub: "32 días sin accidentes", color: "text-slate-700 dark:text-white/70" },
   ],
 };
 

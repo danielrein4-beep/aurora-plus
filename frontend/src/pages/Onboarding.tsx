@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
-  AuroraGradientDef, IconClinic, IconVet, IconHardware, IconRestaurant, IconFarm, IconMining,
+  AuroraGradientDef, IconClinic, IconVet, IconHardware, IconRestaurant, IconFarm,
   IconEducation, IconRetail, IconConstruction, IconCustomize, IconWarning, IconClose, IconCheck, IconLock,
   IconCard, IconBank, IconPrescription, IconFactory,
 } from "../Icons";
@@ -97,14 +97,6 @@ const INDUSTRIES: IndustryItem[] = [
     badge: "100% DISPONIBLE (Listo)",
     isReady: true,
     tagline: "Vertical Insignia: Aurora Ganadería",
-  },
-  {
-    id: "mineria",
-    label: "Minería & Maquinaria",
-    Icon: IconMining,
-    desc: "Control de horas máquina, turnos y seguridad industrial",
-    badge: "Próximamente (Fase 2)",
-    isReady: false,
   },
   {
     id: "educacion",

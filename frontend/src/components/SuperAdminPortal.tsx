@@ -27,9 +27,7 @@ interface SuperAdminPortalProps {
 const MODULOS_DISPONIBLES = [
   { id: "salud", label: "Salud & Clínicas (Mediclinic)", icon: "🏥", desc: "Historias clínicas, citas, vademécum, cobros médicos" },
   { id: "horeca", label: "Gastronomía & Restaurantes", icon: "🍽️", desc: "Mesas en vivo, comandas táctiles, inventario FIFO" },
-  { id: "minero", label: "Minería & Materiales", icon: "⛏️", desc: "Pesaje de ley, fundición, balanzas y despachos" },
-  { id: "repuestos", label: "Repuestos & Talleres", icon: "⚙️", desc: "Compatibilidad por marca/año, VIN, órdenes mecánicas" },
-  { id: "moda", label: "Moda & Calzado Retail", icon: "👗", desc: "Matriz Talla/Color, códigos de barra, boutiques" },
+  { id: "comercio", label: "Comercio (Ferretería, Repuestos, Retail)", icon: "🛒", desc: "POS mostrador, inventario, código de barras, cuentas por cobrar" },
   { id: "ganaderia", label: "Ganadería & Agro", icon: "", desc: "Pesaje por animal, arete RFID, preñez y vacunas" },
 ];
 
@@ -443,9 +441,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                     <option value="todos">Todos los Módulos</option>
                     <option value="salud">Salud (Mediclinic)</option>
                     <option value="horeca">Gastronomía (Restaurante)</option>
-                    <option value="minero">Minería</option>
-                    <option value="repuestos">Repuestos</option>
-                    <option value="moda">Moda</option>
+                    <option value="repuestos">Comercio (Ferretería/Repuestos)</option>
                     <option value="ganaderia">Ganadería</option>
                   </select>
 
@@ -513,11 +509,9 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] text-teal-300 font-medium">
                               {tenant.moduloPrincipal === "salud" && "🏥 Salud"}
                               {tenant.moduloPrincipal === "horeca" && "🍽️ Gastronomía"}
-                              {tenant.moduloPrincipal === "minero" && "⛏️ Minería"}
-                              {tenant.moduloPrincipal === "repuestos" && "⚙️ Repuestos"}
-                              {tenant.moduloPrincipal === "moda" && "👗 Moda"}
+                              {(tenant.moduloPrincipal === "repuestos" || tenant.moduloPrincipal === "ferreteria" || tenant.moduloPrincipal === "comercio") && "🛒 Comercio"}
                               {tenant.moduloPrincipal === "ganaderia" && "Ganadería"}
-                              {!["salud", "horeca", "minero", "repuestos", "moda", "ganaderia"].includes(tenant.moduloPrincipal) &&
+                              {!["salud", "horeca", "repuestos", "ferreteria", "comercio", "ganaderia"].includes(tenant.moduloPrincipal) &&
                                 tenant.moduloPrincipal}
                             </span>
                           </td>
@@ -651,9 +645,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   >
                     <option value="salud">Salud & Clínicas</option>
                     <option value="horeca">Gastronomía & Rest.</option>
-                    <option value="minero">Minería & Pesaje</option>
-                    <option value="repuestos">Repuestos Automotrices</option>
-                    <option value="moda">Moda & Calzado</option>
+                    <option value="comercio">Comercio (Ferretería/Repuestos/Retail)</option>
                     <option value="ganaderia">Ganadería & Agro</option>
                   </select>
                 </div>

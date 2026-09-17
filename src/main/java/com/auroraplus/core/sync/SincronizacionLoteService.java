@@ -4,10 +4,6 @@ import com.auroraplus.core.config.LicenciaService;
 import com.auroraplus.modules.ganaderia.controllers.VentaAnimalController;
 import com.auroraplus.modules.ganaderia.services.GanaderiaVentaService;
 import com.auroraplus.modules.horeca.services.HorecaService;
-import com.auroraplus.modules.minero.controllers.VentaMineralController;
-import com.auroraplus.modules.minero.services.VentaMineralService;
-import com.auroraplus.modules.moda.controllers.VentaModaController;
-import com.auroraplus.modules.moda.services.ModaVentaService;
 import com.auroraplus.modules.repuestos.services.RepuestoConversionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,13 +34,7 @@ public class SincronizacionLoteService {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private VentaMineralService ventaMineralService;
-
-    @Autowired
     private HorecaService horecaService;
-
-    @Autowired
-    private ModaVentaService modaVentaService;
 
     @Autowired
     private GanaderiaVentaService ganaderiaVentaService;
@@ -64,18 +54,16 @@ public class SincronizacionLoteService {
     // un tenant sin el módulo contratado podría colar una venta de esa vertical
     // metiéndola dentro del lote. Mapeo explícito tipoOperacion -> módulo real.
     private static final java.util.Map<String, String> MODULO_POR_TIPO_OPERACION = java.util.Map.of(
-        "venta_minero", "minero",
         "venta_horeca", "horeca",
         "abrir_comanda_horeca", "horeca",
         "agregar_item_comanda_horeca", "horeca",
-        "venta_moda", "moda",
         "venta_ganaderia", "ganaderia",
         "venta_repuestos_volumen", "repuestos",
         "venta_repuestos_presentacion", "repuestos"
     );
 
     public static class OperacionLote {
-        public String tipoOperacion; // venta_minero, venta_horeca, venta_moda, venta_ganaderia, venta_repuestos_volumen, venta_repuestos_presentacion
+        public String tipoOperacion; // venta_horeca, venta_ganaderia, venta_repuestos_volumen, venta_repuestos_presentacion
         public String claveIdempotencia; // obligatoria
         public Object payload; // mismo shape que el body/params del endpoint individual correspondiente
     }
@@ -180,19 +168,6 @@ public class SincronizacionLoteService {
         }
 
         switch (op.tipoOperacion) {
-            case "venta_minero" -> {
-                VentaMineralController.VentaRequest p = objectMapper.convertValue(op.payload, VentaMineralController.VentaRequest.class);
-                List<VentaMineralService.ItemVentaMineral> items = p.items.stream().map(i -> {
-                    VentaMineralService.ItemVentaMineral item = new VentaMineralService.ItemVentaMineral();
-                    item.producto = i.producto;
-                    item.cantidad = i.cantidad;
-                    item.precioUnitario = i.precioUnitario;
-                    item.transformacionId = i.transformacionId;
-                    return item;
-                }).toList();
-                return ventaMineralService.registrarVenta(tenantId, p.numeroFactura, p.comprador, items,
-                    p.monedaPago, p.montoRecibido, op.claveIdempotencia).getId();
-            }
             case "abrir_comanda_horeca" -> {
                 AbrirComandaPayload p = objectMapper.convertValue(op.payload, AbrirComandaPayload.class);
                 return horecaService.aperturarComanda(tenantId, p.numeroMesa, p.mesero, p.canal, p.nombreCliente,
@@ -209,17 +184,6 @@ public class SincronizacionLoteService {
                 Long comandaId = p.comandaId != null ? p.comandaId : resolverComandaId(tenantId, p.comandaClaveCliente);
                 return horecaService.cerrarComanda(comandaId, tenantId, p.metodoPago, p.monedaPago, p.montoRecibido,
                     op.claveIdempotencia).getId();
-            }
-            case "venta_moda" -> {
-                VentaModaController.VentaRequest p = objectMapper.convertValue(op.payload, VentaModaController.VentaRequest.class);
-                List<ModaVentaService.ItemVenta> items = p.items.stream().map(i -> {
-                    ModaVentaService.ItemVenta item = new ModaVentaService.ItemVenta();
-                    item.varianteId = i.varianteId;
-                    item.cantidad = i.cantidad;
-                    return item;
-                }).toList();
-                return modaVentaService.registrarVenta(tenantId, p.numeroTicket, p.clienteId, p.metodoPago,
-                    p.codigoGiftCard, items, p.monedaPago, p.montoRecibido, op.claveIdempotencia).getId();
             }
             case "venta_ganaderia" -> {
                 VentaAnimalController.VentaRequest p = objectMapper.convertValue(op.payload, VentaAnimalController.VentaRequest.class);

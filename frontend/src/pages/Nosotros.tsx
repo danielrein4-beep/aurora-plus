@@ -200,7 +200,7 @@ export default function Nosotros() {
                       <label className="text-slate-700 dark:text-white/40 text-xs mb-1.5 block font-medium">Industria</label>
                       <select value={form.industria} onChange={(e) => setForm({ ...form, industria: e.target.value })}
                         className="w-full bg-white/80 dark:bg-[#0c0c20] border border-slate-300 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-teal-400 transition-colors">
-                        {["Ferretería & Retail", "Clínica & Salud", "Restaurante & Cafetería", "Ganadería & Agro", "Minería & Contratistas", "Otro rubro"].map((opt) => (
+                        {["Comercio", "Clínica & Salud", "Restaurante & Cafetería", "Ganadería & Agro", "Otro rubro"].map((opt) => (
                           <option key={opt} value={opt} className="bg-white dark:bg-[#0c0c20] text-slate-900 dark:text-white">{opt}</option>
                         ))}
                       </select>

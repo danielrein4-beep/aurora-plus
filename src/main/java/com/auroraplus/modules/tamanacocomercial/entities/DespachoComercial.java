@@ -8,8 +8,8 @@ import java.time.LocalDateTime;
 /**
  * Registro comercial de despacho de carbón (chofer, placa, mina de origen y
  * peso), adaptado del proyecto "inventario" (Carbones Tamanaco). Vive aislado
- * en el módulo tamanacocomercial: no reemplaza ni depende de modules.minero,
- * que cubre la operación de extracción, no la comercialización/despacho.
+ * en el módulo tamanacocomercial, específico de la comercialización/despacho
+ * de este cliente puntual (no una vertical de minería genérica).
  */
 @Entity
 @Table(name = "despachos_comerciales")

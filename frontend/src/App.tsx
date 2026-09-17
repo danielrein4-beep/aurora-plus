@@ -16,7 +16,6 @@ import Dashboard from "./pages/Dashboard";
 import MediclinicApp from "./components/MediclinicApp";
 import VeterinariaApp from "./components/VeterinariaApp";
 import RestauranteApp from "./components/RestauranteApp";
-import RetailApp from "./components/RetailApp";
 import ComercioApp from "./components/ComercioApp";
 import GanaderiaApp from "./components/GanaderiaApp";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -40,11 +39,6 @@ function VeterinariaPage() {
 function RestaurantePage() {
   const navigate = useNavigate();
   return <RestauranteApp onSalir={() => navigate("/dashboard")} />;
-}
-
-function RetailPage() {
-  const navigate = useNavigate();
-  return <RetailApp onSalir={() => navigate("/dashboard")} />;
 }
 
 function ComercioPage() {
@@ -94,7 +88,6 @@ export default function App() {
             <Route path="/mediclinic" element={<ProtectedRoute><AnimatedRoute><MediclinicPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/veterinaria" element={<ProtectedRoute><AnimatedRoute><VeterinariaPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/restaurante" element={<ProtectedRoute><AnimatedRoute><RestaurantePage /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/retail" element={<ProtectedRoute><AnimatedRoute><RetailPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/comercio"   element={<ProtectedRoute><AnimatedRoute><ComercioPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/ganaderia"  element={<ProtectedRoute><AnimatedRoute><GanaderiaPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/ganaderia/animal/:animalId" element={<ProtectedRoute><AnimatedRoute><GanaderiaAnimalPage /></AnimatedRoute></ProtectedRoute>} />

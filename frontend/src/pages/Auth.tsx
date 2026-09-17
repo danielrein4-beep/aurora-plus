@@ -441,7 +441,7 @@ export default function Auth() {
               <div className="mt-6 pt-5 border-t border-white/10 space-y-2 text-xs text-white/50">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                  <span>6 verticales nativas — Clínicas, Restaurantes, Minería, Repuestos, Moda y Ganadería</span>
+                  <span>4 verticales nativas — Clínicas, Restaurantes, Comercio y Ganadería</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />

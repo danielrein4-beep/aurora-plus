@@ -1451,121 +1451,6 @@ export function crearPresentacion(tenantId: number, articuloId: number, datos: {
   return request(`/api/inventario/presentaciones?tenantId=${tenantId}&articuloId=${articuloId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-// --- Aurora Retail (Ferretería / Farmacia / Repuestos) ---
-
-export interface ProveedorRetail {
-  id: number;
-  tenantId: number;
-  nombre: string;
-  rif: string | null;
-  telefono: string | null;
-  contacto: string | null;
-  direccion: string | null;
-  activo: boolean;
-}
-
-export function listarProveedoresRetail(): Promise<ProveedorRetail[]> {
-  return request(`/api/retail/proveedores`);
-}
-
-export function crearProveedorRetail(tenantId: number, datos: { nombre: string; rif?: string; telefono?: string; contacto?: string; direccion?: string }): Promise<ProveedorRetail> {
-  return request(`/api/retail/proveedores?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
-}
-
-export interface ItemCompraRetail {
-  articuloId: number;
-  cantidad: number;
-  costoUnitario: number;
-  monedaCosto?: string;
-  presentacionId?: number;
-  fechaVencimiento?: string;
-}
-
-export interface CompraRetail {
-  id: number;
-  tenantId: number;
-  proveedor: ProveedorRetail;
-  numeroFactura: string | null;
-  fechaCompra: string;
-  total: number;
-  montoPagado: number | null;
-}
-
-export function listarComprasRetail(tenantId: number): Promise<CompraRetail[]> {
-  return request(`/api/retail/compras?tenantId=${tenantId}`);
-}
-
-export function registrarCompraRetail(tenantId: number, datos: { proveedorId: number; numeroFactura: string; items: ItemCompraRetail[]; montoPagadoAhora?: number; monedaPago?: string }): Promise<CompraRetail> {
-  return request(`/api/retail/compras?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
-}
-
-/** Búsqueda unificada del POS de mostrador: código de barras, nombre/SKU, principio activo (Farmacia) o código OEM (Repuestos). */
-export function buscarArticulosRetail(tenantId: number, texto: string): Promise<Articulo[]> {
-  return request(`/api/retail/articulos/buscar?tenantId=${tenantId}&texto=${encodeURIComponent(texto)}`);
-}
-
-export interface ItemVentaRetailRequest {
-  articuloId: number;
-  cantidad: number;
-  presentacionId?: number;
-}
-
-export interface ItemVentaRetail {
-  id: number;
-  articulo: Articulo;
-  presentacion: PresentacionArticulo | null;
-  cantidad: number;
-  precioUnitario: number;
-  costoUnitario: number;
-}
-
-export interface VentaRetail {
-  id: number;
-  tenantId: number;
-  cliente: Cliente | null;
-  total: number;
-  moneda: string;
-  esCredito: boolean;
-  fechaRegistro: string;
-}
-
-export function registrarVentaRetail(tenantId: number, datos: {
-  clienteId?: number; items: ItemVentaRetailRequest[]; esCredito?: boolean;
-  metodoPago?: string; monedaPago?: string; montoRecibido?: number;
-}): Promise<{ venta: VentaRetail; items: ItemVentaRetail[] }> {
-  return request(`/api/retail/ventas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
-}
-
-export function listarVentasRetail(tenantId: number): Promise<VentaRetail[]> {
-  return request(`/api/retail/ventas?tenantId=${tenantId}`);
-}
-
-// --- Catálogo de cruce (Repuestos): qué código OEM/vehículos cruzan con un artículo ---
-
-export interface CruceRepuesto {
-  id: number;
-  tenantId: number;
-  articulo: Articulo;
-  codigoOem: string;
-  marcaVehiculo: string;
-  modeloVehiculo: string;
-  anioDesde: number | null;
-  anioHasta: number | null;
-  notas: string | null;
-}
-
-export function listarCrucesPorArticulo(articuloId: number, tenantId: number): Promise<CruceRepuesto[]> {
-  return request(`/api/retail/cruces?articuloId=${articuloId}&tenantId=${tenantId}`);
-}
-
-export function crearCruceRepuesto(tenantId: number, articuloId: number, datos: { codigoOem: string; marcaVehiculo: string; modeloVehiculo: string; anioDesde?: number; anioHasta?: number; notas?: string }): Promise<CruceRepuesto> {
-  return request(`/api/retail/cruces?tenantId=${tenantId}&articuloId=${articuloId}`, { method: "POST", body: JSON.stringify(datos) });
-}
-
-export function eliminarCruceRepuesto(id: number, tenantId: number): Promise<void> {
-  return request(`/api/retail/cruces/${id}?tenantId=${tenantId}`, { method: "DELETE" });
-}
-
 /** Corrección de inventario: indicá el stock REAL contado y el sistema calcula/ audita la diferencia solo. */
 export function ajustarStockArticulo(tenantId: number, articuloId: number, datos: { stockReal: number; motivo?: string }): Promise<Articulo> {
   return request(`/api/inventario/articulos/${articuloId}/ajustar-stock?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
@@ -2211,12 +2096,12 @@ const TENANTS_DEMO_DEFAULT: LicenciaTenant[] = [
   {
     id: 3,
     tenantId: 3,
-    nombreEmpresa: "Corporación Minera El Dorado",
-    moduloPrincipal: "minero",
+    nombreEmpresa: "Ferretería & Repuestos El Tornillo",
+    moduloPrincipal: "repuestos",
     tipoLicencia: "ENTERPRISE",
     activa: true,
     fechaVencimientoPago: "2027-01-01",
-    emailContacto: "operaciones@eldorado-gold.com",
+    emailContacto: "ventas@eltornillo.com",
     telefonoContacto: "+58 412-5554433",
     monedaBase: "USD",
   },
@@ -2554,9 +2439,7 @@ export async function listarModulosTenantSuperAdmin(tenantId: number): Promise<M
   const modulosDefault: ModuloTenant[] = [
     { tenantId, moduloNombre: "salud", activo: true },
     { tenantId, moduloNombre: "horeca", activo: false },
-    { tenantId, moduloNombre: "minero", activo: false },
     { tenantId, moduloNombre: "repuestos", activo: false },
-    { tenantId, moduloNombre: "moda", activo: false },
     { tenantId, moduloNombre: "ganaderia", activo: false },
   ];
   return modulosDefault;

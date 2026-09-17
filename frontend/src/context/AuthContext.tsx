@@ -124,20 +124,19 @@ function marcarTenantVisitado(tenantId: number) {
 // que todavía no tiene su propia plantilla cae en "clinica" por defecto (ver
 // VERTICAL_METADATA en Dashboard.tsx), así que agregar aquí una vertical
 // nueva no rompe nada, solo mejora qué tan preciso se ve el panel.
-// Farmacia/Ferretería/Repuestos NO entran acá a propósito: comparten el mismo
-// motor (Aurora Retail) pero cada una necesita distinguirse de las otras dos
-// dentro de la app (FEFO/Principio Activo en Farmacia, catálogo de cruce en
-// Repuestos, fraccionado en Ferretería) — así que su "industry" es su propio
-// nombre de módulo tal cual, no una categoría compartida. Ver el fallback más
-// abajo y RetailApp.tsx.
+// Farmacia NO entra acá a propósito: comparte el mismo motor (Aurora Retail)
+// que Comercio pero necesita distinguirse dentro de la app (FEFO/Principio
+// Activo, lotes/vencimiento) — así que su "industry" es su propio nombre de
+// módulo tal cual, no una categoría compartida. Ferretería/Repuestos/Retail se
+// unificaron en la UI bajo "Comercio" (ver ComercioApp.tsx), pero el valor de
+// `industry` de cada tenant existente se deja tal cual quedó registrado — el
+// fallback de abajo ya lo pasa tal cual sin necesitar entrada en este mapa.
 const MODULO_A_INDUSTRIA: Record<string, string> = {
   salud: "clinica",
   farmacia: "farmacia",
   horeca: "restaurante",
   restaurante: "restaurante",
   ganaderia: "finca",
-  moda: "ferreteria",
-  minero: "mineria",
   "tamanaco-comercial": "ferreteria",
 };
 

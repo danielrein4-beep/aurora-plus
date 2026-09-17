@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SpecularButton from "../components/SpecularButton";
 import {
-  IconClinic, IconHardware, IconMining,
-  IconRestaurant, IconFarm, IconRetail, IconCheck,
+  IconClinic, IconHardware,
+  IconRestaurant, IconFarm, IconCheck,
 } from "../Icons";
 
 const INDUSTRIES = [
@@ -17,19 +17,11 @@ const INDUSTRIES = [
   },
   {
     Icon: IconHardware,
-    name: "Ferretería",
+    name: "Comercio",
     color: "from-orange-400 to-amber-500",
-    tagline: "Tu bodega bajo control total",
-    desc: "Control de inventario en tiempo real, punto de venta por mostrador, gestión de proveedores y cotizaciones rápidas para tus clientes.",
-    modulos: ["POS por mostrador", "Inventario con alertas de stock", "Gestión de proveedores", "Cotizaciones y órdenes de compra", "Cuentas por cobrar", "Reportes de rotación de productos"],
-  },
-  {
-    Icon: IconMining,
-    name: "Minería",
-    color: "from-slate-400 to-gray-500",
-    tagline: "Operaciones a gran escala, bajo control",
-    desc: "Trazabilidad de maquinaria, gestión de turnos, órdenes de trabajo, control de seguridad e informes regulatorios desde una sola plataforma.",
-    modulos: ["Control de maquinaria y equipos", "Gestión de turnos y personal", "Órdenes de trabajo y mantención", "Reportes de seguridad e incidentes", "Control de materiales y explosivos", "Cumplimiento regulatorio"],
+    tagline: "Tu mostrador y tu inventario bajo control total",
+    desc: "Punto de venta por mostrador, código de barras, inventario en tiempo real, gestión de proveedores y cuentas por cobrar — para ferreterías, tiendas y comercios de todo tipo.",
+    modulos: ["POS por mostrador con escáner de código de barras", "Inventario con alertas de stock", "Gestión de proveedores", "Cotizaciones y órdenes de compra", "Cuentas por cobrar", "Reportes de rotación de productos"],
   },
   {
     Icon: IconRestaurant,
@@ -47,14 +39,6 @@ const INDUSTRIES = [
     desc: "Registro sanitario por animal, vacunación, rotación de potreros, control de inventario ganadero y trazabilidad completa desde nacimiento.",
     modulos: ["Registro individual por animal", "Calendario de vacunación", "Rotación y control de potreros", "Inventario de insumos agrícolas", "Trazabilidad de lotes", "Reportes de producción ganadera"],
   },
-  {
-    Icon: IconRetail,
-    name: "Retail",
-    color: "from-violet-400 to-purple-600",
-    tagline: "Vende más, gestiona menos",
-    desc: "POS para tiendas físicas, control de inventario multitienda, programa de fidelización de clientes y analítica de ventas por categoría.",
-    modulos: ["Punto de venta multitienda", "Inventario en tiempo real", "Programa de puntos y fidelización", "Gestión de devoluciones", "Reportes por categoría y temporada", "Integración con e-commerce"],
-  },
 ];
 
 export default function Industrias() {
@@ -69,7 +53,7 @@ export default function Industrias() {
       <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-16">
         <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-4 py-1.5 text-xs text-teal-600 dark:text-teal-300 mb-6 font-medium">
           <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-          6 industrias con módulos propios
+          4 industrias con módulos propios
         </div>
         <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 dark:text-white mb-5">
           Hecho para tu industria,<br />

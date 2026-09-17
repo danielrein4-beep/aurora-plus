@@ -53,7 +53,7 @@ public class SuperAdminController {
 
     public static class CrearTenantRequest {
         public String nombreEmpresa;
-        public String moduloPrincipal; // minero, horeca, repuestos, moda, tamanaco-comercial, ganaderia...
+        public String moduloPrincipal; // horeca, repuestos, ferreteria, comercio, tamanaco-comercial, ganaderia...
         public LicenciaTenant.TipoLicencia tipoLicencia;
         public String emailContacto;
         public String telefonoContacto;
