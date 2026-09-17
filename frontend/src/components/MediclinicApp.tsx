@@ -17,7 +17,7 @@ import {
   contadorInboxExamenesRecibidos, listarExamenesRecibidosPorPaciente, type ExamenRecibidoPaciente,
   listarPacientes, crearPaciente, actualizarPaciente, eliminarPaciente, buscarPacientePorIdentificacion,
   listarCitasDelDia, listarCitasPorRango, agendarCita, actualizarEstadoCita, reprogramarCita, listarCobrosDelDia,
-  listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera, procesarCobro,
+  listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera, llamarAConsultorioSalaEspera, procesarCobro,
   listarCierresCaja, registrarCierreCaja,
   listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta, eliminarConsulta,
   listarCotizaciones, crearCotizacion, actualizarEstadoCotizacion, eliminarCotizacion as eliminarCotizacionApi,
@@ -110,6 +110,12 @@ export const claveSalaEsperaTurnos = (tenantId: number) => `aurora_mediclinic_sa
 
 export interface TurnoSalaEspera {
   id: string;
+  // ID real en `salud_sala_espera` — cuando existe, este turno está sincronizado
+  // con el backend y sus cambios de estado se ven en cualquier dispositivo
+  // (recepción y doctor en PCs distintos). Sin backendId, el turno vive solo en
+  // este navegador (no debería pasar ya que la admisión siempre crea/vincula un
+  // paciente real, pero se deja como fallback defensivo).
+  backendId?: number;
   turnoNumero: number;
   codigoTurno: string;
   pacienteId: number | null;
@@ -818,7 +824,17 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     if (!user?.tenantId) return;
     recargarTodo();
     const interval = setInterval(cargarContadorLab, 30000);
-    return () => clearInterval(interval);
+    // Sala de espera en vivo: sin esto, lo que admite/llama/atiende la secretaria
+    // en su PC nunca le llega al doctor en la suya (y viceversa) hasta que alguien
+    // recargue la página — cada quien se queda mirando la foto de cuando entró.
+    // No hay WebSocket en el proyecto, así que se resuelve con polling corto.
+    const intervalSalaEspera = setInterval(() => {
+      listarSalaEspera(tenantId).then(setSalaEspera).catch(() => {});
+    }, 6000);
+    return () => {
+      clearInterval(interval);
+      clearInterval(intervalSalaEspera);
+    };
   }, [tenantId]);
 
   // Si no hay perfil activo seleccionado, renderizar la pantalla estilo Netflix
@@ -2834,6 +2850,15 @@ function HistoriasClinicas({
     motivoConsulta: "",
     talla: "1.75",
     peso: "70.0",
+    // Antes no existían — los informes médicos imprimían "120/80, 75bpm,
+    // 36.8°C, 99% SatO2" fijos para CUALQUIER paciente porque no había dónde
+    // capturarlos de verdad. El backend (ConsultaMedica.java) ya los guarda;
+    // solo faltaba el formulario.
+    presionArterial: "",
+    frecuenciaCardiaca: "",
+    frecuenciaRespiratoria: "",
+    temperatura: "",
+    saturacionOxigeno: "",
     observacionFisica: "",
     evolucionClinica: "",
     evolucionEstado: "" as "" | "MEJORO" | "IGUAL" | "EMPEORO",
@@ -2900,6 +2925,11 @@ function HistoriasClinicas({
       motivoConsulta: "",
       talla: "1.75",
       peso: "70.0",
+      presionArterial: "",
+      frecuenciaCardiaca: "",
+      frecuenciaRespiratoria: "",
+      temperatura: "",
+      saturacionOxigeno: "",
       observacionFisica: "",
       evolucionClinica: "",
       evolucionEstado: "",
@@ -2935,21 +2965,21 @@ function HistoriasClinicas({
         identificacion: pacienteSeleccionado.identificacion,
         edad: pacienteSeleccionado.fechaNacimiento
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
-          : pacienteSeleccionado.edad || 34,
+          : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: hoy(),
       },
       signosVitales: {
-        ta: "120/80",
-        fc: "75",
-        fr: "18",
-        temp: "36.8",
+        ta: form.presionArterial.trim() || "No registrado",
+        fc: form.frecuenciaCardiaca || "No registrado",
+        fr: form.frecuenciaRespiratoria || "No registrado",
+        temp: form.temperatura || "No registrado",
         peso: `${form.peso || "70"} kg`,
         talla: `${form.talla || "1.75"} m`,
         imc: imcCalc,
-        satO2: "99%",
+        satO2: form.saturacionOxigeno ? `${form.saturacionOxigeno}%` : "No registrado",
       },
       motivoConsulta: form.motivoConsulta || "Control de rutina y evolución clínica",
       evolucionClinica: form.evolucionClinica,
@@ -2984,6 +3014,11 @@ function HistoriasClinicas({
         anotacionesPrivadas: form.anotacionesPrivadas,
         talla: form.talla,
         peso: form.peso,
+        presionArterial: form.presionArterial.trim() || undefined,
+        frecuenciaCardiaca: form.frecuenciaCardiaca ? Number(form.frecuenciaCardiaca) : undefined,
+        frecuenciaRespiratoria: form.frecuenciaRespiratoria ? Number(form.frecuenciaRespiratoria) : undefined,
+        temperatura: form.temperatura ? Number(form.temperatura) : undefined,
+        saturacionOxigeno: form.saturacionOxigeno ? Number(form.saturacionOxigeno) : undefined,
         observacionFisica: form.observacionFisica,
         evolucionClinica: form.evolucionClinica,
         evolucionEstado: form.evolucionEstado || undefined,
@@ -3041,24 +3076,24 @@ function HistoriasClinicas({
         identificacion: pacienteSeleccionado.identificacion,
         edad: pacienteSeleccionado.fechaNacimiento
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
-          : pacienteSeleccionado.edad || 34,
+          : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
-        ta: "120/80",
-        fc: "75",
-        fr: "18",
-        temp: "36.8",
-        peso: "70 kg",
-        talla: "1.75 m",
-        imc: "22.8",
-        satO2: "99%",
+        ta: c.presionArterial || "No registrado",
+        fc: c.frecuenciaCardiaca != null ? String(c.frecuenciaCardiaca) : "No registrado",
+        fr: c.frecuenciaRespiratoria != null ? String(c.frecuenciaRespiratoria) : "No registrado",
+        temp: c.temperatura != null ? String(c.temperatura) : "No registrado",
+        peso: c.peso ? `${c.peso} kg` : "No registrado",
+        talla: c.talla ? `${c.talla} m` : "No registrado",
+        imc: c.imc != null ? String(c.imc) : "No registrado",
+        satO2: c.saturacionOxigeno != null ? `${c.saturacionOxigeno}%` : "No registrado",
       },
       motivoConsulta: c.motivoConsulta || "Consulta Médica",
-      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      evolucionClinica: c.evolucionClinica || "Sin notas de evolución registradas.",
       diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
       planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
       proximaCita: undefined,
@@ -3089,24 +3124,24 @@ function HistoriasClinicas({
         identificacion: pacienteSeleccionado.identificacion,
         edad: pacienteSeleccionado.fechaNacimiento
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
-          : pacienteSeleccionado.edad || 34,
+          : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
-        ta: "120/80",
-        fc: "75",
-        fr: "18",
-        temp: "36.8",
-        peso: "70 kg",
-        talla: "1.75 m",
-        imc: "22.8",
-        satO2: "99%",
+        ta: c.presionArterial || "No registrado",
+        fc: c.frecuenciaCardiaca != null ? String(c.frecuenciaCardiaca) : "No registrado",
+        fr: c.frecuenciaRespiratoria != null ? String(c.frecuenciaRespiratoria) : "No registrado",
+        temp: c.temperatura != null ? String(c.temperatura) : "No registrado",
+        peso: c.peso ? `${c.peso} kg` : "No registrado",
+        talla: c.talla ? `${c.talla} m` : "No registrado",
+        imc: c.imc != null ? String(c.imc) : "No registrado",
+        satO2: c.saturacionOxigeno != null ? `${c.saturacionOxigeno}%` : "No registrado",
       },
       motivoConsulta: c.motivoConsulta || "Consulta Médica",
-      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      evolucionClinica: c.evolucionClinica || "Sin notas de evolución registradas.",
       diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
       planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
       proximaCita: undefined,
@@ -3140,24 +3175,24 @@ function HistoriasClinicas({
         identificacion: pacienteSeleccionado.identificacion,
         edad: pacienteSeleccionado.fechaNacimiento
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
-          : pacienteSeleccionado.edad || 34,
+          : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
-        ta: "120/80",
-        fc: "75",
-        fr: "18",
-        temp: "36.8",
-        peso: "70 kg",
-        talla: "1.75 m",
-        imc: "22.8",
-        satO2: "99%",
+        ta: c.presionArterial || "No registrado",
+        fc: c.frecuenciaCardiaca != null ? String(c.frecuenciaCardiaca) : "No registrado",
+        fr: c.frecuenciaRespiratoria != null ? String(c.frecuenciaRespiratoria) : "No registrado",
+        temp: c.temperatura != null ? String(c.temperatura) : "No registrado",
+        peso: c.peso ? `${c.peso} kg` : "No registrado",
+        talla: c.talla ? `${c.talla} m` : "No registrado",
+        imc: c.imc != null ? String(c.imc) : "No registrado",
+        satO2: c.saturacionOxigeno != null ? `${c.saturacionOxigeno}%` : "No registrado",
       },
       motivoConsulta: c.motivoConsulta || "Consulta Médica",
-      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      evolucionClinica: c.evolucionClinica || "Sin notas de evolución registradas.",
       diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
       planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
       proximaCita: undefined,
@@ -3689,6 +3724,31 @@ function HistoriasClinicas({
                             Peso: {consultaSeleccionadaFicha.peso} kg
                           </span>
                         )}
+                        {consultaSeleccionadaFicha.presionArterial && (
+                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                            TA: {consultaSeleccionadaFicha.presionArterial}
+                          </span>
+                        )}
+                        {consultaSeleccionadaFicha.frecuenciaCardiaca != null && (
+                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                            FC: {consultaSeleccionadaFicha.frecuenciaCardiaca} bpm
+                          </span>
+                        )}
+                        {consultaSeleccionadaFicha.frecuenciaRespiratoria != null && (
+                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                            FR: {consultaSeleccionadaFicha.frecuenciaRespiratoria} rpm
+                          </span>
+                        )}
+                        {consultaSeleccionadaFicha.temperatura != null && (
+                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                            Temp: {consultaSeleccionadaFicha.temperatura}°C
+                          </span>
+                        )}
+                        {consultaSeleccionadaFicha.saturacionOxigeno != null && (
+                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                            SatO2: {consultaSeleccionadaFicha.saturacionOxigeno}%
+                          </span>
+                        )}
                         {consultaSeleccionadaFicha.observacionFisica && (
                           <span className="bg-white/10 border border-white/15 text-slate-200 px-2.5 py-0.5 rounded-lg">
                             {consultaSeleccionadaFicha.observacionFisica}
@@ -3883,6 +3943,72 @@ function HistoriasClinicas({
                     value={form.observacionFisica}
                     onChange={(e) => setForm({ ...form, observacionFisica: e.target.value })}
                     className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2b. Signos Vitales — sin estos campos, los informes que se imprimen/
+                envían por WhatsApp o correo mostraban valores inventados (120/80,
+                75bpm, 36.8°C, 99% SatO2) para cualquier paciente. Todos opcionales:
+                si el doctor no los toma, el informe dice "No registrado" en vez de
+                fabricar un dato médico falso. */}
+            <div className="rounded-2xl p-4 border border-rose-200/80 dark:border-rose-500/20 bg-rose-50/40 dark:bg-rose-950/20 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-rose-700 dark:text-rose-300">
+                <IconStethoscope size={14} />
+                <span>Signos Vitales</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Presión Arterial</span>
+                  <input
+                    type="text"
+                    placeholder="Ej. 120/80"
+                    value={form.presionArterial}
+                    onChange={(e) => setForm({ ...form, presionArterial: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Frec. Cardíaca (bpm)</span>
+                  <input
+                    type="number"
+                    placeholder="Ej. 75"
+                    value={form.frecuenciaCardiaca}
+                    onChange={(e) => setForm({ ...form, frecuenciaCardiaca: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Frec. Respiratoria (rpm)</span>
+                  <input
+                    type="number"
+                    placeholder="Ej. 18"
+                    value={form.frecuenciaRespiratoria}
+                    onChange={(e) => setForm({ ...form, frecuenciaRespiratoria: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Temperatura (°C)</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    placeholder="Ej. 36.8"
+                    value={form.temperatura}
+                    onChange={(e) => setForm({ ...form, temperatura: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Saturación O2 (%)</span>
+                  <input
+                    type="number"
+                    placeholder="Ej. 98"
+                    value={form.saturacionOxigeno}
+                    onChange={(e) => setForm({ ...form, saturacionOxigeno: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
               </div>
@@ -5151,29 +5277,6 @@ function Procedimientos({
 // SALA DE ESPERA & GESTIÓN DE TURNOS EN TIEMPO REAL
 // ══════════════════════════════════════════════════════════════════════════
 
-export interface TurnoSalaEspera {
-  id: string;
-  turnoNumero: number;
-  codigoTurno: string;
-  pacienteId: number | null;
-  pacienteNombre: string;
-  pacienteCedula: string;
-  pacienteTelefono: string;
-  horaLlegada: string;
-  fecha: string;
-  motivo: string;
-  consultorio: string;
-  estado: "EN_ESPERA" | "EN_CONSULTA" | "ATENDIDO" | "CANCELADO";
-  estadoPago: "PAGADO" | "PENDIENTE" | "EXONERADO" | "PARCIAL";
-  metodoPago?: string;
-  moneda?: "USD" | "VES" | "COP";
-  montoCobrado?: number;
-  montoUSD?: number;
-  montoVES?: number;
-  montoCOP?: number;
-  referenciaPago?: string;
-}
-
 const MOTIVOS_CONSULTA_SUGERIDOS = [
   "Consulta Médica General",
   "Consulta Especializada",
@@ -5227,6 +5330,68 @@ function SalaEspera({
       localStorage.setItem(claveSalaEsperaTurnos(tenantId), JSON.stringify(turnos));
     } catch {}
   }, [turnos, tenantId]);
+
+  // Sincroniza contra el backend (fuente de verdad para el ESTADO) cada vez que
+  // llega un `entradas` fresco — ya sea por el polling del padre (cada 6s) o
+  // porque esta misma pantalla acaba de hacer un cambio. Así lo que admite o
+  // atiende la secretaria en su PC le aparece al doctor en la suya, y viceversa,
+  // sin depender de que ambos tengan el mismo localStorage (que nunca comparten).
+  useEffect(() => {
+    if (!entradas) return;
+    setTurnos((prev) => {
+      const porBackendId = new Map(
+        prev.filter((t) => t.backendId != null).map((t) => [t.backendId as number, t])
+      );
+      const activosIds = new Set(entradas.map((e) => e.id));
+      let proximoNumero = prev.reduce((max, t) => Math.max(max, t.turnoNumero || 0), 0) + 1;
+
+      // Turnos activos según el backend: actualiza el estado si ya existían
+      // localmente, o los sintetiza si llegaron de otro dispositivo.
+      const activos: TurnoSalaEspera[] = entradas.map((entrada) => {
+        const existente = porBackendId.get(entrada.id);
+        if (existente) {
+          return {
+            ...existente,
+            estado: entrada.estado as TurnoSalaEspera["estado"],
+            consultorio: entrada.consultorio || existente.consultorio,
+          };
+        }
+        const numero = proximoNumero++;
+        return {
+          id: `sync-${entrada.id}`,
+          backendId: entrada.id,
+          turnoNumero: numero,
+          codigoTurno: `T-${String(numero).padStart(2, "0")}`,
+          pacienteId: entrada.paciente?.id ?? null,
+          pacienteNombre: entrada.paciente?.nombreCompleto || "Paciente",
+          pacienteCedula: entrada.paciente?.identificacion || "S/C",
+          pacienteTelefono: entrada.paciente?.telefono || "S/T",
+          horaLlegada: entrada.horaLlegada
+            ? new Date(entrada.horaLlegada).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          fecha: hoy(),
+          motivo: "Consulta Médica General",
+          consultorio: entrada.consultorio || "Consultorio 1 (Doctor)",
+          estado: entrada.estado as TurnoSalaEspera["estado"],
+          estadoPago: "PENDIENTE",
+        };
+      });
+
+      // Turnos con backendId que ya no están activos en el backend: si se
+      // acaban de finalizar (en este u otro dispositivo), se conservan en la
+      // lista marcados ATENDIDO en vez de desaparecer de golpe; si ya estaban
+      // en un estado terminal, se dejan tal cual.
+      const yaNoActivos = prev
+        .filter((t) => t.backendId != null && !activosIds.has(t.backendId as number))
+        .map((t) => (t.estado === "ATENDIDO" || t.estado === "CANCELADO" ? t : { ...t, estado: "ATENDIDO" as const }));
+
+      // Turnos puramente locales (sin backendId todavía) — no debería pasar en
+      // uso normal, pero se conservan como red de seguridad.
+      const soloLocales = prev.filter((t) => t.backendId == null);
+
+      return [...activos, ...yaNoActivos, ...soloLocales];
+    });
+  }, [entradas]);
 
   // Modales
   const [modalAdmitir, setModalAdmitir] = useState(false);
@@ -5306,6 +5471,34 @@ function SalaEspera({
   };
 
   // Ejecutar admisión de nuevo paciente a sala de espera
+  // Busca el paciente por cédula (en la lista cargada o en el backend) y si no
+  // existe lo crea — así un walk-in sin ficha previa queda igual admitido con
+  // un paciente REAL, requisito de `salud_sala_espera.paciente_id` (not null).
+  // Antes, sin cédula/paciente elegido del combo, la admisión nunca llegaba al
+  // backend y solo el navegador de quien la creó sabía que ese turno existía.
+  const resolverPacienteAdmision = async (): Promise<number> => {
+    if (admitirPacienteId) return Number(admitirPacienteId);
+    const cedula = admitirCedulaManual.trim();
+    if (cedula && pacientes) {
+      const cedulaLimpia = cedula.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const match = pacientes.find((p) => (p.identificacion || "").toLowerCase().replace(/[^a-z0-9]/g, "") === cedulaLimpia);
+      if (match) return match.id;
+    }
+    if (cedula) {
+      const encontrado = await buscarPacientePorIdentificacion(tenantId, cedula);
+      if (encontrado) return encontrado.id;
+    }
+    const nombreCompleto = admitirNombreManual.trim();
+    const [primerNombre, ...resto] = nombreCompleto.split(/\s+/);
+    const creado = await crearPaciente(tenantId, {
+      identificacion: cedula || `SC-${Date.now()}`,
+      nombres: primerNombre || nombreCompleto,
+      apellidos: resto.join(" ") || "-",
+      telefono: admitirTelefono.trim() || undefined,
+    });
+    return creado.id;
+  };
+
   const handleGuardarAdmision = async (e: React.FormEvent) => {
     e.preventDefault();
     const nombreFinal = admitirNombreManual.trim();
@@ -5316,6 +5509,7 @@ function SalaEspera({
 
     setGuardandoAdmision(true);
     try {
+      const pacienteIdResuelto = await resolverPacienteAdmision();
       const maxNumero = turnos.reduce((max, t) => Math.max(max, t.turnoNumero || 0), 0);
       const nuevoNumero = maxNumero + 1;
       const codigoTurno = `T-${String(nuevoNumero).padStart(2, "0")}`;
@@ -5343,7 +5537,7 @@ function SalaEspera({
         id: `turno-${Date.now()}`,
         turnoNumero: nuevoNumero,
         codigoTurno,
-        pacienteId: admitirPacienteId ? Number(admitirPacienteId) : null,
+        pacienteId: pacienteIdResuelto,
         pacienteNombre: nombreFinal,
         pacienteCedula: admitirCedulaManual.trim() || "S/C",
         pacienteTelefono: admitirTelefono.trim() || "S/T",
@@ -5382,7 +5576,7 @@ function SalaEspera({
         onAgregarCobro(cobroItem);
         try {
           await procesarCobro(tenantId, {
-            pacienteId: admitirPacienteId ? Number(admitirPacienteId) : undefined,
+            pacienteId: pacienteIdResuelto,
             concepto: admitirMotivo.trim() || "Consulta Médica",
             montoTotal: montoNum,
             monedaCobrada: monedaCobro,
@@ -5396,15 +5590,19 @@ function SalaEspera({
         }
       }
 
-      // Backend sync
-      if (admitirPacienteId && tenantId) {
-        registrarLlegadaSalaEspera(tenantId, Number(admitirPacienteId), admitirConsultorio).catch((err) => {
-          dispararToast(`⚠️ El paciente quedó en la sala de espera local, pero no se pudo registrar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
-        });
+      // Backend sync — se espera la respuesta (no fire-and-forget) para capturar
+      // el ID real de `salud_sala_espera` en `backendId`: sin él, este turno
+      // nunca se reconciliaría con lo que ve el doctor en su propia pantalla.
+      let backendId: number | undefined;
+      try {
+        const entradaCreada = await registrarLlegadaSalaEspera(tenantId, pacienteIdResuelto, admitirConsultorio);
+        backendId = entradaCreada.id;
+      } catch (err) {
+        dispararToast(`⚠️ El paciente quedó en la sala de espera local, pero no se pudo registrar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
       }
 
       // Agregar al final (los nuevos van abajo, el primero queda arriba)
-      setTurnos((prev) => [...prev, nuevoTurno]);
+      setTurnos((prev) => [...prev, { ...nuevoTurno, backendId }]);
       dispararToast(`¡Paciente admitido con Turno ${codigoTurno}!`);
 
       // Limpiar formulario y cerrar modal
@@ -5420,12 +5618,27 @@ function SalaEspera({
     }
   };
 
-  // Cambiar estado de turno
+  // Cambiar estado de turno — actualiza optimistamente en pantalla Y en el
+  // backend real (cuando el turno tiene backendId), para que el cambio de
+  // estado se vea en cualquier otro dispositivo, no solo en este navegador.
   const handleCambiarEstado = (id: string, nuevoEstado: TurnoSalaEspera["estado"]) => {
+    const turno = turnos.find((t) => t.id === id);
     setTurnos((prev) =>
       prev.map((t) => (t.id === id ? { ...t, estado: nuevoEstado } : t))
     );
     dispararToast(`Turno actualizado a: ${nuevoEstado.replace("_", " ")}`);
+
+    if (turno?.backendId != null) {
+      const sync =
+        nuevoEstado === "EN_CONSULTA"
+          ? llamarAConsultorioSalaEspera(turno.backendId, turno.consultorio)
+          : nuevoEstado === "ATENDIDO"
+          ? finalizarAtencionSalaEspera(turno.backendId, tenantId)
+          : null; // EN_ESPERA/CANCELADO: sin endpoint de retroceso/anulación en el backend, se queda local.
+      sync?.catch((err) => {
+        dispararToast(`⚠️ Se actualizó en pantalla, pero no se pudo sincronizar con el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+      });
+    }
     onCambio();
   };
 

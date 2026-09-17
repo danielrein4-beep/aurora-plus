@@ -320,7 +320,7 @@ export function construirDocInformeConsulta(data: ConsultaReportData): jsPDF {
   doc.setFont("helvetica", "bold");
   doc.text("EDAD:", 18, y + 13);
   doc.setFont("helvetica", "normal");
-  doc.text(`${data.paciente.edad} años`, 32, y + 13);
+  doc.text(typeof data.paciente.edad === "number" ? `${data.paciente.edad} años` : "No registrada", 32, y + 13);
 
   doc.setFont("helvetica", "bold");
   doc.text("TELÉFONO:", 70, y + 13);

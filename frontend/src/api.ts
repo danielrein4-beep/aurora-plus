@@ -479,6 +479,11 @@ export async function finalizarAtencionSalaEspera(id: number, tenantId: number =
   return request(`/api/salud/sala-espera/${id}/finalizar?tenantId=${tenantId}`, { method: "POST" });
 }
 
+export async function llamarAConsultorioSalaEspera(id: number, consultorio?: string): Promise<SalaEsperaEntrada> {
+  const params = consultorio ? `?consultorio=${encodeURIComponent(consultorio)}` : "";
+  return request(`/api/salud/sala-espera/${id}/llamar${params}`, { method: "POST" });
+}
+
 export interface ProcedimientoMedico {
   id: number;
   nombre: string;
@@ -559,6 +564,14 @@ export interface ConsultaMedica {
   observacionFisica?: string;
   talla?: string;
   peso?: string;
+  /** "120/80" tal cual la anota el doctor — sin este campo, los informes imprimían un valor inventado. */
+  presionArterial?: string;
+  frecuenciaCardiaca?: number;
+  frecuenciaRespiratoria?: number;
+  temperatura?: number;
+  saturacionOxigeno?: number;
+  /** Calculado y devuelto por el backend a partir de peso/talla — no se envía, solo se lee. */
+  imc?: number;
   evolucionClinica?: string;
   /** Cómo llegó el paciente respecto a su visita anterior — alimenta la gráfica de
    * tendencia de evolución en Historias Clínicas. Solo tiene sentido en consultas de
