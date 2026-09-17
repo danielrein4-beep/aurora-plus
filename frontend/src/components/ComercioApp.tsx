@@ -23,12 +23,18 @@ import {
   listarComprasRepuesto,
   registrarCompraRepuesto,
   listarMovimientos,
+  abrirTurno,
+  turnoAbierto,
+  historialTurnos,
+  registrarEgresoTurno,
+  cerrarTurno,
   type RepuestoItem,
   type PresentacionRepuesto,
   type MovimientoRepuesto,
   type ProveedorRepuesto,
   type CompraRepuesto,
   type MovimientoCaja,
+  type Turno,
 } from "../api";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -623,9 +629,6 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [carrito.length, modalCobro, modalNuevoProducto, kardexModalItem, presentacionesModalItem, modalCompraProveedor, ventaReciente, busqueda]);
 
-  // Arqueo Ciego
-  const [desgloseCaja, setDesgloseCaja] = useState({ usd: "", ves: "", punto: "", pagoMovil: "", zelle: "", cop: "" });
-  const [cajaCerradaMsg, setCajaCerradaMsg] = useState<string | null>(null);
 
   // Filtro de productos según perfil y búsqueda
   const productosFiltrados = useMemo(() => {
@@ -1599,100 +1602,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════
-            TAB 4: CIERRE DE CAJA (CIERRE Z) CON ARQUEO CIEGO
+            TAB 4: CIERRE & REPORTES — TURNOS DE CAJA CON ARQUEO REAL
+            (mismo motor /api/financiero/turnos que usa Aurora Horeca)
             ══════════════════════════════════════════════════════════════════ */}
-        {tab === "cierre" && (
-          <div className="max-w-2xl mx-auto w-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 space-y-5">
-            <div className="border-b border-slate-200 dark:border-slate-800 pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Cierre de Turno de Mostrador (Cierre Z)</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Arqueo ciego de caja: cuenta físicamente el dinero para auditar sobrantes o faltantes.</p>
-              </div>
-              <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-bold font-mono">
-                Arqueo Ciego
-              </span>
-            </div>
-
-            {cajaCerradaMsg ? (
-              <div className="p-4 rounded-2xl bg-teal-500/15 border border-teal-500/30 text-center space-y-2">
-                <IconCheckCircle size={32} className="text-teal-400 mx-auto" />
-                <h4 className="font-bold text-slate-900 dark:text-white text-base">{cajaCerradaMsg}</h4>
-                <p className="text-xs text-slate-600 dark:text-slate-300">El turno ha sido cerrado y auditado. El reporte Z fue guardado.</p>
-                <button
-                  onClick={() => { setCajaCerradaMsg(null); setTab("pos"); }}
-                  className="mt-3 px-5 py-2 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400"
-                >
-                  Abrir Nuevo Turno
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💵 Efectivo USD ($)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.usd}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, usd: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇻🇪 Efectivo Bs</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.ves}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, ves: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💳 Punto de Venta (Bs)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.punto}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, punto: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">📲 Pago Móvil (Bs)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.pagoMovil}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, pagoMovil: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">⚡ Zelle / USDT ($)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.zelle}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, zelle: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇨🇴 Pesos COP</label>
-                    <input
-                      type="number" step="1" placeholder="0" value={desgloseCaja.cop}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, cop: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    const totalUSDContado = (Number(desgloseCaja.usd) || 0) + (Number(desgloseCaja.zelle) || 0) +
-                      ((Number(desgloseCaja.ves) || 0) + (Number(desgloseCaja.punto) || 0) + (Number(desgloseCaja.pagoMovil) || 0)) / tasaActivaBs +
-                      ((Number(desgloseCaja.cop) || 0) / tasaCop);
-
-                    setCajaCerradaMsg(`Cierre Z Generado · Total Contado: $${totalUSDContado.toFixed(2)} USD`);
-                  }}
-                  className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm cursor-pointer shadow-lg"
-                >
-                  Cerrar Turno & Auditar Caja
-                </button>
-              </div>
-            )}
-          </div>
+        {tab === "cierre" && user?.tenantId && (
+          <TurnoCajaComercio tenantId={user.tenantId} tasaUsdVes={tasaActivaBs} tasaUsdCop={tasaCop} />
         )}
 
         </main>
@@ -2546,6 +2460,325 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         </div>
       )}
 
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMPONENTE: TURNOS DE CAJA & CIERRE Z (mismo motor /api/financiero/turnos
+// que usa Aurora Horeca — apertura con monto base, egresos y arqueo ciego al
+// cierre, con historial y auditoría real en el backend, no solo un cálculo
+// local que se perdía al recargar la página).
+// ══════════════════════════════════════════════════════════════════════════
+function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: number; tasaUsdVes: number; tasaUsdCop: number }) {
+  const MONEDAS = ["USD", "VES", "COP"] as const;
+  const [moneda, setMoneda] = useState<typeof MONEDAS[number]>("USD");
+  const [turno, setTurno] = useState<Turno | null | undefined>(undefined); // undefined = cargando
+  const [historial, setHistorial] = useState<Turno[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [idCajero, setIdCajero] = useState("");
+  const [montoBase, setMontoBase] = useState("");
+  const [abriendo, setAbriendo] = useState(false);
+
+  const [montoEgreso, setMontoEgreso] = useState("");
+  const [conceptoEgreso, setConceptoEgreso] = useState("");
+  const [registrandoEgreso, setRegistrandoEgreso] = useState(false);
+
+  const [montoDeclarado, setMontoDeclarado] = useState("");
+  const [modoArqueo, setModoArqueo] = useState<"DIRECTO" | "DESGLOSADO">("DESGLOSADO");
+  const [desgloseArqueo, setDesgloseArqueo] = useState({ usd: "", ves: "", punto: "", pagoMovil: "", zelle: "", cop: "" });
+  const [cerrando, setCerrando] = useState(false);
+  const [ultimoCierre, setUltimoCierre] = useState<Turno | null>(null);
+
+  const totalDesgloseCalculado = useMemo(() => {
+    const usd = Number(desgloseArqueo.usd) || 0;
+    const zelle = Number(desgloseArqueo.zelle) || 0;
+    const ves = (Number(desgloseArqueo.ves) || 0) + (Number(desgloseArqueo.punto) || 0) + (Number(desgloseArqueo.pagoMovil) || 0);
+    const cop = Number(desgloseArqueo.cop) || 0;
+
+    if (moneda === "USD") {
+      return usd + zelle + (tasaUsdVes > 0 ? ves / tasaUsdVes : 0) + (tasaUsdCop > 0 ? cop / tasaUsdCop : 0);
+    } else if (moneda === "VES") {
+      return ves + (usd + zelle) * tasaUsdVes + (tasaUsdCop > 0 ? (cop / tasaUsdCop) * tasaUsdVes : 0);
+    } else {
+      return cop + (usd + zelle) * tasaUsdCop;
+    }
+  }, [desgloseArqueo, moneda, tasaUsdVes, tasaUsdCop]);
+
+  const montoDeclaradoFinal = modoArqueo === "DESGLOSADO" ? totalDesgloseCalculado : (Number(montoDeclarado) || 0);
+
+  const cargarTurno = () => {
+    setTurno(undefined);
+    turnoAbierto(tenantId, moneda).then(setTurno).catch(() => setTurno(null));
+  };
+  const cargarHistorial = () => { historialTurnos(tenantId).then(setHistorial).catch(() => setHistorial([])); };
+  useEffect(() => { cargarTurno(); }, [tenantId, moneda]);
+  useEffect(() => { cargarHistorial(); }, [tenantId]);
+
+  const abrir = async () => {
+    setError(null);
+    if (!idCajero.trim()) { setError("Indicá quién abre la caja"); return; }
+    if (montoBase === "" || Number(montoBase) < 0) { setError("Indicá el monto base de apertura"); return; }
+    setAbriendo(true);
+    try {
+      await abrirTurno(tenantId, { idCajero: idCajero.trim(), montoBase: Number(montoBase), moneda });
+      setMontoBase("");
+      cargarTurno();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo abrir el turno");
+    } finally {
+      setAbriendo(false);
+    }
+  };
+
+  const registrarEgreso = async () => {
+    if (!turno) return;
+    setError(null);
+    if (!montoEgreso || Number(montoEgreso) <= 0) { setError("Indicá el monto del egreso"); return; }
+    setRegistrandoEgreso(true);
+    try {
+      await registrarEgresoTurno(tenantId, turno.id, Number(montoEgreso), conceptoEgreso.trim() || undefined);
+      setMontoEgreso(""); setConceptoEgreso("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar el egreso");
+    } finally {
+      setRegistrandoEgreso(false);
+    }
+  };
+
+  const cerrar = async () => {
+    if (!turno) return;
+    setError(null);
+    if (montoDeclaradoFinal < 0) { setError("Indicá lo contado físicamente en caja"); return; }
+    if (!window.confirm(`¿Cerrar el turno con monto declarado de ${montoDeclaradoFinal.toFixed(2)} ${moneda}? Esto genera el Cierre Z y no se puede deshacer.`)) return;
+    setCerrando(true);
+    try {
+      const cerrado = await cerrarTurno(tenantId, turno.id, montoDeclaradoFinal);
+      setUltimoCierre(cerrado);
+      setMontoDeclarado("");
+      setDesgloseArqueo({ usd: "", ves: "", punto: "", pagoMovil: "", zelle: "", cop: "" });
+      cargarTurno();
+      cargarHistorial();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cerrar el turno");
+    } finally {
+      setCerrando(false);
+    }
+  };
+
+  const inputCls = "w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white";
+
+  return (
+    <div className="max-w-2xl mx-auto w-full space-y-5">
+      <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-slate-800 text-xs w-fit">
+        {MONEDAS.map((m) => (
+          <button key={m} onClick={() => setMoneda(m)} className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer ${moneda === m ? "bg-teal-500 text-slate-950" : "text-slate-600 dark:text-slate-400"}`}>
+            {m}
+          </button>
+        ))}
+      </div>
+
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      {turno === undefined ? (
+        <p className="text-xs text-slate-500 dark:text-slate-400">Cargando…</p>
+      ) : turno === null ? (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Abrir turno de caja ({moneda})</h3>
+          <p className="text-slate-500 dark:text-slate-400 text-xs">No hay ninguna caja abierta en {moneda} ahora mismo.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Cajero / Responsable</label>
+              <input value={idCajero} onChange={(e) => setIdCajero(e.target.value)} placeholder="Nombre de quien abre" className={inputCls} />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Monto base de apertura ({moneda})</label>
+              <input value={montoBase} onChange={(e) => setMontoBase(e.target.value)} type="number" step="0.01" placeholder="0.00" className={inputCls} />
+            </div>
+          </div>
+          <button onClick={abrir} disabled={abriendo} className="px-5 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-sm font-bold cursor-pointer disabled:opacity-60">
+            {abriendo ? "Abriendo…" : "Abrir Caja"}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 space-y-1">
+            <div className="flex items-center justify-between">
+              <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Caja abierta ({moneda})</h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-300">ABIERTO</span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Cajero: {turno.idCajero} · Desde {new Date(turno.fechaApertura).toLocaleString()}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Monto base: {Number(turno.montoBase).toFixed(2)} {moneda}</p>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm">Registrar Egreso</h4>
+            <p className="text-slate-500 dark:text-slate-400 text-xs">Pago a proveedor, gasto menor u otra salida de dinero de esta caja.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-3">
+              <input value={montoEgreso} onChange={(e) => setMontoEgreso(e.target.value)} type="number" step="0.01" placeholder={`Monto ${moneda}`} className={inputCls} />
+              <input value={conceptoEgreso} onChange={(e) => setConceptoEgreso(e.target.value)} placeholder="Concepto (ej. Pago a proveedor)" className={inputCls} />
+            </div>
+            <button onClick={registrarEgreso} disabled={registrandoEgreso} className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer disabled:opacity-60 border border-slate-300 dark:border-slate-700">
+              {registrandoEgreso ? "Registrando…" : "− Registrar Egreso"}
+            </button>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-amber-500/30 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-slate-900 dark:text-white text-sm">Cierre de Caja (Cierre Z)</h4>
+                <p className="text-slate-500 dark:text-slate-400 text-xs">Arqueo a ciegas: contá el dinero físico y declará lo que hay para auditar faltantes o sobrantes.</p>
+              </div>
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 flex-shrink-0">
+                Arqueo Ciego
+              </span>
+            </div>
+
+            <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs w-fit">
+              <button
+                type="button"
+                onClick={() => setModoArqueo("DESGLOSADO")}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                  modoArqueo === "DESGLOSADO" ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-300 shadow-sm" : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                Desglose por Método
+              </button>
+              <button
+                type="button"
+                onClick={() => setModoArqueo("DIRECTO")}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                  modoArqueo === "DIRECTO" ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-300 shadow-sm" : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                Monto Directo
+              </button>
+            </div>
+
+            {modoArqueo === "DESGLOSADO" ? (
+              <div className="space-y-3 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  Ingresá lo contado físicamente en cada método para calcular el total sin errores:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💵 Efectivo USD ($)</label>
+                    <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.usd}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, usd: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇻🇪 Efectivo Bs</label>
+                    <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.ves}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, ves: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💳 Punto de Venta (Bs)</label>
+                    <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.punto}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, punto: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">📲 Pago Móvil (Bs)</label>
+                    <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.pagoMovil}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, pagoMovil: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">⚡ Zelle / USDT ($)</label>
+                    <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.zelle}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, zelle: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇨🇴 Pesos COP</label>
+                    <input type="number" step="1" min="0" placeholder="0" value={desgloseArqueo.cop}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, cop: e.target.value }))} className={inputCls} />
+                  </div>
+                </div>
+                <div className="pt-2 flex items-center justify-between border-t border-slate-200 dark:border-slate-700">
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Total declarado acumulado:</span>
+                  <span className="font-mono font-black text-base text-teal-600 dark:text-teal-400">{totalDesgloseCalculado.toFixed(2)} {moneda}</span>
+                </div>
+              </div>
+            ) : (
+              <input
+                value={montoDeclarado}
+                onChange={(e) => setMontoDeclarado(e.target.value)}
+                type="number" step="0.01"
+                placeholder={`Monto contado total en ${moneda}`}
+                className={inputCls}
+              />
+            )}
+
+            <button onClick={cerrar} disabled={cerrando} className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm cursor-pointer disabled:opacity-60 shadow-lg">
+              {cerrando ? "Cerrando turno y auditando…" : `Cerrar Turno y Generar Cierre Z (${montoDeclaradoFinal.toFixed(2)} ${moneda})`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {ultimoCierre && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Cierre Z Registrado</h3>
+              <button onClick={() => setUltimoCierre(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="text-slate-500 dark:text-slate-400 text-xs">Esperado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{Number(ultimoCierre.montoEsperado).toFixed(2)} {ultimoCierre.moneda}</div></div>
+              <div><span className="text-slate-500 dark:text-slate-400 text-xs">Declarado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{Number(ultimoCierre.montoDeclarado).toFixed(2)} {ultimoCierre.moneda}</div></div>
+            </div>
+            <div className={`rounded-xl p-3 text-center font-mono font-bold ${
+              Number(ultimoCierre.descuadre) === 0 ? "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+              : Number(ultimoCierre.descuadre) > 0 ? "bg-sky-500/15 text-sky-600 dark:text-sky-300"
+              : "bg-red-500/15 text-red-500"
+            }`}>
+              {Number(ultimoCierre.descuadre) === 0 ? "Caja cuadrada exacta"
+                : Number(ultimoCierre.descuadre) > 0 ? `Sobrante: +${Number(ultimoCierre.descuadre).toFixed(2)} ${ultimoCierre.moneda}`
+                : `Faltante: ${Number(ultimoCierre.descuadre).toFixed(2)} ${ultimoCierre.moneda}`}
+            </div>
+            <button onClick={() => setUltimoCierre(null)} className="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {historial && historial.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5">
+          <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-3">Historial de Turnos</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-400 dark:text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-700">
+                  <th className="py-2 pr-2">Apertura</th>
+                  <th className="py-2 px-2">Cajero</th>
+                  <th className="py-2 px-2">Moneda</th>
+                  <th className="py-2 px-2 text-right">Base</th>
+                  <th className="py-2 px-2 text-right">Esperado</th>
+                  <th className="py-2 px-2 text-right">Declarado</th>
+                  <th className="py-2 pl-2 text-right">Descuadre</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historial.map((t) => (
+                  <tr key={t.id} className="border-b border-slate-100 dark:border-slate-800">
+                    <td className="py-2 pr-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{new Date(t.fechaApertura).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-slate-600 dark:text-slate-400">{t.idCajero}</td>
+                    <td className="py-2 px-2 text-slate-600 dark:text-slate-400">{t.moneda}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-slate-400">{Number(t.montoBase).toFixed(2)}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-slate-400">{t.montoEsperado != null ? Number(t.montoEsperado).toFixed(2) : "—"}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-slate-400">{t.montoDeclarado != null ? Number(t.montoDeclarado).toFixed(2) : "—"}</td>
+                    <td className={`py-2 pl-2 text-right font-mono font-bold ${
+                      t.descuadre == null ? "text-slate-400" : Number(t.descuadre) === 0 ? "text-teal-600 dark:text-teal-400" : "text-red-500"
+                    }`}>
+                      {t.descuadre != null ? Number(t.descuadre).toFixed(2) : (t.estado === "ABIERTO" ? "Abierto" : "—")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
