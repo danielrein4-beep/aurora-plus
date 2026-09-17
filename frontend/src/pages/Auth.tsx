@@ -4,7 +4,7 @@ import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconLock,
   IconRestaurant, IconPrescription, IconHardware, IconClinic,
-  IconRetail, IconVet, IconFarm, IconBank,
+  IconVet, IconFarm, IconBank,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import { solicitarRecuperacionClave } from "../api";
@@ -26,12 +26,11 @@ interface RubroNegocioItem {
 const RUBROS_REGISTRO: RubroNegocioItem[] = [
   { id: "restaurante", label: "Restaurante & Cafetería", sub: "Comandas, KDS, mesas y delivery", Icon: IconRestaurant, modulo: "horeca", ruta: "/restaurante", nombreDefault: "Mi Restaurante" },
   { id: "farmacia", label: "Farmacia & Droguería", sub: "Medicamentos, lotes y mostrador", Icon: IconPrescription, modulo: "salud", ruta: "/comercio", nombreDefault: "Mi Farmacia" },
-  { id: "ferreteria", label: "Ferretería & Materiales", sub: "POS, inventario y retail", Icon: IconHardware, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Ferretería" },
+  { id: "comercio", label: "Comercio", sub: "POS mostrador, código de barras e inventario", Icon: IconHardware, modulo: "comercio", ruta: "/comercio", nombreDefault: "Mi Negocio" },
   { id: "clinica", label: "Clínica & Consultorios", sub: "Historias clínicas y citas", Icon: IconClinic, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Consultorio" },
-  { id: "retail", label: "Comercio & Tienda Retail", sub: "Venta mostrador y stock", Icon: IconRetail, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Tienda" },
   { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "Fichas, vacunas y petshop", Icon: IconVet, modulo: "salud", ruta: "/veterinaria", nombreDefault: "Mi Veterinaria" },
   { id: "finca", label: "Finca & Ganadería", sub: "Potreros, vacunas y animales", Icon: IconFarm, modulo: "ganaderia", ruta: "/dashboard", nombreDefault: "Mi Finca" },
-  { id: "otro", label: "Otro Rubro Comercial", sub: "ERP y suite administrativa", Icon: IconBank, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Empresa" },
+  { id: "otro", label: "Otro Rubro Comercial", sub: "ERP y suite administrativa", Icon: IconBank, modulo: "comercio", ruta: "/comercio", nombreDefault: "Mi Empresa" },
 ];
 
 export default function Auth() {

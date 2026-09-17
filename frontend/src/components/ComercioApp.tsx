@@ -32,7 +32,12 @@ import {
 // ══════════════════════════════════════════════════════════════════════════
 // TIPOS Y MODELOS
 // ══════════════════════════════════════════════════════════════════════════
-export type PerfilComercio = "ferreteria" | "farmacia" | "retail" | "repuestos";
+// "comercio" es el nombre unificado para tenants nuevos (Ferretería/Repuestos/Retail
+// bajo una sola identidad — ver comentario en ComercioApp más abajo); "ferreteria",
+// "repuestos" y "retail" se mantienen como alias para tenants ya registrados con esos
+// valores. Todos los cuatro se ven y funcionan exactamente igual. Farmacia es la
+// única rama realmente distinta.
+export type PerfilComercio = "ferreteria" | "farmacia" | "retail" | "repuestos" | "comercio";
 
 export interface ProductoComercio {
   id: string;
@@ -399,7 +404,16 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     user?.industry === "farmacia" ? "farmacia" :
     user?.industry === "retail" ? "retail" :
     user?.industry === "repuestos" ? "repuestos" :
+    user?.industry === "comercio" ? "comercio" :
     "ferreteria";
+
+  // Ferretería, Repuestos, Retail y Comercio son una sola identidad visual — un
+  // solo nombre, un solo ícono, un solo set de campos — desde que se unificaron
+  // bajo "Comercio". Solo Farmacia sigue siendo genuinamente distinta (lotes,
+  // vencimiento, principio activo). Usar este flag en vez de repetir la
+  // comparación de 4 valores en cada punto donde antes había una rama por rubro.
+  const esFarmacia = perfilActivo === "farmacia";
+  const esComercio = !esFarmacia;
 
   // Motor Multi-Tasa Fronterizo (USDT / BCV / COP / Propia)
   const [tipoTasaActiva, setTipoTasaActiva] = useState<"USDT" | "BCV" | "PERSONALIZADA">(() => {
@@ -859,10 +873,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   };
 
   const nombreLocal = user?.empresa || (
-    perfilActivo === "ferreteria" ? "Ferretería & Repuestos El Tornillo" :
-    perfilActivo === "farmacia" ? "Farmacia & Droguería San Cristóbal" :
-    perfilActivo === "repuestos" ? "Repuestos Automotrices El Motor" :
-    "Comercio & Minimarket Express"
+    esFarmacia ? "Farmacia & Droguería San Cristóbal" : "Comercio El Tornillo"
   );
 
   return (
@@ -878,9 +889,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         >
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-400 p-0.5 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform flex-shrink-0">
             <div className="w-full h-full bg-slate-50 dark:bg-slate-950 rounded-[10px] flex items-center justify-center">
-              {perfilActivo === "farmacia" ? <IconPrescription size={18} className="text-teal-400" /> :
-               perfilActivo === "ferreteria" || perfilActivo === "repuestos" ? <IconHardware size={18} className="text-teal-400" /> :
-               <IconRetail size={18} className="text-teal-400" />}
+              {esFarmacia ? <IconPrescription size={18} className="text-teal-400" /> :
+               <IconHardware size={18} className="text-teal-400" />}
             </div>
           </div>
           <div className="min-w-0">
@@ -888,7 +898,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               {nombreLocal}
             </div>
             <div className="text-[9px] text-slate-500 dark:text-slate-400 tracking-wider uppercase truncate">
-              Aurora Retail · {perfilActivo.toUpperCase()}
+              Aurora {esFarmacia ? "Farmacia" : "Comercio"}
             </div>
           </div>
         </button>
@@ -1062,11 +1072,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                   placeholder={
-                    perfilActivo === "farmacia"
+                    esFarmacia
                       ? "🔍 Buscar por medicamento, principio activo (ej. Acetaminofén), lote o escanear código..."
-                      : perfilActivo === "ferreteria"
-                      ? "🔍 Buscar por producto, código de parte (ej. TORN-38, Hilux), medida o código de barra..."
-                      : "🔍 Buscar producto, marca o escanear código de barras..."
+                      : "🔍 Buscar por producto, código de parte (ej. TORN-38, Hilux), medida o escanear código de barra..."
                   }
                   className="w-full pl-10 pr-20 py-3 rounded-2xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700/80 focus:border-teal-500 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none shadow-inner"
                   autoFocus
@@ -1308,13 +1316,13 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               <div>
                 <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Control de Inventario & Stock</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {perfilActivo === "ferreteria" || perfilActivo === "repuestos" 
+                  {esComercio
                     ? "Kárdex auditable, presentaciones fraccionadas, escala mayorista y compras a proveedores."
                     : "Catálogo de productos, existencias, lotes y precios de venta."}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {(perfilActivo === "ferreteria" || perfilActivo === "repuestos" || perfilActivo === "retail") && (
+                {esComercio && (
                   <>
                     <button
                       onClick={() => cargarRepuestosBackend()}
@@ -1338,7 +1346,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   onClick={() => setModalNuevoProducto(true)}
                   className="px-4 py-2 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400 shadow-md transition-colors"
                 >
-                  + Nuevo {perfilActivo === "ferreteria" || perfilActivo === "repuestos" ? "Repuesto / Artículo" : "Producto"}
+                  + Nuevo {esComercio ? "Producto / Artículo" : "Producto"}
                 </button>
               </div>
             </div>
@@ -1350,15 +1358,15 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     <th className="p-3">Código</th>
                     <th className="p-3">Producto</th>
                     <th className="p-3">Categoría</th>
-                    {perfilActivo === "farmacia" && <th className="p-3">Principio Activo</th>}
-                    {perfilActivo === "farmacia" && <th className="p-3">Lote / Vence</th>}
-                    {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && <th className="p-3">Unidad / Ubicación</th>}
-                    {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && <th className="p-3">Escala Mayorista</th>}
+                    {esFarmacia && <th className="p-3">Principio Activo</th>}
+                    {esFarmacia && <th className="p-3">Lote / Vence</th>}
+                    {esComercio && <th className="p-3">Unidad / Ubicación</th>}
+                    {esComercio && <th className="p-3">Escala Mayorista</th>}
                     <th className="p-3 text-right">Stock</th>
-                    {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && <th className="p-3 text-right">Último Costo</th>}
+                    {esComercio && <th className="p-3 text-right">Último Costo</th>}
                     <th className="p-3 text-right">Precio USD</th>
                     <th className="p-3 text-right">Precio Bs</th>
-                    {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && <th className="p-3 text-center">Gestión</th>}
+                    {esComercio && <th className="p-3 text-center">Gestión</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-mono">
@@ -1370,10 +1378,10 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       </td>
                       <td className="p-3 font-sans font-bold text-slate-900 dark:text-white">{p.nombre}</td>
                       <td className="p-3 font-sans text-slate-500 dark:text-slate-400">{p.categoria}</td>
-                      {perfilActivo === "farmacia" && <td className="p-3 text-emerald-400">{p.principioActivo || "—"}</td>}
-                      {perfilActivo === "farmacia" && <td className="p-3 text-slate-600 dark:text-slate-300">{p.lote || "—"} ({p.fechaVencimiento || "—"})</td>}
-                      {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && <td className="p-3 text-slate-600 dark:text-slate-300">{p.unidadMedida || "Pza"} · {p.ubicacion || "Almacén"}</td>}
-                      {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && (
+                      {esFarmacia && <td className="p-3 text-emerald-400">{p.principioActivo || "—"}</td>}
+                      {esFarmacia && <td className="p-3 text-slate-600 dark:text-slate-300">{p.lote || "—"} ({p.fechaVencimiento || "—"})</td>}
+                      {esComercio && <td className="p-3 text-slate-600 dark:text-slate-300">{p.unidadMedida || "Pza"} · {p.ubicacion || "Almacén"}</td>}
+                      {esComercio && (
                         <td className="p-3 text-emerald-400 text-xs">
                           {p.precioMayorista && p.cantidadMinimaMayorista
                             ? `$${p.precioMayorista.toFixed(2)} (≥${p.cantidadMinimaMayorista} ${p.unidadMedida || 'u'})`
@@ -1383,14 +1391,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       <td className={`p-3 text-right font-bold ${p.stock <= p.stockMinimo ? "text-amber-400" : "text-teal-400"}`}>
                         {p.stock}
                       </td>
-                      {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && (
+                      {esComercio && (
                         <td className="p-3 text-right text-slate-500 dark:text-slate-400 font-mono">
                           ${p.costo.toFixed(2)}
                         </td>
                       )}
                       <td className="p-3 text-right font-bold text-slate-900 dark:text-white">${p.precio.toFixed(2)}</td>
                       <td className="p-3 text-right text-slate-600 dark:text-slate-300">Bs. {(p.precio * tasaActivaBs).toFixed(2)}</td>
-                      {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && (
+                      {esComercio && (
                         <td className="p-3 text-center space-x-1.5 whitespace-nowrap">
                           <button
                             onClick={() => setKardexModalItem(p)}
@@ -1819,7 +1827,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Nuevo Producto ({perfilActivo.toUpperCase()})</h3>
+              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Nuevo Producto ({esFarmacia ? "FARMACIA" : "COMERCIO"})</h3>
               <button onClick={() => setModalNuevoProducto(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white"><IconClose size={18} /></button>
             </div>
 
@@ -1866,7 +1874,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   codigo,
                   codigoOem,
                   nombre,
-                  categoria: String(fd.get("categoria") || (perfilActivo === "ferreteria" || perfilActivo === "repuestos" ? "Repuestos & Ferretería" : "General")),
+                  categoria: String(fd.get("categoria") || (esComercio ? "Repuestos & Ferretería" : "General")),
                   rubro: perfilActivo,
                   precio,
                   costo,
@@ -1915,7 +1923,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 </div>
               </div>
 
-              {perfilActivo === "farmacia" && (
+              {esFarmacia && (
                 <div className="p-3 bg-slate-100/60 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 space-y-2">
                   <div>
                     <label className="text-[10px] font-bold text-emerald-400 block mb-1">Principio Activo</label>
@@ -1928,7 +1936,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 </div>
               )}
 
-              {(perfilActivo === "ferreteria" || perfilActivo === "repuestos") && (
+              {esComercio && (
                 <div className="space-y-3 p-3.5 bg-slate-100/60 dark:bg-slate-800/50 rounded-2xl border border-slate-300 dark:border-slate-700">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -2055,7 +2063,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         </div>
       )}
 
-      {/* ── MODAL KÁRDEX AUDITABLE DE FERRETERÍA / REPUESTOS ── */}
+      {/* ── MODAL KÁRDEX AUDITABLE DE COMERCIO ── */}
       {kardexModalItem && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
@@ -2214,7 +2222,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
       {/* ── MODAL REGISTRO DE FACTURA DE COMPRA A PROVEEDOR ── */}
       {modalCompraProveedor && (
-        <ModalCompraProveedorFerreteria
+        <ModalCompraProveedorComercio
           tenantId={user?.tenantId || 1}
           productos={productos.filter((p) => p.rubro === perfilActivo)}
           proveedores={proveedoresRepuesto}
@@ -2249,7 +2257,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// COMPONENTE: MODAL DE FACTURA DE COMPRA A PROVEEDOR (FERRETERÍA & REPUESTOS)
+// COMPONENTE: MODAL DE FACTURA DE COMPRA A PROVEEDOR (COMERCIO)
 // ══════════════════════════════════════════════════════════════════════════
 interface ModalCompraProveedorProps {
   tenantId: number;
@@ -2260,7 +2268,7 @@ interface ModalCompraProveedorProps {
   onNuevoProveedor: (p: ProveedorRepuesto) => void;
 }
 
-function ModalCompraProveedorFerreteria({
+function ModalCompraProveedorComercio({
   tenantId,
   productos,
   proveedores,

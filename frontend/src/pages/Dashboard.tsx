@@ -38,9 +38,10 @@ const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNod
   clinica: IconClinic,
   farmacia: IconPrescription,
   veterinaria: IconVet,
+  comercio: IconHardware,
   ferreteria: IconHardware,
   repuestos: IconHardware,
-  retail: IconCard,
+  retail: IconHardware,
   restaurante: IconRestaurant,
   finca: IconFarm,
   ganaderia: IconFarm,
@@ -131,33 +132,15 @@ const VERTICAL_METADATA: Record<string, {
     ],
     defaultPatients: [],
   },
-  ferreteria: {
-    name: "FerrePlus ERP",
-    badge: "EDICIÓN FERRETERÍA & RETAIL",
-    desc: "Kardex multi-unidad, lista de precios por volumen, compras y POS mostrador.",
+  comercio: {
+    name: "Aurora Comercio",
+    badge: "EDICIÓN COMERCIO",
+    desc: "POS mostrador con código de barras, kardex multi-unidad, compras a proveedores y cuentas por cobrar.",
     stats: [
       { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
       { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-sky-500 dark:text-sky-400" },
       { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
       { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-amber-500 dark:text-amber-400" },
-    ],
-    actions: [
-      { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
-      { label: "Consultar Kardex", desc: "Stock por bodega y listas de precio" },
-      { label: "Nueva Cotización", desc: "Presupuesto con validez temporal" },
-      { label: "Cierre de Turno", desc: "Arqueo de caja y corte Z" },
-    ],
-    defaultPatients: [],
-  },
-  repuestos: {
-    name: "Aurora Repuestos & Autopartes",
-    badge: "EDICIÓN REPUESTOS & AUTOPARTES",
-    desc: "Catálogo OEM/SKU, ventas por volumen, presentaciones múltiples y compras a proveedores.",
-    stats: [
-      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Artículos en Stock", val: "0", change: "Sin repuestos cargados", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Órdenes de Compra", val: "0", change: "Sin compras registradas", color: "text-amber-500 dark:text-amber-400" },
     ],
     actions: [
       { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
@@ -185,15 +168,53 @@ const VERTICAL_METADATA: Record<string, {
     ],
     defaultPatients: [],
   },
-  retail: {
-    name: "Aurora Retail & Minimarket",
-    badge: "EDICIÓN RETAIL & COMERCIO",
-    desc: "Caja rápida mostrador, lector de código de barras, control de inventario y cuentas por cobrar.",
+  // Ferretería/Repuestos/Retail son alias de "comercio" para tenants ya
+  // registrados con esos valores — mismo contenido, una sola identidad visual.
+  ferreteria: {
+    name: "Aurora Comercio",
+    badge: "EDICIÓN COMERCIO",
+    desc: "POS mostrador con código de barras, kardex multi-unidad, compras a proveedores y cuentas por cobrar.",
     stats: [
       { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
       { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-sky-500 dark:text-sky-400" },
       { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Caja del Día", val: "$0.00", change: "Multi-moneda (USD/VES/COP)", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-amber-500 dark:text-amber-400" },
+    ],
+    actions: [
+      { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
+      { label: "Consultar Kardex", desc: "Stock por bodega y listas de precio" },
+      { label: "Nueva Cotización", desc: "Presupuesto con validez temporal" },
+      { label: "Cierre de Turno", desc: "Arqueo de caja y corte Z" },
+    ],
+    defaultPatients: [],
+  },
+  repuestos: {
+    name: "Aurora Comercio",
+    badge: "EDICIÓN COMERCIO",
+    desc: "POS mostrador con código de barras, kardex multi-unidad, compras a proveedores y cuentas por cobrar.",
+    stats: [
+      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-amber-500 dark:text-amber-400" },
+    ],
+    actions: [
+      { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
+      { label: "Consultar Kardex", desc: "Stock por bodega y listas de precio" },
+      { label: "Nueva Cotización", desc: "Presupuesto con validez temporal" },
+      { label: "Cierre de Turno", desc: "Arqueo de caja y corte Z" },
+    ],
+    defaultPatients: [],
+  },
+  retail: {
+    name: "Aurora Comercio",
+    badge: "EDICIÓN COMERCIO",
+    desc: "POS mostrador con código de barras, kardex multi-unidad, compras a proveedores y cuentas por cobrar.",
+    stats: [
+      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-amber-500 dark:text-amber-400" },
     ],
     actions: [
       { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
@@ -271,14 +292,18 @@ export default function Dashboard() {
   const [repuestosReales, setRepuestosReales] = useState<RepuestoItem[] | null>(null);
   const [mapaReales, setMapaReales] = useState<MapaMesaEntrada[] | null>(null);
 
+  // Ferretería/Repuestos/Retail/Comercio son una sola identidad unificada
+  // (ver ComercioApp.tsx); Farmacia comparte la misma app/ruta pero sigue
+  // siendo su propio rubro visualmente.
+  const esRubroComercio = userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "comercio";
   const esClinicaReal = (userIndustry === "clinica" || userIndustry === "veterinaria") && !!user?.tenantId;
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
-  const esComercioReal = (userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "farmacia" || userIndustry === "retail") && !!user?.tenantId;
+  const esComercioReal = (esRubroComercio || userIndustry === "farmacia") && !!user?.tenantId;
   const esGanaderiaReal = (userIndustry === "finca" || userIndustry === "ganaderia") && !!user?.tenantId;
   const rutaVertical =
     userIndustry === "restaurante"
       ? "/restaurante"
-      : (userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "farmacia" || userIndustry === "retail")
+      : (esRubroComercio || userIndustry === "farmacia")
         ? "/comercio"
         : (userIndustry === "finca" || userIndustry === "ganaderia")
           ? "/ganaderia"
@@ -353,8 +378,8 @@ export default function Dashboard() {
           },
         ]);
       });
-    } else if (userIndustry === "ferreteria" || userIndustry === "repuestos") {
-      // 2. Ferretería & Repuestos: tesorería, stock y compras
+    } else if (esRubroComercio) {
+      // 2. Comercio (Ferretería/Repuestos/Retail unificados): tesorería, stock y compras
       Promise.allSettled([
         resumenPeriodoAbierto(tid, "USD"),
         listarRepuestos(),
@@ -403,56 +428,6 @@ export default function Dashboard() {
             label: "Órdenes de Compra",
             val: String(compList.length),
             change: compList.length > 0 ? `${compList.length} compras registradas` : "Sin compras registradas",
-            color: "text-amber-400",
-          },
-        ]);
-      });
-    } else if (userIndustry === "retail") {
-      // 3. Retail & Comercio: ventas de caja, stock y CXC
-      Promise.allSettled([
-        resumenPeriodoAbierto(tid, "USD"),
-        listarRepuestos(),
-        listarMovimientos(tid, "CXC"),
-      ]).then(([resTes, resRep, resCxc]) => {
-        const tes = resTes.status === "fulfilled" ? resTes.value : null;
-        const ventasVal = tes ? Number(tes.totalIngresos) || 0 : 0;
-        const cajaVal = tes ? Number(tes.montoEsperadoEnCaja) || 0 : 0;
-        const cantMovs = tes ? Number(tes.cantidadMovimientos) || 0 : 0;
-
-        const repList = resRep.status === "fulfilled" && Array.isArray(resRep.value)
-          ? resRep.value.filter(r => r.tenantId === tid)
-          : [];
-        setRepuestosReales(repList);
-        const bajoMinimo = repList.filter(r => (r.stockActual || 0) <= 5).length;
-
-        const cxcList = resCxc.status === "fulfilled" && Array.isArray(resCxc.value)
-          ? resCxc.value.filter(m => m.estado === "PENDIENTE")
-          : [];
-        const cxcTotal = cxcList.reduce((sum, m) => sum + (Number(m.saldoPendiente ?? m.monto) || 0), 0);
-
-        setMetricasEnVivo([
-          {
-            label: "Ventas de Hoy",
-            val: `$${ventasVal.toFixed(2)}`,
-            change: cantMovs > 0 ? `${cantMovs} tickets emitidos` : "Sin ventas hoy",
-            color: "text-teal-400",
-          },
-          {
-            label: "Artículos en Stock",
-            val: String(repList.length),
-            change: repList.length > 0 ? `${bajoMinimo} bajo mínimo` : "Sin artículos cargados",
-            color: "text-sky-400",
-          },
-          {
-            label: "Cuentas x Cobrar",
-            val: `$${cxcTotal.toFixed(2)}`,
-            change: cxcList.length > 0 ? `${cxcList.length} créditos clientes` : "Al día (sin deudas)",
-            color: "text-purple-400",
-          },
-          {
-            label: "Caja del Día",
-            val: `$${cajaVal.toFixed(2)}`,
-            change: "Multi-moneda (USD/VES/COP)",
             color: "text-amber-400",
           },
         ]);
@@ -881,8 +856,7 @@ export default function Dashboard() {
                     <h3 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white">
                       {userIndustry === "restaurante" ? "Espacio Gastronómico & POS en Vivo" :
                        userIndustry === "farmacia" ? "Espacio de Farmacia & Droguería en Vivo" :
-                       userIndustry === "ferreteria" || userIndustry === "repuestos" ? "Espacio de Ferretería & Repuestos en Vivo" :
-                       userIndustry === "retail" ? "Espacio de Retail & Mostrador POS en Vivo" :
+                       esRubroComercio ? "Espacio de Comercio en Vivo" :
                        userIndustry === "finca" || userIndustry === "ganaderia" ? "Espacio Agropecuario & Ganadería en Vivo" :
                        userIndustry === "veterinaria" ? "Espacio Veterinario & Mascotas en Vivo" :
                        "Espacio de Trabajo Clínico en Vivo"}
@@ -890,8 +864,7 @@ export default function Dashboard() {
                     <p className="text-slate-500 dark:text-white/40 text-xs">
                       {userIndustry === "restaurante" ? "Venta rápida, mapa de mesas, KDS de cocina y control de caja multi-moneda." :
                        userIndustry === "farmacia" ? "Dispensación de medicamentos, control de lotes y ventas por mostrador." :
-                       userIndustry === "ferreteria" || userIndustry === "repuestos" ? "Kardex multi-unidad, catálogo OEM/SKU, compras y cuentas por cobrar." :
-                       userIndustry === "retail" ? "Caja rápida mostrador, lector de código de barras, control de inventario y cuentas por cobrar." :
+                       esRubroComercio ? "Kardex multi-unidad, código de barras, compras y cuentas por cobrar." :
                        userIndustry === "finca" || userIndustry === "ganaderia" ? "Rotación agronómica de potreros, control de hato, producción lechera y trazabilidad." :
                        userIndustry === "veterinaria" ? "Expedientes por mascota, plan de vacunas, cirugías e inventario veterinario." :
                        "Base de datos PostgreSQL Multi-tenant sincronizada en tiempo real."}
@@ -915,7 +888,7 @@ export default function Dashboard() {
                     }`}>
                     {userIndustry === "finca" || userIndustry === "ganaderia" ? "Hato & Animales" :
                      userIndustry === "restaurante" ? "Mesas & Comandas" :
-                     userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "farmacia" ? "Kárdex & Stock" :
+                     esRubroComercio || userIndustry === "farmacia" ? "Kárdex & Stock" :
                      userIndustry === "veterinaria" ? "Expedientes Mascotas" :
                      "Expedientes & Triaje"}
                   </button>
@@ -926,7 +899,7 @@ export default function Dashboard() {
                     }`}>
                     {userIndustry === "finca" || userIndustry === "ganaderia" ? "Agenda Sanitaria" :
                      userIndustry === "restaurante" ? "Reservas & Turnos" :
-                     userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "farmacia" ? "Recepciones & Pedidos" :
+                     esRubroComercio || userIndustry === "farmacia" ? "Recepciones & Pedidos" :
                      "Agenda de Citas"}
                   </button>
                 </div>
@@ -939,7 +912,7 @@ export default function Dashboard() {
                     <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">
                       {userIndustry === "finca" || userIndustry === "ganaderia" ? "Inventario Reciente de Animales en el Hato" :
                        userIndustry === "restaurante" ? "Mesas y Comandas en el Salón" :
-                       userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "farmacia" ? "Artículos en Catálogo & Kárdex" :
+                       esRubroComercio || userIndustry === "farmacia" ? "Artículos en Catálogo & Kárdex" :
                        userIndustry === "veterinaria" ? "Expedientes Veterinarios & Pacientes" :
                        "Lista de Pacientes en Consulta / Triaje"}
                     </h4>
@@ -948,7 +921,7 @@ export default function Dashboard() {
                       className="btn-electric-blue text-xs font-semibold px-4 py-2 rounded-full cursor-pointer">
                       {userIndustry === "finca" || userIndustry === "ganaderia" ? "+ Registrar Animal" :
                        userIndustry === "restaurante" ? "+ Abrir Mesa" :
-                       userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "farmacia" ? "+ Nuevo Artículo" :
+                       esRubroComercio || userIndustry === "farmacia" ? "+ Nuevo Artículo" :
                        "+ Ingresar Paciente"}
                     </button>
                   </div>
@@ -998,7 +971,7 @@ export default function Dashboard() {
                             )}
                           </tbody>
                         </>
-                      ) : (userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "farmacia") ? (
+                      ) : (esRubroComercio || userIndustry === "farmacia") ? (
                         <>
                           <thead className="bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
                             <tr>
