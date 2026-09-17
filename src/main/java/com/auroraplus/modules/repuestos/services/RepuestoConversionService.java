@@ -304,6 +304,53 @@ public class RepuestoConversionService {
         return new ResultadoVenta(precioUnitarioAplicado, total, esMayorista);
     }
 
+    /**
+     * Corrección de inventario: el usuario indica el stock REAL contado (ej. tras un
+     * conteo físico) y el sistema calcula la diferencia solo, dejando el ajuste
+     * registrado en el Kárdex (TipoMovimiento.AJUSTE) para poder auditarlo después —
+     * mismo patrón que Horeca (ajustarStockArticulo), pero sin tocar caja: un ajuste
+     * de inventario no es una venta ni una compra, no genera ingreso ni egreso.
+     */
+    @Transactional
+    public RepuestoItem ajustarStock(Long repuestoId, Long tenantId, BigDecimal stockReal, String motivo) {
+        if (stockReal == null || stockReal.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("El stock real no puede ser negativo");
+        }
+
+        RepuestoItem repuesto = repuestoItemRepository.buscarConBloqueoPesimista(repuestoId)
+            .orElseThrow(() -> new RuntimeException("Repuesto no encontrado"));
+
+        if (!repuesto.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Repuesto no pertenece a este tenant");
+        }
+
+        BigDecimal stockAnterior = repuesto.getStockActual();
+        BigDecimal diferencia = stockReal.subtract(stockAnterior);
+        if (diferencia.compareTo(BigDecimal.ZERO) == 0) {
+            return repuesto;
+        }
+
+        repuesto.setStockActual(stockReal);
+        repuestoItemRepository.save(repuesto);
+
+        MovimientoRepuesto movimiento = new MovimientoRepuesto();
+        movimiento.setTenantId(tenantId);
+        movimiento.setRepuesto(repuesto);
+        movimiento.setTipo(MovimientoRepuesto.TipoMovimiento.AJUSTE);
+        movimiento.setCantidad(diferencia.abs());
+        movimiento.setStockAnterior(stockAnterior);
+        movimiento.setStockNuevo(stockReal);
+        movimiento.setMotivo((motivo == null || motivo.isBlank() ? "Ajuste de inventario" : motivo)
+            + " (" + (diferencia.compareTo(BigDecimal.ZERO) > 0 ? "+" : "") + diferencia + ")");
+        movimientoRepuestoRepository.save(movimiento);
+
+        if (diferencia.compareTo(BigDecimal.ZERO) < 0) {
+            intentarGenerarBorrador(repuesto);
+        }
+
+        return repuesto;
+    }
+
     public static class ResultadoVenta {
         private final BigDecimal precioUnitarioAplicado;
         private final BigDecimal total;

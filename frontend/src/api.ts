@@ -2487,6 +2487,8 @@ export interface RepuestoItem {
   precioMayorista?: number | null;
   cantidadMinimaMayorista?: number | null;
   costoUnitario?: number;
+  stockMinimo?: number;
+  proveedorPrincipalId?: number | null;
 }
 
 export interface PresentacionRepuesto {
@@ -2531,11 +2533,11 @@ export interface DetalleCompraRepuesto {
 export interface CompraRepuesto {
   id: number;
   tenantId: number;
-  proveedor: ProveedorRepuesto;
+  proveedor: ProveedorRepuesto | null;
   numeroFactura?: string | null;
   fechaCompra: string;
   total: number;
-  detalles?: DetalleCompraRepuesto[];
+  items?: DetalleCompraRepuesto[];
 }
 
 export interface ItemCompraRepuestoRequest {
@@ -2584,6 +2586,11 @@ export function actualizarRepuesto(id: number, datos: Partial<RepuestoItem>): Pr
 
 export function eliminarRepuesto(id: number, tenantId: number): Promise<void> {
   return request(`/api/repuestos/items/${id}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
+/** Corrección de inventario: indicá el stock REAL contado y el sistema calcula/audita la diferencia solo (Kárdex tipo AJUSTE). */
+export function ajustarStockRepuesto(id: number, tenantId: number, datos: { stockReal: number; motivo?: string }): Promise<RepuestoItem> {
+  return request(`/api/repuestos/items/${id}/ajustar-stock?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
 export function historialMovimientosRepuesto(id: number, tenantId: number): Promise<MovimientoRepuesto[]> {

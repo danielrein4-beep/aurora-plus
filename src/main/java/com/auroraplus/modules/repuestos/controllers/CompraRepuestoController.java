@@ -38,7 +38,7 @@ public class CompraRepuestoController {
 
     @GetMapping
     public List<CompraRepuesto> listar() {
-        return compraRepuestoRepository.findAllByOrderByFechaCompraDesc();
+        return compraRepuestoRepository.listarConProveedor();
     }
 
     @PostMapping

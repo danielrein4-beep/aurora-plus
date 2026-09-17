@@ -12,6 +12,7 @@ import {
   crearRepuesto,
   actualizarRepuesto,
   eliminarRepuesto,
+  ajustarStockRepuesto,
   listarPresentacionesRepuesto,
   crearPresentacionRepuesto,
   despacharPorPresentacion,
@@ -26,6 +27,7 @@ import {
   type PresentacionRepuesto,
   type MovimientoRepuesto,
   type ProveedorRepuesto,
+  type CompraRepuesto,
   type MovimientoCaja,
 } from "../api";
 
@@ -489,6 +491,12 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [ingresosCaja, setIngresosCaja] = useState<MovimientoCaja[]>([]);
   const [cargandoCompra, setCargandoCompra] = useState(false);
   const [toast, setToast] = useState<{ tipo: "success" | "error" | "info"; mensaje: string } | null>(null);
+  const [editarModalItem, setEditarModalItem] = useState<ProductoComercio | null>(null);
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+  const [ajustarStockModalItem, setAjustarStockModalItem] = useState<ProductoComercio | null>(null);
+  const [guardandoAjuste, setGuardandoAjuste] = useState(false);
+  const [comprasRepuesto, setComprasRepuesto] = useState<CompraRepuesto[] | null>(null);
+  const [cargandoCompras, setCargandoCompras] = useState(false);
 
   const mostrarToast = (mensaje: string, tipo: "success" | "error" | "info" = "success") => {
     setToast({ tipo, mensaje });
@@ -514,7 +522,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             precio: r.precioVenta,
             costo: r.costoUnitario || 0,
             stock: r.stockActual,
-            stockMinimo: 5,
+            stockMinimo: r.stockMinimo ?? 5,
             unidadMedida: r.unidadBase || "UNIDAD",
             codigoParte: r.codigoOriginalOem || undefined,
             precioMayorista: r.precioMayorista || undefined,
@@ -543,12 +551,27 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     listarMovimientos(user.tenantId, "INGRESO").then(setIngresosCaja).catch(() => setIngresosCaja([]));
   };
 
+  // Historial de Compras a Proveedor (mismo patrón que la vista "Compras & Proveedores"
+  // de Horeca) — antes solo existía el modal para REGISTRAR una compra, sin forma de ver
+  // el historial ya registrado. Se filtra por tenant porque /api/repuestos/compras no
+  // toma tenantId como parámetro (a diferencia del resto de endpoints de este módulo).
+  const cargarComprasRepuesto = () => {
+    if (!user?.tenantId) return;
+    setCargandoCompras(true);
+    listarComprasRepuesto()
+      .then((compras) => setComprasRepuesto(compras.filter((c) => c.tenantId === user.tenantId)))
+      .catch(() => setComprasRepuesto([]))
+      .finally(() => setCargandoCompras(false));
+  };
+
   useEffect(() => {
     if (user?.tenantId) {
       cargarRepuestosBackend();
       listarProveedoresRepuesto().then(setProveedoresRepuesto).catch(() => {});
       cargarIngresosCaja();
+      if (esComercio) cargarComprasRepuesto();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.tenantId, perfilActivo]);
 
   useEffect(() => {
@@ -1431,6 +1454,40 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                           >
                             🏷️ Presentaciones
                           </button>
+                          <button
+                            onClick={() => setAjustarStockModalItem(p)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-amber-400 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
+                            title="Corregir stock tras un conteo físico"
+                            disabled={!p.backendId}
+                          >
+                            ⚖️ Ajustar
+                          </button>
+                          <button
+                            onClick={() => setEditarModalItem(p)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-slate-500 dark:text-slate-300 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
+                            title="Editar datos del producto"
+                            disabled={!p.backendId}
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!p.backendId || !user?.tenantId) return;
+                              if (!confirm(`¿Eliminar "${p.nombre}" del catálogo? Esta acción no se puede deshacer.`)) return;
+                              try {
+                                await eliminarRepuesto(p.backendId, user.tenantId);
+                                setProductos((prev) => prev.filter((x) => x.id !== p.id));
+                                mostrarToast("Producto eliminado del catálogo.", "success");
+                              } catch (err: any) {
+                                mostrarToast(err?.message || "No se pudo eliminar el producto.", "error");
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-[10px] text-rose-400 font-bold border border-rose-500/30 cursor-pointer shadow-sm"
+                            title="Eliminar producto del catálogo"
+                            disabled={!p.backendId}
+                          >
+                            <IconTrash size={11} />
+                          </button>
                         </td>
                       )}
                     </tr>
@@ -1438,6 +1495,54 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 </tbody>
               </table>
             </div>
+
+            {esComercio && (
+              <div className="flex-shrink-0 border-t border-slate-200 dark:border-slate-800 pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">Compras & Proveedores — Historial</h4>
+                  <button
+                    onClick={() => cargarComprasRepuesto()}
+                    disabled={cargandoCompras}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-slate-600 dark:text-slate-300 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer flex items-center gap-1"
+                  >
+                    <IconRefresh size={11} className={cargandoCompras ? "animate-spin" : ""} />
+                    <span>Actualizar</span>
+                  </button>
+                </div>
+                {cargandoCompras && comprasRepuesto === null ? (
+                  <div className="py-4 text-center text-slate-500 dark:text-slate-400 text-xs">Cargando historial de compras...</div>
+                ) : !comprasRepuesto || comprasRepuesto.length === 0 ? (
+                  <div className="py-4 text-center text-slate-500 dark:text-slate-400 text-xs rounded-xl bg-slate-100/60 dark:bg-slate-800/40">
+                    Todavía no hay compras a proveedor registradas. Usá "Registrar Compra (Proveedor)" arriba.
+                  </div>
+                ) : (
+                  <div className="max-h-56 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 sticky top-0 uppercase text-[10px]">
+                        <tr>
+                          <th className="p-2.5">Fecha</th>
+                          <th className="p-2.5">Proveedor</th>
+                          <th className="p-2.5">N° Factura</th>
+                          <th className="p-2.5 text-right">Total</th>
+                          <th className="p-2.5 text-right">Ítems</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-600 dark:text-slate-300">
+                        {comprasRepuesto.map((c) => (
+                          <tr key={c.id} className="hover:bg-slate-100/60 dark:hover:bg-slate-800/40">
+                            <td className="p-2.5 text-[11px] text-slate-500 dark:text-slate-400">{new Date(c.fechaCompra).toLocaleDateString()}</td>
+                            <td className="p-2.5 font-sans font-bold text-slate-900 dark:text-white">{c.proveedor?.nombre || "—"}</td>
+                            <td className="p-2.5">{c.numeroFactura || "—"}</td>
+                            <td className="p-2.5 text-right font-bold text-teal-500 dark:text-teal-400">${c.total.toFixed(2)}</td>
+                            <td className="p-2.5 text-right text-slate-500 dark:text-slate-400">{c.items?.length ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -2142,6 +2247,177 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         </div>
       )}
 
+      {/* ── MODAL EDITAR PRODUCTO ── */}
+      {editarModalItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Editar Producto</h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">SKU: {editarModalItem.codigo}</p>
+              </div>
+              <button onClick={() => setEditarModalItem(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!editarModalItem.backendId || !user?.tenantId) return;
+                const fd = new FormData(e.currentTarget);
+                const nombre = String(fd.get("nombre") || editarModalItem.nombre);
+                const precio = Number(fd.get("precio")) || editarModalItem.precio;
+                const unidadMedida = String(fd.get("unidadMedida") || editarModalItem.unidadMedida || "UNIDAD");
+                const codigoOem = String(fd.get("codigoOem") || "") || undefined;
+                const stockMinimo = Number(fd.get("stockMinimo")) || editarModalItem.stockMinimo;
+                const precioMayorista = fd.get("precioMayorista") ? Number(fd.get("precioMayorista")) : undefined;
+                const cantidadMinimaMayorista = fd.get("cantidadMinimaMayorista") ? Number(fd.get("cantidadMinimaMayorista")) : undefined;
+
+                setGuardandoEdicion(true);
+                try {
+                  await actualizarRepuesto(editarModalItem.backendId, {
+                    descripcion: nombre,
+                    precioVenta: precio,
+                    unidadBase: unidadMedida,
+                    codigoOriginalOem: codigoOem,
+                    stockMinimo,
+                    precioMayorista,
+                    cantidadMinimaMayorista,
+                  });
+                  setProductos((prev) => prev.map((p) => p.id === editarModalItem.id ? {
+                    ...p, nombre, precio, unidadMedida, codigoOem, stockMinimo, precioMayorista, cantidadMinimaMayorista,
+                  } : p));
+                  mostrarToast("Producto actualizado correctamente.", "success");
+                  setEditarModalItem(null);
+                } catch (err: any) {
+                  mostrarToast(err?.message || "No se pudo actualizar el producto.", "error");
+                } finally {
+                  setGuardandoEdicion(false);
+                }
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Nombre del Producto</label>
+                <input required name="nombre" defaultValue={editarModalItem.nombre} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Precio Detal ($)</label>
+                  <input required name="precio" type="number" step="0.01" defaultValue={editarModalItem.precio} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Stock Mínimo (alerta)</label>
+                  <input name="stockMinimo" type="number" defaultValue={editarModalItem.stockMinimo} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                </div>
+              </div>
+              {esComercio && (
+                <div className="space-y-3 p-3.5 bg-slate-100/60 dark:bg-slate-800/50 rounded-2xl border border-slate-300 dark:border-slate-700">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-teal-400 block mb-1">Unidad de Medida Base</label>
+                      <select name="unidadMedida" defaultValue={editarModalItem.unidadMedida || "UNIDAD"} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white">
+                        <option value="UNIDAD">Pieza / Unidad (UNIDAD)</option>
+                        <option value="METRO">Metro (METRO)</option>
+                        <option value="KILOGRAMO">Kilogramo (KILOGRAMO)</option>
+                        <option value="SACO">Saco / Bulto (SACO)</option>
+                        <option value="GALON">Galón / Litro (GALON)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-teal-400 block mb-1">Código OEM / Fabricante</label>
+                      <input name="codigoOem" defaultValue={editarModalItem.codigoOem || ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-emerald-400 block mb-1">Precio Mayorista ($) (Opcional)</label>
+                      <input name="precioMayorista" type="number" step="0.01" defaultValue={editarModalItem.precioMayorista ?? ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-emerald-400 block mb-1">Cant. Mínima Mayorista</label>
+                      <input name="cantidadMinimaMayorista" type="number" step="1" defaultValue={editarModalItem.cantidadMinimaMayorista ?? ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                    </div>
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                El stock actual y el costo no se editan aquí — se actualizan solos a través de compras, ventas y ajustes (Kárdex), para mantener la auditoría.
+              </p>
+              <div className="pt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setEditarModalItem(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={guardandoEdicion} className="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold cursor-pointer disabled:opacity-60">
+                  {guardandoEdicion ? "Guardando..." : "Guardar Cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL AJUSTAR STOCK (CORRECCIÓN POR CONTEO FÍSICO) ── */}
+      {ajustarStockModalItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-500 dark:text-amber-300 font-bold uppercase">Ajuste de Inventario</span>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white mt-1">{ajustarStockModalItem.nombre}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">Stock en sistema: {ajustarStockModalItem.stock} {ajustarStockModalItem.unidadMedida || 'und'}</p>
+              </div>
+              <button onClick={() => setAjustarStockModalItem(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!ajustarStockModalItem.backendId || !user?.tenantId) return;
+                const fd = new FormData(e.currentTarget);
+                const stockReal = Number(fd.get("stockReal"));
+                const motivo = String(fd.get("motivo") || "");
+                if (Number.isNaN(stockReal) || stockReal < 0) {
+                  mostrarToast("Ingresá un stock real válido.", "error");
+                  return;
+                }
+                setGuardandoAjuste(true);
+                try {
+                  const actualizado = await ajustarStockRepuesto(ajustarStockModalItem.backendId, user.tenantId, { stockReal, motivo });
+                  setProductos((prev) => prev.map((p) => p.id === ajustarStockModalItem.id ? { ...p, stock: actualizado.stockActual } : p));
+                  mostrarToast("Stock ajustado y registrado en el Kárdex.", "success");
+                  setAjustarStockModalItem(null);
+                } catch (err: any) {
+                  mostrarToast(err?.message || "No se pudo ajustar el stock.", "error");
+                } finally {
+                  setGuardandoAjuste(false);
+                }
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Stock Real Contado</label>
+                <input required name="stockReal" type="number" step="0.01" defaultValue={ajustarStockModalItem.stock} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Motivo del Ajuste</label>
+                <input name="motivo" placeholder="Ej. Conteo físico mensual, mercancía dañada..." className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
+              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                El sistema calcula la diferencia solo y la deja registrada en el Kárdex para auditar después. No genera ingreso ni egreso de caja.
+              </p>
+              <div className="pt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setAjustarStockModalItem(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={guardandoAjuste} className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold cursor-pointer disabled:opacity-60">
+                  {guardandoAjuste ? "Guardando..." : "Confirmar Ajuste"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── MODAL PRESENTACIONES FRACCIONADAS (CAJA, METRO, KILO, SACO) ── */}
       {presentacionesModalItem && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -2247,6 +2523,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           onCompraExitosa={() => {
             setModalCompraProveedor(false);
             cargarRepuestosBackend();
+            cargarComprasRepuesto();
             mostrarToast("Factura de compra procesada. Stock y costo promedio actualizados en Kárdex.", "success");
           }}
           onNuevoProveedor={(nuevo) => setProveedoresRepuesto((prev) => [...prev, nuevo])}

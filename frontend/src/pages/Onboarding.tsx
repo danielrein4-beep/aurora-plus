@@ -168,14 +168,18 @@ const GANADERIA_MODULES = [
 // Mapa de "clinica"/"restaurante"/etc. (id del onboarding) al moduloPrincipal
 // real que entiende el backend (ver TenantProvisioningService y
 // LicenciaService.VERTICALES_CONTROLADAS). "comercio" es el nombre unificado
-// para tenants nuevos (Ferretería/Repuestos/Retail bajo una sola identidad);
-// "ferreteria"/"repuestos"/"retail" se mantienen solo para no romper tenants
-// ya registrados con esos valores — ya no son seleccionables en el onboarding.
+// para tenants nuevos (Ferretería/Repuestos/Retail bajo una sola identidad) en
+// la UI (`industria`/user.industry) — pero el moduloPrincipal que se contrata
+// en el backend sigue siendo "repuestos", porque LicenciaInterceptor gatea
+// /api/repuestos/* por ese segmento exacto de URL (ver LicenciaInterceptor):
+// si se contratara "comercio" en vez de "repuestos", el tenant quedaría con
+// 403 en todo el inventario/POS. "ferreteria"/"retail" se mantienen solo para
+// no romper tenants ya registrados con esos valores.
 const INDUSTRIA_A_MODULO: Record<string, string> = {
   clinica: "salud",
   farmacia: "farmacia",
   restaurante: "horeca",
-  comercio: "comercio",
+  comercio: "repuestos",
   ferreteria: "ferreteria",
   repuestos: "repuestos",
   retail: "repuestos",

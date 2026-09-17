@@ -26,11 +26,15 @@ interface RubroNegocioItem {
 const RUBROS_REGISTRO: RubroNegocioItem[] = [
   { id: "restaurante", label: "Restaurante & Cafetería", sub: "Comandas, KDS, mesas y delivery", Icon: IconRestaurant, modulo: "horeca", ruta: "/restaurante", nombreDefault: "Mi Restaurante" },
   { id: "farmacia", label: "Farmacia & Droguería", sub: "Medicamentos, lotes y mostrador", Icon: IconPrescription, modulo: "salud", ruta: "/comercio", nombreDefault: "Mi Farmacia" },
-  { id: "comercio", label: "Comercio", sub: "POS mostrador, código de barras e inventario", Icon: IconHardware, modulo: "comercio", ruta: "/comercio", nombreDefault: "Mi Negocio" },
+  // modulo:"repuestos" (no "comercio") a propósito: el backend gatea /api/repuestos/*
+  // por el segmento de URL (ver LicenciaInterceptor), así que el módulo contratado
+  // real DEBE ser "repuestos" para que el tenant pueda usar esos endpoints. "comercio"
+  // solo existe como `industria`/user.industry, para la identidad unificada en la UI.
+  { id: "comercio", label: "Comercio", sub: "POS mostrador, código de barras e inventario", Icon: IconHardware, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Negocio" },
   { id: "clinica", label: "Clínica & Consultorios", sub: "Historias clínicas y citas", Icon: IconClinic, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Consultorio" },
   { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "Fichas, vacunas y petshop", Icon: IconVet, modulo: "salud", ruta: "/veterinaria", nombreDefault: "Mi Veterinaria" },
   { id: "finca", label: "Finca & Ganadería", sub: "Potreros, vacunas y animales", Icon: IconFarm, modulo: "ganaderia", ruta: "/dashboard", nombreDefault: "Mi Finca" },
-  { id: "otro", label: "Otro Rubro Comercial", sub: "ERP y suite administrativa", Icon: IconBank, modulo: "comercio", ruta: "/comercio", nombreDefault: "Mi Empresa" },
+  { id: "otro", label: "Otro Rubro Comercial", sub: "ERP y suite administrativa", Icon: IconBank, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Empresa" },
 ];
 
 export default function Auth() {
