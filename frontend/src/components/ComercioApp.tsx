@@ -31,9 +31,9 @@ import {
   cerrarTurno,
   tasaVigente,
   actualizarTasa,
-  obtenerMetodoTasaAutomatica,
-  actualizarMetodoTasaAutomatica,
-  actualizarTasaAutomaticaAhora,
+  obtenerOrigenTasaActiva,
+  actualizarOrigenTasaActiva,
+  actualizarTasaExterna,
   type RepuestoItem,
   type PresentacionRepuesto,
   type MovimientoRepuesto,
@@ -42,7 +42,7 @@ import {
   type MovimientoCaja,
   type Turno,
   type TasaCambio,
-  type MetodoTasaAutomatica,
+  type OrigenTasaActiva,
 } from "../api";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -431,18 +431,25 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const esFarmacia = perfilActivo === "farmacia";
   const esComercio = !esFarmacia;
 
-  // Tasas de cambio reales (mismo motor /api/financiero/tasas que usa Aurora
-  // Horeca — genérico, sin cambios de backend): se guarda un historial en el
-  // servidor, nunca solo en el navegador, y siempre se usa la más reciente.
-  const [tasaBcv, setTasaBcv] = useState<TasaCambio | null>(null);
+  // Tasas de cambio reales — misma metodología que usa Aurora Horeca (mismo
+  // motor genérico /api/financiero/tasas + /api/config/mi-negocio/origen-tasa):
+  // BCV y USDT se consultan en vivo de su fuente pública real, cada una se
+  // guarda como serie propia, y "origenTasaActiva" decide cuál gobierna el
+  // cobro. Se guarda un historial en el servidor, nunca solo en el navegador.
+  const [origenTasaActiva, setOrigenTasaActiva] = useState<OrigenTasaActiva | null>(null);
+  const [tasaVes, setTasaVes] = useState<TasaCambio | null>(null);
   const [tasaCopReal, setTasaCopReal] = useState<TasaCambio | null>(null);
   useEffect(() => {
     if (!user?.tenantId) return;
-    tasaVigente(user.tenantId, "USD", "VES").then(setTasaBcv).catch(() => setTasaBcv(null));
+    obtenerOrigenTasaActiva().then((r) => setOrigenTasaActiva(r.origenTasaActiva)).catch(() => setOrigenTasaActiva("USDT"));
     tasaVigente(user.tenantId, "USD", "COP").then(setTasaCopReal).catch(() => setTasaCopReal(null));
   }, [user?.tenantId]);
+  useEffect(() => {
+    if (!user?.tenantId || !origenTasaActiva) return;
+    tasaVigente(user.tenantId, "USD", "VES", origenTasaActiva).then(setTasaVes).catch(() => setTasaVes(null));
+  }, [user?.tenantId, origenTasaActiva]);
 
-  const tasaActivaBs = tasaBcv ? Number(tasaBcv.tasa) : 0;
+  const tasaActivaBs = tasaVes ? Number(tasaVes.tasa) : 0;
   const tasaCop = tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
@@ -1006,9 +1013,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           {user?.tenantId && (
             <TasaBadgeComercio
               tenantId={user.tenantId}
-              tasaBcv={tasaBcv}
+              origenTasaActiva={origenTasaActiva}
+              tasaVes={tasaVes}
               tasaCop={tasaCopReal}
-              onActualizadaBcv={setTasaBcv}
+              onOrigenCambiado={(o) => setOrigenTasaActiva(o)}
+              onActualizadaVes={setTasaVes}
               onActualizadaCop={setTasaCopReal}
             />
           )}
@@ -2398,21 +2407,19 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// COMPONENTE: BADGE DE TASA DE CAMBIO ACTIVA — USDT y BCV ya NO se teclean a
-// mano: siguen de verdad Binance P2P y el BCV oficial (ver
-// TasaCambioAutomaticaService/ActualizacionTasasAutomaticasJob en el backend,
-// corren cada 4h y aplican la tasa a TODAS las verticales que comparten este
-// mismo motor /api/financiero/tasas). Solo "Propia" sigue siendo 100% manual,
-// para el negocio que quiere fijar su propia tasa sin depender de ninguna
-// fuente externa. COP no tiene fuente automática — se mantiene manual siempre.
+// COMPONENTE: BADGE DE TASA DE CAMBIO ACTIVA — misma metodología que usa
+// Aurora Horeca (ver TasaExternaService + LicenciaTenant.origenTasaActiva en
+// el backend, módulo compartido core.financiero): BCV y USDT no se teclean a
+// mano, se consultan en vivo de su fuente pública real bajo demanda ("Actualizar").
+// Solo "Propia" sigue siendo 100% manual. COP no tiene fuente automática — se
+// mantiene manual siempre.
 // ══════════════════════════════════════════════════════════════════════════
-function TasaBadgeComercio({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizadaCop }: {
-  tenantId: number; tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null;
-  onActualizadaBcv: (t: TasaCambio) => void; onActualizadaCop: (t: TasaCambio) => void;
+function TasaBadgeComercio({ tenantId, origenTasaActiva, tasaVes, tasaCop, onOrigenCambiado, onActualizadaVes, onActualizadaCop }: {
+  tenantId: number; origenTasaActiva: OrigenTasaActiva | null; tasaVes: TasaCambio | null; tasaCop: TasaCambio | null;
+  onOrigenCambiado: (o: OrigenTasaActiva) => void; onActualizadaVes: (t: TasaCambio) => void; onActualizadaCop: (t: TasaCambio) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
-  const [metodo, setMetodo] = useState<MetodoTasaAutomatica | null>(null); // null = cargando desde el backend
-  const [cambiandoMetodo, setCambiandoMetodo] = useState(false);
+  const [cambiandoOrigen, setCambiandoOrigen] = useState(false);
   const [actualizandoAhora, setActualizandoAhora] = useState(false);
   const [tasaCopVal, setTasaCopVal] = useState("");
   const [tasaPropiaVal, setTasaPropiaVal] = useState("");
@@ -2421,15 +2428,11 @@ function TasaBadgeComercio({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onAct
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    obtenerMetodoTasaAutomatica(tenantId).then((r) => setMetodo(r.metodo)).catch(() => setMetodo("BINANCE"));
-  }, [tenantId]);
-
-  useEffect(() => {
     if (!abierto) return;
     setTasaCopVal(tasaCop ? String(Number(tasaCop.tasa)) : "");
-    setTasaPropiaVal(metodo === "MANUAL" && tasaBcv ? String(Number(tasaBcv.tasa)) : "");
+    setTasaPropiaVal(origenTasaActiva === "PERSONALIZADA" && tasaVes ? String(Number(tasaVes.tasa)) : "");
     setError(null);
-  }, [abierto, tasaBcv, tasaCop, metodo]);
+  }, [abierto, tasaVes, tasaCop, origenTasaActiva]);
 
   useEffect(() => {
     if (!abierto) return;
@@ -2442,31 +2445,33 @@ function TasaBadgeComercio({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onAct
     return () => { document.removeEventListener("mousedown", handler); document.removeEventListener("keydown", handlerEsc); };
   }, [abierto]);
 
-  const elegirMetodo = async (nuevo: MetodoTasaAutomatica) => {
-    if (nuevo === metodo) return;
-    setCambiandoMetodo(true);
+  const elegirOrigen = async (nuevo: OrigenTasaActiva) => {
+    if (nuevo === origenTasaActiva) return;
+    setCambiandoOrigen(true);
     setError(null);
     try {
-      await actualizarMetodoTasaAutomatica(tenantId, nuevo);
-      setMetodo(nuevo);
-      if (nuevo !== "MANUAL") {
-        // El backend ya buscó y aplicó la tasa real al elegir la fuente — se relee de una vez.
-        tasaVigente(tenantId, "USD", "VES").then(onActualizadaBcv).catch(() => {});
+      await actualizarOrigenTasaActiva(nuevo);
+      onOrigenCambiado(nuevo);
+      if (nuevo !== "PERSONALIZADA") {
+        // Puede que ese origen todavía no tenga ninguna tasa registrada para este tenant.
+        tasaVigente(tenantId, "USD", "VES", nuevo).then(onActualizadaVes).catch(() => {});
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cambiar la fuente de la tasa");
     } finally {
-      setCambiandoMetodo(false);
+      setCambiandoOrigen(false);
     }
   };
 
   const actualizarAhora = async () => {
+    if (origenTasaActiva !== "BCV" && origenTasaActiva !== "USDT") return;
     setActualizandoAhora(true);
     setError(null);
     try {
-      onActualizadaBcv(await actualizarTasaAutomaticaAhora(tenantId));
+      const fuente = origenTasaActiva === "USDT" ? "BINANCE" : "BCV";
+      onActualizadaVes(await actualizarTasaExterna(tenantId, fuente, "VES"));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo consultar la tasa en este momento");
+      setError(e instanceof Error ? e.message : "No se pudo consultar la tasa pública en este momento");
     } finally {
       setActualizandoAhora(false);
     }
@@ -2475,7 +2480,7 @@ function TasaBadgeComercio({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onAct
   const guardarManual = async () => {
     const vPropia = Number(tasaPropiaVal);
     const vCop = Number(tasaCopVal);
-    if (!(metodo === "MANUAL" && vPropia > 0) && !(vCop > 0)) {
+    if (!(origenTasaActiva === "PERSONALIZADA" && vPropia > 0) && !(vCop > 0)) {
       setError("Ingresá al menos una tasa mayor a cero");
       return;
     }
@@ -2483,8 +2488,8 @@ function TasaBadgeComercio({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onAct
     setError(null);
     try {
       const tareas: Promise<void>[] = [];
-      if (metodo === "MANUAL" && vPropia > 0) {
-        tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: vPropia, origen: "MANUAL" }).then(onActualizadaBcv));
+      if (origenTasaActiva === "PERSONALIZADA" && vPropia > 0) {
+        tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: vPropia, origen: "PERSONALIZADA" }).then(onActualizadaVes));
       }
       if (vCop > 0) {
         tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: vCop, origen: "MANUAL" }).then(onActualizadaCop));
@@ -2498,8 +2503,8 @@ function TasaBadgeComercio({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onAct
     }
   };
 
-  const tasaActivaNumero = tasaBcv ? Number(tasaBcv.tasa) : 0;
-  const etiquetaMetodo = metodo === "BCV" ? "BCV" : metodo === "MANUAL" ? "PROPIA" : "USDT";
+  const tasaActivaNumero = tasaVes ? Number(tasaVes.tasa) : 0;
+  const etiquetaOrigen = origenTasaActiva === "BCV" ? "BCV" : origenTasaActiva === "PERSONALIZADA" ? "PROPIA" : "USDT";
 
   return (
     <div className="relative" ref={popoverRef}>
@@ -2514,7 +2519,7 @@ function TasaBadgeComercio({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onAct
         }`}
       >
         <span className={`w-2 h-2 rounded-full ${tasaActivaNumero > 0 ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
-        <span className="text-[10px] px-1 rounded bg-black/5 dark:bg-white/10 uppercase tracking-wider">{etiquetaMetodo}</span>
+        <span className="text-[10px] px-1 rounded bg-black/5 dark:bg-white/10 uppercase tracking-wider">{etiquetaOrigen}</span>
         <span>{tasaActivaNumero > 0 ? `Bs. ${tasaActivaNumero.toFixed(2)}` : "Sin tasa"}</span>
         {tasaCop && (
           <span className="text-slate-500 dark:text-slate-400 text-[10px] font-normal">· COP {Number(tasaCop.tasa).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
@@ -2527,36 +2532,36 @@ function TasaBadgeComercio({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onAct
           <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
             <div>
               <p className="text-xs font-bold text-slate-900 dark:text-white">Fuente de la Tasa (USD → Bs)</p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">USDT y BCV se sincronizan solos cada 4h.</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">USDT y BCV vienen de su fuente pública real.</p>
             </div>
             <button onClick={() => setAbierto(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={14} /></button>
           </div>
 
           <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-            <button type="button" disabled={cambiandoMetodo} onClick={() => elegirMetodo("BINANCE")}
-              className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${metodo === "BINANCE" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
+            <button type="button" disabled={cambiandoOrigen} onClick={() => elegirOrigen("USDT")}
+              className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "USDT" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
               <IconCoins size={12} /><span>USDT</span>
             </button>
-            <button type="button" disabled={cambiandoMetodo} onClick={() => elegirMetodo("BCV")}
-              className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${metodo === "BCV" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
+            <button type="button" disabled={cambiandoOrigen} onClick={() => elegirOrigen("BCV")}
+              className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "BCV" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
               <IconBank size={12} /><span>BCV</span>
             </button>
-            <button type="button" disabled={cambiandoMetodo} onClick={() => elegirMetodo("MANUAL")}
-              className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${metodo === "MANUAL" ? "bg-amber-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
+            <button type="button" disabled={cambiandoOrigen} onClick={() => elegirOrigen("PERSONALIZADA")}
+              className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "PERSONALIZADA" ? "bg-amber-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
               <IconEdit size={12} /><span>Propia</span>
             </button>
           </div>
 
-          {metodo !== "MANUAL" ? (
+          {origenTasaActiva !== "PERSONALIZADA" ? (
             <div className="space-y-2 text-xs bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
               <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                {metodo === "BCV" ? "Tasa oficial publicada en bcv.org.ve:" : "Promedio de las mejores ofertas de Binance P2P (USDT/VES):"}
+                {origenTasaActiva === "BCV" ? "Tasa oficial publicada en bcv.org.ve:" : "Promedio de las mejores ofertas de Binance P2P (USDT/VES):"}
               </p>
               <p className="font-mono font-black text-lg text-teal-600 dark:text-teal-400">
                 {tasaActivaNumero > 0 ? `Bs. ${tasaActivaNumero.toFixed(2)}` : "Sin tasa todavía"}
               </p>
-              {tasaBcv && (
-                <p className="text-[10px] text-slate-400">Actualizado: {new Date(tasaBcv.fechaActualizacion).toLocaleString()}</p>
+              {tasaVes && (
+                <p className="text-[10px] text-slate-400">Actualizado: {new Date(tasaVes.fechaActualizacion).toLocaleString()}</p>
               )}
               <button type="button" onClick={actualizarAhora} disabled={actualizandoAhora}
                 className="w-full py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5">
@@ -2585,7 +2590,7 @@ function TasaBadgeComercio({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onAct
 
           <button onClick={guardarManual} disabled={guardandoManual}
             className="w-full py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold cursor-pointer disabled:opacity-60 shadow-md">
-            {guardandoManual ? "Guardando…" : metodo === "MANUAL" ? "Guardar Tasa Propia y COP" : "Guardar Tasa COP"}
+            {guardandoManual ? "Guardando…" : origenTasaActiva === "PERSONALIZADA" ? "Guardar Tasa Propia y COP" : "Guardar Tasa COP"}
           </button>
         </div>
       )}

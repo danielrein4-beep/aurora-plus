@@ -21,5 +21,4 @@ public interface LicenciaTenantRepository extends JpaRepository<LicenciaTenant, 
     @Query("SELECT l FROM LicenciaTenant l WHERE l.activa = true AND l.fechaVencimientoPago = :fecha AND l.emailContacto IS NOT NULL")
     List<LicenciaTenant> buscarPorVencerEn(@Param("fecha") LocalDate fecha);
 
-    List<LicenciaTenant> findByActivaTrueAndMetodoTasaAutomatica(String metodoTasaAutomatica);
 }
