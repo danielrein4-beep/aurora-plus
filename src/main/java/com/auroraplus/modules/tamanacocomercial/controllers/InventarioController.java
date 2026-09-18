@@ -5,6 +5,7 @@ import com.auroraplus.modules.tamanacocomercial.entities.MovimientoStock;
 import com.auroraplus.modules.tamanacocomercial.entities.ProductoComercial;
 import com.auroraplus.modules.tamanacocomercial.repositories.MovimientoStockRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.ProductoComercialRepository;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -58,6 +59,7 @@ public class InventarioController {
 
     @DeleteMapping("/productos/{id}")
     public ResponseEntity<?> eliminarProducto(@PathVariable Long id) {
+        TamanacoAccessService.exigirDuenoAdmin();
         if (!productoRepository.existsById(id)) return ResponseEntity.notFound().build();
         productoRepository.deleteById(id);
         return ResponseEntity.ok().build();

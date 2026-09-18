@@ -4,6 +4,7 @@ import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.InventarioPatio;
 import com.auroraplus.modules.tamanacocomercial.repositories.DespachoComercialRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.InventarioPatioRepository;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -65,6 +66,7 @@ public class InventarioRestController {
 
     @DeleteMapping("/pilas/{id}")
     public ResponseEntity<?> eliminarPila(@PathVariable Long id) {
+        TamanacoAccessService.exigirDuenoAdmin();
         if (!inventarioPatioRepository.existsById(id)) return ResponseEntity.notFound().build();
         inventarioPatioRepository.deleteById(id);
         return ResponseEntity.ok().build();

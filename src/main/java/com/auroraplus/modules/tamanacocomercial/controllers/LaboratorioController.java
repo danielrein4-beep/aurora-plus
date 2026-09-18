@@ -3,6 +3,7 @@ package com.auroraplus.modules.tamanacocomercial.controllers;
 import com.auroraplus.modules.tamanacocomercial.dto.AnalisisLaboratorioDTO;
 import com.auroraplus.modules.tamanacocomercial.entities.AnalisisLaboratorio;
 import com.auroraplus.modules.tamanacocomercial.services.LaboratorioService;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -71,6 +72,7 @@ public class LaboratorioController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarAnalisis(@PathVariable Long id, @RequestParam Long tenantId) {
+        TamanacoAccessService.exigirDuenoAdmin();
         try {
             laboratorioService.eliminarAnalisis(tenantId, id);
             return ResponseEntity.ok(Map.of("mensaje", "Análisis eliminado"));

@@ -3,6 +3,7 @@ package com.auroraplus.modules.tamanacocomercial.controllers;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.Mina;
 import com.auroraplus.modules.tamanacocomercial.repositories.MinaRepository;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -62,6 +63,7 @@ public class MinaController {
     @DeleteMapping("/{id}/permanente")
     @Transactional
     public ResponseEntity<Map<String, String>> eliminarPermanente(@PathVariable Long id) {
+        TamanacoAccessService.exigirDuenoAdmin();
         if (!minaRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }

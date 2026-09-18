@@ -6,6 +6,7 @@ import com.auroraplus.modules.tamanacocomercial.entities.CierreSemana;
 import com.auroraplus.modules.tamanacocomercial.entities.Gasto;
 import com.auroraplus.modules.tamanacocomercial.services.CierreSemanaService;
 import com.auroraplus.modules.tamanacocomercial.services.NominaService;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -51,6 +52,7 @@ public class NominaController {
             @RequestParam(required = false) String notas,
             @RequestParam(required = false) String usuario,
             @RequestParam(value = "archivo", required = false) MultipartFile archivo) {
+        TamanacoAccessService.exigirDuenoAdmin();
         try {
             LocalDate f = (fecha != null && !fecha.isBlank()) ? LocalDate.parse(fecha) : LocalDate.now();
             CierreSemana cierre = cierreSemanaService.registrarPagoSemana(tenantId, f, archivo, notas, usuario);
@@ -64,6 +66,7 @@ public class NominaController {
     @PostMapping("/reabrir-semana")
     public ResponseEntity<?> reabrirSemana(@RequestParam Long tenantId, @RequestParam(required = false) String fecha,
                                             @RequestParam(required = false) String usuario) {
+        TamanacoAccessService.exigirDuenoAdmin();
         try {
             LocalDate f = (fecha != null && !fecha.isBlank()) ? LocalDate.parse(fecha) : LocalDate.now();
             cierreSemanaService.reabrirSemana(tenantId, f, usuario != null ? usuario : "Admin");
@@ -76,6 +79,7 @@ public class NominaController {
     @PostMapping({"/{id}/ajuste", "/ajuste"})
     public ResponseEntity<?> guardarAjusteRapido(@RequestParam Long tenantId, @PathVariable(required = false) Long id,
                                                   @RequestBody Map<String, Object> payload) {
+        TamanacoAccessService.exigirDuenoAdmin();
         try {
             Long idNomina = id != null ? id : (payload.get("id") != null ? Long.valueOf(payload.get("id").toString()) : null);
             if (idNomina == null) {
@@ -91,6 +95,7 @@ public class NominaController {
 
     @PostMapping({"/pagar", "/registrar-pago"})
     public ResponseEntity<?> registrarPago(@RequestParam Long tenantId, @RequestBody NominaPagoRequestDTO request) {
+        TamanacoAccessService.exigirDuenoAdmin();
         try {
             Gasto gastoCreado = nominaService.pagarNomina(tenantId, request);
             Map<String, Object> resp = new HashMap<>();

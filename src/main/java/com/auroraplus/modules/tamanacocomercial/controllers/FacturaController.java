@@ -5,6 +5,7 @@ import com.auroraplus.modules.tamanacocomercial.entities.Factura;
 import com.auroraplus.modules.tamanacocomercial.entities.Retencion;
 import com.auroraplus.modules.tamanacocomercial.repositories.FacturaRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.RetencionRepository;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -86,6 +87,7 @@ public class FacturaController {
 
     @PostMapping("/{id}/retencion")
     public ResponseEntity<?> aplicarRetencion(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Retencion retencion) {
+        TamanacoAccessService.exigirDuenoAdmin();
         Long tenantActual = TenantContext.getCurrentTenant();
         Optional<Factura> facturaOpt = facturaRepository.findById(id)
                 .filter(f -> tenantActual != null && tenantActual.equals(f.getTenantId()));

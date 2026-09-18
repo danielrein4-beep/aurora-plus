@@ -16,6 +16,7 @@ import com.auroraplus.modules.tamanacocomercial.services.AuditoriaService;
 import com.auroraplus.modules.tamanacocomercial.services.ChoferService;
 import com.auroraplus.modules.tamanacocomercial.services.CierreSemanaService;
 import com.auroraplus.modules.tamanacocomercial.services.DespachoService;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -267,6 +268,7 @@ public class DespachoController {
 
     @DeleteMapping("/{id}")
     public void eliminarDespacho(@PathVariable Long id, @RequestParam Long tenantId) {
+        TamanacoAccessService.exigirDuenoAdmin();
         Long tenantActual = TenantContext.getCurrentTenant();
         Optional<DespachoComercial> d = despachoComercialRepository.findById(id)
                 .filter(desp -> tenantActual != null && tenantActual.equals(desp.getTenantId()));

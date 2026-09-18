@@ -8,6 +8,7 @@ import com.auroraplus.modules.tamanacocomercial.entities.VentaComercial;
 import com.auroraplus.modules.tamanacocomercial.repositories.MovimientoStockRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.ProductoComercialRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.VentaComercialRepository;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -153,6 +154,7 @@ public class VentaController {
     @PutMapping("/{id}/anular")
     @Transactional
     public ResponseEntity<?> anularVenta(@PathVariable Long id, @RequestParam Long tenantId) {
+        TamanacoAccessService.exigirDuenoAdmin();
         Long tenantActual = TenantContext.getCurrentTenant();
         VentaComercial v = ventaRepository.findById(id).orElse(null);
         if (v == null || tenantActual == null || !tenantActual.equals(v.getTenantId())) return ResponseEntity.notFound().build();

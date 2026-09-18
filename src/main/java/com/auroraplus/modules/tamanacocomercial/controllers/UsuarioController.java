@@ -3,6 +3,7 @@ package com.auroraplus.modules.tamanacocomercial.controllers;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.Usuario;
 import com.auroraplus.modules.tamanacocomercial.repositories.UsuarioRepository;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -49,6 +50,7 @@ public class UsuarioController {
 
     @PostMapping
     public ResponseEntity<?> crearUsuario(@RequestParam Long tenantId, @RequestBody Usuario nuevo) {
+        TamanacoAccessService.exigirDuenoAdmin();
 
         if (nuevo.getEmail() == null || nuevo.getEmail().trim().isEmpty() ||
             nuevo.getPassword() == null || nuevo.getPassword().trim().isEmpty() ||
@@ -91,6 +93,7 @@ public class UsuarioController {
     // OTRO tenant con solo adivinar/incrementar el id. Mismo patrón que ConsultaMedicaService.
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizarUsuario(@PathVariable Long id, @RequestBody Usuario datos) {
+        TamanacoAccessService.exigirDuenoAdmin();
         Long tenantId = TenantContext.getCurrentTenant();
         return usuarioRepository.findById(id)
             .filter(u -> tenantId != null && tenantId.equals(u.getTenantId()))
@@ -145,6 +148,7 @@ public class UsuarioController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarODesactivar(@PathVariable Long id) {
+        TamanacoAccessService.exigirDuenoAdmin();
         Long tenantId = TenantContext.getCurrentTenant();
         return usuarioRepository.findById(id)
             .filter(u -> tenantId != null && tenantId.equals(u.getTenantId()))

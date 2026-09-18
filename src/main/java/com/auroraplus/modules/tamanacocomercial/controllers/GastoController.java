@@ -3,6 +3,7 @@ package com.auroraplus.modules.tamanacocomercial.controllers;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.entities.Gasto;
 import com.auroraplus.modules.tamanacocomercial.repositories.GastoRepository;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +24,7 @@ public class GastoController {
 
     @PostMapping
     public Gasto crear(@RequestParam Long tenantId, @RequestBody Gasto gasto) {
+        TamanacoAccessService.exigirDuenoAdmin();
         gasto.setTenantId(tenantId);
         if (gasto.getMoneda() == null || gasto.getMoneda().trim().isEmpty()) {
             gasto.setMoneda("COP");
@@ -36,6 +38,7 @@ public class GastoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Gasto> actualizar(@PathVariable Long id, @RequestBody Gasto detalles) {
+        TamanacoAccessService.exigirDuenoAdmin();
         Long tenantId = TenantContext.getCurrentTenant();
         return gastoRepository.findById(id)
             .filter(gasto -> tenantId != null && tenantId.equals(gasto.getTenantId()))
@@ -60,6 +63,7 @@ public class GastoController {
 
     @PatchMapping("/{id}/toggle-descontado")
     public ResponseEntity<Gasto> toggleDescontado(@PathVariable Long id) {
+        TamanacoAccessService.exigirDuenoAdmin();
         Long tenantId = TenantContext.getCurrentTenant();
         return gastoRepository.findById(id)
             .filter(gasto -> tenantId != null && tenantId.equals(gasto.getTenantId()))
@@ -72,6 +76,7 @@ public class GastoController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        TamanacoAccessService.exigirDuenoAdmin();
         if (gastoRepository.existsById(id)) {
             gastoRepository.deleteById(id);
             return ResponseEntity.ok().build();

@@ -5,6 +5,7 @@ import com.auroraplus.modules.tamanacocomercial.entities.Chofer;
 import com.auroraplus.modules.tamanacocomercial.repositories.ChoferRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.DespachoComercialRepository;
 import com.auroraplus.modules.tamanacocomercial.services.ChoferService;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -80,6 +81,7 @@ public class ChoferRestController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminar(@PathVariable Long id) {
+        TamanacoAccessService.exigirDuenoAdmin();
         if (!choferRepository.existsById(id)) return ResponseEntity.notFound().build();
         choferRepository.deleteById(id);
         return ResponseEntity.ok().build();

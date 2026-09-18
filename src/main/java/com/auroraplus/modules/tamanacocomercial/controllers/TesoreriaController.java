@@ -7,6 +7,7 @@ import com.auroraplus.modules.tamanacocomercial.entities.Ingreso;
 import com.auroraplus.modules.tamanacocomercial.repositories.CambioMonedaRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.GastoRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.IngresoRepository;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -54,6 +55,7 @@ public class TesoreriaController {
 
     @PostMapping("/ingresos")
     public ResponseEntity<?> registrarIngreso(@RequestParam Long tenantId, @RequestBody Ingreso ingreso) {
+        TamanacoAccessService.exigirDuenoAdmin();
         if (ingreso.getClienteOrigen() == null || ingreso.getClienteOrigen().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "El cliente u origen del pago es obligatorio"));
         }
@@ -73,6 +75,7 @@ public class TesoreriaController {
 
     @PutMapping("/ingresos/{id}")
     public ResponseEntity<?> actualizarIngreso(@PathVariable Long id, @RequestBody Ingreso datos) {
+        TamanacoAccessService.exigirDuenoAdmin();
         Long tenantId = TenantContext.getCurrentTenant();
         return ingresoRepository.findById(id)
             .filter(i -> tenantId != null && tenantId.equals(i.getTenantId()))
@@ -91,6 +94,7 @@ public class TesoreriaController {
 
     @DeleteMapping("/ingresos/{id}")
     public ResponseEntity<?> eliminarIngreso(@PathVariable Long id) {
+        TamanacoAccessService.exigirDuenoAdmin();
         if (!ingresoRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
@@ -105,6 +109,7 @@ public class TesoreriaController {
 
     @PostMapping("/cambios")
     public ResponseEntity<?> registrarCambio(@RequestParam Long tenantId, @RequestBody CambioMoneda cambio) {
+        TamanacoAccessService.exigirDuenoAdmin();
         if (cambio.getMonedaOrigen() == null || cambio.getMonedaDestino() == null)
             return ResponseEntity.badRequest().body(Map.of("error", "Moneda origen y destino son obligatorias"));
         if (cambio.getMonedaOrigen().equalsIgnoreCase(cambio.getMonedaDestino()))
@@ -123,6 +128,7 @@ public class TesoreriaController {
 
     @PutMapping("/cambios/{id}")
     public ResponseEntity<?> actualizarCambio(@PathVariable Long id, @RequestBody CambioMoneda datos) {
+        TamanacoAccessService.exigirDuenoAdmin();
         Long tenantId = TenantContext.getCurrentTenant();
         return cambioMonedaRepository.findById(id)
             .filter(c -> tenantId != null && tenantId.equals(c.getTenantId()))
@@ -147,6 +153,7 @@ public class TesoreriaController {
 
     @DeleteMapping("/cambios/{id}")
     public ResponseEntity<?> eliminarCambio(@PathVariable Long id) {
+        TamanacoAccessService.exigirDuenoAdmin();
         if (!cambioMonedaRepository.existsById(id))
             return ResponseEntity.notFound().build();
         cambioMonedaRepository.deleteById(id);

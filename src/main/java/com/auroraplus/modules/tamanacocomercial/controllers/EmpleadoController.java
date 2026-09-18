@@ -6,6 +6,7 @@ import com.auroraplus.modules.tamanacocomercial.entities.Gasto;
 import com.auroraplus.modules.tamanacocomercial.repositories.EmpleadoRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.GastoRepository;
 import com.auroraplus.modules.tamanacocomercial.services.AuditoriaService;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -57,6 +58,7 @@ public class EmpleadoController {
 
     @PostMapping
     public Empleado crear(@RequestParam Long tenantId, @RequestBody Empleado empleado) {
+        TamanacoAccessService.exigirDuenoAdmin();
         empleado.setTenantId(tenantId);
         if (empleado.getActivo() == null) empleado.setActivo(true);
         Empleado guardado = empleadoRepository.save(empleado);
@@ -66,6 +68,7 @@ public class EmpleadoController {
 
     @PutMapping("/{id}")
     public Empleado actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Empleado detalles) {
+        TamanacoAccessService.exigirDuenoAdmin();
         Long tenantActual = TenantContext.getCurrentTenant();
         Empleado emp = empleadoRepository.findById(id)
                 .filter(e -> tenantActual != null && tenantActual.equals(e.getTenantId()))
@@ -85,6 +88,7 @@ public class EmpleadoController {
 
     @PostMapping("/{id}/pagar")
     public Gasto pagarNomina(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Map<String, Object> payload) {
+        TamanacoAccessService.exigirDuenoAdmin();
         Long tenantActual = TenantContext.getCurrentTenant();
         Empleado emp = empleadoRepository.findById(id)
                 .filter(e -> tenantActual != null && tenantActual.equals(e.getTenantId()))
