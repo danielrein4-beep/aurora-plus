@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.AplicacionMedicamento;
 import com.auroraplus.modules.ganaderia.entities.Medicamento;
 import com.auroraplus.modules.ganaderia.repositories.AplicacionMedicamentoRepository;
@@ -28,7 +29,7 @@ public class MedicamentoController {
 
     @GetMapping
     public List<Medicamento> listar() {
-        return medicamentoRepository.findAll();
+        return medicamentoRepository.findByTenantId(TenantContext.getCurrentTenant());
     }
 
     @PostMapping

@@ -1,6 +1,7 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.InsumoAlimentacion;
 import com.auroraplus.modules.ganaderia.entities.MovimientoInsumo;
 import com.auroraplus.modules.ganaderia.entities.RegistroConsumo;
@@ -30,7 +31,7 @@ public class InsumoAlimentacionController {
 
     @GetMapping("/insumos")
     public List<InsumoAlimentacion> listarInsumos() {
-        return insumoAlimentacionRepository.findAll();
+        return insumoAlimentacionRepository.findByTenantId(TenantContext.getCurrentTenant());
     }
 
     @PostMapping("/insumos")

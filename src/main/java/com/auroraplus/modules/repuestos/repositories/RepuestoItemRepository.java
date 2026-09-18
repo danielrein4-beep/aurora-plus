@@ -13,6 +13,8 @@ import java.util.Optional;
 @Repository
 public interface RepuestoItemRepository extends JpaRepository<RepuestoItem, Long> {
 
+    List<RepuestoItem> findByTenantId(Long tenantId);
+
     Optional<RepuestoItem> findByCodigoSkuAndTenantId(String codigoSku, Long tenantId);
 
     List<RepuestoItem> findByCodigoOriginalOemAndTenantId(String codigoOriginalOem, Long tenantId);

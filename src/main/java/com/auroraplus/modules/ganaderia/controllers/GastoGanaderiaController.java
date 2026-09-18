@@ -2,6 +2,7 @@ package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.GastoGanaderia;
 import com.auroraplus.modules.ganaderia.repositories.GastoGanaderiaRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaGastoService;
@@ -33,12 +34,12 @@ public class GastoGanaderiaController {
         public LocalDate fecha;
     }
 
+    // P0: el tenant SIEMPRE sale de TenantContext (JWT verificado) — antes se aceptaba un
+    // tenantId opcional por query que, si el cliente lo omitía, caía a findAllByOrderByFechaDesc(),
+    // devolviendo los gastos de TODOS los tenants mezclados.
     @GetMapping
-    public List<GastoGanaderia> listar(@RequestParam(required = false) Long tenantId) {
-        if (tenantId != null) {
-            return gastoGanaderiaRepository.findByTenantIdOrderByFechaDesc(tenantId);
-        }
-        return gastoGanaderiaRepository.findAllByOrderByFechaDesc();
+    public List<GastoGanaderia> listar() {
+        return gastoGanaderiaRepository.findByTenantIdOrderByFechaDesc(TenantContext.getCurrentTenant());
     }
 
     @PostMapping

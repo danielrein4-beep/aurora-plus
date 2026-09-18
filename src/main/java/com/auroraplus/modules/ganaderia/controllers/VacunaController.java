@@ -1,6 +1,7 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.AplicacionVacuna;
 import com.auroraplus.modules.ganaderia.entities.Vacuna;
 import com.auroraplus.modules.ganaderia.repositories.AplicacionVacunaRepository;
@@ -30,15 +31,13 @@ public class VacunaController {
     @Autowired
     private com.auroraplus.modules.ganaderia.repositories.AnimalRepository animalRepository;
 
+    // P0: el tenant SIEMPRE sale de TenantContext (JWT verificado) — antes se aceptaba un
+    // tenantId opcional por query que, si el cliente lo omitía, caía a findAll() y devolvía
+    // el catálogo de TODOS los tenants mezclado; y si lo mandaba, confiaba en un valor que
+    // el propio cliente controla, permitiendo leer el catálogo de cualquier otro tenant.
     @GetMapping
-    public List<Vacuna> listar(@RequestParam(required = false) Long tenantId) {
-        // Si se indica tenantId, SIEMPRE se respeta ese filtro (incluso si el
-        // catálogo del tenant está vacío) — nunca caer a findAll(), que
-        // devolvería el catálogo de TODOS los tenants mezclado.
-        if (tenantId != null) {
-            return vacunaRepository.findByTenantId(tenantId);
-        }
-        return vacunaRepository.findAll();
+    public List<Vacuna> listar() {
+        return vacunaRepository.findByTenantId(TenantContext.getCurrentTenant());
     }
 
     @PostMapping

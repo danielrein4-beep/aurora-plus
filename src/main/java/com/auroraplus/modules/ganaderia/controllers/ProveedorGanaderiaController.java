@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.ProveedorGanaderia;
 import com.auroraplus.modules.ganaderia.repositories.ProveedorGanaderiaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +18,7 @@ public class ProveedorGanaderiaController {
 
     @GetMapping
     public List<ProveedorGanaderia> listar() {
-        return proveedorGanaderiaRepository.findAll();
+        return proveedorGanaderiaRepository.findByTenantId(TenantContext.getCurrentTenant());
     }
 
     @PostMapping

@@ -1,6 +1,7 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.Potrero;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
@@ -34,7 +35,7 @@ public class PotreroController {
 
     @GetMapping
     public List<Potrero> listar() {
-        return potreroRepository.findAll();
+        return potreroRepository.findByTenantId(TenantContext.getCurrentTenant());
     }
 
     public static class PosicionRequest {

@@ -39,7 +39,7 @@ public class RepuestoItemController {
 
     @GetMapping
     public List<RepuestoItem> listar() {
-        return repuestoItemRepository.findAll();
+        return repuestoItemRepository.findByTenantId(TenantContext.getCurrentTenant());
     }
 
     @GetMapping("/sku/{codigoSku}")
