@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Set;
 
 /**
  * Alta de un tenant nuevo: usada tanto por el super-admin (panel interno)
@@ -100,9 +101,20 @@ public class TenantProvisioningService {
 
         LicenciaTenant guardada = licenciaTenantRepository.save(licencia);
 
+        // Sub-verticales que comparten el módulo/backend "salud" pero declaran su
+        // propio moduloPrincipal para poder distinguirse en el frontend (ver
+        // AuthContext.MODULO_A_INDUSTRIA) — mismo criterio ya usado para
+        // Farmacia/Ferretería/Repuestos, que comparten el motor de Aurora Retail
+        // con su propio moduloPrincipal. LicenciaService protege las rutas por el
+        // nombre real del módulo ("salud"), no por esta etiqueta de negocio — sin
+        // este mapeo, el ModuloTenant se activaba con el nombre de la etiqueta
+        // ("odontologia") y el tenant quedaba sin acceso a ningún endpoint de
+        // /api/salud/**.
+        String moduloBackend = VARIANTES_DE_SALUD.contains(request.moduloPrincipal) ? "salud" : request.moduloPrincipal;
+
         ModuloTenant moduloInicial = new ModuloTenant();
         moduloInicial.setTenantId(nuevoTenantId);
-        moduloInicial.setModuloNombre(request.moduloPrincipal);
+        moduloInicial.setModuloNombre(moduloBackend);
         moduloInicial.setActivo(true);
         moduloTenantRepository.save(moduloInicial);
 
@@ -111,11 +123,13 @@ public class TenantProvisioningService {
             // usuario inicial debe tener rol MEDICO para que el sistema lo reconozca
             // como el médico del consultorio y le auto-asigne citas/consultas —
             // DUENO_ADMIN no cuenta para ese resuelto, aunque igual tenga acceso.
-            Usuario.Rol rolInicial = "salud".equals(request.moduloPrincipal) ? Usuario.Rol.MEDICO : Usuario.Rol.DUENO_ADMIN;
+            Usuario.Rol rolInicial = "salud".equals(moduloBackend) ? Usuario.Rol.MEDICO : Usuario.Rol.DUENO_ADMIN;
             authService.crearUsuario(nuevoTenantId, request.usuarioInicial, request.passwordInicial,
                 rolInicial, request.nombreEmpresa);
         }
 
         return guardada;
     }
+
+    private static final Set<String> VARIANTES_DE_SALUD = Set.of("odontologia");
 }
