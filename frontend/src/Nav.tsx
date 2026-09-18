@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import AuroraLogo from "./AuroraLogo";
 import { useAuth } from "./context/AuthContext";
@@ -33,12 +33,34 @@ export default function Nav() {
   const { isLoggedIn, user, logout } = useAuth();
   const miSistema = VERTICAL_POR_INDUSTRIA[user?.industry || ""] || VERTICAL_POR_DEFECTO;
 
+  const navClicksRef = useRef<number>(0);
+  const navClickTimeoutRef = useRef<any>(null);
+
+  const handleNavLogoClick = (e: React.MouseEvent) => {
+    if (e.altKey || e.shiftKey) {
+      navigate("/superadmin");
+      return;
+    }
+    navClicksRef.current += 1;
+    if (navClickTimeoutRef.current) clearTimeout(navClickTimeoutRef.current);
+
+    if (navClicksRef.current >= 5) {
+      navClicksRef.current = 0;
+      navigate("/superadmin");
+    } else {
+      navClickTimeoutRef.current = setTimeout(() => {
+        navClicksRef.current = 0;
+      }, 3500);
+      navigate("/");
+    }
+  };
+
   return (
     <nav className="aurora-public-nav fixed top-0 left-0 right-0 z-50 transition-colors duration-500">
       <div className="max-w-5xl mx-auto px-5 sm:px-8 h-20 flex items-center justify-between">
 
         {/* Logo */}
-        <button onClick={() => navigate("/")} className="flex items-center gap-3 group cursor-pointer">
+        <button onClick={handleNavLogoClick} className="flex items-center gap-3 group cursor-pointer" title="Aurora Plus">
           <AuroraLogo size={38} animated />
           <div className="text-left">
             <div className="font-['IBM_Plex_Sans'] font-bold text-base leading-none tracking-tight text-[#f8f6ef]">

@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import AuroraLogo from "./AuroraLogo";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Nav from "./Nav";
 import { AuroraGradientDef } from "./Icons";
@@ -9,11 +10,17 @@ export default function Layout() {
   const navigate = useNavigate();
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
   
-  // 5-Clicks Easter Egg Trigger para CEOs de Aurora
+  // 5-Clicks Easter Egg Trigger para CEOs de Aurora (o Alt/Shift + Clic)
   const clicksRef = useRef<number>(0);
   const clickTimeoutRef = useRef<any>(null);
 
-  const handleFooterLogoClick = () => {
+  const handleFooterLogoClick = (e: React.MouseEvent) => {
+    // Si presiona Alt o Shift, abre de inmediato sin esperar los 5 clics
+    if (e.altKey || e.shiftKey) {
+      setShowSuperAdmin(true);
+      return;
+    }
+
     clicksRef.current += 1;
 
     if (clickTimeoutRef.current) {
@@ -26,9 +33,21 @@ export default function Layout() {
     } else {
       clickTimeoutRef.current = setTimeout(() => {
         clicksRef.current = 0;
-      }, 2500);
+      }, 3500);
     }
   };
+
+  // Atajo de teclado global Ctrl+Shift+A o Ctrl+Shift+S para acceder de inmediato
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === "A" || e.key === "S" || e.key === "a" || e.key === "s")) {
+        e.preventDefault();
+        setShowSuperAdmin((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     // Clase "dark" fija: el sitio público quedó oscuro permanente (decisión ya
@@ -63,9 +82,12 @@ export default function Layout() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div
             onClick={handleFooterLogoClick}
-            className="flex items-center gap-3 select-none cursor-pointer group transition-transform active:scale-95"
-            title="Aurora Plus"
+            className="flex items-center gap-3 select-none cursor-pointer group transition-transform active:scale-95 p-2 -m-2 rounded-2xl hover:bg-white/5"
+            title="Aurora Plus - Administracion"
           >
+            <div className="p-1 rounded-xl bg-white/5 border border-white/10 group-hover:border-teal-400/40 transition-colors">
+              <AuroraLogo size={28} animated />
+            </div>
             <div>
               <span className="font-['Outfit'] font-bold text-aurora text-sm group-hover:brightness-110 transition-all">
                 Aurora Plus

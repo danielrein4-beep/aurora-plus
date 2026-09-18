@@ -527,8 +527,18 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   // LOGIN SCREEN
   if (!sesion) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800">
-        <div className="w-full max-w-md p-8 bg-white rounded-3xl border border-slate-200 shadow-xl space-y-6">
+      <div className={onClose ? "fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-md overflow-y-auto flex items-center justify-center p-4 sm:p-6 animate-fadeIn" : "min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800"}>
+        <div className="w-full max-w-md p-8 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-6 relative my-auto">
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition-all cursor-pointer font-bold text-xs"
+              title="Cerrar"
+            >
+              [X]
+            </button>
+          )}
           <div className="text-center space-y-2">
             <div className="inline-flex p-3 rounded-2xl bg-slate-900 text-white shadow-md">
               <span className="font-mono text-sm font-black tracking-wider">SUPERADMIN</span>
@@ -603,11 +613,12 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
   // MAIN DASHBOARD (Aurora White Professional)
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans p-4 sm:p-6 lg:p-8 space-y-6">
+    <div className={onClose ? "fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-md overflow-y-auto p-3 sm:p-6 animate-fadeIn flex flex-col" : "min-h-screen bg-slate-50 text-slate-800 font-sans p-4 sm:p-6 lg:p-8 space-y-6"}>
+      <div className={onClose ? "max-w-7xl mx-auto w-full bg-slate-50 text-slate-800 font-sans p-4 sm:p-6 lg:p-8 space-y-6 rounded-3xl shadow-2xl border border-slate-200 my-auto" : "space-y-6"}>
       {/* Toast Feedback */}
       {feedback && (
         <div
-          className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-2xl shadow-xl border text-xs font-bold transition-all ${
+          className={`fixed top-4 right-4 z-[10000] px-5 py-3 rounded-2xl shadow-xl border text-xs font-bold transition-all ${
             feedback.tipo === "error"
               ? "bg-rose-50 border-rose-200 text-rose-800"
               : "bg-emerald-50 border-emerald-200 text-emerald-800"
@@ -669,13 +680,21 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             Cerrar Sesion
           </button>
 
-          {onClose && (
+          {onClose ? (
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer text-sm font-bold"
-              title="Volver"
+              className="px-3.5 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 cursor-pointer text-xs font-bold transition-all shadow-xs"
+              title="Cerrar SuperAdmin"
             >
-              [Cerrar]
+              Cerrar Portal
+            </button>
+          ) : (
+            <button
+              onClick={() => window.location.href = "/"}
+              className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer text-xs font-bold transition-all"
+              title="Ir a la pagina principal"
+            >
+              Volver al Inicio
             </button>
           )}
         </div>
@@ -997,7 +1016,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
       {/* MODAL: DIRECTÓRIO DE USUARIOS Y LÍMITE DE CUOTA */}
       {showUsuariosDirectorioModal && tenantParaUsuariosDirectorio && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="relative w-full max-w-2xl p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-6">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
@@ -1183,7 +1202,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
       {/* MODAL: REGISTRAR PAGO */}
       {showPagoModal && tenantParaPago && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="relative w-full max-w-lg p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
@@ -1287,7 +1306,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
       {/* MODAL: REGALAR TIEMPO */}
       {showRegaloModal && tenantParaRegalo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="relative w-full max-w-md p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
@@ -1357,7 +1376,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
       {/* MODAL: MODULOS DE INDUSTRIA CONTRATADOS */}
       {showModulosModal && tenantParaModulos && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="relative w-full max-w-lg p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
@@ -1442,7 +1461,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
       {/* MODAL: ALTA RAPIDA DE NEGOCIO (NUEVO TENANT) */}
       {showNuevoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="relative w-full max-w-lg p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
@@ -1613,7 +1632,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
       {/* MODAL: CREAR USUARIO PARA TENANT */}
       {showUsuarioModal && tenantParaUsuario && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="relative w-full max-w-md p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
@@ -1703,7 +1722,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
       {/* MODAL: HISTORIAL DE PAGOS */}
       {showHistorialPagosModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="relative w-full max-w-3xl p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
@@ -1773,6 +1792,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

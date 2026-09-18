@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
@@ -36,6 +36,28 @@ const RUBROS_REGISTRO: RubroNegocioItem[] = [
 ];
 
 export default function Auth() {
+  const authClicksRef = useRef<number>(0);
+  const authClickTimeoutRef = useRef<any>(null);
+
+  const handleAuthLogoClick = (e: React.MouseEvent) => {
+    if (e.altKey || e.shiftKey) {
+      navigate("/superadmin");
+      return;
+    }
+    authClicksRef.current += 1;
+    if (authClickTimeoutRef.current) clearTimeout(authClickTimeoutRef.current);
+
+    if (authClicksRef.current >= 5) {
+      authClicksRef.current = 0;
+      navigate("/superadmin");
+    } else {
+      authClickTimeoutRef.current = setTimeout(() => {
+        authClicksRef.current = 0;
+      }, 3500);
+      navigate("/");
+    }
+  };
+
   const [mode, setMode] = useState<Mode>("login");
   const [form, setForm] = useState(() => {
     let email = "";
@@ -182,7 +204,7 @@ export default function Auth() {
         
         {/* Barra superior de la tarjeta */}
         <div className="flex flex-wrap items-center justify-between gap-4 pb-8 mb-8 border-b border-white/10">
-          <button onClick={() => navigate("/")} className="flex items-center gap-3.5 group cursor-pointer" title="Ir a la página principal">
+          <button onClick={handleAuthLogoClick} className="flex items-center gap-3.5 group cursor-pointer" title="Ir a la página principal">
             <div className="p-2 rounded-2xl bg-white/5 border border-white/10 shadow-inner group-hover:scale-105 transition-transform duration-300">
               <AuroraLogo size={34} animated />
             </div>
