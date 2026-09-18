@@ -4,6 +4,7 @@ import com.auroraplus.core.config.entities.LicenciaTenant;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.core.financiero.entities.TasaCambio;
 import com.auroraplus.core.financiero.repositories.TasaCambioRepository;
+import com.auroraplus.core.financiero.services.ActualizacionTasasAutomaticasJob;
 import com.auroraplus.core.financiero.services.MotorFinancieroService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Gestión de tasas de cambio y moneda base por tenant (Fase 1.2): sin esto no
@@ -29,6 +32,59 @@ public class TasaCambioController {
 
     @Autowired
     private LicenciaTenantRepository licenciaTenantRepository;
+
+    @Autowired
+    private ActualizacionTasasAutomaticasJob actualizacionTasasAutomaticasJob;
+
+    private static final Set<String> METODOS_VALIDOS = Set.of("BINANCE", "BCV", "MANUAL");
+
+    /** Qué fuente sigue automáticamente la tasa USD->VES de este tenant: BINANCE, BCV o MANUAL ("Propia"). */
+    @GetMapping("/metodo-automatico")
+    public Map<String, String> obtenerMetodoAutomatico(@RequestParam Long tenantId) {
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
+        return Map.of("metodo", licencia.getMetodoTasaAutomatica());
+    }
+
+    public static class MetodoAutomaticoRequest {
+        public String metodo; // BINANCE, BCV o MANUAL
+    }
+
+    @PutMapping("/metodo-automatico")
+    public Map<String, String> actualizarMetodoAutomatico(@RequestParam Long tenantId, @RequestBody MetodoAutomaticoRequest request) {
+        if (request.metodo == null || !METODOS_VALIDOS.contains(request.metodo)) {
+            throw new RuntimeException("Método inválido — debe ser BINANCE, BCV o MANUAL");
+        }
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
+        licencia.setMetodoTasaAutomatica(request.metodo);
+        licenciaTenantRepository.save(licencia);
+        // Al elegir BINANCE o BCV, se busca la tasa de una vez en vez de esperar hasta la
+        // próxima corrida programada (cada 4h) — el negocio ve el cambio reflejado al instante.
+        if (!"MANUAL".equals(request.metodo)) {
+            actualizacionTasasAutomaticasJob.actualizarAhoraParaTenant(tenantId, request.metodo);
+        }
+        return Map.of("metodo", request.metodo);
+    }
+
+    /** Fuerza ya la búsqueda de la tasa automática vigente de este tenant (botón "Actualizar ahora"), sin esperar la corrida programada. */
+    @PostMapping("/metodo-automatico/actualizar-ahora")
+    public ResponseEntity<TasaCambio> actualizarAhora(@RequestParam Long tenantId) {
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
+        if ("MANUAL".equals(licencia.getMetodoTasaAutomatica())) {
+            throw new RuntimeException("Este negocio tiene la tasa en modo Propia (manual) — no hay fuente automática que actualizar");
+        }
+        BigDecimal tasa = actualizacionTasasAutomaticasJob.actualizarAhoraParaTenant(tenantId, licencia.getMetodoTasaAutomatica())
+            .orElseThrow(() -> new RuntimeException("No se pudo obtener la tasa de " + licencia.getMetodoTasaAutomatica() + " en este momento — intente de nuevo en unos minutos"));
+        return vigenteTrasActualizar(tenantId, tasa);
+    }
+
+    private ResponseEntity<TasaCambio> vigenteTrasActualizar(Long tenantId, BigDecimal tasaEsperada) {
+        return ResponseEntity.ok(tasaCambioRepository.findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(
+                tenantId, "USD", "VES")
+            .orElseThrow(() -> new RuntimeException("La tasa se actualizó (" + tasaEsperada + ") pero no se pudo releer")));
+    }
 
     public static class ActualizarTasaRequest {
         public String monedaOrigen;

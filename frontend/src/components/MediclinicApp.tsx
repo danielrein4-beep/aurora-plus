@@ -6,7 +6,7 @@ import {
   IconStethoscope, IconUsers, IconFileText, IconPrescription, IconHourglass, IconCalendar,
   IconCard, IconCustomize, IconSearch, IconUser, IconCheck, IconTrash, IconRefresh,
   IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconUnlock, IconWarning, IconClose, IconBank,
-  IconWhatsApp, IconMail, IconChart
+  IconWhatsApp, IconMail, IconChart, IconCoins, IconEdit
 } from "../Icons";
 import ThemeToggle from "./ThemeToggle";
 import CanalEndemico from "./CanalEndemico";
@@ -21,9 +21,9 @@ import {
   listarCierresCaja, registrarCierreCaja,
   listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta, eliminarConsulta,
   listarCotizaciones, crearCotizacion, actualizarEstadoCotizacion, eliminarCotizacion as eliminarCotizacionApi,
-  tasaVigente, actualizarTasa,
+  tasaVigente, actualizarTasa, obtenerMetodoTasaAutomatica, actualizarMetodoTasaAutomatica, actualizarTasaAutomaticaAhora,
   type Paciente, type CitaMedica, type SalaEsperaEntrada, type ProcedimientoMedico, type ConsultaMedica,
-  type CierreCajaRegistro, type CotizacionMedicaApi, type TasaCambio,
+  type CierreCajaRegistro, type CotizacionMedicaApi, type TasaCambio, type MetodoTasaAutomatica,
 } from "../api";
 import {
   generarPdfCierreCaja, generarPdfInformeConsulta, generarTextoWhatsAppConsulta,
@@ -745,31 +745,75 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   });
 
   const [modalTasasRapidas, setModalTasasRapidas] = useState(false);
-  const [tasaBCVInput, setTasaBCVInput] = useState<string>("");
   const [tasaCOPInput, setTasaCOPInput] = useState<string>("");
+  const [tasaPropiaInput, setTasaPropiaInput] = useState<string>("");
   const [toastTasa, setToastTasa] = useState<string | null>(null);
 
+  // Fuente que sigue la tasa USD->Bs de este tenant — igual que en Comercio: USDT y BCV
+  // ya no se teclean, siguen de verdad Binance P2P / el BCV oficial (ver
+  // TasaCambioAutomaticaService en el backend, corre sola cada 4h). Solo "Propia" es manual.
+  const [metodoTasa, setMetodoTasa] = useState<MetodoTasaAutomatica | null>(null);
+  const [cambiandoMetodoTasa, setCambiandoMetodoTasa] = useState(false);
+  const [actualizandoTasaAhora, setActualizandoTasaAhora] = useState(false);
   const [guardandoTasasRapidas, setGuardandoTasasRapidas] = useState(false);
 
+  useEffect(() => {
+    if (!tenantId) return;
+    obtenerMetodoTasaAutomatica(tenantId).then((r) => setMetodoTasa(r.metodo)).catch(() => setMetodoTasa("BINANCE"));
+  }, [tenantId]);
+
   const abrirModalTasas = () => {
-    setTasaBCVInput(tasaBcv ? String(Number(tasaBcv.tasa)) : "");
     setTasaCOPInput(tasaCopReal ? String(Number(tasaCopReal.tasa)) : "");
+    setTasaPropiaInput(metodoTasa === "MANUAL" && tasaBcv ? String(Number(tasaBcv.tasa)) : "");
     setModalTasasRapidas(true);
+  };
+
+  const elegirMetodoTasa = async (nuevo: MetodoTasaAutomatica) => {
+    if (nuevo === metodoTasa) return;
+    setCambiandoMetodoTasa(true);
+    try {
+      await actualizarMetodoTasaAutomatica(tenantId, nuevo);
+      setMetodoTasa(nuevo);
+      if (nuevo !== "MANUAL") {
+        tasaVigente(tenantId, "USD", "VES").then(setTasaBcv).catch(() => {});
+      }
+    } catch (err) {
+      setToastTasa(err instanceof Error ? err.message : "No se pudo cambiar la fuente de la tasa");
+      setTimeout(() => setToastTasa(null), 3500);
+    } finally {
+      setCambiandoMetodoTasa(false);
+    }
+  };
+
+  const actualizarTasaAhoraModal = async () => {
+    setActualizandoTasaAhora(true);
+    try {
+      setTasaBcv(await actualizarTasaAutomaticaAhora(tenantId));
+    } catch (err) {
+      setToastTasa(err instanceof Error ? err.message : "No se pudo consultar la tasa en este momento");
+      setTimeout(() => setToastTasa(null), 3500);
+    } finally {
+      setActualizandoTasaAhora(false);
+    }
   };
 
   const guardarTasasRapidas = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const bcv = parseFloat(tasaBCVInput);
+    const propia = parseFloat(tasaPropiaInput);
     const cop = parseFloat(tasaCOPInput);
-    if (!(bcv > 0) && !(cop > 0)) { setToastTasa("Ingresá al menos una tasa mayor a cero"); setTimeout(() => setToastTasa(null), 3500); return; }
+    if (!(metodoTasa === "MANUAL" && propia > 0) && !(cop > 0)) {
+      setToastTasa("Ingresá al menos una tasa mayor a cero");
+      setTimeout(() => setToastTasa(null), 3500);
+      return;
+    }
     setGuardandoTasasRapidas(true);
     try {
       const tareas: Promise<void>[] = [];
-      if (bcv > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: bcv, origen: "MANUAL" }).then(setTasaBcv));
+      if (metodoTasa === "MANUAL" && propia > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: propia, origen: "MANUAL" }).then(setTasaBcv));
       if (cop > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: cop, origen: "MANUAL" }).then(setTasaCopReal));
       await Promise.all(tareas);
       setModalTasasRapidas(false);
-      setToastTasa(`Tasas actualizadas: BCV Bs. ${(bcv || Number(tasaBcv?.tasa) || 0).toFixed(2)} | COP $${(cop || Number(tasaCopReal?.tasa) || 0).toLocaleString()}`);
+      setToastTasa(`Tasas actualizadas: Bs. ${(propia || Number(tasaBcv?.tasa) || 0).toFixed(2)} | COP $${(cop || Number(tasaCopReal?.tasa) || 0).toLocaleString()}`);
       setTimeout(() => setToastTasa(null), 3500);
     } catch (err) {
       setToastTasa(err instanceof Error ? err.message : "No se pudo actualizar la tasa");
@@ -1294,8 +1338,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   <IconBank size={22} />
                 </div>
                 <div>
-                  <h3 className="font-['Outfit'] font-black text-lg leading-tight">Tasas de Cambio Oficiales</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-white/50">Ajuste manual e instantáneo para cobros y caja</p>
+                  <h3 className="font-['Outfit'] font-black text-lg leading-tight">Fuente de la Tasa (USD → Bs)</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-white/50">USDT y BCV se sincronizan solos cada 4h.</p>
                 </div>
               </div>
               <button
@@ -1308,46 +1352,57 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             </div>
 
             <form onSubmit={guardarTasasRapidas} className="space-y-4">
-              {/* Tasa BCV */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-white/80 flex items-center justify-between">
-                  <span>Tasa BCV (Bs. / USD)</span>
-                  <span className="text-[10px] font-mono text-teal-600 dark:text-teal-400">Bolívares por Dólar</span>
-                </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3.5 text-xs font-mono font-bold text-slate-400">Bs.</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    required
-                    autoFocus
-                    value={tasaBCVInput}
-                    onChange={(e) => setTasaBCVInput(e.target.value)}
-                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-slate-50 dark:bg-black/20 text-slate-900 dark:text-white font-mono font-bold text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
-                    placeholder="Ej. 56.40"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5 pt-1 flex-wrap">
-                  <span className="text-[10px] text-slate-400">Ajuste rápido:</span>
-                  {[56.40, 57.50, 58.00, 60.00].map((val) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setTasaBCVInput(String(val))}
-                      className="text-[10px] px-2 py-0.5 rounded bg-slate-200/70 dark:bg-white/10 hover:bg-teal-500 hover:text-white transition-colors font-mono cursor-pointer font-bold"
-                    >
-                      Bs. {val.toFixed(2)}
-                    </button>
-                  ))}
-                </div>
+              <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-white/10 p-1 rounded-xl">
+                <button type="button" disabled={cambiandoMetodoTasa} onClick={() => elegirMetodoTasa("BINANCE")}
+                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${metodoTasa === "BINANCE" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
+                  <IconCoins size={12} /><span>USDT</span>
+                </button>
+                <button type="button" disabled={cambiandoMetodoTasa} onClick={() => elegirMetodoTasa("BCV")}
+                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${metodoTasa === "BCV" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
+                  <IconBank size={12} /><span>BCV</span>
+                </button>
+                <button type="button" disabled={cambiandoMetodoTasa} onClick={() => elegirMetodoTasa("MANUAL")}
+                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${metodoTasa === "MANUAL" ? "bg-amber-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
+                  <IconEdit size={12} /><span>Propia</span>
+                </button>
               </div>
 
-              {/* Tasa COP */}
+              {metodoTasa !== "MANUAL" ? (
+                <div className="space-y-2 text-xs bg-slate-100 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/10">
+                  <p className="text-[10px] text-slate-500 dark:text-white/50">
+                    {metodoTasa === "BCV" ? "Tasa oficial publicada en bcv.org.ve:" : "Promedio de las mejores ofertas de Binance P2P (USDT/VES):"}
+                  </p>
+                  <p className="font-mono font-black text-lg text-teal-600 dark:text-teal-400">
+                    {tasaBcv ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa todavía"}
+                  </p>
+                  {tasaBcv && <p className="text-[10px] text-slate-400">Actualizado: {new Date(tasaBcv.fechaActualizacion).toLocaleString()}</p>}
+                  <button type="button" onClick={actualizarTasaAhoraModal} disabled={actualizandoTasaAhora}
+                    className="w-full py-1.5 rounded-lg bg-slate-200/70 dark:bg-white/10 hover:bg-teal-500 hover:text-white transition-colors text-[11px] font-bold cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5">
+                    <IconRefresh size={12} className={actualizandoTasaAhora ? "animate-spin" : ""} />
+                    <span>{actualizandoTasaAhora ? "Consultando…" : "Actualizar Ahora"}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-white/80">Tu Tasa Propia (Bs. / USD)</label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3.5 text-xs font-mono font-bold text-slate-400">Bs.</span>
+                    <input
+                      type="number" step="0.01" min="0.01" autoFocus
+                      value={tasaPropiaInput}
+                      onChange={(e) => setTasaPropiaInput(e.target.value)}
+                      className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-amber-400/60 bg-amber-50 dark:bg-amber-500/10 text-slate-900 dark:text-white font-mono font-bold text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all"
+                      placeholder="Ej. 66.00"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Tasa COP — sin fuente automática, siempre manual */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-white/80 flex items-center justify-between">
                   <span>Tasa TRM (Pesos COP / USD)</span>
-                  <span className="text-[10px] font-mono text-teal-600 dark:text-teal-400">Pesos por Dólar</span>
+                  <span className="text-[10px] font-mono text-teal-600 dark:text-teal-400">Siempre manual</span>
                 </label>
                 <div className="relative flex items-center">
                   <span className="absolute left-3.5 text-xs font-mono font-bold text-slate-400">$</span>
@@ -1355,7 +1410,6 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                     type="number"
                     step="1"
                     min="1"
-                    required
                     value={tasaCOPInput}
                     onChange={(e) => setTasaCOPInput(e.target.value)}
                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-slate-50 dark:bg-black/20 text-slate-900 dark:text-white font-mono font-bold text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
@@ -1383,7 +1437,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   Simulación de Conversión ($10.00 USD):
                 </div>
                 <div className="flex items-center justify-between text-teal-700 dark:text-teal-300 font-bold">
-                  <span>Bs. {((parseFloat(tasaBCVInput) || 0) * 10).toFixed(2)} VES</span>
+                  <span>Bs. {((metodoTasa === "MANUAL" ? parseFloat(tasaPropiaInput) || 0 : Number(tasaBcv?.tasa) || 0) * 10).toFixed(2)} VES</span>
                   <span>${((parseFloat(tasaCOPInput) || 0) * 10).toLocaleString()} COP</span>
                 </div>
               </div>
@@ -1403,7 +1457,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-md hover:shadow-teal-500/20 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-60"
                 >
                   <IconCheck size={16} />
-                  <span>{guardandoTasasRapidas ? "Guardando…" : "Guardar Tasas"}</span>
+                  <span>{guardandoTasasRapidas ? "Guardando…" : metodoTasa === "MANUAL" ? "Guardar Tasa Propia y COP" : "Guardar Tasa COP"}</span>
                 </button>
               </div>
             </form>

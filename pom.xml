@@ -54,6 +54,13 @@
             <artifactId>poi-ooxml</artifactId>
             <version>5.3.0</version>
         </dependency>
+        <!-- Solo para leer la tasa oficial publicada en bcv.org.ve (no tiene API pública,
+             el valor viene embebido en el HTML) — ver TasaCambioAutomaticaService. -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.18.1</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>

@@ -78,6 +78,12 @@ public class LicenciaTenant {
     @Column(name = "margen_tolerancia_descuadre", nullable = false, precision = 18, scale = 2)
     private BigDecimal margenToleranciaDescuadre = new BigDecimal("2.00");
 
+    // Fuente que sigue automáticamente la tasa USD->VES de este tenant (ver
+    // ActualizacionTasasAutomaticasJob): BINANCE (P2P), BCV (oficial) o MANUAL
+    // (el negocio fija su propia tasa "Propia" y el job nunca la toca).
+    @Column(name = "metodo_tasa_automatica", nullable = false, length = 20)
+    private String metodoTasaAutomatica = "BINANCE";
+
     public enum TipoLicencia { BASICA, COMERCIAL, INDUSTRIAL }
 
     public Long getId() { return id; }
@@ -114,4 +120,6 @@ public class LicenciaTenant {
     public void setDomicilioFiscal(String domicilioFiscal) { this.domicilioFiscal = domicilioFiscal; }
     public BigDecimal getMargenToleranciaDescuadre() { return margenToleranciaDescuadre; }
     public void setMargenToleranciaDescuadre(BigDecimal margenToleranciaDescuadre) { this.margenToleranciaDescuadre = margenToleranciaDescuadre; }
+    public String getMetodoTasaAutomatica() { return metodoTasaAutomatica; }
+    public void setMetodoTasaAutomatica(String metodoTasaAutomatica) { this.metodoTasaAutomatica = metodoTasaAutomatica; }
 }

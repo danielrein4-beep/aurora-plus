@@ -1773,6 +1773,22 @@ export function actualizarTasa(tenantId: number, datos: { monedaOrigen: string; 
   return request(`/api/financiero/tasas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
+export type MetodoTasaAutomatica = "BINANCE" | "BCV" | "MANUAL";
+
+/** Qué fuente sigue automáticamente la tasa USD->VES de este tenant: BINANCE (P2P), BCV (oficial) o MANUAL ("Propia", la fija el negocio). */
+export function obtenerMetodoTasaAutomatica(tenantId: number): Promise<{ metodo: MetodoTasaAutomatica }> {
+  return request(`/api/financiero/tasas/metodo-automatico?tenantId=${tenantId}`);
+}
+
+export function actualizarMetodoTasaAutomatica(tenantId: number, metodo: MetodoTasaAutomatica): Promise<{ metodo: MetodoTasaAutomatica }> {
+  return request(`/api/financiero/tasas/metodo-automatico?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify({ metodo }) });
+}
+
+/** Fuerza ya la búsqueda de la tasa automática vigente (Binance/BCV) sin esperar la corrida programada cada 4h. */
+export function actualizarTasaAutomaticaAhora(tenantId: number): Promise<TasaCambio> {
+  return request(`/api/financiero/tasas/metodo-automatico/actualizar-ahora?tenantId=${tenantId}`, { method: "POST" });
+}
+
 export type TipoMovimientoCaja = "INGRESO" | "EGRESO" | "CXC" | "CXP";
 
 export interface MovimientoCaja {
