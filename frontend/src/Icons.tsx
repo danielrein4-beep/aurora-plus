@@ -40,6 +40,14 @@ export function IconVet({ size = 24 }: IconProps) {
   );
 }
 
+export function IconTooth({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 4c-2.2 0-3.2 1.1-4.3 1.1-1.7 0-3.2 1.4-3.2 3.6 0 2.8 1.1 4.4 1.6 7 .4 2 .8 3.3 1.9 3.3.9 0 1-2.3 1.6-3.9.4-1 .8-1.6 1.4-1.6s1 .6 1.4 1.6c.6 1.6.7 3.9 1.6 3.9 1.1 0 1.5-1.3 1.9-3.3.5-2.6 1.6-4.2 1.6-7 0-2.2-1.5-3.6-3.2-3.6C15.2 5.1 14.2 4 12 4z" {...s} />
+    </svg>
+  );
+}
+
 export function IconClinic({ size = 24 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">

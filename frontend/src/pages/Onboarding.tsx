@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
-  AuroraGradientDef, IconClinic, IconVet, IconHardware, IconRestaurant, IconFarm, IconMining,
+  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconRestaurant, IconFarm, IconMining,
   IconEducation, IconRetail, IconConstruction, IconCustomize, IconWarning, IconClose, IconCheck, IconLock,
   IconCard, IconBank, IconPrescription, IconFactory,
 } from "../Icons";
@@ -79,6 +79,15 @@ const INDUSTRIES: IndustryItem[] = [
     badge: "100% DISPONIBLE (Listo)",
     isReady: true,
     tagline: "Vertical: Mediclinic Vet",
+  },
+  {
+    id: "odontologia",
+    label: "Odontología",
+    Icon: IconTooth,
+    desc: "Historia clínica, agenda, odontograma FDI y facturación para consultorios dentales",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical: Mediclinic Odonto",
   },
   {
     id: "repuestos",
@@ -204,6 +213,7 @@ const INDUSTRIA_A_MODULO: Record<string, string> = {
   repuestos: "repuestos",
   retail: "repuestos",
   veterinaria: "salud",
+  odontologia: "odontologia",
   finca: "ganaderia",
   otro: "horeca",
 };
@@ -216,6 +226,7 @@ const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
   repuestos: RETAIL_MODULES,
   retail: RETAIL_MODULES,
   veterinaria: CLINIC_MODULES,
+  odontologia: CLINIC_MODULES,
   finca: GANADERIA_MODULES,
   otro: RESTAURANT_MODULES,
 };
@@ -228,6 +239,7 @@ const NOMBRE_POR_DEFECTO: Record<string, string> = {
   repuestos: "Mi Casa de Repuestos",
   retail: "Mi Tienda",
   veterinaria: "Mi Veterinaria",
+  odontologia: "Mi Consultorio Dental",
   finca: "Mi Finca",
   otro: "Mi Negocio",
 };
@@ -240,6 +252,7 @@ const VERTICAL_LABEL: Record<string, string> = {
   repuestos: "Aurora Retail (Repuestos Automotrices)",
   retail: "Retail POS (Comercio & Tiendas)",
   veterinaria: "Mediclinic Vet",
+  odontologia: "Mediclinic Odonto",
   finca: "Aurora Ganadería (Control de Fincas & Ganado)",
   otro: "Aurora Suite Comercial",
 };
@@ -301,7 +314,7 @@ export default function Onboarding() {
     const rutaDestino =
       selectedIndustry === "restaurante"
         ? "/restaurante"
-        : selectedIndustry === "clinica" || selectedIndustry === "farmacia" || selectedIndustry === "veterinaria"
+        : selectedIndustry === "clinica" || selectedIndustry === "farmacia" || selectedIndustry === "veterinaria" || selectedIndustry === "odontologia"
         ? "/mediclinic"
         : "/dashboard";
 
