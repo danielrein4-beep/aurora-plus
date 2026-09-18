@@ -1,5 +1,6 @@
 package com.auroraplus.modules.repuestos.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.repuestos.entities.ProveedorRepuesto;
 import com.auroraplus.modules.repuestos.repositories.ProveedorRepuestoRepository;
@@ -24,6 +25,7 @@ public class ProveedorRepuestoController {
 
     @PostMapping
     public ResponseEntity<ProveedorRepuesto> crear(@RequestParam Long tenantId, @RequestBody ProveedorRepuesto proveedor) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         if (proveedor.getNombre() == null || proveedor.getNombre().isBlank()) {
             throw new RuntimeException("El nombre del proveedor es obligatorio");
         }
@@ -34,6 +36,7 @@ public class ProveedorRepuestoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ProveedorRepuesto> actualizar(@PathVariable Long id, @RequestBody ProveedorRepuesto datos) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         Long tenantId = TenantContext.getCurrentTenant();
         return proveedorRepuestoRepository.findById(id)
             .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))

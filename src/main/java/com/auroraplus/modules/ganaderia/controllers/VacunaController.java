@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.ganaderia.entities.AplicacionVacuna;
 import com.auroraplus.modules.ganaderia.entities.Vacuna;
 import com.auroraplus.modules.ganaderia.repositories.AplicacionVacunaRepository;
@@ -76,6 +77,7 @@ public class VacunaController {
      */
     @PostMapping("/aplicar-lote")
     public ResponseEntity<List<AplicacionVacuna>> aplicarLote(@RequestParam Long tenantId, @RequestBody AplicacionLoteRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         if (request.animalIds == null || request.animalIds.isEmpty()) {
             throw new RuntimeException("Debe seleccionar al menos un animal para aplicar el tratamiento");
         }

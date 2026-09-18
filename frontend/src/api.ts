@@ -636,6 +636,33 @@ export async function eliminarConsulta(
   });
 }
 
+// --- Odontograma (Mediclinic Odonto) ---
+
+export type EstadoDiente = "SANO" | "CARIES" | "OBTURADO" | "AUSENTE" | "CORONA" | "ENDODONCIA" | "EXTRACCION_INDICADA" | "IMPLANTE";
+
+export interface OdontogramaDiente {
+  id: number;
+  numeroFdi: number;
+  estado: EstadoDiente;
+  notas: string | null;
+  fechaActualizacion: string;
+}
+
+export async function listarOdontograma(pacienteId: number): Promise<OdontogramaDiente[]> {
+  return request<OdontogramaDiente[]>(`/api/salud/odontograma?pacienteId=${pacienteId}`);
+}
+
+export async function actualizarDienteOdontograma(
+  pacienteId: number,
+  numeroFdi: number,
+  datos: { estado: EstadoDiente; notas?: string }
+): Promise<OdontogramaDiente> {
+  return request<OdontogramaDiente>(`/api/salud/odontograma/diente`, {
+    method: "PUT",
+    body: JSON.stringify({ pacienteId, numeroFdi, ...datos }),
+  });
+}
+
 // --- Horeca / Restaurantes ---
 
 export interface Mesa {
@@ -1052,6 +1079,7 @@ export function editarMesero(meseroId: number, datos: { nombre?: string; telefon
 
 // --- RRHH: empleados con reloj checador (para vincular con un mesero) ---
 export type TipoControlEmpleado = "POR_HORA" | "SALARIO_FIJO" | "SOLO_CONTROL";
+export type PeriodicidadPago = "SEMANAL" | "QUINCENAL" | "MENSUAL";
 
 export interface EmpleadoRrhh {
   id: number;
@@ -1061,6 +1089,9 @@ export interface EmpleadoRrhh {
   cargo: string | null;
   tipoControl: TipoControlEmpleado;
   tarifaPorHora: number | null;
+  salarioFijo: number | null;
+  monedaSalario: string | null;
+  periodicidadPago: PeriodicidadPago;
   activo: boolean;
 }
 
@@ -1079,6 +1110,7 @@ export interface LineaLiquidacionRrhh {
   horasTrabajadas: number;
   tarifaPorHora: number | null;
   totalPagar: number | null;
+  monedaPago: string | null;
 }
 
 export interface LiquidacionPeriodoRrhh {
@@ -1089,6 +1121,51 @@ export interface LiquidacionPeriodoRrhh {
 
 export function liquidarPeriodoRrhh(tenantId: number, desde: string, hasta: string): Promise<LiquidacionPeriodoRrhh> {
   return request(`/api/rrhh/asistencia/liquidacion?tenantId=${tenantId}&desde=${desde}&hasta=${hasta}`);
+}
+
+// --- RRHH: pagos de nómina ya efectuados (el gasto real + recibo del empleado) ---
+export interface PagoNomina {
+  id: number;
+  tenantId: number;
+  empleadoId: number;
+  nombreEmpleado: string;
+  cedulaEmpleado: string | null;
+  cargoEmpleado: string | null;
+  periodoDesde: string;
+  periodoHasta: string;
+  tipoControl: TipoControlEmpleado;
+  horasTrabajadas: number | null;
+  monto: number;
+  moneda: string;
+  movimientoCajaId: number | null;
+  fechaPago: string;
+}
+
+export function pagarNomina(tenantId: number, datos: {
+  empleadoId: number; periodoDesde: string; periodoHasta: string;
+  horasTrabajadas?: number | null; monto: number; moneda: string;
+}): Promise<PagoNomina> {
+  return request(`/api/rrhh/pagos-nomina?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function listarPagosNomina(tenantId: number, empleadoId?: number): Promise<PagoNomina[]> {
+  const params = new URLSearchParams({ tenantId: String(tenantId) });
+  if (empleadoId != null) params.set("empleadoId", String(empleadoId));
+  return request(`/api/rrhh/pagos-nomina?${params}`);
+}
+
+// Igual que descargarCierrePdf: necesita el Bearer token, no puede ser un <a href> plano.
+export async function descargarReciboNominaPdf(tenantId: number, pagoId: number): Promise<Blob> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const res = await fetch(`/api/rrhh/pagos-nomina/${pagoId}/recibo.pdf?tenantId=${tenantId}`, { headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) throw new ApiError(`Error ${res.status}`);
+  return res.blob();
 }
 
 export function desactivarMesero(meseroId: number): Promise<void> {
@@ -1155,6 +1232,21 @@ export function obtenerEstadoBinancePay(): Promise<EstadoBinancePay> {
 
 export function guardarBinancePay(datos: { apiKey?: string; secretKey?: string; activo: boolean }): Promise<EstadoBinancePay> {
   return request(`/api/config/mi-negocio/binance-pay`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export interface EstadoWhatsApp {
+  configurado: boolean;
+  activo: boolean;
+  phoneNumberId: string | null;
+  plantillaNombre: string | null;
+}
+
+export function obtenerEstadoWhatsApp(): Promise<EstadoWhatsApp> {
+  return request(`/api/config/mi-negocio/whatsapp`);
+}
+
+export function guardarWhatsApp(datos: { phoneNumberId?: string; accessToken?: string; plantillaNombre?: string; activo: boolean }): Promise<EstadoWhatsApp> {
+  return request(`/api/config/mi-negocio/whatsapp`, { method: "PUT", body: JSON.stringify(datos) });
 }
 
 export interface OrdenBinancePay {

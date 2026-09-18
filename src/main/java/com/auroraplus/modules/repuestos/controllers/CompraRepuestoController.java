@@ -1,5 +1,6 @@
 package com.auroraplus.modules.repuestos.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.repuestos.entities.CompraRepuesto;
 import com.auroraplus.modules.repuestos.repositories.CompraRepuestoRepository;
 import com.auroraplus.modules.repuestos.services.RepuestoCompraService;
@@ -43,6 +44,7 @@ public class CompraRepuestoController {
 
     @PostMapping
     public ResponseEntity<CompraRepuesto> registrar(@RequestParam Long tenantId, @RequestBody CompraRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         List<RepuestoCompraService.ItemCompra> items = request.items.stream().map(i -> {
             RepuestoCompraService.ItemCompra item = new RepuestoCompraService.ItemCompra();
             item.repuestoId = i.repuestoId;

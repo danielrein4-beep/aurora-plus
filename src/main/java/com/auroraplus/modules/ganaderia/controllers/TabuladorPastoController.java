@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.ganaderia.entities.TabuladorPasto;
 import com.auroraplus.modules.ganaderia.repositories.TabuladorPastoRepository;
 import com.auroraplus.modules.ganaderia.services.ReferenciaPastoreoService;
@@ -36,11 +37,13 @@ public class TabuladorPastoController {
     /** Sembrar manualmente los valores de referencia por defecto — falla si el tenant ya tiene su tabulador (para no pisar ediciones existentes). */
     @PostMapping("/sembrar-valores-defecto")
     public List<TabuladorPasto> sembrarValoresDefecto(@RequestParam Long tenantId) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         return referenciaPastoreoService.sembrarValoresPorDefecto(tenantId);
     }
 
     @PostMapping
     public ResponseEntity<TabuladorPasto> crear(@RequestParam Long tenantId, @RequestBody TabuladorPasto fila) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         fila.setTenantId(tenantId);
         if (fila.isEsGenerico() && tabuladorPastoRepository.findByTenantIdAndEsGenericoTrue(tenantId).isPresent()) {
             throw new RuntimeException("Este tenant ya tiene una fila genérica — edítela en vez de crear otra");
@@ -50,6 +53,7 @@ public class TabuladorPastoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<TabuladorPasto> actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody TabuladorPasto datos) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         TabuladorPasto fila = tabuladorPastoRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Fila de tabulador no encontrada"));
         if (!fila.getTenantId().equals(tenantId)) {
@@ -63,6 +67,7 @@ public class TabuladorPastoController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         TabuladorPasto fila = tabuladorPastoRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Fila de tabulador no encontrada"));
         if (!fila.getTenantId().equals(tenantId)) {

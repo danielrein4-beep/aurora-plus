@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.ganaderia.entities.GastoGanaderia;
 import com.auroraplus.modules.ganaderia.repositories.GastoGanaderiaRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaGastoService;
@@ -38,6 +39,7 @@ public class GastoGanaderiaController {
 
     @PostMapping
     public ResponseEntity<GastoGanaderia> registrar(@RequestParam Long tenantId, @RequestBody GastoRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         return ResponseEntity.ok(ganaderiaGastoService.registrarGasto(tenantId, request.categoria, request.descripcion, request.monto, request.fecha));
     }
 }

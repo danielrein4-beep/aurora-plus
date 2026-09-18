@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.Potrero;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
@@ -124,6 +125,7 @@ public class PotreroController {
     /** Forma rápida de fijar el orden de rotación de todos los potreros de una vez, sin editar uno por uno. */
     @PostMapping("/reordenar")
     public List<Potrero> reordenar(@RequestParam Long tenantId, @RequestBody List<Long> potreroIdsEnOrden) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         return potreroRotacionService.reordenar(tenantId, potreroIdsEnOrden);
     }
 

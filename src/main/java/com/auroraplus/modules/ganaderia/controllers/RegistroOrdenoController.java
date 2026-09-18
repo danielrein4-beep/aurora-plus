@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.RegistroOrdeno;
 import com.auroraplus.modules.ganaderia.entities.TanqueLeche;
@@ -199,6 +200,7 @@ public class RegistroOrdenoController {
 
     @PostMapping("/tanque/despacho")
     public ResponseEntity<?> despacharTanque(@RequestParam Long tenantId, @RequestBody DespachoTanqueRequest req) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         if (req.litrosVendidos == null || req.litrosVendidos.compareTo(BigDecimal.ZERO) <= 0) {
             return ResponseEntity.badRequest().body("Los litros a despachar deben ser mayores a cero");
         }
@@ -272,6 +274,7 @@ public class RegistroOrdenoController {
 
     @PutMapping("/tanque/config")
     public ResponseEntity<TanqueLeche> configurarTanque(@RequestParam Long tenantId, @RequestBody ConfigTanqueRequest req) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         TanqueLeche tanque = tanqueLecheRepository.findByTenantId(tenantId)
             .orElseGet(() -> {
                 TanqueLeche nuevo = new TanqueLeche();

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.config.entities.LicenciaTenant;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
@@ -51,6 +52,7 @@ public class VentaAnimalController {
 
     @PostMapping
     public ResponseEntity<VentaAnimal> registrar(@RequestBody VentaRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(ganaderiaVentaService.registrarVenta(tenantId, request.numeroTicket, request.comprador,
             request.items, request.monedaPago, request.montoRecibido, request.claveIdempotencia));

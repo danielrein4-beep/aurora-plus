@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.controllers.AnimalController;
 import com.auroraplus.modules.ganaderia.controllers.BajaAnimalController;
@@ -65,6 +66,7 @@ class GanaderiaAislamientoTenantP0Test {
     @AfterEach
     void limpiarContexto() {
         TenantContext.clear();
+        AuthContext.clear();
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -288,6 +290,7 @@ class GanaderiaAislamientoTenantP0Test {
         req.items = List.of(item);
 
         TenantContext.setCurrentTenant(tenantB);
+        AuthContext.set("tester", "ADMINISTRADOR_FINCA");
         RuntimeException ex = assertThrows(RuntimeException.class, () -> compraAnimalController.registrar(req),
             "Tenant B NO debe poder registrar compra usando proveedor de Tenant A");
         assertTrue(ex.getMessage().contains("Proveedor no pertenece a este tenant") || ex.getMessage().contains("Violación de seguridad"),
@@ -333,6 +336,7 @@ class GanaderiaAislamientoTenantP0Test {
         req.items = List.of(item);
 
         TenantContext.setCurrentTenant(tenantB);
+        AuthContext.set("tester", "ADMINISTRADOR_FINCA");
         RuntimeException ex = assertThrows(RuntimeException.class, () -> ventaAnimalController.registrar(req),
             "Tenant B NO debe poder vender un animal perteneciente al Tenant A");
         assertTrue(ex.getMessage().contains("Animal no pertenece a este tenant") || ex.getMessage().contains("Violación de seguridad"),

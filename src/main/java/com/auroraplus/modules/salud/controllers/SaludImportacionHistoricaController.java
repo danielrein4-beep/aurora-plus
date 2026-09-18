@@ -1,5 +1,6 @@
 package com.auroraplus.modules.salud.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.repositories.CasoHistoricoImportadoRepository;
 import com.auroraplus.modules.salud.services.SaludImportacionHistoricaService;
@@ -28,6 +29,7 @@ public class SaludImportacionHistoricaController {
     @PostMapping("/importar")
     public ResponseEntity<SaludImportacionHistoricaService.ResultadoImportacion> importar(
             @RequestParam("archivo") MultipartFile archivo) {
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
         Long tenantId = TenantContext.getCurrentTenant();
         if (tenantId == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
@@ -48,6 +50,7 @@ public class SaludImportacionHistoricaController {
     /** Lista las cargas ya hechas (agrupadas por archivo) — para saber qué ya se importó y poder deshacerlo si hace falta. */
     @GetMapping("/importaciones")
     public List<ImportacionResumen> listarImportaciones() {
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
         return casoHistoricoImportadoRepository.findAll().stream()
             .collect(java.util.stream.Collectors.groupingBy(
                 c -> c.getFuente() == null ? "(sin nombre)" : c.getFuente(),
@@ -59,6 +62,7 @@ public class SaludImportacionHistoricaController {
 
     @DeleteMapping("/importaciones/{fuente}")
     public ResponseEntity<Void> deshacerImportacion(@PathVariable String fuente) {
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
         importacionService.deshacerImportacion(fuente);
         return ResponseEntity.noContent().build();
     }

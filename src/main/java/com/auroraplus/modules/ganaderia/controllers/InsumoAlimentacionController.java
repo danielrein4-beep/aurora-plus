@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.ganaderia.entities.InsumoAlimentacion;
 import com.auroraplus.modules.ganaderia.entities.MovimientoInsumo;
 import com.auroraplus.modules.ganaderia.entities.RegistroConsumo;
@@ -47,6 +48,7 @@ public class InsumoAlimentacionController {
 
     @PostMapping("/entradas")
     public ResponseEntity<InsumoAlimentacion> registrarEntrada(@RequestParam Long tenantId, @RequestBody EntradaRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         return ResponseEntity.ok(ganaderiaAlimentacionService.registrarEntrada(tenantId, request.insumoId, request.cantidad, request.costoTotal, request.motivo));
     }
 

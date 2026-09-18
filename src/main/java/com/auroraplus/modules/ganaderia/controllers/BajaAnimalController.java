@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.BajaAnimal;
@@ -42,6 +43,7 @@ public class BajaAnimalController {
     @PostMapping
     @Transactional
     public ResponseEntity<BajaAnimal> registrar(@RequestBody BajaRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = TenantContext.getCurrentTenant();
         Animal animal = animalRepository.findById(request.animalId)
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));

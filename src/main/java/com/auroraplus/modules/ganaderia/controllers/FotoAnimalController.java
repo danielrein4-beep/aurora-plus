@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.FotoAnimal;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
@@ -60,6 +61,7 @@ public class FotoAnimalController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         if (fotoAnimalRepository.existsById(id)) {
             fotoAnimalRepository.deleteById(id);
             return ResponseEntity.ok().build();

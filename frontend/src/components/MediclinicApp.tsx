@@ -11,6 +11,7 @@ import {
 import ThemeToggle from "./ThemeToggle";
 import CanalEndemico from "./CanalEndemico";
 import Cie10Buscador from "./Cie10Buscador";
+import Odontograma from "./Odontograma";
 import HistorialImportacionesSalud from "./HistorialImportacionesSalud";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -21,6 +22,7 @@ import {
   listarCierresCaja, registrarCierreCaja,
   listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta, eliminarConsulta,
   listarCotizaciones, crearCotizacion, actualizarEstadoCotizacion, eliminarCotizacion as eliminarCotizacionApi,
+  obtenerEstadoWhatsApp, guardarWhatsApp, type EstadoWhatsApp,
   type Paciente, type CitaMedica, type SalaEsperaEntrada, type ProcedimientoMedico, type ConsultaMedica,
   type CierreCajaRegistro, type CotizacionMedicaApi,
 } from "../api";
@@ -2816,6 +2818,11 @@ function HistoriasClinicas({
   pacienteInicialId?: number | null;
   onVerDocumento?: (payload: DocumentoVisorPayload) => void;
 }) {
+  // Mediclinic Odonto: el odontograma solo se muestra para tenants de esta
+  // vertical — el resto (Clínica/Veterinaria) sigue exactamente igual.
+  const { user } = useAuth();
+  const esOdontologia = user?.industry === "odontologia";
+
   const [pacienteId, setPacienteId] = useState<number | "">(() => {
     if (pacienteInicialId) return pacienteInicialId;
     if (pacientes && pacientes.length > 0) return pacientes[0].id;
@@ -3328,6 +3335,10 @@ function HistoriasClinicas({
         <div className="p-8 text-center rounded-2xl border border-dashed border-slate-300 dark:border-white/10 text-slate-400 text-xs">
           Selecciona o busca un paciente para ver su ficha y gestionar su consulta.
         </div>
+      )}
+
+      {esOdontologia && pacienteSeleccionado && (
+        <Odontograma pacienteId={Number(pacienteSeleccionado.id)} />
       )}
 
       {/* ── 2.5. TRAZABILIDAD Y EVOLUCIÓN DEL PACIENTE ── */}
@@ -7880,7 +7891,100 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
         </button>
       </form>
 
+      <ConfiguracionWhatsApp />
+
       <HistorialImportacionesSalud claveDoctor={config.claveDoctor} />
+    </div>
+  );
+}
+
+/**
+ * Conecta la cuenta de WhatsApp Business (Meta) DEL NEGOCIO para que el
+ * recordatorio de citas de mañana se mande solo, automáticamente, todos los
+ * días — sin esto configurado, el sistema sigue mandando el recordatorio por
+ * correo y deja disponible el panel manual de "Recordatorios de Mañana" en
+ * Agenda Médica (enlaces wa.me) como respaldo. El Access Token nunca se
+ * vuelve a mostrar una vez guardado — solo se puede reemplazar.
+ */
+function ConfiguracionWhatsApp() {
+  const [estado, setEstado] = useState<EstadoWhatsApp | null>(null);
+  const [form, setForm] = useState({ phoneNumberId: "", accessToken: "", plantillaNombre: "" });
+  const [guardando, setGuardando] = useState(false);
+  const [mensaje, setMensaje] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const cargar = () => {
+    obtenerEstadoWhatsApp()
+      .then((e) => { setEstado(e); setForm((f) => ({ ...f, phoneNumberId: e.phoneNumberId || "", plantillaNombre: e.plantillaNombre || "" })); })
+      .catch(() => setEstado(null));
+  };
+  useEffect(() => { cargar(); }, []);
+
+  const guardar = async (activo: boolean) => {
+    setGuardando(true);
+    setError(null);
+    setMensaje(null);
+    try {
+      const nuevoEstado = await guardarWhatsApp({
+        phoneNumberId: form.phoneNumberId || undefined,
+        accessToken: form.accessToken || undefined,
+        plantillaNombre: form.plantillaNombre || undefined,
+        activo,
+      });
+      setEstado(nuevoEstado);
+      setForm((f) => ({ ...f, accessToken: "" }));
+      setMensaje(activo ? "✓ WhatsApp conectado y activado — el recordatorio de mañana se enviará solo." : "✓ Guardado (desactivado).");
+      setTimeout(() => setMensaje(null), 4000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la configuración de WhatsApp");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="apple-glass rounded-2xl p-6 space-y-4">
+      <div>
+        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Recordatorio de Citas por WhatsApp (automático)</h4>
+        <p className="text-[11px] text-slate-500 dark:text-white/50 mt-0.5">
+          Conecta tu propia cuenta de WhatsApp Business Cloud API (Meta) para que el recordatorio de la cita de mañana se le mande solo a cada paciente, todos los días, sin que nadie tenga que hacer clic.
+          Necesitas: un Phone Number ID, un Access Token, y una plantilla ya aprobada por Meta para mensajes de recordatorio.
+        </p>
+      </div>
+
+      {estado && (
+        <div className={`text-[11px] font-bold px-3 py-2 rounded-lg ${estado.activo ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-slate-300/40 dark:bg-white/10 text-slate-500 dark:text-white/50"}`}>
+          {estado.activo ? "Activo — enviando recordatorios automáticos" : estado.configurado ? "Configurado, pero desactivado" : "Sin configurar todavía"}
+        </div>
+      )}
+      {mensaje && <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{mensaje}</div>}
+      {error && <div className="text-[11px] font-bold text-red-500">{error}</div>}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-[10px] text-slate-400 uppercase font-mono">Phone Number ID</label>
+          <input value={form.phoneNumberId} onChange={(e) => setForm({ ...form, phoneNumberId: e.target.value })} placeholder="Ej. 109876543210123" className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+        </div>
+        <div>
+          <label className="text-[10px] text-slate-400 uppercase font-mono">Nombre de la plantilla aprobada</label>
+          <input value={form.plantillaNombre} onChange={(e) => setForm({ ...form, plantillaNombre: e.target.value })} placeholder="Ej. recordatorio_cita" className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-[10px] text-slate-400 uppercase font-mono">Access Token {estado?.configurado ? "(dejar en blanco para no cambiarlo)" : ""}</label>
+          <input type="password" value={form.accessToken} onChange={(e) => setForm({ ...form, accessToken: e.target.value })} placeholder="EAAG..." className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => guardar(true)} disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-60">
+          {guardando ? "Guardando…" : "Guardar y activar"}
+        </button>
+        {estado?.activo && (
+          <button type="button" onClick={() => guardar(false)} disabled={guardando} className="text-xs font-semibold px-4 py-2.5 rounded-full cursor-pointer text-slate-500 dark:text-white/50">
+            Desactivar
+          </button>
+        )}
+      </div>
     </div>
   );
 }

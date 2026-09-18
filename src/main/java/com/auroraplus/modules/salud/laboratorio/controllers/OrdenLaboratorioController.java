@@ -1,5 +1,6 @@
 package com.auroraplus.modules.salud.laboratorio.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.laboratorio.entities.OrdenLaboratorio;
 import com.auroraplus.modules.salud.laboratorio.services.SaludLaboratorioService;
@@ -54,6 +55,7 @@ public class OrdenLaboratorioController {
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, String> body
     ) {
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
         Long tenantId = TenantContext.getCurrentTenant();
         String notas = body != null ? body.get("notas") : null;
         OrdenLaboratorio actualizada = laboratorioService.marcarRevisadoPorMedico(tenantId, id, notas);

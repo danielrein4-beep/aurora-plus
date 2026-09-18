@@ -42,6 +42,20 @@ public class Empleado {
     @Column(name = "tarifa_por_hora", precision = 18, scale = 2)
     private BigDecimal tarifaPorHora;
 
+    // Solo se usa (y solo tiene sentido) cuando tipoControl = SALARIO_FIJO —
+    // monto pactado por período (no depende de las horas fichadas).
+    @Column(name = "salario_fijo", precision = 18, scale = 2)
+    private BigDecimal salarioFijo;
+
+    @Column(name = "moneda_salario", length = 5)
+    private String monedaSalario = "USD";
+
+    // Cada cuánto se le paga (SEMANAL, QUINCENAL, MENSUAL) — solo orienta al
+    // dueño sobre cuándo le toca pagarle; no dispara nada automático, el pago
+    // real se registra a mano en Nómina de Personal.
+    @Column(name = "periodicidad_pago", nullable = false, length = 20)
+    private String periodicidadPago = "MENSUAL";
+
     @Column(nullable = false)
     private Boolean activo = true;
 
@@ -59,6 +73,12 @@ public class Empleado {
     public void setTipoControl(String tipoControl) { this.tipoControl = tipoControl; }
     public BigDecimal getTarifaPorHora() { return tarifaPorHora; }
     public void setTarifaPorHora(BigDecimal tarifaPorHora) { this.tarifaPorHora = tarifaPorHora; }
+    public BigDecimal getSalarioFijo() { return salarioFijo; }
+    public void setSalarioFijo(BigDecimal salarioFijo) { this.salarioFijo = salarioFijo; }
+    public String getMonedaSalario() { return monedaSalario; }
+    public void setMonedaSalario(String monedaSalario) { this.monedaSalario = monedaSalario; }
+    public String getPeriodicidadPago() { return periodicidadPago; }
+    public void setPeriodicidadPago(String periodicidadPago) { this.periodicidadPago = periodicidadPago; }
     public Boolean getActivo() { return activo; }
     public void setActivo(Boolean activo) { this.activo = activo; }
 }

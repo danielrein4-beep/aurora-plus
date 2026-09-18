@@ -1,5 +1,6 @@
 package com.auroraplus.modules.salud.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.Paciente;
 import com.auroraplus.modules.salud.services.PacienteService;
@@ -71,6 +72,7 @@ public class PacienteController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> desactivar(@PathVariable Long id) {
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
         asegurarFiltroTenant();
         pacienteService.desactivar(TenantContext.getCurrentTenant(), id);
         return ResponseEntity.noContent().build();

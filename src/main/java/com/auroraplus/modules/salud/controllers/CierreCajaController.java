@@ -1,5 +1,6 @@
 package com.auroraplus.modules.salud.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.CierreCaja;
 import com.auroraplus.modules.salud.services.CierreCajaService;
@@ -37,6 +38,7 @@ public class CierreCajaController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarCierre(@PathVariable Long id) {
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
         cierreCajaService.eliminarCierre(TenantContext.getCurrentTenant(), id);
         return ResponseEntity.noContent().build();
     }

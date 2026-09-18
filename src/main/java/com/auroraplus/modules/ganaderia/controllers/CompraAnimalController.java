@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.CompraAnimal;
 import com.auroraplus.modules.ganaderia.repositories.CompraAnimalRepository;
@@ -36,6 +37,7 @@ public class CompraAnimalController {
 
     @PostMapping
     public ResponseEntity<CompraAnimal> registrar(@RequestBody CompraRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(ganaderiaCompraService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, request.items));
     }

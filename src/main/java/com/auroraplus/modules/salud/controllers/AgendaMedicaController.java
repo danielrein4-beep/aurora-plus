@@ -1,5 +1,6 @@
 package com.auroraplus.modules.salud.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.BloqueoAgenda;
 import com.auroraplus.modules.salud.entities.CitaMedica;
@@ -98,6 +99,7 @@ public class AgendaMedicaController {
 
     @DeleteMapping("/bloqueos/{id}")
     public ResponseEntity<Void> eliminarBloqueo(@PathVariable Long id) {
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
         agendaMedicaService.eliminarBloqueo(TenantContext.getCurrentTenant(), id);
         return ResponseEntity.noContent().build();
     }

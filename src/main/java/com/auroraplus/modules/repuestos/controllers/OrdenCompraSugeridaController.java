@@ -1,5 +1,6 @@
 package com.auroraplus.modules.repuestos.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.repuestos.entities.OrdenCompraSugerida;
 import com.auroraplus.modules.repuestos.repositories.OrdenCompraSugeridaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ public class OrdenCompraSugeridaController {
     /** El administrador aprueba o rechaza el borrador — nunca se dispara nada automático desde acá todavía. */
     @PatchMapping("/{id}")
     public ResponseEntity<OrdenCompraSugerida> decidir(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody DecisionRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         if (request.estado != OrdenCompraSugerida.Estado.APROBADA && request.estado != OrdenCompraSugerida.Estado.RECHAZADA) {
             throw new RuntimeException("Solo se puede aprobar o rechazar un borrador");
         }

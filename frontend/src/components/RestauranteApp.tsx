@@ -21,6 +21,7 @@ import {
   listarProveedoresHoreca, crearProveedorHoreca, editarProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   listarMeseros, crearMesero, editarMesero, desactivarMesero, reactivarMesero, type MeseroHoreca, type MeseroConEstado,
   listarEmpleadosRrhh, type EmpleadoRrhh, editarEmpleadoRrhh, liquidarPeriodoRrhh, type TipoControlEmpleado, type LiquidacionPeriodoRrhh,
+  type PeriodicidadPago, pagarNomina, listarPagosNomina, descargarReciboNominaPdf, type PagoNomina,
   listarReservasDia, crearReserva, editarReserva, cambiarEstadoReserva, type ReservaHoreca, type EstadoReserva,
   obtenerEstadoBinancePay, guardarBinancePay, pagarComandaConBinance, obtenerComanda, type EstadoBinancePay, type OrdenBinancePay,
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
@@ -10128,7 +10129,7 @@ function Administracion({ tenantId, monedasActivas }: { tenantId: number; moneda
       {tab === "cuentas" && <CuentasPorCobrarPagar tenantId={tenantId} />}
       {tab === "cierre" && <CierreDeCaja tenantId={tenantId} />}
       {tab === "resumen" && <ResumenDiario tenantId={tenantId} />}
-      {tab === "nomina" && <NominaPersonal tenantId={tenantId} />}
+      {tab === "nomina" && <NominaPersonal tenantId={tenantId} monedasActivas={monedasActivas} />}
     </div>
   );
 }
@@ -10143,8 +10144,17 @@ function Administracion({ tenantId, monedasActivas }: { tenantId: number; moneda
 const LABEL_TIPO_CONTROL: Record<TipoControlEmpleado, string> = {
   POR_HORA: "Por hora", SALARIO_FIJO: "Salario fijo", SOLO_CONTROL: "Solo control (sin pago)",
 };
+const LABEL_PERIODICIDAD: Record<PeriodicidadPago, string> = {
+  SEMANAL: "Semanal", QUINCENAL: "Quincenal", MENSUAL: "Mensual",
+};
 
-function NominaPersonal({ tenantId }: { tenantId: number }) {
+function formatMontoNomina(monto: number, moneda: string | null | undefined): string {
+  const m = moneda || "USD";
+  return m === "USD" ? `$${monto.toFixed(2)}` : `${monto.toFixed(2)} ${m}`;
+}
+
+function NominaPersonal({ tenantId, monedasActivas }: { tenantId: number; monedasActivas: typeof MONEDAS_POR_DEFECTO }) {
+  const monedasNomina = ["USD", ...(Object.keys(monedasActivas) as (keyof typeof monedasActivas)[]).filter((m) => monedasActivas[m])];
   const [desde, setDesde] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; });
   const [hasta, setHasta] = useState(hoy());
   const [empleados, setEmpleados] = useState<EmpleadoRrhh[] | null>(null);
@@ -10152,11 +10162,15 @@ function NominaPersonal({ tenantId }: { tenantId: number }) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editandoPagoId, setEditandoPagoId] = useState<number | null>(null);
-  const [formPago, setFormPago] = useState<{ tipoControl: TipoControlEmpleado; tarifaPorHora: string }>({ tipoControl: "SOLO_CONTROL", tarifaPorHora: "" });
+  const [formPago, setFormPago] = useState<{ tipoControl: TipoControlEmpleado; tarifaPorHora: string; salarioFijo: string; monedaSalario: string; periodicidadPago: PeriodicidadPago }>({ tipoControl: "SOLO_CONTROL", tarifaPorHora: "", salarioFijo: "", monedaSalario: "USD", periodicidadPago: "MENSUAL" });
   const [guardandoPago, setGuardandoPago] = useState(false);
+  const [pagos, setPagos] = useState<PagoNomina[]>([]);
+  const [pagandoId, setPagandoId] = useState<number | null>(null);
+  const [descargandoReciboId, setDescargandoReciboId] = useState<number | null>(null);
 
   const cargarEmpleados = () => listarEmpleadosRrhh().then((r) => setEmpleados(r.filter((e) => e.activo))).catch(() => setEmpleados([]));
-  useEffect(() => { cargarEmpleados(); }, [tenantId]);
+  const cargarPagos = () => listarPagosNomina(tenantId).then(setPagos).catch(() => setPagos([]));
+  useEffect(() => { cargarEmpleados(); cargarPagos(); }, [tenantId]);
 
   const calcular = () => {
     setCargando(true);
@@ -10170,11 +10184,18 @@ function NominaPersonal({ tenantId }: { tenantId: number }) {
 
   const abrirEditarPago = (emp: EmpleadoRrhh) => {
     setEditandoPagoId(emp.id);
-    setFormPago({ tipoControl: emp.tipoControl, tarifaPorHora: emp.tarifaPorHora != null ? String(emp.tarifaPorHora) : "" });
+    setFormPago({
+      tipoControl: emp.tipoControl,
+      tarifaPorHora: emp.tarifaPorHora != null ? String(emp.tarifaPorHora) : "",
+      salarioFijo: emp.salarioFijo != null ? String(emp.salarioFijo) : "",
+      monedaSalario: emp.monedaSalario || "USD",
+      periodicidadPago: emp.periodicidadPago || "MENSUAL",
+    });
   };
 
   const guardarPago = async (emp: EmpleadoRrhh) => {
     if (formPago.tipoControl === "POR_HORA" && !formPago.tarifaPorHora) { setError("Indica la tarifa por hora"); return; }
+    if (formPago.tipoControl === "SALARIO_FIJO" && !formPago.salarioFijo) { setError("Indica el monto del salario"); return; }
     setGuardandoPago(true);
     setError(null);
     try {
@@ -10182,6 +10203,9 @@ function NominaPersonal({ tenantId }: { tenantId: number }) {
         nombre: emp.nombre, cedula: emp.cedula || undefined, cargo: emp.cargo || undefined,
         tipoControl: formPago.tipoControl,
         tarifaPorHora: formPago.tipoControl === "POR_HORA" ? Number(formPago.tarifaPorHora) : undefined,
+        salarioFijo: formPago.tipoControl === "SALARIO_FIJO" ? Number(formPago.salarioFijo) : undefined,
+        monedaSalario: formPago.tipoControl === "SALARIO_FIJO" ? formPago.monedaSalario : undefined,
+        periodicidadPago: formPago.periodicidadPago,
       });
       setEditandoPagoId(null);
       cargarEmpleados();
@@ -10193,6 +10217,44 @@ function NominaPersonal({ tenantId }: { tenantId: number }) {
     }
   };
 
+  // Un pago ya hecho que se solapa con [desde,hasta] bloquea el botón "Pagar"
+  // para ese empleado — el backend también lo rechaza, esto solo evita el
+  // viaje redondo y muestra de una vez el recibo ya emitido.
+  const pagoDelPeriodo = (empleadoId: number) =>
+    pagos.find((p) => p.empleadoId === empleadoId && p.periodoDesde <= hasta && p.periodoHasta >= desde);
+
+  const pagarEmpleado = async (emp: EmpleadoRrhh, monto: number, moneda: string, horasTrabajadas: number) => {
+    if (!window.confirm(`¿Confirmas el pago de ${formatMontoNomina(monto, moneda)} a ${emp.nombre} por el período ${desde} a ${hasta}? Esto registrará el gasto en caja y no se puede deshacer.`)) return;
+    setPagandoId(emp.id);
+    setError(null);
+    try {
+      await pagarNomina(tenantId, {
+        empleadoId: emp.id, periodoDesde: desde, periodoHasta: hasta,
+        horasTrabajadas: emp.tipoControl === "POR_HORA" ? horasTrabajadas : undefined,
+        monto, moneda,
+      });
+      cargarPagos();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar el pago");
+    } finally {
+      setPagandoId(null);
+    }
+  };
+
+  const descargarRecibo = async (pagoId: number) => {
+    setDescargandoReciboId(pagoId);
+    try {
+      const blob = await descargarReciboNominaPdf(tenantId, pagoId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo generar el recibo");
+    } finally {
+      setDescargandoReciboId(null);
+    }
+  };
+
   // Combina el directorio completo (para que salga el que aún no fichó nada
   // en el período, con 0 horas) con lo que sí calculó la liquidación.
   const filas = (empleados || []).map((emp) => {
@@ -10201,9 +10263,18 @@ function NominaPersonal({ tenantId }: { tenantId: number }) {
       empleado: emp,
       horasTrabajadas: linea?.horasTrabajadas ?? 0,
       totalPagar: linea?.totalPagar ?? null,
+      monedaPago: linea?.monedaPago ?? null,
     };
   });
-  const totalGeneral = filas.reduce((s, f) => s + (f.totalPagar || 0), 0);
+  // No se suman montos de distinta moneda entre sí — se agrupan por moneda
+  // para no mezclar, por ejemplo, salarios en USD con salarios en VES.
+  const totalesPorMoneda = filas.reduce<Record<string, number>>((acc, f) => {
+    if (f.totalPagar != null) {
+      const m = f.monedaPago || "USD";
+      acc[m] = (acc[m] || 0) + f.totalPagar;
+    }
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-5">
@@ -10227,7 +10298,7 @@ function NominaPersonal({ tenantId }: { tenantId: number }) {
         </div>
       ) : (
         <div className="space-y-2.5">
-          {filas.map(({ empleado: emp, horasTrabajadas, totalPagar }) => (
+          {filas.map(({ empleado: emp, horasTrabajadas, totalPagar, monedaPago }) => (
             <div key={emp.id} className="apple-glass rounded-2xl p-4">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
@@ -10235,13 +10306,20 @@ function NominaPersonal({ tenantId }: { tenantId: number }) {
                   <div className="text-xs text-slate-500 dark:text-white/40 flex items-center gap-2 flex-wrap mt-0.5">
                     {emp.cargo && <span>{emp.cargo}</span>}
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${emp.tipoControl === "POR_HORA" ? "bg-teal-500/15 text-teal-600 dark:text-teal-400" : emp.tipoControl === "SALARIO_FIJO" ? "bg-sky-500/15 text-sky-600 dark:text-sky-400" : "bg-slate-300/50 dark:bg-white/10 text-slate-500 dark:text-white/50"}`}>
-                      {LABEL_TIPO_CONTROL[emp.tipoControl]}{emp.tipoControl === "POR_HORA" && emp.tarifaPorHora ? ` · $${Number(emp.tarifaPorHora).toFixed(2)}/h` : ""}
+                      {LABEL_TIPO_CONTROL[emp.tipoControl]}
+                      {emp.tipoControl === "POR_HORA" && emp.tarifaPorHora ? ` · $${Number(emp.tarifaPorHora).toFixed(2)}/h` : ""}
+                      {emp.tipoControl === "SALARIO_FIJO" && emp.salarioFijo ? ` · ${formatMontoNomina(Number(emp.salarioFijo), emp.monedaSalario)}` : ""}
                     </span>
+                    {emp.tipoControl !== "SOLO_CONTROL" && (
+                      <span className="text-[10px] font-semibold text-slate-400 dark:text-white/30">
+                        Se le paga: {LABEL_PERIODICIDAD[emp.periodicidadPago] || "Mensual"}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-slate-500 dark:text-white/40">{horasTrabajadas.toFixed(2)} horas fichadas</div>
-                  <div className="font-mono font-bold text-slate-900 dark:text-white">{totalPagar != null ? `$${totalPagar.toFixed(2)}` : "—"}</div>
+                  <div className="font-mono font-bold text-slate-900 dark:text-white">{totalPagar != null ? formatMontoNomina(totalPagar, monedaPago) : "—"}</div>
                 </div>
                 <button onClick={() => abrirEditarPago(emp)} className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 cursor-pointer flex-shrink-0">
                   Elegir cómo se le paga
@@ -10252,7 +10330,7 @@ function NominaPersonal({ tenantId }: { tenantId: number }) {
                   <Campo label="Forma de pago">
                     <select value={formPago.tipoControl} onChange={(e) => setFormPago({ ...formPago, tipoControl: e.target.value as TipoControlEmpleado })} className="input-horeca">
                       <option value="POR_HORA">Por hora fichada</option>
-                      <option value="SALARIO_FIJO">Salario fijo (solo lleva control de horas)</option>
+                      <option value="SALARIO_FIJO">Salario fijo (monto pactado por período)</option>
                       <option value="SOLO_CONTROL">Solo control de asistencia (sin pago)</option>
                     </select>
                   </Campo>
@@ -10261,17 +10339,67 @@ function NominaPersonal({ tenantId }: { tenantId: number }) {
                       <input type="number" step="0.01" min="0" value={formPago.tarifaPorHora} onChange={(e) => setFormPago({ ...formPago, tarifaPorHora: e.target.value })} className="input-horeca w-28" />
                     </Campo>
                   )}
+                  {formPago.tipoControl === "SALARIO_FIJO" && (
+                    <>
+                      <Campo label="Monto del salario">
+                        <input type="number" step="0.01" min="0" value={formPago.salarioFijo} onChange={(e) => setFormPago({ ...formPago, salarioFijo: e.target.value })} className="input-horeca w-28" />
+                      </Campo>
+                      <Campo label="Moneda">
+                        <select value={formPago.monedaSalario} onChange={(e) => setFormPago({ ...formPago, monedaSalario: e.target.value })} className="input-horeca">
+                          {monedasNomina.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </Campo>
+                    </>
+                  )}
+                  {formPago.tipoControl !== "SOLO_CONTROL" && (
+                    <Campo label="Cada cuánto se le paga">
+                      <select value={formPago.periodicidadPago} onChange={(e) => setFormPago({ ...formPago, periodicidadPago: e.target.value as PeriodicidadPago })} className="input-horeca">
+                        <option value="SEMANAL">Semanal</option>
+                        <option value="QUINCENAL">Quincenal</option>
+                        <option value="MENSUAL">Mensual</option>
+                      </select>
+                    </Campo>
+                  )}
                   <button onClick={() => guardarPago(emp)} disabled={guardandoPago} className="btn-cyber-neon text-white text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
                     {guardandoPago ? "Guardando…" : "Guardar"}
                   </button>
                   <button onClick={() => setEditandoPagoId(null)} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">Cancelar</button>
                 </div>
               )}
+              {totalPagar != null && totalPagar > 0 && (() => {
+                const pagoExistente = pagoDelPeriodo(emp.id);
+                return (
+                  <div className="mt-3 pt-3 border-t border-slate-300/50 dark:border-white/10 flex items-center justify-between gap-2 flex-wrap">
+                    {pagoExistente ? (
+                      <>
+                        <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                          Pagado el {new Date(pagoExistente.fechaPago).toLocaleDateString("es-VE")} · {formatMontoNomina(pagoExistente.monto, pagoExistente.moneda)}
+                        </span>
+                        <button onClick={() => descargarRecibo(pagoExistente.id)} disabled={descargandoReciboId === pagoExistente.id}
+                          className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 cursor-pointer disabled:opacity-60">
+                          {descargandoReciboId === pagoExistente.id ? "Generando…" : "Descargar recibo"}
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={() => pagarEmpleado(emp, totalPagar, monedaPago || "USD", horasTrabajadas)} disabled={pagandoId === emp.id}
+                        className="g-aurora text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer disabled:opacity-60">
+                        {pagandoId === emp.id ? "Pagando…" : `Pagar ${formatMontoNomina(totalPagar, monedaPago)}`}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ))}
-          <div className="apple-glass rounded-2xl p-4 flex items-center justify-between font-bold text-slate-900 dark:text-white">
+          <div className="apple-glass rounded-2xl p-4 flex items-center justify-between font-bold text-slate-900 dark:text-white flex-wrap gap-2">
             <span>Total a pagar en el período</span>
-            <span className="font-mono">${totalGeneral.toFixed(2)}</span>
+            <span className="font-mono flex items-center gap-3">
+              {Object.keys(totalesPorMoneda).length === 0
+                ? "$0.00"
+                : Object.entries(totalesPorMoneda).map(([moneda, monto]) => (
+                    <span key={moneda}>{formatMontoNomina(monto, moneda)}</span>
+                  ))}
+            </span>
           </div>
         </div>
       )}

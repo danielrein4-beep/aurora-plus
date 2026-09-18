@@ -1,5 +1,6 @@
 package com.auroraplus.modules.repuestos.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.repuestos.entities.MovimientoRepuesto;
 import com.auroraplus.modules.repuestos.entities.RepuestoItem;
@@ -51,6 +52,7 @@ public class RepuestoItemController {
 
     @PostMapping
     public ResponseEntity<RepuestoItem> crear(@RequestParam Long tenantId, @RequestBody RepuestoItem item) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         if (item.getCodigoSku() == null || item.getCodigoSku().isBlank()) {
             throw new RuntimeException("El código SKU es obligatorio");
         }
@@ -60,6 +62,7 @@ public class RepuestoItemController {
 
     @PutMapping("/{id}")
     public ResponseEntity<RepuestoItem> actualizar(@PathVariable Long id, @RequestBody RepuestoItem datos) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         Long tenantId = TenantContext.getCurrentTenant();
         return repuestoItemRepository.findById(id)
             .filter(item -> tenantId != null && tenantId.equals(item.getTenantId()))
@@ -79,6 +82,7 @@ public class RepuestoItemController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         RepuestoItem item = repuestoItemRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Repuesto no encontrado"));
         if (!item.getTenantId().equals(tenantId)) {

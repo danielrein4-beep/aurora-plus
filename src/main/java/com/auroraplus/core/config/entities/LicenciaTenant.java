@@ -107,6 +107,26 @@ public class LicenciaTenant {
     @Column(name = "binance_pay_activo", nullable = false)
     private boolean binancePayActivo = false;
 
+    // WhatsApp Business Cloud API (Meta) del NEGOCIO — cada tenant conecta SU
+    // PROPIA cuenta de Meta para automatizar el recordatorio de citas por
+    // WhatsApp (antes solo un link wa.me que la secretaria mandaba a mano).
+    // El phoneNumberId no es secreto, pero el access token sí — se guarda
+    // cifrado (ver CifradoSimetricoService). La plantilla debe estar
+    // previamente aprobada por Meta: WhatsApp no permite que un negocio le
+    // escriba primero a un número con texto libre, solo con una plantilla
+    // ya revisada — por eso el nombre de plantilla es configurable y no fijo.
+    @Column(name = "whatsapp_phone_number_id")
+    private String whatsappPhoneNumberId;
+
+    @Column(name = "whatsapp_access_token_cifrado", columnDefinition = "TEXT")
+    private String whatsappAccessTokenCifrado;
+
+    @Column(name = "whatsapp_plantilla_nombre")
+    private String whatsappPlantillaNombre;
+
+    @Column(name = "whatsapp_activo", nullable = false)
+    private boolean whatsappActivo = false;
+
     // Auditoría antifraude en Cierre Z: si |descuadre| supera este margen, el
     // cierre igual se procesa (no bloquea al cajero) pero queda una
     // AlertaAdmin silenciosa para el dueño (ver TesoreriaService). Cada
@@ -160,6 +180,14 @@ public class LicenciaTenant {
     public void setBinancePaySecretKeyCifrado(String binancePaySecretKeyCifrado) { this.binancePaySecretKeyCifrado = binancePaySecretKeyCifrado; }
     public boolean isBinancePayActivo() { return binancePayActivo; }
     public void setBinancePayActivo(boolean binancePayActivo) { this.binancePayActivo = binancePayActivo; }
+    public String getWhatsappPhoneNumberId() { return whatsappPhoneNumberId; }
+    public void setWhatsappPhoneNumberId(String whatsappPhoneNumberId) { this.whatsappPhoneNumberId = whatsappPhoneNumberId; }
+    public String getWhatsappAccessTokenCifrado() { return whatsappAccessTokenCifrado; }
+    public void setWhatsappAccessTokenCifrado(String whatsappAccessTokenCifrado) { this.whatsappAccessTokenCifrado = whatsappAccessTokenCifrado; }
+    public String getWhatsappPlantillaNombre() { return whatsappPlantillaNombre; }
+    public void setWhatsappPlantillaNombre(String whatsappPlantillaNombre) { this.whatsappPlantillaNombre = whatsappPlantillaNombre; }
+    public boolean isWhatsappActivo() { return whatsappActivo; }
+    public void setWhatsappActivo(boolean whatsappActivo) { this.whatsappActivo = whatsappActivo; }
     public BigDecimal getMargenToleranciaDescuadre() { return margenToleranciaDescuadre; }
     public void setMargenToleranciaDescuadre(BigDecimal margenToleranciaDescuadre) { this.margenToleranciaDescuadre = margenToleranciaDescuadre; }
 }

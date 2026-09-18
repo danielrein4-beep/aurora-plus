@@ -66,30 +66,34 @@ public class RelojChecadorService {
         return registroAsistenciaRepository.save(registro);
     }
 
-    /** Liquidación de nómina por horas trabajadas en un período — solo para empleados con tarifaPorHora configurada. */
+    /** Liquidación de nómina en un período: horas fichadas (todos) + monto a pagar según tipoControl. */
     public Map<String, Object> liquidarPeriodo(Long tenantId, LocalDateTime desde, LocalDateTime hasta) {
         List<RegistroAsistencia> registros = registroAsistenciaRepository.findByTenantIdAndFechaCheckInBetween(tenantId, desde, hasta);
 
         Map<Long, BigDecimal> horasPorEmpleado = new LinkedHashMap<>();
-        Map<Long, Empleado> empleadosPorId = new LinkedHashMap<>();
-
         for (RegistroAsistencia r : registros) {
             if (r.getHorasTrabajadas() == null) continue; // turno todavía abierto, no cuenta para la liquidación
-            Long empId = r.getEmpleado().getId();
-            horasPorEmpleado.merge(empId, r.getHorasTrabajadas(), BigDecimal::add);
-            empleadosPorId.putIfAbsent(empId, r.getEmpleado());
+            horasPorEmpleado.merge(r.getEmpleado().getId(), r.getHorasTrabajadas(), BigDecimal::add);
         }
 
-        List<Map<String, Object>> liquidacionPorEmpleado = horasPorEmpleado.entrySet().stream().map(entry -> {
-            Empleado emp = empleadosPorId.get(entry.getKey());
-            BigDecimal horas = entry.getValue().setScale(2, RoundingMode.HALF_UP);
+        // SALARIO_FIJO se debe ver en la liquidación aunque el empleado no haya
+        // fichado ningún turno en el período (su pago no depende de las horas) —
+        // por eso se parte del directorio completo, no solo de quienes ficharon.
+        List<Empleado> empleadosActivos = empleadoRepository.findAll().stream()
+            .filter(e -> Boolean.TRUE.equals(e.getActivo()))
+            .toList();
 
-            // Solo se calcula monto a pagar para POR_HORA — SALARIO_FIJO y SOLO_CONTROL
-            // registran las horas igual (control interno), pero no generan un pago
-            // derivado de ellas.
+        List<Map<String, Object>> liquidacionPorEmpleado = empleadosActivos.stream().map(emp -> {
+            BigDecimal horas = horasPorEmpleado.getOrDefault(emp.getId(), BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+
             boolean esPorHora = "POR_HORA".equals(emp.getTipoControl()) && emp.getTarifaPorHora() != null;
+            boolean esSalarioFijo = "SALARIO_FIJO".equals(emp.getTipoControl()) && emp.getSalarioFijo() != null;
+
             BigDecimal tarifa = esPorHora ? emp.getTarifaPorHora() : null;
-            BigDecimal totalPagar = esPorHora ? horas.multiply(tarifa).setScale(2, RoundingMode.HALF_UP) : null;
+            BigDecimal totalPagar = esPorHora ? horas.multiply(tarifa).setScale(2, RoundingMode.HALF_UP)
+                : esSalarioFijo ? emp.getSalarioFijo().setScale(2, RoundingMode.HALF_UP)
+                : null;
+            String monedaPago = esPorHora ? "USD" : esSalarioFijo ? emp.getMonedaSalario() : null;
 
             Map<String, Object> linea = new LinkedHashMap<>();
             linea.put("empleadoId", emp.getId());
@@ -98,6 +102,7 @@ public class RelojChecadorService {
             linea.put("horasTrabajadas", horas);
             linea.put("tarifaPorHora", tarifa);
             linea.put("totalPagar", totalPagar);
+            linea.put("monedaPago", monedaPago);
             return linea;
         }).toList();
 

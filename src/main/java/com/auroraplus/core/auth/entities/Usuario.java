@@ -27,7 +27,20 @@ public class Usuario {
         // proveedores/compras, editar zonas ni administrar el directorio de
         // meseros — esas acciones quedan reservadas a DUENO_ADMIN/CAJERO_VENDEDOR
         // (ver AuthContext.exigirRol usado en los controladores de Horeca).
-        MESERO
+        MESERO,
+        // Roles de Ganadería/Fincas (el Propietario del negocio sigue siendo
+        // DUENO_ADMIN, igual que en toda vertical — no se duplica ese rol
+        // acá). ADMINISTRADOR_FINCA: gestión amplia del día a día (compras,
+        // ventas, sanidad, finanzas) pero sin llegar a la configuración
+        // crítica del negocio, reservada al propietario. ENCARGADO_FINCA:
+        // operación de campo con permiso para registrar (pesos, sanidad,
+        // ordeño, movimientos de animales) pero no para acciones
+        // financieras ni eliminar/anular. TRABAJADOR_FINCA: solo registra
+        // tareas operativas asignadas (ej. marcar un ordeño hecho), sin
+        // acceso a nada financiero ni administrativo.
+        ADMINISTRADOR_FINCA,
+        ENCARGADO_FINCA,
+        TRABAJADOR_FINCA
     }
 
     @Id

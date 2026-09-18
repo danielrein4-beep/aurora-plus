@@ -1,5 +1,6 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.entities.ComisionPlataforma;
 import com.auroraplus.core.config.repositories.ComisionPlataformaRepository;
 import com.auroraplus.modules.ganaderia.entities.Animal;
@@ -58,6 +59,7 @@ public class PublicacionVentaController {
 
     @PostMapping("/publicaciones")
     public ResponseEntity<PublicacionVenta> publicar(@RequestParam Long tenantId, @RequestBody PublicacionRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         Animal animal = animalRepository.findById(request.animalId).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         if (!animal.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
@@ -113,6 +115,7 @@ public class PublicacionVentaController {
     @Transactional
     public ResponseEntity<OfertaCompra> aceptarOferta(@PathVariable Long ofertaId, @RequestParam Long tenantId,
                                                         @RequestParam(required = false) BigDecimal porcentajeComision) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         OfertaCompra oferta = ofertaCompraRepository.findById(ofertaId).orElseThrow(() -> new RuntimeException("Oferta no encontrada"));
         if (!oferta.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Oferta no pertenece a este tenant");

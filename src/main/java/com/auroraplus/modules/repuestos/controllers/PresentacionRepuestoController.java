@@ -1,5 +1,6 @@
 package com.auroraplus.modules.repuestos.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.repuestos.entities.PresentacionRepuesto;
 import com.auroraplus.modules.repuestos.repositories.PresentacionRepuestoRepository;
 import com.auroraplus.modules.repuestos.services.RepuestoConversionService;
@@ -34,6 +35,7 @@ public class PresentacionRepuestoController {
             @RequestParam Long repuestoId, @RequestParam Long tenantId,
             @RequestParam String nombrePresentacion, @RequestParam BigDecimal factorConversion,
             @RequestParam BigDecimal precioVenta) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         PresentacionRepuesto presentacion = repuestoConversionService.registrarPresentacion(
             repuestoId, tenantId, nombrePresentacion, factorConversion, precioVenta);
         return ResponseEntity.ok(presentacion);

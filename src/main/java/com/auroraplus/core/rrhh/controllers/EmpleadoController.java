@@ -18,6 +18,7 @@ public class EmpleadoController {
     private EmpleadoRepository empleadoRepository;
 
     private static final Set<String> TIPOS_CONTROL_VALIDOS = Set.of("POR_HORA", "SALARIO_FIJO", "SOLO_CONTROL");
+    private static final Set<String> PERIODICIDADES_VALIDAS = Set.of("SEMANAL", "QUINCENAL", "MENSUAL");
 
     private void validar(Empleado empleado) {
         String tipo = empleado.getTipoControl();
@@ -30,6 +31,17 @@ public class EmpleadoController {
         }
         if ("POR_HORA".equals(tipo) && empleado.getTarifaPorHora() == null) {
             throw new RuntimeException("Un empleado POR_HORA requiere tarifaPorHora");
+        }
+        if ("SALARIO_FIJO".equals(tipo) && empleado.getSalarioFijo() == null) {
+            throw new RuntimeException("Un empleado SALARIO_FIJO requiere salarioFijo");
+        }
+        if (empleado.getMonedaSalario() == null || empleado.getMonedaSalario().isBlank()) {
+            empleado.setMonedaSalario("USD");
+        }
+        if (empleado.getPeriodicidadPago() == null || empleado.getPeriodicidadPago().isBlank()) {
+            empleado.setPeriodicidadPago("MENSUAL");
+        } else if (!PERIODICIDADES_VALIDAS.contains(empleado.getPeriodicidadPago())) {
+            throw new RuntimeException("periodicidadPago inválida. Use: " + PERIODICIDADES_VALIDAS);
         }
     }
 
@@ -56,6 +68,9 @@ public class EmpleadoController {
         empleado.setCargo(datos.getCargo());
         empleado.setTipoControl(datos.getTipoControl());
         empleado.setTarifaPorHora(datos.getTarifaPorHora());
+        empleado.setSalarioFijo(datos.getSalarioFijo());
+        empleado.setMonedaSalario(datos.getMonedaSalario());
+        empleado.setPeriodicidadPago(datos.getPeriodicidadPago());
         if (datos.getActivo() != null) empleado.setActivo(datos.getActivo());
         validar(empleado);
         return ResponseEntity.ok(empleadoRepository.save(empleado));

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.salud.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.ProcedimientoMedico;
 import com.auroraplus.modules.salud.repositories.ProcedimientoMedicoRepository;
@@ -23,6 +24,7 @@ public class ProcedimientoMedicoController {
 
     @PostMapping
     public ResponseEntity<ProcedimientoMedico> crear(@RequestParam(required = false) Long tenantId, @RequestBody ProcedimientoMedico proc) {
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
         Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
         proc.setTenantId(tenantActivo);
         return ResponseEntity.ok(procedimientoMedicoRepository.save(proc));
@@ -33,6 +35,7 @@ public class ProcedimientoMedicoController {
     // modificar el precio/nombre de un procedimiento de OTRA clínica.
     @PutMapping("/{id}")
     public ResponseEntity<ProcedimientoMedico> actualizar(@PathVariable Long id, @RequestBody ProcedimientoMedico datos) {
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
         Long tenantId = TenantContext.getCurrentTenant();
         return procedimientoMedicoRepository.findById(id)
             .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))
