@@ -17,4 +17,7 @@ public interface PagoSuscripcionTenantRepository extends JpaRepository<PagoSuscr
 
     @Query("SELECT COALESCE(SUM(p.monto), 0) FROM PagoSuscripcionTenant p WHERE p.estado = 'CONFIRMADO' AND p.fechaPago >= :desde")
     BigDecimal sumarIngresosDesde(@Param("desde") LocalDateTime desde);
+
+    @Query("SELECT COALESCE(SUM(p.monto), 0) FROM PagoSuscripcionTenant p WHERE p.estado = 'CONFIRMADO' AND p.fechaPago >= :desde AND p.fechaPago <= :hasta")
+    BigDecimal sumarIngresosRango(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
 }

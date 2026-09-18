@@ -3662,3 +3662,136 @@ export function listarAuditoria(opciones?: { modulo?: string; accion?: string; p
 }
 
 
+
+
+// ==========================================
+// MODULO FINANCIERO Y CONTABILIDAD SAAS SUPERADMIN
+// ==========================================
+
+export interface SaasGastoFijo {
+  id: number;
+  concepto: string;
+  categoria: string;
+  montoUsd: number;
+  periodicidad: string;
+  diaPago: number;
+  metodoPago: string;
+  proveedor?: string;
+  activo: boolean;
+  notas?: string;
+  fechaCreacion: string;
+}
+
+export interface SaasMovimientoFinanciero {
+  id: number;
+  tipo: "INGRESO" | "EGRESO";
+  categoria: string;
+  concepto: string;
+  montoUsd: number;
+  fechaMovimiento: string;
+  metodoPago: string;
+  referenciaComprobante?: string;
+  tenantId?: number;
+  gastoFijoId?: number;
+  notas?: string;
+  registradoPor: string;
+  fechaCreacion: string;
+}
+
+export interface ResumenFinancieroSaas {
+  mes: string;
+  ingresosSuscripciones: number;
+  ingresosExtras: number;
+  totalIngresos: number;
+  totalEgresos: number;
+  gastosFijosMensuales: number;
+  utilidadNeta: number;
+  margenPorcentaje: number;
+  balanceHistorico: number;
+  totalGastosFijosActivos: number;
+}
+
+export interface CrearGastoFijoRequest {
+  concepto: string;
+  categoria?: string;
+  montoUsd: number;
+  periodicidad?: string;
+  diaPago?: number;
+  metodoPago?: string;
+  proveedor?: string;
+  notas?: string;
+}
+
+export interface RegistrarMovimientoRequest {
+  tipo: "INGRESO" | "EGRESO";
+  categoria?: string;
+  concepto: string;
+  montoUsd: number;
+  fechaMovimiento?: string;
+  metodoPago?: string;
+  referenciaComprobante?: string;
+  notas?: string;
+}
+
+export async function obtenerResumenFinancieroSaas(mes?: string): Promise<ResumenFinancieroSaas> {
+  const url = mes ? `/api/super-admin/tenants/finanzas/resumen?mes=${mes}` : "/api/super-admin/tenants/finanzas/resumen";
+  return requestSuperAdmin<ResumenFinancieroSaas>(url);
+}
+
+export async function listarGastosFijosSaas(): Promise<SaasGastoFijo[]> {
+  return requestSuperAdmin<SaasGastoFijo[]>("/api/super-admin/tenants/finanzas/gastos-fijos");
+}
+
+export async function crearGastoFijoSaas(datos: CrearGastoFijoRequest): Promise<SaasGastoFijo> {
+  return requestSuperAdmin<SaasGastoFijo>("/api/super-admin/tenants/finanzas/gastos-fijos", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function actualizarGastoFijoSaas(id: number, datos: Partial<SaasGastoFijo>): Promise<SaasGastoFijo> {
+  return requestSuperAdmin<SaasGastoFijo>(`/api/super-admin/tenants/finanzas/gastos-fijos/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function toggleGastoFijoSaas(id: number): Promise<SaasGastoFijo> {
+  return requestSuperAdmin<SaasGastoFijo>(`/api/super-admin/tenants/finanzas/gastos-fijos/${id}/toggle`, {
+    method: "POST",
+  });
+}
+
+export async function eliminarGastoFijoSaas(id: number): Promise<{ mensaje: string }> {
+  return requestSuperAdmin<{ mensaje: string }>(`/api/super-admin/tenants/finanzas/gastos-fijos/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function ejecutarGastoFijoSaas(id: number, referencia?: string): Promise<SaasMovimientoFinanciero> {
+  const url = referencia ? `/api/super-admin/tenants/finanzas/gastos-fijos/${id}/ejecutar?referencia=${encodeURIComponent(referencia)}` : `/api/super-admin/tenants/finanzas/gastos-fijos/${id}/ejecutar`;
+  return requestSuperAdmin<SaasMovimientoFinanciero>(url, {
+    method: "POST",
+  });
+}
+
+export async function listarMovimientosFinancierosSaas(mes?: string, tipo?: string): Promise<SaasMovimientoFinanciero[]> {
+  const params = new URLSearchParams();
+  if (mes) params.append("mes", mes);
+  if (tipo && tipo !== "TODOS") params.append("tipo", tipo);
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return requestSuperAdmin<SaasMovimientoFinanciero[]>(`/api/super-admin/tenants/finanzas/movimientos${q}`);
+}
+
+export async function registrarMovimientoFinancieroSaas(datos: RegistrarMovimientoRequest): Promise<SaasMovimientoFinanciero> {
+  return requestSuperAdmin<SaasMovimientoFinanciero>("/api/super-admin/tenants/finanzas/movimientos", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function eliminarMovimientoFinancieroSaas(id: number): Promise<{ mensaje: string }> {
+  return requestSuperAdmin<{ mensaje: string }>(`/api/super-admin/tenants/finanzas/movimientos/${id}`, {
+    method: "DELETE",
+  });
+}

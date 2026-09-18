@@ -34,6 +34,21 @@ import {
   guardarSesionSuperAdmin,
   borrarSesionSuperAdmin,
   guardarSesion,
+  SaasGastoFijo,
+  SaasMovimientoFinanciero,
+  ResumenFinancieroSaas,
+  CrearGastoFijoRequest,
+  RegistrarMovimientoRequest,
+  obtenerResumenFinancieroSaas,
+  listarGastosFijosSaas,
+  crearGastoFijoSaas,
+  actualizarGastoFijoSaas,
+  toggleGastoFijoSaas,
+  eliminarGastoFijoSaas,
+  ejecutarGastoFijoSaas,
+  listarMovimientosFinancierosSaas,
+  registrarMovimientoFinancieroSaas,
+  eliminarMovimientoFinancieroSaas,
 } from "../api";
 
 interface SuperAdminPortalProps {
@@ -172,6 +187,49 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   // Barrido de suspension
   const [ejecutandoBarrido, setEjecutandoBarrido] = useState(false);
 
+  // VISTA PRINCIPAL (TENANTS vs FINANZAS)
+  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "FINANZAS">("TENANTS");
+
+  // ESTADOS DEL MODULO FINANCIERO SAAS
+  const [mesFinanzas, setMesFinanzas] = useState<string>(() => new Date().toISOString().substring(0, 7));
+  const [subTabFinanzas, setSubTabFinanzas] = useState<"MOVIMIENTOS" | "GASTOS_FIJOS">("MOVIMIENTOS");
+  const [resumenFinanzas, setResumenFinanzas] = useState<ResumenFinancieroSaas | null>(null);
+  const [gastosFijos, setGastosFijos] = useState<SaasGastoFijo[]>([]);
+  const [movimientos, setMovimientos] = useState<SaasMovimientoFinanciero[]>([]);
+  const [cargandoFinanzas, setCargandoFinanzas] = useState(false);
+  const [filtroTipoMovimiento, setFiltroTipoMovimiento] = useState<"TODOS" | "INGRESO" | "EGRESO">("TODOS");
+  const [filtroTextoMovimiento, setFiltroTextoMovimiento] = useState("");
+
+  // Modales de Finanzas
+  const [showGastoFijoModal, setShowGastoFijoModal] = useState(false);
+  const [gastoFijoEnEdicion, setGastoFijoEnEdicion] = useState<SaasGastoFijo | null>(null);
+  const [gastoFijoForm, setGastoFijoForm] = useState<CrearGastoFijoRequest>({
+    concepto: "",
+    categoria: "INFRAESTRUCTURA",
+    montoUsd: 0,
+    periodicidad: "MENSUAL",
+    diaPago: 1,
+    metodoPago: "TARJETA_CREDITO",
+    proveedor: "",
+    notas: "",
+  });
+
+  const [showMovimientoModal, setShowMovimientoModal] = useState(false);
+  const [movimientoForm, setMovimientoForm] = useState<RegistrarMovimientoRequest>({
+    tipo: "EGRESO",
+    categoria: "INFRAESTRUCTURA",
+    concepto: "",
+    montoUsd: 0,
+    fechaMovimiento: new Date().toISOString().substring(0, 10),
+    metodoPago: "TRANSFERENCIA_BANCARIA",
+    referenciaComprobante: "",
+    notas: "",
+  });
+
+  const [showEjecutarGastoModal, setShowEjecutarGastoModal] = useState(false);
+  const [gastoParaEjecutar, setGastoParaEjecutar] = useState<SaasGastoFijo | null>(null);
+  const [referenciaEjecucion, setReferenciaEjecucion] = useState("");
+
   const avisar = (msg: string, tipo: "success" | "error" | "info" = "success") => {
     setFeedback({ msg, tipo });
     setTimeout(() => setFeedback(null), 5000);
@@ -192,6 +250,137 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       setLoadingData(false);
     }
   };
+
+  // FUNCIONES DEL MODULO FINANCIERO SAAS
+  const cargarDatosFinancieros = async (mesAUsar = mesFinanzas) => {
+    if (!sesion) return;
+    try {
+      setCargandoFinanzas(true);
+      const [resumen, gf, movs] = await Promise.all([
+        obtenerResumenFinancieroSaas(mesAUsar),
+        listarGastosFijosSaas(),
+        listarMovimientosFinancierosSaas(mesAUsar, filtroTipoMovimiento),
+      ]);
+      setResumenFinanzas(resumen);
+      setGastosFijos(gf);
+      setMovimientos(movs);
+    } catch (e: any) {
+      avisar(e?.message || "Error al cargar informacion financiera", "error");
+    } finally {
+      setCargandoFinanzas(false);
+    }
+  };
+
+  useEffect(() => {
+    if (sesion && vistaPrincipal === "FINANZAS") {
+      cargarDatosFinancieros(mesFinanzas);
+    }
+  }, [sesion, vistaPrincipal, mesFinanzas, filtroTipoMovimiento]);
+
+  const handleGuardarGastoFijo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gastoFijoForm.concepto || Number(gastoFijoForm.montoUsd) <= 0) {
+      avisar("Concepto y monto valido requeridos", "error");
+      return;
+    }
+    try {
+      if (gastoFijoEnEdicion) {
+        await actualizarGastoFijoSaas(gastoFijoEnEdicion.id, {
+          ...gastoFijoForm,
+          montoUsd: Number(gastoFijoForm.montoUsd),
+        });
+        avisar("Gasto fijo actualizado exitosamente");
+      } else {
+        await crearGastoFijoSaas({
+          ...gastoFijoForm,
+          montoUsd: Number(gastoFijoForm.montoUsd),
+        });
+        avisar("Gasto fijo programado exitosamente");
+      }
+      setShowGastoFijoModal(false);
+      setGastoFijoEnEdicion(null);
+      await cargarDatosFinancieros();
+    } catch (e: any) {
+      avisar(e?.message || "Error al guardar gasto fijo", "error");
+    }
+  };
+
+  const handleToggleGastoFijo = async (id: number) => {
+    try {
+      await toggleGastoFijoSaas(id);
+      avisar("Estado de gasto fijo actualizado");
+      await cargarDatosFinancieros();
+    } catch (e: any) {
+      avisar(e?.message || "Error al alternar gasto fijo", "error");
+    }
+  };
+
+  const handleEliminarGastoFijo = async (id: number) => {
+    if (!confirm("Esta seguro de eliminar este gasto fijo programado?")) return;
+    try {
+      await eliminarGastoFijoSaas(id);
+      avisar("Gasto fijo eliminado");
+      await cargarDatosFinancieros();
+    } catch (e: any) {
+      avisar(e?.message || "Error al eliminar gasto fijo", "error");
+    }
+  };
+
+  const handleConfirmarEjecutarGastoFijo = async () => {
+    if (!gastoParaEjecutar) return;
+    try {
+      await ejecutarGastoFijoSaas(gastoParaEjecutar.id, referenciaEjecucion);
+      avisar(`Egreso asentado para ${gastoParaEjecutar.concepto}`);
+      setShowEjecutarGastoModal(false);
+      setGastoParaEjecutar(null);
+      setReferenciaEjecucion("");
+      await cargarDatosFinancieros();
+    } catch (e: any) {
+      avisar(e?.message || "Error al ejecutar gasto fijo como egreso", "error");
+    }
+  };
+
+  const handleGuardarMovimiento = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!movimientoForm.concepto || Number(movimientoForm.montoUsd) <= 0) {
+      avisar("Concepto y monto valido requeridos", "error");
+      return;
+    }
+    try {
+      await registrarMovimientoFinancieroSaas({
+        ...movimientoForm,
+        montoUsd: Number(movimientoForm.montoUsd),
+      });
+      avisar(`${movimientoForm.tipo === "INGRESO" ? "Ingreso extra" : "Egreso operativo"} registrado con exito`);
+      setShowMovimientoModal(false);
+      await cargarDatosFinancieros();
+    } catch (e: any) {
+      avisar(e?.message || "Error al registrar movimiento financiero", "error");
+    }
+  };
+
+  const handleEliminarMovimiento = async (id: number) => {
+    if (!confirm("Esta seguro de anular este movimiento del libro contable?")) return;
+    try {
+      await eliminarMovimientoFinancieroSaas(id);
+      avisar("Movimiento eliminado");
+      await cargarDatosFinancieros();
+    } catch (e: any) {
+      avisar(e?.message || "Error al eliminar movimiento", "error");
+    }
+  };
+
+  const movimientosFiltrados = useMemo(() => {
+    if (!filtroTextoMovimiento.trim()) return movimientos;
+    const txt = filtroTextoMovimiento.toLowerCase();
+    return movimientos.filter(
+      (m) =>
+        m.concepto.toLowerCase().includes(txt) ||
+        m.categoria.toLowerCase().includes(txt) ||
+        (m.referenciaComprobante && m.referenciaComprobante.toLowerCase().includes(txt)) ||
+        (m.notas && m.notas.toLowerCase().includes(txt))
+    );
+  }, [movimientos, filtroTextoMovimiento]);
 
   useEffect(() => {
     if (sesion) {
@@ -700,7 +889,50 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         </div>
       </header>
 
-      {/* KPIS CARDS (5 columnas ahora con total usuarios) */}
+      {/* BARRA DE NAVEGACION PRINCIPAL SUPERADMIN */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+        <button
+          onClick={() => setVistaPrincipal("TENANTS")}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            vistaPrincipal === "TENANTS"
+              ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <span>Directorio de Tenants</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+            vistaPrincipal === "TENANTS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+          }`}>
+            {tenants.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            setVistaPrincipal("FINANZAS");
+            cargarDatosFinancieros();
+          }}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            vistaPrincipal === "FINANZAS"
+              ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <span>Finanzas & Contabilidad SaaS</span>
+          {resumenFinanzas && (
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+              vistaPrincipal === "FINANZAS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700 border border-teal-200"
+            }`}>
+              ${resumenFinanzas.totalIngresos.toFixed(2)}
+            </span>
+          )}
+        </button>
+      </div>
+
+            {/* VISTA: TENANTS Y CLIENTES */}
+      {vistaPrincipal === "TENANTS" && (
+        <div className="space-y-6 animate-fadeIn">
+{/* KPIS CARDS (5 columnas ahora con total usuarios) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Negocios</span>
@@ -1014,7 +1246,400 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         </div>
       </div>
 
-      {/* MODAL: DIRECTÓRIO DE USUARIOS Y LÍMITE DE CUOTA */}
+      
+        </div>
+      )}
+
+      {/* VISTA: FINANZAS Y CONTABILIDAD SAAS */}
+      {vistaPrincipal === "FINANZAS" && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* BARRA SUPERIOR DE FINANZAS */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Periodo Contable</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="month"
+                    value={mesFinanzas}
+                    onChange={(e) => setMesFinanzas(e.target.value)}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-teal-500"
+                  />
+                  <button
+                    onClick={() => cargarDatosFinancieros(mesFinanzas)}
+                    disabled={cargandoFinanzas}
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {cargandoFinanzas ? "Cargando..." : "Refrescar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => {
+                  setMovimientoForm({
+                    tipo: "EGRESO",
+                    categoria: "INFRAESTRUCTURA",
+                    concepto: "",
+                    montoUsd: 0,
+                    fechaMovimiento: new Date().toISOString().substring(0, 10),
+                    metodoPago: "TRANSFERENCIA_BANCARIA",
+                    referenciaComprobante: "",
+                    notas: "",
+                  });
+                  setShowMovimientoModal(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-all cursor-pointer"
+              >
+                + Registrar Egreso / Gasto
+              </button>
+
+              <button
+                onClick={() => {
+                  setMovimientoForm({
+                    tipo: "INGRESO",
+                    categoria: "SERVICIO_EXTRA",
+                    concepto: "",
+                    montoUsd: 0,
+                    fechaMovimiento: new Date().toISOString().substring(0, 10),
+                    metodoPago: "TRANSFERENCIA_BANCARIA",
+                    referenciaComprobante: "",
+                    notas: "",
+                  });
+                  setShowMovimientoModal(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs transition-all cursor-pointer"
+              >
+                + Registrar Ingreso Extra
+              </button>
+
+              <button
+                onClick={() => {
+                  setGastoFijoEnEdicion(null);
+                  setGastoFijoForm({
+                    concepto: "",
+                    categoria: "INFRAESTRUCTURA",
+                    montoUsd: 0,
+                    periodicidad: "MENSUAL",
+                    diaPago: 1,
+                    metodoPago: "TARJETA_CREDITO",
+                    proveedor: "",
+                    notas: "",
+                  });
+                  setShowGastoFijoModal(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xs shadow-teal-600/20 transition-all cursor-pointer"
+              >
+                + Nuevo Gasto Fijo
+              </button>
+            </div>
+          </div>
+
+          {/* KPIS FINANCIEROS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* KPI 1: INGRESOS */}
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Ingresos Totales (Mes)</span>
+              <div className="font-['Outfit'] text-3xl font-black text-slate-900">
+                ${resumenFinanzas?.totalIngresos.toFixed(2) ?? "0.00"}
+              </div>
+              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
+                <span>Suscripciones: ${resumenFinanzas?.ingresosSuscripciones.toFixed(2) ?? "0.00"}</span>
+                <span>Extras: ${resumenFinanzas?.ingresosExtras.toFixed(2) ?? "0.00"}</span>
+              </div>
+            </div>
+
+            {/* KPI 2: EGRESOS */}
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+              <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Egresos Totales (Mes)</span>
+              <div className="font-['Outfit'] text-3xl font-black text-slate-900">
+                ${resumenFinanzas?.totalEgresos.toFixed(2) ?? "0.00"}
+              </div>
+              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
+                <span>Gastos operativos del mes</span>
+                <span>{movimientos.filter(m => m.tipo === 'EGRESO').length} pagos</span>
+              </div>
+            </div>
+
+            {/* KPI 3: GASTOS FIJOS */}
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Gastos Fijos Comprometidos</span>
+              <div className="font-['Outfit'] text-3xl font-black text-slate-900">
+                ${resumenFinanzas?.gastosFijosMensuales.toFixed(2) ?? "0.00"}
+                <span className="text-xs font-normal text-slate-400">/mes</span>
+              </div>
+              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
+                <span>Overhead mensual activo</span>
+                <span>{resumenFinanzas?.totalGastosFijosActivos ?? 0} servicios</span>
+              </div>
+            </div>
+
+            {/* KPI 4: UTILIDAD NETA */}
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Utilidad Neta (Mes)</span>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                  (resumenFinanzas?.utilidadNeta ?? 0) >= 0
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-rose-50 text-rose-700 border-rose-200"
+                }`}>
+                  {(resumenFinanzas?.utilidadNeta ?? 0) >= 0 ? "Rentable" : "En Deficit"}
+                </span>
+              </div>
+              <div className={`font-['Outfit'] text-3xl font-black ${
+                (resumenFinanzas?.utilidadNeta ?? 0) >= 0 ? "text-emerald-700" : "text-rose-700"
+              }`}>
+                {(resumenFinanzas?.utilidadNeta ?? 0) >= 0 ? "+" : ""}${resumenFinanzas?.utilidadNeta.toFixed(2) ?? "0.00"}
+              </div>
+              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
+                <span>Margen: {resumenFinanzas?.margenPorcentaje.toFixed(1) ?? "0.0"}%</span>
+                <span>Balance Acum.: ${resumenFinanzas?.balanceHistorico.toFixed(2) ?? "0.00"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SUB-TABS FINANZAS */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSubTabFinanzas("MOVIMIENTOS")}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    subTabFinanzas === "MOVIMIENTOS"
+                      ? "bg-teal-600 text-white shadow-xs shadow-teal-600/20"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  Libro de Movimientos ({movimientos.length})
+                </button>
+
+                <button
+                  onClick={() => setSubTabFinanzas("GASTOS_FIJOS")}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    subTabFinanzas === "GASTOS_FIJOS"
+                      ? "bg-teal-600 text-white shadow-xs shadow-teal-600/20"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  Gastos Fijos Programados ({gastosFijos.length})
+                </button>
+              </div>
+
+              {subTabFinanzas === "MOVIMIENTOS" && (
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                    {(["TODOS", "INGRESO", "EGRESO"] as const).map((tipo) => (
+                      <button
+                        key={tipo}
+                        onClick={() => setFiltroTipoMovimiento(tipo)}
+                        className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                          filtroTipoMovimiento === tipo
+                            ? "bg-white text-slate-900 shadow-2xs"
+                            : "text-slate-500 hover:text-slate-800"
+                        }`}
+                      >
+                        {tipo === "TODOS" ? "Todos" : tipo === "INGRESO" ? "Ingresos" : "Egresos"}
+                      </button>
+                    ))}
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Buscar por concepto o referencia..."
+                    value={filtroTextoMovimiento}
+                    onChange={(e) => setFiltroTextoMovimiento(e.target.value)}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:outline-hidden focus:border-teal-500 w-56"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* CONTENIDO TAB 1: MOVIMIENTOS */}
+            {subTabFinanzas === "MOVIMIENTOS" && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      <th className="pb-3 px-3">Fecha</th>
+                      <th className="pb-3 px-3">Tipo</th>
+                      <th className="pb-3 px-3">Concepto & Notas</th>
+                      <th className="pb-3 px-3">Categoria</th>
+                      <th className="pb-3 px-3">Metodo & Ref</th>
+                      <th className="pb-3 px-3 text-right">Monto USD</th>
+                      <th className="pb-3 px-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {movimientosFiltrados.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400">
+                          No hay movimientos registrados para este periodo contable.
+                        </td>
+                      </tr>
+                    ) : (
+                      movimientosFiltrados.map((m) => (
+                        <tr key={m.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">
+                            {m.fechaMovimiento}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className={`inline-block px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                              m.tipo === "INGRESO"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-rose-50 text-rose-700 border-rose-200"
+                            }`}>
+                              {m.tipo === "INGRESO" ? "[+] INGRESO" : "[-] EGRESO"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="font-bold text-slate-800">{m.concepto}</div>
+                            {m.notas && <div className="text-[10px] text-slate-400">{m.notas}</div>}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                              {m.categoria}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="text-slate-700 text-[11px]">{m.metodoPago}</div>
+                            {m.referenciaComprobante && (
+                              <div className="font-mono text-[10px] text-slate-400">{m.referenciaComprobante}</div>
+                            )}
+                          </td>
+                          <td className={`py-2.5 px-3 text-right font-mono font-bold text-xs ${
+                            m.tipo === "INGRESO" ? "text-emerald-600" : "text-rose-600"
+                          }`}>
+                            {m.tipo === "INGRESO" ? "+" : "-"}${m.montoUsd.toFixed(2)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              onClick={() => handleEliminarMovimiento(m.id)}
+                              className="text-slate-400 hover:text-rose-600 font-bold text-xs cursor-pointer p-1 rounded-lg hover:bg-rose-50"
+                              title="Anular movimiento"
+                            >
+                              [Eliminar]
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* CONTENIDO TAB 2: GASTOS FIJOS */}
+            {subTabFinanzas === "GASTOS_FIJOS" && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      <th className="pb-3 px-3">Concepto & Proveedor</th>
+                      <th className="pb-3 px-3">Categoria</th>
+                      <th className="pb-3 px-3">Monto USD / Frecuencia</th>
+                      <th className="pb-3 px-3">Corte / Pago</th>
+                      <th className="pb-3 px-3">Metodo</th>
+                      <th className="pb-3 px-3">Estado</th>
+                      <th className="pb-3 px-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {gastosFijos.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400">
+                          No se han configurado gastos fijos recurrentes aun.
+                        </td>
+                      </tr>
+                    ) : (
+                      gastosFijos.map((g) => (
+                        <tr key={g.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-2.5 px-3">
+                            <div className="font-bold text-slate-800">{g.concepto}</div>
+                            <div className="text-[10px] text-slate-400">{g.proveedor || "Sin proveedor asignado"}</div>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                              {g.categoria}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="font-mono font-bold text-slate-900">${g.montoUsd.toFixed(2)}</div>
+                            <div className="text-[10px] text-slate-400">{g.periodicidad}</div>
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600 text-[11px]">
+                            Dia {g.diaPago} del mes
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600 text-[11px]">
+                            {g.metodoPago}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <button
+                              onClick={() => handleToggleGastoFijo(g.id)}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
+                                g.activo
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                  : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
+                              }`}
+                            >
+                              {g.activo ? "Activo" : "Pausado"}
+                            </button>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {g.activo && (
+                                <button
+                                  onClick={() => {
+                                    setGastoParaEjecutar(g);
+                                    setReferenciaEjecucion("");
+                                    setShowEjecutarGastoModal(true);
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold transition-colors cursor-pointer"
+                                  title="Registrar un egreso de este gasto para el mes actual"
+                                >
+                                  Pagar este Mes
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setGastoFijoEnEdicion(g);
+                                  setGastoFijoForm({
+                                    concepto: g.concepto,
+                                    categoria: g.categoria,
+                                    montoUsd: g.montoUsd,
+                                    periodicidad: g.periodicidad,
+                                    diaPago: g.diaPago,
+                                    metodoPago: g.metodoPago,
+                                    proveedor: g.proveedor || "",
+                                    notas: g.notas || "",
+                                  });
+                                  setShowGastoFijoModal(true);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[10px] font-bold transition-colors cursor-pointer"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => handleEliminarGastoFijo(g.id)}
+                                className="p-1 text-slate-400 hover:text-rose-600 font-bold text-xs cursor-pointer"
+                                title="Eliminar gasto fijo"
+                              >
+                                [X]
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+{/* MODAL: DIRECTÓRIO DE USUARIOS Y LÍMITE DE CUOTA */}
       {showUsuariosDirectorioModal && tenantParaUsuariosDirectorio && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="relative w-full max-w-2xl p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-6">
@@ -1787,6 +2412,445 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs cursor-pointer"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: REGISTRAR / EDITAR GASTO FIJO */}
+      {showGastoFijoModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
+                  {gastoFijoEnEdicion ? "Editar Gasto Fijo" : "Nuevo Gasto Fijo Programado"}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Defina obligaciones recurrentes de operacion (servidores, modelos de IA, equipo, etc.)
+                </p>
+              </div>
+              <button
+                onClick={() => setShowGastoFijoModal(false)}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
+              >
+                [X]
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarGastoFijo} className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                  Concepto del Gasto *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Servidores AWS EC2, Licencias OpenAI, Alquiler de Oficina"
+                  value={gastoFijoForm.concepto}
+                  onChange={(e) => setGastoFijoForm({ ...gastoFijoForm, concepto: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-medium text-slate-800 bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                    Proveedor / Empresa
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Amazon AWS, Anthropic, Hetzner"
+                    value={gastoFijoForm.proveedor || ""}
+                    onChange={(e) => setGastoFijoForm({ ...gastoFijoForm, proveedor: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-medium text-slate-800 bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                    Categoria
+                  </label>
+                  <select
+                    value={gastoFijoForm.categoria}
+                    onChange={(e) => setGastoFijoForm({ ...gastoFijoForm, categoria: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 bg-white cursor-pointer"
+                  >
+                    <option value="INFRAESTRUCTURA">INFRAESTRUCTURA (Hosting, Cloud)</option>
+                    <option value="SERVICIOS_IA">SERVICIOS IA (APIs, Modelos)</option>
+                    <option value="DOMINIO_RED">DOMINIO & RED (Cloudflare, DNS)</option>
+                    <option value="NOMINA_EQUIPO">NOMINA / EQUIPO (Soporte, Devs)</option>
+                    <option value="MARKETING">MARKETING (Pauta, Publicidad)</option>
+                    <option value="SOFTWARE_HERRAMIENTAS">SOFTWARE & HERRAMIENTAS</option>
+                    <option value="OTRO">OTRO</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                    Monto USD *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    min="0.01"
+                    placeholder="0.00"
+                    value={gastoFijoForm.montoUsd || ""}
+                    onChange={(e) => setGastoFijoForm({ ...gastoFijoForm, montoUsd: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-slate-800 bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                    Periodicidad
+                  </label>
+                  <select
+                    value={gastoFijoForm.periodicidad}
+                    onChange={(e) => setGastoFijoForm({ ...gastoFijoForm, periodicidad: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 bg-white cursor-pointer"
+                  >
+                    <option value="MENSUAL">MENSUAL</option>
+                    <option value="ANUAL">ANUAL</option>
+                    <option value="TRIMESTRAL">TRIMESTRAL</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                    Dia de Corte
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={gastoFijoForm.diaPago || 1}
+                    onChange={(e) => setGastoFijoForm({ ...gastoFijoForm, diaPago: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-slate-800 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                  Metodo de Pago Sugerido
+                </label>
+                <select
+                  value={gastoFijoForm.metodoPago}
+                  onChange={(e) => setGastoFijoForm({ ...gastoFijoForm, metodoPago: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-medium text-slate-800 bg-white cursor-pointer"
+                >
+                  <option value="TARJETA_CREDITO">Tarjeta de Credito Corporativa</option>
+                  <option value="TRANSFERENCIA_BANCARIA">Transferencia Bancaria</option>
+                  <option value="BINANCE_USDT">Binance USDT / Crypto</option>
+                  <option value="PAYPAL">PayPal</option>
+                  <option value="OTRO">Otro Metodo</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                  Notas Adicionales
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Detalles sobre facturacion o cuenta..."
+                  value={gastoFijoForm.notas || ""}
+                  onChange={(e) => setGastoFijoForm({ ...gastoFijoForm, notas: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-medium text-slate-800 bg-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowGastoFijoModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xs shadow-teal-600/20 cursor-pointer"
+                >
+                  {gastoFijoEnEdicion ? "Guardar Cambios" : "Programar Gasto Fijo"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: REGISTRAR MOVIMIENTO FINANCIERO (INGRESO O EGRESO) */}
+      {showMovimientoModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
+                  {movimientoForm.tipo === "INGRESO" ? "Registrar Ingreso Extra" : "Registrar Egreso / Gasto Operativo"}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Asiente un movimiento real en el libro contable de Aurora Plus
+                </p>
+              </div>
+              <button
+                onClick={() => setShowMovimientoModal(false)}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
+              >
+                [X]
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarMovimiento} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                    Tipo de Movimiento
+                  </label>
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setMovimientoForm({ ...movimientoForm, tipo: "EGRESO" })}
+                      className={`flex-1 py-1.5 rounded-lg font-bold text-center cursor-pointer transition-all ${
+                        movimientoForm.tipo === "EGRESO"
+                          ? "bg-rose-600 text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Egreso (Gasto)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMovimientoForm({ ...movimientoForm, tipo: "INGRESO" })}
+                      className={`flex-1 py-1.5 rounded-lg font-bold text-center cursor-pointer transition-all ${
+                        movimientoForm.tipo === "INGRESO"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Ingreso (Entrada)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                    Fecha de Operacion
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={movimientoForm.fechaMovimiento}
+                    onChange={(e) => setMovimientoForm({ ...movimientoForm, fechaMovimiento: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                  Concepto / Descripcion *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder={movimientoForm.tipo === "INGRESO" ? "Ej. Consultoria personalizada, onboarding especial" : "Ej. Pauta Facebook Ads, Pago de hosting"}
+                  value={movimientoForm.concepto}
+                  onChange={(e) => setMovimientoForm({ ...movimientoForm, concepto: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-medium text-slate-800 bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                    Monto en USD *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    placeholder="0.00"
+                    value={movimientoForm.montoUsd || ""}
+                    onChange={(e) => setMovimientoForm({ ...movimientoForm, montoUsd: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-slate-800 bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                    Categoria
+                  </label>
+                  <select
+                    value={movimientoForm.categoria}
+                    onChange={(e) => setMovimientoForm({ ...movimientoForm, categoria: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 bg-white cursor-pointer"
+                  >
+                    {movimientoForm.tipo === "INGRESO" ? (
+                      <>
+                        <option value="SERVICIO_EXTRA">SERVICIO EXTRA</option>
+                        <option value="SUSCRIPCION">SUSCRIPCION ESPECIAL</option>
+                        <option value="CONSULTORIA">CONSULTORIA / ONBOARDING</option>
+                        <option value="OTRO">OTRO INGRESO</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="INFRAESTRUCTURA">INFRAESTRUCTURA (Cloud/Servidores)</option>
+                        <option value="SERVICIOS_IA">SERVICIOS IA (APIs)</option>
+                        <option value="NOMINA">NOMINA / EQUIPO</option>
+                        <option value="MARKETING">MARKETING / PUBLICIDAD</option>
+                        <option value="GASTO_FIJO">GASTO FIJO PROGRAMADO</option>
+                        <option value="OTRO">OTRO GASTO</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                    Metodo de Pago
+                  </label>
+                  <select
+                    value={movimientoForm.metodoPago}
+                    onChange={(e) => setMovimientoForm({ ...movimientoForm, metodoPago: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-medium text-slate-800 bg-white cursor-pointer"
+                  >
+                    <option value="TRANSFERENCIA_BANCARIA">Transferencia Bancaria</option>
+                    <option value="PAGO_MOVIL">Pago Movil (Bs.)</option>
+                    <option value="ZELLE">Zelle (USD)</option>
+                    <option value="BINANCE_USDT">Binance USDT</option>
+                    <option value="TARJETA_CREDITO">Tarjeta de Credito</option>
+                    <option value="EFECTIVO_USD">Efectivo USD</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                    Referencia / Comprobante
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. #098124, Factura 45"
+                    value={movimientoForm.referenciaComprobante || ""}
+                    onChange={(e) => setMovimientoForm({ ...movimientoForm, referenciaComprobante: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono text-slate-800 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                  Notas
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Detalles sobre este movimiento..."
+                  value={movimientoForm.notas || ""}
+                  onChange={(e) => setMovimientoForm({ ...movimientoForm, notas: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-medium text-slate-800 bg-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowMovimientoModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className={`px-5 py-2 rounded-xl text-white font-bold text-xs shadow-xs cursor-pointer ${
+                    movimientoForm.tipo === "INGRESO"
+                      ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20"
+                      : "bg-rose-600 hover:bg-rose-500 shadow-rose-600/20"
+                  }`}
+                >
+                  Asentar Movimiento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EJECUTAR GASTO FIJO COMO EGRESO */}
+      {showEjecutarGastoModal && gastoParaEjecutar && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-md p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
+                  Asentar Pago de Gasto Fijo
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Registrar egreso para este periodo contable
+                </p>
+              </div>
+              <button
+                onClick={() => setShowEjecutarGastoModal(false)}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
+              >
+                [X]
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Concepto:</span>
+                <span className="font-bold text-slate-900">{gastoParaEjecutar.concepto}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Proveedor:</span>
+                <span className="text-slate-700">{gastoParaEjecutar.proveedor || "N/A"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Monto a Asentar:</span>
+                <span className="font-mono font-black text-rose-600 text-sm">
+                  ${gastoParaEjecutar.montoUsd.toFixed(2)} USD
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Metodo:</span>
+                <span className="text-slate-700">{gastoParaEjecutar.metodoPago}</span>
+              </div>
+            </div>
+
+            <div className="space-y-1 text-xs">
+              <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                Numero de Referencia o Comprobante (Opcional)
+              </label>
+              <input
+                type="text"
+                placeholder="Ej. Factura #INV-2026-09"
+                value={referenciaEjecucion}
+                onChange={(e) => setReferenciaEjecucion(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono text-slate-800 bg-white"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 text-xs">
+              <button
+                onClick={() => setShowEjecutarGastoModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarEjecutarGastoFijo}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer shadow-xs shadow-rose-600/20"
+              >
+                Confirmar Egreso
               </button>
             </div>
           </div>

@@ -7,9 +7,13 @@ import com.auroraplus.core.auth.services.JwtService;
 import com.auroraplus.core.config.entities.LicenciaTenant;
 import com.auroraplus.core.config.entities.ModuloTenant;
 import com.auroraplus.core.config.entities.PagoSuscripcionTenant;
+import com.auroraplus.core.config.entities.SaasGastoFijo;
+import com.auroraplus.core.config.entities.SaasMovimientoFinanciero;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.core.config.repositories.ModuloTenantRepository;
 import com.auroraplus.core.config.repositories.PagoSuscripcionTenantRepository;
+import com.auroraplus.core.config.repositories.SaasGastoFijoRepository;
+import com.auroraplus.core.config.repositories.SaasMovimientoFinancieroRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -38,6 +42,12 @@ public class SuperAdminController {
 
     @Autowired
     private PagoSuscripcionTenantRepository pagoSuscripcionRepository;
+
+    @Autowired
+    private SaasGastoFijoRepository saasGastoFijoRepository;
+
+    @Autowired
+    private SaasMovimientoFinancieroRepository saasMovimientoRepository;
 
     @Autowired
     private AuthService authService;
@@ -508,4 +518,180 @@ public class SuperAdminController {
         return ResponseEntity.ok(usuarioRepository.save(u));
     }
 
+
+    // ==========================================
+    // MODULO FINANCIERO Y CONTABILIDAD SAAS
+    // ==========================================
+
+    @GetMapping("/finanzas/resumen")
+    public ResponseEntity<Map<String, Object>> obtenerResumenFinanciero(
+        @RequestParam(required = false) String mes
+    ) {
+        LocalDate ahora = LocalDate.now();
+        LocalDate desde;
+        LocalDate hasta;
+        if (mes != null && mes.matches("^\\d{4}-\\d{2}$")) {
+            desde = LocalDate.parse(mes + "-01");
+            hasta = desde.with(TemporalAdjusters.lastDayOfMonth());
+        } else {
+            desde = ahora.with(TemporalAdjusters.firstDayOfMonth());
+            hasta = ahora.with(TemporalAdjusters.lastDayOfMonth());
+        }
+
+        LocalDateTime desdeDt = desde.atStartOfDay();
+        LocalDateTime hastaDt = hasta.atTime(23, 59, 59);
+
+        BigDecimal ingresosSuscripciones = pagoSuscripcionRepository.sumarIngresosRango(desdeDt, hastaDt);
+        BigDecimal ingresosExtras = saasMovimientoRepository.sumMontoPorTipoYRango("INGRESO", desde, hasta);
+        BigDecimal totalIngresos = ingresosSuscripciones.add(ingresosExtras);
+
+        BigDecimal totalEgresos = saasMovimientoRepository.sumMontoPorTipoYRango("EGRESO", desde, hasta);
+        BigDecimal gastosFijosComprometidos = saasGastoFijoRepository.sumTotalMensualActivo();
+
+        BigDecimal utilidadNeta = totalIngresos.subtract(totalEgresos);
+        double margen = 0.0;
+        if (totalIngresos.compareTo(BigDecimal.ZERO) > 0) {
+            margen = utilidadNeta.divide(totalIngresos, 4, java.math.RoundingMode.HALF_UP).doubleValue() * 100.0;
+        }
+
+        BigDecimal ingresosHistoricos = pagoSuscripcionRepository.sumarIngresosDesde(LocalDateTime.of(2020, 1, 1, 0, 0))
+            .add(saasMovimientoRepository.sumMontoHistoricoPorTipo("INGRESO"));
+        BigDecimal egresosHistoricos = saasMovimientoRepository.sumMontoHistoricoPorTipo("EGRESO");
+        BigDecimal balanceHistorico = ingresosHistoricos.subtract(egresosHistoricos);
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("mes", desde.toString().substring(0, 7));
+        map.put("ingresosSuscripciones", ingresosSuscripciones);
+        map.put("ingresosExtras", ingresosExtras);
+        map.put("totalIngresos", totalIngresos);
+        map.put("totalEgresos", totalEgresos);
+        map.put("gastosFijosMensuales", gastosFijosComprometidos);
+        map.put("utilidadNeta", utilidadNeta);
+        map.put("margenPorcentaje", Math.round(margen * 100.0) / 100.0);
+        map.put("balanceHistorico", balanceHistorico);
+        map.put("totalGastosFijosActivos", saasGastoFijoRepository.findByActivoTrue().size());
+
+        return ResponseEntity.ok(map);
+    }
+
+    @GetMapping("/finanzas/gastos-fijos")
+    public List<SaasGastoFijo> listarGastosFijos() {
+        return saasGastoFijoRepository.findByOrderByActivoDescConceptoAsc();
+    }
+
+    @PostMapping("/finanzas/gastos-fijos")
+    public ResponseEntity<SaasGastoFijo> crearGastoFijo(@RequestBody SaasGastoFijo gasto) {
+        if (gasto.getConcepto() == null || gasto.getConcepto().trim().isEmpty()) {
+            throw new RuntimeException("El concepto es obligatorio");
+        }
+        if (gasto.getMontoUsd() == null || gasto.getMontoUsd().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("El monto debe ser mayor a 0");
+        }
+        if (gasto.getPeriodicidad() == null) gasto.setPeriodicidad("MENSUAL");
+        if (gasto.getCategoria() == null) gasto.setCategoria("INFRAESTRUCTURA");
+        if (gasto.getActivo() == null) gasto.setActivo(true);
+        gasto.setFechaCreacion(LocalDateTime.now());
+        return ResponseEntity.ok(saasGastoFijoRepository.save(gasto));
+    }
+
+    @PutMapping("/finanzas/gastos-fijos/{id:[0-9]+}")
+    public ResponseEntity<SaasGastoFijo> actualizarGastoFijo(@PathVariable Long id, @RequestBody SaasGastoFijo act) {
+        SaasGastoFijo g = saasGastoFijoRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Gasto fijo no encontrado: " + id));
+        if (act.getConcepto() != null) g.setConcepto(act.getConcepto());
+        if (act.getCategoria() != null) g.setCategoria(act.getCategoria());
+        if (act.getMontoUsd() != null) g.setMontoUsd(act.getMontoUsd());
+        if (act.getPeriodicidad() != null) g.setPeriodicidad(act.getPeriodicidad());
+        if (act.getDiaPago() != null) g.setDiaPago(act.getDiaPago());
+        if (act.getMetodoPago() != null) g.setMetodoPago(act.getMetodoPago());
+        if (act.getProveedor() != null) g.setProveedor(act.getProveedor());
+        if (act.getActivo() != null) g.setActivo(act.getActivo());
+        if (act.getNotas() != null) g.setNotas(act.getNotas());
+        return ResponseEntity.ok(saasGastoFijoRepository.save(g));
+    }
+
+    @PostMapping("/finanzas/gastos-fijos/{id:[0-9]+}/toggle")
+    public ResponseEntity<SaasGastoFijo> toggleGastoFijo(@PathVariable Long id) {
+        SaasGastoFijo g = saasGastoFijoRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Gasto fijo no encontrado: " + id));
+        g.setActivo(!Boolean.TRUE.equals(g.getActivo()));
+        return ResponseEntity.ok(saasGastoFijoRepository.save(g));
+    }
+
+    @DeleteMapping("/finanzas/gastos-fijos/{id:[0-9]+}")
+    public ResponseEntity<Map<String, String>> eliminarGastoFijo(@PathVariable Long id) {
+        saasGastoFijoRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("mensaje", "Gasto fijo eliminado"));
+    }
+
+    @PostMapping("/finanzas/gastos-fijos/{id:[0-9]+}/ejecutar")
+    public ResponseEntity<SaasMovimientoFinanciero> ejecutarGastoFijo(
+        @PathVariable Long id,
+        @RequestParam(required = false) String referencia
+    ) {
+        SaasGastoFijo gf = saasGastoFijoRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Gasto fijo no encontrado: " + id));
+        SaasMovimientoFinanciero mov = new SaasMovimientoFinanciero();
+        mov.setTipo("EGRESO");
+        mov.setCategoria(gf.getCategoria());
+        mov.setConcepto("Pago Fijo: " + gf.getConcepto() + (gf.getProveedor() != null ? " (" + gf.getProveedor() + ")" : ""));
+        mov.setMontoUsd(gf.getMontoUsd());
+        mov.setFechaMovimiento(LocalDate.now());
+        mov.setMetodoPago(gf.getMetodoPago() != null ? gf.getMetodoPago() : "TARJETA_CREDITO");
+        mov.setReferenciaComprobante(referencia);
+        mov.setGastoFijoId(gf.getId());
+        mov.setRegistradoPor("superadmin");
+        mov.setFechaCreacion(LocalDateTime.now());
+        return ResponseEntity.ok(saasMovimientoRepository.save(mov));
+    }
+
+    @GetMapping("/finanzas/movimientos")
+    public List<SaasMovimientoFinanciero> listarMovimientos(
+        @RequestParam(required = false) String mes,
+        @RequestParam(required = false) String tipo
+    ) {
+        LocalDate ahora = LocalDate.now();
+        LocalDate desde;
+        LocalDate hasta;
+        if (mes != null && mes.matches("^\\d{4}-\\d{2}$")) {
+            desde = LocalDate.parse(mes + "-01");
+            hasta = desde.with(TemporalAdjusters.lastDayOfMonth());
+        } else {
+            desde = ahora.with(TemporalAdjusters.firstDayOfMonth());
+            hasta = ahora.with(TemporalAdjusters.lastDayOfMonth());
+        }
+
+        if (tipo != null && !tipo.trim().isEmpty() && !tipo.equalsIgnoreCase("TODOS")) {
+            return saasMovimientoRepository.findByTipoAndFechaMovimientoBetweenOrderByFechaMovimientoDescIdDesc(
+                tipo.toUpperCase(), desde, hasta
+            );
+        }
+        return saasMovimientoRepository.findByFechaMovimientoBetweenOrderByFechaMovimientoDescIdDesc(desde, hasta);
+    }
+
+    @PostMapping("/finanzas/movimientos")
+    public ResponseEntity<SaasMovimientoFinanciero> registrarMovimiento(@RequestBody SaasMovimientoFinanciero mov) {
+        if (mov.getConcepto() == null || mov.getConcepto().trim().isEmpty()) {
+            throw new RuntimeException("El concepto es obligatorio");
+        }
+        if (mov.getMontoUsd() == null || mov.getMontoUsd().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("El monto debe ser mayor a 0");
+        }
+        if (mov.getTipo() == null || (!mov.getTipo().equalsIgnoreCase("INGRESO") && !mov.getTipo().equalsIgnoreCase("EGRESO"))) {
+            throw new RuntimeException("El tipo debe ser INGRESO o EGRESO");
+        }
+        mov.setTipo(mov.getTipo().toUpperCase());
+        if (mov.getCategoria() == null) mov.setCategoria("OTRO");
+        if (mov.getFechaMovimiento() == null) mov.setFechaMovimiento(LocalDate.now());
+        if (mov.getMetodoPago() == null) mov.setMetodoPago("TRANSFERENCIA_BANCARIA");
+        mov.setRegistradoPor("superadmin");
+        mov.setFechaCreacion(LocalDateTime.now());
+        return ResponseEntity.ok(saasMovimientoRepository.save(mov));
+    }
+
+    @DeleteMapping("/finanzas/movimientos/{id:[0-9]+}")
+    public ResponseEntity<Map<String, String>> eliminarMovimiento(@PathVariable Long id) {
+        saasMovimientoRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("mensaje", "Movimiento eliminado"));
+    }
 }
