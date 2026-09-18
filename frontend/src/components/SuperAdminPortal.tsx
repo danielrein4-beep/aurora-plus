@@ -540,8 +540,8 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             </button>
           )}
           <div className="text-center space-y-2">
-            <div className="inline-flex p-3 rounded-2xl bg-slate-900 text-white shadow-md">
-              <span className="font-mono text-sm font-black tracking-wider">SUPERADMIN</span>
+            <div className="inline-flex p-3 rounded-2xl bg-teal-50 border border-teal-200 shadow-xs">
+              <AuroraLogo size={40} animated={false} />
             </div>
             <h1 className="font-['Outfit'] text-2xl font-black text-slate-900 tracking-tight">
               Centro de Control Maestro
@@ -589,7 +589,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             <button
               type="submit"
               disabled={loadingLogin}
-              className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm tracking-wide transition-all shadow-md cursor-pointer disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm tracking-wide transition-all shadow-md shadow-teal-600/20 cursor-pointer disabled:opacity-50"
             >
               {loadingLogin ? "Validando credenciales..." : "Iniciar Sesion SuperAdmin"}
             </button>
@@ -631,8 +631,8 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       {/* HEADER SUPERADMIN */}
       <header className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-slate-900 text-white rounded-2xl shadow-sm">
-            <span className="font-mono text-xs font-black tracking-widest">AURORA</span>
+          <div className="p-2.5 rounded-2xl bg-teal-50 border border-teal-200/80 shadow-xs flex items-center justify-center">
+            <AuroraLogo size={32} animated={false} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -668,7 +668,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
           <button
             onClick={() => setShowNuevoModal(true)}
-            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xs shadow-teal-600/20 transition-all cursor-pointer"
           >
             + Nuevo Negocio
           </button>
@@ -683,7 +683,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           {onClose ? (
             <button
               onClick={onClose}
-              className="px-3.5 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 cursor-pointer text-xs font-bold transition-all shadow-xs"
+              className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 cursor-pointer text-xs font-bold transition-all shadow-2xs"
               title="Cerrar SuperAdmin"
             >
               Cerrar Portal
@@ -750,9 +750,9 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
             <button
               onClick={() => setFiltroModulo("TODOS")}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
                 filtroModulo === "TODOS"
-                  ? "bg-slate-900 text-white shadow-xs"
+                  ? "bg-teal-600 text-white shadow-xs shadow-teal-600/20"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -764,9 +764,9 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 <button
                   key={m.id}
                   onClick={() => setFiltroModulo(m.id)}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                     filtroModulo === m.id
-                      ? "bg-slate-900 text-white shadow-xs"
+                      ? "bg-teal-600 text-white shadow-xs shadow-teal-600/20"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
@@ -786,10 +786,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
               <button
                 key={est}
                 onClick={() => setFiltroEstado(est)}
-                className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+                className={`px-3.5 py-1 rounded-xl font-bold transition-all cursor-pointer ${
                   filtroEstado === est
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-800"
+                    ? "bg-teal-600 text-white shadow-xs shadow-teal-600/20"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 {est === "TODOS" && "Todos"}
@@ -826,7 +826,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2 font-bold text-xs text-slate-700">
             <span>Directorio de Clientes</span>
-            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono text-[10px]">
+            <span className="px-3 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 font-bold text-xs">
               {tenantsFiltrados.length} negocios listados
             </span>
           </div>
@@ -979,7 +979,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                           {/* Impersonar Soporte */}
                           <button
                             onClick={() => handleImpersonar(t.tenantId)}
-                            className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-mono font-bold text-[10px] cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 font-bold text-[10px] cursor-pointer transition-colors shadow-2xs"
                             title="Acceso de soporte tecnico directo"
                           >
                             Soporte
@@ -1066,7 +1066,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                       onClick={() => setLimiteUsuariosInput(String(num))}
                       className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold font-mono transition-all cursor-pointer ${
                         limiteUsuariosInput === String(num)
-                          ? "bg-slate-900 text-white border-slate-900"
+                          ? "bg-teal-600 text-white border-teal-600 font-bold shadow-xs"
                           : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                       }`}
                     >
@@ -1078,7 +1078,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                     onClick={() => setLimiteUsuariosInput("")}
                     className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
                       limiteUsuariosInput === ""
-                        ? "bg-slate-900 text-white border-slate-900"
+                        ? "bg-teal-600 text-white border-teal-600 font-bold shadow-xs"
                         : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                     }`}
                   >
@@ -1122,7 +1122,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 <button
                   type="button"
                   onClick={() => abrirModalUsuario(tenantParaUsuariosDirectorio)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs cursor-pointer shadow-xs"
                 >
                   + Agregar Usuario
                 </button>
@@ -1191,7 +1191,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
               <button
                 type="button"
                 onClick={() => setShowUsuariosDirectorioModal(false)}
-                className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer hover:bg-slate-800"
+                className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs cursor-pointer"
               >
                 Cerrar Directorio
               </button>
@@ -1232,7 +1232,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                       onClick={() => setPagoForm({ ...pagoForm, meses: pkg.m, dias: 0, monto: pkg.p })}
                       className={`p-2.5 rounded-xl border font-bold text-center transition-all cursor-pointer ${
                         pagoForm.meses === pkg.m && pagoForm.dias === 0
-                          ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                          ? "bg-teal-600 text-white border-teal-600 font-bold shadow-xs"
                           : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                       }`}
                     >
@@ -1331,7 +1331,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                       onClick={() => setRegaloForm({ ...regaloForm, dias: d })}
                       className={`flex-1 py-2 rounded-xl border font-bold transition-all cursor-pointer ${
                         regaloForm.dias === d
-                          ? "bg-slate-900 text-white border-slate-900"
+                          ? "bg-teal-600 text-white border-teal-600 font-bold shadow-xs"
                           : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                       }`}
                     >
@@ -1450,7 +1450,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setShowModulosModal(false)}
-                className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer hover:bg-slate-800"
+                className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs cursor-pointer"
               >
                 Listo
               </button>
@@ -1710,7 +1710,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 <button
                   type="submit"
                   disabled={creandoUsuario}
-                  className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold cursor-pointer disabled:opacity-50 shadow-md"
+                  className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold cursor-pointer disabled:opacity-50 shadow-md shadow-teal-600/20"
                 >
                   {creandoUsuario ? "Guardando..." : "Crear Usuario"}
                 </button>
@@ -1784,7 +1784,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setShowHistorialPagosModal(false)}
-                className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer hover:bg-slate-800"
+                className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs cursor-pointer"
               >
                 Cerrar
               </button>
