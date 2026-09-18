@@ -206,7 +206,7 @@ function HomePointerAurora({ hostRef }: { hostRef: RefObject<HTMLElement | null>
 
 export default function Home() {
   const homeRef = useRef<HTMLElement>(null);
-  const [activeTab, setActiveTab] = useState("Ferretería");
+  const [activeTab, setActiveTab] = useState("Comercio");
   const [heroTitleSettled, setHeroTitleSettled] = useState(false);
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
@@ -277,7 +277,7 @@ export default function Home() {
           initial="hidden"
           animate="show"
           className="relative z-10 w-full max-w-5xl mx-auto">
-          <motion.p variants={heroItem} className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · seis rubros · tres monedas</motion.p>
+          <motion.p variants={heroItem} className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · cuatro rubros · tres monedas</motion.p>
           <motion.h1 variants={heroItem} className="mt-5 max-w-3xl font-['IBM_Plex_Sans'] text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-[-0.055em] text-[#f8f6ef]">
             <TrueFocus
               sentence="Automatiza, simplifica, crece..."
