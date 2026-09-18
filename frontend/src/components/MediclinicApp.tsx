@@ -21,8 +21,9 @@ import {
   listarCierresCaja, registrarCierreCaja,
   listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta, eliminarConsulta,
   listarCotizaciones, crearCotizacion, actualizarEstadoCotizacion, eliminarCotizacion as eliminarCotizacionApi,
+  tasaVigente, actualizarTasa,
   type Paciente, type CitaMedica, type SalaEsperaEntrada, type ProcedimientoMedico, type ConsultaMedica,
-  type CierreCajaRegistro, type CotizacionMedicaApi,
+  type CierreCajaRegistro, type CotizacionMedicaApi, type TasaCambio,
 } from "../api";
 import {
   generarPdfCierreCaja, generarPdfInformeConsulta, generarTextoWhatsAppConsulta,
@@ -622,6 +623,28 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     try { localStorage.setItem(claveConfigPerfil(tenantId), JSON.stringify(nuevaConfig)); } catch {}
   };
 
+  // Tasas de cambio reales (mismo motor /api/financiero/tasas que usa Aurora
+  // Horeca y Comercio — genérico, sin cambios de backend): antes tasaBCV/
+  // tasaCOP vivían solo en configPerfil (localStorage de este dispositivo,
+  // nunca sincronizadas entre secretaria/doctor ni entre dispositivos). Se
+  // guarda un historial en el servidor y siempre se usa la más reciente.
+  const [tasaBcv, setTasaBcv] = useState<TasaCambio | null>(null);
+  const [tasaCopReal, setTasaCopReal] = useState<TasaCambio | null>(null);
+  useEffect(() => {
+    if (!tenantId) return;
+    tasaVigente(tenantId, "USD", "VES").then(setTasaBcv).catch(() => setTasaBcv(null));
+    tasaVigente(tenantId, "USD", "COP").then(setTasaCopReal).catch(() => setTasaCopReal(null));
+  }, [tenantId]);
+
+  // Único punto de lectura para el resto de la app (cotizaciones, cierres de
+  // caja, PDFs) — mismo objeto configPerfil de siempre, pero con tasaBCV/
+  // tasaCOP siempre reemplazadas por el valor real del backend cuando existe.
+  const configPerfilConTasas = useMemo(() => ({
+    ...configPerfil,
+    tasaBCV: tasaBcv ? Number(tasaBcv.tasa) : configPerfil.tasaBCV,
+    tasaCOP: tasaCopReal ? Number(tasaCopReal.tasa) : configPerfil.tasaCOP,
+  }), [configPerfil, tasaBcv, tasaCopReal]);
+
   const seleccionarDoctor = () => {
     setModalClaveDoctor(true);
     setAccionPendienteDoctor(() => () => {
@@ -726,25 +749,34 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [tasaCOPInput, setTasaCOPInput] = useState<string>("");
   const [toastTasa, setToastTasa] = useState<string | null>(null);
 
+  const [guardandoTasasRapidas, setGuardandoTasasRapidas] = useState(false);
+
   const abrirModalTasas = () => {
-    setTasaBCVInput(String(configPerfil.tasaBCV || 56.40));
-    setTasaCOPInput(String(configPerfil.tasaCOP || 4200));
+    setTasaBCVInput(tasaBcv ? String(Number(tasaBcv.tasa)) : "");
+    setTasaCOPInput(tasaCopReal ? String(Number(tasaCopReal.tasa)) : "");
     setModalTasasRapidas(true);
   };
 
-  const guardarTasasRapidas = (e?: React.FormEvent) => {
+  const guardarTasasRapidas = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const bcv = parseFloat(tasaBCVInput) || configPerfil.tasaBCV || 56.40;
-    const cop = parseFloat(tasaCOPInput) || configPerfil.tasaCOP || 4200;
-    const nuevaConfig = {
-      ...configPerfil,
-      tasaBCV: bcv,
-      tasaCOP: cop,
-    };
-    guardarConfigPerfil(nuevaConfig);
-    setModalTasasRapidas(false);
-    setToastTasa(`Tasas actualizadas: BCV Bs. ${bcv.toFixed(2)} | COP $${cop.toLocaleString()}`);
-    setTimeout(() => setToastTasa(null), 3500);
+    const bcv = parseFloat(tasaBCVInput);
+    const cop = parseFloat(tasaCOPInput);
+    if (!(bcv > 0) && !(cop > 0)) { setToastTasa("Ingresá al menos una tasa mayor a cero"); setTimeout(() => setToastTasa(null), 3500); return; }
+    setGuardandoTasasRapidas(true);
+    try {
+      const tareas: Promise<void>[] = [];
+      if (bcv > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: bcv, origen: "MANUAL" }).then(setTasaBcv));
+      if (cop > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: cop, origen: "MANUAL" }).then(setTasaCopReal));
+      await Promise.all(tareas);
+      setModalTasasRapidas(false);
+      setToastTasa(`Tasas actualizadas: BCV Bs. ${(bcv || Number(tasaBcv?.tasa) || 0).toFixed(2)} | COP $${(cop || Number(tasaCopReal?.tasa) || 0).toLocaleString()}`);
+      setTimeout(() => setToastTasa(null), 3500);
+    } catch (err) {
+      setToastTasa(err instanceof Error ? err.message : "No se pudo actualizar la tasa");
+      setTimeout(() => setToastTasa(null), 3500);
+    } finally {
+      setGuardandoTasasRapidas(false);
+    }
   };
 
   useEffect(() => {
@@ -1050,17 +1082,19 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               </button>
             )}
 
-            <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/70 dark:bg-white/5 border border-slate-300/60 dark:border-white/15 shadow-sm text-xs">
+            <div className={`flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border shadow-sm text-xs ${
+              tasaBcv ? "bg-white/70 dark:bg-white/5 border-slate-300/60 dark:border-white/15" : "bg-amber-500/10 border-amber-500/30"
+            }`}>
               <span className="font-bold text-slate-700 dark:text-white/80 flex items-center gap-1.5">
                 <IconBank size={14} className="text-teal-600 dark:text-teal-400" />
                 <span>Tasas del Día:</span>
               </span>
               <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                VES: Bs. {Number(configPerfil.tasaBCV || 56.4).toFixed(2)}
+                VES: {tasaBcv ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa"}
               </span>
               <span className="text-slate-300 dark:text-white/20">|</span>
               <span className="font-mono font-bold text-sky-600 dark:text-sky-400">
-                COP: ${Number(configPerfil.tasaCOP || 4200).toLocaleString()}
+                COP: {tasaCopReal ? `$${Number(tasaCopReal.tasa).toLocaleString()}` : "Sin tasa"}
               </span>
 
               <button
@@ -1169,7 +1203,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               <HistoriasClinicas
                 tenantId={tenantId}
                 pacientes={pacientes}
-                config={configPerfil}
+                config={configPerfilConTasas}
                 rol={rolActivo}
                 pacienteInicialId={pacienteSeleccionadoId}
                 onVerDocumento={setVisorDocumento}
@@ -1180,7 +1214,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 tenantId={tenantId}
                 procedimientos={procedimientos}
                 pacientes={pacientes}
-                config={configPerfil}
+                config={configPerfilConTasas}
                 onCambio={recargarTodo}
                 pacienteInicialId={pacienteSeleccionadoId}
                 onVerDocumento={setVisorDocumento}
@@ -1195,7 +1229,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onAgregarCobro={agregarCobroLocal}
                 onAgregarCierre={agregarCierreAuditado}
                 onCambio={recargarTodo}
-                config={configPerfil}
+                config={configPerfilConTasas}
                 onNavegar={setPagina}
                 onSeleccionarPacienteParaConsulta={(id) => {
                   setPacienteSeleccionadoId(id);
@@ -1223,7 +1257,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 citasHoy={citasHoy}
                 cobrosLocales={cobrosLocales}
                 historialCierres={historialCierres}
-                config={configPerfil}
+                config={configPerfilConTasas}
                 rol={rolActivo}
                 onEliminarCobro={eliminarCobroLocal}
                 onLimpiarCobros={limpiarCobrosLocales}
@@ -1232,7 +1266,19 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onVerDocumento={setVisorDocumento}
               />
             )}
-            {pagina === "configuracion" && <Configuracion config={configPerfil} onGuardar={guardarConfigPerfil} user={user} />}
+            {pagina === "configuracion" && (
+              <Configuracion
+                config={configPerfilConTasas}
+                onGuardar={guardarConfigPerfil}
+                user={user}
+                tasaBcv={tasaBcv}
+                tasaCop={tasaCopReal}
+                onActualizarTasas={async (bcv, cop) => {
+                  if (bcv > 0) setTasaBcv(await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: bcv, origen: "MANUAL" }));
+                  if (cop > 0) setTasaCopReal(await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: cop, origen: "MANUAL" }));
+                }}
+              />
+            )}
           </div>
         </div>
       </main>
@@ -1353,10 +1399,11 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-md hover:shadow-teal-500/20 transition-all cursor-pointer flex items-center gap-1.5"
+                  disabled={guardandoTasasRapidas}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-md hover:shadow-teal-500/20 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-60"
                 >
                   <IconCheck size={16} />
-                  <span>Guardar Tasas</span>
+                  <span>{guardandoTasasRapidas ? "Guardando…" : "Guardar Tasas"}</span>
                 </button>
               </div>
             </form>
@@ -4408,6 +4455,7 @@ function Procedimientos({
   const [modalTasas, setModalTasas] = useState(false);
   const [tempTasaBCV, setTempTasaBCV] = useState(config?.tasaBCV || 950);
   const [tempTasaCOP, setTempTasaCOP] = useState(config?.tasaCOP || 4000);
+  const [guardandoTasasModal, setGuardandoTasasModal] = useState(false);
 
   // Filtros del Historial
   const [filtroTexto, setFiltroTexto] = useState("");
@@ -5249,21 +5297,26 @@ function Procedimientos({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (config) {
-                    config.tasaBCV = tempTasaBCV;
-                    config.tasaCOP = tempTasaCOP;
-                    try {
-                      localStorage.setItem("aurora_mediclinic_config_perfil", JSON.stringify(config));
-                    } catch {}
+                disabled={guardandoTasasModal}
+                onClick={async () => {
+                  setGuardandoTasasModal(true);
+                  try {
+                    const tareas: Promise<unknown>[] = [];
+                    if (tempTasaBCV > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: tempTasaBCV, origen: "MANUAL" }));
+                    if (tempTasaCOP > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: tempTasaCOP, origen: "MANUAL" }));
+                    await Promise.all(tareas);
+                    setModalTasas(false);
+                    dispararToast("Tasas actualizadas correctamente.");
+                    onCambio();
+                  } catch (err) {
+                    dispararToast(err instanceof Error ? err.message : "No se pudo actualizar la tasa.");
+                  } finally {
+                    setGuardandoTasasModal(false);
                   }
-                  setModalTasas(false);
-                  dispararToast("Tasas actualizadas correctamente.");
-                  onCambio();
                 }}
-                className="flex-1 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold cursor-pointer"
+                className="flex-1 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60"
               >
-                Guardar Tasas
+                {guardandoTasasModal ? "Guardando…" : "Guardar Tasas"}
               </button>
             </div>
           </div>
@@ -7962,16 +8015,34 @@ function ResumenesFinancieros({
 // ══════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN & PERFIL MÉDICO
 // ══════════════════════════════════════════════════════════════════════════
-function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c: any) => void; user: any }) {
+function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, onActualizarTasas }: {
+  config: any; onGuardar: (c: any) => void; user: any;
+  tasaBcv?: TasaCambio | null; tasaCop?: TasaCambio | null; onActualizarTasas?: (bcv: number, cop: number) => Promise<void>;
+}) {
   const [form, setForm] = useState(config);
   const [claveForm, setClaveForm] = useState({ actual: "", nueva: "", confirmar: "" });
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
-  const guardar = (e: React.FormEvent) => {
+  const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
-    onGuardar(form);
-    setMensaje("✓ Configuración y perfil guardados exitosamente.");
-    setTimeout(() => setMensaje(null), 3500);
+    setGuardando(true);
+    try {
+      // Las tasas se guardan por separado en /api/financiero/tasas (mismo motor real
+      // que Horeca/Comercio, con historial) — solo se envían si el usuario las cambió.
+      const bcvCambio = Number(form.tasaBCV) !== (tasaBcv ? Number(tasaBcv.tasa) : undefined);
+      const copCambio = Number(form.tasaCOP) !== (tasaCop ? Number(tasaCop.tasa) : undefined);
+      if (onActualizarTasas && (bcvCambio || copCambio)) {
+        await onActualizarTasas(bcvCambio ? Number(form.tasaBCV) || 0 : 0, copCambio ? Number(form.tasaCOP) || 0 : 0);
+      }
+      onGuardar(form);
+      setMensaje("✓ Configuración y perfil guardados exitosamente.");
+    } catch (err) {
+      setMensaje(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo guardar la tasa.");
+    } finally {
+      setGuardando(false);
+      setTimeout(() => setMensaje(null), 3500);
+    }
   };
 
   const guardarClave = (e: React.FormEvent) => {
@@ -8046,8 +8117,8 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
           </div>
         </div>
 
-        <button type="submit" className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer">
-          Guardar Cambios de Perfil
+        <button type="submit" disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-60">
+          {guardando ? "Guardando…" : "Guardar Cambios de Perfil"}
         </button>
       </form>
 

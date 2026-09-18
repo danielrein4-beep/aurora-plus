@@ -3,6 +3,7 @@ import {
   IconHardware, IconPrescription, IconRetail, IconCard, IconSearch, IconTrash,
   IconCheck, IconWarning, IconClose, IconUsers, IconFileText, IconHourglass,
   IconDownload, IconRefresh, IconCheckCircle, IconBank, IconChart, IconBox, IconLock,
+  IconSettings, IconCoins, IconEdit,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
@@ -28,6 +29,8 @@ import {
   historialTurnos,
   registrarEgresoTurno,
   cerrarTurno,
+  tasaVigente,
+  actualizarTasa,
   type RepuestoItem,
   type PresentacionRepuesto,
   type MovimientoRepuesto,
@@ -35,6 +38,7 @@ import {
   type CompraRepuesto,
   type MovimientoCaja,
   type Turno,
+  type TasaCambio,
 } from "../api";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -423,25 +427,19 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const esFarmacia = perfilActivo === "farmacia";
   const esComercio = !esFarmacia;
 
-  // Motor Multi-Tasa Fronterizo (USDT / BCV / COP / Propia)
-  const [tipoTasaActiva, setTipoTasaActiva] = useState<"USDT" | "BCV" | "PERSONALIZADA">(() => {
-    try { return (localStorage.getItem("aurora_tipo_tasa_activa") as any) || "USDT"; } catch { return "USDT"; }
-  });
-  const [tasaUsdtVal, setTasaUsdtVal] = useState(() => {
-    try { return localStorage.getItem("aurora_tasa_usdt_val") || "65.50"; } catch { return "65.50"; }
-  });
-  const [tasaBcvVal, setTasaBcvVal] = useState("56.80");
-  const [tasaCopVal, setTasaCopVal] = useState("4180");
-  const [tasaPersVal, setTasaPersVal] = useState("");
-  const [popoverTasa, setPopoverTasa] = useState(false);
+  // Tasas de cambio reales (mismo motor /api/financiero/tasas que usa Aurora
+  // Horeca — genérico, sin cambios de backend): se guarda un historial en el
+  // servidor, nunca solo en el navegador, y siempre se usa la más reciente.
+  const [tasaBcv, setTasaBcv] = useState<TasaCambio | null>(null);
+  const [tasaCopReal, setTasaCopReal] = useState<TasaCambio | null>(null);
+  useEffect(() => {
+    if (!user?.tenantId) return;
+    tasaVigente(user.tenantId, "USD", "VES").then(setTasaBcv).catch(() => setTasaBcv(null));
+    tasaVigente(user.tenantId, "USD", "COP").then(setTasaCopReal).catch(() => setTasaCopReal(null));
+  }, [user?.tenantId]);
 
-  const tasaActivaBs = useMemo(() => {
-    if (tipoTasaActiva === "USDT") return Number(tasaUsdtVal) || 65.50;
-    if (tipoTasaActiva === "BCV") return Number(tasaBcvVal) || 56.80;
-    return Number(tasaPersVal) || Number(tasaUsdtVal) || 65.50;
-  }, [tipoTasaActiva, tasaUsdtVal, tasaBcvVal, tasaPersVal]);
-
-  const tasaCop = Number(tasaCopVal) || 4180;
+  const tasaActivaBs = tasaBcv ? Number(tasaBcv.tasa) : 0;
+  const tasaCop = tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
   const [tab, setTab] = useState<"general" | "pos" | "inventario" | "clientes" | "cierre">("general");
@@ -786,8 +784,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     const ingresado = parseFloat(montoRecibido);
     if (!isNaN(ingresado) && ingresado > 0) {
       if (monedaRecibida === "USD") recibidoEnUSD = ingresado;
-      else if (monedaRecibida === "VES") recibidoEnUSD = ingresado / tasaActivaBs;
-      else if (monedaRecibida === "COP") recibidoEnUSD = ingresado / tasaCop;
+      else if (monedaRecibida === "VES" && tasaActivaBs > 0) recibidoEnUSD = ingresado / tasaActivaBs;
+      else if (monedaRecibida === "COP" && tasaCop > 0) recibidoEnUSD = ingresado / tasaCop;
     }
 
     const vueltoUSD = Math.max(0, recibidoEnUSD - totalUSD);
@@ -1001,84 +999,15 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
         {/* ── TOPBAR LIMPIO: SOLO TASAS, TEMA Y PERFIL ── */}
         <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-end gap-2.5 shadow-sm flex-shrink-0">
-          {/* Badge de Tasa Flotante */}
-          <div className="relative">
-            <button
-              onClick={() => setPopoverTasa((v) => !v)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-teal-500/30 text-xs font-mono font-bold hover:border-teal-400 transition-all cursor-pointer shadow-inner"
-              title="Cambiar tasa activa (USDT / BCV / COP)"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-teal-400">{tipoTasaActiva}: Bs. {tasaActivaBs.toFixed(2)}</span>
-              <span className="text-slate-500 dark:text-slate-400 text-[10px]">· COP {tasaCop.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
-              <span className="text-slate-500 dark:text-slate-400 text-[9px]">▼</span>
-            </button>
-
-            {popoverTasa && (
-              <div className="absolute right-0 mt-2 z-50 w-72 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-300 dark:border-slate-700 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white">Tasa Activa para Venta</span>
-                  <button onClick={() => setPopoverTasa(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white"><IconClose size={14} /></button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs">
-                  <button
-                    onClick={() => { setTipoTasaActiva("USDT"); try { localStorage.setItem("aurora_tipo_tasa_activa", "USDT"); } catch {} }}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "USDT" ? "bg-emerald-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
-                  >💎 USDT</button>
-                  <button
-                    onClick={() => { setTipoTasaActiva("BCV"); try { localStorage.setItem("aurora_tipo_tasa_activa", "BCV"); } catch {} }}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "BCV" ? "bg-teal-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
-                  >🏛️ BCV</button>
-                  <button
-                    onClick={() => { setTipoTasaActiva("PERSONALIZADA"); try { localStorage.setItem("aurora_tipo_tasa_activa", "PERSONALIZADA"); } catch {} }}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "PERSONALIZADA" ? "bg-amber-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
-                  >✏️ Propia</button>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Tasa USDT ($):</span>
-                    <input
-                      type="number" step="0.01" value={tasaUsdtVal}
-                      onChange={(e) => { setTasaUsdtVal(e.target.value); try { localStorage.setItem("aurora_tasa_usdt_val", e.target.value); } catch {} }}
-                      className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-right text-xs"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Tasa BCV ($):</span>
-                    <input
-                      type="number" step="0.01" value={tasaBcvVal}
-                      onChange={(e) => setTasaBcvVal(e.target.value)}
-                      className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-right text-xs"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Pesos COP:</span>
-                    <input
-                      type="number" step="1" value={tasaCopVal}
-                      onChange={(e) => setTasaCopVal(e.target.value)}
-                      className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-right text-xs"
-                    />
-                  </div>
-                  {tipoTasaActiva === "PERSONALIZADA" && (
-                    <div className="flex items-center justify-between gap-2 bg-amber-500/10 p-1.5 rounded-lg border border-amber-500/20">
-                      <span className="text-[11px] text-amber-300 font-bold">Propia (Bs):</span>
-                      <input
-                        type="number" step="0.01" placeholder="Ej. 66.50" value={tasaPersVal}
-                        onChange={(e) => setTasaPersVal(e.target.value)}
-                        className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-amber-500/40 font-mono text-right text-xs font-bold text-amber-300"
-                      />
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => setPopoverTasa(false)}
-                  className="w-full py-1.5 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400"
-                >Aplicar tasas al POS</button>
-              </div>
-            )}
-          </div>
+          {user?.tenantId && (
+            <TasaBadgeComercio
+              tenantId={user.tenantId}
+              tasaBcv={tasaBcv}
+              tasaCop={tasaCopReal}
+              onActualizadaBcv={setTasaBcv}
+              onActualizadaCop={setTasaCopReal}
+            />
+          )}
 
           <ThemeToggle />
         </header>
@@ -1763,8 +1692,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 if (isNaN(val) || val <= 0) return null;
                 const recibidoEquivUSD =
                   monedaRecibida === "USD" ? val :
-                  monedaRecibida === "VES" ? val / tasaActivaBs :
-                  val / tasaCop;
+                  monedaRecibida === "VES" ? (tasaActivaBs > 0 ? val / tasaActivaBs : 0) :
+                  (tasaCop > 0 ? val / tasaCop : 0);
                 const diffUSD = recibidoEquivUSD - totalUSD;
 
                 if (diffUSD > 0.005) {
@@ -2460,6 +2389,200 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         </div>
       )}
 
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMPONENTE: BADGE DE TASA DE CAMBIO ACTIVA (mismo motor /api/financiero/tasas
+// que usa Aurora Horeca) — antes esto era un cálculo 100% local (localStorage,
+// valores por defecto inventados como 56.80/4180) sin ninguna conexión al
+// backend: el botón "Aplicar tasas al POS" no hacía nada más que cerrar el
+// popover. Ahora persiste en el servidor con historial (nunca se sobreescribe
+// la tasa anterior, siempre se usa la más reciente) y esa misma tasa es la
+// que ve el resto de la app (POS, cierre de caja, recibos).
+// ══════════════════════════════════════════════════════════════════════════
+function TasaBadgeComercio({ tenantId, tasaBcv, tasaCop, onActualizadaBcv, onActualizadaCop }: {
+  tenantId: number; tasaBcv: TasaCambio | null; tasaCop: TasaCambio | null;
+  onActualizadaBcv: (t: TasaCambio) => void; onActualizadaCop: (t: TasaCambio) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [tipoActivo, setTipoActivo] = useState<"USDT" | "BCV" | "PERSONALIZADA">(() => {
+    try { return (localStorage.getItem("aurora_tipo_tasa_activa") as any) || "USDT"; } catch { return "USDT"; }
+  });
+  const [tasaUsdtVal, setTasaUsdtVal] = useState(() => {
+    try { return localStorage.getItem("aurora_tasa_usdt_val") || ""; } catch { return ""; }
+  });
+  const [tasaBcvVal, setTasaBcvVal] = useState("");
+  const [tasaCopVal, setTasaCopVal] = useState("");
+  const [tasaPersVal, setTasaPersVal] = useState(() => {
+    try { return localStorage.getItem("aurora_tasa_pers_val") || ""; } catch { return ""; }
+  });
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    setTasaBcvVal(tasaBcv ? String(Number(tasaBcv.tasa)) : "");
+    setTasaCopVal(tasaCop ? String(Number(tasaCop.tasa)) : "");
+    setError(null);
+  }, [abierto, tasaBcv, tasaCop]);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) setAbierto(false);
+    };
+    const handlerEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setAbierto(false); };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", handlerEsc);
+    return () => { document.removeEventListener("mousedown", handler); document.removeEventListener("keydown", handlerEsc); };
+  }, [abierto]);
+
+  const guardarTipoActivo = (tipo: "USDT" | "BCV" | "PERSONALIZADA") => {
+    setTipoActivo(tipo);
+    try { localStorage.setItem("aurora_tipo_tasa_activa", tipo); } catch {}
+  };
+
+  const tasaActivaNumero = useMemo(() => {
+    if (tipoActivo === "USDT") return Number(tasaUsdtVal) || (tasaBcv ? Number(tasaBcv.tasa) : 0);
+    if (tipoActivo === "BCV") return tasaBcv ? Number(tasaBcv.tasa) : (Number(tasaUsdtVal) || 0);
+    return Number(tasaPersVal) || (tasaBcv ? Number(tasaBcv.tasa) : 0);
+  }, [tipoActivo, tasaUsdtVal, tasaBcv, tasaPersVal]);
+
+  const actualizar = async () => {
+    const vBcv = Number(tasaBcvVal);
+    const vUsdt = Number(tasaUsdtVal);
+    const vCop = Number(tasaCopVal);
+    const vPers = Number(tasaPersVal);
+
+    if (vBcv <= 0 && vUsdt <= 0 && vCop <= 0 && vPers <= 0) {
+      setError("Ingresá al menos una tasa mayor a cero");
+      return;
+    }
+    setGuardando(true);
+    setError(null);
+    try {
+      try {
+        localStorage.setItem("aurora_tipo_tasa_activa", tipoActivo);
+        if (vUsdt > 0) localStorage.setItem("aurora_tasa_usdt_val", String(vUsdt));
+        if (vPers > 0) localStorage.setItem("aurora_tasa_pers_val", String(vPers));
+      } catch {}
+
+      const tareas: Promise<void>[] = [];
+      const tasaPrincipal = tipoActivo === "USDT" ? (vUsdt > 0 ? vUsdt : vBcv) : (vBcv > 0 ? vBcv : vUsdt);
+      if (tasaPrincipal > 0) {
+        tareas.push(actualizarTasa(tenantId, {
+          monedaOrigen: "USD",
+          monedaDestino: "VES",
+          tasa: tasaPrincipal,
+          origen: tipoActivo
+        }).then(onActualizadaBcv));
+      }
+      if (vCop > 0) {
+        tareas.push(actualizarTasa(tenantId, {
+          monedaOrigen: "USD",
+          monedaDestino: "COP",
+          tasa: vCop,
+          origen: "MANUAL"
+        }).then(onActualizadaCop));
+      }
+      await Promise.all(tareas);
+      setAbierto(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo actualizar la tasa");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="relative" ref={popoverRef}>
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        title="Cambiar o configurar tasas (USDT / BCV / COP)"
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono font-bold cursor-pointer border transition-all shadow-inner ${
+          tasaActivaNumero > 0
+            ? "bg-slate-100 dark:bg-slate-800 border-teal-500/30 hover:border-teal-400 text-teal-600 dark:text-teal-400"
+            : "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
+        }`}
+      >
+        <span className={`w-2 h-2 rounded-full ${tasaActivaNumero > 0 ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+        <span className="text-[10px] px-1 rounded bg-black/5 dark:bg-white/10 uppercase tracking-wider">{tipoActivo}</span>
+        <span>{tasaActivaNumero > 0 ? `Bs. ${tasaActivaNumero.toFixed(2)}` : "Sin tasa"}</span>
+        {tasaCop && (
+          <span className="text-slate-500 dark:text-slate-400 text-[10px] font-normal">· COP {Number(tasaCop.tasa).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+        )}
+        <span className="text-slate-500 dark:text-slate-400 text-[9px]">▼</span>
+      </button>
+
+      {abierto && (
+        <div className="absolute right-0 mt-2 z-50 w-80 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-300 dark:border-slate-700 space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+            <div>
+              <p className="text-xs font-bold text-slate-900 dark:text-white">Tasas de Cambio Operativas</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">Se guarda un historial — siempre se usa la más reciente.</p>
+            </div>
+            <button onClick={() => setAbierto(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={14} /></button>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Tasa activa para cobro en POS:</label>
+            <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+              <button type="button" onClick={() => guardarTipoActivo("USDT")}
+                className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 ${tipoActivo === "USDT" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
+                <IconCoins size={12} /><span>USDT</span>
+              </button>
+              <button type="button" onClick={() => guardarTipoActivo("BCV")}
+                className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 ${tipoActivo === "BCV" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
+                <IconBank size={12} /><span>BCV</span>
+              </button>
+              <button type="button" onClick={() => guardarTipoActivo("PERSONALIZADA")}
+                className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 ${tipoActivo === "PERSONALIZADA" ? "bg-amber-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
+                <IconEdit size={12} /><span>Propia</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-20 text-[10px] font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1"><IconCoins size={12} className="text-emerald-500 shrink-0" /><span>USDT:</span></span>
+              <input value={tasaUsdtVal} onChange={(e) => setTasaUsdtVal(e.target.value)} type="number" step="0.01" min="0" placeholder="Ej. 65.50"
+                className="flex-1 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono font-bold text-xs text-slate-900 dark:text-white" />
+              <span className="text-[10px] text-slate-400">Bs</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-20 text-[10px] font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1"><IconBank size={12} className="text-teal-500 shrink-0" /><span>BCV:</span></span>
+              <input value={tasaBcvVal} onChange={(e) => setTasaBcvVal(e.target.value)} type="number" step="0.01" min="0" placeholder="Ej. 56.40"
+                className="flex-1 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono font-bold text-xs text-slate-900 dark:text-white" />
+              <span className="text-[10px] text-slate-400">Bs</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-20 text-[10px] font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1"><span className="text-[9px] font-extrabold px-1 rounded bg-sky-500/20 text-sky-500">COP</span><span>Pesos:</span></span>
+              <input value={tasaCopVal} onChange={(e) => setTasaCopVal(e.target.value)} type="number" step="0.01" min="0" placeholder="Ej. 4180"
+                className="flex-1 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono font-bold text-xs text-slate-900 dark:text-white" />
+              <span className="text-[10px] text-slate-400">COP</span>
+            </div>
+            {tipoActivo === "PERSONALIZADA" && (
+              <div className="flex items-center gap-2 bg-amber-500/10 p-1.5 rounded-lg border border-amber-500/20">
+                <span className="w-20 text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1"><IconEdit size={12} className="shrink-0" /><span>Propia:</span></span>
+                <input value={tasaPersVal} onChange={(e) => setTasaPersVal(e.target.value)} type="number" step="0.01" min="0" placeholder="Ej. 66.00"
+                  className="flex-1 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-amber-500/40 font-mono font-bold text-xs text-amber-700 dark:text-amber-300" />
+                <span className="text-[10px] text-slate-400">Bs</span>
+              </div>
+            )}
+          </div>
+
+          {error && <p className="text-[10px] text-red-500">{error}</p>}
+
+          <button onClick={actualizar} disabled={guardando}
+            className="w-full py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold cursor-pointer disabled:opacity-60 shadow-md">
+            {guardando ? "Guardando…" : "Guardar y Aplicar Tasas"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
