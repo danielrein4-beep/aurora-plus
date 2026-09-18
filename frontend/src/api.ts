@@ -2071,7 +2071,7 @@ export function borrarSesionSuperAdmin() {
   localStorage.removeItem(SUPER_ADMIN_STORAGE_KEY);
 }
 
-export type TipoLicencia = "DEMO" | "BASICO" | "PROFESIONAL" | "ENTERPRISE";
+export type TipoLicencia = "BASICA" | "COMERCIAL" | "INDUSTRIAL" | "ENTERPRISE" | "DEMO" | "BASICO" | "PROFESIONAL";
 
 export interface LicenciaTenant {
   id: number;
@@ -2084,7 +2084,11 @@ export interface LicenciaTenant {
   emailContacto?: string;
   telefonoContacto?: string;
   monedaBase?: string;
+  rif?: string;
+  razonSocial?: string;
   createdAt?: string;
+  limiteUsuarios?: number | null;
+  cantidadUsuarios?: number;
 }
 
 export interface ModuloTenant {
@@ -2104,6 +2108,8 @@ export interface CrearTenantRequest {
   monedaBase?: string;
   usuarioInicial?: string;
   passwordInicial?: string;
+  accesoTotal?: boolean;
+  limiteUsuarios?: number | null;
 }
 
 const TENANTS_DEMO_DEFAULT: LicenciaTenant[] = [
@@ -2485,6 +2491,16 @@ export async function listarModulosTenantSuperAdmin(tenantId: number): Promise<M
   return modulosDefault;
 }
 
+export async function concederAccesoTotalSuperAdmin(tenantId: number): Promise<LicenciaTenant> {
+  const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/acceso-total`, {
+    method: "POST",
+  });
+  const lista = obtenerTenantsLocales();
+  const index = lista.findIndex(t => t.tenantId === tenantId);
+  if (index !== -1) { lista[index] = res; guardarTenantsLocales(lista); }
+  return res;
+}
+
 export async function activarModuloTenantSuperAdmin(tenantId: number, moduloNombre: string, activo: boolean): Promise<ModuloTenant> {
   const res = await requestSuperAdmin<ModuloTenant>(`/api/super-admin/tenants/${tenantId}/modulos`, {
     method: "POST",
@@ -2495,6 +2511,122 @@ export async function activarModuloTenantSuperAdmin(tenantId: number, moduloNomb
   if (idx !== -1) modulos[idx] = res; else modulos.push(res);
   localStorage.setItem(`aurora_super_admin_modulos_${tenantId}`, JSON.stringify(modulos));
   return res;
+}
+
+export interface SuperAdminStats {
+  totalTenants: number;
+  activos: number;
+  suspendidos: number;
+  porVencer7Dias: number;
+  vencidos: number;
+  ingresosMes: number;
+  tenantsPorModulo: Record<string, number>;
+  totalUsuarios?: number;
+}
+
+export interface PagoSuscripcion {
+  id: number;
+  tenantId: number;
+  nombreEmpresa: string;
+  monto: number;
+  moneda: string;
+  metodoPago: string;
+  referenciaComprobante?: string;
+  mesesPagados: number;
+  diasAcreditados: number;
+  fechaPago: string;
+  fechaRegistro: string;
+  estado: string;
+  notas?: string;
+  registradoPor: string;
+}
+
+export interface RegistrarPagoSuperAdminRequest {
+  tenantId: number;
+  monto: number;
+  moneda?: string;
+  metodoPago?: string;
+  referenciaComprobante?: string;
+  meses?: number;
+  dias?: number;
+  notas?: string;
+}
+
+export interface RegalarTiempoSuperAdminRequest {
+  dias?: number;
+  meses?: number;
+  motivo?: string;
+}
+
+export async function obtenerStatsSuperAdmin(): Promise<SuperAdminStats> {
+  return requestSuperAdmin<SuperAdminStats>("/api/super-admin/tenants/stats");
+}
+
+export async function ejecutarBarridoSuspensionSuperAdmin(): Promise<{ suspendidos: number; mensaje: string }> {
+  return requestSuperAdmin<{ suspendidos: number; mensaje: string }>("/api/super-admin/tenants/barrido-suspension", {
+    method: "POST",
+  });
+}
+
+export async function listarPagosSuperAdmin(tenantId?: number): Promise<PagoSuscripcion[]> {
+  const url = tenantId ? `/api/super-admin/tenants/pagos?tenantId=${tenantId}` : "/api/super-admin/tenants/pagos";
+  return requestSuperAdmin<PagoSuscripcion[]>(url);
+}
+
+export async function registrarPagoSuperAdmin(datos: RegistrarPagoSuperAdminRequest): Promise<PagoSuscripcion> {
+  return requestSuperAdmin<PagoSuscripcion>("/api/super-admin/tenants/pagos", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function regalarTiempoSuperAdmin(tenantId: number, datos: RegalarTiempoSuperAdminRequest): Promise<LicenciaTenant> {
+  const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/regalar-tiempo`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+  const lista = obtenerTenantsLocales();
+  const index = lista.findIndex(t => t.tenantId === tenantId);
+  if (index !== -1) { lista[index] = res; guardarTenantsLocales(lista); }
+  return res;
+}
+
+export async function impersonarTenantSuperAdmin(tenantId: number): Promise<{ token: string; tenantId: string; nombreEmpresa: string; moduloPrincipal: string }> {
+  return requestSuperAdmin<{ token: string; tenantId: string; nombreEmpresa: string; moduloPrincipal: string }>(`/api/super-admin/tenants/${tenantId}/impersonate`, {
+    method: "POST",
+  });
+}
+
+
+export interface UsuarioTenant {
+  id: number;
+  tenantId: number;
+  username: string;
+  rol: string;
+  nombreCompleto?: string;
+  activo: boolean;
+  fechaCreacion: string;
+}
+
+export async function listarUsuariosTenantSuperAdmin(tenantId: number): Promise<UsuarioTenant[]> {
+  return requestSuperAdmin<UsuarioTenant[]>(`/api/super-admin/tenants/${tenantId}/usuarios`);
+}
+
+export async function asignarLimiteUsuariosSuperAdmin(tenantId: number, limite: number | null): Promise<LicenciaTenant> {
+  const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/limite-usuarios`, {
+    method: "POST",
+    body: JSON.stringify({ limiteUsuarios: limite }),
+  });
+  const lista = obtenerTenantsLocales();
+  const idx = lista.findIndex(t => t.tenantId === tenantId);
+  if (idx !== -1) { lista[idx] = res; guardarTenantsLocales(lista); }
+  return res;
+}
+
+export async function toggleUsuarioActivoSuperAdmin(tenantId: number, usuarioId: number): Promise<UsuarioTenant> {
+  return requestSuperAdmin<UsuarioTenant>(`/api/super-admin/tenants/${tenantId}/usuarios/${usuarioId}/toggle-activo`, {
+    method: "POST",
+  });
 }
 
 export async function crearUsuarioTenantSuperAdmin(tenantId: number, datos: {

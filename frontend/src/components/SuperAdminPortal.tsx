@@ -1,125 +1,220 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import AuroraLogo from "../AuroraLogo";
 import {
   LicenciaTenant,
   ModuloTenant,
   TipoLicencia,
   CrearTenantRequest,
   SuperAdminSession,
+  SuperAdminStats,
+  PagoSuscripcion,
+  UsuarioTenant,
+  RegistrarPagoSuperAdminRequest,
+  RegalarTiempoSuperAdminRequest,
   loginSuperAdminApi,
   listarTenantsSuperAdmin,
+  obtenerStatsSuperAdmin,
+  ejecutarBarridoSuspensionSuperAdmin,
+  listarPagosSuperAdmin,
+  registrarPagoSuperAdmin,
+  regalarTiempoSuperAdmin,
+  impersonarTenantSuperAdmin,
   crearTenantSuperAdmin,
   activarTenantSuperAdmin,
   desactivarTenantSuperAdmin,
-  renovarTenantSuperAdmin,
   cambiarPlanTenantSuperAdmin,
   listarModulosTenantSuperAdmin,
   activarModuloTenantSuperAdmin,
+  concederAccesoTotalSuperAdmin,
+  listarUsuariosTenantSuperAdmin,
+  asignarLimiteUsuariosSuperAdmin,
+  toggleUsuarioActivoSuperAdmin,
   crearUsuarioTenantSuperAdmin,
   leerSesionSuperAdmin,
   guardarSesionSuperAdmin,
   borrarSesionSuperAdmin,
+  guardarSesion,
 } from "../api";
 
 interface SuperAdminPortalProps {
-  onClose: () => void;
+  onClose?: () => void;
 }
 
-const MODULOS_DISPONIBLES = [
-  { id: "salud", label: "Salud & Clínicas (Mediclinic)", icon: "🏥", desc: "Historias clínicas, citas, vademécum, cobros médicos" },
-  { id: "horeca", label: "Gastronomía & Restaurantes", icon: "🍽️", desc: "Mesas en vivo, comandas táctiles, inventario FIFO" },
-  { id: "minero", label: "Minería & Materiales", icon: "⛏️", desc: "Pesaje de ley, fundición, balanzas y despachos" },
-  { id: "repuestos", label: "Repuestos & Talleres", icon: "⚙️", desc: "Compatibilidad por marca/año, VIN, órdenes mecánicas" },
-  { id: "moda", label: "Moda & Calzado Retail", icon: "👗", desc: "Matriz Talla/Color, códigos de barra, boutiques" },
-  { id: "ganaderia", label: "Ganadería & Agro", icon: "", desc: "Pesaje por animal, arete RFID, preñez y vacunas" },
+const MODULOS_SISTEMA = [
+  { id: "salud", tag: "SAL", label: "Salud & MediClinic", desc: "Clinicas, expedientes medicos, vademecum, consultas" },
+  { id: "ganaderia", tag: "GAN", label: "Ganaderia & Agro", desc: "Ordeño, tanques de leche, potreros y control de hato" },
+  { id: "horeca", tag: "HOR", label: "Gastronomia / HORECA", desc: "Restaurantes, comandas, mesas y escandallos" },
+  { id: "repuestos", tag: "COM", label: "Comercio & Retail", desc: "Punto de venta mostrador, stock, inventario y repuestos" },
+  { id: "minero", tag: "MIN", label: "Mineria & Balanzas", desc: "Control de ley de mineral, bocamina y fundicion" },
+  { id: "moda", tag: "MOD", label: "Moda & Calzado", desc: "Talla y color, gestion de boutiques y colecciones" },
+  { id: "tamanaco-comercial", tag: "TAM", label: "Tamanaco Enterprise", desc: "Despliegue integral multi-empresa e industrial" },
 ];
+
+function calcularDiasRestantes(fechaVencimiento: string | null): number {
+  if (!fechaVencimiento) return 0;
+  const partes = fechaVencimiento.split("-");
+  const v = new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]));
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const diffTime = v.getTime() - hoy.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function getBadgeDias(dias: number, activa: boolean) {
+  if (!activa) {
+    return { texto: "Suspendido", color: "bg-rose-50 text-rose-700 border-rose-200" };
+  }
+  if (dias <= 0) {
+    return { texto: "Vencido Hoy", color: "bg-rose-50 text-rose-700 border-rose-200" };
+  }
+  if (dias <= 5) {
+    return { texto: `${dias} dias (Critico)`, color: "bg-rose-50 text-rose-700 border-rose-200" };
+  }
+  if (dias <= 15) {
+    return { texto: `${dias} dias (Por vencer)`, color: "bg-amber-50 text-amber-700 border-amber-200" };
+  }
+  return { texto: `${dias} dias activos`, color: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+}
 
 export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   const [sesion, setSesion] = useState<SuperAdminSession | null>(() => leerSesionSuperAdmin());
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [usernameInput, setUsernameInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loadingLogin, setLoadingLogin] = useState(false);
 
-  // Estados de datos
   const [tenants, setTenants] = useState<LicenciaTenant[]>([]);
-  const [loadingTenants, setLoadingTenants] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterModulo, setFilterModulo] = useState<string>("todos");
-  const [filterEstado, setFilterEstado] = useState<string>("todos");
-  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
+  const [stats, setStats] = useState<SuperAdminStats | null>(null);
+  const [loadingData, setLoadingData] = useState(false);
+  const [feedback, setFeedback] = useState<{ msg: string; tipo: "success" | "error" | "info" } | null>(null);
 
-  // Modal Nuevo Tenant
+  // Filtros
+  const [filtroTexto, setFiltroTexto] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<"TODOS" | "ACTIVOS" | "SUSPENDIDOS" | "POR_VENCER">("TODOS");
+  const [filtroModulo, setFiltroModulo] = useState<string>("TODOS");
+
+  // Modales
   const [showNuevoModal, setShowNuevoModal] = useState(false);
+  const [showPagoModal, setShowPagoModal] = useState(false);
+  const [showRegaloModal, setShowRegaloModal] = useState(false);
+  const [showModulosModal, setShowModulosModal] = useState(false);
+  const [showUsuarioModal, setShowUsuarioModal] = useState(false);
+  const [showUsuariosDirectorioModal, setShowUsuariosDirectorioModal] = useState(false);
+  const [showHistorialPagosModal, setShowHistorialPagosModal] = useState(false);
+
+  // Tenants seleccionados para modales
+  const [tenantParaPago, setTenantParaPago] = useState<LicenciaTenant | null>(null);
+  const [tenantParaRegalo, setTenantParaRegalo] = useState<LicenciaTenant | null>(null);
+  const [tenantParaModulos, setTenantParaModulos] = useState<LicenciaTenant | null>(null);
+  const [tenantParaUsuario, setTenantParaUsuario] = useState<LicenciaTenant | null>(null);
+  const [tenantParaUsuariosDirectorio, setTenantParaUsuariosDirectorio] = useState<LicenciaTenant | null>(null);
+
+  // Formulario nuevo tenant
   const [nuevoForm, setNuevoForm] = useState<CrearTenantRequest>({
     nombreEmpresa: "",
     moduloPrincipal: "salud",
-    tipoLicencia: "ENTERPRISE",
+    tipoLicencia: "COMERCIAL",
     emailContacto: "",
     telefonoContacto: "",
-    mesesVigencia: 12,
+    mesesVigencia: 1,
     monedaBase: "USD",
     usuarioInicial: "admin",
     passwordInicial: "admin123",
+    accesoTotal: false,
+    limiteUsuarios: undefined,
   });
   const [creandoTenant, setCreandoTenant] = useState(false);
 
-  // Modal Gestión de Módulos por Tenant
-  const [tenantSeleccionado, setTenantSeleccionado] = useState<LicenciaTenant | null>(null);
-  const [modulosTenant, setModulosTenant] = useState<ModuloTenant[]>([]);
-  const [loadingModulos, setLoadingModulos] = useState(false);
-  const [showModulosModal, setShowModulosModal] = useState(false);
+  // Formulario registrar pago
+  const [pagoForm, setPagoForm] = useState<RegistrarPagoSuperAdminRequest>({
+    tenantId: 0,
+    monto: 35.0,
+    moneda: "USD",
+    metodoPago: "PAGO_MOVIL",
+    referenciaComprobante: "",
+    meses: 1,
+    dias: 0,
+    notas: "",
+  });
+  const [registrandoPago, setRegistrandoPago] = useState(false);
 
-  // Modal Crear Usuario Tenant
-  const [showUsuarioModal, setShowUsuarioModal] = useState(false);
+  // Formulario regalar tiempo
+  const [regaloForm, setRegaloForm] = useState<RegalarTiempoSuperAdminRequest>({
+    dias: 15,
+    motivo: "Cortesia comercial",
+  });
+  const [regalandoTiempo, setRegalandoTiempo] = useState(false);
+
+  // Formulario nuevo usuario
   const [usuarioForm, setUsuarioForm] = useState({
     username: "",
     password: "",
     nombreCompleto: "",
-    rol: "ADMIN",
+    rol: "DUENO_ADMIN",
   });
   const [creandoUsuario, setCreandoUsuario] = useState(false);
 
+  // Modulos de tenant
+  const [modulosTenant, setModulosTenant] = useState<ModuloTenant[]>([]);
+  const [loadingModulos, setLoadingModulos] = useState(false);
+  const [concediendoAccesoTotal, setConcediendoAccesoTotal] = useState(false);
+
+  // Directorio y limite de usuarios del tenant
+  const [usuariosTenant, setUsuariosTenant] = useState<UsuarioTenant[]>([]);
+  const [loadingUsuariosTenant, setLoadingUsuariosTenant] = useState(false);
+  const [limiteUsuariosInput, setLimiteUsuariosInput] = useState<string>("");
+  const [guardandoLimite, setGuardandoLimite] = useState(false);
+
+  // Historial de pagos
+  const [historialPagos, setHistorialPagos] = useState<PagoSuscripcion[]>([]);
+  const [loadingPagos, setLoadingPagos] = useState(false);
+
+  // Barrido de suspension
+  const [ejecutandoBarrido, setEjecutandoBarrido] = useState(false);
+
+  const avisar = (msg: string, tipo: "success" | "error" | "info" = "success") => {
+    setFeedback({ msg, tipo });
+    setTimeout(() => setFeedback(null), 5000);
+  };
+
+  const cargarTodo = async () => {
+    setLoadingData(true);
+    try {
+      const [listaTenants, st] = await Promise.all([
+        listarTenantsSuperAdmin(),
+        obtenerStatsSuperAdmin().catch(() => null),
+      ]);
+      setTenants(listaTenants);
+      setStats(st);
+    } catch (err: any) {
+      avisar(err?.message || "Error al cargar datos de SuperAdmin", "error");
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
   useEffect(() => {
-    if (sesion && sesion.autenticado) {
-      cargarTenants();
+    if (sesion) {
+      cargarTodo();
     }
   }, [sesion]);
-
-  const cargarTenants = async () => {
-    setLoadingTenants(true);
-    try {
-      const data = await listarTenantsSuperAdmin();
-      setTenants(data);
-    } catch (err) {
-      console.error("Error al cargar tenants:", err);
-    } finally {
-      setLoadingTenants(false);
-    }
-  };
-
-  const mostrarNotificacion = (msg: string) => {
-    setMensajeExito(msg);
-    setTimeout(() => {
-      setMensajeExito(null);
-    }, 4000);
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
     setLoadingLogin(true);
-
     try {
-      const token = await loginSuperAdminApi(username, password);
-      const nuevaSesion: SuperAdminSession = {
+      const token = await loginSuperAdminApi(usernameInput.trim(), passwordInput);
+      const s: SuperAdminSession = {
         token,
-        username,
+        username: usernameInput.trim(),
         autenticado: true,
       };
-      guardarSesionSuperAdmin(nuevaSesion);
-      setSesion(nuevaSesion);
+      guardarSesionSuperAdmin(s);
+      setSesion(s);
+      avisar(`Sesion iniciada como SuperAdmin (${s.username})`);
     } catch (err: any) {
-      setLoginError(err?.message || "Credenciales de CEO / SuperAdmin inválidas.");
+      setLoginError(err?.message || "Credenciales invalidas de SuperAdmin");
     } finally {
       setLoadingLogin(false);
     }
@@ -128,642 +223,1061 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   const handleLogout = () => {
     borrarSesionSuperAdmin();
     setSesion(null);
-    setUsername("");
-    setPassword("");
   };
 
-  const handleToggleActivo = async (tenant: LicenciaTenant) => {
+  const handleBarrido = async () => {
+    setEjecutandoBarrido(true);
     try {
-      if (tenant.activa) {
-        await desactivarTenantSuperAdmin(tenant.tenantId);
-        mostrarNotificacion(`Tenant "${tenant.nombreEmpresa}" suspendido temporalmente.`);
-      } else {
-        await activarTenantSuperAdmin(tenant.tenantId);
-        mostrarNotificacion(`Tenant "${tenant.nombreEmpresa}" reactivado exitosamente.`);
-      }
-      await cargarTenants();
+      const res = await ejecutarBarridoSuspensionSuperAdmin();
+      avisar(res.mensaje || "Barrido de licencias ejecutado.");
+      cargarTodo();
     } catch (err: any) {
-      alert(err?.message || "Error al cambiar estado");
+      avisar(err?.message || "Error al ejecutar barrido", "error");
+    } finally {
+      setEjecutandoBarrido(false);
     }
   };
 
-  const handleRenovar = async (tenant: LicenciaTenant, meses: number) => {
+  const handleActivar = async (tenantId: number) => {
     try {
-      await renovarTenantSuperAdmin(tenant.tenantId, meses);
-      mostrarNotificacion(`Licencia de "${tenant.nombreEmpresa}" extendida por +${meses} mes(es).`);
-      await cargarTenants();
+      await activarTenantSuperAdmin(tenantId);
+      avisar(`Tenant #${tenantId} reactivado exitosamente.`);
+      cargarTodo();
     } catch (err: any) {
-      alert(err?.message || "Error al renovar licencia");
+      avisar(err?.message || "Error al reactivar tenant", "error");
     }
   };
 
-  const handleCambiarPlan = async (tenant: LicenciaTenant, nuevoPlan: TipoLicencia) => {
+  const handleDesactivar = async (tenantId: number) => {
+    if (!confirm(`Confirma suspender manualmente el Tenant #${tenantId}?`)) return;
     try {
-      await cambiarPlanTenantSuperAdmin(tenant.tenantId, nuevoPlan);
-      mostrarNotificacion(`Plan de "${tenant.nombreEmpresa}" actualizado a ${nuevoPlan}.`);
-      await cargarTenants();
+      await desactivarTenantSuperAdmin(tenantId);
+      avisar(`Tenant #${tenantId} suspendido.`);
+      cargarTodo();
     } catch (err: any) {
-      alert(err?.message || "Error al cambiar plan");
+      avisar(err?.message || "Error al suspender tenant", "error");
     }
   };
 
-  const handleAbrirModulos = async (tenant: LicenciaTenant) => {
-    setTenantSeleccionado(tenant);
+  const handleCambiarPlan = async (tenantId: number, plan: TipoLicencia) => {
+    try {
+      await cambiarPlanTenantSuperAdmin(tenantId, plan);
+      avisar(`Plan actualizado a ${plan} para Tenant #${tenantId}.`);
+      cargarTodo();
+    } catch (err: any) {
+      avisar(err?.message || "Error al cambiar plan", "error");
+    }
+  };
+
+  const handleImpersonar = async (tenantId: number) => {
+    try {
+      const res = await impersonarTenantSuperAdmin(tenantId);
+      avisar(`Acceso de soporte concedido para ${res.nombreEmpresa}. Abriendo sesion...`);
+      // Usa la MISMA sesión que lee el resto de la app (guardarSesion/leerSesion en
+      // api.ts, clave "aurora_token") — antes esto escribía claves sueltas
+      // ("aurora_auth_token", etc.) que nadie más leía, así que "Impersonar" no
+      // dejaba realmente logueado como el tenant al entrar a /dashboard.
+      guardarSesion({ token: res.token, rol: "DUENO_ADMIN", username: "soporte-superadmin", tenantId: Number(res.tenantId) });
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 1000);
+    } catch (err: any) {
+      avisar(err?.message || "Error al impersonar tenant", "error");
+    }
+  };
+
+  const abrirModalPago = (tenant: LicenciaTenant) => {
+    setTenantParaPago(tenant);
+    setPagoForm({
+      tenantId: tenant.tenantId,
+      monto: 35.0,
+      moneda: "USD",
+      metodoPago: "PAGO_MOVIL",
+      referenciaComprobante: "",
+      meses: 1,
+      dias: 0,
+      notas: "",
+    });
+    setShowPagoModal(true);
+  };
+
+  const handleRegistrarPago = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegistrandoPago(true);
+    try {
+      await registrarPagoSuperAdmin(pagoForm);
+      avisar(`Pago registrado. Licencia extendida y reactivada.`);
+      setShowPagoModal(false);
+      cargarTodo();
+    } catch (err: any) {
+      avisar(err?.message || "Error al registrar pago", "error");
+    } finally {
+      setRegistrandoPago(false);
+    }
+  };
+
+  const abrirModalRegalo = (tenant: LicenciaTenant) => {
+    setTenantParaRegalo(tenant);
+    setRegaloForm({ dias: 15, motivo: "Cortesia de soporte" });
+    setShowRegaloModal(true);
+  };
+
+  const handleRegalarTiempo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tenantParaRegalo) return;
+    setRegalandoTiempo(true);
+    try {
+      await regalarTiempoSuperAdmin(tenantParaRegalo.tenantId, regaloForm);
+      avisar(`Se acreditaron +${regaloForm.dias} dias a "${tenantParaRegalo.nombreEmpresa}".`);
+      setShowRegaloModal(false);
+      cargarTodo();
+    } catch (err: any) {
+      avisar(err?.message || "Error al regalar tiempo", "error");
+    } finally {
+      setRegalandoTiempo(false);
+    }
+  };
+
+  const abrirModalModulos = async (tenant: LicenciaTenant) => {
+    setTenantParaModulos(tenant);
     setShowModulosModal(true);
     setLoadingModulos(true);
     try {
-      const lista = await listarModulosTenantSuperAdmin(tenant.tenantId);
-      setModulosTenant(lista);
-    } catch (err) {
-      console.error(err);
+      const mods = await listarModulosTenantSuperAdmin(tenant.tenantId);
+      setModulosTenant(mods);
+    } catch (err: any) {
+      avisar("Error al consultar modulos del tenant", "error");
     } finally {
       setLoadingModulos(false);
     }
   };
 
-  const handleToggleModulo = async (moduloNombre: string, activoActual: boolean) => {
-    if (!tenantSeleccionado) return;
+  const handleConcederAccesoTotal = async () => {
+    if (!tenantParaModulos) return;
+    setConcediendoAccesoTotal(true);
     try {
-      await activarModuloTenantSuperAdmin(tenantSeleccionado.tenantId, moduloNombre, !activoActual);
-      const nuevaLista = await listarModulosTenantSuperAdmin(tenantSeleccionado.tenantId);
-      setModulosTenant(nuevaLista);
-      mostrarNotificacion(`Módulo "${moduloNombre.toUpperCase()}" ${!activoActual ? "habilitado" : "deshabilitado"}.`);
+      await concederAccesoTotalSuperAdmin(tenantParaModulos.tenantId);
+      avisar(`Acceso Total concedido a "${tenantParaModulos.nombreEmpresa}". Suite completa activada.`);
+      const mods = await listarModulosTenantSuperAdmin(tenantParaModulos.tenantId);
+      setModulosTenant(mods);
+      cargarTodo();
     } catch (err: any) {
-      alert(err?.message || "Error al actualizar módulo");
+      avisar(err?.message || "Error al conceder acceso total", "error");
+    } finally {
+      setConcediendoAccesoTotal(false);
     }
   };
 
-  const handleCrearTenantSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nuevoForm.nombreEmpresa.trim()) return;
+  const handleToggleModulo = async (moduloNombre: string, activoActual: boolean) => {
+    if (!tenantParaModulos) return;
+    try {
+      await activarModuloTenantSuperAdmin(tenantParaModulos.tenantId, moduloNombre, !activoActual);
+      const mods = await listarModulosTenantSuperAdmin(tenantParaModulos.tenantId);
+      setModulosTenant(mods);
+      avisar(`Modulo "${moduloNombre}" ${!activoActual ? "habilitado" : "deshabilitado"}.`);
+    } catch (err: any) {
+      avisar(err?.message || "Error al cambiar modulo", "error");
+    }
+  };
 
+  // Directorio y gestion de limite de usuarios
+  const abrirModalUsuariosDirectorio = async (tenant: LicenciaTenant) => {
+    setTenantParaUsuariosDirectorio(tenant);
+    setLimiteUsuariosInput(tenant.limiteUsuarios ? String(tenant.limiteUsuarios) : "");
+    setShowUsuariosDirectorioModal(true);
+    setLoadingUsuariosTenant(true);
+    try {
+      const users = await listarUsuariosTenantSuperAdmin(tenant.tenantId);
+      setUsuariosTenant(users);
+    } catch (err: any) {
+      avisar(err?.message || "Error al listar usuarios del tenant", "error");
+    } finally {
+      setLoadingUsuariosTenant(false);
+    }
+  };
+
+  const handleGuardarLimite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tenantParaUsuariosDirectorio) return;
+    setGuardandoLimite(true);
+    try {
+      const val = limiteUsuariosInput.trim();
+      const num = val === "" ? null : Number(val);
+      const actualizada = await asignarLimiteUsuariosSuperAdmin(tenantParaUsuariosDirectorio.tenantId, num);
+      setTenantParaUsuariosDirectorio(actualizada);
+      avisar(`Limite de usuarios actualizado a: ${actualizada.limiteUsuarios ? actualizada.limiteUsuarios + " usuarios" : "Ilimitado"}.`);
+      cargarTodo();
+    } catch (err: any) {
+      avisar(err?.message || "Error al actualizar limite", "error");
+    } finally {
+      setGuardandoLimite(false);
+    }
+  };
+
+  const handleToggleUsuarioActivo = async (usuarioId: number) => {
+    if (!tenantParaUsuariosDirectorio) return;
+    try {
+      await toggleUsuarioActivoSuperAdmin(tenantParaUsuariosDirectorio.tenantId, usuarioId);
+      const users = await listarUsuariosTenantSuperAdmin(tenantParaUsuariosDirectorio.tenantId);
+      setUsuariosTenant(users);
+      avisar("Estado de usuario modificado.");
+      cargarTodo();
+    } catch (err: any) {
+      avisar(err?.message || "Error al modificar estado de usuario", "error");
+    }
+  };
+
+  const handleCrearTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
     setCreandoTenant(true);
     try {
-      await crearTenantSuperAdmin(nuevoForm);
-      mostrarNotificacion(`¡Tenant "${nuevoForm.nombreEmpresa}" aprovisionado con éxito!`);
+      const nuevo = await crearTenantSuperAdmin(nuevoForm);
+      avisar(`Negocio "${nuevo.nombreEmpresa}" dado de alta con ID #${nuevo.tenantId}.`);
       setShowNuevoModal(false);
       setNuevoForm({
         nombreEmpresa: "",
         moduloPrincipal: "salud",
-        tipoLicencia: "ENTERPRISE",
+        tipoLicencia: "COMERCIAL",
         emailContacto: "",
         telefonoContacto: "",
-        mesesVigencia: 12,
+        mesesVigencia: 1,
         monedaBase: "USD",
         usuarioInicial: "admin",
         passwordInicial: "admin123",
+        accesoTotal: false,
+        limiteUsuarios: undefined,
       });
-      await cargarTenants();
+      cargarTodo();
     } catch (err: any) {
-      alert(err?.message || "Error al aprovisionar tenant");
+      avisar(err?.message || "Error al crear tenant", "error");
     } finally {
       setCreandoTenant(false);
     }
   };
 
-  const handleCrearUsuarioSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tenantSeleccionado || !usuarioForm.username.trim() || !usuarioForm.password.trim()) return;
+  const abrirModalUsuario = (tenant: LicenciaTenant) => {
+    setTenantParaUsuario(tenant);
+    setUsuarioForm({
+      username: "",
+      password: "",
+      nombreCompleto: "",
+      rol: "DUENO_ADMIN",
+    });
+    setShowUsuarioModal(true);
+  };
 
+  const handleCrearUsuario = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tenantParaUsuario) return;
     setCreandoUsuario(true);
     try {
-      await crearUsuarioTenantSuperAdmin(tenantSeleccionado.tenantId, usuarioForm);
-      mostrarNotificacion(`Usuario "${usuarioForm.username}" creado para ${tenantSeleccionado.nombreEmpresa}.`);
+      await crearUsuarioTenantSuperAdmin(tenantParaUsuario.tenantId, usuarioForm);
+      avisar(`Usuario "${usuarioForm.username}" creado para ${tenantParaUsuario.nombreEmpresa}.`);
       setShowUsuarioModal(false);
-      setUsuarioForm({ username: "", password: "", nombreCompleto: "", rol: "ADMIN" });
+      // Si el directorio de usuarios esta abierto para este tenant, refrescarlo
+      if (tenantParaUsuariosDirectorio && tenantParaUsuariosDirectorio.tenantId === tenantParaUsuario.tenantId) {
+        const users = await listarUsuariosTenantSuperAdmin(tenantParaUsuario.tenantId);
+        setUsuariosTenant(users);
+      }
+      cargarTodo();
     } catch (err: any) {
-      alert(err?.message || "Error al crear usuario");
+      avisar(err?.message || "Error al crear usuario", "error");
     } finally {
       setCreandoUsuario(false);
     }
   };
 
+  const abrirHistorialPagos = async (tenantId?: number) => {
+    setShowHistorialPagosModal(true);
+    setLoadingPagos(true);
+    try {
+      const pagos = await listarPagosSuperAdmin(tenantId);
+      setHistorialPagos(pagos);
+    } catch (err: any) {
+      avisar("Error al consultar historial de pagos", "error");
+    } finally {
+      setLoadingPagos(false);
+    }
+  };
+
   // Filtrado de tenants
-  const tenantsFiltrados = tenants.filter((t) => {
-    const matchSearch =
-      t.nombreEmpresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (t.emailContacto && t.emailContacto.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      String(t.tenantId).includes(searchTerm);
-    const matchModulo = filterModulo === "todos" || t.moduloPrincipal === filterModulo;
-    const matchEstado =
-      filterEstado === "todos" ||
-      (filterEstado === "activa" && t.activa) ||
-      (filterEstado === "inactiva" && !t.activa);
-    return matchSearch && matchModulo && matchEstado;
-  });
+  const tenantsFiltrados = useMemo(() => {
+    return tenants.filter((t) => {
+      if (filtroTexto.trim()) {
+        const q = filtroTexto.toLowerCase();
+        const coincide =
+          t.nombreEmpresa.toLowerCase().includes(q) ||
+          String(t.tenantId).includes(q) ||
+          (t.emailContacto && t.emailContacto.toLowerCase().includes(q)) ||
+          t.moduloPrincipal.toLowerCase().includes(q);
+        if (!coincide) return false;
+      }
 
-  const totalActivos = tenants.filter((t) => t.activa).length;
-  const totalInactivos = tenants.filter((t) => !t.activa).length;
+      const dias = calcularDiasRestantes(t.fechaVencimientoPago);
+      if (filtroEstado === "ACTIVOS" && (!t.activa || dias <= 0)) return false;
+      if (filtroEstado === "SUSPENDIDOS" && t.activa && dias > 0) return false;
+      if (filtroEstado === "POR_VENCER" && (!t.activa || dias > 15 || dias <= 0)) return false;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-2xl flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
-      {/* Contenedor Maestro */}
-      <div className="relative w-full max-w-6xl bg-gradient-to-b from-slate-900/95 to-slate-950/98 border border-emerald-500/40 rounded-3xl shadow-[0_0_80px_rgba(16,185,129,0.18)] overflow-hidden my-auto">
-        
-        {/* Cabecera Cyberpunk / Obsidian */}
-        <div className="px-6 py-5 border-b border-emerald-500/20 bg-slate-900/80 flex items-center justify-between backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-cyan-400 p-[2px] shadow-lg shadow-emerald-500/30 animate-pulse">
-              <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-                <span className="text-xl">⚡</span>
-              </div>
+      if (filtroModulo !== "TODOS" && t.moduloPrincipal !== filtroModulo) return false;
+
+      return true;
+    });
+  }, [tenants, filtroTexto, filtroEstado, filtroModulo]);
+
+  // LOGIN SCREEN
+  if (!sesion) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800">
+        <div className="w-full max-w-md p-8 bg-white rounded-3xl border border-slate-200 shadow-xl space-y-6">
+          <div className="text-center space-y-2">
+            <div className="inline-flex p-3 rounded-2xl bg-slate-900 text-white shadow-md">
+              <span className="font-mono text-sm font-black tracking-wider">SUPERADMIN</span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-bold font-['Outfit'] text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-200 to-cyan-400">
-                  Aurora Plus Sovereign CEO Portal
-                </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono tracking-wider font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  SUPERADMIN v2.6
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Consola Central de Gestión Multi-Tenant & Licenciamiento Global
-              </p>
-            </div>
+            <h1 className="font-['Outfit'] text-2xl font-black text-slate-900 tracking-tight">
+              Centro de Control Maestro
+            </h1>
+            <p className="text-xs text-slate-500 font-medium">
+              Aurora Suite Cloud Enterprise. Acceso restringido para administradores.
+            </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            {sesion?.autenticado && (
-              <button
-                onClick={handleLogout}
-                className="text-xs px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all cursor-pointer font-medium"
-              >
-                Cerrar Sesión CEO
-              </button>
-            )}
+          {loginError && (
+            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold text-center">
+              {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4 text-xs">
+            <div className="space-y-1">
+              <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                Usuario Maestro
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="admin"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-hidden focus:border-slate-800 focus:ring-1 focus:ring-slate-800 bg-white font-medium"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                Contraseña de Seguridad
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="••••••••"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-hidden focus:border-slate-800 focus:ring-1 focus:ring-slate-800 bg-white font-mono"
+              />
+            </div>
+
             <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-slate-700"
-              title="Cerrar Panel"
+              type="submit"
+              disabled={loadingLogin}
+              className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm tracking-wide transition-all shadow-md cursor-pointer disabled:opacity-50"
             >
-              ✕
+              {loadingLogin ? "Validando credenciales..." : "Iniciar Sesion SuperAdmin"}
             </button>
-          </div>
-        </div>
+          </form>
 
-        {/* Notificación Flotante */}
-        {mensajeExito && (
-          <div className="mx-6 mt-4 p-3 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-xs flex items-center gap-2 shadow-lg shadow-emerald-900/40 animate-slideDown">
-            <span className="text-base">✓</span>
-            <span className="font-medium">{mensajeExito}</span>
-          </div>
-        )}
-
-        {/* CUERPO PRINCIPAL */}
-        <div className="p-6">
-          {!sesion?.autenticado ? (
-            /* FORMULARIO DE LOGIN SUPERADMIN */
-            <div className="max-w-md mx-auto py-10">
-              <div className="text-center mb-6">
-                <div className="inline-flex p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-3xl mb-3 shadow-inner">
-                  🔐
-                </div>
-                <h3 className="text-xl font-bold text-white font-['Outfit']">
-                  Acceso Restringido para Directores Ejecutivos
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Ingrese las credenciales maestras de CEO / SuperAdmin para administrar los tenants del ecosistema Aurora.
-                </p>
-              </div>
-
-              {loginError && (
-                <div className="mb-4 p-3 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-xs">
-                  {loginError}
-                </div>
-              )}
-
-              <form onSubmit={handleLogin} className="space-y-4 bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-md">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Usuario SuperAdmin / CEO
-                  </label>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="admin o ceo"
-                    required
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-emerald-500 transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Clave Maestra
-                  </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    required
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-emerald-500 transition-colors"
-                  />
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={loadingLogin}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-slate-950 font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {loadingLogin ? "Verificando Credenciales..." : "Desbloquear Consola Soberana"}
-                  </button>
-                </div>
-
-                <p className="text-[11px] text-center text-slate-500 pt-2">
-                  Credencial por defecto local: <code className="text-emerald-400 font-mono">admin</code> / <code className="text-emerald-400 font-mono">admin123</code>
-                </p>
-              </form>
-            </div>
-          ) : (
-            /* CONSOLA DE ADMINISTRACIÓN DE TENANTS */
-            <div className="space-y-6">
-              
-              {/* KPIs Directivos */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm">
-                  <div className="text-slate-400 text-xs font-medium">Total Organizaciones</div>
-                  <div className="text-2xl sm:text-3xl font-bold font-mono text-white mt-1">
-                    {tenants.length}
-                  </div>
-                  <div className="text-[11px] text-emerald-400 mt-1">SaaS Multi-Tenant</div>
-                </div>
-
-                <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm">
-                  <div className="text-slate-400 text-xs font-medium">Tenants Activos</div>
-                  <div className="text-2xl sm:text-3xl font-bold font-mono text-emerald-400 mt-1">
-                    {totalActivos}
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-1">Operando en producción</div>
-                </div>
-
-                <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm">
-                  <div className="text-slate-400 text-xs font-medium">Suspendidos / Vencidos</div>
-                  <div className="text-2xl sm:text-3xl font-bold font-mono text-amber-400 mt-1">
-                    {totalInactivos}
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-1">Requieren renovación</div>
-                </div>
-
-                <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm flex flex-col justify-between">
-                  <div>
-                    <div className="text-slate-400 text-xs font-medium">Acción Rápida</div>
-                    <div className="text-xs text-slate-300 font-semibold mt-1">Nuevo Despliegue</div>
-                  </div>
-                  <button
-                    onClick={() => setShowNuevoModal(true)}
-                    className="mt-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                  >
-                    <span>+</span> Aprovisionar Tenant
-                  </button>
-                </div>
-              </div>
-
-              {/* Barra de Búsqueda y Filtros */}
-              <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-900/50 p-3 rounded-2xl border border-slate-800">
-                <div className="w-full sm:w-72 relative">
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Buscar tenant, ID, email..."
-                    className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                  />
-                  <span className="absolute left-3 top-2.5 text-slate-500 text-xs">🔍</span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                  <select
-                    value={filterModulo}
-                    onChange={(e) => setFilterModulo(e.target.value)}
-                    className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value="todos">Todos los Módulos</option>
-                    <option value="salud">Salud (Mediclinic)</option>
-                    <option value="horeca">Gastronomía (Restaurante)</option>
-                    <option value="minero">Minería</option>
-                    <option value="repuestos">Repuestos</option>
-                    <option value="moda">Moda</option>
-                    <option value="ganaderia">Ganadería</option>
-                  </select>
-
-                  <select
-                    value={filterEstado}
-                    onChange={(e) => setFilterEstado(e.target.value)}
-                    className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value="todos">Todos los Estados</option>
-                    <option value="activa">Solo Activos</option>
-                    <option value="inactiva">Solo Inactivos</option>
-                  </select>
-
-                  <button
-                    onClick={cargarTenants}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition-colors cursor-pointer"
-                    title="Recargar lista"
-                  >
-                    🔄
-                  </button>
-                </div>
-              </div>
-
-              {/* TABLA DE TENANTS */}
-              <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
-                <table className="w-full text-left text-xs text-slate-300">
-                  <thead className="bg-slate-950/80 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
-                    <tr>
-                      <th className="p-3.5 font-semibold">Tenant ID</th>
-                      <th className="p-3.5 font-semibold">Organización / Empresa</th>
-                      <th className="p-3.5 font-semibold">Módulo Principal</th>
-                      <th className="p-3.5 font-semibold">Plan</th>
-                      <th className="p-3.5 font-semibold">Estado</th>
-                      <th className="p-3.5 font-semibold">Vencimiento</th>
-                      <th className="p-3.5 font-semibold text-right">Acciones Soberanas</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-sans">
-                    {loadingTenants ? (
-                      <tr>
-                        <td colSpan={7} className="p-8 text-center text-slate-500">
-                          <div className="inline-block animate-spin text-xl mb-2">⚡</div>
-                          <div>Sincronizando organizaciones de la base de datos...</div>
-                        </td>
-                      </tr>
-                    ) : tenantsFiltrados.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="p-8 text-center text-slate-500">
-                          No se encontraron tenants con los filtros especificados.
-                        </td>
-                      </tr>
-                    ) : (
-                      tenantsFiltrados.map((tenant) => (
-                        <tr key={tenant.tenantId} className="hover:bg-slate-800/30 transition-colors">
-                          <td className="p-3.5 font-mono text-emerald-400 font-bold">
-                            #{tenant.tenantId}
-                          </td>
-                          <td className="p-3.5">
-                            <div className="font-bold text-white text-sm">{tenant.nombreEmpresa}</div>
-                            <div className="text-[11px] text-slate-400">
-                              {tenant.emailContacto || "Sin email"} • {tenant.monedaBase || "USD"}
-                            </div>
-                          </td>
-                          <td className="p-3.5">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] text-teal-300 font-medium">
-                              {tenant.moduloPrincipal === "salud" && "🏥 Salud"}
-                              {tenant.moduloPrincipal === "horeca" && "🍽️ Gastronomía"}
-                              {tenant.moduloPrincipal === "minero" && "⛏️ Minería"}
-                              {tenant.moduloPrincipal === "repuestos" && "⚙️ Repuestos"}
-                              {tenant.moduloPrincipal === "moda" && "👗 Moda"}
-                              {tenant.moduloPrincipal === "ganaderia" && "Ganadería"}
-                              {!["salud", "horeca", "minero", "repuestos", "moda", "ganaderia"].includes(tenant.moduloPrincipal) &&
-                                tenant.moduloPrincipal}
-                            </span>
-                          </td>
-                          <td className="p-3.5">
-                            <select
-                              value={tenant.tipoLicencia}
-                              onChange={(e) => handleCambiarPlan(tenant, e.target.value as TipoLicencia)}
-                              className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-[11px] font-bold text-cyan-300 focus:outline-none focus:border-cyan-500 cursor-pointer"
-                            >
-                              <option value="DEMO">DEMO</option>
-                              <option value="BASICO">BÁSICO</option>
-                              <option value="PROFESIONAL">PROFESIONAL</option>
-                              <option value="ENTERPRISE">ENTERPRISE</option>
-                            </select>
-                          </td>
-                          <td className="p-3.5">
-                            <button
-                              onClick={() => handleToggleActivo(tenant)}
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border cursor-pointer transition-all ${
-                                tenant.activa
-                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                                  : "bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20"
-                              }`}
-                            >
-                              {tenant.activa ? "● Activo" : "○ Suspendido"}
-                            </button>
-                          </td>
-                          <td className="p-3.5 font-mono text-slate-300">
-                            {tenant.fechaVencimientoPago || "Ilimitado"}
-                          </td>
-                          <td className="p-3.5 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {/* Botón Renovar +1 Mes */}
-                              <button
-                                onClick={() => handleRenovar(tenant, 1)}
-                                className="px-2 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[11px] font-medium transition-colors cursor-pointer"
-                                title="Extender +1 mes"
-                              >
-                                +1m
-                              </button>
-                              
-                              {/* Botón Renovar +1 Año */}
-                              <button
-                                onClick={() => handleRenovar(tenant, 12)}
-                                className="px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium transition-colors cursor-pointer"
-                                title="Extender +1 año"
-                              >
-                                +1y
-                              </button>
-
-                              {/* Botón Gestionar Módulos */}
-                              <button
-                                onClick={() => handleAbrirModulos(tenant)}
-                                className="px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1"
-                                title="Módulos Habilitados"
-                              >
-                                <span>📦</span> Módulos
-                              </button>
-
-                              {/* Botón Crear Usuario */}
-                              <button
-                                onClick={() => {
-                                  setTenantSeleccionado(tenant);
-                                  setShowUsuarioModal(true);
-                                }}
-                                className="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1"
-                                title="Aprovisionar Usuario Admin"
-                              >
-                                <span>👤</span> Usuario
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
+          {onClose && (
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-xs text-slate-400 hover:text-slate-600 font-semibold cursor-pointer"
+              >
+                Volver a la aplicacion
+              </button>
             </div>
           )}
         </div>
+      </div>
+    );
+  }
 
-        {/* PIE DE PÁGINA DEL MODAL */}
-        <div className="px-6 py-3.5 border-t border-slate-800/80 bg-slate-950/80 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span>Motor de Gobernanza Aurora Core • Tenant Isolation Protocol</span>
+  // MAIN DASHBOARD (Aurora White Professional)
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans p-4 sm:p-6 lg:p-8 space-y-6">
+      {/* Toast Feedback */}
+      {feedback && (
+        <div
+          className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-2xl shadow-xl border text-xs font-bold transition-all ${
+            feedback.tipo === "error"
+              ? "bg-rose-50 border-rose-200 text-rose-800"
+              : "bg-emerald-50 border-emerald-200 text-emerald-800"
+          }`}
+        >
+          {feedback.msg}
+        </div>
+      )}
+
+      {/* HEADER SUPERADMIN */}
+      <header className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-slate-900 text-white rounded-2xl shadow-sm">
+            <span className="font-mono text-xs font-black tracking-widest">AURORA</span>
           </div>
-          <div>Aurora Plus Enterprise Suite © 2026</div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="font-['Outfit'] font-black text-xl text-slate-900 tracking-tight">
+                Panel Maestro de SuperAdmin
+              </h1>
+              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-wider border border-slate-200">
+                Modo Maestro
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 font-medium">
+              Control de licencias, facturacion, capacidad de usuarios y acceso a la suite Aurora.
+            </p>
+          </div>
         </div>
 
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleBarrido}
+            disabled={ejecutandoBarrido}
+            className="px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            title="Suspende automaticamente los negocios que ya expiraron su fecha de vencimiento"
+          >
+            <span>{ejecutandoBarrido ? "Ejecutando..." : "Barrido de Suspension"}</span>
+          </button>
+
+          <button
+            onClick={() => abrirHistorialPagos()}
+            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-xs transition-all cursor-pointer"
+          >
+            Historial de Pagos
+          </button>
+
+          <button
+            onClick={() => setShowNuevoModal(true)}
+            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+          >
+            + Nuevo Negocio
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-bold text-xs transition-all cursor-pointer"
+          >
+            Cerrar Sesion
+          </button>
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer text-sm font-bold"
+              title="Volver"
+            >
+              [Cerrar]
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* KPIS CARDS (5 columnas ahora con total usuarios) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Negocios</span>
+          <div className="font-['Outfit'] text-3xl font-black text-slate-900">
+            {stats?.totalTenants ?? tenants.length}
+          </div>
+          <span className="text-[10px] text-slate-500">Registrados en la suite</span>
+        </div>
+
+        <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Activos & Vigentes</span>
+          <div className="font-['Outfit'] text-3xl font-black text-emerald-600">
+            {stats?.activos ?? tenants.filter((t) => t.activa).length}
+          </div>
+          <span className="text-[10px] text-slate-500">Con acceso operativo al sistema</span>
+        </div>
+
+        <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Suspendidos / Vencidos</span>
+          <div className="font-['Outfit'] text-3xl font-black text-rose-600">
+            {stats?.suspendidos ?? tenants.filter((t) => !t.activa).length}
+          </div>
+          <span className="text-[10px] text-slate-500">Sin licencia activa</span>
+        </div>
+
+        <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Usuarios en Plataforma</span>
+          <div className="font-['Outfit'] text-3xl font-black text-blue-600">
+            {stats?.totalUsuarios ?? tenants.reduce((acc, t) => acc + (t.cantidadUsuarios || 0), 0)}
+          </div>
+          <span className="text-[10px] text-slate-500">Cuentas creadas por tenants</span>
+        </div>
+
+        <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Ingresos Mes (USD)</span>
+          <div className="font-['Outfit'] text-3xl font-black text-slate-900 font-mono">
+            ${(stats?.ingresosMes ?? 0).toFixed(2)}
+          </div>
+          <span className="text-[10px] text-slate-500">Suscripciones cobradas este mes</span>
+        </div>
       </div>
 
-      {/* MODAL: APROVISIONAR NUEVO TENANT */}
-      {showNuevoModal && (
-        <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-emerald-500/50 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <span>🚀</span> Aprovisionar Nuevo Tenant / Cliente
-              </h3>
+      {/* FILTROS POR VERTICAL Y BUSCADOR */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-4 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Pills por Modulo */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <button
+              onClick={() => setFiltroModulo("TODOS")}
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                filtroModulo === "TODOS"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              Todos los Modulos ({tenants.length})
+            </button>
+            {MODULOS_SISTEMA.map((m) => {
+              const cant = stats?.tenantsPorModulo?.[m.id] ?? tenants.filter((t) => t.moduloPrincipal === m.id).length;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setFiltroModulo(m.id)}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    filtroModulo === m.id
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  <span className="text-[9px] px-1 py-0.5 rounded-md bg-slate-200/80 text-slate-700 font-mono font-black">
+                    {m.tag}
+                  </span>
+                  <span>{m.label}</span>
+                  <span className="text-[10px] opacity-75 font-mono">({cant})</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Filtro por estado */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl text-xs">
+            {(["TODOS", "ACTIVOS", "POR_VENCER", "SUSPENDIDOS"] as const).map((est) => (
               <button
-                onClick={() => setShowNuevoModal(false)}
-                className="text-slate-400 hover:text-white text-sm"
+                key={est}
+                onClick={() => setFiltroEstado(est)}
+                className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+                  filtroEstado === est
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
               >
-                ✕
+                {est === "TODOS" && "Todos"}
+                {est === "ACTIVOS" && "Activos"}
+                {est === "POR_VENCER" && "Por Vencer"}
+                {est === "SUSPENDIDOS" && "Suspendidos"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Buscador */}
+        <div className="relative">
+          <input
+            type="text"
+            value={filtroTexto}
+            onChange={(e) => setFiltroTexto(e.target.value)}
+            placeholder="Buscar por nombre de empresa, ID de tenant, correo o modulo..."
+            className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 text-xs bg-slate-50/50 focus:bg-white focus:outline-hidden focus:border-slate-800 transition-all font-medium"
+          />
+          {filtroTexto && (
+            <button
+              onClick={() => setFiltroTexto("")}
+              className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-600 font-bold"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* TABLA PRINCIPAL DE TENANTS */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-bold text-xs text-slate-700">
+            <span>Directorio de Clientes</span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono text-[10px]">
+              {tenantsFiltrados.length} negocios listados
+            </span>
+          </div>
+          <button
+            onClick={cargarTodo}
+            disabled={loadingData}
+            className="text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
+          >
+            {loadingData ? "Actualizando..." : "Refrescar datos"}
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-slate-700">
+            <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-100">
+              <tr>
+                <th className="py-3 px-4">Tenant ID</th>
+                <th className="py-3 px-4">Empresa / Negocio</th>
+                <th className="py-3 px-4">Modulo Base</th>
+                <th className="py-3 px-4">Plan Licencia</th>
+                <th className="py-3 px-4">Usuarios (Uso / Tope)</th>
+                <th className="py-3 px-4">Estado & Dias Restantes</th>
+                <th className="py-3 px-4">Vencimiento</th>
+                <th className="py-3 px-4 text-right">Acciones Operativas</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium">
+              {tenantsFiltrados.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-400 text-xs">
+                    No se encontraron clientes con los filtros seleccionados.
+                  </td>
+                </tr>
+              ) : (
+                tenantsFiltrados.map((t) => {
+                  const dias = calcularDiasRestantes(t.fechaVencimientoPago);
+                  const badgeDias = getBadgeDias(dias, t.activa);
+                  const cantUsuarios = t.cantidadUsuarios || 0;
+                  const limite = t.limiteUsuarios;
+                  const cupoLleno = limite != null && limite > 0 && cantUsuarios >= limite;
+
+                  return (
+                    <tr key={t.tenantId} className="hover:bg-slate-50/70 transition-colors">
+                      {/* ID */}
+                      <td className="py-3 px-4 font-mono font-bold text-slate-900">
+                        #{t.tenantId}
+                      </td>
+
+                      {/* Empresa */}
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-slate-900">{t.nombreEmpresa}</div>
+                        <div className="text-[10px] text-slate-400">{t.emailContacto || "Sin correo"}</div>
+                      </td>
+
+                      {/* Modulo */}
+                      <td className="py-3 px-4">
+                        <span className="inline-block px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-mono font-bold text-[10px] uppercase">
+                          {t.moduloPrincipal}
+                        </span>
+                      </td>
+
+                      {/* Plan */}
+                      <td className="py-3 px-4">
+                        <select
+                          value={t.tipoLicencia}
+                          onChange={(e) => handleCambiarPlan(t.tenantId, e.target.value as TipoLicencia)}
+                          className="px-2 py-1 rounded-lg border border-slate-200 text-[10px] font-bold bg-white text-slate-800 cursor-pointer"
+                        >
+                          <option value="BASICA">BASICA</option>
+                          <option value="COMERCIAL">COMERCIAL</option>
+                          <option value="INDUSTRIAL">INDUSTRIAL</option>
+                        </select>
+                      </td>
+
+                      {/* Usuarios y Limite */}
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => abrirModalUsuariosDirectorio(t)}
+                          className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                            cupoLleno
+                              ? "bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100"
+                              : limite != null && limite > 0
+                              ? "bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100"
+                              : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200"
+                          }`}
+                          title="Haga clic para ver directorio de usuarios y configurar limite"
+                        >
+                          <span className="font-mono font-black">{cantUsuarios}</span>
+                          <span className="text-slate-400">/</span>
+                          <span className="font-mono">{limite ? limite : "Ilim."}</span>
+                          <span className="text-[9px] uppercase font-semibold">
+                            {cupoLleno ? "[Lleno]" : limite ? "[Tope]" : "[Libre]"}
+                          </span>
+                        </button>
+                      </td>
+
+                      {/* Estado */}
+                      <td className="py-3 px-4">
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${badgeDias.color}`}
+                        >
+                          {badgeDias.texto}
+                        </span>
+                      </td>
+
+                      {/* Vencimiento */}
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">
+                        {t.fechaVencimientoPago || "Indefinido"}
+                      </td>
+
+                      {/* Acciones */}
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Registrar Pago */}
+                          <button
+                            onClick={() => abrirModalPago(t)}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-xs cursor-pointer"
+                            title="Registrar pago y extender licencia"
+                          >
+                            Cobro
+                          </button>
+
+                          {/* Regalar Dias */}
+                          <button
+                            onClick={() => abrirModalRegalo(t)}
+                            className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[10px] cursor-pointer"
+                            title="Regalar dias de cortesia"
+                          >
+                            Cortesia
+                          </button>
+
+                          {/* Modulos */}
+                          <button
+                            onClick={() => abrirModalModulos(t)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-[10px] cursor-pointer"
+                            title="Gestionar modulos de industria"
+                          >
+                            Modulos
+                          </button>
+
+                          {/* Usuarios */}
+                          <button
+                            onClick={() => abrirModalUsuariosDirectorio(t)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-[10px] cursor-pointer"
+                            title="Ver usuarios y definir limites de cuentas"
+                          >
+                            Usuarios
+                          </button>
+
+                          {/* Impersonar Soporte */}
+                          <button
+                            onClick={() => handleImpersonar(t.tenantId)}
+                            className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-mono font-bold text-[10px] cursor-pointer"
+                            title="Acceso de soporte tecnico directo"
+                          >
+                            Soporte
+                          </button>
+
+                          {/* Activar / Suspender */}
+                          {t.activa ? (
+                            <button
+                              onClick={() => handleDesactivar(t.tenantId)}
+                              className="p-1 text-slate-400 hover:text-rose-600 font-bold text-xs cursor-pointer"
+                              title="Suspender acceso"
+                            >
+                              [Off]
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleActivar(t.tenantId)}
+                              className="p-1 text-slate-400 hover:text-emerald-600 font-bold text-xs cursor-pointer"
+                              title="Reactivar acceso"
+                            >
+                              [On]
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* MODAL: DIRECTÓRIO DE USUARIOS Y LÍMITE DE CUOTA */}
+      {showUsuariosDirectorioModal && tenantParaUsuariosDirectorio && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="relative w-full max-w-2xl p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
+                  Gestion de Usuarios y Limite de Capacidad
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Negocio: <strong className="text-slate-800">{tenantParaUsuariosDirectorio.nombreEmpresa}</strong> (#{tenantParaUsuariosDirectorio.tenantId})
+                </p>
+              </div>
+              <button
+                onClick={() => setShowUsuariosDirectorioModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-700 font-bold text-sm"
+              >
+                [Cerrar]
               </button>
             </div>
 
-            <form onSubmit={handleCrearTenantSubmit} className="space-y-3.5 text-xs">
+            {/* SECCION A: CONFIGURAR LIMITE DE USUARIOS */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+                    Limite de Usuarios Permitidos
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Capacidad maxima de cuentas activas simultaneas para este negocio.
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Estado Actual:</span>
+                  <div className="font-mono font-black text-xs text-slate-900">
+                    {tenantParaUsuariosDirectorio.cantidadUsuarios || 0} en uso /{" "}
+                    {tenantParaUsuariosDirectorio.limiteUsuarios
+                      ? `${tenantParaUsuariosDirectorio.limiteUsuarios} max.`
+                      : "Ilimitado"}
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleGuardarLimite} className="flex flex-wrap items-center gap-2 pt-1">
+                <div className="flex items-center gap-1">
+                  {[1, 3, 5, 10, 25, 50].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setLimiteUsuariosInput(String(num))}
+                      className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold font-mono transition-all cursor-pointer ${
+                        limiteUsuariosInput === String(num)
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setLimiteUsuariosInput("")}
+                    className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
+                      limiteUsuariosInput === ""
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    Ilimitado
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Otro valor"
+                    value={limiteUsuariosInput}
+                    onChange={(e) => setLimiteUsuariosInput(e.target.value)}
+                    className="w-24 px-3 py-1.5 rounded-xl border border-slate-300 font-mono text-xs bg-white text-slate-900 font-bold"
+                  />
+                  <button
+                    type="submit"
+                    disabled={guardandoLimite}
+                    className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    {guardandoLimite ? "Guardando..." : "Guardar Limite"}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* SECCION B: LISTA DE USUARIOS ACTIVOS */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="font-bold text-slate-800 text-xs flex items-center gap-2">
+                  <span>Directorio de Cuentas ({usuariosTenant.length})</span>
+                  {tenantParaUsuariosDirectorio.limiteUsuarios &&
+                    usuariosTenant.length >= tenantParaUsuariosDirectorio.limiteUsuarios && (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black uppercase">
+                        Limite de cuentas alcanzado
+                      </span>
+                    )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => abrirModalUsuario(tenantParaUsuariosDirectorio)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer"
+                >
+                  + Agregar Usuario
+                </button>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-2xl">
+                {loadingUsuariosTenant ? (
+                  <div className="py-8 text-center text-slate-400 text-xs">Cargando directorio...</div>
+                ) : usuariosTenant.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400 text-xs">
+                    No hay usuarios registrados para este tenant.
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-xs text-slate-700">
+                    <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-100">
+                      <tr>
+                        <th className="py-2.5 px-3">Usuario / Email</th>
+                        <th className="py-2.5 px-3">Nombre</th>
+                        <th className="py-2.5 px-3">Rol</th>
+                        <th className="py-2.5 px-3">Estado</th>
+                        <th className="py-2.5 px-3 text-right">Accion</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {usuariosTenant.map((u) => (
+                        <tr key={u.id} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{u.username}</td>
+                          <td className="py-2.5 px-3 text-slate-600">{u.nombreCompleto || "-"}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-[10px] font-bold">
+                              {u.rol}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                u.activo
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : "bg-rose-50 text-rose-700 border border-rose-200"
+                              }`}
+                            >
+                              {u.activo ? "Activo" : "Inactivo"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              onClick={() => handleToggleUsuarioActivo(u.id)}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
+                                u.activo
+                                  ? "bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700"
+                                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                              }`}
+                            >
+                              {u.activo ? "Desactivar" : "Reactivar"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setShowUsuariosDirectorioModal(false)}
+                className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer hover:bg-slate-800"
+              >
+                Cerrar Directorio
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: REGISTRAR PAGO */}
+      {showPagoModal && tenantParaPago && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Nombre de la Organización / Empresa</label>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
+                  Registrar Cobro de Suscripcion
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Cliente: <strong className="text-slate-800">{tenantParaPago.nombreEmpresa}</strong> (#{tenantParaPago.tenantId})
+                </p>
+              </div>
+              <button onClick={() => setShowPagoModal(false)} className="p-2 text-slate-400 hover:text-slate-700 font-bold text-sm">[Cerrar]</button>
+            </div>
+
+            <form onSubmit={handleRegistrarPago} className="space-y-4 text-xs">
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <label className="font-bold text-slate-600 uppercase text-[10px]">Paquete de Renovacion</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { m: 1, p: 35, label: "1 Mes" },
+                    { m: 3, p: 95, label: "3 Meses" },
+                    { m: 6, p: 180, label: "6 Meses" },
+                    { m: 12, p: 340, label: "1 Año" },
+                  ].map((pkg) => (
+                    <button
+                      key={pkg.m}
+                      type="button"
+                      onClick={() => setPagoForm({ ...pagoForm, meses: pkg.m, dias: 0, monto: pkg.p })}
+                      className={`p-2.5 rounded-xl border font-bold text-center transition-all cursor-pointer ${
+                        pagoForm.meses === pkg.m && pagoForm.dias === 0
+                          ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      <div className="font-['Outfit'] text-sm">{pkg.label}</div>
+                      <div className="text-[10px] opacity-75 font-mono">${pkg.p}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase text-[10px]">Monto Cobrado (USD)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={pagoForm.monto}
+                    onChange={(e) => setPagoForm({ ...pagoForm, monto: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono font-bold"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase text-[10px]">Metodo de Pago</label>
+                  <select
+                    value={pagoForm.metodoPago}
+                    onChange={(e) => setPagoForm({ ...pagoForm, metodoPago: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white"
+                  >
+                    <option value="PAGO_MOVIL">Pago Movil (Bolivares BCV)</option>
+                    <option value="TRANSFERENCIA_VES">Transferencia Bancaria VES</option>
+                    <option value="BINANCE_USDT">Binance Pay (USDT)</option>
+                    <option value="ZELLE">Zelle (USD)</option>
+                    <option value="EFECTIVO_USD">Efectivo USD</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 uppercase text-[10px]">Referencia de Transaccion / Comprobante</label>
                 <input
                   type="text"
-                  required
-                  placeholder="Ej: Policlínica del Este, C.A."
-                  value={nuevoForm.nombreEmpresa}
-                  onChange={(e) => setNuevoForm({ ...nuevoForm, nombreEmpresa: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-emerald-500"
+                  placeholder="Ej. Ref #849201 o Hash de Binance"
+                  value={pagoForm.referenciaComprobante || ""}
+                  onChange={(e) => setPagoForm({ ...pagoForm, referenciaComprobante: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Módulo Vertical Principal</label>
-                  <select
-                    value={nuevoForm.moduloPrincipal}
-                    onChange={(e) => setNuevoForm({ ...nuevoForm, moduloPrincipal: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value="salud">Salud & Clínicas</option>
-                    <option value="horeca">Gastronomía & Rest.</option>
-                    <option value="minero">Minería & Pesaje</option>
-                    <option value="repuestos">Repuestos Automotrices</option>
-                    <option value="moda">Moda & Calzado</option>
-                    <option value="ganaderia">Ganadería & Agro</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Plan de Licencia</label>
-                  <select
-                    value={nuevoForm.tipoLicencia}
-                    onChange={(e) => setNuevoForm({ ...nuevoForm, tipoLicencia: e.target.value as TipoLicencia })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value="ENTERPRISE">ENTERPRISE (Full)</option>
-                    <option value="PROFESIONAL">PROFESIONAL</option>
-                    <option value="BASICO">BÁSICO</option>
-                    <option value="DEMO">DEMO</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Vigencia Inicial</label>
-                  <select
-                    value={nuevoForm.mesesVigencia}
-                    onChange={(e) => setNuevoForm({ ...nuevoForm, mesesVigencia: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value={1}>1 Mes</option>
-                    <option value={3}>3 Meses</option>
-                    <option value={6}>6 Meses</option>
-                    <option value={12}>12 Meses (1 Año)</option>
-                    <option value={24}>24 Meses (2 Años)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Moneda Base</label>
-                  <select
-                    value={nuevoForm.monedaBase}
-                    onChange={(e) => setNuevoForm({ ...nuevoForm, monedaBase: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value="USD">USD ($)</option>
-                    <option value="VES">VES (Bs.)</option>
-                    <option value="EUR">EUR (€)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Email de Contacto</label>
-                  <input
-                    type="email"
-                    placeholder="gerencia@cliente.com"
-                    value={nuevoForm.emailContacto}
-                    onChange={(e) => setNuevoForm({ ...nuevoForm, emailContacto: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Teléfono</label>
-                  <input
-                    type="text"
-                    placeholder="+58 414-0000000"
-                    value={nuevoForm.telefonoContacto}
-                    onChange={(e) => setNuevoForm({ ...nuevoForm, telefonoContacto: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800 space-y-2">
-                <div className="text-[11px] font-bold text-teal-400">Credenciales Iniciales del Administrador del Tenant</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-slate-400 text-[10px]">Usuario Admin</label>
-                    <input
-                      type="text"
-                      value={nuevoForm.usuarioInicial}
-                      onChange={(e) => setNuevoForm({ ...nuevoForm, usuarioInicial: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 text-[10px]">Contraseña</label>
-                    <input
-                      type="password"
-                      value={nuevoForm.passwordInicial}
-                      onChange={(e) => setNuevoForm({ ...nuevoForm, passwordInicial: e.target.value })}
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowNuevoModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer font-medium"
+                  onClick={() => setShowPagoModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={creandoTenant}
-                  className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/30 cursor-pointer disabled:opacity-50"
+                  disabled={registrandoPago}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer disabled:opacity-50 shadow-md"
                 >
-                  {creandoTenant ? "Aprovisionando..." : "Desplegar Tenant"}
+                  {registrandoPago ? "Acreditando..." : "Confirmar Pago & Activar"}
                 </button>
               </div>
             </form>
@@ -771,155 +1285,413 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         </div>
       )}
 
-      {/* MODAL: GESTIÓN DE MÓDULOS DE UN TENANT */}
-      {showModulosModal && tenantSeleccionado && (
-        <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-purple-500/50 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      {/* MODAL: REGALAR TIEMPO */}
+      {showRegaloModal && tenantParaRegalo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="relative w-full max-w-md p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <span>📦</span> Módulos Habilitados para Tenant #{tenantSeleccionado.tenantId}
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
+                  Regalar Tiempo de Cortesia
                 </h3>
-                <p className="text-xs text-purple-300 font-semibold">{tenantSeleccionado.nombreEmpresa}</p>
+                <p className="text-xs text-slate-500">
+                  Para: <strong className="text-slate-800">{tenantParaRegalo.nombreEmpresa}</strong> (#{tenantParaRegalo.tenantId})
+                </p>
+              </div>
+              <button onClick={() => setShowRegaloModal(false)} className="p-2 text-slate-400 hover:text-slate-700 font-bold text-sm">[Cerrar]</button>
+            </div>
+
+            <form onSubmit={handleRegalarTiempo} className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 uppercase text-[10px]">Dias de Licencia a Obsequiar</label>
+                <div className="flex items-center gap-2">
+                  {[7, 15, 30, 60].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setRegaloForm({ ...regaloForm, dias: d })}
+                      className={`flex-1 py-2 rounded-xl border font-bold transition-all cursor-pointer ${
+                        regaloForm.dias === d
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      +{d} dias
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 uppercase text-[10px]">Motivo / Nota Interna</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Prueba piloto, cortesia por soporte tecnico..."
+                  value={regaloForm.motivo}
+                  onChange={(e) => setRegaloForm({ ...regaloForm, motivo: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowRegaloModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={regalandoTiempo}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer disabled:opacity-50 shadow-md"
+                >
+                  {regalandoTiempo ? "Acreditando..." : "Otorgar Cortesia"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: MODULOS DE INDUSTRIA CONTRATADOS */}
+      {showModulosModal && tenantParaModulos && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
+                  Modulos de Industria Contratados
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Negocio: <strong className="text-slate-800">{tenantParaModulos.nombreEmpresa}</strong> (#{tenantParaModulos.tenantId})
+                </p>
+              </div>
+              <button onClick={() => setShowModulosModal(false)} className="p-2 text-slate-400 hover:text-slate-700 font-bold text-sm">[Cerrar]</button>
+            </div>
+
+            {/* Banner Desbloquear Toda la Suite */}
+            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-3 shadow-xs">
+              <div className="space-y-0.5">
+                <div className="font-black text-emerald-950 text-xs flex items-center gap-1.5">
+                  <span>Acceso Total en 1 Clic</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-black uppercase">Suite Completa</span>
+                </div>
+                <div className="text-[10px] text-emerald-700 leading-tight">
+                  Eleva la licencia a Industrial y activa todos los modulos verticales automaticamente.
+                </div>
               </div>
               <button
-                onClick={() => setShowModulosModal(false)}
-                className="text-slate-400 hover:text-white text-sm"
+                type="button"
+                onClick={handleConcederAccesoTotal}
+                disabled={concediendoAccesoTotal}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-xs whitespace-nowrap disabled:opacity-50 transition-all hover:scale-102"
               >
-                ✕
+                {concediendoAccesoTotal ? "Activando..." : "Desbloquear Todo"}
               </button>
             </div>
 
-            <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
-              {MODULOS_DISPONIBLES.map((mod) => {
-                const activo = modulosTenant.some((m) => m.moduloNombre === mod.id && m.activo);
-                return (
-                  <div
-                    key={mod.id}
-                    className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between ${
-                      activo
-                        ? "bg-purple-950/30 border-purple-500/40 text-white shadow-inner"
-                        : "bg-slate-950/50 border-slate-800 text-slate-400"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{mod.icon}</span>
-                      <div>
-                        <div className="font-bold text-xs text-slate-200">{mod.label}</div>
-                        <div className="text-[10px] text-slate-400">{mod.desc}</div>
-                      </div>
-                    </div>
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+              {loadingModulos ? (
+                <div className="py-8 text-center text-slate-400 text-xs">Cargando modulos...</div>
+              ) : (
+                MODULOS_SISTEMA.map((m) => {
+                  const modEncontrado = modulosTenant.find((t) => t.moduloNombre === m.id);
+                  const activo = modEncontrado ? modEncontrado.activo : tenantParaModulos.moduloPrincipal === m.id;
 
-                    <button
-                      onClick={() => handleToggleModulo(mod.id, activo)}
-                      disabled={loadingModulos}
-                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                        activo
-                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30"
-                          : "bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-white"
-                      }`}
+                  return (
+                    <div
+                      key={m.id}
+                      className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-center justify-between gap-3 hover:bg-white transition-all"
                     >
-                      {activo ? "✓ HABILITADO" : "+ Habilitar"}
-                    </button>
-                  </div>
-                );
-              })}
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-xs font-black px-2 py-1 bg-slate-200 rounded-lg text-slate-700">{m.tag}</span>
+                        <div>
+                          <div className="font-bold text-slate-900 text-xs">{m.label}</div>
+                          <div className="text-[10px] text-slate-500">{m.desc}</div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleToggleModulo(m.id, activo)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          activo
+                            ? "bg-emerald-600 text-white shadow-xs"
+                            : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                        }`}
+                      >
+                        {activo ? "Habilitado" : "Inactivo"}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="flex justify-end pt-2">
               <button
                 onClick={() => setShowModulosModal(false)}
-                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs cursor-pointer shadow-lg shadow-purple-600/30"
+                className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer hover:bg-slate-800"
               >
-                Cerrar y Guardar
+                Listo
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: APROVISIONAR USUARIO PARA TENANT */}
-      {showUsuarioModal && tenantSeleccionado && (
-        <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-cyan-500/50 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      {/* MODAL: ALTA RAPIDA DE NEGOCIO (NUEVO TENANT) */}
+      {showNuevoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <span>👤</span> Crear Usuario para Tenant #{tenantSeleccionado.tenantId}
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
+                  Alta de Nuevo Cliente / Negocio
                 </h3>
-                <p className="text-xs text-cyan-300 font-semibold">{tenantSeleccionado.nombreEmpresa}</p>
+                <p className="text-xs text-slate-500">
+                  Asigna un nuevo TenantID e inicializa su primer usuario administrador.
+                </p>
               </div>
-              <button
-                onClick={() => setShowUsuarioModal(false)}
-                className="text-slate-400 hover:text-white text-sm"
-              >
-                ✕
-              </button>
+              <button onClick={() => setShowNuevoModal(false)} className="p-2 text-slate-400 hover:text-slate-700 font-bold text-sm">[Cerrar]</button>
             </div>
 
-            <form onSubmit={handleCrearUsuarioSubmit} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Nombre Completo</label>
-                <input
-                  type="text"
-                  placeholder="Ej: Lic. Elena Torres"
-                  value={usuarioForm.nombreCompleto}
-                  onChange={(e) => setUsuarioForm({ ...usuarioForm, nombreCompleto: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Nombre de Usuario (Login)</label>
+            <form onSubmit={handleCrearTenant} className="space-y-3.5 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 uppercase text-[10px]">Nombre Comercial de la Empresa *</label>
                 <input
                   type="text"
                   required
-                  placeholder="elena.torres"
+                  placeholder="Ej. Clinica Dental Sonrisa Feliz"
+                  value={nuevoForm.nombreEmpresa}
+                  onChange={(e) => setNuevoForm({ ...nuevoForm, nombreEmpresa: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold"
+                />
+              </div>
+
+              {/* Opcion Acceso Total */}
+              <div className={`p-3.5 rounded-2xl border transition-all ${
+                nuevoForm.accesoTotal
+                  ? "bg-blue-50 border-blue-300 shadow-xs"
+                  : "bg-slate-50 border-slate-200"
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5 font-black text-xs text-slate-900">
+                      <span>Acceso Total (Toda la Suite Aurora)</span>
+                      <span className="px-2 py-0.5 rounded-full bg-blue-600 text-[9px] text-white font-black uppercase tracking-wider">SuperAdmin</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      Habilita simultaneamente Salud, Ganaderia, Restaurante, Comercio, Mineria, Moda y Tamanaco bajo un solo Tenant con Plan Industrial.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={!!nuevoForm.accesoTotal}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setNuevoForm({
+                          ...nuevoForm,
+                          accesoTotal: checked,
+                          tipoLicencia: checked ? "INDUSTRIAL" : nuevoForm.tipoLicencia,
+                        });
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase text-[10px]">Modulo Vertical Inicial</label>
+                  <select
+                    value={nuevoForm.moduloPrincipal}
+                    onChange={(e) => setNuevoForm({ ...nuevoForm, moduloPrincipal: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white"
+                  >
+                    <option value="salud">Salud & Clinicas</option>
+                    <option value="ganaderia">Ganaderia & Agro</option>
+                    <option value="horeca">Gastronomia / HORECA</option>
+                    <option value="repuestos">Comercio & Retail</option>
+                    <option value="minero">Mineria & Balanzas</option>
+                    <option value="moda">Moda & Calzado</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase text-[10px]">Plan de Licencia</label>
+                  <select
+                    value={nuevoForm.tipoLicencia}
+                    onChange={(e) => setNuevoForm({ ...nuevoForm, tipoLicencia: e.target.value as TipoLicencia })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white"
+                  >
+                    <option value="BASICA">BASICA</option>
+                    <option value="COMERCIAL">COMERCIAL</option>
+                    <option value="INDUSTRIAL">INDUSTRIAL</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase text-[10px]">Email de Contacto</label>
+                  <input
+                    type="email"
+                    placeholder="contacto@empresa.com"
+                    value={nuevoForm.emailContacto}
+                    onChange={(e) => setNuevoForm({ ...nuevoForm, emailContacto: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase text-[10px]">Meses Iniciales</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={nuevoForm.mesesVigencia}
+                    onChange={(e) => setNuevoForm({ ...nuevoForm, mesesVigencia: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase text-[10px]">Limite Usuarios</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Vacio = Ilimitado"
+                    value={nuevoForm.limiteUsuarios || ""}
+                    onChange={(e) => setNuevoForm({ ...nuevoForm, limiteUsuarios: e.target.value ? Number(e.target.value) : undefined })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="font-bold text-slate-800 text-[11px]">Primer Usuario Administrador</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Usuario (ej. admin)"
+                    value={nuevoForm.usuarioInicial}
+                    onChange={(e) => setNuevoForm({ ...nuevoForm, usuarioInicial: e.target.value })}
+                    className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white font-medium"
+                  />
+                  <input
+                    type="text"
+                    required
+                    placeholder="Clave inicial"
+                    value={nuevoForm.passwordInicial}
+                    onChange={(e) => setNuevoForm({ ...nuevoForm, passwordInicial: e.target.value })}
+                    className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNuevoModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creandoTenant}
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer disabled:opacity-50 shadow-md shadow-blue-600/20"
+                >
+                  {creandoTenant ? "Creando..." : "Dar de Alta"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CREAR USUARIO PARA TENANT */}
+      {showUsuarioModal && tenantParaUsuario && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="relative w-full max-w-md p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
+                  Crear Usuario de Acceso
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Para: <strong className="text-slate-800">{tenantParaUsuario.nombreEmpresa}</strong> (#{tenantParaUsuario.tenantId})
+                </p>
+              </div>
+              <button onClick={() => setShowUsuarioModal(false)} className="p-2 text-slate-400 hover:text-slate-700 font-bold text-sm">[Cerrar]</button>
+            </div>
+
+            <form onSubmit={handleCrearUsuario} className="space-y-3.5 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 uppercase text-[10px]">Username / Email *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ej. doctor@clinica.com"
                   value={usuarioForm.username}
                   onChange={(e) => setUsuarioForm({ ...usuarioForm, username: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold"
                 />
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Contraseña</label>
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 uppercase text-[10px]">Nombre Completo</label>
                 <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={usuarioForm.password}
-                  onChange={(e) => setUsuarioForm({ ...usuarioForm, password: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-500"
+                  type="text"
+                  placeholder="Ej. Dr. Carlos Mendoza"
+                  value={usuarioForm.nombreCompleto}
+                  onChange={(e) => setUsuarioForm({ ...usuarioForm, nombreCompleto: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300"
                 />
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Rol en la Organización</label>
-                <select
-                  value={usuarioForm.rol}
-                  onChange={(e) => setUsuarioForm({ ...usuarioForm, rol: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="ADMIN">ADMINISTRADOR</option>
-                  <option value="MEDICO">MÉDICO / DOCTOR</option>
-                  <option value="SECRETARIA">SECRETARIA / RECEPCIÓN</option>
-                  <option value="GERENTE">GERENTE GENERAL</option>
-                  <option value="CAJERO">CAJERO / FACTURACIÓN</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase text-[10px]">Contraseña *</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={usuarioForm.password}
+                    onChange={(e) => setUsuarioForm({ ...usuarioForm, password: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600 uppercase text-[10px]">Rol Asignado</label>
+                  <select
+                    value={usuarioForm.rol}
+                    onChange={(e) => setUsuarioForm({ ...usuarioForm, rol: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white"
+                  >
+                    <option value="DUENO_ADMIN">DUENO_ADMIN</option>
+                    <option value="MEDICO">MEDICO (Salud)</option>
+                    <option value="CAJERO_VENDEDOR">CAJERO_VENDEDOR</option>
+                    <option value="ENCARGADO_INVENTARIO">ENCARGADO_INVENTARIO</option>
+                    <option value="MESERO">MESERO (Horeca)</option>
+                    <option value="ADMINISTRADOR_FINCA">ADMINISTRADOR_FINCA (Ganaderia)</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowUsuarioModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer font-medium"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={creandoUsuario}
-                  className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold shadow-lg shadow-cyan-500/30 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold cursor-pointer disabled:opacity-50 shadow-md"
                 >
                   {creandoUsuario ? "Guardando..." : "Crear Usuario"}
                 </button>
@@ -929,6 +1701,78 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         </div>
       )}
 
+      {/* MODAL: HISTORIAL DE PAGOS */}
+      {showHistorialPagosModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="relative w-full max-w-3xl p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
+                  Registro Historico de Pagos de Suscripcion
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Trazabilidad de pagos, transferencias y dias acreditados a cada tenant.
+                </p>
+              </div>
+              <button onClick={() => setShowHistorialPagosModal(false)} className="p-2 text-slate-400 hover:text-slate-700 font-bold text-sm">[Cerrar]</button>
+            </div>
+
+            <div className="max-h-96 overflow-y-auto">
+              {loadingPagos ? (
+                <div className="py-8 text-center text-slate-400 text-xs">Cargando pagos...</div>
+              ) : historialPagos.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs">No hay pagos registrados aun.</div>
+              ) : (
+                <table className="w-full text-left text-xs text-slate-700">
+                  <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3">Fecha</th>
+                      <th className="py-2.5 px-3">Tenant</th>
+                      <th className="py-2.5 px-3">Monto</th>
+                      <th className="py-2.5 px-3">Metodo</th>
+                      <th className="py-2.5 px-3">Referencia</th>
+                      <th className="py-2.5 px-3">Meses / Dias</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {historialPagos.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
+                          {p.fechaPago ? p.fechaPago.slice(0, 10) : "-"}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {p.nombreEmpresa} <span className="text-slate-400 font-normal">#{p.tenantId}</span>
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-emerald-600">
+                          ${p.monto.toFixed(2)} {p.moneda}
+                        </td>
+                        <td className="py-2.5 px-3 text-[11px] text-slate-600">
+                          {p.metodoPago}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
+                          {p.referenciaComprobante || "-"}
+                        </td>
+                        <td className="py-2.5 px-3 text-[11px] font-bold text-slate-800">
+                          +{p.mesesPagados} meses ({p.diasAcreditados} dias)
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setShowHistorialPagosModal(false)}
+                className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer hover:bg-slate-800"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import SuperAdminPortal from "./components/SuperAdminPortal";
 import PortalPublicoBioanalista from "./pages/PortalPublicoBioanalista";
 import PortalLaboratorioPaciente from "./pages/PortalLaboratorioPaciente";
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from "react-router-dom";
@@ -89,6 +90,7 @@ export default function App() {
             <Route path="/resetear-clave" element={<AnimatedRoute><ResetearClave /></AnimatedRoute>} />
             <Route path="/onboarding" element={<AnimatedRoute><Onboarding /></AnimatedRoute>} />
             {/* Protected — requiere sesión activa */}
+            <Route path="/superadmin" element={<AnimatedRoute><SuperAdminPortal /></AnimatedRoute>} />
             <Route path="/dashboard"  element={<ProtectedRoute><AnimatedRoute><Dashboard /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/finanzas" element={<ProtectedRoute><AnimatedRoute><CentroFinanciero /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/auditoria" element={<ProtectedRoute><AnimatedRoute><Auditoria /></AnimatedRoute></ProtectedRoute>} />

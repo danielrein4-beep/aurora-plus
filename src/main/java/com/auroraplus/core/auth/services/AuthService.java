@@ -32,6 +32,9 @@ public class AuthService {
     @Autowired
     private CorreoService correoService;
 
+    @Autowired(required = false)
+    private com.auroraplus.core.config.repositories.LicenciaTenantRepository licenciaTenantRepository;
+
     @Autowired
     private JwtService jwtService;
 
@@ -143,6 +146,18 @@ public class AuthService {
         }
         if (usuarioRepository.buscarPorTenantYUsername(tenantId, usernameNormalizado).isPresent()) {
             throw new RuntimeException("Ya existe un usuario '" + username + "' en este negocio");
+        }
+
+        if (licenciaTenantRepository != null) {
+            licenciaTenantRepository.findByTenantId(tenantId).ifPresent(licencia -> {
+                if (licencia.getLimiteUsuarios() != null && licencia.getLimiteUsuarios() > 0) {
+                    long activos = usuarioRepository.countByTenantIdAndActivoTrue(tenantId);
+                    if (activos >= licencia.getLimiteUsuarios()) {
+                        throw new RuntimeException("Se ha alcanzado el límite máximo de usuarios ("
+                            + licencia.getLimiteUsuarios() + ") permitido para este negocio. Contacte a SuperAdmin para ampliar la cuota.");
+                    }
+                }
+            });
         }
 
         Usuario usuario = new Usuario();

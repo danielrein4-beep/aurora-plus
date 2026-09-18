@@ -134,6 +134,12 @@ public class LicenciaTenant {
     @Column(name = "margen_tolerancia_descuadre", nullable = false, precision = 18, scale = 2)
     private BigDecimal margenToleranciaDescuadre = new BigDecimal("2.00");
 
+    @Column(name = "limite_usuarios")
+    private Integer limiteUsuarios;
+
+    @Transient
+    private Long cantidadUsuarios;
+
     public enum TipoLicencia { BASICA, COMERCIAL, INDUSTRIAL }
 
     public Long getId() { return id; }
@@ -190,4 +196,8 @@ public class LicenciaTenant {
     public void setWhatsappActivo(boolean whatsappActivo) { this.whatsappActivo = whatsappActivo; }
     public BigDecimal getMargenToleranciaDescuadre() { return margenToleranciaDescuadre; }
     public void setMargenToleranciaDescuadre(BigDecimal margenToleranciaDescuadre) { this.margenToleranciaDescuadre = margenToleranciaDescuadre; }
+    public Integer getLimiteUsuarios() { return limiteUsuarios; }
+    public void setLimiteUsuarios(Integer limiteUsuarios) { this.limiteUsuarios = limiteUsuarios; }
+    public Long getCantidadUsuarios() { return cantidadUsuarios; }
+    public void setCantidadUsuarios(Long cantidadUsuarios) { this.cantidadUsuarios = cantidadUsuarios; }
 }

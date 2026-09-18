@@ -48,6 +48,8 @@ public class TenantProvisioningService {
         public String monedaBase;
         public String usuarioInicial;
         public String passwordInicial;
+        public Boolean accesoTotal;
+        public Integer limiteUsuarios;
     }
 
     @Transactional
@@ -98,6 +100,9 @@ public class TenantProvisioningService {
         if (request.monedaBase != null && !request.monedaBase.isBlank()) {
             licencia.setMonedaBase(request.monedaBase);
         }
+        if (request.limiteUsuarios != null && request.limiteUsuarios > 0) {
+            licencia.setLimiteUsuarios(request.limiteUsuarios);
+        }
 
         LicenciaTenant guardada = licenciaTenantRepository.save(licencia);
 
@@ -118,6 +123,22 @@ public class TenantProvisioningService {
         moduloInicial.setActivo(true);
         moduloTenantRepository.save(moduloInicial);
 
+        if (Boolean.TRUE.equals(request.accesoTotal)) {
+            if (licencia.getTipoLicencia().ordinal() < LicenciaTenant.TipoLicencia.INDUSTRIAL.ordinal()) {
+                licencia.setTipoLicencia(LicenciaTenant.TipoLicencia.INDUSTRIAL);
+                licenciaTenantRepository.save(licencia);
+            }
+            for (String mod : TODOS_LOS_MODULOS) {
+                if (!mod.equals(moduloBackend)) {
+                    ModuloTenant mt = new ModuloTenant();
+                    mt.setTenantId(nuevoTenantId);
+                    mt.setModuloNombre(mod);
+                    mt.setActivo(true);
+                    moduloTenantRepository.save(mt);
+                }
+            }
+        }
+
         if (request.usuarioInicial != null && !request.usuarioInicial.isBlank()) {
             // Salud es "un solo médico por tenant" (ver MedicoTenantResolver): el
             // usuario inicial debe tener rol MEDICO para que el sistema lo reconozca
@@ -132,4 +153,8 @@ public class TenantProvisioningService {
     }
 
     private static final Set<String> VARIANTES_DE_SALUD = Set.of("odontologia");
+
+    public static final Set<String> TODOS_LOS_MODULOS = Set.of(
+        "salud", "ganaderia", "horeca", "repuestos", "farmacia", "ferreteria", "moda", "minero", "tamanaco-comercial"
+    );
 }
