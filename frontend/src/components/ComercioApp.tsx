@@ -1091,7 +1091,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               ══════════════════════════════════════════════════════════════════ */}
           {tab === "general" && (
             <DashboardGeneralComercio
-              productos={productos}
+              productos={productos.filter((p) => p.rubro === perfilActivo)}
               ingresosCaja={ingresosCaja}
               onIrAInventario={() => setTab("inventario")}
             />
