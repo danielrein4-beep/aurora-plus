@@ -815,7 +815,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   // LOGIN SCREEN
   if (!sesion) {
     return (
-      <div className={onClose ? "fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-md overflow-y-auto flex items-center justify-center p-4 sm:p-6 animate-fadeIn" : "min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800"}>
+      <div className={onClose ? "fixed inset-0 z-[9999] w-screen h-screen bg-slate-100 flex items-center justify-center p-4 animate-fadeIn font-sans text-slate-800" : "min-h-screen w-full bg-slate-100 flex items-center justify-center p-4 font-sans text-slate-800"}>
         <div className="w-full max-w-md p-8 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-6 relative my-auto">
           {onClose && (
             <button
@@ -899,10 +899,9 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     );
   }
 
-  // MAIN DASHBOARD (Aurora White Professional)
+  // MAIN DASHBOARD (Aurora Full Screen Backoffice Suite)
   return (
-    <div className={onClose ? "fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-md overflow-y-auto p-3 sm:p-6 animate-fadeIn flex flex-col" : "min-h-screen bg-slate-50 text-slate-800 font-sans p-4 sm:p-6 lg:p-8 space-y-6"}>
-      <div className={onClose ? "max-w-7xl mx-auto w-full bg-slate-50 text-slate-800 font-sans p-4 sm:p-6 lg:p-8 space-y-6 rounded-3xl shadow-2xl border border-slate-200 my-auto" : "space-y-6"}>
+    <div className={onClose ? "fixed inset-0 z-[9999] w-screen h-screen bg-slate-100 flex flex-col md:flex-row overflow-hidden font-sans text-slate-800 animate-fadeIn" : "min-h-screen w-full bg-slate-100 flex flex-col md:flex-row overflow-hidden font-sans text-slate-800"}>
       {/* Toast Feedback */}
       {feedback && (
         <div
@@ -916,162 +915,302 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         </div>
       )}
 
-      {/* HEADER SUPERADMIN */}
-      <header className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="p-2.5 rounded-2xl bg-teal-50 border border-teal-200/80 shadow-xs flex items-center justify-center">
-            <AuroraLogo size={32} animated={false} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-['Outfit'] font-black text-xl text-slate-900 tracking-tight">
-                Panel Maestro de SuperAdmin
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-wider border border-slate-200">
-                Modo Maestro
-              </span>
+      {/* BARRA LATERAL (SIDEBAR) ENTERPRISE */}
+      <aside className="w-full md:w-64 lg:w-72 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 h-auto md:h-screen z-20 shadow-xs">
+        {/* PARTE SUPERIOR: BRANDING & ESTADO */}
+        <div className="p-5 border-b border-slate-100 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-teal-50 border border-teal-200/80 shadow-xs flex items-center justify-center">
+              <AuroraLogo size={28} animated={false} />
             </div>
-            <p className="text-xs text-slate-500 font-medium">
-              Control de licencias, facturacion, capacidad de usuarios y acceso a la suite Aurora.
-            </p>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-['Outfit'] font-black text-base text-slate-900 tracking-tight">
+                  Aurora Plus
+                </span>
+                <span className="px-1.5 py-0.5 rounded-md bg-teal-50 text-teal-700 text-[9px] font-bold border border-teal-200">
+                  v2.4
+                </span>
+              </div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Consola SuperAdmin
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/70 text-[11px]">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="font-semibold text-slate-700">Sistema Operativo</span>
+            </div>
+            <span className="px-1.5 py-0.5 rounded-md bg-emerald-100/60 text-emerald-800 font-mono font-bold text-[9px]">
+              MODO DIOS
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleBarrido}
-            disabled={ejecutandoBarrido}
-            className="px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-            title="Suspende automaticamente los negocios que ya expiraron su fecha de vencimiento"
-          >
-            <span>{ejecutandoBarrido ? "Ejecutando..." : "Barrido de Suspension"}</span>
-          </button>
+        {/* NAVEGACION DE MODULOS PRINCIPALES */}
+        <div className="p-4 space-y-1.5 flex-1 overflow-y-auto">
+          <div className="px-2 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            Modulos del Ecosistema
+          </div>
 
+          {/* ITEM 1: DIRECTORIO DE TENANTS */}
           <button
-            onClick={() => abrirHistorialPagos()}
-            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer border ${
-              vistaPrincipal === "PAGOS"
-                ? "bg-teal-600 text-white border-teal-600 shadow-xs"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+            onClick={() => setVistaPrincipal("TENANTS")}
+            className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
+              vistaPrincipal === "TENANTS"
+                ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+                : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
             }`}
           >
-            Historial de Pagos
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${
+                vistaPrincipal === "TENANTS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
+              }`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <div>
+                <div className="font-bold text-xs">Directorio de Tenants</div>
+                <div className={`text-[10px] ${vistaPrincipal === "TENANTS" ? "text-white/80" : "text-slate-400"}`}>
+                  Gestion de clientes y licencias
+                </div>
+              </div>
+            </div>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+              vistaPrincipal === "TENANTS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+            }`}>
+              {tenants.length}
+            </span>
           </button>
 
+          {/* ITEM 2: HISTORIAL DE PAGOS */}
           <button
-            onClick={() => setShowNuevoModal(true)}
-            className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xs shadow-teal-600/20 transition-all cursor-pointer"
+            onClick={() => {
+              setVistaPrincipal("PAGOS");
+              cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant);
+            }}
+            className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
+              vistaPrincipal === "PAGOS"
+                ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+                : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
+            }`}
           >
-            + Nuevo Negocio
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${
+                vistaPrincipal === "PAGOS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
+              }`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+              </div>
+              <div>
+                <div className="font-bold text-xs">Historial de Cobros</div>
+                <div className={`text-[10px] ${vistaPrincipal === "PAGOS" ? "text-white/80" : "text-slate-400"}`}>
+                  Pagos y prorrogas SaaS
+                </div>
+              </div>
+            </div>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+              vistaPrincipal === "PAGOS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+            }`}>
+              {historialPagos.length}
+            </span>
           </button>
 
+          {/* ITEM 3: METRICAS Y ANALITICA */}
           <button
-            onClick={handleLogout}
-            className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-bold text-xs transition-all cursor-pointer"
+            onClick={() => {
+              setVistaPrincipal("METRICAS");
+              cargarAnalytics();
+            }}
+            className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
+              vistaPrincipal === "METRICAS"
+                ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+                : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
+            }`}
           >
-            Cerrar Sesion
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${
+                vistaPrincipal === "METRICAS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
+              }`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div>
+                <div className="font-bold text-xs">Metricas & Estadisticas</div>
+                <div className={`text-[10px] ${vistaPrincipal === "METRICAS" ? "text-white/80" : "text-slate-400"}`}>
+                  KPIs, tendencias y ranking
+                </div>
+              </div>
+            </div>
+            {analyticsData && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                vistaPrincipal === "METRICAS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              }`}>
+                ${analyticsData.kpis.facturacionPeriodoUsd.toFixed(0)}
+              </span>
+            )}
           </button>
 
-          {onClose ? (
+          {/* ITEM 4: FINANZAS Y CONTABILIDAD */}
+          <button
+            onClick={() => {
+              setVistaPrincipal("FINANZAS");
+              cargarDatosFinancieros();
+            }}
+            className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
+              vistaPrincipal === "FINANZAS"
+                ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+                : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${
+                vistaPrincipal === "FINANZAS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
+              }`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <div className="font-bold text-xs">Finanzas & Contabilidad</div>
+                <div className={`text-[10px] ${vistaPrincipal === "FINANZAS" ? "text-white/80" : "text-slate-400"}`}>
+                  Gastos fijos, ingresos y P&L
+                </div>
+              </div>
+            </div>
+            {resumenFinanzas && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                vistaPrincipal === "FINANZAS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700 border border-teal-200"
+              }`}>
+                ${resumenFinanzas.totalIngresos.toFixed(0)}
+              </span>
+            )}
+          </button>
+
+          {/* ACCIONES GLOBALES EN SIDEBAR */}
+          <div className="pt-4 space-y-2">
+            <div className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Acciones Globales
+            </div>
             <button
-              onClick={onClose}
-              className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 cursor-pointer text-xs font-bold transition-all shadow-2xs"
-              title="Cerrar SuperAdmin"
+              onClick={() => setShowNuevoModal(true)}
+              className="w-full py-2.5 px-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xs shadow-teal-600/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
             >
-              Cerrar Portal
+              <span>+ Nuevo Negocio SaaS</span>
             </button>
-          ) : (
+
             <button
-              onClick={() => window.location.href = "/"}
-              className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer text-xs font-bold transition-all"
-              title="Ir a la pagina principal"
+              onClick={handleBarrido}
+              disabled={ejecutandoBarrido}
+              className="w-full py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100/70 text-amber-800 border border-amber-300 font-bold text-xs transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+              title="Suspende automaticamente los negocios que ya expiraron su fecha de vencimiento"
             >
-              Volver al Inicio
+              <span>{ejecutandoBarrido ? "Ejecutando..." : "Barrido de Suspension"}</span>
             </button>
-          )}
+          </div>
         </div>
-      </header>
 
-      {/* BARRA DE NAVEGACION PRINCIPAL SUPERADMIN */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto">
-        <button
-          onClick={() => setVistaPrincipal("TENANTS")}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-            vistaPrincipal === "TENANTS"
-              ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
-        >
-          <span>Directorio de Tenants</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-            vistaPrincipal === "TENANTS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-          }`}>
-            {tenants.length}
-          </span>
-        </button>
+        {/* PIE DEL SIDEBAR: USUARIO Y SALIDA */}
+        <div className="p-4 border-t border-slate-200 space-y-2.5 bg-slate-50/50">
+          <div className="flex items-center gap-2.5 px-2">
+            <div className="w-8 h-8 rounded-full bg-slate-800 text-white text-xs font-black flex items-center justify-center">
+              SA
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-xs text-slate-800 truncate">
+                {sesion?.username || "SuperAdmin"}
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">
+                Administrador Global
+              </div>
+            </div>
+          </div>
 
-        <button
-          onClick={() => {
-            setVistaPrincipal("PAGOS");
-            cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant);
-          }}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-            vistaPrincipal === "PAGOS"
-              ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
-        >
-          <span>Historial de Cobros & Pagos</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-            vistaPrincipal === "PAGOS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-          }`}>
-            {historialPagos.length}
-          </span>
-        </button>
+          <div className="flex items-center gap-2 pt-1">
+            {onClose ? (
+              <button
+                onClick={onClose}
+                className="flex-1 py-1.5 px-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 cursor-pointer text-xs font-bold transition-all shadow-2xs text-center"
+                title="Volver a la vista previa del portal"
+              >
+                Volver al Sitio
+              </button>
+            ) : (
+              <button
+                onClick={() => window.location.href = "/"}
+                className="flex-1 py-1.5 px-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer text-xs font-bold transition-all text-center"
+                title="Ir a la pagina principal"
+              >
+                Ir a Inicio
+              </button>
+            )}
 
-        <button
-          onClick={() => {
-            setVistaPrincipal("METRICAS");
-            cargarAnalytics();
-          }}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-            vistaPrincipal === "METRICAS"
-              ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
-        >
-          <span>Metricas & Estadisticas</span>
-          {analyticsData && (
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-              vistaPrincipal === "METRICAS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-            }`}>
-              ${analyticsData.kpis.facturacionPeriodoUsd.toFixed(2)}
-            </span>
-          )}
-        </button>
+            <button
+              onClick={handleLogout}
+              className="py-1.5 px-2.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-all cursor-pointer"
+              title="Cerrar sesion de SuperAdmin"
+            >
+              Salir
+            </button>
+          </div>
+        </div>
+      </aside>
 
-        <button
-          onClick={() => {
-            setVistaPrincipal("FINANZAS");
-            cargarDatosFinancieros();
-          }}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-            vistaPrincipal === "FINANZAS"
-              ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
-        >
-          <span>Finanzas & Contabilidad SaaS</span>
-          {resumenFinanzas && (
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-              vistaPrincipal === "FINANZAS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700 border border-teal-200"
-            }`}>
-              ${resumenFinanzas.totalIngresos.toFixed(2)}
-            </span>
-          )}
-        </button>
-      </div>
+      {/* AREA DE CONTENIDO PRINCIPAL (MAIN WORKSPACE) */}
+      <div className="flex-1 h-full overflow-y-auto flex flex-col bg-slate-100/70">
+        {/* HEADER SUPERIOR DEL WORKSPACE */}
+        <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10 shadow-2xs">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 text-xs font-medium">Consola Maestro</span>
+              <span className="text-slate-300 text-xs">/</span>
+              <span className="font-bold text-slate-800 text-xs">
+                {vistaPrincipal === "TENANTS"
+                  ? "Directorio de Clientes & Licencias"
+                  : vistaPrincipal === "PAGOS"
+                  ? "Historial de Cobros & Facturas"
+                  : vistaPrincipal === "METRICAS"
+                  ? "Metricas & Business Intelligence"
+                  : "Finanzas & Contabilidad SaaS"}
+              </span>
+            </div>
+            <h1 className="font-['Outfit'] font-black text-xl text-slate-900 mt-0.5">
+              {vistaPrincipal === "TENANTS"
+                ? "Directorio General de Tenants"
+                : vistaPrincipal === "PAGOS"
+                ? "Historial de Cobros y Suscripciones"
+                : vistaPrincipal === "METRICAS"
+                ? "Metricas, Estadisticas y Rendimiento SaaS"
+                : "Finanzas, Gastos Fijos y Flujo de Caja"}
+            </h1>
+          </div>
 
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-2xl text-xs text-slate-600">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span className="font-semibold">Atajo:</span>
+              <kbd className="px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-mono font-bold text-slate-700 shadow-2xs">Ctrl+Shift+S</kbd>
+            </div>
+
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer"
+                title="Minimizar panel maestro"
+              >
+                Cerrar Panel
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* CONTENIDO DEL MODULO SELECCIONADO */}
+        <div className="p-6 lg:p-8 space-y-6 flex-1 max-w-7xl w-full mx-auto">
             {/* VISTA: TENANTS Y CLIENTES */}
       {vistaPrincipal === "TENANTS" && (
         <div className="space-y-6 animate-fadeIn">
@@ -2538,7 +2677,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           </div>
         </div>
       )}
-{/* MODAL: DIRECTÓRIO DE USUARIOS Y LÍMITE DE CUOTA */}
+        </div>
+      </div>
+
+      {/* MODAL: DIRECTÓRIO DE USUARIOS Y LÍMITE DE CUOTA */}
       {showUsuariosDirectorioModal && tenantParaUsuariosDirectorio && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="relative w-full max-w-2xl p-7 bg-white rounded-3xl border border-slate-200 shadow-2xl space-y-6">
@@ -3755,7 +3897,6 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           </div>
         </div>
       )}
-      </div>
     </div>
   );
 }
