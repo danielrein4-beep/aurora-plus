@@ -29,6 +29,7 @@ public class CierreCajaController {
     @PostMapping
     public ResponseEntity<CierreCaja> registrarCierre(
             @RequestBody CierreCaja cierre) {
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
         Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");

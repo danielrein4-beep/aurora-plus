@@ -20,6 +20,7 @@ import {
   listarCitasDelDia, listarCitasPorRango, agendarCita, actualizarEstadoCita, reprogramarCita, listarCobrosDelDia,
   listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera, procesarCobro,
   listarCierresCaja, registrarCierreCaja,
+  estadoPinDoctor, verificarPinDoctor, configurarPinDoctor,
   listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta, eliminarConsulta,
   listarCotizaciones, crearCotizacion, actualizarEstadoCotizacion, eliminarCotizacion as eliminarCotizacionApi,
   obtenerEstadoWhatsApp, guardarWhatsApp, type EstadoWhatsApp,
@@ -353,31 +354,37 @@ function SelectorPerfilesNetflix({
 // ══════════════════════════════════════════════════════════════════════════
 function ModalClaveDoctor({
   doctorNombre,
-  claveCorrecta,
   onExito,
   onCancelar,
 }: {
   doctorNombre: string;
-  claveCorrecta: string;
   onExito: () => void;
   onCancelar: () => void;
 }) {
   const [clave, setClave] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [mostrarClave, setMostrarClave] = useState(false);
+  const [verificando, setVerificando] = useState(false);
 
-  const validar = (e: React.FormEvent) => {
+  // El PIN se valida en el servidor (ConfiguracionMedicaController) — nunca se compara
+  // en el navegador. Antes esto se comparaba contra un valor en localStorage, texto
+  // plano, saltable con las herramientas de desarrollador.
+  const validar = async (e: React.FormEvent) => {
     e.preventDefault();
-    const input = clave.trim();
-    // Solo el PIN que el médico configuró en Configuración & Perfil abre este panel — el valor
-    // por defecto ("1234") es únicamente el que trae de fábrica un tenant nuevo hasta que el
-    // médico lo cambie, no un atajo permanente. Nunca aceptar "admin"/"doctor" como comodín.
-    const esperada = (claveCorrecta || "1234").trim();
-    if (input === esperada) {
-      onExito();
-    } else {
-      setError("Contraseña o PIN incorrecto. Intenta de nuevo.");
-      setClave("");
+    setVerificando(true);
+    setError(null);
+    try {
+      const { valido } = await verificarPinDoctor(clave.trim());
+      if (valido) {
+        onExito();
+      } else {
+        setError("Contraseña o PIN incorrecto. Intenta de nuevo.");
+        setClave("");
+      }
+    } catch {
+      setError("No se pudo verificar el PIN. Intenta de nuevo.");
+    } finally {
+      setVerificando(false);
     }
   };
 
@@ -451,10 +458,11 @@ function ModalClaveDoctor({
             </button>
             <button
               type="submit"
-              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-lg flex items-center gap-2 text-white"
+              disabled={verificando}
+              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-lg flex items-center gap-2 text-white disabled:opacity-50"
             >
               <IconCheck size={16} />
-              <span>Entrar al Panel Médico</span>
+              <span>{verificando ? "Verificando…" : "Entrar al Panel Médico"}</span>
             </button>
           </div>
         </form>
@@ -477,10 +485,11 @@ function ModalConfigurarClavePrimeraVez({
   const [pin, setPin] = useState("");
   const [confirmar, setConfirmar] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   const soloDigitos = (v: string) => v.replace(/\D/g, "").slice(0, 4);
 
-  const validar = (e: React.FormEvent) => {
+  const validar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pin.length !== 4) {
       setError("El PIN debe tener exactamente 4 dígitos.");
@@ -490,7 +499,18 @@ function ModalConfigurarClavePrimeraVez({
       setError("Los dos PIN no coinciden — revísalos e intenta de nuevo.");
       return;
     }
-    onConfigurado(pin);
+    setGuardando(true);
+    setError(null);
+    try {
+      // Se guarda hasheado en el servidor (ConfiguracionMedicaController) — nunca en
+      // localStorage del navegador.
+      await configurarPinDoctor(pin);
+      onConfigurado(pin);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar el PIN.");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -556,10 +576,11 @@ function ModalConfigurarClavePrimeraVez({
 
           <button
             type="submit"
-            className="w-full btn-electric-blue text-xs font-bold px-6 py-3 rounded-xl cursor-pointer shadow-lg flex items-center justify-center gap-2 text-white"
+            disabled={guardando}
+            className="w-full btn-electric-blue text-xs font-bold px-6 py-3 rounded-xl cursor-pointer shadow-lg flex items-center justify-center gap-2 text-white disabled:opacity-50"
           >
             <IconCheck size={16} />
-            <span>Guardar mi PIN y entrar al Panel Médico</span>
+            <span>{guardando ? "Guardando…" : "Guardar mi PIN y entrar al Panel Médico"}</span>
           </button>
         </form>
       </div>
@@ -585,6 +606,13 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [rolActivo, setRolActivo] = useState<RolVista>("MEDICO");
   const [modalClaveDoctor, setModalClaveDoctor] = useState(false);
   const [accionPendienteDoctor, setAccionPendienteDoctor] = useState<(() => void) | null>(null);
+
+  // Si el PIN del médico ya fue personalizado — se resuelve contra el servidor, nunca
+  // contra localStorage (ver ConfiguracionMedicaController). null mientras carga.
+  const [pinPersonalizado, setPinPersonalizado] = useState<boolean | null>(null);
+  useEffect(() => {
+    estadoPinDoctor().then((r) => setPinPersonalizado(r.personalizada)).catch(() => setPinPersonalizado(false));
+  }, [tenantId]);
 
   // Configuración de perfil y tasas persistente — SIEMPRE bajo una clave con el tenantId (ver nota
   // junto a claveConfigPerfil): sin esto, el perfil guardado de un médico se le mostraba a
@@ -830,11 +858,11 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           onSeleccionarSecretaria={seleccionarSecretaria}
           onSalir={handleSalirAlHub}
         />
-        {modalClaveDoctor && !configPerfil.claveDoctorPersonalizada && (
+        {modalClaveDoctor && !pinPersonalizado && (
           <ModalConfigurarClavePrimeraVez
             doctorNombre={configPerfil.doctorNombre}
-            onConfigurado={(nuevoPin) => {
-              guardarConfigPerfil({ ...configPerfil, claveDoctor: nuevoPin, claveDoctorPersonalizada: true });
+            onConfigurado={() => {
+              setPinPersonalizado(true);
               setModalClaveDoctor(false);
               if (accionPendienteDoctor) {
                 accionPendienteDoctor();
@@ -843,10 +871,9 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             }}
           />
         )}
-        {modalClaveDoctor && configPerfil.claveDoctorPersonalizada && (
+        {modalClaveDoctor && pinPersonalizado && (
           <ModalClaveDoctor
             doctorNombre={configPerfil.doctorNombre}
-            claveCorrecta={configPerfil.claveDoctor || "1234"}
             onExito={() => {
               setModalClaveDoctor(false);
               if (accionPendienteDoctor) {
@@ -1083,11 +1110,11 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         )}
 
         {/* MODAL DE AUTENTICACIÓN MÉDICA PARA SECCIONES RESTRINGIDAS */}
-        {modalClaveDoctor && !configPerfil.claveDoctorPersonalizada && (
+        {modalClaveDoctor && !pinPersonalizado && (
           <ModalConfigurarClavePrimeraVez
             doctorNombre={configPerfil.doctorNombre}
-            onConfigurado={(nuevoPin) => {
-              guardarConfigPerfil({ ...configPerfil, claveDoctor: nuevoPin, claveDoctorPersonalizada: true });
+            onConfigurado={() => {
+              setPinPersonalizado(true);
               setModalClaveDoctor(false);
               if (accionPendienteDoctor) {
                 accionPendienteDoctor();
@@ -1096,10 +1123,9 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             }}
           />
         )}
-        {modalClaveDoctor && configPerfil.claveDoctorPersonalizada && (
+        {modalClaveDoctor && pinPersonalizado && (
           <ModalClaveDoctor
             doctorNombre={configPerfil.doctorNombre}
-            claveCorrecta={configPerfil.claveDoctor || "1234"}
             onExito={() => {
               setModalClaveDoctor(false);
               if (accionPendienteDoctor) {
@@ -7768,7 +7794,9 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
     setTimeout(() => setMensaje(null), 3500);
   };
 
-  const guardarClave = (e: React.FormEvent) => {
+  const [guardandoClave, setGuardandoClave] = useState(false);
+
+  const guardarClave = async (e: React.FormEvent) => {
     e.preventDefault();
     const nueva = claveForm.nueva.trim();
     if (!/^\d{4}$/.test(nueva)) {
@@ -7779,11 +7807,23 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
       setMensaje("❌ Los dos PIN no coinciden.");
       return;
     }
-    const configActualizada = { ...form, claveDoctor: nueva, claveDoctorPersonalizada: true };
-    onGuardar(configActualizada);
-    setForm(configActualizada);
-    setMensaje("✓ PIN del Doctor actualizado exitosamente.");
-    setClaveForm({ actual: "", nueva: "", confirmar: "" });
+    setGuardandoClave(true);
+    try {
+      // Se valida y guarda en el servidor (ConfiguracionMedicaController) — pide el PIN
+      // actual para cambiarlo, igual que cualquier cambio de contraseña real.
+      await configurarPinDoctor(nueva, claveForm.actual.trim());
+      // Copia local de respaldo — solo la usa el confirm-dialog de borrado de
+      // importaciones del Canal Endémico, que igual está protegido en el backend.
+      const configActualizada = { ...form, claveDoctor: nueva, claveDoctorPersonalizada: true };
+      onGuardar(configActualizada);
+      setForm(configActualizada);
+      setMensaje("✓ PIN del Doctor actualizado exitosamente.");
+      setClaveForm({ actual: "", nueva: "", confirmar: "" });
+    } catch (err) {
+      setMensaje(`❌ ${err instanceof Error ? err.message : "No se pudo actualizar el PIN."}`);
+    } finally {
+      setGuardandoClave(false);
+    }
     setTimeout(() => setMensaje(null), 3500);
   };
 
@@ -7858,6 +7898,19 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="sm:col-span-2">
+            <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">PIN Actual *</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              required
+              maxLength={4}
+              placeholder="••••"
+              value={claveForm.actual}
+              onChange={(e) => setClaveForm({ ...claveForm, actual: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+              className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono tracking-[0.3em] text-center"
+            />
+          </div>
           <div>
             <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Nuevo PIN (4 dígitos) *</label>
             <input
@@ -7886,8 +7939,8 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
           </div>
         </div>
 
-        <button type="submit" className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer">
-          Actualizar PIN del Doctor
+        <button type="submit" disabled={guardandoClave} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-50">
+          {guardandoClave ? "Guardando…" : "Actualizar PIN del Doctor"}
         </button>
       </form>
 

@@ -498,6 +498,26 @@ export function eliminarCierreCaja(id: number): Promise<void> {
   return request<void>(`/api/salud/cierres-caja/${id}`, { method: "DELETE" });
 }
 
+// El PIN del Médico Titular se valida en el servidor (nunca se guarda ni se
+// compara en el navegador) — ver ConfiguracionMedicaController.
+export function estadoPinDoctor(): Promise<{ personalizada: boolean }> {
+  return request(`/api/salud/config/pin/estado`);
+}
+
+export function verificarPinDoctor(pin: string): Promise<{ valido: boolean }> {
+  return request(`/api/salud/config/pin/verificar`, {
+    method: "POST",
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export function configurarPinDoctor(pinNuevo: string, pinActual?: string): Promise<{ mensaje: string }> {
+  return request(`/api/salud/config/pin/configurar`, {
+    method: "POST",
+    body: JSON.stringify({ pinNuevo, pinActual }),
+  });
+}
+
 export interface SalaEsperaEntrada {
   id: number;
   paciente: Paciente;
