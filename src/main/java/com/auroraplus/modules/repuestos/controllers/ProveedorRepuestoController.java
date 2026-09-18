@@ -20,7 +20,7 @@ public class ProveedorRepuestoController {
 
     @GetMapping
     public List<ProveedorRepuesto> listar() {
-        return proveedorRepuestoRepository.findAll();
+        return proveedorRepuestoRepository.findByTenantId(TenantContext.getCurrentTenant());
     }
 
     @PostMapping

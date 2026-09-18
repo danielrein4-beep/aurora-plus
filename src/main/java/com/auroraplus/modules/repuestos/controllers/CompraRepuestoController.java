@@ -1,6 +1,7 @@
 package com.auroraplus.modules.repuestos.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.repuestos.entities.CompraRepuesto;
 import com.auroraplus.modules.repuestos.repositories.CompraRepuestoRepository;
 import com.auroraplus.modules.repuestos.services.RepuestoCompraService;
@@ -39,7 +40,7 @@ public class CompraRepuestoController {
 
     @GetMapping
     public List<CompraRepuesto> listar() {
-        return compraRepuestoRepository.findAllByOrderByFechaCompraDesc();
+        return compraRepuestoRepository.findByTenantIdOrderByFechaCompraDesc(TenantContext.getCurrentTenant());
     }
 
     @PostMapping

@@ -1,6 +1,7 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.FotoAnimal;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
@@ -62,10 +63,15 @@ public class FotoAnimalController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
-        if (fotoAnimalRepository.existsById(id)) {
-            fotoAnimalRepository.deleteById(id);
-            return ResponseEntity.ok().build();
+        Long tenantId = TenantContext.getCurrentTenant();
+        FotoAnimal foto = fotoAnimalRepository.findById(id).orElse(null);
+        if (foto == null) {
+            return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.notFound().build();
+        if (!foto.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: Foto no pertenece a este tenant");
+        }
+        fotoAnimalRepository.deleteById(id);
+        return ResponseEntity.ok().build();
     }
 }
