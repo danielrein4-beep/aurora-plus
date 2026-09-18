@@ -1,6 +1,7 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.BajaAnimal;
@@ -24,6 +25,9 @@ public class BajaAnimalController {
 
     @Autowired
     private AnimalRepository animalRepository;
+
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
 
     public static class BajaRequest {
         public Long animalId;
@@ -68,6 +72,8 @@ public class BajaAnimalController {
         baja.setMotivo(request.motivo);
         baja.setObservaciones(request.observaciones);
 
-        return ResponseEntity.ok(bajaAnimalRepository.save(baja));
+        BajaAnimal guardada = bajaAnimalRepository.save(baja);
+        auditoriaService.registrar(tenantId, "GANADERIA", "ELIMINAR", "Animal", animal.getId(), "Registró baja del animal — motivo: " + request.motivo);
+        return ResponseEntity.ok(guardada);
     }
 }

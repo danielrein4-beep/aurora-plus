@@ -3500,4 +3500,33 @@ export function obtenerDetallePeriodoNomina(periodoId: number): Promise<DetalleP
   return request(`/api/personal/nomina/periodos/${periodoId}/detalle`);
 }
 
+// Bitácora de auditoría — solo el Dueño/Administrador puede consultarla (ver AuditoriaController).
+export interface RegistroAuditoriaApi {
+  id: number;
+  fecha: string;
+  modulo: string;
+  accion: string;
+  entidad: string;
+  entidadId: string | null;
+  descripcion: string;
+  usuario: string;
+  rolUsuario: string | null;
+}
+
+export interface PaginaAuditoria {
+  content: RegistroAuditoriaApi[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+}
+
+export function listarAuditoria(opciones?: { modulo?: string; accion?: string; pagina?: number; tamano?: number }): Promise<PaginaAuditoria> {
+  const params = new URLSearchParams();
+  if (opciones?.modulo) params.set("modulo", opciones.modulo);
+  if (opciones?.accion) params.set("accion", opciones.accion);
+  params.set("pagina", String(opciones?.pagina ?? 0));
+  params.set("tamano", String(opciones?.tamano ?? 50));
+  return request(`/api/auditoria?${params.toString()}`);
+}
+
 

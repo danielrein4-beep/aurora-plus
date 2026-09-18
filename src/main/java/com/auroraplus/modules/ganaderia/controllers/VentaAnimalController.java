@@ -1,6 +1,7 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.config.entities.LicenciaTenant;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
@@ -33,6 +34,9 @@ public class VentaAnimalController {
     @Autowired
     private LicenciaTenantRepository licenciaTenantRepository;
 
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
+
     public static class VentaRequest {
         public String numeroTicket;
         public String comprador;
@@ -54,8 +58,10 @@ public class VentaAnimalController {
     public ResponseEntity<VentaAnimal> registrar(@RequestBody VentaRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         Long tenantId = TenantContext.getCurrentTenant();
-        return ResponseEntity.ok(ganaderiaVentaService.registrarVenta(tenantId, request.numeroTicket, request.comprador,
-            request.items, request.monedaPago, request.montoRecibido, request.claveIdempotencia));
+        VentaAnimal venta = ganaderiaVentaService.registrarVenta(tenantId, request.numeroTicket, request.comprador,
+            request.items, request.monedaPago, request.montoRecibido, request.claveIdempotencia);
+        auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "VentaAnimal", venta.getId(), "Registró una venta — comprador: " + request.comprador);
+        return ResponseEntity.ok(venta);
     }
 
     @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)

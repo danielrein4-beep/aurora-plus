@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
-  AuroraGradientDef, IconClinic, IconVet, IconHardware, IconCard, IconUsers, IconCustomize,
+  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconCard, IconUsers, IconCustomize,
   IconStethoscope, IconCalendar, IconPrescription, IconRocket, IconDownload, IconKey,
   IconHourglass, IconUser, IconClose, IconCheckCircle, IconBank, IconChat, IconFileText,
-  IconRestaurant, IconFarm,
+  IconRestaurant, IconFarm, IconShield,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -39,6 +39,7 @@ const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNod
   clinica: IconClinic,
   farmacia: IconPrescription,
   veterinaria: IconVet,
+  odontologia: IconTooth,
   ferreteria: IconHardware,
   repuestos: IconHardware,
   retail: IconCard,
@@ -51,6 +52,7 @@ const ACTION_ICON: Record<string, (props: { size?: number }) => React.ReactNode>
   "Nueva Consulta": IconStethoscope,
   "Agendar Cita": IconCalendar,
   "Emitir Receta": IconPrescription,
+  "Odontograma": IconTooth,
   "Cobrar Factura": IconCard,
   "Ficha Mascota": IconVet,
   "Plan Vacunación": IconPrescription,
@@ -129,6 +131,24 @@ const VERTICAL_METADATA: Record<string, {
       { label: "Plan Vacunación", desc: "Recordatorios automáticos" },
       { label: "Venta PetShop", desc: "Cobro rápido por mostrador" },
       { label: "Cirugías", desc: "Registro pre y post operatorio" },
+    ],
+    defaultPatients: [],
+  },
+  odontologia: {
+    name: "Mediclinic Odonto",
+    badge: "EDICIÓN ODONTOLÓGICA",
+    desc: "Historia clínica, agenda, odontograma FDI interactivo y facturación para consultorios dentales.",
+    stats: [
+      { label: "Pacientes Atendidos", val: "0", change: "Sin pacientes registrados", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Citas de Hoy", val: "0", change: "Sin citas agendadas", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Ingresos del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Tratamientos en Curso", val: "0", change: "Sin planes activos", color: "text-amber-500 dark:text-amber-400" },
+    ],
+    actions: [
+      { label: "Nueva Consulta", desc: "Abrir historia clínica y registrar diagnóstico" },
+      { label: "Agendar Cita", desc: "Asignar horario y notificar por WhatsApp" },
+      { label: "Odontograma", desc: "Registrar estado dental diente por diente (FDI)" },
+      { label: "Cobrar Factura", desc: "Punto de venta multi-moneda" },
     ],
     defaultPatients: [],
   },
@@ -281,7 +301,7 @@ export default function Dashboard() {
     return () => { activo = false; };
   }, [user?.tenantId]);
 
-  const esClinicaReal = (userIndustry === "clinica" || userIndustry === "veterinaria") && !!user?.tenantId;
+  const esClinicaReal = (userIndustry === "clinica" || userIndustry === "veterinaria" || userIndustry === "odontologia") && !!user?.tenantId;
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
   const esComercioReal = (userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "farmacia" || userIndustry === "retail") && !!user?.tenantId;
   const esGanaderiaReal = (userIndustry === "finca" || userIndustry === "ganaderia") && !!user?.tenantId;
@@ -894,7 +914,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className={`grid grid-cols-1 md:grid-cols-3 ${user?.rol === "DUENO_ADMIN" ? "lg:grid-cols-4" : ""} gap-5`}>
                 {/* 1. Módulo Operativo Principal (Vertical Activa) */}
                 <div 
                   onClick={() => navigate(rutaVertical)}
@@ -987,6 +1007,39 @@ export default function Dashboard() {
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
                 </div>
+
+                {/* 4. Auditoría — solo el Dueño/Administrador la ve */}
+                {user?.rol === "DUENO_ADMIN" && (
+                  <div
+                    onClick={() => navigate("/auditoria")}
+                    className="apple-glass rounded-3xl p-6 border border-slate-300/60 dark:border-white/10 hover:border-amber-400/50 transition-all duration-300 group cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 dark:bg-amber-400/10 text-amber-600 dark:text-amber-300 flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform">
+                          <IconShield size={24} />
+                        </div>
+                        <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 uppercase">
+                          Solo Dueño/Admin
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white group-hover:text-amber-500 dark:group-hover:text-amber-300 transition-colors">
+                          Auditoría
+                        </h4>
+                        <p className="text-slate-500 dark:text-white/60 text-xs mt-1 leading-relaxed line-clamp-2">
+                          Quién creó, editó o eliminó cada registro sensible en tu negocio, con fecha y usuario.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-300">
+                      <span>Abrir Auditoría</span>
+                      <span className="group-hover:translate-x-1 transition-transform">→</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1275,7 +1328,7 @@ export default function Dashboard() {
                         No hay tareas sanitarias ni partos próximos programados para hoy en el hato.
                       </p>
                     )
-                  ) : (userIndustry === "clinica" || userIndustry === "veterinaria") ? (
+                  ) : (userIndustry === "clinica" || userIndustry === "veterinaria" || userIndustry === "odontologia") ? (
                     citasReales === null ? (
                       <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-4">Cargando…</p>
                     ) : citasReales.length === 0 ? (

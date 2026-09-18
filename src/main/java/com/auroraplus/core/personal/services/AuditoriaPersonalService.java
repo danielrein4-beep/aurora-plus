@@ -1,5 +1,6 @@
 package com.auroraplus.core.personal.services;
 
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.core.personal.entities.AuditoriaPersonal;
 import com.auroraplus.core.personal.repositories.AuditoriaPersonalRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,12 @@ public class AuditoriaPersonalService {
     @Autowired
     private AuditoriaPersonalRepository auditoriaPersonalRepository;
 
+    // También se refleja en la bitácora única y transversal (core.auditoria) que ve el
+    // Dueño/Administrador desde cualquier vertical — este registro local sigue existiendo
+    // aparte porque otros consumidores internos de Personal/Nómina dependen de su contrato exacto.
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
+
     public void registrar(Long tenantId, Long usuarioId, String accion, String entidad, Long entidadId, String detalle) {
         AuditoriaPersonal registro = new AuditoriaPersonal();
         registro.setTenantId(tenantId);
@@ -25,5 +32,7 @@ public class AuditoriaPersonalService {
         registro.setEntidadId(entidadId);
         registro.setDetalle(detalle);
         auditoriaPersonalRepository.save(registro);
+
+        auditoriaService.registrar(tenantId, "PERSONAL", accion, entidad, entidadId, detalle);
     }
 }

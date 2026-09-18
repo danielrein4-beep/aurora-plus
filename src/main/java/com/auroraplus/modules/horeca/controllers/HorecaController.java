@@ -1,6 +1,7 @@
 package com.auroraplus.modules.horeca.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.pagos.BinancePayService;
 import com.auroraplus.modules.horeca.entities.Comanda;
@@ -39,6 +40,9 @@ public class HorecaController {
 
     @Autowired
     private BinancePayService binancePayService;
+
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
 
     @PostMapping("/comandas/abrir")
     public ResponseEntity<Comanda> abrirComanda(
@@ -109,7 +113,10 @@ public class HorecaController {
             @RequestParam(required = false) String usuario,
             @RequestParam(required = false) String claveIdempotencia) {
         AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR");
-        return ResponseEntity.ok(horecaService.anularComanda(comandaId, TenantContext.getCurrentTenant(), motivo, usuario, claveIdempotencia));
+        Long tenantId = TenantContext.getCurrentTenant();
+        Comanda resultado = horecaService.anularComanda(comandaId, tenantId, motivo, usuario, claveIdempotencia);
+        auditoriaService.registrar(tenantId, "HORECA", "ELIMINAR", "Comanda", comandaId, "Anuló una comanda — motivo: " + motivo);
+        return ResponseEntity.ok(resultado);
     }
 
     /** Anula UN ítem de una comanda todavía ABIERTA (no toda la comanda) — exige motivo y queda con usuario/fecha.
@@ -120,7 +127,10 @@ public class HorecaController {
             @RequestParam String motivo,
             @RequestParam(required = false) String usuario) {
         AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR");
-        return ResponseEntity.ok(horecaService.anularItem(itemId, TenantContext.getCurrentTenant(), motivo, usuario));
+        Long tenantId = TenantContext.getCurrentTenant();
+        ItemComanda resultado = horecaService.anularItem(itemId, tenantId, motivo, usuario);
+        auditoriaService.registrar(tenantId, "HORECA", "ELIMINAR", "ItemComanda", itemId, "Anuló un ítem de comanda — motivo: " + motivo);
+        return ResponseEntity.ok(resultado);
     }
 
     @PostMapping("/comandas/{comandaId}/items")

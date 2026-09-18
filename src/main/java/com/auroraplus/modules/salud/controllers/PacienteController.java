@@ -1,6 +1,7 @@
 package com.auroraplus.modules.salud.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.Paciente;
 import com.auroraplus.modules.salud.services.PacienteService;
@@ -28,6 +29,9 @@ public class PacienteController {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
 
     // El filtro de Hibernate habilitado en TenantInterceptor no persiste hasta la sesión que
     // ejecuta la query real — se re-habilita aquí explícitamente antes de cualquier lectura,
@@ -74,7 +78,9 @@ public class PacienteController {
     public ResponseEntity<Void> desactivar(@PathVariable Long id) {
         AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
         asegurarFiltroTenant();
-        pacienteService.desactivar(TenantContext.getCurrentTenant(), id);
+        Long tenantId = TenantContext.getCurrentTenant();
+        pacienteService.desactivar(tenantId, id);
+        auditoriaService.registrar(tenantId, "SALUD", "ELIMINAR", "Paciente", id, "Desactivó un paciente");
         return ResponseEntity.noContent().build();
     }
 }

@@ -1,6 +1,7 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.CompraAnimal;
 import com.auroraplus.modules.ganaderia.repositories.CompraAnimalRepository;
@@ -21,6 +22,9 @@ public class CompraAnimalController {
     @Autowired
     private CompraAnimalRepository compraAnimalRepository;
 
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
+
     public static class CompraRequest {
         public Long proveedorId;
         public String numeroFactura;
@@ -39,6 +43,8 @@ public class CompraAnimalController {
     public ResponseEntity<CompraAnimal> registrar(@RequestBody CompraRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         Long tenantId = TenantContext.getCurrentTenant();
-        return ResponseEntity.ok(ganaderiaCompraService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, request.items));
+        CompraAnimal compra = ganaderiaCompraService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, request.items);
+        auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "CompraAnimal", compra.getId(), "Registró una compra — factura: " + request.numeroFactura);
+        return ResponseEntity.ok(compra);
     }
 }

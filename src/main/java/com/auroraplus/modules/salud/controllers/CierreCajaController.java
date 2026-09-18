@@ -1,6 +1,7 @@
 package com.auroraplus.modules.salud.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.CierreCaja;
 import com.auroraplus.modules.salud.services.CierreCajaService;
@@ -21,6 +22,9 @@ public class CierreCajaController {
     @Autowired
     private CierreCajaService cierreCajaService;
 
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
+
     @GetMapping
     public List<CierreCaja> listarHistorial() {
         return cierreCajaService.listarHistorial(TenantContext.getCurrentTenant());
@@ -34,13 +38,17 @@ public class CierreCajaController {
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }
-        return ResponseEntity.ok(cierreCajaService.registrarCierre(tenantActivo, cierre));
+        CierreCaja guardado = cierreCajaService.registrarCierre(tenantActivo, cierre);
+        auditoriaService.registrar(tenantActivo, "SALUD", "CREAR", "CierreCaja", guardado.getId(), "Registró un cierre de caja");
+        return ResponseEntity.ok(guardado);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarCierre(@PathVariable Long id) {
         AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
-        cierreCajaService.eliminarCierre(TenantContext.getCurrentTenant(), id);
+        Long tenantId = TenantContext.getCurrentTenant();
+        cierreCajaService.eliminarCierre(tenantId, id);
+        auditoriaService.registrar(tenantId, "SALUD", "ELIMINAR", "CierreCaja", id, "Eliminó un cierre de caja");
         return ResponseEntity.noContent().build();
     }
 }

@@ -1,6 +1,7 @@
 package com.auroraplus.modules.salud.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.salud.entities.ConfiguracionMedica;
 import com.auroraplus.modules.salud.repositories.ConfiguracionMedicaRepository;
@@ -27,6 +28,9 @@ public class ConfiguracionMedicaController {
 
     @Autowired
     private ConfiguracionMedicaRepository configuracionMedicaRepository;
+
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -82,6 +86,8 @@ public class ConfiguracionMedicaController {
         config.setClaveDoctorHash(passwordEncoder.encode(pinNuevo));
         config.setClaveDoctorPersonalizada(true);
         configuracionMedicaRepository.save(config);
+
+        auditoriaService.registrar(tenantId, "SALUD", "EDITAR", "ConfiguracionMedica", tenantId, "Cambió el PIN del Médico Titular");
 
         return ResponseEntity.ok(Map.of("mensaje", "PIN actualizado correctamente"));
     }

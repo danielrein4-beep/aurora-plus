@@ -1,6 +1,7 @@
 package com.auroraplus.modules.repuestos.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.repuestos.entities.MovimientoRepuesto;
 import com.auroraplus.modules.repuestos.entities.RepuestoItem;
@@ -33,6 +34,9 @@ public class RepuestoItemController {
     @Autowired
     private MovimientoRepuestoRepository movimientoRepuestoRepository;
 
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
+
     @GetMapping
     public List<RepuestoItem> listar() {
         return repuestoItemRepository.findAll();
@@ -57,7 +61,9 @@ public class RepuestoItemController {
             throw new RuntimeException("El código SKU es obligatorio");
         }
         item.setTenantId(tenantId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(repuestoItemRepository.save(item));
+        RepuestoItem guardado = repuestoItemRepository.save(item);
+        auditoriaService.registrar(tenantId, "COMERCIO", "CREAR", "RepuestoItem", guardado.getId(), "Creó el repuesto SKU " + guardado.getCodigoSku());
+        return ResponseEntity.status(HttpStatus.CREATED).body(guardado);
     }
 
     @PutMapping("/{id}")
@@ -89,6 +95,7 @@ public class RepuestoItemController {
             throw new RuntimeException("No autorizado para eliminar este repuesto");
         }
         repuestoItemRepository.deleteById(id);
+        auditoriaService.registrar(tenantId, "COMERCIO", "ELIMINAR", "RepuestoItem", id, "Eliminó el repuesto SKU " + item.getCodigoSku());
         return ResponseEntity.ok().build();
     }
 

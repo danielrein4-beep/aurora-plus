@@ -1,6 +1,7 @@
 package com.auroraplus.modules.horeca.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.rrhh.entities.Empleado;
 import com.auroraplus.core.rrhh.repositories.EmpleadoRepository;
@@ -25,6 +26,9 @@ public class MeseroHorecaController {
 
     @Autowired
     private RegistroAsistenciaRepository registroAsistenciaRepository;
+
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
 
     // DTO de salida: el mesero tal cual + si está fichado AHORA MISMO (cuando
     // tiene empleadoId vinculado) — se resuelve acá, contra el reloj checador
@@ -69,7 +73,9 @@ public class MeseroHorecaController {
         mesero.setNombre(request.nombre.trim());
         mesero.setTelefono(request.telefono != null && !request.telefono.isBlank() ? request.telefono.trim() : null);
         mesero.setEmpleadoId(resolverEmpleadoId(request.empleadoId));
-        return ResponseEntity.ok(meseroHorecaRepository.save(mesero));
+        MeseroHoreca guardado = meseroHorecaRepository.save(mesero);
+        auditoriaService.registrar(mesero.getTenantId(), "HORECA", "CREAR", "Mesero", guardado.getId(), "Creó al mesero: " + guardado.getNombre());
+        return ResponseEntity.ok(guardado);
     }
 
     @PutMapping("/{id}")
@@ -115,6 +121,7 @@ public class MeseroHorecaController {
         }
         mesero.setActivo(false);
         meseroHorecaRepository.save(mesero);
+        auditoriaService.registrar(tenantId, "HORECA", "ELIMINAR", "Mesero", id, "Desactivó al mesero: " + mesero.getNombre());
         return ResponseEntity.noContent().build();
     }
 
