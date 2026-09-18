@@ -11,9 +11,18 @@ import org.springframework.stereotype.Service;
  * o una acción de negocio equivalente) en la bitácora de auditoría del tenant.
  * Se llama DESPUÉS de que la operación ya se completó con éxito — nunca antes,
  * para no registrar acciones que en realidad fallaron.
+ *
+ * Además de las llamadas explícitas hechas a mano (con una descripción legible,
+ * ej. "Anuló una comanda — motivo: X"), AuditoriaAutoInterceptor genera un
+ * registro genérico para CUALQUIER POST/PUT/PATCH/DELETE exitoso de la API que
+ * no haya llamado ya a este método — así ninguna acción de crear/editar/eliminar
+ * queda sin rastro, aunque nadie haya instrumentado ese endpoint específico. El
+ * flag de este hilo evita que ambos caminos dupliquen el mismo registro.
  */
 @Service
 public class RegistroAuditoriaService {
+
+    private static final ThreadLocal<Boolean> YA_REGISTRADO_EN_ESTA_REQUEST = ThreadLocal.withInitial(() -> false);
 
     @Autowired
     private RegistroAuditoriaRepository registroAuditoriaRepository;
@@ -30,5 +39,16 @@ public class RegistroAuditoriaService {
         r.setUsuario(usuario != null ? usuario : "sistema");
         r.setRolUsuario(AuthContext.getRol());
         registroAuditoriaRepository.save(r);
+        YA_REGISTRADO_EN_ESTA_REQUEST.set(true);
+    }
+
+    /** Usado solo por AuditoriaAutoInterceptor para saber si ya se registró esta request a mano. */
+    public boolean yaRegistradoEnEstaRequest() {
+        return YA_REGISTRADO_EN_ESTA_REQUEST.get();
+    }
+
+    /** Debe llamarse siempre al final de cada request (afterCompletion), incluso si no hubo registro. */
+    public void limpiarFlagDeRequest() {
+        YA_REGISTRADO_EN_ESTA_REQUEST.remove();
     }
 }

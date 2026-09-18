@@ -1,5 +1,6 @@
 package com.auroraplus.core.config;
 
+import com.auroraplus.core.auditoria.AuditoriaAutoInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -16,6 +17,9 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Autowired
     private RateLimitInterceptor rateLimitInterceptor;
+
+    @Autowired
+    private AuditoriaAutoInterceptor auditoriaAutoInterceptor;
 
     // SOLO estas dos rutas de /api/auth/** son públicas — es donde se consigue
     // el token en primer lugar. Todo lo demás bajo /api/auth/** (ej.
@@ -54,5 +58,12 @@ public class WebConfig implements WebMvcConfigurer {
             .addPathPatterns("/api/**")
             .excludePathPatterns("/api/super-admin/**", "/api/public/**", RUTAS_LOGIN_PUBLICAS[0], RUTAS_LOGIN_PUBLICAS[1],
                 RUTAS_LOGIN_PUBLICAS[2], RUTAS_LOGIN_PUBLICAS[3], RUTAS_LOGIN_PUBLICAS[4], RUTAS_LOGIN_PUBLICAS[5]);
+        // Registrado DESPUÉS de tenantInterceptor a propósito: Spring ejecuta afterCompletion en
+        // orden inverso al de registro, así que el de auditoría corre ANTES de que
+        // TenantInterceptor limpie AuthContext/TenantContext — los necesita para saber quién y
+        // de qué tenant fue la acción.
+        registry.addInterceptor(auditoriaAutoInterceptor)
+            .addPathPatterns("/api/**")
+            .excludePathPatterns("/api/super-admin/**", "/api/public/**", "/api/auditoria/**");
     }
 }
