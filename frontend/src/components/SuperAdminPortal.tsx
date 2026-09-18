@@ -56,6 +56,12 @@ import {
   MetodoPagoAnalytics,
   TendenciaDataPoint,
   obtenerAnalyticsSuperAdmin,
+  SaasSoporteTicket,
+  SaasSoporteMensaje,
+  listarTicketsSuperAdmin,
+  listarMensajesTicketSuperAdmin,
+  enviarMensajeTicketSuperAdmin,
+  cambiarEstadoTicketSuperAdmin,
 } from "../api";
 
 interface SuperAdminPortalProps {
@@ -196,7 +202,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
   // VISTA PRINCIPAL (TENANTS vs FINANZAS)
   // VISTA PRINCIPAL (TENANTS vs PAGOS vs FINANZAS)
-  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "FINANZAS">("TENANTS");
+  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "FINANZAS" | "SOPORTE">("TENANTS");
 
   // FILTROS Y ESTADOS DEL MODULO DEDICADO DE HISTORIAL DE PAGOS
   const [filtroPagosTenant, setFiltroPagosTenant] = useState<number | "TODOS">("TODOS");
@@ -219,6 +225,17 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   const [analyticsData, setAnalyticsData] = useState<SaasAnalyticsResponse | null>(null);
   const [cargandoAnalytics, setCargandoAnalytics] = useState(false);
   const [filtroRankingBusqueda, setFiltroRankingBusqueda] = useState("");
+
+  // ESTADOS DEL MODULO DE SOPORTE & ASISTENCIA AL TENANT
+  const [ticketsSoporte, setTicketsSoporte] = useState<SaasSoporteTicket[]>([]);
+  const [ticketSeleccionado, setTicketSeleccionado] = useState<SaasSoporteTicket | null>(null);
+  const [mensajesSoporte, setMensajesSoporte] = useState<SaasSoporteMensaje[]>([]);
+  const [nuevoMensajeSoporte, setNuevoMensajeSoporte] = useState("");
+  const [filtroEstadoSoporte, setFiltroEstadoSoporte] = useState<string>("TODOS");
+  const [filtroPrioridadSoporte, setFiltroPrioridadSoporte] = useState<string>("TODOS");
+  const [filtroTextoBusquedaSoporte, setFiltroTextoBusquedaSoporte] = useState("");
+  const [cargandoTicketsSoporte, setCargandoTicketsSoporte] = useState(false);
+  const [enviandoMensajeSoporte, setEnviandoMensajeSoporte] = useState(false);
 
   // Modales de Finanzas
   const [showGastoFijoModal, setShowGastoFijoModal] = useState(false);
@@ -399,6 +416,78 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       cargarAnalytics(periodoAnalytics, fechaRefAnalytics);
     }
   }, [sesion, vistaPrincipal, periodoAnalytics, fechaRefAnalytics]);
+
+  // SOPORTE FUNCTIONS
+  const cargarTicketsSoporte = async () => {
+    setCargandoTicketsSoporte(true);
+    try {
+      const data = await listarTicketsSuperAdmin(filtroEstadoSoporte, filtroPrioridadSoporte, filtroTextoBusquedaSoporte);
+      setTicketsSoporte(data);
+      if (ticketSeleccionado) {
+        const updated = data.find((t) => t.id === ticketSeleccionado.id);
+        if (updated) setTicketSeleccionado(updated);
+      }
+    } catch (e) {
+      console.error("Error al cargar tickets:", e);
+    } finally {
+      setCargandoTicketsSoporte(false);
+    }
+  };
+
+  const cargarMensajesSoporte = async (ticketId: number) => {
+    try {
+      const msgs = await listarMensajesTicketSuperAdmin(ticketId);
+      setMensajesSoporte(msgs);
+    } catch (e) {
+      console.error("Error al cargar mensajes del ticket:", e);
+    }
+  };
+
+  const handleEnviarMensajeSoporte = async (e?: React.FormEvent, textoDirecto?: string) => {
+    if (e) e.preventDefault();
+    const txt = textoDirecto || nuevoMensajeSoporte;
+    if (!ticketSeleccionado || !txt.trim() || enviandoMensajeSoporte) return;
+
+    setEnviandoMensajeSoporte(true);
+    try {
+      const msg = await enviarMensajeTicketSuperAdmin(ticketSeleccionado.id, txt.trim(), sesion?.username || "Soporte Aurora");
+      setMensajesSoporte((prev) => [...prev, msg]);
+      setNuevoMensajeSoporte("");
+      cargarTicketsSoporte();
+    } catch (err: any) {
+      avisar("Error al enviar mensaje: " + (err.message || "Error"));
+    } finally {
+      setEnviandoMensajeSoporte(false);
+    }
+  };
+
+  const handleCambiarEstadoTicket = async (ticketId: number, nuevoEstado: string) => {
+    try {
+      const updated = await cambiarEstadoTicketSuperAdmin(ticketId, nuevoEstado, sesion?.username);
+      avisar("Ticket #" + ticketId + " actualizado a " + nuevoEstado);
+      setTicketSeleccionado(updated);
+      cargarTicketsSoporte();
+    } catch (err: any) {
+      avisar("Error al cambiar estado: " + (err.message || "Error"));
+    }
+  };
+
+  useEffect(() => {
+    if (sesion && vistaPrincipal === "SOPORTE") {
+      cargarTicketsSoporte();
+    }
+  }, [sesion, vistaPrincipal, filtroEstadoSoporte, filtroPrioridadSoporte, filtroTextoBusquedaSoporte]);
+
+  useEffect(() => {
+    if (sesion && vistaPrincipal === "SOPORTE" && ticketSeleccionado) {
+      cargarMensajesSoporte(ticketSeleccionado.id);
+      const interval = setInterval(() => {
+        cargarMensajesSoporte(ticketSeleccionado.id);
+        cargarTicketsSoporte();
+      }, 3500);
+      return () => clearInterval(interval);
+    }
+  }, [sesion, vistaPrincipal, ticketSeleccionado?.id]);
 
   const handleEliminarMovimiento = async (id: number) => {
     if (!confirm("Esta seguro de anular este movimiento del libro contable?")) return;
@@ -1092,6 +1181,49 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             )}
           </button>
 
+          {/* ITEM 5: CENTRO DE SOPORTE Y CHAT EN VIVO */}
+          <button
+            onClick={() => {
+              setVistaPrincipal("SOPORTE");
+              cargarTicketsSoporte();
+            }}
+            className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
+              vistaPrincipal === "SOPORTE"
+                ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+                : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${
+                vistaPrincipal === "SOPORTE" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
+              }`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+              </div>
+              <div>
+                <div className="font-bold text-xs">Soporte & Asistencia</div>
+                <div className={`text-[10px] ${vistaPrincipal === "SOPORTE" ? "text-white/80" : "text-slate-400"}`}>
+                  Tickets y chat en vivo
+                </div>
+              </div>
+            </div>
+            {(() => {
+              const abiertosCnt = ticketsSoporte.filter((t) => t.estado === "ABIERTO" || t.estado === "EN_ATENCION").length;
+              return (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                  vistaPrincipal === "SOPORTE"
+                    ? "bg-white/20 text-white"
+                    : abiertosCnt > 0
+                    ? "bg-amber-100 text-amber-800 border border-amber-300"
+                    : "bg-slate-100 text-slate-600"
+                }`}>
+                  {abiertosCnt} abiertos
+                </span>
+              );
+            })()}
+          </button>
+
           {/* ACCIONES GLOBALES EN SIDEBAR */}
           <div className="pt-4 space-y-2">
             <div className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -1176,7 +1308,9 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   ? "Historial de Cobros & Facturas"
                   : vistaPrincipal === "METRICAS"
                   ? "Metricas & Business Intelligence"
-                  : "Finanzas & Contabilidad SaaS"}
+                  : vistaPrincipal === "FINANZAS"
+                  ? "Finanzas & Contabilidad SaaS"
+                  : "Centro de Soporte & Chat en Vivo"}
               </span>
             </div>
             <h1 className="font-['Outfit'] font-black text-xl text-slate-900 mt-0.5">
@@ -1186,7 +1320,9 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 ? "Historial de Cobros y Suscripciones"
                 : vistaPrincipal === "METRICAS"
                 ? "Metricas, Estadisticas y Rendimiento SaaS"
-                : "Finanzas, Gastos Fijos y Flujo de Caja"}
+                : vistaPrincipal === "FINANZAS"
+                ? "Finanzas, Gastos Fijos y Flujo de Caja"
+                : "Mesa de Ayuda, Tickets y Chat con Tenants"}
             </h1>
           </div>
 
@@ -2677,6 +2813,330 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           </div>
         </div>
       )}
+      {/* VISTA: CENTRO DE SOPORTE Y CHAT EN VIVO TIPO WHATSAPP */}
+      {vistaPrincipal === "SOPORTE" && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* HEADER & CONTROLES DE LA BANDEJA */}
+          <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 uppercase tracking-wider">
+                  Mesa de Ayuda SaaS
+                </span>
+                <span className="text-xs text-slate-400 font-mono">
+                  {ticketsSoporte.length} Casos Registrados
+                </span>
+              </div>
+              <h2 className="font-['Outfit'] font-extrabold text-2xl text-slate-900 mt-1">
+                Centro de Atencion al Cliente y Chat en Vivo
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Canal directo de comunicacion en tiempo real tipo WhatsApp para resolver dudas tecnicas y operativas de los inquilinos.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => cargarTicketsSoporte()}
+                disabled={cargandoTicketsSoporte}
+                className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              >
+                {cargandoTicketsSoporte ? "Sincronizando..." : "Refrescar Tickets"}
+              </button>
+            </div>
+          </div>
+
+          {/* CONTENEDOR TIPO WHATSAPP / ZENDESK DE DOBLE COLUMNA */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xs flex flex-col lg:flex-row h-[750px] overflow-hidden">
+            {/* COLUMNA IZQUIERDA: BANDEJA DE TICKETS (340px - 380px) */}
+            <div className="w-full lg:w-96 border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col bg-white shrink-0">
+              {/* BUSCADOR Y FILTROS RAPIDOS */}
+              <div className="p-4 border-b border-slate-100 space-y-3 bg-slate-50/50">
+                <input
+                  type="text"
+                  placeholder="Buscar por cliente, asunto o texto..."
+                  value={filtroTextoBusquedaSoporte}
+                  onChange={(e) => setFiltroTextoBusquedaSoporte(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-2xl bg-white border border-slate-200 text-xs text-slate-800 focus:border-teal-500 outline-none"
+                />
+
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+                  {(["TODOS", "ABIERTO", "EN_ATENCION", "RESUELTO"] as const).map((est) => (
+                    <button
+                      key={est}
+                      onClick={() => setFiltroEstadoSoporte(est)}
+                      className={`px-3 py-1 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+                        filtroEstadoSoporte === est
+                          ? "bg-teal-600 text-white shadow-xs"
+                          : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {est === "TODOS"
+                        ? "Todos"
+                        : est === "ABIERTO"
+                        ? "Abiertos"
+                        : est === "EN_ATENCION"
+                        ? "En Atencion"
+                        : "Resueltos"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* LISTA DE TICKETS SCROLLEABLE */}
+              <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+                {ticketsSoporte.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-2">
+                    <div className="font-bold text-xs">Sin tickets de soporte</div>
+                    <p className="text-[11px]">No hay casos que coincidan con los filtros actuales.</p>
+                  </div>
+                ) : (
+                  ticketsSoporte.map((t) => {
+                    const seleccionado = ticketSeleccionado?.id === t.id;
+                    const esUrgente = t.prioridad === "URGENTE";
+                    const esAlta = t.prioridad === "ALTA";
+
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => {
+                          setTicketSeleccionado(t);
+                          cargarMensajesSoporte(t.id);
+                        }}
+                        className={`p-4 transition-all cursor-pointer space-y-1.5 ${
+                          seleccionado
+                            ? "bg-teal-50/70 border-l-4 border-l-teal-600"
+                            : "hover:bg-slate-50/80"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-800 text-xs truncate max-w-[200px]">
+                            {t.nombreEmpresa}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {t.fechaActualizacion ? t.fechaActualizacion.substring(11, 16) : ""}
+                          </span>
+                        </div>
+
+                        <div className="text-xs font-semibold text-slate-700 line-clamp-1">
+                          {t.tituloAsunto}
+                        </div>
+
+                        {t.ultimoMensaje && (
+                          <div className="text-[11px] text-slate-500 line-clamp-1">
+                            {t.ultimoMensaje}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-1 text-[10px]">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`px-2 py-0.5 rounded-md font-bold border ${
+                              t.estado === "ABIERTO"
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : t.estado === "EN_ATENCION"
+                                ? "bg-teal-50 text-teal-700 border-teal-200"
+                                : "bg-slate-100 text-slate-600 border-slate-200"
+                            }`}>
+                              {t.estado}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded-md font-bold text-[9px] ${
+                              esUrgente
+                                ? "bg-rose-100 text-rose-800"
+                                : esAlta
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-slate-100 text-slate-600"
+                            }`}>
+                              {t.prioridad}
+                            </span>
+                          </div>
+
+                          <span className="font-mono text-slate-400">
+                            Tenant #{t.tenantId}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* COLUMNA DERECHA: SALA DE CONVERSACION EN VIVO TIPO WHATSAPP */}
+            <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+              {!ticketSeleccionado ? (
+                <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-3 bg-slate-50/50">
+                  <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-xs text-slate-400">
+                    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-['Outfit'] font-bold text-base text-slate-700">
+                      Selecciona un caso de soporte
+                    </h3>
+                    <p className="text-xs text-slate-500 max-w-sm mt-1">
+                      Elige un ticket de la bandeja izquierda para ver los antecedentes y responder al inquilino en tiempo real.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col h-full overflow-hidden">
+                  {/* HEADER DE LA SALA DE CHAT */}
+                  <div className="p-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-200 text-teal-800 font-bold text-sm flex items-center justify-center font-mono shadow-xs">
+                        #{ticketSeleccionado.tenantId}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-slate-900 text-sm">
+                            {ticketSeleccionado.nombreEmpresa}
+                          </h4>
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                            ticketSeleccionado.estado === "RESUELTO"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : ticketSeleccionado.estado === "EN_ATENCION"
+                              ? "bg-teal-50 text-teal-700 border-teal-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}>
+                            {ticketSeleccionado.estado}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+                          <span>Asunto: <strong className="text-slate-700">{ticketSeleccionado.tituloAsunto}</strong></span>
+                          <span>-</span>
+                          <span>Usuario: {ticketSeleccionado.usuarioCreador}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ACCIONES DE ESTADO DEL TICKET */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleCambiarEstadoTicket(ticketSeleccionado.id, "EN_ATENCION")}
+                        className="px-3 py-1.5 rounded-xl border border-teal-200 bg-teal-50 hover:bg-teal-100/70 text-teal-800 text-xs font-bold transition-all cursor-pointer"
+                        title="Marcar como caso en revision activa"
+                      >
+                        En Atencion
+                      </button>
+
+                      <button
+                        onClick={() => handleCambiarEstadoTicket(ticketSeleccionado.id, "RESUELTO")}
+                        className="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all cursor-pointer"
+                        title="Marcar caso como resuelto"
+                      >
+                        Resolver Caso
+                      </button>
+
+                      <button
+                        onClick={() => handleImpersonar(ticketSeleccionado.tenantId)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                        title="Abrir sesion de soporte en pantalla para este tenant"
+                      >
+                        Impersonar
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* AREA DE MENSAJES (ESTILO WHATSAPP) */}
+                  <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-100/60">
+                    {mensajesSoporte.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-slate-400 text-xs">
+                        Cargando mensajes del caso...
+                      </div>
+                    ) : (
+                      mensajesSoporte.map((m) => {
+                        const esSuperAdmin = m.emisorTipo === "SUPERADMIN";
+
+                        return (
+                          <div
+                            key={m.id}
+                            className={`flex flex-col ${esSuperAdmin ? "items-end" : "items-start"}`}
+                          >
+                            <div className="text-[10px] font-semibold text-slate-400 mb-1 px-1">
+                              {esSuperAdmin ? "Tu (Soporte Aurora)" : m.emisorNombre || ticketSeleccionado.nombreEmpresa}
+                            </div>
+                            <div
+                              className={`max-w-[75%] p-4 text-xs rounded-2xl shadow-xs ${
+                                esSuperAdmin
+                                  ? "bg-teal-600 text-white rounded-tr-xs"
+                                  : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
+                              }`}
+                            >
+                              <div className="leading-relaxed whitespace-pre-wrap">{m.contenido}</div>
+                              <div
+                                className={`text-[10px] mt-1.5 text-right font-mono flex items-center justify-end gap-1 ${
+                                  esSuperAdmin ? "text-teal-100" : "text-slate-400"
+                                }`}
+                              >
+                                <span>{m.fechaEnvio ? m.fechaEnvio.substring(11, 16) : ""}</span>
+                                {esSuperAdmin && (
+                                  <span className="font-bold">{m.leidoPorDestinatario ? "[OK]" : "[OK]"}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* BARRA DE RESPUESTAS RAPIDAS (CANNED REPLIES) */}
+                  <div className="px-4 py-2 bg-white border-t border-slate-100 flex items-center gap-2 overflow-x-auto text-xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                      Respuestas Rapidas:
+                    </span>
+                    <button
+                      onClick={() => handleEnviarMensajeSoporte(undefined, "Hola, un asesor tecnico esta revisando su solicitud en la plataforma Aurora Plus.")}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer"
+                    >
+                      Revisando caso
+                    </button>
+                    <button
+                      onClick={() => handleEnviarMensajeSoporte(undefined, "Su licencia y modulos han sido actualizados satisfactoriamente en el ecosistema.")}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer"
+                    >
+                      Licencia activada
+                    </button>
+                    <button
+                      onClick={() => handleEnviarMensajeSoporte(undefined, "Por favor adjunte el comprobante o referencia de pago para procesar la acreditacion.")}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer"
+                    >
+                      Solicitar comprobante
+                    </button>
+                    <button
+                      onClick={() => handleEnviarMensajeSoporte(undefined, "El inconveniente ha quedado resuelto. Si requiere asistencia adicional, no dude en escribirnos.")}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer"
+                    >
+                      Caso resuelto
+                    </button>
+                  </div>
+
+                  {/* BARRA DE ENTRADA DE TEXTO TIPO WHATSAPP */}
+                  <form onSubmit={(e) => handleEnviarMensajeSoporte(e)} className="p-4 bg-white border-t border-slate-200 flex items-center gap-3">
+                    <input
+                      type="text"
+                      placeholder="Escribe una respuesta para el cliente..."
+                      value={nuevoMensajeSoporte}
+                      onChange={(e) => setNuevoMensajeSoporte(e.target.value)}
+                      disabled={enviandoMensajeSoporte}
+                      className="flex-1 px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500 font-medium"
+                    />
+                    <button
+                      type="submit"
+                      disabled={enviandoMensajeSoporte || !nuevoMensajeSoporte.trim()}
+                      className="px-6 py-3 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-2xl transition-all shadow-md shadow-teal-600/20 cursor-pointer disabled:opacity-40 shrink-0"
+                    >
+                      {enviandoMensajeSoporte ? "Enviando..." : "Enviar Respuesta"}
+                    </button>
+                  </form>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
         </div>
       </div>
 

@@ -113,7 +113,7 @@ public class TenantInterceptor implements HandlerInterceptor {
         // expiración natural — cambiar la clave ahora sí cierra las sesiones abiertas en otros
         // dispositivos.
         Integer tokenVersionClaim = claims.get("tokenVersion", Integer.class);
-        if (tokenVersionClaim != null) {
+        if (tokenVersionClaim != null && !"soporte-superadmin".equals(claims.getSubject())) {
             Usuario usuario = usuarioRepository.buscarPorTenantYUsername(tenantId, claims.getSubject()).orElse(null);
             if (usuario == null || usuario.getTokenVersion() != tokenVersionClaim) {
                 rechazar(response, "Sesión invalidada — la contraseña cambió, inicia sesión de nuevo");

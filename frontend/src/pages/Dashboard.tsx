@@ -1,3 +1,4 @@
+import TenantSoporteWidget from "../components/TenantSoporteWidget";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
@@ -1641,14 +1642,7 @@ export default function Dashboard() {
       )}
 
       {/* ── BOTÓN FLOTANTE DE SOPORTE WHATSAPP ── */}
-      <a
-        href="https://wa.me/584141234567?text=Hola%20Aurora%20Plus,%20necesito%20asistencia%20con%20mi%20cuenta"
-        target="_blank"
-        rel="noreferrer"
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 bg-[#25D366] text-white font-bold text-xs px-4 py-3 rounded-full shadow-[0_8px_25px_rgba(37,211,102,0.4)] hover:scale-105 transition-transform">
-        <IconChat size={16} />
-        <span className="hidden sm:inline">Soporte WhatsApp</span>
-      </a>
+      <TenantSoporteWidget />
 
     </div>
   );

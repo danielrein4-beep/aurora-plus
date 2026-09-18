@@ -3880,3 +3880,128 @@ export async function obtenerAnalyticsSuperAdmin(periodo?: string, fechaRef?: st
   const q = params.toString() ? `?${params.toString()}` : "";
   return requestSuperAdmin<SaasAnalyticsResponse>(`/api/super-admin/tenants/analytics${q}`);
 }
+
+
+// =========================================================================
+// SISTEMA DE SOPORTE & ASISTENCIA AL TENANT (TICKETS Y CHAT EN VIVO)
+// =========================================================================
+export interface SaasSoporteTicket {
+  id: number;
+  tenantId: number;
+  nombreEmpresa: string;
+  usuarioCreador: string;
+  tituloAsunto: string;
+  categoria: "SOPORTE_TECNICO" | "FACTURACION" | "DUDA_USO" | "CONFIGURACION" | "ERROR_SISTEMA" | string;
+  prioridad: "BAJA" | "MEDIA" | "ALTA" | "URGENTE" | string;
+  estado: "ABIERTO" | "EN_ATENCION" | "RESUELTO" | "CERRADO" | string;
+  agenteAsignado?: string | null;
+  ultimoMensaje?: string | null;
+  fechaCreacion: string;
+  fechaActualizacion: string;
+  mensajesNoLeidos?: number;
+}
+
+export interface SaasSoporteMensaje {
+  id: number;
+  ticketId: number;
+  emisorTipo: "TENANT" | "SUPERADMIN";
+  emisorNombre: string;
+  contenido: string;
+  fechaEnvio: string;
+  leidoPorDestinatario: boolean;
+}
+
+export interface CrearTicketRequest {
+  tenantId?: number;
+  nombreEmpresa?: string;
+  tituloAsunto: string;
+  mensajeInicial: string;
+  categoria?: string;
+  prioridad?: string;
+  usuarioCreador?: string;
+}
+
+// SUPER ADMIN SOPORTE APIS
+export async function listarTicketsSuperAdmin(estado?: string, prioridad?: string, q?: string): Promise<SaasSoporteTicket[]> {
+  const params = new URLSearchParams();
+  if (estado && estado !== "TODOS") params.append("estado", estado);
+  if (prioridad && prioridad !== "TODOS") params.append("prioridad", prioridad);
+  if (q) params.append("q", q);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return requestSuperAdmin<SaasSoporteTicket[]>(`/api/super-admin/soporte/tickets${query}`);
+}
+
+export async function listarMensajesTicketSuperAdmin(ticketId: number): Promise<SaasSoporteMensaje[]> {
+  return requestSuperAdmin<SaasSoporteMensaje[]>(`/api/super-admin/soporte/tickets/${ticketId}/mensajes`);
+}
+
+export async function enviarMensajeTicketSuperAdmin(ticketId: number, contenido: string, agenteNombre: string = "Soporte Aurora"): Promise<SaasSoporteMensaje> {
+  return requestSuperAdmin<SaasSoporteMensaje>(`/api/super-admin/soporte/tickets/${ticketId}/mensajes`, {
+    method: "POST",
+    body: JSON.stringify({ contenido, agenteNombre }),
+  });
+}
+
+export async function cambiarEstadoTicketSuperAdmin(ticketId: number, estado: string, agenteAsignado?: string): Promise<SaasSoporteTicket> {
+  return requestSuperAdmin<SaasSoporteTicket>(`/api/super-admin/soporte/tickets/${ticketId}/estado`, {
+    method: "PUT",
+    body: JSON.stringify({ estado, agenteAsignado }),
+  });
+}
+
+// TENANT SOPORTE APIS
+export async function listarTicketsTenant(tenantId?: number): Promise<SaasSoporteTicket[]> {
+  const sesion = leerSesion();
+  const tid = tenantId || sesion?.tenantId || 1;
+  const res = await fetch(`/api/tenant/soporte/tickets?tenantId=${tid}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {}),
+      "X-Tenant-Id": String(tid),
+    },
+  });
+  if (!res.ok) throw new Error("Error al listar tickets del tenant");
+  return res.json();
+}
+
+export async function crearTicketTenant(datos: CrearTicketRequest): Promise<SaasSoporteTicket> {
+  const sesion = leerSesion();
+  const tid = datos.tenantId || sesion?.tenantId || 1;
+  const res = await fetch("/api/tenant/soporte/tickets", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {}),
+      "X-Tenant-Id": String(tid),
+    },
+    body: JSON.stringify({ ...datos, tenantId: tid, usuarioCreador: datos.usuarioCreador || sesion?.username || "admin" }),
+  });
+  if (!res.ok) throw new Error("Error al crear ticket");
+  return res.json();
+}
+
+export async function listarMensajesTicketTenant(ticketId: number): Promise<SaasSoporteMensaje[]> {
+  const sesion = leerSesion();
+  const res = await fetch(`/api/tenant/soporte/tickets/${ticketId}/mensajes`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {}),
+    },
+  });
+  if (!res.ok) throw new Error("Error al cargar mensajes del ticket");
+  return res.json();
+}
+
+export async function enviarMensajeTicketTenant(ticketId: number, contenido: string, emisorNombre?: string): Promise<SaasSoporteMensaje> {
+  const sesion = leerSesion();
+  const res = await fetch(`/api/tenant/soporte/tickets/${ticketId}/mensajes`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {}),
+    },
+    body: JSON.stringify({ contenido, emisorNombre: emisorNombre || sesion?.username || "Usuario" }),
+  });
+  if (!res.ok) throw new Error("Error al enviar mensaje");
+  return res.json();
+}
