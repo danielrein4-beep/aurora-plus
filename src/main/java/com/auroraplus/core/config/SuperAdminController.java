@@ -694,4 +694,384 @@ public class SuperAdminController {
         saasMovimientoRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("mensaje", "Movimiento eliminado"));
     }
+
+    // =========================================================================
+    // MODULO DE METRICAS, ESTADISTICAS Y RANKING DE TENANTS SAAS
+    // =========================================================================
+    @GetMapping("/analytics")
+    public ResponseEntity<Map<String, Object>> obtenerAnalytics(
+        @RequestParam(required = false, defaultValue = "MES") String periodo,
+        @RequestParam(required = false) String fechaRef
+    ) {
+        String modo = (periodo != null ? periodo.toUpperCase().trim() : "MES");
+        LocalDate refDate;
+        try {
+            if (fechaRef != null && fechaRef.matches("^\\d{4}-\\d{2}-\\d{2}$")) {
+                refDate = LocalDate.parse(fechaRef);
+            } else {
+                refDate = LocalDate.now();
+            }
+        } catch (Exception e) {
+            refDate = LocalDate.now();
+        }
+
+        LocalDateTime desde;
+        LocalDateTime hasta;
+        String periodoLabel;
+
+        switch (modo) {
+            case "DIA":
+                desde = refDate.atStartOfDay();
+                hasta = refDate.atTime(23, 59, 59);
+                periodoLabel = "Dia: " + refDate.toString();
+                break;
+            case "SEMANA":
+                desde = refDate.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)).atStartOfDay();
+                hasta = refDate.with(TemporalAdjusters.nextOrSame(java.time.DayOfWeek.SUNDAY)).atTime(23, 59, 59);
+                periodoLabel = "Semana: " + desde.toLocalDate() + " al " + hasta.toLocalDate();
+                break;
+            case "HISTORICO":
+                desde = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
+                hasta = LocalDateTime.now().plusDays(1);
+                periodoLabel = "Historico Total Acumulado";
+                break;
+            case "MES":
+            default:
+                modo = "MES";
+                desde = refDate.with(TemporalAdjusters.firstDayOfMonth()).atStartOfDay();
+                hasta = refDate.with(TemporalAdjusters.lastDayOfMonth()).atTime(23, 59, 59);
+                periodoLabel = "Mes: " + refDate.getMonth().getDisplayName(java.time.format.TextStyle.FULL, new Locale("es", "ES")) + " " + refDate.getYear();
+                break;
+        }
+
+        List<LicenciaTenant> todosTenants = licenciaTenantRepository.findAll();
+        List<PagoSuscripcionTenant> todosPagos = pagoSuscripcionRepository.findAllByOrderByFechaPagoDesc();
+
+        List<PagoSuscripcionTenant> pagosConfirmados = todosPagos.stream()
+            .filter(p -> "CONFIRMADO".equalsIgnoreCase(p.getEstado()))
+            .collect(Collectors.toList());
+
+        final LocalDateTime fDesde = desde;
+        final LocalDateTime fHasta = hasta;
+        List<PagoSuscripcionTenant> pagosPeriodo = pagosConfirmados.stream()
+            .filter(p -> p.getFechaPago() != null && !p.getFechaPago().isBefore(fDesde) && !p.getFechaPago().isAfter(fHasta))
+            .collect(Collectors.toList());
+
+        // KPIs
+        BigDecimal facturacionPeriodo = pagosPeriodo.stream()
+            .map(PagoSuscripcionTenant::getMonto)
+            .filter(Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        long cantidadPagosPeriodo = pagosPeriodo.size();
+        BigDecimal ticketPromedioPeriodo = cantidadPagosPeriodo > 0
+            ? facturacionPeriodo.divide(BigDecimal.valueOf(cantidadPagosPeriodo), 2, java.math.RoundingMode.HALF_UP)
+            : BigDecimal.ZERO;
+
+        BigDecimal facturacionHistorica = pagosConfirmados.stream()
+            .map(PagoSuscripcionTenant::getMonto)
+            .filter(Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        long totalTenants = todosTenants.size();
+        long tenantsActivos = todosTenants.stream().filter(LicenciaTenant::isActiva).count();
+        long tenantsSuspendidos = totalTenants - tenantsActivos;
+        double tasaRetencion = totalTenants > 0 ? Math.round(((double) tenantsActivos / totalTenants) * 1000.0) / 10.0 : 100.0;
+
+        long nuevosTenantsPeriodo = todosTenants.stream()
+            .filter(t -> t.getFechaAlta() != null && !t.getFechaAlta().isBefore(fDesde.toLocalDate()) && !t.getFechaAlta().isAfter(fHasta.toLocalDate()))
+            .count();
+
+        // 1. RANKING TOP TENANTS
+        Map<Long, List<PagoSuscripcionTenant>> pagosPorTenant = pagosConfirmados.stream()
+            .collect(Collectors.groupingBy(PagoSuscripcionTenant::getTenantId));
+
+        Map<Long, List<PagoSuscripcionTenant>> pagosPeriodoPorTenant = pagosPeriodo.stream()
+            .collect(Collectors.groupingBy(PagoSuscripcionTenant::getTenantId));
+
+        List<Map<String, Object>> topTenants = new ArrayList<>();
+        for (LicenciaTenant lic : todosTenants) {
+            Long tid = lic.getTenantId();
+            List<PagoSuscripcionTenant> pgs = pagosPorTenant.getOrDefault(tid, Collections.emptyList());
+            List<PagoSuscripcionTenant> pgsPeriodo = pagosPeriodoPorTenant.getOrDefault(tid, Collections.emptyList());
+
+            BigDecimal totalPagado = pgs.stream()
+                .map(PagoSuscripcionTenant::getMonto)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal pagadoPeriodo = pgsPeriodo.stream()
+                .map(PagoSuscripcionTenant::getMonto)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            int mesesAdquiridos = pgs.stream()
+                .mapToInt(p -> p.getMesesPagados() != null ? p.getMesesPagados() : 1)
+                .sum();
+
+            LocalDateTime ultimoPago = pgs.stream()
+                .map(PagoSuscripcionTenant::getFechaPago)
+                .filter(Objects::nonNull)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
+
+            Map<String, Object> fila = new LinkedHashMap<>();
+            fila.put("tenantId", tid);
+            fila.put("nombreEmpresa", lic.getNombreEmpresa());
+            fila.put("moduloPrincipal", lic.getModuloPrincipal() != null ? lic.getModuloPrincipal() : "general");
+            fila.put("tipoLicencia", lic.getTipoLicencia() != null ? lic.getTipoLicencia().name() : "COMERCIAL");
+            fila.put("activa", lic.isActiva());
+            fila.put("totalFacturadoUsd", totalPagado);
+            fila.put("facturadoPeriodoUsd", pagadoPeriodo);
+            fila.put("cantidadPagos", pgs.size());
+            fila.put("cantidadPagosPeriodo", pgsPeriodo.size());
+            fila.put("mesesAdquiridos", mesesAdquiridos);
+            fila.put("ultimoPago", ultimoPago != null ? ultimoPago.toString() : null);
+            fila.put("fechaVencimientoPago", lic.getFechaVencimientoPago() != null ? lic.getFechaVencimientoPago().toString() : null);
+            topTenants.add(fila);
+        }
+
+        // Ordenar por totalFacturadoUsd descendente, luego por mesesAdquiridos
+        topTenants.sort((a, b) -> {
+            BigDecimal mB = (BigDecimal) b.get("totalFacturadoUsd");
+            BigDecimal mA = (BigDecimal) a.get("totalFacturadoUsd");
+            int c = mB.compareTo(mA);
+            if (c != 0) return c;
+            Integer mesB = (Integer) b.get("mesesAdquiridos");
+            Integer mesA = (Integer) a.get("mesesAdquiridos");
+            return mesB.compareTo(mesA);
+        });
+
+        for (int i = 0; i < topTenants.size(); i++) {
+            topTenants.get(i).put("posicion", i + 1);
+        }
+
+        // 2. DESGLOSE POR VERTICAL / INDUSTRIA
+        Map<String, List<LicenciaTenant>> tenantsPorModulo = todosTenants.stream()
+            .collect(Collectors.groupingBy(t -> t.getModuloPrincipal() != null ? t.getModuloPrincipal().toLowerCase() : "general"));
+
+        List<Map<String, Object>> verticales = new ArrayList<>();
+        for (Map.Entry<String, List<LicenciaTenant>> entry : tenantsPorModulo.entrySet()) {
+            String mod = entry.getKey();
+            List<LicenciaTenant> listaT = entry.getValue();
+            Set<Long> tids = listaT.stream().map(LicenciaTenant::getTenantId).collect(Collectors.toSet());
+
+            BigDecimal facturadoVert = pagosConfirmados.stream()
+                .filter(p -> tids.contains(p.getTenantId()))
+                .map(PagoSuscripcionTenant::getMonto)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal facturadoVertPeriodo = pagosPeriodo.stream()
+                .filter(p -> tids.contains(p.getTenantId()))
+                .map(PagoSuscripcionTenant::getMonto)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            String nombreLimpio;
+            switch (mod) {
+                case "salud": nombreLimpio = "Salud y MediClinic"; break;
+                case "horeca": nombreLimpio = "Gastronomia / HORECA"; break;
+                case "ganaderia": nombreLimpio = "Ganaderia y Agro"; break;
+                case "repuestos": nombreLimpio = "Repuestos y Talleres"; break;
+                case "moda": nombreLimpio = "Moda y Calzado"; break;
+                case "minero": nombreLimpio = "Mineria y Canteras"; break;
+                case "comercial":
+                case "tamanaco-comercial": nombreLimpio = "Comercio General"; break;
+                default: nombreLimpio = mod.substring(0, 1).toUpperCase() + mod.substring(1); break;
+            }
+
+            double cuotaTenants = totalTenants > 0 ? Math.round(((double) listaT.size() / totalTenants) * 1000.0) / 10.0 : 0.0;
+            double cuotaFacturacion = facturacionHistorica.compareTo(BigDecimal.ZERO) > 0
+                ? Math.round(facturadoVert.multiply(BigDecimal.valueOf(100)).divide(facturacionHistorica, 1, java.math.RoundingMode.HALF_UP).doubleValue() * 10.0) / 10.0
+                : 0.0;
+
+            Map<String, Object> vObj = new LinkedHashMap<>();
+            vObj.put("vertical", mod);
+            vObj.put("nombreVertical", nombreLimpio);
+            vObj.put("totalTenants", listaT.size());
+            vObj.put("cuotaTenantsPct", cuotaTenants);
+            vObj.put("totalFacturadoUsd", facturadoVert);
+            vObj.put("facturadoPeriodoUsd", facturadoVertPeriodo);
+            vObj.put("cuotaFacturacionPct", cuotaFacturacion);
+            verticales.add(vObj);
+        }
+
+        verticales.sort((a, b) -> ((BigDecimal) b.get("totalFacturadoUsd")).compareTo((BigDecimal) a.get("totalFacturadoUsd")));
+
+        // 3. DESGLOSE POR PLAN DE LICENCIA
+        Map<String, List<LicenciaTenant>> tenantsPorPlan = todosTenants.stream()
+            .collect(Collectors.groupingBy(t -> t.getTipoLicencia() != null ? t.getTipoLicencia().name() : "COMERCIAL"));
+
+        List<Map<String, Object>> planes = new ArrayList<>();
+        for (String planName : Arrays.asList("BASICA", "COMERCIAL", "INDUSTRIAL")) {
+            List<LicenciaTenant> lPlan = tenantsPorPlan.getOrDefault(planName, Collections.emptyList());
+            Set<Long> tids = lPlan.stream().map(LicenciaTenant::getTenantId).collect(Collectors.toSet());
+            BigDecimal facturadoPlan = pagosConfirmados.stream()
+                .filter(p -> tids.contains(p.getTenantId()))
+                .map(PagoSuscripcionTenant::getMonto)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            double pct = totalTenants > 0 ? Math.round(((double) lPlan.size() / totalTenants) * 1000.0) / 10.0 : 0.0;
+
+            Map<String, Object> pMap = new LinkedHashMap<>();
+            pMap.put("plan", planName);
+            pMap.put("totalTenants", lPlan.size());
+            pMap.put("porcentaje", pct);
+            pMap.put("totalFacturadoUsd", facturadoPlan);
+            planes.add(pMap);
+        }
+
+        // 4. DESGLOSE POR METODO DE PAGO
+        Map<String, List<PagoSuscripcionTenant>> pagosPorMetodo = pagosPeriodo.stream()
+            .collect(Collectors.groupingBy(p -> p.getMetodoPago() != null ? p.getMetodoPago() : "OTRO"));
+
+        List<Map<String, Object>> metodosPago = new ArrayList<>();
+        for (Map.Entry<String, List<PagoSuscripcionTenant>> entry : pagosPorMetodo.entrySet()) {
+            BigDecimal sum = entry.getValue().stream()
+                .map(PagoSuscripcionTenant::getMonto)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            double pct = facturacionPeriodo.compareTo(BigDecimal.ZERO) > 0
+                ? Math.round(sum.multiply(BigDecimal.valueOf(100)).divide(facturacionPeriodo, 1, java.math.RoundingMode.HALF_UP).doubleValue() * 10.0) / 10.0
+                : 0.0;
+
+            Map<String, Object> mObj = new LinkedHashMap<>();
+            mObj.put("metodo", entry.getKey());
+            mObj.put("cantidadPagos", entry.getValue().size());
+            mObj.put("totalUsd", sum);
+            mObj.put("porcentaje", pct);
+            metodosPago.add(mObj);
+        }
+        metodosPago.sort((a, b) -> ((BigDecimal) b.get("totalUsd")).compareTo((BigDecimal) a.get("totalUsd")));
+
+        // 5. TENDENCIA TEMPORAL
+        List<Map<String, Object>> tendencia = new ArrayList<>();
+        if ("DIA".equals(modo)) {
+            for (int i = 6; i >= 0; i--) {
+                LocalDate d = refDate.minusDays(i);
+                LocalDateTime dIni = d.atStartOfDay();
+                LocalDateTime dFin = d.atTime(23, 59, 59);
+                BigDecimal sumDia = pagosConfirmados.stream()
+                    .filter(p -> p.getFechaPago() != null && !p.getFechaPago().isBefore(dIni) && !p.getFechaPago().isAfter(dFin))
+                    .map(PagoSuscripcionTenant::getMonto)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                long cntDia = pagosConfirmados.stream()
+                    .filter(p -> p.getFechaPago() != null && !p.getFechaPago().isBefore(dIni) && !p.getFechaPago().isAfter(dFin))
+                    .count();
+
+                Map<String, Object> pto = new LinkedHashMap<>();
+                pto.put("etiqueta", d.getDayOfWeek().getDisplayName(java.time.format.TextStyle.SHORT, new Locale("es", "ES")) + " " + d.getDayOfMonth());
+                pto.put("fecha", d.toString());
+                pto.put("montoUsd", sumDia);
+                pto.put("cantidad", cntDia);
+                tendencia.add(pto);
+            }
+        } else if ("SEMANA".equals(modo)) {
+            LocalDate monday = refDate.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+            for (int i = 0; i < 7; i++) {
+                LocalDate d = monday.plusDays(i);
+                LocalDateTime dIni = d.atStartOfDay();
+                LocalDateTime dFin = d.atTime(23, 59, 59);
+                BigDecimal sumDia = pagosConfirmados.stream()
+                    .filter(p -> p.getFechaPago() != null && !p.getFechaPago().isBefore(dIni) && !p.getFechaPago().isAfter(dFin))
+                    .map(PagoSuscripcionTenant::getMonto)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                long cntDia = pagosConfirmados.stream()
+                    .filter(p -> p.getFechaPago() != null && !p.getFechaPago().isBefore(dIni) && !p.getFechaPago().isAfter(dFin))
+                    .count();
+
+                Map<String, Object> pto = new LinkedHashMap<>();
+                pto.put("etiqueta", d.getDayOfWeek().getDisplayName(java.time.format.TextStyle.SHORT, new Locale("es", "ES")) + " " + d.getDayOfMonth());
+                pto.put("fecha", d.toString());
+                pto.put("montoUsd", sumDia);
+                pto.put("cantidad", cntDia);
+                tendencia.add(pto);
+            }
+        } else if ("MES".equals(modo)) {
+            LocalDate primerDia = refDate.with(TemporalAdjusters.firstDayOfMonth());
+            LocalDate ultimoDia = refDate.with(TemporalAdjusters.lastDayOfMonth());
+            LocalDate curr = primerDia;
+            while (!curr.isAfter(ultimoDia)) {
+                LocalDate finBloque = curr.plusDays(4);
+                if (finBloque.isAfter(ultimoDia)) finBloque = ultimoDia;
+                LocalDateTime bIni = curr.atStartOfDay();
+                LocalDateTime bFin = finBloque.atTime(23, 59, 59);
+
+                BigDecimal sumBlk = pagosConfirmados.stream()
+                    .filter(p -> p.getFechaPago() != null && !p.getFechaPago().isBefore(bIni) && !p.getFechaPago().isAfter(bFin))
+                    .map(PagoSuscripcionTenant::getMonto)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                long cntBlk = pagosConfirmados.stream()
+                    .filter(p -> p.getFechaPago() != null && !p.getFechaPago().isBefore(bIni) && !p.getFechaPago().isAfter(bFin))
+                    .count();
+
+                Map<String, Object> pto = new LinkedHashMap<>();
+                pto.put("etiqueta", "D" + curr.getDayOfMonth() + "-D" + finBloque.getDayOfMonth());
+                pto.put("fecha", curr.toString());
+                pto.put("montoUsd", sumBlk);
+                pto.put("cantidad", cntBlk);
+                tendencia.add(pto);
+
+                curr = finBloque.plusDays(1);
+            }
+        } else {
+            // HISTORICO
+            for (int i = 5; i >= 0; i--) {
+                LocalDate mDate = refDate.minusMonths(i);
+                LocalDateTime mIni = mDate.with(TemporalAdjusters.firstDayOfMonth()).atStartOfDay();
+                LocalDateTime mFin = mDate.with(TemporalAdjusters.lastDayOfMonth()).atTime(23, 59, 59);
+
+                BigDecimal sumMes = pagosConfirmados.stream()
+                    .filter(p -> p.getFechaPago() != null && !p.getFechaPago().isBefore(mIni) && !p.getFechaPago().isAfter(mFin))
+                    .map(PagoSuscripcionTenant::getMonto)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                long cntMes = pagosConfirmados.stream()
+                    .filter(p -> p.getFechaPago() != null && !p.getFechaPago().isBefore(mIni) && !p.getFechaPago().isAfter(mFin))
+                    .count();
+
+                Map<String, Object> pto = new LinkedHashMap<>();
+                pto.put("etiqueta", mDate.getMonth().getDisplayName(java.time.format.TextStyle.SHORT, new Locale("es", "ES")) + " " + (mDate.getYear() % 100));
+                pto.put("fecha", mDate.toString().substring(0, 7));
+                pto.put("montoUsd", sumMes);
+                pto.put("cantidad", cntMes);
+                tendencia.add(pto);
+            }
+        }
+
+        Map<String, Object> respuesta = new LinkedHashMap<>();
+        respuesta.put("periodo", modo);
+        respuesta.put("periodoLabel", periodoLabel);
+        respuesta.put("fechaRef", refDate.toString());
+        respuesta.put("fechaDesde", desde.toString());
+        respuesta.put("fechaHasta", hasta.toString());
+
+        // KPIs
+        Map<String, Object> kpis = new LinkedHashMap<>();
+        kpis.put("facturacionPeriodoUsd", facturacionPeriodo);
+        kpis.put("facturacionHistoricaUsd", facturacionHistorica);
+        kpis.put("cantidadPagosPeriodo", cantidadPagosPeriodo);
+        kpis.put("ticketPromedioPeriodoUsd", ticketPromedioPeriodo);
+        kpis.put("totalTenants", totalTenants);
+        kpis.put("tenantsActivos", tenantsActivos);
+        kpis.put("tenantsSuspendidos", tenantsSuspendidos);
+        kpis.put("tasaRetencionPct", tasaRetencion);
+        kpis.put("nuevosTenantsPeriodo", nuevosTenantsPeriodo);
+        respuesta.put("kpis", kpis);
+
+        // Secciones
+        respuesta.put("topTenants", topTenants);
+        respuesta.put("verticales", verticales);
+        respuesta.put("planes", planes);
+        respuesta.put("metodosPago", metodosPago);
+        respuesta.put("tendencia", tendencia);
+
+        return ResponseEntity.ok(respuesta);
+    }
+
 }

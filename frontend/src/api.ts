@@ -3795,3 +3795,88 @@ export async function eliminarMovimientoFinancieroSaas(id: number): Promise<{ me
     method: "DELETE",
   });
 }
+
+
+// =========================================================================
+// ANALITICA Y ESTADISTICAS SAAS SUPER ADMIN
+// =========================================================================
+export interface TopTenantRanking {
+  posicion: number;
+  tenantId: number;
+  nombreEmpresa: string;
+  moduloPrincipal: string;
+  tipoLicencia: string;
+  activa: boolean;
+  totalFacturadoUsd: number;
+  facturadoPeriodoUsd: number;
+  cantidadPagos: number;
+  cantidadPagosPeriodo: number;
+  mesesAdquiridos: number;
+  ultimoPago?: string | null;
+  fechaVencimientoPago?: string | null;
+}
+
+export interface VerticalAnalytics {
+  vertical: string;
+  nombreVertical: string;
+  totalTenants: number;
+  cuotaTenantsPct: number;
+  totalFacturadoUsd: number;
+  facturadoPeriodoUsd: number;
+  cuotaFacturacionPct: number;
+}
+
+export interface PlanAnalytics {
+  plan: string;
+  totalTenants: number;
+  porcentaje: number;
+  totalFacturadoUsd: number;
+}
+
+export interface MetodoPagoAnalytics {
+  metodo: string;
+  cantidadPagos: number;
+  totalUsd: number;
+  porcentaje: number;
+}
+
+export interface TendenciaDataPoint {
+  etiqueta: string;
+  fecha: string;
+  montoUsd: number;
+  cantidad: number;
+}
+
+export interface SaasKpis {
+  facturacionPeriodoUsd: number;
+  facturacionHistoricaUsd: number;
+  cantidadPagosPeriodo: number;
+  ticketPromedioPeriodoUsd: number;
+  totalTenants: number;
+  tenantsActivos: number;
+  tenantsSuspendidos: number;
+  tasaRetencionPct: number;
+  nuevosTenantsPeriodo: number;
+}
+
+export interface SaasAnalyticsResponse {
+  periodo: "DIA" | "SEMANA" | "MES" | "HISTORICO";
+  periodoLabel: string;
+  fechaRef: string;
+  fechaDesde: string;
+  fechaHasta: string;
+  kpis: SaasKpis;
+  topTenants: TopTenantRanking[];
+  verticales: VerticalAnalytics[];
+  planes: PlanAnalytics[];
+  metodosPago: MetodoPagoAnalytics[];
+  tendencia: TendenciaDataPoint[];
+}
+
+export async function obtenerAnalyticsSuperAdmin(periodo?: string, fechaRef?: string): Promise<SaasAnalyticsResponse> {
+  const params = new URLSearchParams();
+  if (periodo) params.append("periodo", periodo);
+  if (fechaRef) params.append("fechaRef", fechaRef);
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return requestSuperAdmin<SaasAnalyticsResponse>(`/api/super-admin/tenants/analytics${q}`);
+}

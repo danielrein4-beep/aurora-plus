@@ -49,6 +49,13 @@ import {
   listarMovimientosFinancierosSaas,
   registrarMovimientoFinancieroSaas,
   eliminarMovimientoFinancieroSaas,
+  SaasAnalyticsResponse,
+  TopTenantRanking,
+  VerticalAnalytics,
+  PlanAnalytics,
+  MetodoPagoAnalytics,
+  TendenciaDataPoint,
+  obtenerAnalyticsSuperAdmin,
 } from "../api";
 
 interface SuperAdminPortalProps {
@@ -189,7 +196,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
   // VISTA PRINCIPAL (TENANTS vs FINANZAS)
   // VISTA PRINCIPAL (TENANTS vs PAGOS vs FINANZAS)
-  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "FINANZAS">("TENANTS");
+  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "FINANZAS">("TENANTS");
 
   // FILTROS Y ESTADOS DEL MODULO DEDICADO DE HISTORIAL DE PAGOS
   const [filtroPagosTenant, setFiltroPagosTenant] = useState<number | "TODOS">("TODOS");
@@ -205,6 +212,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   const [cargandoFinanzas, setCargandoFinanzas] = useState(false);
   const [filtroTipoMovimiento, setFiltroTipoMovimiento] = useState<"TODOS" | "INGRESO" | "EGRESO">("TODOS");
   const [filtroTextoMovimiento, setFiltroTextoMovimiento] = useState("");
+
+  // ESTADOS DEL MODULO DE METRICAS & ANALITICA SAAS
+  const [periodoAnalytics, setPeriodoAnalytics] = useState<"DIA" | "SEMANA" | "MES" | "HISTORICO">("MES");
+  const [fechaRefAnalytics, setFechaRefAnalytics] = useState<string>(() => new Date().toISOString().substring(0, 10));
+  const [analyticsData, setAnalyticsData] = useState<SaasAnalyticsResponse | null>(null);
+  const [cargandoAnalytics, setCargandoAnalytics] = useState(false);
+  const [filtroRankingBusqueda, setFiltroRankingBusqueda] = useState("");
 
   // Modales de Finanzas
   const [showGastoFijoModal, setShowGastoFijoModal] = useState(false);
@@ -364,6 +378,27 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       avisar(e?.message || "Error al registrar movimiento financiero", "error");
     }
   };
+
+  const cargarAnalytics = async (periodo?: "DIA" | "SEMANA" | "MES" | "HISTORICO", fechaRef?: string) => {
+    setCargandoAnalytics(true);
+    try {
+      const p = periodo || periodoAnalytics;
+      const f = fechaRef || fechaRefAnalytics;
+      const data = await obtenerAnalyticsSuperAdmin(p, f);
+      setAnalyticsData(data);
+    } catch (err: any) {
+      console.error("Error al cargar analitica:", err);
+      avisar("Error al obtener metricas SaaS: " + (err.message || "Error de conexion"));
+    } finally {
+      setCargandoAnalytics(false);
+    }
+  };
+
+  useEffect(() => {
+    if (sesion && vistaPrincipal === "METRICAS") {
+      cargarAnalytics(periodoAnalytics, fechaRefAnalytics);
+    }
+  }, [sesion, vistaPrincipal, periodoAnalytics, fechaRefAnalytics]);
 
   const handleEliminarMovimiento = async (id: number) => {
     if (!confirm("Esta seguro de anular este movimiento del libro contable?")) return;
@@ -992,6 +1027,27 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           }`}>
             {historialPagos.length}
           </span>
+        </button>
+
+        <button
+          onClick={() => {
+            setVistaPrincipal("METRICAS");
+            cargarAnalytics();
+          }}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+            vistaPrincipal === "METRICAS"
+              ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <span>Metricas & Estadisticas</span>
+          {analyticsData && (
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+              vistaPrincipal === "METRICAS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+            }`}>
+              ${analyticsData.kpis.facturacionPeriodoUsd.toFixed(2)}
+            </span>
+          )}
         </button>
 
         <button
@@ -1953,6 +2009,532 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* VISTA: METRICAS, ESTADISTICAS Y RANKING DE TENANTS */}
+      {vistaPrincipal === "METRICAS" && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* HEADER DEL MODULO DE METRICAS Y FILTROS TEMPORALES */}
+          <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 uppercase tracking-wider">
+                  Business Intelligence SaaS
+                </span>
+                <span className="text-xs text-slate-400 font-mono">
+                  {analyticsData ? analyticsData.periodoLabel : "Cargando metricas..."}
+                </span>
+              </div>
+              <h2 className="font-['Outfit'] font-extrabold text-2xl text-slate-900 mt-1">
+                Metricas, Estadisticas y Rendimiento SaaS
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Analisis consolidado de facturacion por periodo, ranking de clientes lideres y verticales con mayor traccion.
+              </p>
+            </div>
+
+            {/* CONTROLES DE PERIODO */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Botones de periodo */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                {(["DIA", "SEMANA", "MES", "HISTORICO"] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => {
+                      setPeriodoAnalytics(p);
+                      cargarAnalytics(p, fechaRefAnalytics);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      periodoAnalytics === p
+                        ? "bg-teal-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    {p === "DIA" ? "Dia / Hoy" : p === "SEMANA" ? "Esta Semana" : p === "MES" ? "Este Mes" : "Historico Total"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Selector de fecha de referencia */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-1.5">
+                <span className="text-[11px] font-semibold text-slate-500">Fecha Ref:</span>
+                <input
+                  type="date"
+                  value={fechaRefAnalytics}
+                  onChange={(e) => {
+                    setFechaRefAnalytics(e.target.value);
+                    cargarAnalytics(periodoAnalytics, e.target.value);
+                  }}
+                  className="text-xs font-mono font-medium text-slate-700 bg-transparent border-none outline-none cursor-pointer"
+                />
+              </div>
+
+              {/* Boton refrescar */}
+              <button
+                onClick={() => cargarAnalytics(periodoAnalytics, fechaRefAnalytics)}
+                disabled={cargandoAnalytics}
+                className="px-3.5 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                title="Actualizar estadisticas"
+              >
+                {cargandoAnalytics ? "Calculando..." : "Refrescar"}
+              </button>
+            </div>
+          </div>
+
+          {/* TARJETAS DE KPIS PRINCIPALES (4 COLUMNAS) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* KPI 1: Facturacion Periodo */}
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Facturacion del Periodo
+                </span>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                  {periodoAnalytics}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="font-['Outfit'] font-black text-2xl text-slate-900">
+                  ${analyticsData ? analyticsData.kpis.facturacionPeriodoUsd.toFixed(2) : "0.00"}
+                </span>
+                <span className="text-xs font-bold text-teal-600">USD</span>
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <span>{analyticsData ? analyticsData.kpis.cantidadPagosPeriodo : 0} cobros confirmados</span>
+                <span className="font-mono font-bold text-slate-700">
+                  Prom: ${analyticsData ? analyticsData.kpis.ticketPromedioPeriodoUsd.toFixed(2) : "0.00"}
+                </span>
+              </div>
+            </div>
+
+            {/* KPI 2: Facturacion Historica Total */}
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Ingreso Acumulado (LTV)
+                </span>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Global
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="font-['Outfit'] font-black text-2xl text-slate-900">
+                  ${analyticsData ? analyticsData.kpis.facturacionHistoricaUsd.toFixed(2) : "0.00"}
+                </span>
+                <span className="text-xs font-bold text-emerald-600">USD</span>
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <span>Total vida util SaaS</span>
+                <span className="font-mono text-emerald-700 font-bold">100% Cobrado</span>
+              </div>
+            </div>
+
+            {/* KPI 3: Tenants Activos y Retencion */}
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Tenants Activos & Retencion
+                </span>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  {analyticsData ? `${analyticsData.kpis.tasaRetencionPct}%` : "100%"}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="font-['Outfit'] font-black text-2xl text-slate-900">
+                  {analyticsData ? analyticsData.kpis.tenantsActivos : 0}
+                </span>
+                <span className="text-xs text-slate-500">
+                  de {analyticsData ? analyticsData.kpis.totalTenants : 0} negocios
+                </span>
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <span>{analyticsData ? analyticsData.kpis.tenantsSuspendidos : 0} suspendidos por mora</span>
+                <span className="font-semibold text-blue-700">Tasa Retencion</span>
+              </div>
+            </div>
+
+            {/* KPI 4: Nuevos Registros */}
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Nuevos Tenants
+                </span>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                  Altas
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="font-['Outfit'] font-black text-2xl text-slate-900">
+                  +{analyticsData ? analyticsData.kpis.nuevosTenantsPeriodo : 0}
+                </span>
+                <span className="text-xs text-slate-500">en este periodo</span>
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <span>Crecimiento de cartera</span>
+                <span className="font-semibold text-amber-700">Adquisicion</span>
+              </div>
+            </div>
+          </div>
+
+          {/* GRAFICO INTERACTIVO DE TENDENCIA TEMPORAL */}
+          {analyticsData && analyticsData.tendencia && analyticsData.tendencia.length > 0 && (
+            <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-['Outfit'] font-bold text-base text-slate-900">
+                    Tendencia de Facturacion Temporal
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Evolucion de ingresos USD y volumen de transacciones segun el periodo seleccionado ({analyticsData.periodoLabel}).
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-md bg-teal-600 inline-block"></span>
+                    <span className="text-slate-600 font-medium">Facturacion USD</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* BARRAS DE GRAFICO SVG / CSS NATIVO */}
+              {(() => {
+                const maxVal = Math.max(...analyticsData.tendencia.map((t) => t.montoUsd), 10);
+                return (
+                  <div className="pt-6 pb-2">
+                    <div className="grid grid-cols-6 sm:grid-cols-7 gap-2 sm:gap-4 items-end h-48 border-b border-slate-200 pb-2">
+                      {analyticsData.tendencia.map((pto, idx) => {
+                        const pctHeight = Math.max(Math.round((pto.montoUsd / maxVal) * 100), 6);
+                        return (
+                          <div key={idx} className="flex flex-col items-center h-full justify-end group relative">
+                            {/* Tooltip con monto al pasar el cursor */}
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-10 bg-slate-900 text-white text-[10px] font-mono py-1 px-2 rounded-lg whitespace-nowrap z-10 pointer-events-none shadow-md">
+                              ${pto.montoUsd.toFixed(2)} USD ({pto.cantidad} cobros)
+                            </div>
+
+                            {/* Monto texto encima de la barra si > 0 */}
+                            {pto.montoUsd > 0 && (
+                              <span className="text-[10px] font-mono font-bold text-teal-700 mb-1">
+                                ${pto.montoUsd.toFixed(0)}
+                              </span>
+                            )}
+
+                            {/* Barra vertical con animacion */}
+                            <div
+                              style={{ height: `${pctHeight}%` }}
+                              className={`w-full max-w-[48px] rounded-t-xl transition-all duration-300 ${
+                                pto.montoUsd > 0
+                                  ? "bg-teal-600 hover:bg-teal-500 shadow-sm shadow-teal-600/20 cursor-pointer"
+                                  : "bg-slate-100 hover:bg-slate-200"
+                              }`}
+                            ></div>
+
+                            {/* Etiqueta x-axis */}
+                            <span className="text-[10px] font-medium text-slate-500 mt-2 truncate max-w-full text-center">
+                              {pto.etiqueta}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* GRID 2 COLUMNAS: VERTICALES MAS VENDIDAS Y DISTRIBUCION DE PLANES/METODOS */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* COLUMNA 1: VERTICALES E INDUSTRIAS MAS VENDIDAS */}
+            <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <h3 className="font-['Outfit'] font-bold text-base text-slate-900">
+                    Verticales e Industrias Mas Vendidas
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Cuota de mercado, volumen de clientes y facturacion por sector economico.
+                  </p>
+                </div>
+                <span className="text-xs font-mono font-bold text-slate-400">
+                  {analyticsData ? analyticsData.verticales.length : 0} Sectores
+                </span>
+              </div>
+
+              <div className="space-y-3.5">
+                {analyticsData && analyticsData.verticales.length > 0 ? (
+                  analyticsData.verticales.map((v, i) => (
+                    <div key={v.vertical} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100/60 transition-colors space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-800 text-[10px] font-bold flex items-center justify-center font-mono">
+                            {i + 1}
+                          </span>
+                          <span className="font-bold text-slate-800 text-xs">
+                            {v.nombreVertical}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-xs text-slate-900">
+                            ${v.totalFacturadoUsd.toFixed(2)} USD
+                          </span>
+                          <span className="text-[10px] text-teal-700 font-bold ml-1.5">
+                            ({v.cuotaFacturacionPct}%)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Barra de progreso de cuota */}
+                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="bg-teal-600 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.max(v.cuotaFacturacionPct, v.cuotaTenantsPct, 4)}%` }}
+                        ></div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
+                        <span>{v.totalTenants} negocios ({v.cuotaTenantsPct}% de clientes)</span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          Periodo: ${v.facturadoPeriodoUsd.toFixed(2)} USD
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-slate-400 text-xs">
+                    No hay datos de verticales disponibles para este periodo.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* COLUMNA 2: ADOPCION DE PLANES Y CANALES DE PAGO */}
+            <div className="space-y-6">
+              {/* PLANES DE LICENCIA */}
+              <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-['Outfit'] font-bold text-base text-slate-900">
+                      Adopcion de Planes de Licencia
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Distribucion de suscripciones activas por nivel de servicio.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  {analyticsData && analyticsData.planes.map((p) => (
+                    <div
+                      key={p.plan}
+                      className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-1"
+                    >
+                      <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                        p.plan === "INDUSTRIAL"
+                          ? "bg-purple-50 text-purple-700 border-purple-200"
+                          : p.plan === "COMERCIAL"
+                          ? "bg-teal-50 text-teal-700 border-teal-200"
+                          : "bg-slate-100 text-slate-700 border-slate-200"
+                      }`}>
+                        {p.plan}
+                      </span>
+                      <div className="font-['Outfit'] font-extrabold text-xl text-slate-900">
+                        {p.totalTenants}
+                      </div>
+                      <div className="text-[10px] font-semibold text-slate-500">
+                        {p.porcentaje}% cuota
+                      </div>
+                      <div className="text-[10px] font-mono font-bold text-slate-700 pt-1 border-t border-slate-200">
+                        ${p.totalFacturadoUsd.toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* CANALES DE PAGO Y METODOS */}
+              <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-['Outfit'] font-bold text-base text-slate-900">
+                      Canales de Cobro Utilizados
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Volumen captado segun pasarela o metodo en el periodo.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  {analyticsData && analyticsData.metodosPago && analyticsData.metodosPago.length > 0 ? (
+                    analyticsData.metodosPago.map((m) => (
+                      <div key={m.metodo} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-800">{m.metodo}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            ({m.cantidadPagos} pagos)
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-slate-900">
+                            ${m.totalUsd.toFixed(2)} USD
+                          </span>
+                          <span className="text-[10px] text-teal-700 font-bold ml-1.5">
+                            ({m.porcentaje}%)
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-4 text-center text-slate-400 text-xs">
+                      No hay transacciones registradas en este periodo.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* TABLA RANKING: TOP TENANTS CON MAYOR FACTURACION */}
+          <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-['Outfit'] font-bold text-lg text-slate-900">
+                  Ranking de Tenants por Facturacion (Top Clientes SaaS)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Listado ordenado por volumen historico pagado en USD y recurrencia de suscripcion.
+                </p>
+              </div>
+
+              {/* Filtro de busqueda rapida en ranking */}
+              <div className="w-full sm:w-72">
+                <input
+                  type="text"
+                  placeholder="Buscar tenant o vertical en ranking..."
+                  value={filtroRankingBusqueda}
+                  onChange={(e) => setFiltroRankingBusqueda(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none"
+                />
+              </div>
+            </div>
+
+            {/* TABLA DEL RANKING */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="pb-3 px-3">Posicion</th>
+                    <th className="pb-3 px-3">Cliente / Tenant</th>
+                    <th className="pb-3 px-3">Vertical / Industria</th>
+                    <th className="pb-3 px-3">Plan</th>
+                    <th className="pb-3 px-3 text-center">Meses Adquiridos</th>
+                    <th className="pb-3 px-3 text-right">Facturado Periodo</th>
+                    <th className="pb-3 px-3 text-right">Total Historico (LTV)</th>
+                    <th className="pb-3 px-3 text-center">Total Pagos</th>
+                    <th className="pb-3 px-3">Vencimiento</th>
+                    <th className="pb-3 px-3 text-right">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(() => {
+                    const listaFiltrada = (analyticsData?.topTenants || []).filter((t) => {
+                      if (!filtroRankingBusqueda.trim()) return true;
+                      const q = filtroRankingBusqueda.toLowerCase();
+                      return (
+                        t.nombreEmpresa.toLowerCase().includes(q) ||
+                        t.moduloPrincipal.toLowerCase().includes(q) ||
+                        t.tipoLicencia.toLowerCase().includes(q)
+                      );
+                    });
+
+                    if (listaFiltrada.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={10} className="py-8 text-center text-slate-400">
+                            No se encontraron clientes que coincidan con la busqueda.
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return listaFiltrada.map((t) => {
+                      const esLider = t.posicion === 1;
+                      const esTop3 = t.posicion <= 3;
+                      return (
+                        <tr
+                          key={t.tenantId}
+                          className={`hover:bg-slate-50/80 transition-colors ${
+                            esLider ? "bg-amber-50/30" : ""
+                          }`}
+                        >
+                          <td className="py-3 px-3">
+                            <span className={`inline-flex items-center justify-center font-mono font-bold text-xs px-2.5 py-1 rounded-xl border ${
+                              esLider
+                                ? "bg-amber-100 text-amber-900 border-amber-300 shadow-xs"
+                                : esTop3
+                                ? "bg-teal-100 text-teal-900 border-teal-300"
+                                : "bg-slate-100 text-slate-700 border-slate-200"
+                            }`}>
+                              #{t.posicion}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-slate-800 text-xs">
+                              {t.nombreEmpresa}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              Tenant ID: #{t.tenantId}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-bold">
+                              {t.moduloPrincipal.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                              t.tipoLicencia === "INDUSTRIAL"
+                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                : t.tipoLicencia === "COMERCIAL"
+                                ? "bg-teal-50 text-teal-700 border-teal-200"
+                                : "bg-slate-100 text-slate-700 border-slate-200"
+                            }`}>
+                              {t.tipoLicencia}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-700">
+                            {t.mesesAdquiridos} meses
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-bold text-xs text-slate-700">
+                            ${t.facturadoPeriodoUsd.toFixed(2)}
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-extrabold text-xs text-emerald-700">
+                            ${t.totalFacturadoUsd.toFixed(2)} USD
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono text-slate-600">
+                            {t.cantidadPagos}
+                          </td>
+                          <td className="py-3 px-3 font-mono text-[11px] text-slate-500">
+                            {t.fechaVencimientoPago || "N/A"}
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              t.activa
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-rose-50 text-rose-700 border-rose-200"
+                            }`}>
+                              {t.activa ? "ACTIVO" : "SUSPENDIDO"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
