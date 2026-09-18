@@ -184,6 +184,10 @@ export function obtenerMiNegocio(): Promise<MiNegocio> {
   return request("/api/config/mi-negocio/marca");
 }
 
+export function actualizarLogo(imagenBase64: string): Promise<MiNegocio> {
+  return request("/api/config/mi-negocio/logo", { method: "PUT", body: JSON.stringify({ imagenBase64 }) });
+}
+
 /** Moneda principal del negocio (USD/VES/COP) — la usa todo el motor financiero (tasas, conversiones, caja) como base de precios. Solo el Dueño/Administrador la puede cambiar. */
 export function obtenerMonedaBaseNegocio(): Promise<{ monedaBase: string }> {
   return request("/api/config/mi-negocio/moneda-base");
@@ -450,6 +454,53 @@ export function registrarCierreCaja(tenantId: number, datos: Omit<CierreCajaRegi
 
 export function eliminarCierreCaja(id: number): Promise<void> {
   return request<void>(`/api/salud/cierres-caja/${id}`, { method: "DELETE" });
+}
+
+// El PIN del Médico Titular se valida en el servidor (nunca se guarda ni se
+// compara en el navegador) — ver ConfiguracionMedicaController.
+export function estadoPinDoctor(): Promise<{ personalizada: boolean }> {
+  return request(`/api/salud/config/pin/estado`);
+}
+
+export function verificarPinDoctor(pin: string): Promise<{ valido: boolean }> {
+  return request(`/api/salud/config/pin/verificar`, {
+    method: "POST",
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export function configurarPinDoctor(pinNuevo: string, pinActual?: string): Promise<{ mensaje: string }> {
+  return request(`/api/salud/config/pin/configurar`, {
+    method: "POST",
+    body: JSON.stringify({ pinNuevo, pinActual }),
+  });
+}
+
+// Perfil médico y membrete de documentos (motor de personalización de PDFs) — guardado por
+// tenant en el servidor (ver ConfiguracionMedicaController), no en localStorage de un solo
+// dispositivo. Se inyecta automáticamente en el encabezado y la firma de cada PDF generado.
+export interface PerfilMedicoDocumentos {
+  doctorNombre: string;
+  especialidad: string;
+  matriculaMpps: string;
+  colegioMedicos: string;
+  encabezadoTexto: string;
+  firmaBase64: string | null;
+  /** Borrador editable del recordatorio de cita por WhatsApp (costo, forma de pago, hora de
+   * llegada los define cada médico) — el sistema solo rellena saludo/paciente/fecha/hora. */
+  plantillaRecordatorioCita: string | null;
+}
+
+export function obtenerPerfilMedicoDocumentos(): Promise<PerfilMedicoDocumentos> {
+  return request("/api/salud/config/perfil");
+}
+
+export function actualizarPerfilMedicoDocumentos(datos: Omit<PerfilMedicoDocumentos, "firmaBase64">): Promise<PerfilMedicoDocumentos> {
+  return request("/api/salud/config/perfil", { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function actualizarFirmaMedico(firmaBase64: string): Promise<PerfilMedicoDocumentos> {
+  return request("/api/salud/config/firma", { method: "PUT", body: JSON.stringify({ firmaBase64 }) });
 }
 
 export interface SalaEsperaEntrada {
@@ -1765,28 +1816,42 @@ export interface TasaCambio {
   fechaActualizacion: string;
 }
 
-export function tasaVigente(tenantId: number, monedaOrigen: string, monedaDestino: string): Promise<TasaCambio> {
-  return request(`/api/financiero/tasas/vigente?tenantId=${tenantId}&monedaOrigen=${monedaOrigen}&monedaDestino=${monedaDestino}`);
+export function tasaVigente(tenantId: number, monedaOrigen: string, monedaDestino: string, origen?: string): Promise<TasaCambio> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), monedaOrigen, monedaDestino });
+  if (origen) params.set("origen", origen);
+  return request(`/api/financiero/tasas/vigente?${params.toString()}`);
 }
 
 export function actualizarTasa(tenantId: number, datos: { monedaOrigen: string; monedaDestino: string; tasa: number; origen?: string }): Promise<TasaCambio> {
   return request(`/api/financiero/tasas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export type MetodoTasaAutomatica = "BINANCE" | "BCV" | "MANUAL";
+export type OrigenTasaActiva = "BCV" | "USDT" | "PERSONALIZADA";
 
-/** Qué fuente sigue automáticamente la tasa USD->VES de este tenant: BINANCE (P2P), BCV (oficial) o MANUAL ("Propia", la fija el negocio). */
-export function obtenerMetodoTasaAutomatica(tenantId: number): Promise<{ metodo: MetodoTasaAutomatica }> {
-  return request(`/api/financiero/tasas/metodo-automatico?tenantId=${tenantId}`);
+/**
+ * Cuál tasa gobierna el cobro en el POS — decisión de negocio (Dueño/Administrador), no una
+ * preferencia por navegador. BCV y USDT no las escribe el negocio (se consultan en vivo con
+ * actualizarTasaExterna); PERSONALIZADA sí, vía actualizarTasa. Misma metodología que Horeca.
+ */
+export function obtenerOrigenTasaActiva(): Promise<{ origenTasaActiva: OrigenTasaActiva }> {
+  return request("/api/config/mi-negocio/origen-tasa");
 }
 
-export function actualizarMetodoTasaAutomatica(tenantId: number, metodo: MetodoTasaAutomatica): Promise<{ metodo: MetodoTasaAutomatica }> {
-  return request(`/api/financiero/tasas/metodo-automatico?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify({ metodo }) });
+export function actualizarOrigenTasaActiva(origenTasaActiva: OrigenTasaActiva): Promise<{ origenTasaActiva: OrigenTasaActiva }> {
+  return request("/api/config/mi-negocio/origen-tasa", { method: "PUT", body: JSON.stringify({ origenTasaActiva }) });
 }
 
-/** Fuerza ya la búsqueda de la tasa automática vigente (Binance/BCV) sin esperar la corrida programada cada 4h. */
-export function actualizarTasaAutomaticaAhora(tenantId: number): Promise<TasaCambio> {
-  return request(`/api/financiero/tasas/metodo-automatico/actualizar-ahora?tenantId=${tenantId}`, { method: "POST" });
+export type FuenteTasaCambio = "BCV" | "BINANCE";
+
+/**
+ * Refresca la tasa USD/VES consultando en vivo una fuente pública (BCV oficial
+ * o Binance P2P) y la registra como tasa nueva. Si la fuente falla, el backend
+ * no escribe nada y esta llamada lanza un error con el motivo real — nunca se
+ * simula un valor.
+ */
+export function actualizarTasaExterna(tenantId: number, fuente: FuenteTasaCambio, monedaDestino: string = "VES"): Promise<TasaCambio> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), fuente, monedaDestino });
+  return request(`/api/financiero/tasas/actualizar-externa?${params.toString()}`, { method: "POST" });
 }
 
 export type TipoMovimientoCaja = "INGRESO" | "EGRESO" | "CXC" | "CXP";

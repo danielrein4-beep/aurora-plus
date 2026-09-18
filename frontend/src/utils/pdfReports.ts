@@ -19,6 +19,7 @@ export interface CierreCajaData {
   clinicaNombre: string;
   doctorNombre: string;
   responsableNombre?: string;
+  logoBase64?: string | null;
   fecha: string;
   horaCierre: string;
   tasaBCV: number;
@@ -37,6 +38,10 @@ export interface ConsultaReportData {
   especialidad: string;
   matriculaMPPS: string;
   colegioMedicos: string;
+  /** Motor de personalización de PDFs — membrete por tenant (ver ConfiguracionMedicaController). */
+  logoBase64?: string | null;
+  firmaBase64?: string | null;
+  encabezadoTexto?: string | null;
   paciente: {
     expediente: string;
     nombreCompleto: string;
@@ -75,6 +80,7 @@ export interface CotizacionItem {
 export interface CotizacionData {
   clinicaNombre: string;
   doctorNombre: string;
+  logoBase64?: string | null;
   pacienteNombre: string;
   pacienteCedula: string;
   pacienteTelefono?: string;
@@ -97,19 +103,25 @@ export function construirDocCierreCaja(data: CierreCajaData): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  // ── ENCABEZADO ──
+  // ── ENCABEZADO (logo personalizable por tenant si el médico lo configuró) ──
   doc.setFillColor(14, 165, 233); // Sky Blue Header Banner
   doc.rect(0, 0, pageWidth, 28, "F");
+
+  const tieneLogoCierre = !!data.logoBase64;
+  const textoXCierre = tieneLogoCierre ? 30 : 14;
+  if (tieneLogoCierre) {
+    try { doc.addImage(data.logoBase64 as string, "PNG", 12, 5, 14, 18, undefined, "FAST"); } catch { /* se omite si el logo es inválido */ }
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.setTextColor(255, 255, 255);
-  doc.text((data.clinicaNombre || "CENTRO MÉDICO").toUpperCase(), 14, 12);
+  doc.text((data.clinicaNombre || "CENTRO MÉDICO").toUpperCase(), textoXCierre, 12);
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text("REPORTE DE AUDITORÍA Y CIERRE DE CAJA DIARIA", 14, 19);
-  doc.text(`Fecha: ${data.fecha} | Hora de Cierre: ${data.horaCierre}`, 14, 24);
+  doc.text("REPORTE DE AUDITORÍA Y CIERRE DE CAJA DIARIA", textoXCierre, 19);
+  doc.text(`Fecha: ${data.fecha} | Hora de Cierre: ${data.horaCierre}`, textoXCierre, 24);
 
   // ── CAJERO / DOCTOR & TASA BCV ──
   doc.setTextColor(30, 41, 59);
@@ -280,24 +292,39 @@ export function construirDocInformeConsulta(data: ConsultaReportData): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  // ── MEMBRETE CLÍNICO ──
+  // ── MEMBRETE CLÍNICO (personalizable por tenant — ver ConfiguracionMedicaController) ──
   doc.setFillColor(13, 148, 136); // Teal Medical Header
   doc.rect(0, 0, pageWidth, 30, "F");
+
+  // El logo empuja el texto del encabezado a la derecha para no superponerse.
+  const tieneLogo = !!data.logoBase64;
+  const textoX = tieneLogo ? 30 : 14;
+  if (tieneLogo) {
+    try {
+      doc.addImage(data.logoBase64 as string, "PNG", 12, 6, 14, 18, undefined, "FAST");
+    } catch { /* logo corrupto o formato no soportado — se omite, el resto del membrete sigue */ }
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   doc.setTextColor(255, 255, 255);
-  doc.text((data.clinicaNombre || "CENTRO MÉDICO ESPECIALIZADO").toUpperCase(), 14, 11);
+  doc.text((data.clinicaNombre || "CENTRO MÉDICO ESPECIALIZADO").toUpperCase(), textoX, 11);
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text(`Dr(a). ${data.doctorNombre || "Médico Especialista"} — ${data.especialidad || "Medicina General"}`, 14, 18);
-  doc.text(`MPPS: ${data.matriculaMPPS || "N/A"} | Col. Médicos: ${data.colegioMedicos || "N/A"}`, 14, 24);
+  doc.text(`Dr(a). ${data.doctorNombre || "Médico Especialista"} — ${data.especialidad || "Medicina General"}`, textoX, 18);
+  doc.text(`MPPS: ${data.matriculaMPPS || "N/A"} | Col. Médicos: ${data.colegioMedicos || "N/A"}`, textoX, 24);
 
   doc.setFont("helvetica", "bold");
   doc.text(`EXPEDIENTE: ${data.paciente.expediente}`, pageWidth - 14, 18, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.text(`Fecha: ${data.paciente.fechaConsulta}`, pageWidth - 14, 24, { align: "right" });
+
+  if (data.encabezadoTexto) {
+    doc.setFontSize(7.5);
+    doc.setTextColor(230, 253, 250);
+    doc.text(data.encabezadoTexto, pageWidth - 14, 28, { align: "right", maxWidth: pageWidth / 2 });
+  }
 
   // ── DATOS DEL PACIENTE ──
   let y = 37;
@@ -365,8 +392,13 @@ export function construirDocInformeConsulta(data: ConsultaReportData): jsPDF {
     doc.text(`Próxima Cita / Control: ${data.proximaCita}`, 18, y + 62);
   }
 
-  // ── SELLO Y FIRMA ──
+  // ── SELLO Y FIRMA (imagen real si el médico la configuró — ver Configuración & Perfil) ──
   const signY = 240;
+  if (data.firmaBase64) {
+    try {
+      doc.addImage(data.firmaBase64, "PNG", 85, signY - 16, 40, 14, undefined, "FAST");
+    } catch { /* firma corrupta o formato no soportado — queda solo la línea de firma */ }
+  }
   doc.setDrawColor(148, 163, 184);
   doc.line(70, signY, 140, signY);
 
@@ -464,19 +496,25 @@ export function construirDocCotizacion(data: CotizacionData): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  // Encabezado
+  // Encabezado (logo personalizable por tenant si el médico lo configuró)
   doc.setFillColor(14, 165, 233);
   doc.rect(0, 0, pageWidth, 28, "F");
+
+  const tieneLogoCot = !!data.logoBase64;
+  const textoXCot = tieneLogoCot ? 30 : 14;
+  if (tieneLogoCot) {
+    try { doc.addImage(data.logoBase64 as string, "PNG", 12, 5, 14, 18, undefined, "FAST"); } catch { /* se omite si el logo es inválido */ }
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   doc.setTextColor(255, 255, 255);
-  doc.text((data.clinicaNombre || "CENTRO MÉDICO ESPECIALIZADO").toUpperCase(), 14, 12);
+  doc.text((data.clinicaNombre || "CENTRO MÉDICO ESPECIALIZADO").toUpperCase(), textoXCot, 12);
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text("PRESUPUESTO / COTIZACIÓN DE PROCEDIMIENTOS MÉDICOS", 14, 19);
-  doc.text(`Fecha de Emisión: ${data.fecha} | Validez: 15 días`, 14, 24);
+  doc.text("PRESUPUESTO / COTIZACIÓN DE PROCEDIMIENTOS MÉDICOS", textoXCot, 19);
+  doc.text(`Fecha de Emisión: ${data.fecha} | Validez: 15 días`, textoXCot, 24);
 
   // Datos paciente
   let y = 36;
@@ -947,6 +985,198 @@ export function obtenerBase64PdfDocumento(
   }
   const dataUri = doc.output("datauristring");
   return { base64: dataUri, nombreArchivo };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMPROBANTE DE PAGO (NO FISCAL) — Sala de Espera / checkout del paciente.
+// REGLA ESTRICTA: esto nunca es una factura fiscal ni legal, solo constancia
+// de que el consultorio recibió un pago. Usa el mismo membrete personalizable
+// por tenant (logo/firma/encabezado) que el resto de los documentos médicos.
+// ══════════════════════════════════════════════════════════════════════════
+export interface ComprobantePagoData {
+  clinicaNombre: string;
+  doctorNombre: string;
+  logoBase64?: string | null;
+  firmaBase64?: string | null;
+  encabezadoTexto?: string | null;
+  numeroComprobante: string;
+  fecha: string;
+  paciente: { nombreCompleto: string; identificacion: string; email?: string };
+  concepto: string;
+  montoCobrado: number;
+  moneda: "USD" | "VES" | "COP";
+  metodoPago: string;
+  referencia?: string;
+}
+
+function formatearMontoComprobante(monto: number, moneda: string): string {
+  if (moneda === "VES") return `Bs. ${monto.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`;
+  if (moneda === "COP") return `$${monto.toLocaleString("es-CO")} COP`;
+  return `$${monto.toFixed(2)} USD`;
+}
+
+/**
+ * Comprobante de Pago — diseño ultra-minimalista a propósito: 0% color de acento, sin
+ * bloques gráficos, sin logo/firma. Solo tipografía en negro/gris sobre blanco, bien
+ * espaciada. La nota legal (no es factura fiscal) va casi imperceptible al pie, en
+ * negrita pero diminuta y gris claro — visible si se busca, invisible si no.
+ */
+export function construirDocComprobantePago(data: ComprobantePagoData): jsPDF {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginX = 22;
+  const maxWidth = pageWidth - marginX * 2;
+  const NEGRO: [number, number, number] = [17, 17, 17];
+  const GRIS: [number, number, number] = [107, 114, 128];
+
+  const parrafo = (texto: string, y: number, opts: { size?: number; bold?: boolean; color?: [number, number, number]; lineHeight?: number } = {}) => {
+    doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+    doc.setFontSize(opts.size ?? 11);
+    doc.setTextColor(...(opts.color ?? NEGRO));
+    const lineas = doc.splitTextToSize(texto, maxWidth);
+    doc.text(lineas, marginX, y);
+    return y + lineas.length * (opts.lineHeight ?? 6);
+  };
+
+  let y = 30;
+
+  // Identificación mínima del documento — texto plano, sin banner ni logo.
+  y = parrafo(data.clinicaNombre || "Consultorio Médico", y, { size: 10, bold: true });
+  y = parrafo(`Comprobante N.° ${data.numeroComprobante}  ·  ${data.fecha}`, y, { size: 9, color: GRIS, lineHeight: 5 });
+
+  y += 12;
+
+  // ── CUERPO — plantilla exacta ──
+  const medioDePago = data.referencia ? `${data.metodoPago || "N/A"} (Ref. ${data.referencia})` : (data.metodoPago || "N/A");
+
+  y = parrafo(`Hola ${data.paciente.nombreCompleto},`, y);
+  y += 2;
+  y = parrafo(`Gracias por asistir al consultorio de ${data.doctorNombre || "Médico Titular"}.`, y);
+  y += 2;
+  y = parrafo(`Le notificamos que hemos recibido y validado su pago por concepto de la consulta de fecha ${data.fecha}.`, y);
+
+  y += 10;
+  y = parrafo(`Monto: ${formatearMontoComprobante(data.montoCobrado, data.moneda)}`, y, { bold: true });
+  y = parrafo(`Medio de pago: ${medioDePago}`, y, { bold: true });
+
+  y += 10;
+  y = parrafo(
+    "Gracias por su confianza y preferencia, fue un placer atenderle, quedamos a su disposición para cualquier consulta o inquietud adicional.",
+    y
+  );
+
+  // ── NOTA LEGAL — casi imperceptible: diminuta, gris muy claro, hasta abajo del todo ──
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6);
+  doc.setTextColor(156, 163, 175); // #9CA3AF
+  const notaLegal = doc.splitTextToSize(
+    "Este comprobante certifica el pago recibido y no constituye una factura fiscal ni documento legal tributario.",
+    maxWidth
+  );
+  doc.text(notaLegal, marginX, pageHeight - 12);
+
+  return doc;
+}
+
+export function generarPdfComprobantePago(data: ComprobantePagoData) {
+  const doc = construirDocComprobantePago(data);
+  const safeName = (data.paciente.nombreCompleto || "Paciente").replace(/\s+/g, "_");
+  doc.save(`Comprobante_Pago_${data.numeroComprobante}_${safeName}.pdf`);
+}
+
+export function obtenerBase64PdfComprobantePago(data: ComprobantePagoData): { base64: string; nombreArchivo: string } {
+  const doc = construirDocComprobantePago(data);
+  const safeName = (data.paciente.nombreCompleto || "Paciente").replace(/\s+/g, "_");
+  const nombreArchivo = `Comprobante_Pago_${data.numeroComprobante}_${safeName}.pdf`;
+  return { base64: doc.output("datauristring"), nombreArchivo };
+}
+
+/**
+ * Plantilla de correo del comprobante — mismo criterio ultra-minimalista que el PDF:
+ * blanco y negro/gris, sin colores de acento, sin bloques ni logos. `cuerpo` se envía
+ * como `cuerpoHtml` a SaludEmailService (helper.setText(cuerpoHtml, true) — HTML real).
+ * La nota legal va en negrita, diminuta (10px) y gris muy claro (#9CA3AF), hasta el
+ * final, para que exista pero no ensucie la estética del mensaje.
+ */
+export function generarTextoEmailComprobante(data: ComprobantePagoData): { subject: string; body: string } {
+  const subject = `Comprobante de Pago N.° ${data.numeroComprobante} - ${data.clinicaNombre || "Centro Médico"}`;
+  const medioDePago = data.referencia ? `${data.metodoPago || "N/A"} (Ref. ${data.referencia})` : (data.metodoPago || "N/A");
+
+  const body = `
+<div style="font-family: Helvetica, Arial, sans-serif; color: #111111; max-width: 480px; margin: 0 auto; padding: 32px 16px; line-height: 1.6; font-size: 15px;">
+  <p style="margin: 0 0 16px;">Hola ${data.paciente.nombreCompleto},</p>
+  <p style="margin: 0 0 16px;">Gracias por asistir al consultorio de ${data.doctorNombre || "Médico Titular"}.</p>
+  <p style="margin: 0 0 24px;">Le notificamos que hemos recibido y validado su pago por concepto de la consulta de fecha ${data.fecha}.</p>
+
+  <p style="margin: 0 0 4px;"><strong>Monto:</strong> ${formatearMontoComprobante(data.montoCobrado, data.moneda)}</p>
+  <p style="margin: 0 0 24px;"><strong>Medio de pago:</strong> ${medioDePago}</p>
+
+  <p style="margin: 0 0 40px;">Gracias por su confianza y preferencia, fue un placer atenderle, quedamos a su disposición para cualquier consulta o inquietud adicional.</p>
+
+  <p style="margin: 0; font-size: 10px; font-weight: bold; color: #9CA3AF;">
+    Este comprobante certifica el pago recibido y no constituye una factura fiscal ni documento legal tributario.
+  </p>
+</div>`.trim();
+
+  return { subject, body };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// RECORDATORIO DE CITA POR WHATSAPP — no lleva PDF adjunto (no aplica el workaround de
+// descarga), solo texto. No se automatiza con la API oficial de Meta (tiene costo y
+// requiere aprobación) — se abre wa.me número por número, uno a la vez, con el mensaje
+// ya escrito. El borrador es 100% editable por cada médico (ver Configuración & Perfil):
+// costo de consulta, método de pago y hora de llegada varían por consultorio, así que
+// el sistema solo rellena el saludo, el nombre del paciente, la fecha y la hora.
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Borrador de referencia — el médico lo edita a su gusto la primera vez que entra a Configuración. */
+export const PLANTILLA_RECORDATORIO_CITA_POR_DEFECTO =
+  "{saludo}, le escribimos del consultorio de {clinica}.\n" +
+  "Usted tiene una cita programada para el día {fecha} a las {hora}.\n" +
+  "Deseamos confirmar su asistencia, por favor.\n\n" +
+  "En caso de confirmarla, le esperamos por orden de llegada. Le recordamos que nuestras consultas tienen un costo de [edite aquí: monto] y por el momento aceptamos pagos en [edite aquí: métodos de pago].\n\n" +
+  "En caso de no poder asistir, por favor indíquenos si desea reprogramar su cita.\n\n" +
+  "Quedamos atentos. ¡Feliz día!";
+
+/** "Buenos días" / "Buenas tardes" / "Buenas noches" según la hora local del dispositivo que envía. */
+export function saludoSegunHora(fecha: Date = new Date()): string {
+  const h = fecha.getHours();
+  if (h < 12) return "Buenos días";
+  if (h < 19) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+export interface DatosRecordatorioCita {
+  paciente: string;
+  fecha: string; // ya formateada, ej. "24/09/2026"
+  hora: string; // ej. "2:00 p. m."
+  clinica: string;
+  doctor: string;
+}
+
+/** Rellena la plantilla del médico (o el borrador por defecto si aún no la personalizó). */
+export function generarTextoRecordatorioCita(plantilla: string | null | undefined, datos: DatosRecordatorioCita): string {
+  const base = plantilla && plantilla.trim() ? plantilla : PLANTILLA_RECORDATORIO_CITA_POR_DEFECTO;
+  return base
+    .replace(/\{saludo\}/g, saludoSegunHora())
+    .replace(/\{paciente\}/g, datos.paciente)
+    .replace(/\{fecha\}/g, datos.fecha)
+    .replace(/\{hora\}/g, datos.hora)
+    .replace(/\{clinica\}/g, datos.clinica)
+    .replace(/\{doctor\}/g, datos.doctor);
+}
+
+/**
+ * Workaround de UX para "Enviar por WhatsApp" (`wa.me` no admite adjuntar archivos por
+ * URL): fuerza la descarga del PDF localmente y, al mismo tiempo, abre WhatsApp con un
+ * mensaje predefinido — así el archivo queda de primero en las descargas recientes del
+ * dispositivo y el usuario solo tiene que adjuntarlo con el clip (📎) al chat ya abierto.
+ */
+export function descargarPdfYAbrirWhatsApp(doc: jsPDF, nombreArchivo: string, telefono: string, mensaje: string, codigoPaisManual?: string) {
+  doc.save(nombreArchivo);
+  abrirWhatsAppDirecto(telefono, mensaje, codigoPaisManual);
 }
 
 // ══════════════════════════════════════════════════════════════════════════

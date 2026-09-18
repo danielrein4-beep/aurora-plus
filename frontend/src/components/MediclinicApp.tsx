@@ -21,15 +21,22 @@ import {
   listarCierresCaja, registrarCierreCaja,
   listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta, eliminarConsulta,
   listarCotizaciones, crearCotizacion, actualizarEstadoCotizacion, eliminarCotizacion as eliminarCotizacionApi,
-  tasaVigente, actualizarTasa, obtenerMetodoTasaAutomatica, actualizarMetodoTasaAutomatica, actualizarTasaAutomaticaAhora,
+  tasaVigente, actualizarTasa, obtenerOrigenTasaActiva, actualizarOrigenTasaActiva, actualizarTasaExterna,
+  estadoPinDoctor, verificarPinDoctor, configurarPinDoctor,
+  obtenerPerfilMedicoDocumentos, actualizarPerfilMedicoDocumentos, actualizarFirmaMedico,
+  obtenerMiNegocio, actualizarLogo, enviarEmailDocumento,
   type Paciente, type CitaMedica, type SalaEsperaEntrada, type ProcedimientoMedico, type ConsultaMedica,
-  type CierreCajaRegistro, type CotizacionMedicaApi, type TasaCambio, type MetodoTasaAutomatica,
+  type CierreCajaRegistro, type CotizacionMedicaApi, type TasaCambio, type OrigenTasaActiva,
+  type PerfilMedicoDocumentos,
 } from "../api";
 import {
   generarPdfCierreCaja, generarPdfInformeConsulta, generarTextoWhatsAppConsulta,
   generarPdfCotizacion, generarTextoWhatsAppCotizacion,
   abrirWhatsAppDirecto, formatearTelefonoParaWhatsApp,
-  type CobroItem, type CierreCajaData, type ConsultaReportData, type CotizacionData, type CotizacionItem
+  obtenerBase64PdfComprobantePago, generarTextoEmailComprobante,
+  generarTextoRecordatorioCita, PLANTILLA_RECORDATORIO_CITA_POR_DEFECTO,
+  type CobroItem, type CierreCajaData, type ConsultaReportData, type CotizacionData, type CotizacionItem,
+  type ComprobantePagoData,
 } from "../utils/pdfReports";
 import DocumentoPreviewModal, { type DocumentoVisorPayload } from "./DocumentoPreviewModal";
 import {
@@ -357,31 +364,39 @@ function SelectorPerfilesNetflix({
 // ══════════════════════════════════════════════════════════════════════════
 function ModalClaveDoctor({
   doctorNombre,
-  claveCorrecta,
   onExito,
   onCancelar,
 }: {
   doctorNombre: string;
-  claveCorrecta: string;
   onExito: () => void;
   onCancelar: () => void;
 }) {
   const [clave, setClave] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [mostrarClave, setMostrarClave] = useState(false);
+  const [verificando, setVerificando] = useState(false);
 
-  const validar = (e: React.FormEvent) => {
+  // El PIN nunca se guarda ni se compara en el navegador — se valida contra el hash
+  // real en el servidor (ver ConfiguracionMedicaController). Antes se comparaba en el
+  // cliente contra un valor de localStorage, lo que permitía leerlo o saltárselo con
+  // las herramientas de desarrollador.
+  const validar = async (e: React.FormEvent) => {
     e.preventDefault();
     const input = clave.trim();
-    // Solo el PIN que el médico configuró en Configuración & Perfil abre este panel — el valor
-    // por defecto ("1234") es únicamente el que trae de fábrica un tenant nuevo hasta que el
-    // médico lo cambie, no un atajo permanente. Nunca aceptar "admin"/"doctor" como comodín.
-    const esperada = (claveCorrecta || "1234").trim();
-    if (input === esperada) {
-      onExito();
-    } else {
-      setError("Contraseña o PIN incorrecto. Intenta de nuevo.");
-      setClave("");
+    setVerificando(true);
+    setError(null);
+    try {
+      const { valido } = await verificarPinDoctor(input);
+      if (valido) {
+        onExito();
+      } else {
+        setError("Contraseña o PIN incorrecto. Intenta de nuevo.");
+        setClave("");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo verificar el PIN — intenta de nuevo.");
+    } finally {
+      setVerificando(false);
     }
   };
 
@@ -455,10 +470,11 @@ function ModalClaveDoctor({
             </button>
             <button
               type="submit"
-              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-lg flex items-center gap-2 text-white"
+              disabled={verificando}
+              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-lg flex items-center gap-2 text-white disabled:opacity-60"
             >
               <IconCheck size={16} />
-              <span>Entrar al Panel Médico</span>
+              <span>{verificando ? "Verificando…" : "Entrar al Panel Médico"}</span>
             </button>
           </div>
         </form>
@@ -590,6 +606,13 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [modalClaveDoctor, setModalClaveDoctor] = useState(false);
   const [accionPendienteDoctor, setAccionPendienteDoctor] = useState<(() => void) | null>(null);
 
+  // El PIN del Médico Titular se valida en el servidor (ver ConfiguracionMedicaController) —
+  // "personalizada" indica si ya eligió uno propio o sigue en el PIN de fábrica "1234".
+  const [pinPersonalizado, setPinPersonalizado] = useState<boolean | null>(null);
+  useEffect(() => {
+    estadoPinDoctor().then((r) => setPinPersonalizado(r.personalizada)).catch(() => setPinPersonalizado(false));
+  }, [tenantId]);
+
   // Configuración de perfil y tasas persistente — SIEMPRE bajo una clave con el tenantId (ver nota
   // junto a claveConfigPerfil): sin esto, el perfil guardado de un médico se le mostraba a
   // cualquier otro que iniciara sesión después en el mismo navegador.
@@ -623,27 +646,55 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     try { localStorage.setItem(claveConfigPerfil(tenantId), JSON.stringify(nuevaConfig)); } catch {}
   };
 
-  // Tasas de cambio reales (mismo motor /api/financiero/tasas que usa Aurora
-  // Horeca y Comercio — genérico, sin cambios de backend): antes tasaBCV/
-  // tasaCOP vivían solo en configPerfil (localStorage de este dispositivo,
-  // nunca sincronizadas entre secretaria/doctor ni entre dispositivos). Se
-  // guarda un historial en el servidor y siempre se usa la más reciente.
+  // Tasas de cambio reales — misma metodología que usa Aurora Horeca (mismo
+  // motor genérico /api/financiero/tasas + /api/config/mi-negocio/origen-tasa):
+  // BCV y USDT se consultan en vivo de su fuente pública real, cada una se
+  // guarda como serie propia, y "origenTasaActiva" decide cuál gobierna el
+  // cobro. Antes tasaBCV/tasaCOP vivían solo en configPerfil (localStorage de
+  // este dispositivo, nunca sincronizadas entre secretaria/doctor). Se guarda
+  // un historial en el servidor y siempre se usa la más reciente.
+  const [origenTasaActiva, setOrigenTasaActiva] = useState<OrigenTasaActiva | null>(null);
   const [tasaBcv, setTasaBcv] = useState<TasaCambio | null>(null);
   const [tasaCopReal, setTasaCopReal] = useState<TasaCambio | null>(null);
   useEffect(() => {
     if (!tenantId) return;
-    tasaVigente(tenantId, "USD", "VES").then(setTasaBcv).catch(() => setTasaBcv(null));
+    obtenerOrigenTasaActiva().then((r) => setOrigenTasaActiva(r.origenTasaActiva)).catch(() => setOrigenTasaActiva("USDT"));
     tasaVigente(tenantId, "USD", "COP").then(setTasaCopReal).catch(() => setTasaCopReal(null));
+  }, [tenantId]);
+  useEffect(() => {
+    if (!tenantId || !origenTasaActiva) return;
+    tasaVigente(tenantId, "USD", "VES", origenTasaActiva).then(setTasaBcv).catch(() => setTasaBcv(null));
+  }, [tenantId, origenTasaActiva]);
+
+  // Motor de personalización de PDFs — membrete guardado por tenant en el servidor (ver
+  // ConfiguracionMedicaController), no en localStorage de un solo dispositivo: logo,
+  // firma electrónica, texto de encabezado y datos del doctor se inyectan automáticamente
+  // en cada PDF (historias, récipes, cotizaciones, comprobantes de pago).
+  const [perfilDocs, setPerfilDocs] = useState<PerfilMedicoDocumentos | null>(null);
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  useEffect(() => {
+    if (!tenantId) return;
+    obtenerPerfilMedicoDocumentos().then(setPerfilDocs).catch(() => setPerfilDocs(null));
+    obtenerMiNegocio().then((r) => setLogoBase64(r.logoBase64)).catch(() => setLogoBase64(null));
   }, [tenantId]);
 
   // Único punto de lectura para el resto de la app (cotizaciones, cierres de
   // caja, PDFs) — mismo objeto configPerfil de siempre, pero con tasaBCV/
-  // tasaCOP siempre reemplazadas por el valor real del backend cuando existe.
+  // tasaCOP y el membrete de documentos siempre reemplazados por el valor
+  // real del backend cuando existe.
   const configPerfilConTasas = useMemo(() => ({
     ...configPerfil,
     tasaBCV: tasaBcv ? Number(tasaBcv.tasa) : configPerfil.tasaBCV,
     tasaCOP: tasaCopReal ? Number(tasaCopReal.tasa) : configPerfil.tasaCOP,
-  }), [configPerfil, tasaBcv, tasaCopReal]);
+    doctorNombre: perfilDocs?.doctorNombre || configPerfil.doctorNombre,
+    especialidad: perfilDocs?.especialidad || configPerfil.especialidad,
+    matriculaMPPS: perfilDocs?.matriculaMpps || configPerfil.matriculaMPPS,
+    colegioMedicos: perfilDocs?.colegioMedicos || configPerfil.colegioMedicos,
+    encabezadoTexto: perfilDocs?.encabezadoTexto || "",
+    firmaBase64: perfilDocs?.firmaBase64 || null,
+    logoBase64,
+    plantillaRecordatorioCita: perfilDocs?.plantillaRecordatorioCita || PLANTILLA_RECORDATORIO_CITA_POR_DEFECTO,
+  }), [configPerfil, tasaBcv, tasaCopReal, perfilDocs, logoBase64]);
 
   const seleccionarDoctor = () => {
     setModalClaveDoctor(true);
@@ -749,33 +800,27 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [tasaPropiaInput, setTasaPropiaInput] = useState<string>("");
   const [toastTasa, setToastTasa] = useState<string | null>(null);
 
-  // Fuente que sigue la tasa USD->Bs de este tenant — igual que en Comercio: USDT y BCV
-  // ya no se teclean, siguen de verdad Binance P2P / el BCV oficial (ver
-  // TasaCambioAutomaticaService en el backend, corre sola cada 4h). Solo "Propia" es manual.
-  const [metodoTasa, setMetodoTasa] = useState<MetodoTasaAutomatica | null>(null);
+  // Fuente que sigue la tasa USD->Bs de este tenant — misma metodología que usa Aurora
+  // Horeca: USDT y BCV ya no se teclean, se consultan en vivo de su fuente pública real
+  // bajo demanda (ver TasaExternaService en el backend). Solo "Propia" es manual.
   const [cambiandoMetodoTasa, setCambiandoMetodoTasa] = useState(false);
   const [actualizandoTasaAhora, setActualizandoTasaAhora] = useState(false);
   const [guardandoTasasRapidas, setGuardandoTasasRapidas] = useState(false);
 
-  useEffect(() => {
-    if (!tenantId) return;
-    obtenerMetodoTasaAutomatica(tenantId).then((r) => setMetodoTasa(r.metodo)).catch(() => setMetodoTasa("BINANCE"));
-  }, [tenantId]);
-
   const abrirModalTasas = () => {
     setTasaCOPInput(tasaCopReal ? String(Number(tasaCopReal.tasa)) : "");
-    setTasaPropiaInput(metodoTasa === "MANUAL" && tasaBcv ? String(Number(tasaBcv.tasa)) : "");
+    setTasaPropiaInput(origenTasaActiva === "PERSONALIZADA" && tasaBcv ? String(Number(tasaBcv.tasa)) : "");
     setModalTasasRapidas(true);
   };
 
-  const elegirMetodoTasa = async (nuevo: MetodoTasaAutomatica) => {
-    if (nuevo === metodoTasa) return;
+  const elegirMetodoTasa = async (nuevo: OrigenTasaActiva) => {
+    if (nuevo === origenTasaActiva) return;
     setCambiandoMetodoTasa(true);
     try {
-      await actualizarMetodoTasaAutomatica(tenantId, nuevo);
-      setMetodoTasa(nuevo);
-      if (nuevo !== "MANUAL") {
-        tasaVigente(tenantId, "USD", "VES").then(setTasaBcv).catch(() => {});
+      await actualizarOrigenTasaActiva(nuevo);
+      setOrigenTasaActiva(nuevo);
+      if (nuevo !== "PERSONALIZADA") {
+        tasaVigente(tenantId, "USD", "VES", nuevo).then(setTasaBcv).catch(() => {});
       }
     } catch (err) {
       setToastTasa(err instanceof Error ? err.message : "No se pudo cambiar la fuente de la tasa");
@@ -786,9 +831,11 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   };
 
   const actualizarTasaAhoraModal = async () => {
+    if (origenTasaActiva !== "BCV" && origenTasaActiva !== "USDT") return;
     setActualizandoTasaAhora(true);
     try {
-      setTasaBcv(await actualizarTasaAutomaticaAhora(tenantId));
+      const fuente = origenTasaActiva === "USDT" ? "BINANCE" : "BCV";
+      setTasaBcv(await actualizarTasaExterna(tenantId, fuente, "VES"));
     } catch (err) {
       setToastTasa(err instanceof Error ? err.message : "No se pudo consultar la tasa en este momento");
       setTimeout(() => setToastTasa(null), 3500);
@@ -801,7 +848,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     if (e) e.preventDefault();
     const propia = parseFloat(tasaPropiaInput);
     const cop = parseFloat(tasaCOPInput);
-    if (!(metodoTasa === "MANUAL" && propia > 0) && !(cop > 0)) {
+    if (!(origenTasaActiva === "PERSONALIZADA" && propia > 0) && !(cop > 0)) {
       setToastTasa("Ingresá al menos una tasa mayor a cero");
       setTimeout(() => setToastTasa(null), 3500);
       return;
@@ -809,7 +856,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     setGuardandoTasasRapidas(true);
     try {
       const tareas: Promise<void>[] = [];
-      if (metodoTasa === "MANUAL" && propia > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: propia, origen: "MANUAL" }).then(setTasaBcv));
+      if (origenTasaActiva === "PERSONALIZADA" && propia > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: propia, origen: "PERSONALIZADA" }).then(setTasaBcv));
       if (cop > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: cop, origen: "MANUAL" }).then(setTasaCopReal));
       await Promise.all(tareas);
       setModalTasasRapidas(false);
@@ -924,11 +971,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           onSeleccionarSecretaria={seleccionarSecretaria}
           onSalir={handleSalirAlHub}
         />
-        {modalClaveDoctor && !configPerfil.claveDoctorPersonalizada && (
+        {modalClaveDoctor && pinPersonalizado === false && (
           <ModalConfigurarClavePrimeraVez
             doctorNombre={configPerfil.doctorNombre}
-            onConfigurado={(nuevoPin) => {
-              guardarConfigPerfil({ ...configPerfil, claveDoctor: nuevoPin, claveDoctorPersonalizada: true });
+            onConfigurado={async (nuevoPin) => {
+              await configurarPinDoctor(nuevoPin);
+              setPinPersonalizado(true);
               setModalClaveDoctor(false);
               if (accionPendienteDoctor) {
                 accionPendienteDoctor();
@@ -937,10 +985,9 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             }}
           />
         )}
-        {modalClaveDoctor && configPerfil.claveDoctorPersonalizada && (
+        {modalClaveDoctor && pinPersonalizado === true && (
           <ModalClaveDoctor
             doctorNombre={configPerfil.doctorNombre}
-            claveCorrecta={configPerfil.claveDoctor || "1234"}
             onExito={() => {
               setModalClaveDoctor(false);
               if (accionPendienteDoctor) {
@@ -1179,11 +1226,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         )}
 
         {/* MODAL DE AUTENTICACIÓN MÉDICA PARA SECCIONES RESTRINGIDAS */}
-        {modalClaveDoctor && !configPerfil.claveDoctorPersonalizada && (
+        {modalClaveDoctor && pinPersonalizado === false && (
           <ModalConfigurarClavePrimeraVez
             doctorNombre={configPerfil.doctorNombre}
-            onConfigurado={(nuevoPin) => {
-              guardarConfigPerfil({ ...configPerfil, claveDoctor: nuevoPin, claveDoctorPersonalizada: true });
+            onConfigurado={async (nuevoPin) => {
+              await configurarPinDoctor(nuevoPin);
+              setPinPersonalizado(true);
               setModalClaveDoctor(false);
               if (accionPendienteDoctor) {
                 accionPendienteDoctor();
@@ -1192,10 +1240,9 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             }}
           />
         )}
-        {modalClaveDoctor && configPerfil.claveDoctorPersonalizada && (
+        {modalClaveDoctor && pinPersonalizado === true && (
           <ModalClaveDoctor
             doctorNombre={configPerfil.doctorNombre}
-            claveCorrecta={configPerfil.claveDoctor || "1234"}
             onExito={() => {
               setModalClaveDoctor(false);
               if (accionPendienteDoctor) {
@@ -1293,7 +1340,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               }}
             />
           )}
-          {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} />}
+          {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} config={configPerfilConTasas} />}
             {pagina === "canal-endemico" && <CanalEndemico modo="medico" clinicaNombre={configPerfil.clinicaNombre} doctorNombre={configPerfil.doctorNombre} />}
             {pagina === "financiero" && (
               <ResumenesFinancieros
@@ -1317,10 +1364,14 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 user={user}
                 tasaBcv={tasaBcv}
                 tasaCop={tasaCopReal}
+                origenTasaActiva={origenTasaActiva}
                 onActualizarTasas={async (bcv, cop) => {
-                  if (bcv > 0) setTasaBcv(await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: bcv, origen: "MANUAL" }));
+                  if (bcv > 0) setTasaBcv(await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: bcv, origen: "PERSONALIZADA" }));
                   if (cop > 0) setTasaCopReal(await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: cop, origen: "MANUAL" }));
                 }}
+                pinPersonalizado={pinPersonalizado}
+                onPerfilDocsActualizado={setPerfilDocs}
+                onLogoActualizado={setLogoBase64}
               />
             )}
           </div>
@@ -1339,7 +1390,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 </div>
                 <div>
                   <h3 className="font-['Outfit'] font-black text-lg leading-tight">Fuente de la Tasa (USD → Bs)</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-white/50">USDT y BCV se sincronizan solos cada 4h.</p>
+                  <p className="text-[11px] text-slate-500 dark:text-white/50">USDT y BCV vienen de su fuente pública real.</p>
                 </div>
               </div>
               <button
@@ -1353,24 +1404,24 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
             <form onSubmit={guardarTasasRapidas} className="space-y-4">
               <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-white/10 p-1 rounded-xl">
-                <button type="button" disabled={cambiandoMetodoTasa} onClick={() => elegirMetodoTasa("BINANCE")}
-                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${metodoTasa === "BINANCE" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
+                <button type="button" disabled={cambiandoMetodoTasa} onClick={() => elegirMetodoTasa("USDT")}
+                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "USDT" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
                   <IconCoins size={12} /><span>USDT</span>
                 </button>
                 <button type="button" disabled={cambiandoMetodoTasa} onClick={() => elegirMetodoTasa("BCV")}
-                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${metodoTasa === "BCV" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
+                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "BCV" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
                   <IconBank size={12} /><span>BCV</span>
                 </button>
-                <button type="button" disabled={cambiandoMetodoTasa} onClick={() => elegirMetodoTasa("MANUAL")}
-                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${metodoTasa === "MANUAL" ? "bg-amber-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
+                <button type="button" disabled={cambiandoMetodoTasa} onClick={() => elegirMetodoTasa("PERSONALIZADA")}
+                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "PERSONALIZADA" ? "bg-amber-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
                   <IconEdit size={12} /><span>Propia</span>
                 </button>
               </div>
 
-              {metodoTasa !== "MANUAL" ? (
+              {origenTasaActiva !== "PERSONALIZADA" ? (
                 <div className="space-y-2 text-xs bg-slate-100 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/10">
                   <p className="text-[10px] text-slate-500 dark:text-white/50">
-                    {metodoTasa === "BCV" ? "Tasa oficial publicada en bcv.org.ve:" : "Promedio de las mejores ofertas de Binance P2P (USDT/VES):"}
+                    {origenTasaActiva === "BCV" ? "Tasa oficial publicada en bcv.org.ve:" : "Promedio de las mejores ofertas de Binance P2P (USDT/VES):"}
                   </p>
                   <p className="font-mono font-black text-lg text-teal-600 dark:text-teal-400">
                     {tasaBcv ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa todavía"}
@@ -1437,7 +1488,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   Simulación de Conversión ($10.00 USD):
                 </div>
                 <div className="flex items-center justify-between text-teal-700 dark:text-teal-300 font-bold">
-                  <span>Bs. {((metodoTasa === "MANUAL" ? parseFloat(tasaPropiaInput) || 0 : Number(tasaBcv?.tasa) || 0) * 10).toFixed(2)} VES</span>
+                  <span>Bs. {((origenTasaActiva === "PERSONALIZADA" ? parseFloat(tasaPropiaInput) || 0 : Number(tasaBcv?.tasa) || 0) * 10).toFixed(2)} VES</span>
                   <span>${((parseFloat(tasaCOPInput) || 0) * 10).toLocaleString()} COP</span>
                 </div>
               </div>
@@ -1457,7 +1508,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-md hover:shadow-teal-500/20 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-60"
                 >
                   <IconCheck size={16} />
-                  <span>{guardandoTasasRapidas ? "Guardando…" : metodoTasa === "MANUAL" ? "Guardar Tasa Propia y COP" : "Guardar Tasa COP"}</span>
+                  <span>{guardandoTasasRapidas ? "Guardando…" : origenTasaActiva === "PERSONALIZADA" ? "Guardar Tasa Propia y COP" : "Guardar Tasa COP"}</span>
                 </button>
               </div>
             </form>
@@ -3060,6 +3111,9 @@ function HistoriasClinicas({
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
+      logoBase64: config.logoBase64,
+      firmaBase64: config.firmaBase64,
+      encabezadoTexto: config.encabezadoTexto,
       paciente: {
         expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
         nombreCompleto: pacienteSeleccionado.nombreCompleto,
@@ -3171,6 +3225,9 @@ function HistoriasClinicas({
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
+      logoBase64: config.logoBase64,
+      firmaBase64: config.firmaBase64,
+      encabezadoTexto: config.encabezadoTexto,
       paciente: {
         expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
         nombreCompleto: pacienteSeleccionado.nombreCompleto,
@@ -3219,6 +3276,9 @@ function HistoriasClinicas({
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
+      logoBase64: config.logoBase64,
+      firmaBase64: config.firmaBase64,
+      encabezadoTexto: config.encabezadoTexto,
       paciente: {
         expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
         nombreCompleto: pacienteSeleccionado.nombreCompleto,
@@ -3270,6 +3330,9 @@ function HistoriasClinicas({
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
+      logoBase64: config.logoBase64,
+      firmaBase64: config.firmaBase64,
+      encabezadoTexto: config.encabezadoTexto,
       paciente: {
         expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
         nombreCompleto: pacienteSeleccionado.nombreCompleto,
@@ -4647,6 +4710,7 @@ function Procedimientos({
     const dataCot: CotizacionData = {
       clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config?.doctorNombre || "Médico Titular",
+      logoBase64: config?.logoBase64,
       pacienteNombre: cot.pacienteNombre,
       pacienteCedula: cot.pacienteCedula,
       pacienteTelefono: cot.pacienteTelefono,
@@ -4679,6 +4743,7 @@ function Procedimientos({
     const dataCot: CotizacionData = {
       clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config?.doctorNombre || "Médico Titular",
+      logoBase64: config?.logoBase64,
       pacienteNombre: cot.pacienteNombre,
       pacienteCedula: cot.pacienteCedula,
       pacienteTelefono: cot.pacienteTelefono,
@@ -5356,7 +5421,7 @@ function Procedimientos({
                   setGuardandoTasasModal(true);
                   try {
                     const tareas: Promise<unknown>[] = [];
-                    if (tempTasaBCV > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: tempTasaBCV, origen: "MANUAL" }));
+                    if (tempTasaBCV > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: tempTasaBCV, origen: "PERSONALIZADA" }));
                     if (tempTasaCOP > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: tempTasaCOP, origen: "MANUAL" }));
                     await Promise.all(tareas);
                     setModalTasas(false);
@@ -5530,6 +5595,9 @@ function SalaEspera({
   const [pagoMetodo, setPagoMetodo] = useState("Efectivo USD");
   const [pagoMontoUSD, setPagoMontoUSD] = useState("25");
   const [pagoReferencia, setPagoReferencia] = useState("");
+  const [pagoEmail, setPagoEmail] = useState("");
+  const [enviandoComprobante, setEnviandoComprobante] = useState(false);
+  const [comprobanteMsg, setComprobanteMsg] = useState<string | null>(null);
 
   const tasaBCV = Number(config?.tasaBCV) || 950;
 
@@ -5833,6 +5901,61 @@ function SalaEspera({
     onCambio();
   };
 
+  // Comprobante de Pago (NO fiscal — regla estricta, ver pdfReports.ts): se arma con el
+  // membrete personalizado del tenant (config.logoBase64/firmaBase64/encabezadoTexto, ver
+  // Configuración & Perfil) y se envía por el mismo servicio SMTP que ya usa Mediclinic
+  // para informes de consulta (SaludEmailService — nunca se toca Horeca/Comercio).
+  const construirComprobanteData = (): ComprobantePagoData | null => {
+    if (!modalPago) return null;
+    const montoNum = parseFloat(pagoMontoUSD) || 0;
+    const moneda: "USD" | "VES" | "COP" =
+      pagoMetodo.includes("VES") || pagoMetodo.includes("Punto") || pagoMetodo.includes("Pago Móvil") ? "VES" :
+      pagoMetodo.includes("COP") ? "COP" : "USD";
+    return {
+      clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
+      doctorNombre: config?.doctorNombre || "Médico Titular",
+      logoBase64: config?.logoBase64,
+      firmaBase64: config?.firmaBase64,
+      encabezadoTexto: config?.encabezadoTexto,
+      numeroComprobante: `${new Date().getFullYear()}-${String(modalPago.turnoNumero).padStart(4, "0")}`,
+      fecha: new Date().toLocaleDateString("es-VE", { day: "2-digit", month: "2-digit", year: "numeric" }),
+      paciente: {
+        nombreCompleto: modalPago.pacienteNombre,
+        identificacion: modalPago.pacienteCedula,
+        email: pagoEmail.trim() || undefined,
+      },
+      concepto: modalPago.motivo || "Consulta Médica",
+      montoCobrado: montoNum,
+      moneda,
+      metodoPago: pagoMetodo,
+      referencia: pagoReferencia.trim() || undefined,
+    };
+  };
+
+  const handleEnviarComprobantePago = async () => {
+    const data = construirComprobanteData();
+    if (!data) return;
+    const email = pagoEmail.trim();
+    if (!email || !email.includes("@")) {
+      setComprobanteMsg("⚠️ Ingresa un correo válido del paciente.");
+      return;
+    }
+    setEnviandoComprobante(true);
+    setComprobanteMsg(null);
+    try {
+      const { base64, nombreArchivo } = obtenerBase64PdfComprobantePago(data);
+      const { subject, body } = generarTextoEmailComprobante(data);
+      await enviarEmailDocumento({ destinatario: email, asunto: subject, cuerpo: body, pdfBase64: base64, nombreArchivo });
+      setComprobanteMsg("✓ Comprobante enviado por correo exitosamente.");
+    } catch (err) {
+      setComprobanteMsg(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo enviar el comprobante.");
+    } finally {
+      setEnviandoComprobante(false);
+      setTimeout(() => setComprobanteMsg(null), 4000);
+    }
+  };
+
+
   // Eliminar turno
   const handleEliminarTurno = (id: string) => {
     if (confirm("¿Estás seguro de eliminar este turno de la sala de espera?")) {
@@ -5861,6 +5984,7 @@ function SalaEspera({
     const dataCierre: CierreCajaData = {
       clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config?.doctorNombre || "Médico Titular",
+      logoBase64: config?.logoBase64,
       responsableNombre: config?.secretariaNombre || "Recepción / Asistente",
       fecha: hoy(),
       horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -6210,6 +6334,8 @@ function SalaEspera({
                             onClick={() => {
                               setModalPago(t);
                               setPagoMontoUSD("25");
+                              setPagoEmail(pacientes?.find((p) => p.id === t.pacienteId)?.email || "");
+                              setComprobanteMsg(null);
                             }}
                             className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-400/30 font-bold text-[10px] hover:bg-amber-500/25 cursor-pointer"
                             title="Haz clic para registrar cobro"
@@ -6581,6 +6707,31 @@ function SalaEspera({
                 </button>
               </div>
             </form>
+
+            {/* Comprobante de Pago (NO fiscal) — solo por correo, con PDF adjunto real vía SMTP.
+                No se envía por WhatsApp: por decisión de negocio, no se automatiza ese canal. */}
+            <div className="pt-3 border-t border-slate-200 dark:border-white/10 space-y-2">
+              <label className="font-bold text-slate-700 dark:text-white/80 text-xs">Comprobante de Pago (no fiscal)</label>
+              <input
+                type="email"
+                placeholder="correo@paciente.com"
+                value={pagoEmail}
+                onChange={(e) => setPagoEmail(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 text-xs"
+              />
+              {comprobanteMsg && <p className="text-[11px] font-bold">{comprobanteMsg}</p>}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={enviandoComprobante}
+                  onClick={handleEnviarComprobantePago}
+                  className="flex-1 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-md cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
+                >
+                  <IconMail size={13} />
+                  <span>{enviandoComprobante ? "Enviando…" : "Enviar comprobante de pago vía correo"}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -6736,11 +6887,13 @@ function AgendaMedica({
   pacientes,
   citasHoy,
   onCambio,
+  config,
 }: {
   tenantId: number;
   pacientes: Paciente[] | null;
   citasHoy: CitaMedica[] | null;
   onCambio: () => void;
+  config?: any;
 }) {
   // Fecha seleccionada actual (YYYY-MM-DD)
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(() => hoy());
@@ -7314,7 +7467,13 @@ function AgendaMedica({
                     type="button"
                     onClick={() => {
                       const [my, mm, md] = mañana().split("-");
-                      const msg = `Hola ${cita.pacienteNombre}, le recordamos su cita médica programada para mañana ${md}/${mm}/${my} a las ${cita.hora}.`;
+                      const msg = generarTextoRecordatorioCita(config?.plantillaRecordatorioCita, {
+                        paciente: cita.pacienteNombre,
+                        fecha: `${md}/${mm}/${my}`,
+                        hora: cita.hora,
+                        clinica: config?.clinicaNombre || "nuestro consultorio",
+                        doctor: config?.doctorNombre || "Médico Titular",
+                      });
                       abrirWhatsAppDirecto(cita.pacienteTelefono, msg);
                     }}
                     className="text-emerald-600 hover:text-emerald-500 font-bold flex items-center gap-1 cursor-pointer"
@@ -7502,7 +7661,13 @@ function AgendaMedica({
                         <button
                           type="button"
                           onClick={() => {
-                            const msg = `Hola ${cita.pacienteNombre}, le recordamos su cita médica programada para el día ${fechaCortaFmt} a las ${cita.hora}.`;
+                            const msg = generarTextoRecordatorioCita(config?.plantillaRecordatorioCita, {
+                              paciente: cita.pacienteNombre,
+                              fecha: fechaCortaFmt,
+                              hora: cita.hora,
+                              clinica: config?.clinicaNombre || "nuestro consultorio",
+                              doctor: config?.doctorNombre || "Médico Titular",
+                            });
                             abrirWhatsAppDirecto(cita.pacienteTelefono, msg);
                           }}
                           className="text-emerald-600 hover:text-emerald-500 font-bold flex items-center gap-1 text-[10px] cursor-pointer hover:underline"
@@ -7880,6 +8045,7 @@ function ResumenesFinancieros({
                 const dataHoy: CierreCajaData = {
                   clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
                   doctorNombre: config?.doctorNombre || "Médico Titular",
+                  logoBase64: config?.logoBase64,
                   responsableNombre: config?.secretariaNombre || config?.doctorNombre || "Recepción y Caja",
                   fecha: hoy(),
                   horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -8069,14 +8235,19 @@ function ResumenesFinancieros({
 // ══════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN & PERFIL MÉDICO
 // ══════════════════════════════════════════════════════════════════════════
-function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, onActualizarTasas }: {
+function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, origenTasaActiva, onActualizarTasas, pinPersonalizado, onPerfilDocsActualizado, onLogoActualizado }: {
   config: any; onGuardar: (c: any) => void; user: any;
-  tasaBcv?: TasaCambio | null; tasaCop?: TasaCambio | null; onActualizarTasas?: (bcv: number, cop: number) => Promise<void>;
+  tasaBcv?: TasaCambio | null; tasaCop?: TasaCambio | null; origenTasaActiva?: OrigenTasaActiva | null;
+  onActualizarTasas?: (bcv: number, cop: number) => Promise<void>; pinPersonalizado?: boolean | null;
+  onPerfilDocsActualizado?: (p: PerfilMedicoDocumentos) => void;
+  onLogoActualizado?: (b64: string | null) => void;
 }) {
   const [form, setForm] = useState(config);
   const [claveForm, setClaveForm] = useState({ actual: "", nueva: "", confirmar: "" });
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [subiendoLogo, setSubiendoLogo] = useState(false);
+  const [subiendoFirma, setSubiendoFirma] = useState(false);
 
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -8084,11 +8255,25 @@ function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, onActualizar
     try {
       // Las tasas se guardan por separado en /api/financiero/tasas (mismo motor real
       // que Horeca/Comercio, con historial) — solo se envían si el usuario las cambió.
-      const bcvCambio = Number(form.tasaBCV) !== (tasaBcv ? Number(tasaBcv.tasa) : undefined);
+      // BCV solo es editable a mano cuando la fuente activa es "PERSONALIZADA" (ver
+      // TasaBadge de arriba); si sigue en BCV/USDT, este campo queda de solo lectura.
+      const bcvCambio = origenTasaActiva === "PERSONALIZADA" && Number(form.tasaBCV) !== (tasaBcv ? Number(tasaBcv.tasa) : undefined);
       const copCambio = Number(form.tasaCOP) !== (tasaCop ? Number(tasaCop.tasa) : undefined);
       if (onActualizarTasas && (bcvCambio || copCambio)) {
         await onActualizarTasas(bcvCambio ? Number(form.tasaBCV) || 0 : 0, copCambio ? Number(form.tasaCOP) || 0 : 0);
       }
+      // Motor de personalización de PDFs: el membrete (nombre, especialidad, matrícula,
+      // colegio, texto de encabezado) se guarda por tenant en el servidor — antes se
+      // quedaba solo en localStorage de este dispositivo (ver ConfiguracionMedicaController).
+      const perfilActualizado = await actualizarPerfilMedicoDocumentos({
+        doctorNombre: form.doctorNombre || "",
+        especialidad: form.especialidad || "",
+        matriculaMpps: form.matriculaMPPS || "",
+        colegioMedicos: form.colegioMedicos || "",
+        encabezadoTexto: form.encabezadoTexto || "",
+        plantillaRecordatorioCita: form.plantillaRecordatorioCita || "",
+      });
+      onPerfilDocsActualizado?.(perfilActualizado);
       onGuardar(form);
       setMensaje("✓ Configuración y perfil guardados exitosamente.");
     } catch (err) {
@@ -8099,7 +8284,79 @@ function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, onActualizar
     }
   };
 
-  const guardarClave = (e: React.FormEvent) => {
+  const leerImagenComoBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const subirLogo = async (file: File | null) => {
+    if (!file) return;
+    setSubiendoLogo(true);
+    setMensaje(null);
+    try {
+      const b64 = await leerImagenComoBase64(file);
+      await actualizarLogo(b64);
+      onLogoActualizado?.(b64);
+      setMensaje("✓ Logo actualizado — ya se usará en los próximos PDF generados.");
+    } catch (err) {
+      setMensaje(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo subir el logo.");
+    } finally {
+      setSubiendoLogo(false);
+      setTimeout(() => setMensaje(null), 3500);
+    }
+  };
+
+  const subirFirma = async (file: File | null) => {
+    if (!file) return;
+    setSubiendoFirma(true);
+    setMensaje(null);
+    try {
+      const b64 = await leerImagenComoBase64(file);
+      const perfilActualizado = await actualizarFirmaMedico(b64);
+      onPerfilDocsActualizado?.(perfilActualizado);
+      setMensaje("✓ Firma electrónica actualizada — ya se usará en los próximos PDF generados.");
+    } catch (err) {
+      setMensaje(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo subir la firma.");
+    } finally {
+      setSubiendoFirma(false);
+      setTimeout(() => setMensaje(null), 3500);
+    }
+  };
+
+  const [cambiandoClave, setCambiandoClave] = useState(false);
+  const [guardandoPlantilla, setGuardandoPlantilla] = useState(false);
+
+  // Borrador del recordatorio de cita por WhatsApp — costo, método de pago y hora de
+  // llegada los escribe cada médico a su gusto; el sistema solo rellena las llaves
+  // {saludo}/{paciente}/{fecha}/{hora}/{clinica} al enviar (ver generarTextoRecordatorioCita).
+  const guardarPlantillaRecordatorio = async () => {
+    setGuardandoPlantilla(true);
+    setMensaje(null);
+    try {
+      const perfilActualizado = await actualizarPerfilMedicoDocumentos({
+        doctorNombre: form.doctorNombre || "",
+        especialidad: form.especialidad || "",
+        matriculaMpps: form.matriculaMPPS || "",
+        colegioMedicos: form.colegioMedicos || "",
+        encabezadoTexto: form.encabezadoTexto || "",
+        plantillaRecordatorioCita: form.plantillaRecordatorioCita || "",
+      });
+      onPerfilDocsActualizado?.(perfilActualizado);
+      setMensaje("✓ Plantilla de recordatorio guardada.");
+    } catch (err) {
+      setMensaje(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo guardar la plantilla.");
+    } finally {
+      setGuardandoPlantilla(false);
+      setTimeout(() => setMensaje(null), 3500);
+    }
+  };
+
+  // El PIN se guarda hasheado en el servidor (ver ConfiguracionMedicaController) — cambiar
+  // uno ya personalizado exige el PIN actual, igual que cualquier cambio de contraseña real.
+  const guardarClave = async (e: React.FormEvent) => {
     e.preventDefault();
     const nueva = claveForm.nueva.trim();
     if (!/^\d{4}$/.test(nueva)) {
@@ -8110,12 +8367,17 @@ function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, onActualizar
       setMensaje("❌ Los dos PIN no coinciden.");
       return;
     }
-    const configActualizada = { ...form, claveDoctor: nueva, claveDoctorPersonalizada: true };
-    onGuardar(configActualizada);
-    setForm(configActualizada);
-    setMensaje("✓ PIN del Doctor actualizado exitosamente.");
-    setClaveForm({ actual: "", nueva: "", confirmar: "" });
-    setTimeout(() => setMensaje(null), 3500);
+    setCambiandoClave(true);
+    try {
+      await configurarPinDoctor(nueva, pinPersonalizado ? claveForm.actual.trim() : undefined);
+      setMensaje("✓ PIN del Doctor actualizado exitosamente.");
+      setClaveForm({ actual: "", nueva: "", confirmar: "" });
+    } catch (err) {
+      setMensaje(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo actualizar el PIN.");
+    } finally {
+      setCambiandoClave(false);
+      setTimeout(() => setMensaje(null), 3500);
+    }
   };
 
   return (
@@ -8155,6 +8417,13 @@ function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, onActualizar
             <label className="text-[10px] text-slate-400 uppercase font-mono">Colegio de Médicos</label>
             <input value={form.colegioMedicos} onChange={(e) => setForm({ ...form, colegioMedicos: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
           </div>
+          <div className="sm:col-span-2">
+            <label className="text-[10px] text-slate-400 uppercase font-mono">Texto de Encabezado (dirección, teléfono, RIF, horario…)</label>
+            <textarea value={form.encabezadoTexto || ""} onChange={(e) => setForm({ ...form, encabezadoTexto: e.target.value })} rows={2}
+              placeholder="Ej. Av. Principal, Torre Médica, Piso 3 — Tel. 0212-1234567"
+              className="w-full mt-1 px-3 py-2 rounded-lg border text-xs resize-none" />
+            <p className="text-[9px] text-slate-400 mt-0.5">Aparece en el encabezado de historias, récipes, cotizaciones y comprobantes de pago.</p>
+          </div>
         </div>
 
         <div className="pt-2 border-t border-slate-200 dark:border-white/10">
@@ -8162,7 +8431,12 @@ function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, onActualizar
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] text-slate-400 uppercase font-mono">Tasa BCV (Bs. / USD)</label>
-              <input type="number" step="0.01" value={form.tasaBCV} onChange={(e) => setForm({ ...form, tasaBCV: parseFloat(e.target.value) || 0 })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono font-bold" />
+              <input type="number" step="0.01" value={form.tasaBCV} disabled={origenTasaActiva !== "PERSONALIZADA"}
+                onChange={(e) => setForm({ ...form, tasaBCV: parseFloat(e.target.value) || 0 })}
+                className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono font-bold disabled:opacity-50 disabled:cursor-not-allowed" />
+              {origenTasaActiva !== "PERSONALIZADA" && (
+                <p className="text-[9px] text-slate-400 mt-0.5">Gobernada por {origenTasaActiva === "BCV" ? "BCV" : "USDT"} — cambiala en el badge de tasa arriba.</p>
+              )}
             </div>
             <div>
               <label className="text-[10px] text-slate-400 uppercase font-mono">Tasa TRM (Pesos COP / USD)</label>
@@ -8175,6 +8449,100 @@ function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, onActualizar
           {guardando ? "Guardando…" : "Guardar Cambios de Perfil"}
         </button>
       </form>
+
+      {/* Motor de Personalización de PDFs: logo y firma electrónica, inyectados automáticamente
+          en el encabezado y el pie de página de CADA documento (historias, récipes, cotizaciones,
+          comprobantes de pago) — ver pdfReports.ts y ConfiguracionMedicaController. */}
+      <div className="apple-glass rounded-2xl p-6 space-y-4">
+        <div>
+          <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+            <IconFileText size={16} className="text-teal-500" />
+            <span>Motor de Personalización de PDFs</span>
+          </h4>
+          <p className="text-[11px] text-slate-500 dark:text-white/50 mt-0.5">
+            Tu logo y firma quedan guardados en el servidor y se insertan solos en cada documento — no hay que repetir esto por cada consulta.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Logo (Clínica / Doctor)</label>
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 flex items-center justify-center overflow-hidden shrink-0">
+                {config.logoBase64 ? (
+                  <img src={config.logoBase64} alt="Logo" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-[9px] text-slate-400 text-center px-1">Sin logo</span>
+                )}
+              </div>
+              <label className={`text-xs font-bold px-3 py-2 rounded-lg border cursor-pointer ${subiendoLogo ? "opacity-60 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-white/5"} border-slate-300 dark:border-white/15 text-slate-700 dark:text-white/80`}>
+                {subiendoLogo ? "Subiendo…" : "Subir Logo"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => subirLogo(e.target.files?.[0] || null)} />
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Firma Electrónica</label>
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 flex items-center justify-center overflow-hidden shrink-0">
+                {config.firmaBase64 ? (
+                  <img src={config.firmaBase64} alt="Firma" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-[9px] text-slate-400 text-center px-1">Sin firma</span>
+                )}
+              </div>
+              <label className={`text-xs font-bold px-3 py-2 rounded-lg border cursor-pointer ${subiendoFirma ? "opacity-60 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-white/5"} border-slate-300 dark:border-white/15 text-slate-700 dark:text-white/80`}>
+                {subiendoFirma ? "Subiendo…" : "Subir Firma"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => subirFirma(e.target.files?.[0] || null)} />
+              </label>
+            </div>
+          </div>
+        </div>
+        <p className="text-[9px] text-slate-400">Usa imágenes con fondo transparente (PNG) para mejor resultado — la firma se inserta a tamaño reducido sobre la línea de firma del documento.</p>
+      </div>
+
+      {/* Recordatorio de Cita por WhatsApp — 100% editable, sin API oficial de Meta (no se
+          paga ni se espera aprobación): se abre wa.me número por número con este texto. */}
+      <div className="apple-glass rounded-2xl p-6 space-y-3">
+        <div>
+          <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+            <IconWhatsApp size={16} className="text-emerald-500" />
+            <span>Recordatorio de Cita por WhatsApp</span>
+          </h4>
+          <p className="text-[11px] text-slate-500 dark:text-white/50 mt-0.5">
+            Este es tu borrador — ajústalo a tu costo de consulta, forma de pago y horario de llegada. Se usa cada vez que envías un recordatorio desde la Agenda.
+          </p>
+        </div>
+
+        <textarea
+          value={form.plantillaRecordatorioCita ?? ""}
+          onChange={(e) => setForm({ ...form, plantillaRecordatorioCita: e.target.value })}
+          rows={8}
+          className="w-full px-3 py-2 rounded-lg border text-xs font-mono resize-y"
+        />
+        <p className="text-[9px] text-slate-400">
+          Llaves disponibles (se rellenan solas al enviar): <code className="font-mono">{"{saludo}"}</code> · <code className="font-mono">{"{paciente}"}</code> · <code className="font-mono">{"{fecha}"}</code> · <code className="font-mono">{"{hora}"}</code> · <code className="font-mono">{"{clinica}"}</code> · <code className="font-mono">{"{doctor}"}</code>. El costo y el método de pago los escribes tú directo en el texto.
+        </p>
+
+        <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+          <p className="text-[9px] font-bold text-slate-400 uppercase font-mono mb-1">Vista previa</p>
+          <p className="text-[11px] text-slate-700 dark:text-white/70 whitespace-pre-line">
+            {generarTextoRecordatorioCita(form.plantillaRecordatorioCita, {
+              paciente: "Carlos Pérez",
+              fecha: "24/09/2026",
+              hora: "2:00 p. m.",
+              clinica: form.clinicaNombre || "tu consultorio",
+              doctor: form.doctorNombre || "Médico Titular",
+            })}
+          </p>
+        </div>
+
+        <button type="button" disabled={guardandoPlantilla} onClick={guardarPlantillaRecordatorio}
+          className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-60">
+          {guardandoPlantilla ? "Guardando…" : "Guardar Plantilla"}
+        </button>
+      </div>
 
       {/* Cambio de PIN / Contraseña del Doctor */}
       <form onSubmit={guardarClave} className="apple-glass rounded-2xl p-6 space-y-4 border border-teal-500/30">
@@ -8189,6 +8557,21 @@ function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, onActualizar
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {pinPersonalizado && (
+            <div className="sm:col-span-2">
+              <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">PIN Actual *</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                required
+                maxLength={4}
+                placeholder="••••"
+                value={claveForm.actual}
+                onChange={(e) => setClaveForm({ ...claveForm, actual: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono tracking-[0.3em] text-center"
+              />
+            </div>
+          )}
           <div>
             <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Nuevo PIN (4 dígitos) *</label>
             <input
@@ -8217,8 +8600,8 @@ function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, onActualizar
           </div>
         </div>
 
-        <button type="submit" className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer">
-          Actualizar PIN del Doctor
+        <button type="submit" disabled={cambiandoClave} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-60">
+          {cambiandoClave ? "Actualizando…" : "Actualizar PIN del Doctor"}
         </button>
       </form>
 
