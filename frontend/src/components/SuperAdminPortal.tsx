@@ -188,7 +188,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   const [ejecutandoBarrido, setEjecutandoBarrido] = useState(false);
 
   // VISTA PRINCIPAL (TENANTS vs FINANZAS)
-  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "FINANZAS">("TENANTS");
+  // VISTA PRINCIPAL (TENANTS vs PAGOS vs FINANZAS)
+  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "FINANZAS">("TENANTS");
+
+  // FILTROS Y ESTADOS DEL MODULO DEDICADO DE HISTORIAL DE PAGOS
+  const [filtroPagosTenant, setFiltroPagosTenant] = useState<number | "TODOS">("TODOS");
+  const [filtroPagosMetodo, setFiltroPagosMetodo] = useState<string>("TODOS");
+  const [filtroPagosTexto, setFiltroPagosTexto] = useState<string>("");
 
   // ESTADOS DEL MODULO FINANCIERO SAAS
   const [mesFinanzas, setMesFinanzas] = useState<string>(() => new Date().toISOString().substring(0, 7));
@@ -677,7 +683,57 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   };
 
   const abrirHistorialPagos = async (tenantId?: number) => {
-    setShowHistorialPagosModal(true);
+    setVistaPrincipal("PAGOS");
+    if (tenantId) {
+      setFiltroPagosTenant(tenantId);
+    } else {
+      setFiltroPagosTenant("TODOS");
+    }
+    await cargarPagos(tenantId);
+  };
+
+  // CALCULOS Y MEMOS DEL MODULO DEDICADO DE PAGOS
+  const totalCobradoHistorico = useMemo(() => {
+    return historialPagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0);
+  }, [historialPagos]);
+
+  const mesActualStr = useMemo(() => new Date().toISOString().substring(0, 7), []);
+
+  const pagosMesActual = useMemo(() => {
+    return historialPagos.filter((p) => p.fechaPago && p.fechaPago.startsWith(mesActualStr));
+  }, [historialPagos, mesActualStr]);
+
+  const totalCobradoMes = useMemo(() => {
+    return pagosMesActual.reduce((acc, p) => acc + (Number(p.monto) || 0), 0);
+  }, [pagosMesActual]);
+
+  const ticketPromedio = useMemo(() => {
+    return historialPagos.length > 0 ? totalCobradoHistorico / historialPagos.length : 0;
+  }, [historialPagos, totalCobradoHistorico]);
+
+  const totalDiasAcreditados = useMemo(() => {
+    return historialPagos.reduce((acc, p) => acc + (p.diasAcreditados || 0), 0);
+  }, [historialPagos]);
+
+  const pagosFiltrados = useMemo(() => {
+    return historialPagos.filter((p) => {
+      if (filtroPagosTenant !== "TODOS" && p.tenantId !== filtroPagosTenant) return false;
+      if (filtroPagosMetodo !== "TODOS" && p.metodoPago !== filtroPagosMetodo) return false;
+      if (filtroPagosTexto.trim()) {
+        const q = filtroPagosTexto.toLowerCase();
+        const coincide =
+          p.nombreEmpresa.toLowerCase().includes(q) ||
+          String(p.tenantId).includes(q) ||
+          (p.referenciaComprobante && p.referenciaComprobante.toLowerCase().includes(q)) ||
+          (p.metodoPago && p.metodoPago.toLowerCase().includes(q)) ||
+          (p.notas && p.notas.toLowerCase().includes(q));
+        if (!coincide) return false;
+      }
+      return true;
+    });
+  }, [historialPagos, filtroPagosTenant, filtroPagosMetodo, filtroPagosTexto]);
+
+  const cargarPagos = async (tenantId?: number) => {
     setLoadingPagos(true);
     try {
       const pagos = await listarPagosSuperAdmin(tenantId);
@@ -686,6 +742,14 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       avisar("Error al consultar historial de pagos", "error");
     } finally {
       setLoadingPagos(false);
+    }
+  };
+
+  const abrirModalPagoDesdeModulo = () => {
+    if (tenants.length > 0) {
+      abrirModalPago(tenants[0]);
+    } else {
+      avisar("No hay tenants registrados para registrar un cobro", "info");
     }
   };
 
@@ -850,7 +914,11 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
           <button
             onClick={() => abrirHistorialPagos()}
-            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-xs transition-all cursor-pointer"
+            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer border ${
+              vistaPrincipal === "PAGOS"
+                ? "bg-teal-600 text-white border-teal-600 shadow-xs"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+            }`}
           >
             Historial de Pagos
           </button>
@@ -890,10 +958,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       </header>
 
       {/* BARRA DE NAVEGACION PRINCIPAL SUPERADMIN */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto">
         <button
           onClick={() => setVistaPrincipal("TENANTS")}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
             vistaPrincipal === "TENANTS"
               ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
               : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
@@ -909,10 +977,29 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
         <button
           onClick={() => {
+            setVistaPrincipal("PAGOS");
+            cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant);
+          }}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+            vistaPrincipal === "PAGOS"
+              ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <span>Historial de Cobros & Pagos</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+            vistaPrincipal === "PAGOS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+          }`}>
+            {historialPagos.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
             setVistaPrincipal("FINANZAS");
             cargarDatosFinancieros();
           }}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
             vistaPrincipal === "FINANZAS"
               ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
               : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
@@ -1247,6 +1334,236 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       </div>
 
       
+        </div>
+      )}
+
+      
+      {/* VISTA: MODULO DEDICADO DE HISTORIAL DE COBROS Y PAGOS */}
+      {vistaPrincipal === "PAGOS" && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* BARRA SUPERIOR DE PAGOS */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-['Outfit'] font-black text-lg text-slate-900">
+                  Historial de Pagos & Cobros de Clientes
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-wider border border-emerald-200">
+                  Modulo de Facturacion
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium">
+                Auditoria de suscripciones cobradas, comprobantes de pago y extensiones de licencia.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant)}
+                disabled={loadingPagos}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-xs transition-all cursor-pointer disabled:opacity-50"
+              >
+                {loadingPagos ? "Cargando..." : "Refrescar"}
+              </button>
+
+              <button
+                onClick={abrirModalPagoDesdeModulo}
+                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xs shadow-teal-600/20 transition-all cursor-pointer"
+              >
+                + Registrar Nuevo Cobro
+              </button>
+            </div>
+          </div>
+
+          {/* KPIS DE PAGOS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Total Cobrado Historico</span>
+              <div className="font-['Outfit'] text-3xl font-black text-slate-900">
+                ${totalCobradoHistorico.toFixed(2)}
+                <span className="text-xs font-normal text-slate-400"> USD</span>
+              </div>
+              <span className="text-[10px] text-slate-500">{historialPagos.length} cobros procesados</span>
+            </div>
+
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+              <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider">Cobros del Mes Actual</span>
+              <div className="font-['Outfit'] text-3xl font-black text-slate-900">
+                ${totalCobradoMes.toFixed(2)}
+                <span className="text-xs font-normal text-slate-400"> USD</span>
+              </div>
+              <span className="text-[10px] text-slate-500">{pagosMesActual.length} suscripciones renovadas</span>
+            </div>
+
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Ticket Promedio</span>
+              <div className="font-['Outfit'] text-3xl font-black text-slate-900">
+                ${ticketPromedio.toFixed(2)}
+                <span className="text-xs font-normal text-slate-400"> USD</span>
+              </div>
+              <span className="text-[10px] text-slate-500">Promedio por cobro de cliente</span>
+            </div>
+
+            <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tiempo Acreditado</span>
+              <div className="font-['Outfit'] text-3xl font-black text-slate-900 font-mono">
+                +{totalDiasAcreditados}
+                <span className="text-xs font-normal text-slate-400 font-sans"> dias</span>
+              </div>
+              <span className="text-[10px] text-slate-500">Dias de operacion entregados</span>
+            </div>
+          </div>
+
+          {/* FILTROS AVANZADOS Y TABLA DE PAGOS */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3 flex-wrap text-xs">
+                {/* Filtro por Tenant */}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-500 text-[10px] uppercase">Cliente:</span>
+                  <select
+                    value={filtroPagosTenant}
+                    onChange={(e) => setFiltroPagosTenant(e.target.value === "TODOS" ? "TODOS" : Number(e.target.value))}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 font-medium text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-teal-500"
+                  >
+                    <option value="TODOS">Todos los Clientes ({tenants.length})</option>
+                    {tenants.map((t) => (
+                      <option key={t.tenantId} value={t.tenantId}>
+                        #{t.tenantId} - {t.nombreEmpresa}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Filtro por Metodo */}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-500 text-[10px] uppercase">Metodo:</span>
+                  <select
+                    value={filtroPagosMetodo}
+                    onChange={(e) => setFiltroPagosMetodo(e.target.value)}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 font-medium text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-teal-500"
+                  >
+                    <option value="TODOS">Todos los Metodos</option>
+                    <option value="BINANCE_USDT">Binance USDT</option>
+                    <option value="PAGO_MOVIL">Pago Movil (Bs.)</option>
+                    <option value="TRANSFERENCIA_VES">Transferencia Bs.</option>
+                    <option value="ZELLE">Zelle (USD)</option>
+                    <option value="EFECTIVO_USD">Efectivo USD</option>
+                    <option value="TARJETA_CREDITO">Tarjeta de Credito</option>
+                    <option value="CORTESIA">Cortesia</option>
+                  </select>
+                </div>
+
+                {/* Buscador */}
+                <input
+                  type="text"
+                  placeholder="Buscar por cliente, referencia, comprobante..."
+                  value={filtroPagosTexto}
+                  onChange={(e) => setFiltroPagosTexto(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:outline-hidden focus:border-teal-500 w-64"
+                />
+
+                {(filtroPagosTenant !== "TODOS" || filtroPagosMetodo !== "TODOS" || filtroPagosTexto) && (
+                  <button
+                    onClick={() => {
+                      setFiltroPagosTenant("TODOS");
+                      setFiltroPagosMetodo("TODOS");
+                      setFiltroPagosTexto("");
+                    }}
+                    className="text-xs text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+                  >
+                    Limpiar filtros
+                  </button>
+                )}
+              </div>
+
+              <span className="px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800 font-bold text-xs">
+                {pagosFiltrados.length} cobros listados
+              </span>
+            </div>
+
+            {/* TABLA PRINCIPAL DE HISTORIAL DE PAGOS */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="pb-3 px-3">Fecha & Hora</th>
+                    <th className="pb-3 px-3">Cliente / Negocio</th>
+                    <th className="pb-3 px-3">Monto Cobrado</th>
+                    <th className="pb-3 px-3">Metodo de Pago</th>
+                    <th className="pb-3 px-3">Comprobante / Ref</th>
+                    <th className="pb-3 px-3">Tiempo Acreditado</th>
+                    <th className="pb-3 px-3">Estado</th>
+                    <th className="pb-3 px-3">Notas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {loadingPagos ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        Cargando historial de pagos...
+                      </td>
+                    </tr>
+                  ) : pagosFiltrados.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        No se encontraron cobros registrados con los criterios seleccionados.
+                      </td>
+                    </tr>
+                  ) : (
+                    pagosFiltrados.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-3 px-3 font-mono text-[11px] text-slate-600">
+                          {p.fechaPago ? p.fechaPago.replace("T", " ").substring(0, 16) : "-"}
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold">
+                              #{p.tenantId}
+                            </span>
+                            <span className="font-bold text-slate-900">{p.nombreEmpresa}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="font-mono font-black text-emerald-700 text-sm">
+                            ${Number(p.monto).toFixed(2)}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-bold ml-1">{p.moneda}</span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-mono text-[10px] font-bold border border-slate-200">
+                            {p.metodoPago}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[11px] text-slate-600">
+                          {p.referenciaComprobante ? (
+                            <span className="px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200 text-slate-800">
+                              {p.referenciaComprobante}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 font-bold text-[10px]">
+                            +{p.mesesPagados} mes ({p.diasAcreditados} dias)
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[10px]">
+                            {p.estado || "CONFIRMADO"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-slate-500 text-[11px] max-w-xs truncate" title={p.notas || ""}>
+                          {p.notas || "-"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
