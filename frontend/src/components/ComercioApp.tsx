@@ -20,7 +20,7 @@ import {
   crearProveedorRepuesto,
   listarComprasRepuesto,
   registrarCompraRepuesto,
-  listarMovimientos,
+  listarMovimientos, registrarMovimiento,
   tasaVigente, actualizarTasa, actualizarTasaExterna, ApiError,
   obtenerOrigenTasaActiva, actualizarOrigenTasaActiva,
   type RepuestoItem,
@@ -496,7 +496,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const tasaCop = tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
-  const [tab, setTab] = useState<"general" | "pos" | "inventario" | "clientes" | "cierre">("general");
+  const [tab, setTab] = useState<"general" | "pos" | "inventario" | "clientes" | "gastos" | "cierre">("general");
 
   // Estado del Catálogo y Clientes
   const [productos, setProductos] = useState<ProductoComercio[]>(() => {
@@ -547,6 +547,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [modalCompraProveedor, setModalCompraProveedor] = useState(false);
   const [proveedoresRepuesto, setProveedoresRepuesto] = useState<ProveedorRepuesto[]>([]);
   const [ingresosCaja, setIngresosCaja] = useState<MovimientoCaja[]>([]);
+  const [gastosCaja, setGastosCaja] = useState<MovimientoCaja[]>([]);
+  const [formGasto, setFormGasto] = useState({ tipo: "EGRESO" as "INGRESO" | "EGRESO", monto: "", moneda: "USD" as "USD" | "VES" | "COP", concepto: "" });
+  const [guardandoGasto, setGuardandoGasto] = useState(false);
   const [cargandoCompra, setCargandoCompra] = useState(false);
   const [toast, setToast] = useState<{ tipo: "success" | "error" | "info"; mensaje: string } | null>(null);
 
@@ -603,11 +606,37 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     listarMovimientos(user.tenantId, "INGRESO").then(setIngresosCaja).catch(() => setIngresosCaja([]));
   };
 
+  // Gastos sueltos (alquiler, papelería, servicios) que no salen del POS —
+  // antes esta pestaña no existía y no había dónde anotarlos.
+  const cargarGastosCaja = () => {
+    if (!user?.tenantId) return;
+    listarMovimientos(user.tenantId, "EGRESO").then(setGastosCaja).catch(() => setGastosCaja([]));
+  };
+
+  const registrarGasto = async () => {
+    if (!user?.tenantId) return;
+    if (!formGasto.monto || Number(formGasto.monto) <= 0) { mostrarToast("Ingresa un monto válido", "error"); return; }
+    if (!formGasto.concepto.trim()) { mostrarToast("Describe el concepto del movimiento", "error"); return; }
+    setGuardandoGasto(true);
+    try {
+      await registrarMovimiento(user.tenantId, { tipo: formGasto.tipo, monto: Number(formGasto.monto), moneda: formGasto.moneda, concepto: formGasto.concepto.trim() });
+      setFormGasto({ ...formGasto, monto: "", concepto: "" });
+      cargarGastosCaja();
+      if (formGasto.tipo === "INGRESO") cargarIngresosCaja();
+      mostrarToast("Movimiento registrado");
+    } catch (e) {
+      mostrarToast(e instanceof Error ? e.message : "No se pudo registrar el movimiento", "error");
+    } finally {
+      setGuardandoGasto(false);
+    }
+  };
+
   useEffect(() => {
     if (user?.tenantId) {
       cargarRepuestosBackend();
       listarProveedoresRepuesto().then(setProveedoresRepuesto).catch(() => {});
       cargarIngresosCaja();
+      cargarGastosCaja();
     }
   }, [user?.tenantId, perfilActivo]);
 
@@ -944,6 +973,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             { id: "pos" as const, Icon: IconCard, etiqueta: "POS Mostrador" },
             { id: "inventario" as const, Icon: IconBox, etiqueta: "Inventario & Stock" },
             { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
+            { id: "gastos" as const, Icon: IconBank, etiqueta: "Ingresos & Gastos" },
             { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
           ]).map((item) => (
             <button
@@ -1523,6 +1553,77 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════
+            TAB: INGRESOS & GASTOS — gastos sueltos (alquiler, papelería,
+            servicios) que no pasan por el POS; las ventas siguen entrando
+            solas desde el mostrador, esto es solo para anotar lo demás.
+            ══════════════════════════════════════════════════════════════════ */}
+        {tab === "gastos" && (
+          <div className="max-w-3xl mx-auto w-full space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4" style={{ borderLeftColor: "#10b981" }}>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Ingresos registrados</div>
+                <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
+                  ${ingresosCaja.filter((m) => m.moneda === "USD").reduce((s, m) => s + Number(m.monto), 0).toFixed(2)}
+                </div>
+              </div>
+              <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4" style={{ borderLeftColor: "#ef4444" }}>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Gastos registrados</div>
+                <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
+                  ${gastosCaja.filter((m) => m.moneda === "USD").reduce((s, m) => s + Number(m.monto), 0).toFixed(2)}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Registrar movimiento</h3>
+              <div className="flex items-center gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs w-fit">
+                {(["EGRESO", "INGRESO"] as const).map((t) => (
+                  <button key={t} onClick={() => setFormGasto({ ...formGasto, tipo: t })}
+                    className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer ${formGasto.tipo === t ? (t === "EGRESO" ? "bg-red-500 text-white" : "bg-teal-500 text-slate-950") : "text-slate-600 dark:text-slate-400"}`}>
+                    {t === "EGRESO" ? "Gasto" : "Ingreso"}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <input value={formGasto.monto} onChange={(e) => setFormGasto({ ...formGasto, monto: e.target.value })} type="number" step="0.01" placeholder="Monto"
+                  className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" />
+                <select value={formGasto.moneda} onChange={(e) => setFormGasto({ ...formGasto, moneda: e.target.value as "USD" | "VES" | "COP" })}
+                  className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm">
+                  <option value="USD">USD</option>
+                  <option value="VES">VES</option>
+                  <option value="COP">COP</option>
+                </select>
+                <input value={formGasto.concepto} onChange={(e) => setFormGasto({ ...formGasto, concepto: e.target.value })} placeholder="Concepto (ej. Alquiler del local)"
+                  className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm sm:col-span-2" />
+              </div>
+              <button onClick={registrarGasto} disabled={guardandoGasto}
+                className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-sm cursor-pointer disabled:opacity-60">
+                {guardandoGasto ? "Guardando…" : "Registrar"}
+              </button>
+            </div>
+
+            <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-3">Últimos gastos registrados</h3>
+              {gastosCaja.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">Aún no hay gastos registrados.</p>
+              ) : (
+                <div className="space-y-2">
+                  {gastosCaja.slice(0, 15).map((m) => (
+                    <div key={m.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 text-sm">
+                      <div>
+                        <div className="font-semibold text-slate-900 dark:text-white">{m.concepto}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">{new Date(m.fechaRegistro).toLocaleString()}</div>
+                      </div>
+                      <div className="font-mono font-bold text-red-500">-{Number(m.monto).toFixed(2)} {m.moneda}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
