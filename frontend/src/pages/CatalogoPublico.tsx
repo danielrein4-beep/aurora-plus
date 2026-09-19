@@ -202,13 +202,15 @@ export default function CatalogoPublico() {
     });
   }, [tienda, categoriaSeleccionada, busqueda]);
 
-  // Operaciones del carrito
+  // Operaciones del carrito — nunca dejan la cantidad superar el stock real del producto.
   const agregarAlCarrito = (producto: ProductoCatalogo) => {
+    if (producto.stock <= 0) return;
     setCarrito((prev) => {
       const idx = prev.findIndex((item) => item.producto.id === producto.id);
       if (idx >= 0) {
+        if (prev[idx].cantidad >= producto.stock) return prev;
         const nuevo = [...prev];
-        nuevo[idx].cantidad += 1;
+        nuevo[idx] = { ...nuevo[idx], cantidad: nuevo[idx].cantidad + 1 };
         return nuevo;
       }
       return [...prev, { producto, cantidad: 1 }];
@@ -220,7 +222,7 @@ export default function CatalogoPublico() {
       return prev
         .map((item) => {
           if (item.producto.id === id) {
-            const nuevaCantidad = item.cantidad + delta;
+            const nuevaCantidad = Math.min(item.cantidad + delta, item.producto.stock);
             return nuevaCantidad > 0 ? { ...item, cantidad: nuevaCantidad } : null;
           }
           return item;
@@ -514,10 +516,16 @@ export default function CatalogoPublico() {
 
                     {/* Stock y Unidad */}
                     <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
-                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400/90 font-medium">
-                        <SvgCheck className="w-3 h-3 text-emerald-400" />
-                        En stock
-                      </span>
+                      {prod.stock > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400/90 font-medium">
+                          <SvgCheck className="w-3 h-3 text-emerald-400" />
+                          En stock
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-rose-400/90 font-medium">
+                          Agotado
+                        </span>
+                      )}
                       {prod.unidad && (
                         <>
                           <span className="text-slate-600">•</span>
@@ -568,7 +576,8 @@ export default function CatalogoPublico() {
                         <button
                           type="button"
                           onClick={() => modificarCantidad(prod.id, 1)}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 transition-colors"
+                          disabled={(itemEnCarrito?.cantidad ?? 0) >= prod.stock}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           <SvgPlus className="w-3.5 h-3.5" />
                         </button>
@@ -577,10 +586,11 @@ export default function CatalogoPublico() {
                       <button
                         type="button"
                         onClick={() => agregarAlCarrito(prod)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 hover:border-emerald-500/40 border border-slate-700/80 text-slate-200 text-xs font-semibold transition-all duration-150 active:scale-95"
+                        disabled={prod.stock <= 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 hover:border-emerald-500/40 border border-slate-700/80 text-slate-200 text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-800 disabled:hover:text-slate-200"
                       >
                         <SvgPlus className="w-3.5 h-3.5" />
-                        <span>Agregar</span>
+                        <span>{prod.stock <= 0 ? "Agotado" : "Agregar"}</span>
                       </button>
                     )}
                   </div>

@@ -99,8 +99,8 @@ export const ModalBasculaBluetooth: React.FC<ModalBasculaBluetoothProps> = ({
     });
   };
 
-  const handleTransferir = () => {
-    if (lectura.peso > 0) {
+  const handleTransferir = (forzar = false) => {
+    if (lectura.peso > 0 && (lectura.estable || forzar)) {
       onCapturarPeso(lectura.peso);
       handleDesconectar();
       onCerrar();
@@ -326,10 +326,10 @@ export const ModalBasculaBluetooth: React.FC<ModalBasculaBluetoothProps> = ({
 
           <button
             type="button"
-            onClick={handleTransferir}
-            disabled={lectura.peso <= 0}
+            onClick={() => handleTransferir(false)}
+            disabled={lectura.peso <= 0 || !lectura.estable}
             className={`flex-1 py-3.5 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-2 ${
-              lectura.peso > 0
+              lectura.peso > 0 && lectura.estable
                 ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 hover:brightness-110 shadow-lg shadow-emerald-500/20 font-black cursor-pointer"
                 : "bg-white/10 text-slate-500 cursor-not-allowed"
             }`}
@@ -340,6 +340,18 @@ export const ModalBasculaBluetooth: React.FC<ModalBasculaBluetoothProps> = ({
             <span>Transferir {lectura.peso > 0 ? `${lectura.peso.toFixed(1)} kg` : "Peso"} al Formulario</span>
           </button>
         </div>
+
+        {/* Escape para basculas sin deteccion de estabilidad confiable — el usuario asume
+            que el peso puede no ser exacto si lo fuerza mientras aun marca "EN MOVIMIENTO". */}
+        {lectura.peso > 0 && !lectura.estable && (
+          <button
+            type="button"
+            onClick={() => handleTransferir(true)}
+            className="w-full text-center text-[11px] text-slate-500 hover:text-amber-400 underline underline-offset-2 transition"
+          >
+            Forzar transferencia sin esperar estabilizacion (no recomendado)
+          </button>
+        )}
 
       </div>
     </div>

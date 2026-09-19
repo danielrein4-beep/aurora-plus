@@ -190,11 +190,51 @@ public class CatalogoPublicoController {
     // adivinar el tenantId). Solo la CREACION de un pedido (abajo) es legitimamente publica:
     // la hace un cliente sin sesion desde el catalogo.
 
+    /** Precio real en USD de un producto del catalogo, resuelto en el servidor a partir de
+     * su id ("rep-N", "art-N" o "mod-N" para el catalogo de demo) — nunca del precio que
+     * manda el navegador, que cualquiera puede alterar antes de enviarlo. Null si el id no
+     * corresponde a ningun producto real: ese item se descarta del pedido. */
+    private BigDecimal resolverPrecioReal(Long tenantId, String productoId, BigDecimal tasaVes) {
+        if (productoId == null) return null;
+        try {
+            if (productoId.startsWith("rep-") && repuestoItemRepository != null) {
+                Long id = Long.parseLong(productoId.substring(4));
+                RepuestoItem item = repuestoItemRepository.findById(id).orElse(null);
+                if (item == null || !tenantId.equals(item.getTenantId())) return null;
+                return item.getPrecioVenta() != null ? item.getPrecioVenta() : BigDecimal.ZERO;
+            }
+            if (productoId.startsWith("art-") && articuloRepository != null) {
+                Long id = Long.parseLong(productoId.substring(4));
+                Articulo art = articuloRepository.findById(id).orElse(null);
+                if (art == null || !tenantId.equals(art.getTenantId())) return null;
+                return art.getPrecioVenta() != null ? art.getPrecioVenta() : BigDecimal.ZERO;
+            }
+            if (productoId.startsWith("mod-") && Long.valueOf(1L).equals(tenantId)) {
+                for (Map<String, Object> p : generarCatalogoModelo(tasaVes)) {
+                    if (productoId.equals(p.get("id"))) return (BigDecimal) p.get("precioUsd");
+                }
+            }
+        } catch (NumberFormatException ignored) { /* id malformado -> item descartado */ }
+        return null;
+    }
+
     @PostMapping("/{tenantId:[0-9]+}/pedidos")
     public ResponseEntity<?> registrarPedidoWeb(@PathVariable Long tenantId, @RequestBody CrearPedidoWebRequest req) {
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
         if (licencia == null) {
             return ResponseEntity.status(404).body(Map.of("error", "Tienda no encontrada"));
+        }
+        if (req.items == null || req.items.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "El pedido no tiene articulos."));
+        }
+
+        BigDecimal tasaVes = BigDecimal.valueOf(50.0);
+        if (tasaCambioRepository != null) {
+            Optional<TasaCambio> tc = tasaCambioRepository
+                .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, "USD", "VES");
+            if (tc.isPresent() && tc.get().getTasa() != null && tc.get().getTasa().compareTo(BigDecimal.ZERO) > 0) {
+                tasaVes = tc.get().getTasa();
+            }
         }
 
         String numPedido = "PED-" + String.format("%04d", (int)(Math.random() * 9000) + 1000);
@@ -208,25 +248,38 @@ public class CatalogoPublicoController {
         pedido.setDireccionEntrega(req.direccionEntrega != null ? req.direccionEntrega : "");
         pedido.setMetodoPago(req.metodoPago != null ? req.metodoPago : "PAGO_MOVIL");
         pedido.setEstado("PENDIENTE");
-        pedido.setTotalUsd(req.totalUsd != null ? req.totalUsd : BigDecimal.ZERO);
-        pedido.setTotalBs(req.totalBs != null ? req.totalBs : BigDecimal.ZERO);
-        pedido.setTasaCambio(req.tasaCambio != null ? req.tasaCambio : BigDecimal.ONE);
+        pedido.setTasaCambio(tasaVes);
         pedido.setNotas(req.notas != null ? req.notas : "");
 
+        // Recalcular cada linea y el total a partir del precio REAL en el catalogo — nunca
+        // confiar en precioUnitarioUsd/subtotalUsd/totalUsd que manda el navegador, que
+        // cualquiera puede editar antes de enviar el pedido para pagar de menos.
         StringBuilder itemsTxt = new StringBuilder();
         StringBuilder msgWhatsapp = new StringBuilder();
         msgWhatsapp.append("*NUEVO PEDIDO WEB - ").append(licencia.getNombreEmpresa().toUpperCase()).append("*\n");
         msgWhatsapp.append("Pedido: #").append(numPedido).append("\n\n");
         msgWhatsapp.append("*DETALLE DEL PEDIDO:*\n");
 
-        if (req.items != null) {
-            for (LineaPedidoDto it : req.items) {
-                itemsTxt.append(it.cantidad).append("x ").append(it.nombre)
-                        .append(" ($").append(it.precioUnitarioUsd).append("); ");
-                msgWhatsapp.append("- ").append(it.cantidad).append("x ").append(it.nombre)
-                        .append(" ($").append(it.subtotalUsd).append(" USD)\n");
-            }
+        BigDecimal totalUsdReal = BigDecimal.ZERO;
+        for (LineaPedidoDto it : req.items) {
+            BigDecimal precioReal = resolverPrecioReal(tenantId, it.productoId, tasaVes);
+            if (precioReal == null) continue; // producto invalido/de otro tenant: se ignora
+            BigDecimal cantidad = it.cantidad != null && it.cantidad.compareTo(BigDecimal.ZERO) > 0 ? it.cantidad : BigDecimal.ONE;
+            BigDecimal subtotal = precioReal.multiply(cantidad).setScale(2, RoundingMode.HALF_UP);
+            totalUsdReal = totalUsdReal.add(subtotal);
+
+            String nombre = it.nombre != null ? it.nombre : "Articulo";
+            itemsTxt.append(cantidad).append("x ").append(nombre).append(" ($").append(precioReal).append("); ");
+            msgWhatsapp.append("- ").append(cantidad).append("x ").append(nombre)
+                    .append(" ($").append(subtotal).append(" USD)\n");
         }
+
+        if (totalUsdReal.compareTo(BigDecimal.ZERO) == 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Ninguno de los articulos del pedido pudo validarse contra el catalogo real."));
+        }
+
+        pedido.setTotalUsd(totalUsdReal);
+        pedido.setTotalBs(totalUsdReal.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP));
         pedido.setItemsJson(itemsTxt.toString());
         PedidoWebComercio guardado = pedidoWebRepository.save(pedido);
 
