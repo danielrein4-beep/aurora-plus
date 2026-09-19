@@ -3591,7 +3591,7 @@ function ModalCompraProveedorComercio({
 
         {/* Agregar ítems a la factura */}
         <div className="p-3.5 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/70 dark:border-slate-700/60 space-y-2">
-          <div className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Añadir Ítems de Repuesto / Ferretería:</div>
+          <div className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Añadir Ítems:</div>
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
             <div className="sm:col-span-6">
               <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Artículo</label>
