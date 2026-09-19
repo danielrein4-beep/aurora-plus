@@ -34,7 +34,8 @@ public class TicketOcrService {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
-    private static final String MODELO = "gemini-3.6-flash";
+    @Value("${gemini.model:gemini-1.5-flash}")
+    private String modelo;
 
     public TicketExtraidoDTO procesarTicket(MultipartFile file) throws Exception {
         String key = (apiKey != null) ? apiKey.trim() : "";
@@ -73,7 +74,7 @@ public class TicketOcrService {
         );
 
         String jsonPayload = objectMapper.writeValueAsString(requestBodyMap);
-        String endpointUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + MODELO + ":generateContent?key=" + key;
+        String endpointUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + modelo + ":generateContent?key=" + key;
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(endpointUrl))
