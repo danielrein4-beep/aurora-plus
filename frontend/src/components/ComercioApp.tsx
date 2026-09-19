@@ -1,3 +1,5 @@
+import ModalCatalogoQR from "./ModalCatalogoQR";
+import PedidosWebPanel, { type PedidoWeb } from "./PedidosWebPanel";
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import { useState, useMemo, useEffect, useRef } from "react";
 import {
@@ -259,7 +261,7 @@ function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaA
           </div>
         ` : ""}
         <div class="divider"></div>
-        <div><strong>Método:</strong> ${venta.esCredito ? "VENTA A CRÉDITO 🤝" : venta.metodoPago.replace("_", " ")}</div>
+        <div><strong>Método:</strong> ${venta.esCredito ? "VENTA A CRÉDITO " : venta.metodoPago.replace("_", " ")}</div>
         ${venta.recibido != null && venta.recibido > 0 ? `<div><strong>Recibido:</strong> ${venta.monedaRecibida === "VES" ? "Bs. " : venta.monedaRecibida === "COP" ? "COP $" : "$"}${venta.recibido.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${venta.monedaRecibida || ""}</div>` : ""}
         ${venta.vuelto != null && venta.vuelto > 0.004 ? `<div class="bold">VUELTO: ${venta.monedaVuelto === "VES" ? "Bs. " : venta.monedaVuelto === "COP" ? "COP $" : "$"}${venta.vuelto.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${venta.monedaVuelto || "USD"}</div>` : ""}
         <div class="divider"></div>
@@ -454,7 +456,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const tasaCop = tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
-  const [tab, setTab] = useState<"general" | "pos" | "inventario" | "clientes" | "gastos" | "cierre" | "auditoria">("general");
+  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "clientes" | "gastos" | "cierre" | "auditoria">("general");
+  const [modalQrVisible, setModalQrVisible] = useState(false);
 
   // Estado del Catálogo y Clientes
   const [productos, setProductos] = useState<ProductoComercio[]>(() => {
@@ -516,6 +519,21 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [guardandoAjuste, setGuardandoAjuste] = useState(false);
   const [comprasRepuesto, setComprasRepuesto] = useState<CompraRepuesto[] | null>(null);
   const [cargandoCompras, setCargandoCompras] = useState(false);
+
+  
+  const cargarPedidoWebAlPos = (pedido: PedidoWeb) => {
+    const linea: LineaCarritoComercio = {
+      productoId: "web-" + pedido.id,
+      codigo: pedido.numeroPedido,
+      nombre: `Pedido Web #${pedido.numeroPedido} (${pedido.clienteNombre})`,
+      precio: Number(pedido.totalUsd),
+      cantidad: 1,
+      unidadMedida: "Pedido",
+    };
+    setCarrito([linea]);
+    setTab("pos");
+    mostrarToast(`Pedido #${pedido.numeroPedido} cargado al mostrador POS. Listo para cobrar.`, "success");
+  };
 
   const mostrarToast = (mensaje: string, tipo: "success" | "error" | "info" = "success") => {
     setToast({ tipo, mensaje });
@@ -1010,20 +1028,20 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             </div>
           ))}
 
-          <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-800">
-            <button
-              type="button"
-              title="Próximamente: tu catálogo público con precios y código QR para que tus clientes lo vean desde el celular"
-              onClick={() => mostrarToast("Catálogo QR — muy pronto vas a poder compartir tus precios con un código QR.", "info")}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 opacity-70"
-            >
-              <IconLock size={16} />
-              <span className="flex-1 text-left">Catálogo QR</span>
-              <span className="text-[8px] font-black uppercase tracking-wider bg-violet-500/20 text-violet-500 dark:text-violet-300 px-1.5 py-0.5 rounded-full">
-                Pronto
-              </span>
-            </button>
-          </div>
+                  <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-800">
+          <button
+            type="button"
+            title="Tu catálogo digital público con precios y código QR para que tus clientes pidan por WhatsApp"
+            onClick={() => setModalQrVisible(true)}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-teal-600 dark:text-teal-400 bg-teal-500/10 hover:bg-teal-500/20 transition-colors"
+          >
+            <IconShoppingBag size={16} />
+            <span className="flex-1 text-left">Mi Catálogo Online & QR</span>
+            <span className="text-[8px] font-black uppercase tracking-wider bg-teal-500/20 text-teal-600 dark:text-teal-300 px-1.5 py-0.5 rounded-full">
+              Online
+            </span>
+          </button>
+        </div>
         </nav>
 
         {/* Salir al Hub */}
@@ -1090,8 +1108,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   onChange={(e) => setBusqueda(e.target.value)}
                   placeholder={
                     esFarmacia
-                      ? "🔍 Buscar por medicamento, principio activo (ej. Acetaminofén), lote o escanear código..."
-                      : "🔍 Buscar por producto, código de parte (ej. TORN-38, Hilux), medida o escanear código de barra..."
+                      ? " Buscar por medicamento, principio activo (ej. Acetaminofén), lote o escanear código..."
+                      : " Buscar por producto, código de parte (ej. TORN-38, Hilux), medida o escanear código de barra..."
                   }
                   className="w-full pl-10 pr-20 py-3 rounded-2xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700/80 focus:border-teal-500 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none shadow-inner"
                   autoFocus
@@ -1151,7 +1169,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                         </div>
                         {p.principioActivo && (
                           <div className="text-[10px] text-emerald-400 font-semibold truncate">
-                            🌿 {p.principioActivo}
+                             {p.principioActivo}
                           </div>
                         )}
                         {p.codigoOem && (
@@ -1161,7 +1179,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                         )}
                         {p.precioMayorista && p.cantidadMinimaMayorista && (
                           <div className="text-[9px] text-emerald-400 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 truncate">
-                            🏷️ Mayoreo: ${p.precioMayorista.toFixed(2)} (≥{p.cantidadMinimaMayorista} {p.unidadMedida || "u"})
+                            ️ Mayoreo: ${p.precioMayorista.toFixed(2)} (≥{p.cantidadMinimaMayorista} {p.unidadMedida || "u"})
                           </div>
                         )}
                         {p.lote && (
@@ -1171,7 +1189,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                         )}
                         {p.ubicacion && (
                           <div className="text-[9px] text-slate-500 dark:text-slate-400 font-mono">
-                            📍 {p.ubicacion}
+                             {p.ubicacion}
                           </div>
                         )}
                       </div>
@@ -1295,7 +1313,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     title="Descargar presupuesto formal para cliente"
                   >
                     <IconFileText size={14} />
-                    <span>📄 Cotización</span>
+                    <span> Cotización</span>
                   </button>
 
                   <button
@@ -1304,7 +1322,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     className="py-2 px-3 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 disabled:opacity-40 text-xs font-bold text-amber-300 flex items-center justify-center gap-1.5 cursor-pointer"
                     title="Cargar a cuenta por cobrar (crédito)"
                   >
-                    <span>🤝 A Crédito</span>
+                    <span> A Crédito</span>
                   </button>
                 </div>
 
@@ -1313,7 +1331,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   disabled={carrito.length === 0}
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-400 text-slate-950 font-black text-sm cursor-pointer hover:opacity-95 disabled:opacity-40 shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all flex items-center justify-center gap-2"
                 >
-                  <span>💰 Cobrar en Mostrador (${totalUSD.toFixed(2)})</span>
+                  <span> Cobrar en Mostrador (${totalUSD.toFixed(2)})</span>
                   <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-950/25 text-[10px] font-mono text-slate-950 font-black">
                     F4
                   </kbd>
@@ -1422,14 +1440,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                             className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-teal-300 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
                             title="Ver movimientos auditables en Kárdex"
                           >
-                            📜 Kárdex
+                             Kárdex
                           </button>
                           <button
                             onClick={() => setPresentacionesModalItem(p)}
                             className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-cyan-300 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
                             title="Gestionar presentaciones fraccionadas (Cajas, Metros, etc.)"
                           >
-                            🏷️ Presentaciones
+                            ️ Presentaciones
                           </button>
                           <button
                             onClick={() => setAjustarStockModalItem(p)}
@@ -1551,7 +1569,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     )}
                   </div>
                   <div className="font-bold text-sm text-slate-900 dark:text-white">{c.nombre}</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">📞 {c.telefono}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400"> {c.telefono}</div>
                   <div className="pt-2 border-t border-slate-300/60 dark:border-slate-700/50 flex items-center justify-between">
                     <div>
                       <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Saldo por Cobrar:</span>
@@ -1654,6 +1672,15 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           <TurnoCajaComercio tenantId={user.tenantId} tasaUsdVes={tasaActivaBs} tasaUsdCop={tasaCop} />
         )}
 
+        {tab === "pedidos_web" && user?.tenantId && (
+          <PedidosWebPanel
+            tenantId={user.tenantId}
+            tasaVes={tasaActivaBs}
+            onCargarAlPos={cargarPedidoWebAlPos}
+            onVerQrModal={() => setModalQrVisible(true)}
+          />
+        )}
+
         {tab === "auditoria" && user?.rol === "DUENO_ADMIN" && (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             <BitacoraAuditoria moduloSugerido="COMERCIO" />
@@ -1664,6 +1691,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       </div>
 
       {/* ── MODAL DE COBRO MIXTO DE MOSTRADOR ── */}
+      {modalQrVisible && user?.tenantId && (
+        <ModalCatalogoQR
+          tenantId={user.tenantId}
+          nombreNegocio={user?.empresa || "Mi Comercio"}
+          onClose={() => setModalQrVisible(false)}
+        />
+      )}
+
       {modalCobro && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
@@ -1691,12 +1726,12 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">1. Método de Pago</label>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 {[
-                  ["EFECTIVO_USD", "💵 USD Efectivo", "USD"],
-                  ["EFECTIVO_BS", "🇻🇪 Bs Efectivo", "VES"],
-                  ["PAGO_MOVIL", "📲 Pago Móvil", "VES"],
-                  ["PUNTO_VENTA", "💳 Punto Débito", "VES"],
+                  ["EFECTIVO_USD", " USD Efectivo", "USD"],
+                  ["EFECTIVO_BS", " Bs Efectivo", "VES"],
+                  ["PAGO_MOVIL", " Pago Móvil", "VES"],
+                  ["PUNTO_VENTA", " Punto Débito", "VES"],
                   ["ZELLE", "⚡ Zelle / USDT", "USD"],
-                  ["COP_EFECTIVO", "🇨🇴 Pesos COP", "COP"],
+                  ["COP_EFECTIVO", " Pesos COP", "COP"],
                 ].map(([id, label, mon]) => (
                   <button
                     key={id}
@@ -1896,7 +1931,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 onClick={() => imprimirTicketComercio(ventaReciente, nombreLocal, tasaActivaBs, tasaCop)}
                 className="flex-1 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
               >
-                🖨️ Imprimir Ticket 80mm
+                ️ Imprimir Ticket 80mm
               </button>
               <button
                 onClick={() => setVentaReciente(null)}
@@ -2906,22 +2941,22 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💵 Efectivo USD ($)</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1"> Efectivo USD ($)</label>
                     <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.usd}
                       onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, usd: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇻🇪 Efectivo Bs</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1"> Efectivo Bs</label>
                     <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.ves}
                       onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, ves: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💳 Punto de Venta (Bs)</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1"> Punto de Venta (Bs)</label>
                     <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.punto}
                       onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, punto: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">📲 Pago Móvil (Bs)</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1"> Pago Móvil (Bs)</label>
                     <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.pagoMovil}
                       onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, pagoMovil: e.target.value }))} className={inputCls} />
                   </div>
@@ -2931,7 +2966,7 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
                       onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, zelle: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇨🇴 Pesos COP</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1"> Pesos COP</label>
                     <input type="number" step="1" min="0" placeholder="0" value={desgloseArqueo.cop}
                       onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, cop: e.target.value }))} className={inputCls} />
                   </div>

@@ -1,3 +1,4 @@
+import CatalogoPublico from "./pages/CatalogoPublico";
 import NotFound from "./pages/NotFound";
 import { obtenerDatosImpersonacion, salirDeImpersonacion } from "./api";
 import React, { useState, useEffect } from "react";
@@ -148,6 +149,9 @@ export default function App() {
             <Route path="/lab/:token" element={<PortalPublicoBioanalista />} />
             {/* Portal público donde el PACIENTE sube sus resultados de laboratorio (QR fijo del consultorio) */}
             <Route path="/lab-paciente/:token" element={<PortalLaboratorioPaciente />} />
+            {/* Catalogo digital publico para Retail / Comercio */}
+            <Route path="/catalogo/:tenantId" element={<CatalogoPublico />} />
+            <Route path="/tienda/:tenantId" element={<CatalogoPublico />} />
             {/* Auth + onboarding — full screen con transiciones fluidas */}
             <Route path="/auth"       element={<AnimatedRoute><Auth /></AnimatedRoute>} />
             <Route path="/resetear-clave" element={<AnimatedRoute><ResetearClave /></AnimatedRoute>} />
@@ -155,7 +159,6 @@ export default function App() {
             {/* Protected — requiere sesión activa */}
             {/* Ruta /superadmin eliminada por seguridad: responde 404 a intrusos */}
             <Route path="/superadmin" element={<NotFound />} />
-            <Route path="*" element={<NotFound />} />
             <Route path="/dashboard"  element={<ProtectedRoute><AnimatedRoute><Dashboard /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/finanzas" element={<ProtectedRoute><AnimatedRoute><CentroFinanciero /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/auditoria" element={<ProtectedRoute><AnimatedRoute><Auditoria /></AnimatedRoute></ProtectedRoute>} />
@@ -166,6 +169,7 @@ export default function App() {
             <Route path="/comercio"   element={<ProtectedRoute><AnimatedRoute><ComercioPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/ganaderia"  element={<ProtectedRoute><AnimatedRoute><GanaderiaPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/ganaderia/animal/:animalId" element={<ProtectedRoute><AnimatedRoute><GanaderiaAnimalPage /></AnimatedRoute></ProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
           {/* Modal Oculto de SuperAdmin (Invocado solo con Atajo Secreto Ctrl+Shift+S) */}
           {showSuperAdminModal && (
