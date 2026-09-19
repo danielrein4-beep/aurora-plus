@@ -460,12 +460,12 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                     onClick={() => irA(n.id)}
                     className={`sidebar-glare w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                       n.premium
-                        ? "text-white/30 hover:bg-white/10"
+                        ? "text-white/30"
                         : pagina === n.id
-                        ? "bg-[#177E89] text-white shadow-md"
+                        ? "text-white"
                         : alertaVencimiento
-                        ? "text-red-300 hover:bg-red-500/10"
-                        : "text-white/60 hover:bg-white/10 hover:text-white"
+                        ? "text-red-300"
+                        : "text-white/60 hover:text-white"
                     }`}
                   >
                     <span className="flex items-center gap-2.5"><n.Icon size={16} /><span>{n.label}</span></span>

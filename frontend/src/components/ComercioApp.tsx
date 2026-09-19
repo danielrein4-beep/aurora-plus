@@ -1049,8 +1049,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   onClick={() => { setTab(item.id); setSidebarAbierto(false); }}
                   className={`sidebar-glare w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
                     tab === item.id
-                      ? "bg-[#177E89] text-white shadow-md"
-                      : "text-white/60 hover:bg-white/10 hover:text-white"
+                      ? "text-white"
+                      : "text-white/60 hover:text-white"
                   }`}
                 >
                   <item.Icon size={16} />

@@ -1130,8 +1130,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onClick={() => intentarNavegar(n.id)}
                 className={`sidebar-glare w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                   activo
-                    ? "bg-[#177E89] text-white shadow-md"
-                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                    ? "text-white"
+                    : "text-white/60 hover:text-white"
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
