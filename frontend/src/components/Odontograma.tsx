@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { IconTooth, IconClose, IconPrinter, IconCheck, IconFileText, IconCoins, IconEdit, IconTrash } from "../Icons";
+import FiguraDienteAnatomico, { categorizarDienteFdi } from "./FiguraDienteAnatomico";
 import {
   listarOdontograma,
   actualizarDienteOdontograma,
@@ -390,7 +391,7 @@ export default function Odontograma({
                       title={`${nombreDiente(fdi)}: ${info.label}${tieneNota ? ` — ${notasPorFdi[fdi]}` : ""}`}
                       className={`relative flex flex-col items-center gap-1 p-2 rounded-xl cursor-pointer transition-all hover:scale-110 hover:shadow-md border border-slate-200/60 dark:border-white/10 ${info.bg}`}
                     >
-                      <IconTooth size={20} />
+                      <FiguraDienteAnatomico fdi={fdi} estado={estado} size={26} />
                       <span className="text-[10px] font-mono font-bold">{fdi}</span>
                       {tieneNota && (
                         <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-sky-500" />
@@ -424,7 +425,7 @@ export default function Odontograma({
                         title={`${nombreDiente(fdi)}: ${info.label}${tieneNota ? ` — ${notasPorFdi[fdi]}` : ""}`}
                         className={`relative flex flex-col items-center gap-1 p-2 rounded-xl cursor-pointer transition-all hover:scale-110 hover:shadow-md border border-slate-200/60 dark:border-white/10 ${info.bg}`}
                       >
-                        <IconTooth size={18} />
+                        <FiguraDienteAnatomico fdi={fdi} estado={estado} size={22} />
                         <span className="text-[10px] font-mono font-bold">{fdi}</span>
                         {tieneNota && (
                           <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-sky-500" />
@@ -449,7 +450,7 @@ export default function Odontograma({
                         title={`${nombreDiente(fdi)}: ${info.label}${tieneNota ? ` — ${notasPorFdi[fdi]}` : ""}`}
                         className={`relative flex flex-col items-center gap-1 p-2 rounded-xl cursor-pointer transition-all hover:scale-110 hover:shadow-md border border-slate-200/60 dark:border-white/10 ${info.bg}`}
                       >
-                        <IconTooth size={18} />
+                        <FiguraDienteAnatomico fdi={fdi} estado={estado} size={22} />
                         <span className="text-[10px] font-mono font-bold">{fdi}</span>
                         {tieneNota && (
                           <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-sky-500" />
@@ -489,7 +490,7 @@ export default function Odontograma({
                       title={`${nombreDiente(fdi)}: ${info.label}${tieneNota ? ` — ${notasPorFdi[fdi]}` : ""}`}
                       className={`relative flex flex-col items-center gap-1 p-2 rounded-xl cursor-pointer transition-all hover:scale-110 hover:shadow-md border border-slate-200/60 dark:border-white/10 ${info.bg}`}
                     >
-                      <IconTooth size={20} />
+                      <FiguraDienteAnatomico fdi={fdi} estado={estado} size={26} />
                       <span className="text-[10px] font-mono font-bold">{fdi}</span>
                       {tieneNota && (
                         <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-sky-500" />
@@ -524,16 +525,26 @@ export default function Odontograma({
             className="bg-white dark:bg-[#0c1421] text-slate-900 dark:text-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-white/15 space-y-4"
           >
             <div className="flex items-start justify-between border-b border-slate-200/80 dark:border-white/10 pb-3">
-              <div>
-                <h4 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white">
-                  Pieza #{dienteSeleccionado}
-                </h4>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                  {nombreDiente(dienteSeleccionado)}
-                </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  {sextanteDe(dienteSeleccionado)}
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center">
+                  <FiguraDienteAnatomico fdi={dienteSeleccionado} estado={estadoForm} size={42} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
+                      Pieza #{dienteSeleccionado}
+                    </h4>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300">
+                      {categorizarDienteFdi(dienteSeleccionado).nombreCorto}
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                    {nombreDiente(dienteSeleccionado)}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    {sextanteDe(dienteSeleccionado)}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setDienteSeleccionado(null)}
