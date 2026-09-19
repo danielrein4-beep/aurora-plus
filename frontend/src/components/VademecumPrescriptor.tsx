@@ -108,10 +108,10 @@ export const VademecumPrescriptor: React.FC<Props> = ({
     setDuracionPersonalizada(7);
   };
 
-  const handleAgregarAlRecipe = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAgregarAlRecipe = (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (modoManual) {
-      if (!nombreManual.trim()) return;
+      if (!nombreManual.trim() || !posologiaPersonalizada.trim()) return;
       const nuevo: ItemRecipePrescrito = {
         id: "man_" + Date.now(),
         medicamento: nombreManual.trim(),
@@ -129,6 +129,7 @@ export const VademecumPrescriptor: React.FC<Props> = ({
       setPosologiaPersonalizada("");
       setIndicacionesPersonalizadas("");
     } else if (medSeleccionado) {
+      if (!(posologiaPersonalizada || medSeleccionado.posologiaSugerida || "").trim()) return;
       const nuevo: ItemRecipePrescrito = {
         id: medSeleccionado.id + "_" + Date.now(),
         medicamento: `${medSeleccionado.nombreGenerico} (${medSeleccionado.nombresComerciales.split(",")[0].trim()})`,
@@ -192,9 +193,13 @@ export const VademecumPrescriptor: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Formulario de Prescripcion Manual */}
+      {/* Formulario de Prescripcion Manual — <div>, NUNCA <form>: este componente ya vive
+          dentro del <form> de la consulta médica (handleGuardarSolo) y HTML no permite
+          formularios anidados. Un <form> aquí hacía que el navegador reordenara el árbol y
+          el botón "Agregar al Recipe" terminara disparando el submit del formulario externo
+          (guardaba la consulta a medias y sacaba al médico de la pantalla). */}
       {modoManual && (
-        <form onSubmit={handleAgregarAlRecipe} className="p-4 rounded-2xl bg-white/70 dark:bg-slate-900/70 border border-teal-500/30 shadow-sm space-y-3">
+        <div className="p-4 rounded-2xl bg-white/70 dark:bg-slate-900/70 border border-teal-500/30 shadow-sm space-y-3">
           <div className="font-bold text-xs text-teal-600 dark:text-teal-400">Prescribir Medicamento No Listado / Formula Magistral:</div>
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
             <div className="sm:col-span-6">
@@ -270,13 +275,15 @@ export const VademecumPrescriptor: React.FC<Props> = ({
               Cancelar
             </button>
             <button
-              type="submit"
-              className="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold shadow-md transition"
+              type="button"
+              onClick={() => handleAgregarAlRecipe()}
+              disabled={!nombreManual.trim() || !posologiaPersonalizada.trim()}
+              className="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               + Agregar al Recipe
             </button>
           </div>
-        </form>
+        </div>
       )}
 
       {/* Buscador y Filtro del Vademecum */}
@@ -359,7 +366,7 @@ export const VademecumPrescriptor: React.FC<Props> = ({
 
       {/* Modal / Panel de Dosificacion del Medicamento Seleccionado */}
       {medSeleccionado && (
-        <form onSubmit={handleAgregarAlRecipe} className="p-4 rounded-3xl bg-slate-50 dark:bg-slate-900 border border-teal-500/40 shadow-lg space-y-3 animate-fade-in">
+        <div className="p-4 rounded-3xl bg-slate-50 dark:bg-slate-900 border border-teal-500/40 shadow-lg space-y-3 animate-fade-in">
           <div className="flex items-start justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
             <div>
               <span className="text-[10px] font-black uppercase tracking-wider text-teal-600 dark:text-teal-400 block">
@@ -427,7 +434,6 @@ export const VademecumPrescriptor: React.FC<Props> = ({
             <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">Posologia e Instrucciones para el Paciente *</label>
             <textarea
               rows={2}
-              required
               value={posologiaPersonalizada}
               onChange={(e) => setPosologiaPersonalizada(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
@@ -448,13 +454,15 @@ export const VademecumPrescriptor: React.FC<Props> = ({
               Cancelar
             </button>
             <button
-              type="submit"
-              className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-black shadow-md transition cursor-pointer"
+              type="button"
+              onClick={() => handleAgregarAlRecipe()}
+              disabled={!(posologiaPersonalizada || medSeleccionado.posologiaSugerida || "").trim()}
+              className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-black shadow-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               + Agregar al Recipe
             </button>
           </div>
-        </form>
+        </div>
       )}
 
       {/* Lista del Recipe Medico Actual */}

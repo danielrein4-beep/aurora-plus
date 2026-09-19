@@ -22,6 +22,8 @@ import { VademecumPrescriptor, type ItemRecipePrescrito } from "./VademecumPresc
 import {
   generarPdfRecipeMedico,
   generarTextoWhatsAppRecipe,
+  construirDocRecipeMedico,
+  descargarPdfYAbrirWhatsApp,
   type RecipeReportData,
   type RecipeItemData,
 } from "../utils/pdfReports";
@@ -4542,10 +4544,16 @@ function HistoriasClinicas({
                   }
                 }}
                 onEnviarWhatsAppRecipe={() => {
+                  // El texto del mensaje dice "vea el PDF adjunto" — hay que descargarlo de
+                  // verdad, no solo mandar el texto (wa.me no admite adjuntar por URL, ver
+                  // descargarPdfYAbrirWhatsApp: descarga + abre WhatsApp al mismo tiempo).
                   const recipeData = construirRecipeReportData();
                   if (recipeData && pacienteSeleccionado?.telefono) {
+                    const pdfDoc = construirDocRecipeMedico(recipeData);
+                    const nombreLimpio = recipeData.paciente.nombre.replace(/[^a-zA-Z0-9]/g, "_");
                     const msg = generarTextoWhatsAppRecipe(recipeData);
-                    abrirWhatsAppDirecto(pacienteSeleccionado.telefono, msg);
+                    descargarPdfYAbrirWhatsApp(pdfDoc, `Recipe_Medico_${nombreLimpio}.pdf`, pacienteSeleccionado.telefono, msg);
+                    dispararToast("📄 Récipe descargado. Adjúntalo con el clip (📎) en WhatsApp.");
                   }
                 }}
               />
