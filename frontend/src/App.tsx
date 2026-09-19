@@ -34,7 +34,7 @@ function AnimatedRoute({ children }: { children: React.ReactNode }) {
 
 function MediclinicPage() {
   const navigate = useNavigate();
-  return <><ModuleAccessBar /><MediclinicApp onSalir={() => navigate("/dashboard")} /></>;
+  return <MediclinicApp onSalir={() => navigate("/dashboard")} />;
 }
 
 function VeterinariaPage() {
@@ -49,12 +49,12 @@ function RestaurantePage() {
 
 function ComercioPage() {
   const navigate = useNavigate();
-  return <><ModuleAccessBar /><ComercioApp onSalir={() => navigate("/dashboard")} /></>;
+  return <ComercioApp onSalir={() => navigate("/dashboard")} />;
 }
 
 function GanaderiaPage() {
   const navigate = useNavigate();
-  return <><ModuleAccessBar /><GanaderiaApp onSalir={() => navigate("/dashboard")} /></>;
+  return <GanaderiaApp onSalir={() => navigate("/dashboard")} />;
 }
 
 // Deep link del QR impreso de cada animal: /ganaderia/animal/:animalId
@@ -62,7 +62,7 @@ function GanaderiaAnimalPage() {
   const navigate = useNavigate();
   const { animalId } = useParams();
   const id = Number(animalId);
-  return <><ModuleAccessBar /><GanaderiaApp onSalir={() => navigate("/dashboard")} deepLinkAnimalId={Number.isFinite(id) ? id : undefined} /></>;
+  return <GanaderiaApp onSalir={() => navigate("/dashboard")} deepLinkAnimalId={Number.isFinite(id) ? id : undefined} />;
 }
 
 export default function App() {
