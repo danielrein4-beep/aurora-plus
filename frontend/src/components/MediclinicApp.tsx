@@ -659,12 +659,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   // junto a claveConfigPerfil): sin esto, el perfil guardado de un médico se le mostraba a
   // cualquier otro que iniciara sesión después en el mismo navegador.
   const configPerfilPorDefecto = () => ({
-    doctorNombre: user?.nombre || "Médico Titular",
-    secretariaNombre: "Recepción / Asistente",
-    especialidad: "Medicina General / Especialista",
+    doctorNombre: user?.nombre || (esOdontologia ? "Odontólogo Titular" : "Médico Titular"),
+    secretariaNombre: esOdontologia ? "Asistente Dental / Recepción" : "Recepción / Asistente",
+    especialidad: esOdontologia ? "Odontología General / Especialista" : "Medicina General / Especialista",
     matriculaMPPS: "",
     colegioMedicos: "",
-    clinicaNombre: user?.empresa || "Mi Consultorio Médico",
+    clinicaNombre: user?.empresa || (esOdontologia ? "Mi Consultorio Odontológico" : "Mi Consultorio Médico"),
     tasaBCV: 56.40,
     tasaCOP: 4200,
     claveDoctor: "1234",
@@ -1164,49 +1164,47 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="font-['Outfit'] font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
-                  {rolActivo === "MEDICO" ? `¡Bienvenido ${configPerfil.doctorNombre}!` : "¡Bienvenida Secretaría Clínica!"}
+                                <h1 className="font-['Outfit'] font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
+                  {rolActivo === "MEDICO" ? `¡Bienvenido ${configPerfil.doctorNombre}!` : (esOdontologia ? "¡Bienvenida Recepción / Asistente!" : "¡Bienvenida Secretaría Clínica!")}
                 </h1>
                 <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-extrabold uppercase tracking-wider ${
                   rolActivo === "MEDICO"
-                    ? "bg-teal-100 dark:bg-teal-950/80 border-teal-300/50 dark:border-teal-500/30 text-teal-700 dark:text-teal-300"
+                    ? (esOdontologia ? "bg-emerald-100 dark:bg-emerald-950/80 border-emerald-300/50 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "bg-teal-100 dark:bg-teal-950/80 border-teal-300/50 dark:border-teal-500/30 text-teal-700 dark:text-teal-300")
                     : "bg-sky-100 dark:bg-sky-950/80 border-sky-300/50 dark:border-sky-500/30 text-sky-700 dark:text-sky-300"
                 }`}>
-                  {rolActivo === "MEDICO" ? "MÉDICO TITULAR" : "SECRETARÍA CLÍNICA"}
+                  {rolActivo === "MEDICO" ? (esOdontologia ? "ODONTÓLOGO TITULAR" : "MÉDICO TITULAR") : (esOdontologia ? "RECEPCIÓN DENTAL" : "SECRETARÍA CLÍNICA")}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-white/50 font-medium mt-0.5">
                 {rolActivo === "MEDICO"
-                  ? `${configPerfil.especialidad} ${configPerfil.matriculaMPPS ? `| MPPS-${configPerfil.matriculaMPPS}` : ""}`
-                  : "Control de Sala de Espera, Facturación & Agendamiento"}
-              </p>
-            </div>
+                  ? `${(esOdontologia && (!configPerfil.especialidad || configPerfil.especialidad.includes("Medicina"))) ? "Odontología General / Especialista" : configPerfil.especialidad} ${configPerfil.matriculaMPPS ? `| MPPS-${configPerfil.matriculaMPPS}` : ""} ${configPerfil.colegioMedicos ? `| ${esOdontologia ? "Colegio Odontólogos" : "Col. Médicos"} ${configPerfil.colegioMedicos}` : ""}`
+                  : (esOdontologia ? "Control de Sala de Espera, Presupuestos & Citas Odontológicas" : "Control de Sala de Espera, Facturación & Agendamiento")}
+              </p></div>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
             {perfilActivo === "MEDICO" && (
               <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-xs">
-                <button
-                  onClick={() => intentarCambiarRol("MEDICO")}
-                  className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    rolActivo === "MEDICO" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
-                  }`}
-                  title="Cambiar a vista de Médico Titular"
-                >
-                  <IconStethoscope size={13} />
-                  <span>Médico</span>
-                </button>
-                <button
-                  onClick={() => intentarCambiarRol("SECRETARIA")}
-                  className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    rolActivo === "SECRETARIA" ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"
-                  }`}
-                  title="Supervisar vista de Secretaría y Sala de Espera"
-                >
-                  <IconFileText size={13} />
-                  <span>Secretaria</span>
-                </button>
-              </div>
+                                  <button
+                    onClick={() => intentarCambiarRol("MEDICO")}
+                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      rolActivo === "MEDICO" ? (esOdontologia ? "bg-emerald-600 text-white shadow-xs" : "bg-teal-600 text-white shadow-xs") : "text-slate-600 dark:text-white/60"
+                    }`}
+                    title={esOdontologia ? "Cambiar a vista de Odontólogo Titular" : "Cambiar a vista de Médico Titular"}
+                  >
+                    {esOdontologia ? <IconTooth size={13} /> : <IconStethoscope size={13} />}
+                    <span>{esOdontologia ? "Odontólogo" : "Médico"}</span>
+                  </button>
+                  <button
+                    onClick={() => intentarCambiarRol("SECRETARIA")}
+                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      rolActivo === "SECRETARIA" ? (esOdontologia ? "bg-emerald-600 text-white shadow-xs" : "bg-teal-600 text-white shadow-xs") : "text-slate-600 dark:text-white/60"
+                    }`}
+                    title={esOdontologia ? "Supervisar vista de Recepción y Asistencia" : "Supervisar vista de Secretaría y Sala de Espera"}
+                  >
+                    <IconFileText size={13} />
+                    <span>{esOdontologia ? "Recepción" : "Secretaria"}</span>
+                  </button></div>
             )}
 
             {inboxLabPendientes > 0 && (
