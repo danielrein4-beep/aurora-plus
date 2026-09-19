@@ -1,4 +1,12 @@
 import BitacoraAuditoria from "./BitacoraAuditoria";
+import ModalBasculaBluetooth from "./ModalBasculaBluetooth";
+import {
+  encolarAccionGanaderia,
+  contarPendientesGanaderia,
+  procesarColaGanaderia,
+  esFalloDeConexion,
+  generarClaveIdempotencia,
+} from "../offlineQueueGanaderia";
 import { useState, useEffect } from "react";
 import AuroraLogo from "../AuroraLogo";
 import { AuroraGradientDef } from "../Icons";
@@ -271,6 +279,10 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [modalRotar, setModalRotar] = useState<PotreroGanaderia | null>(null);
   const [modalOrdeno, setModalOrdeno] = useState(false);
   const [modalPesaje, setModalPesaje] = useState<AnimalGanaderia | null>(null);
+  const [modalBasculaAbierto, setModalBasculaAbierto] = useState(false);
+  const [estaOnline, setEstaOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [pendientesOffline, setPendientesOffline] = useState(0);
+  const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
   const [modalVacuna, setModalVacuna] = useState(false);
   const [modalReproduccion, setModalReproduccion] = useState(false);
   const [modalCelo, setModalCelo] = useState(false);
@@ -1088,7 +1100,30 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     if (!modalRotar) return;
     try {
       await rotarPotreroGanaderia(modalRotar.id, tenantId, potreroDestinoId);
-    } catch {
+    } catch (err) {
+      if (esFalloDeConexion(err)) {
+        encolarAccionGanaderia(tenantId, {
+          tipo: "rotar_potrero",
+          id: generarClaveIdempotencia(),
+          claveIdempotencia: generarClaveIdempotencia(),
+          descripcion: `Rotacion de ${modalRotar.nombre} a potrero #${potreroDestinoId}`,
+          creadaEn: Date.now(),
+          payload: {
+            potreroOrigenId: modalRotar.id,
+            potreroDestinoId: potreroDestinoId,
+            nombreOrigen: modalRotar.nombre,
+          }
+        });
+        setPendientesOffline(contarPendientesGanaderia(tenantId));
+        setPotreros(prev => prev.map(p => {
+          if (p.id === modalRotar.id) return { ...p, estado: "EN_DESCANSO", fechaInicioDescanso: new Date().toISOString().slice(0, 10) };
+          if (p.id === potreroDestinoId) return { ...p, estado: "ACTIVO", fechaInicioUso: new Date().toISOString().slice(0, 10) };
+          return p;
+        }));
+        setModalRotar(null);
+        notificar(`Rotacion guardada en Modo Campo (offline). Se sincronizara al volver a tener senal.`);
+        return;
+      }
       notificar(`No se pudo rotar el hato de ${modalRotar.nombre} — revisa tu conexión e inténtalo de nuevo.`);
       return;
     }
@@ -1243,7 +1278,60 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     }
   };
 
-  // Manejador: Registrar pesaje
+  // Sincronizacion de operaciones de campo realizadas offline (manga/potreros)
+  const handleSincronizarManual = async () => {
+    if (sincronizandoOffline) return;
+    setSincronizandoOffline(true);
+    try {
+      const res = await procesarColaGanaderia(tenantId, {
+        registrar_peso: async (acc) => {
+          await registrarPesoGanaderia(tenantId, acc.payload.animalId, acc.payload.peso);
+        },
+        rotar_potrero: async (acc) => {
+          await rotarPotreroGanaderia(acc.payload.potreroOrigenId, tenantId, acc.payload.potreroDestinoId);
+        },
+        registrar_ordeno: async (acc) => {
+          await registrarOrdenoGanaderia(tenantId, {
+            animalId: acc.payload.animalId,
+            cantidadLitros: acc.payload.litros,
+            turno: acc.payload.sesion,
+            fecha: new Date().toISOString().slice(0, 10),
+            precioVentaLitro: 0.5,
+          });
+        },
+        aplicar_vacuna: async (acc) => {
+          await aplicarVacunaGanaderia(acc.payload.vacunaId, tenantId, acc.payload.animalId || 0, acc.payload.dosis || "1 dosis");
+        }
+      });
+
+      setPendientesOffline(res.quedanPendientes);
+      if (res.sincronizadas.length > 0) {
+        notificar(`Sincronizacion completada: ${res.sincronizadas.length} registros de campo sincronizados.`);
+      }
+    } catch {
+      notificar("No se pudo completar la sincronizacion en este momento.");
+    } finally {
+      setSincronizandoOffline(false);
+    }
+  };
+
+  useEffect(() => {
+    setPendientesOffline(contarPendientesGanaderia(tenantId));
+    const handleOnline = () => {
+      setEstaOnline(true);
+      handleSincronizarManual();
+    };
+    const handleOffline = () => setEstaOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [tenantId]);
+
+  // Manejador: Registrar pesaje con soporte offline y balanza digital
   const handleGuardarPesaje = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!modalPesaje) return;
@@ -1252,17 +1340,38 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       await registrarPesoGanaderia(tenantId, modalPesaje.id, Number(pesoNuevo));
       const resGdp = await obtenerGdpGanaderia(modalPesaje.id).catch(() => null);
       if (resGdp) setGdpData(resGdp);
-    } catch {
-      notificar(`No se pudo registrar el pesaje — revisa tu conexión e inténtalo de nuevo.`);
-      return;
+      setAnimales(prev => prev.map(a => a.id === modalPesaje.id ? { ...a, pesoActual: Number(pesoNuevo) } : a));
+      notificar(`Pesaje registrado: ${pesoNuevo} kg.`);
+      setTimeout(() => {
+        setModalPesaje(null);
+        setGdpData(null);
+      }, 1500);
+    } catch (err) {
+      if (esFalloDeConexion(err)) {
+        encolarAccionGanaderia(tenantId, {
+          tipo: "registrar_peso",
+          id: generarClaveIdempotencia(),
+          claveIdempotencia: generarClaveIdempotencia(),
+          descripcion: `Pesaje ${modalPesaje.nombre || modalPesaje.arete}: ${pesoNuevo} kg`,
+          creadaEn: Date.now(),
+          payload: {
+            animalId: modalPesaje.id,
+            peso: Number(pesoNuevo),
+            nombreAnimal: modalPesaje.nombre,
+            arete: modalPesaje.arete,
+          }
+        });
+        setPendientesOffline(contarPendientesGanaderia(tenantId));
+        setAnimales(prev => prev.map(a => a.id === modalPesaje.id ? { ...a, pesoActual: Number(pesoNuevo) } : a));
+        notificar(`Pesaje guardado en Modo Campo (sin conexion). Se sincronizara automaticamente.`);
+        setTimeout(() => {
+          setModalPesaje(null);
+          setGdpData(null);
+        }, 1500);
+        return;
+      }
+      notificar("No se pudo registrar el pesaje en este momento.");
     }
-
-    setAnimales(prev => prev.map(a => a.id === modalPesaje.id ? { ...a, pesoActual: Number(pesoNuevo) } : a));
-    notificar(`Pesaje registrado: ${pesoNuevo} kg.`);
-    setTimeout(() => {
-      setModalPesaje(null);
-      setGdpData(null);
-    }, 1500);
   };
 
   // Manejador: Aplicar vacuna (Soporte individual y masivo con verificación de catálogo y tiempos de retiro)
@@ -1445,8 +1554,35 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           </div>
         </div>
 
-        {/* Barra de Tasas Multi-Moneda & Precio Leche Centralizado */}
+                {/* Barra de Tasas Multi-Moneda & Precio Leche Centralizado */}
         <div className="flex items-center gap-2">
+          {/* Badge Modo Campo / Sincronizacion Offline */}
+          <button
+            type="button"
+            onClick={handleSincronizarManual}
+            disabled={sincronizandoOffline || pendientesOffline === 0}
+            title={pendientesOffline > 0 ? "Haga clic para sincronizar cambios locales con el servidor" : "Conexion activa con el servidor"}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all shadow-sm ${
+              !estaOnline || pendientesOffline > 0
+                ? "bg-amber-500/15 border-amber-500/40 text-amber-500 dark:text-amber-400 hover:bg-amber-500/25 cursor-pointer"
+                : "bg-emerald-500/10 border-emerald-500/25 text-emerald-600 dark:text-emerald-400"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${
+              !estaOnline ? "bg-amber-400 animate-pulse" : (pendientesOffline > 0 ? "bg-amber-400" : "bg-emerald-400")
+            }`}></span>
+            <span>
+              {!estaOnline 
+                ? `Modo Campo (${pendientesOffline} pend.)`
+                : (pendientesOffline > 0 ? `Sincronizar (${pendientesOffline})` : "En Linea")
+              }
+            </span>
+            {pendientesOffline > 0 && (
+              <svg className={`w-3.5 h-3.5 ${sincronizandoOffline ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            )}
+          </button>
           {/* Tasas de cambio */}
           <button
             type="button"
@@ -5377,6 +5513,18 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         </div>
       )}
 
+      <ModalBasculaBluetooth
+        abierto={modalBasculaAbierto}
+        onCerrar={() => setModalBasculaAbierto(false)}
+        onCapturarPeso={(pesoCapturado) => {
+          setPesoNuevo(pesoCapturado);
+          notificar(`Peso capturado de balanza: ${pesoCapturado} kg`);
+        }}
+        animalNombre={modalPesaje?.nombre}
+        animalArete={modalPesaje?.arete}
+        pesoAnterior={modalPesaje?.pesoActual}
+      />
+
       {modalPesaje && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-emerald-500/30 text-left space-y-4">
@@ -5389,7 +5537,19 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
             <form onSubmit={handleGuardarPesaje} className="space-y-4 text-xs">
               <div>
-                <label className="text-slate-400 block mb-1">Nuevo Peso (kg) *</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-slate-400 block">Nuevo Peso (kg) *</label>
+                  <button
+                    type="button"
+                    onClick={() => setModalBasculaAbierto(true)}
+                    className="px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19l6-6-6-6m6 6l-6-6 6 6-6 6" />
+                    </svg>
+                    <span>Conectar Balanza Digital</span>
+                  </button>
+                </div>
                 <input
                   type="number"
                   onFocus={e => e.target.select()}
