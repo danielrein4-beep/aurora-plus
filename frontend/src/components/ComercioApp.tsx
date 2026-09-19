@@ -7,11 +7,12 @@ import {
   IconHardware, IconPrescription, IconRetail, IconCard, IconSearch, IconTrash,
   IconCheck, IconWarning, IconClose, IconUsers, IconFileText, IconHourglass,
   IconDownload, IconRefresh, IconCheckCircle, IconBank, IconChart, IconBox, IconLock,
-  IconSettings, IconCoins, IconEdit, IconShoppingBag,
+  IconSettings, IconCoins, IconEdit, IconShoppingBag, IconTruck,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
 import { useBarcodeScanner, decodificarCodigoPesado } from "../hooks/useBarcodeScanner";
+import { comprimirImagenFactura } from "../utils/imageCompression";
 import {
   listarRepuestos,
   crearRepuesto,
@@ -25,8 +26,10 @@ import {
   historialMovimientosRepuesto,
   listarProveedoresRepuesto,
   crearProveedorRepuesto,
+  actualizarProveedorRepuesto,
   listarComprasRepuesto,
   registrarCompraRepuesto,
+  extraerFacturaOcr,
   listarMovimientos, registrarMovimiento,
   abrirTurno,
   turnoAbierto,
@@ -44,6 +47,7 @@ import {
   type Turno,
   type TasaCambio,
   type OrigenTasaActiva,
+  type FacturaExtraidaOcr,
 } from "../api";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -457,7 +461,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const tasaCop = tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
-  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "clientes" | "gastos" | "cierre" | "auditoria">("general");
+  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "gastos" | "cierre" | "auditoria">("general");
   const [modalQrVisible, setModalQrVisible] = useState(false);
   const [modalIaVisible, setModalIaVisible] = useState(false);
 
@@ -521,6 +525,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [guardandoAjuste, setGuardandoAjuste] = useState(false);
   const [comprasRepuesto, setComprasRepuesto] = useState<CompraRepuesto[] | null>(null);
   const [cargandoCompras, setCargandoCompras] = useState(false);
+  const [proveedorDetalle, setProveedorDetalle] = useState<ProveedorRepuesto | null>(null);
+  const [busquedaProveedor, setBusquedaProveedor] = useState("");
+  const [modalNuevoProveedor, setModalNuevoProveedor] = useState(false);
 
   
   const cargarPedidoWebAlPos = (pedido: PedidoWeb) => {
@@ -1002,6 +1009,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             {
               titulo: "Gestión",
               items: [
+                ...(esComercio ? [{ id: "proveedores" as const, Icon: IconTruck, etiqueta: "Proveedores" }] : []),
                 { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
                 { id: "gastos" as const, Icon: IconBank, etiqueta: "Ingresos & Gastos" },
                 { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
@@ -1556,6 +1564,85 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════
+            TAB: PROVEEDORES — ficha completa por proveedor + historial de
+            compras (mismo patrón que "Compras & Proveedores" de Aurora
+            Horeca, adaptado a la estética y al modelo de datos de Comercio:
+            ProveedorRepuesto/CompraRepuesto en vez de ProveedorHoreca).
+            ══════════════════════════════════════════════════════════════════ */}
+        {tab === "proveedores" && esComercio && (
+          <div className="flex-1 bg-white/80 dark:bg-slate-900/80 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Proveedores</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Ficha de contacto y compras registradas por cada proveedor de tu inventario.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                  <IconSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={busquedaProveedor}
+                    onChange={(e) => setBusquedaProveedor(e.target.value)}
+                    placeholder="Buscar por nombre o RIF..."
+                    className="pl-8 pr-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs w-56"
+                  />
+                </div>
+                <button
+                  onClick={() => setModalNuevoProveedor(true)}
+                  className="px-4 py-2 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400 shadow-md transition-colors flex items-center gap-1.5"
+                >
+                  <IconTruck size={14} />
+                  + Nuevo Proveedor
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {proveedoresRepuesto.length === 0 ? (
+                <div className="py-10 text-center text-slate-500 dark:text-slate-400 text-xs rounded-2xl bg-slate-100/60 dark:bg-slate-800/40">
+                  Todavía no hay proveedores registrados. Usá "+ Nuevo Proveedor" arriba, o registrá uno directamente al cargar una compra.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {proveedoresRepuesto
+                    .filter((p) => {
+                      const q = busquedaProveedor.trim().toLowerCase();
+                      if (!q) return true;
+                      return p.nombre.toLowerCase().includes(q) || (p.rif || "").toLowerCase().includes(q);
+                    })
+                    .map((p) => {
+                      const comprasDeEste = (comprasRepuesto || []).filter((c) => c.proveedor?.id === p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => setProveedorDetalle(p)}
+                          className="text-left p-4 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 hover:border-teal-400 dark:hover:border-teal-500 transition-colors cursor-pointer space-y-2"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white truncate">{p.nombre}</div>
+                            <span className={`flex-shrink-0 text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
+                              p.activo ? "bg-teal-500/20 text-teal-600 dark:text-teal-400" : "bg-slate-400/20 text-slate-500 dark:text-slate-400"
+                            }`}>
+                              {p.activo ? "Activo" : "Inactivo"}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{p.rif || "Sin RIF registrado"}</div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">{p.contacto || "—"} {p.telefono ? `· ${p.telefono}` : ""}</div>
+                          <div className="pt-1.5 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-[10px]">
+                            <span className="text-slate-400 dark:text-slate-500">{comprasDeEste.length} compra{comprasDeEste.length === 1 ? "" : "s"} registrada{comprasDeEste.length === 1 ? "" : "s"}</span>
+                            <span className="text-cyan-600 dark:text-cyan-400 font-bold">Ver ficha →</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -2556,6 +2643,33 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         />
       )}
 
+      {/* ── MODAL ALTA DE PROVEEDOR (pestaña Proveedores) ── */}
+      {modalNuevoProveedor && (
+        <ModalFormularioProveedorComercio
+          tenantId={user?.tenantId || 1}
+          onClose={() => setModalNuevoProveedor(false)}
+          onGuardado={(nuevo) => {
+            setProveedoresRepuesto((prev) => [...prev, nuevo]);
+            setModalNuevoProveedor(false);
+            mostrarToast("Proveedor registrado correctamente.", "success");
+          }}
+        />
+      )}
+
+      {/* ── MODAL FICHA DE PROVEEDOR: datos + historial de compras + edición ── */}
+      {proveedorDetalle && (
+        <ModalDetalleProveedorComercio
+          proveedor={proveedorDetalle}
+          compras={(comprasRepuesto || []).filter((c) => c.proveedor?.id === proveedorDetalle.id)}
+          onClose={() => setProveedorDetalle(null)}
+          onActualizado={(actualizado) => {
+            setProveedoresRepuesto((prev) => prev.map((p) => (p.id === actualizado.id ? actualizado : p)));
+            setProveedorDetalle(actualizado);
+            mostrarToast("Proveedor actualizado.", "success");
+          }}
+        />
+      )}
+
       {/* Toast flotante */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50">
@@ -3133,6 +3247,20 @@ function ModalCompraProveedorComercio({
   const [guardandoCompra, setGuardandoCompra] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Carga de factura por foto (OCR con IA) — mismo endpoint genérico
+  // /api/ocr/facturas/extraer que ya usa Aurora Horeca, sin cambios de
+  // backend. Solo es una PROPUESTA: nada se agrega a la factura sin pasar
+  // por acá y quedar visible/editable en la tabla de ítems antes de guardar.
+  const [leyendoFoto, setLeyendoFoto] = useState(false);
+  const [avisoOcr, setAvisoOcr] = useState<string | null>(null);
+  // Separado de errorMsg a propósito: un fallo leyendo la foto no debe
+  // confundirse con un error al registrar la compra — son momentos distintos.
+  const [errorOcr, setErrorOcr] = useState<string | null>(null);
+  // Nombre que la IA leyó en la foto cuando no coincide con ningún proveedor
+  // ya registrado — permite crearlo sin salir de este modal.
+  const [proveedorSugerido, setProveedorSugerido] = useState<string | null>(null);
+  const inputFotoRef = useRef<HTMLInputElement | null>(null);
+
   const totalFactura = useMemo(() => {
     return lineas.reduce((acc, l) => acc + (Number(l.cantidad) || 0) * (Number(l.costoUnitario) || 0), 0);
   }, [lineas]);
@@ -3174,6 +3302,82 @@ function ModalCompraProveedorComercio({
       setErrorMsg(err.message || "Error al crear proveedor");
     } finally {
       setCreandoProv(false);
+    }
+  };
+
+  // Busca el producto cuyo nombre o código más se acerque a la descripción
+  // leída por la IA — coincidencia simple por inclusión de texto, nunca
+  // exacta (la IA transcribe con variaciones de tildes/mayúsculas/abreviaturas).
+  const buscarProductoPorDescripcion = (descripcion: string) => {
+    const q = descripcion.trim().toLowerCase();
+    if (!q) return null;
+    return (
+      productos.find((p) => p.nombre.toLowerCase() === q) ||
+      productos.find((p) => p.nombre.toLowerCase().includes(q) || q.includes(p.nombre.toLowerCase())) ||
+      productos.find((p) => p.codigo.toLowerCase() === q) ||
+      null
+    );
+  };
+
+  const subirFotoFactura = async (file: File) => {
+    setLeyendoFoto(true);
+    setErrorOcr(null);
+    setAvisoOcr(null);
+    try {
+      const archivoOptimizado = await comprimirImagenFactura(file);
+      const datos: FacturaExtraidaOcr = await extraerFacturaOcr(archivoOptimizado);
+
+      if (datos.numeroFactura) setNumeroFactura(datos.numeroFactura);
+
+      if (datos.proveedor) {
+        const pNombre = datos.proveedor.trim().toLowerCase();
+        const match = proveedores.find(
+          (p) => p.nombre.toLowerCase() === pNombre || p.nombre.toLowerCase().includes(pNombre) || pNombre.includes(p.nombre.toLowerCase())
+        );
+        if (match) {
+          setProveedorSelId(String(match.id));
+          setProveedorSugerido(null);
+        } else {
+          setProveedorSugerido(datos.proveedor.trim());
+        }
+      }
+
+      let vinculados = 0;
+      let sinCoincidencia = 0;
+      const nuevasLineas: LineaCompraItem[] = [];
+      for (const it of datos.items || []) {
+        if (!it.descripcion) continue;
+        const encontrado = buscarProductoPorDescripcion(it.descripcion);
+        if (encontrado && encontrado.backendId) {
+          vinculados++;
+          nuevasLineas.push({
+            repuestoId: encontrado.backendId,
+            nombre: encontrado.nombre,
+            cantidad: it.cantidad ? String(it.cantidad) : "1",
+            costoUnitario: it.precioUnitario ? String(it.precioUnitario) : String(encontrado.costo || 1),
+          });
+        } else {
+          sinCoincidencia++;
+        }
+      }
+      if (nuevasLineas.length > 0) setLineas((prev) => [...prev, ...nuevasLineas]);
+
+      if (vinculados === 0 && sinCoincidencia === 0) {
+        setErrorOcr("La foto no arrojó ítems legibles — cárgalos manualmente o probá con una foto más clara.");
+      } else {
+        setAvisoOcr(
+          `Se leyeron ${vinculados + sinCoincidencia} ítems de la factura. ${vinculados} se agregaron automáticamente por coincidir con tu inventario.` +
+          (sinCoincidencia > 0
+            ? ` ${sinCoincidencia} no coinciden con ningún producto existente — agrégalos manualmente abajo eligiendo el artículo correcto, o créalos primero desde Inventario.`
+            : "") +
+          " Revisa cantidades y costos antes de procesar la factura."
+        );
+      }
+    } catch (e) {
+      setErrorOcr(e instanceof Error ? e.message : "No se pudo leer la factura");
+    } finally {
+      setLeyendoFoto(false);
+      if (inputFotoRef.current) inputFotoRef.current.value = "";
     }
   };
 
@@ -3227,6 +3431,50 @@ function ModalCompraProveedorComercio({
             <IconWarning size={13} className="flex-shrink-0" /> {errorMsg}
           </div>
         )}
+
+        {/* Carga de factura por foto (OCR con IA) */}
+        <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/70 dark:border-slate-700/60 space-y-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              ref={inputFotoRef}
+              type="file"
+              accept="image/*,application/pdf"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFotoFactura(f); }}
+            />
+            <button
+              type="button"
+              onClick={() => inputFotoRef.current?.click()}
+              disabled={leyendoFoto}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-60 text-slate-950 font-bold text-xs cursor-pointer shadow-md"
+            >
+              <IconFileText size={14} />
+              {leyendoFoto ? "Leyendo factura..." : "Cargar con foto de la factura"}
+            </button>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400">Sube una foto o PDF y Aurora completa proveedor, ítems y costos — siempre revisa antes de procesar.</span>
+          </div>
+          {avisoOcr && <p className="text-[11px] text-teal-600 dark:text-teal-400">{avisoOcr}</p>}
+          {errorOcr && <p className="text-[11px] text-red-500">{errorOcr}</p>}
+          {proveedorSugerido && (
+            <div className="flex items-center gap-2 flex-wrap text-[11px]">
+              <span className="text-amber-600 dark:text-amber-400">
+                La foto dice "<strong>{proveedorSugerido}</strong>" — no está registrado todavía.
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setNuevoProvModal(true);
+                  setNombreNuevoProv(proveedorSugerido);
+                  setProveedorSugerido(null);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold cursor-pointer"
+              >
+                + Crear proveedor "{proveedorSugerido}"
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Proveedor y Factura */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -3418,6 +3666,282 @@ function ModalCompraProveedorComercio({
               {guardandoCompra ? "Procesando Factura..." : "Procesar Factura y Actualizar Kárdex"}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMPONENTE: MODAL ALTA / EDICIÓN DE PROVEEDOR (COMERCIO)
+// Formulario dedicado de la pestaña "Proveedores" — el modal de compra sigue
+// teniendo su propio alta rápida ("+ Nuevo Proveedor" inline) para no
+// interrumpir el flujo de facturación; este es el alta completa con todos
+// los campos de contacto, para cuando el proveedor llega en persona o llama
+// por teléfono sin factura que escanear todavía.
+// ══════════════════════════════════════════════════════════════════════════
+function ModalFormularioProveedorComercio({
+  tenantId,
+  proveedor,
+  onClose,
+  onGuardado,
+}: {
+  tenantId: number;
+  proveedor?: ProveedorRepuesto;
+  onClose: () => void;
+  onGuardado: (p: ProveedorRepuesto) => void;
+}) {
+  const [nombre, setNombre] = useState(proveedor?.nombre || "");
+  const [rif, setRif] = useState(proveedor?.rif || "");
+  const [telefono, setTelefono] = useState(proveedor?.telefono || "");
+  const [contacto, setContacto] = useState(proveedor?.contacto || "");
+  const [direccion, setDireccion] = useState(proveedor?.direccion || "");
+  const [activo, setActivo] = useState(proveedor?.activo ?? true);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const esEdicion = !!proveedor;
+
+  const guardar = async () => {
+    if (!nombre.trim()) {
+      setError("El nombre del proveedor es obligatorio");
+      return;
+    }
+    setGuardando(true);
+    setError(null);
+    try {
+      const datos = {
+        nombre: nombre.trim(),
+        rif: rif.trim() || undefined,
+        telefono: telefono.trim() || undefined,
+        contacto: contacto.trim() || undefined,
+        direccion: direccion.trim() || undefined,
+        activo,
+      };
+      const resultado = esEdicion
+        ? await actualizarProveedorRepuesto(proveedor!.id, datos)
+        : await crearProveedorRepuesto(tenantId, datos);
+      onGuardado(resultado);
+    } catch (err: any) {
+      setError(err.message || "No se pudo guardar el proveedor");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+          <div>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase">Proveedores</span>
+            <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white mt-1">
+              {esEdicion ? "Editar Proveedor" : "Nuevo Proveedor"}
+            </h3>
+          </div>
+          <button onClick={onClose} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+        </div>
+
+        {error && (
+          <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-semibold flex items-center gap-1.5">
+            <IconWarning size={13} className="flex-shrink-0" /> {error}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Nombre / Razón Social *</label>
+            <input
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Nombre de la Distribuidora / Proveedor"
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">RIF / Cédula</label>
+              <input
+                value={rif}
+                onChange={(e) => setRif(e.target.value)}
+                placeholder="J-12345678-0"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Teléfono</label>
+              <input
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                placeholder="0414-1234567"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Persona de Contacto</label>
+            <input
+              value={contacto}
+              onChange={(e) => setContacto(e.target.value)}
+              placeholder="Nombre de quien atiende los pedidos"
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Dirección</label>
+            <input
+              value={direccion}
+              onChange={(e) => setDireccion(e.target.value)}
+              placeholder="Dirección de despacho / oficina"
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+            />
+          </div>
+          {esEdicion && (
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
+              <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} className="rounded" />
+              Proveedor activo
+            </label>
+          )}
+        </div>
+
+        <div className="flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={guardar}
+            disabled={guardando}
+            className="flex-1 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
+          >
+            {guardando ? "Guardando..." : esEdicion ? "Guardar Cambios" : "Registrar Proveedor"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMPONENTE: MODAL FICHA DE PROVEEDOR — datos de contacto + historial
+// completo de compras a ese proveedor (mismo espíritu que ModalDetalleProveedor
+// de Aurora Horeca). El historial ya llega filtrado desde ComercioApp (misma
+// lista comprasRepuesto que alimenta "Compras & Proveedores" en Inventario).
+// ══════════════════════════════════════════════════════════════════════════
+function ModalDetalleProveedorComercio({
+  proveedor,
+  compras,
+  onClose,
+  onActualizado,
+}: {
+  proveedor: ProveedorRepuesto;
+  compras: CompraRepuesto[];
+  onClose: () => void;
+  onActualizado: (p: ProveedorRepuesto) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+
+  const totalComprado = compras.reduce((acc, c) => acc + (c.total || 0), 0);
+
+  if (editando) {
+    return (
+      <ModalFormularioProveedorComercio
+        tenantId={proveedor.tenantId}
+        proveedor={proveedor}
+        onClose={() => setEditando(false)}
+        onGuardado={(actualizado) => {
+          setEditando(false);
+          onActualizado(actualizado);
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
+          <div className="min-w-0">
+            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+              proveedor.activo ? "bg-teal-500/20 text-teal-600 dark:text-teal-400" : "bg-slate-400/20 text-slate-500 dark:text-slate-400"
+            }`}>
+              {proveedor.activo ? "Proveedor Activo" : "Proveedor Inactivo"}
+            </span>
+            <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white mt-1 truncate">{proveedor.nombre}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{proveedor.rif || "Sin RIF registrado"}</p>
+          </div>
+          <button onClick={onClose} className="flex-shrink-0 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 text-xs flex-shrink-0">
+          <div className="p-2.5 rounded-xl bg-slate-100/60 dark:bg-slate-800/40">
+            <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">Contacto</div>
+            <div className="text-slate-700 dark:text-slate-200 font-semibold">{proveedor.contacto || "—"}</div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-slate-100/60 dark:bg-slate-800/40">
+            <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">Teléfono</div>
+            <div className="text-slate-700 dark:text-slate-200 font-semibold font-mono">{proveedor.telefono || "—"}</div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-slate-100/60 dark:bg-slate-800/40 col-span-2">
+            <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">Dirección</div>
+            <div className="text-slate-700 dark:text-slate-200 font-semibold">{proveedor.direccion || "—"}</div>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex items-center justify-between mb-1.5 flex-shrink-0">
+            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Historial de Compras</span>
+            <span className="text-xs font-mono font-black text-teal-500 dark:text-teal-400">${totalComprado.toFixed(2)} total</span>
+          </div>
+          {compras.length === 0 ? (
+            <div className="py-6 text-center text-slate-500 dark:text-slate-400 text-xs rounded-xl bg-slate-100/60 dark:bg-slate-800/40">
+              Sin compras registradas a este proveedor todavía.
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 sticky top-0 uppercase text-[10px]">
+                  <tr>
+                    <th className="p-2.5">Fecha</th>
+                    <th className="p-2.5">N° Factura</th>
+                    <th className="p-2.5 text-right">Ítems</th>
+                    <th className="p-2.5 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-600 dark:text-slate-300">
+                  {compras.map((c) => (
+                    <tr key={c.id} className="hover:bg-slate-100/60 dark:hover:bg-slate-800/40">
+                      <td className="p-2.5 text-[11px]">{new Date(c.fechaCompra).toLocaleDateString()}</td>
+                      <td className="p-2.5">{c.numeroFactura || "—"}</td>
+                      <td className="p-2.5 text-right">{c.items?.length ?? "—"}</td>
+                      <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">${c.total.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer"
+          >
+            Cerrar
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditando(true)}
+            className="flex-1 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg flex items-center justify-center gap-1.5"
+          >
+            <IconEdit size={13} /> Editar Proveedor
+          </button>
         </div>
       </div>
     </div>
