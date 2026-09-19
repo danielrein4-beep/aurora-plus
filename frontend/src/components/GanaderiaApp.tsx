@@ -2957,7 +2957,10 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                               </div>
                             ) : (
                               <div className="space-y-2 max-h-60 overflow-y-auto">
-                                {fichaVacunas.map((v) => (
+                                {fichaVacunas.map((v) => {
+                                  const hoyStr = new Date().toISOString().slice(0, 10);
+                                  const refuerzoVencido = v.fechaProximaDosis && v.fechaProximaDosis < hoyStr;
+                                  return (
                                   <div key={v.id} className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs space-y-1">
                                     <div className="flex justify-between font-bold text-white">
                                       <span>{v.vacuna?.nombre || "Vacuna Sanitaria"}</span>
@@ -2970,8 +2973,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                                     {v.veterinarioResponsable && (
                                       <div className="text-[10px] text-slate-400">Vet: {v.veterinarioResponsable}</div>
                                     )}
+                                    {v.fechaProximaDosis && (
+                                      <div className={`text-[10px] font-bold ${refuerzoVencido ? "text-rose-400" : "text-amber-400"}`}>
+                                        {refuerzoVencido ? "Refuerzo VENCIDO: " : "Proximo refuerzo: "}{v.fechaProximaDosis}
+                                      </div>
+                                    )}
                                   </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
 

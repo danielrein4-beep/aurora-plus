@@ -3408,7 +3408,7 @@ export interface AplicacionVacunaGanaderia {
   lote?: string;
   veterinarioResponsable?: string;
   costo?: number;
-  fechaProximoRefuerzo?: string;
+  fechaProximaDosis?: string;
   fechaFinRetiroLeche?: string;
   fechaFinRetiroCarne?: string;
 }
