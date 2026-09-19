@@ -917,7 +917,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             </button>
           )}
           <div className="text-center space-y-2">
-            <div className="inline-flex p-3 rounded-2xl bg-teal-50 border border-teal-200 shadow-xs">
+            <div className="inline-flex p-3 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-xs">
               <AuroraLogo size={40} animated={false} />
             </div>
             <h1 className="font-['Outfit'] text-2xl font-black text-slate-900 tracking-tight">
@@ -966,7 +966,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             <button
               type="submit"
               disabled={loadingLogin}
-              className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm tracking-wide transition-all shadow-md shadow-teal-600/20 cursor-pointer disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-sm tracking-wide transition-all shadow-md shadow-emerald-500/20 cursor-pointer disabled:opacity-50"
             >
               {loadingLogin ? "Validando credenciales..." : "Iniciar Sesion SuperAdmin"}
             </button>
@@ -1009,7 +1009,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         {/* PARTE SUPERIOR: BRANDING & ESTADO */}
         <div className="p-5 border-b border-slate-100 space-y-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-teal-50 border border-teal-200/80 shadow-xs flex items-center justify-center">
+            <div className="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200/80 shadow-xs flex items-center justify-center">
               <AuroraLogo size={28} animated={false} />
             </div>
             <div>
@@ -1017,7 +1017,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 <span className="font-['Outfit'] font-black text-base text-slate-900 tracking-tight">
                   Aurora Plus
                 </span>
-                <span className="px-1.5 py-0.5 rounded-md bg-teal-50 text-teal-700 text-[9px] font-bold border border-teal-200">
+                <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[9px] font-bold border border-emerald-200">
                   v2.4
                 </span>
               </div>
@@ -1049,13 +1049,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             onClick={() => setVistaPrincipal("TENANTS")}
             className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
               vistaPrincipal === "TENANTS"
-                ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
                 : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
             }`}
           >
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-xl ${
-                vistaPrincipal === "TENANTS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
+                vistaPrincipal === "TENANTS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
               }`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -1083,13 +1083,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             }}
             className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
               vistaPrincipal === "PAGOS"
-                ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
                 : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
             }`}
           >
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-xl ${
-                vistaPrincipal === "PAGOS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
+                vistaPrincipal === "PAGOS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
               }`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -1117,13 +1117,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             }}
             className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
               vistaPrincipal === "METRICAS"
-                ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
                 : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
             }`}
           >
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-xl ${
-                vistaPrincipal === "METRICAS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
+                vistaPrincipal === "METRICAS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
               }`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -1153,13 +1153,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             }}
             className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
               vistaPrincipal === "FINANZAS"
-                ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
                 : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
             }`}
           >
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-xl ${
-                vistaPrincipal === "FINANZAS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
+                vistaPrincipal === "FINANZAS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
               }`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1174,7 +1174,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             </div>
             {resumenFinanzas && (
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                vistaPrincipal === "FINANZAS" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700 border border-teal-200"
+                vistaPrincipal === "FINANZAS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
               }`}>
                 ${resumenFinanzas.totalIngresos.toFixed(0)}
               </span>
@@ -1189,13 +1189,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             }}
             className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
               vistaPrincipal === "SOPORTE"
-                ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
                 : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
             }`}
           >
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-xl ${
-                vistaPrincipal === "SOPORTE" ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
+                vistaPrincipal === "SOPORTE" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
               }`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -1231,7 +1231,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             </div>
             <button
               onClick={() => setShowNuevoModal(true)}
-              className="w-full py-2.5 px-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xs shadow-teal-600/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs shadow-emerald-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
             >
               <span>+ Nuevo Negocio SaaS</span>
             </button>
@@ -1402,7 +1402,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
               onClick={() => setFiltroModulo("TODOS")}
               className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
                 filtroModulo === "TODOS"
-                  ? "bg-teal-600 text-white shadow-xs shadow-teal-600/20"
+                  ? "bg-emerald-500 text-white shadow-xs shadow-emerald-500/20"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -1416,7 +1416,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   onClick={() => setFiltroModulo(m.id)}
                   className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                     filtroModulo === m.id
-                      ? "bg-teal-600 text-white shadow-xs shadow-teal-600/20"
+                      ? "bg-emerald-500 text-white shadow-xs shadow-emerald-500/20"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
@@ -1438,7 +1438,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 onClick={() => setFiltroEstado(est)}
                 className={`px-3.5 py-1 rounded-xl font-bold transition-all cursor-pointer ${
                   filtroEstado === est
-                    ? "bg-teal-600 text-white shadow-xs shadow-teal-600/20"
+                    ? "bg-emerald-500 text-white shadow-xs shadow-emerald-500/20"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
@@ -1476,7 +1476,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2 font-bold text-xs text-slate-700">
             <span>Directorio de Clientes</span>
-            <span className="px-3 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 font-bold text-xs">
+            <span className="px-3 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-xs">
               {tenantsFiltrados.length} negocios listados
             </span>
           </div>
@@ -1593,7 +1593,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                           {/* Registrar Pago */}
                           <button
                             onClick={() => abrirModalPago(t)}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-xs cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-[10px] shadow-xs cursor-pointer"
                             title="Registrar pago y extender licencia"
                           >
                             Cobro
@@ -1629,7 +1629,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                           {/* Impersonar Soporte */}
                           <button
                             onClick={() => handleImpersonar(t.tenantId)}
-                            className="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 font-bold text-[10px] cursor-pointer transition-colors shadow-2xs"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[10px] cursor-pointer transition-colors shadow-2xs"
                             title="Acceso de soporte tecnico directo"
                           >
                             Soporte
@@ -1699,7 +1699,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
               <button
                 onClick={abrirModalPagoDesdeModulo}
-                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xs shadow-teal-600/20 transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs shadow-emerald-500/20 transition-all cursor-pointer"
               >
                 + Registrar Nuevo Cobro
               </button>
@@ -1718,7 +1718,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             </div>
 
             <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-1">
-              <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider">Cobros del Mes Actual</span>
+              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Cobros del Mes Actual</span>
               <div className="font-['Outfit'] text-3xl font-black text-slate-900">
                 ${totalCobradoMes.toFixed(2)}
                 <span className="text-xs font-normal text-slate-400"> USD</span>
@@ -1755,7 +1755,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   <select
                     value={filtroPagosTenant}
                     onChange={(e) => setFiltroPagosTenant(e.target.value === "TODOS" ? "TODOS" : Number(e.target.value))}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 font-medium text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-teal-500"
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 font-medium text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-emerald-500"
                   >
                     <option value="TODOS">Todos los Clientes ({tenants.length})</option>
                     {tenants.map((t) => (
@@ -1772,7 +1772,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   <select
                     value={filtroPagosMetodo}
                     onChange={(e) => setFiltroPagosMetodo(e.target.value)}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 font-medium text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-teal-500"
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 font-medium text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-emerald-500"
                   >
                     <option value="TODOS">Todos los Metodos</option>
                     <option value="BINANCE_USDT">Binance USDT</option>
@@ -1791,7 +1791,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   placeholder="Buscar por cliente, referencia, comprobante..."
                   value={filtroPagosTexto}
                   onChange={(e) => setFiltroPagosTexto(e.target.value)}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:outline-hidden focus:border-teal-500 w-64"
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:outline-hidden focus:border-emerald-500 w-64"
                 />
 
                 {(filtroPagosTenant !== "TODOS" || filtroPagosMetodo !== "TODOS" || filtroPagosTexto) && (
@@ -1808,7 +1808,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 )}
               </div>
 
-              <span className="px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800 font-bold text-xs">
+              <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-xs">
                 {pagosFiltrados.length} cobros listados
               </span>
             </div>
@@ -1876,7 +1876,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                           )}
                         </td>
                         <td className="py-3 px-3">
-                          <span className="inline-block px-2.5 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 font-bold text-[10px]">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-[10px]">
                             +{p.mesesPagados} mes ({p.diasAcreditados} dias)
                           </span>
                         </td>
@@ -1911,7 +1911,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                     type="month"
                     value={mesFinanzas}
                     onChange={(e) => setMesFinanzas(e.target.value)}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-teal-500"
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-emerald-500"
                   />
                   <button
                     onClick={() => cargarDatosFinancieros(mesFinanzas)}
@@ -1978,7 +1978,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   });
                   setShowGastoFijoModal(true);
                 }}
-                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xs shadow-teal-600/20 transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs shadow-emerald-500/20 transition-all cursor-pointer"
               >
                 + Nuevo Gasto Fijo
               </button>
@@ -2056,7 +2056,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   onClick={() => setSubTabFinanzas("MOVIMIENTOS")}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     subTabFinanzas === "MOVIMIENTOS"
-                      ? "bg-teal-600 text-white shadow-xs shadow-teal-600/20"
+                      ? "bg-emerald-500 text-white shadow-xs shadow-emerald-500/20"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
@@ -2067,7 +2067,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   onClick={() => setSubTabFinanzas("GASTOS_FIJOS")}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     subTabFinanzas === "GASTOS_FIJOS"
-                      ? "bg-teal-600 text-white shadow-xs shadow-teal-600/20"
+                      ? "bg-emerald-500 text-white shadow-xs shadow-emerald-500/20"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
@@ -2098,7 +2098,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                     placeholder="Buscar por concepto o referencia..."
                     value={filtroTextoMovimiento}
                     onChange={(e) => setFiltroTextoMovimiento(e.target.value)}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:outline-hidden focus:border-teal-500 w-56"
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:outline-hidden focus:border-emerald-500 w-56"
                   />
                 </div>
               )}
@@ -2295,7 +2295,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 uppercase tracking-wider">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider">
                   Business Intelligence SaaS
                 </span>
                 <span className="text-xs text-slate-400 font-mono">
@@ -2323,7 +2323,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                     }}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       periodoAnalytics === p
-                        ? "bg-teal-600 text-white shadow-xs"
+                        ? "bg-emerald-500 text-white shadow-xs"
                         : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
@@ -2366,7 +2366,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Facturacion del Periodo
                 </span>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   {periodoAnalytics}
                 </span>
               </div>
@@ -2374,7 +2374,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 <span className="font-['Outfit'] font-black text-2xl text-slate-900">
                   ${analyticsData ? analyticsData.kpis.facturacionPeriodoUsd.toFixed(2) : "0.00"}
                 </span>
-                <span className="text-xs font-bold text-teal-600">USD</span>
+                <span className="text-xs font-bold text-emerald-600">USD</span>
               </div>
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
                 <span>{analyticsData ? analyticsData.kpis.cantidadPagosPeriodo : 0} cobros confirmados</span>
@@ -2467,7 +2467,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 </div>
                 <div className="flex items-center gap-3 text-xs">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-md bg-teal-600 inline-block"></span>
+                    <span className="w-3 h-3 rounded-md bg-emerald-500 inline-block"></span>
                     <span className="text-slate-600 font-medium">Facturacion USD</span>
                   </div>
                 </div>
@@ -2490,7 +2490,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
                             {/* Monto texto encima de la barra si > 0 */}
                             {pto.montoUsd > 0 && (
-                              <span className="text-[10px] font-mono font-bold text-teal-700 mb-1">
+                              <span className="text-[10px] font-mono font-bold text-emerald-700 mb-1">
                                 ${pto.montoUsd.toFixed(0)}
                               </span>
                             )}
@@ -2500,7 +2500,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                               style={{ height: `${pctHeight}%` }}
                               className={`w-full max-w-[48px] rounded-t-xl transition-all duration-300 ${
                                 pto.montoUsd > 0
-                                  ? "bg-teal-600 hover:bg-teal-500 shadow-sm shadow-teal-600/20 cursor-pointer"
+                                  ? "bg-emerald-500 hover:bg-emerald-500 shadow-sm shadow-emerald-500/20 cursor-pointer"
                                   : "bg-slate-100 hover:bg-slate-200"
                               }`}
                             ></div>
@@ -2543,7 +2543,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                     <div key={v.vertical} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100/60 transition-colors space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-800 text-[10px] font-bold flex items-center justify-center font-mono">
+                          <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center justify-center font-mono">
                             {i + 1}
                           </span>
                           <span className="font-bold text-slate-800 text-xs">
@@ -2554,7 +2554,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                           <span className="font-mono font-bold text-xs text-slate-900">
                             ${v.totalFacturadoUsd.toFixed(2)} USD
                           </span>
-                          <span className="text-[10px] text-teal-700 font-bold ml-1.5">
+                          <span className="text-[10px] text-emerald-700 font-bold ml-1.5">
                             ({v.cuotaFacturacionPct}%)
                           </span>
                         </div>
@@ -2563,7 +2563,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                       {/* Barra de progreso de cuota */}
                       <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                         <div
-                          className="bg-teal-600 h-full rounded-full transition-all duration-500"
+                          className="bg-emerald-500 h-full rounded-full transition-all duration-500"
                           style={{ width: `${Math.max(v.cuotaFacturacionPct, v.cuotaTenantsPct, 4)}%` }}
                         ></div>
                       </div>
@@ -2609,7 +2609,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                         p.plan === "INDUSTRIAL"
                           ? "bg-purple-50 text-purple-700 border-purple-200"
                           : p.plan === "COMERCIAL"
-                          ? "bg-teal-50 text-teal-700 border-teal-200"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                           : "bg-slate-100 text-slate-700 border-slate-200"
                       }`}>
                         {p.plan}
@@ -2655,7 +2655,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                           <span className="font-mono font-bold text-slate-900">
                             ${m.totalUsd.toFixed(2)} USD
                           </span>
-                          <span className="text-[10px] text-teal-700 font-bold ml-1.5">
+                          <span className="text-[10px] text-emerald-700 font-bold ml-1.5">
                             ({m.porcentaje}%)
                           </span>
                         </div>
@@ -2690,7 +2690,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   placeholder="Buscar tenant o vertical en ranking..."
                   value={filtroRankingBusqueda}
                   onChange={(e) => setFiltroRankingBusqueda(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none"
+                  className="w-full px-3.5 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
                 />
               </div>
             </div>
@@ -2749,7 +2749,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                               esLider
                                 ? "bg-amber-100 text-amber-900 border-amber-300 shadow-xs"
                                 : esTop3
-                                ? "bg-teal-100 text-teal-900 border-teal-300"
+                                ? "bg-emerald-100 text-emerald-900 border-emerald-300"
                                 : "bg-slate-100 text-slate-700 border-slate-200"
                             }`}>
                               #{t.posicion}
@@ -2764,7 +2764,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                             </div>
                           </td>
                           <td className="py-3 px-3">
-                            <span className="inline-block px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-bold">
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
                               {t.moduloPrincipal.toUpperCase()}
                             </span>
                           </td>
@@ -2773,7 +2773,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                               t.tipoLicencia === "INDUSTRIAL"
                                 ? "bg-purple-50 text-purple-700 border-purple-200"
                                 : t.tipoLicencia === "COMERCIAL"
-                                ? "bg-teal-50 text-teal-700 border-teal-200"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                 : "bg-slate-100 text-slate-700 border-slate-200"
                             }`}>
                               {t.tipoLicencia}
@@ -2820,7 +2820,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 uppercase tracking-wider">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider">
                   Mesa de Ayuda SaaS
                 </span>
                 <span className="text-xs text-slate-400 font-mono">
@@ -2857,7 +2857,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   placeholder="Buscar por cliente, asunto o texto..."
                   value={filtroTextoBusquedaSoporte}
                   onChange={(e) => setFiltroTextoBusquedaSoporte(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-2xl bg-white border border-slate-200 text-xs text-slate-800 focus:border-teal-500 outline-none"
+                  className="w-full px-3.5 py-2 rounded-2xl bg-white border border-slate-200 text-xs text-slate-800 focus:border-emerald-500 outline-none"
                 />
 
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
@@ -2867,7 +2867,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                       onClick={() => setFiltroEstadoSoporte(est)}
                       className={`px-3 py-1 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
                         filtroEstadoSoporte === est
-                          ? "bg-teal-600 text-white shadow-xs"
+                          ? "bg-emerald-500 text-white shadow-xs"
                           : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
                       }`}
                     >
@@ -2905,7 +2905,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                         }}
                         className={`p-4 transition-all cursor-pointer space-y-1.5 ${
                           seleccionado
-                            ? "bg-teal-50/70 border-l-4 border-l-teal-600"
+                            ? "bg-emerald-50/70 border-l-4 border-l-emerald-500"
                             : "hover:bg-slate-50/80"
                         }`}
                       >
@@ -2934,7 +2934,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                               t.estado === "ABIERTO"
                                 ? "bg-amber-50 text-amber-700 border-amber-200"
                                 : t.estado === "EN_ATENCION"
-                                ? "bg-teal-50 text-teal-700 border-teal-200"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                 : "bg-slate-100 text-slate-600 border-slate-200"
                             }`}>
                               {t.estado}
@@ -2984,7 +2984,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   {/* HEADER DE LA SALA DE CHAT */}
                   <div className="p-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-200 text-teal-800 font-bold text-sm flex items-center justify-center font-mono shadow-xs">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-sm flex items-center justify-center font-mono shadow-xs">
                         #{ticketSeleccionado.tenantId}
                       </div>
                       <div>
@@ -2996,7 +2996,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                             ticketSeleccionado.estado === "RESUELTO"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                               : ticketSeleccionado.estado === "EN_ATENCION"
-                              ? "bg-teal-50 text-teal-700 border-teal-200"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                               : "bg-amber-50 text-amber-700 border-amber-200"
                           }`}>
                             {ticketSeleccionado.estado}
@@ -3014,7 +3014,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleCambiarEstadoTicket(ticketSeleccionado.id, "EN_ATENCION")}
-                        className="px-3 py-1.5 rounded-xl border border-teal-200 bg-teal-50 hover:bg-teal-100/70 text-teal-800 text-xs font-bold transition-all cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100/70 text-emerald-800 text-xs font-bold transition-all cursor-pointer"
                         title="Marcar como caso en revision activa"
                       >
                         En Atencion
@@ -3059,14 +3059,14 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                             <div
                               className={`max-w-[75%] p-4 text-xs rounded-2xl shadow-xs ${
                                 esSuperAdmin
-                                  ? "bg-teal-600 text-white rounded-tr-xs"
+                                  ? "bg-emerald-500 text-white rounded-tr-xs"
                                   : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
                               }`}
                             >
                               <div className="leading-relaxed whitespace-pre-wrap">{m.contenido}</div>
                               <div
                                 className={`text-[10px] mt-1.5 text-right font-mono flex items-center justify-end gap-1 ${
-                                  esSuperAdmin ? "text-teal-100" : "text-slate-400"
+                                  esSuperAdmin ? "text-emerald-100" : "text-slate-400"
                                 }`}
                               >
                                 <span>{m.fechaEnvio ? m.fechaEnvio.substring(11, 16) : ""}</span>
@@ -3120,12 +3120,12 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                       value={nuevoMensajeSoporte}
                       onChange={(e) => setNuevoMensajeSoporte(e.target.value)}
                       disabled={enviandoMensajeSoporte}
-                      className="flex-1 px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500 font-medium"
+                      className="flex-1 px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 font-medium"
                     />
                     <button
                       type="submit"
                       disabled={enviandoMensajeSoporte || !nuevoMensajeSoporte.trim()}
-                      className="px-6 py-3 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-2xl transition-all shadow-md shadow-teal-600/20 cursor-pointer disabled:opacity-40 shrink-0"
+                      className="px-6 py-3 bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-xs rounded-2xl transition-all shadow-md shadow-emerald-500/20 cursor-pointer disabled:opacity-40 shrink-0"
                     >
                       {enviandoMensajeSoporte ? "Enviando..." : "Enviar Respuesta"}
                     </button>
@@ -3192,7 +3192,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                       onClick={() => setLimiteUsuariosInput(String(num))}
                       className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold font-mono transition-all cursor-pointer ${
                         limiteUsuariosInput === String(num)
-                          ? "bg-teal-600 text-white border-teal-600 font-bold shadow-xs"
+                          ? "bg-emerald-500 text-white border-emerald-500 font-bold shadow-xs"
                           : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                       }`}
                     >
@@ -3204,7 +3204,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                     onClick={() => setLimiteUsuariosInput("")}
                     className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
                       limiteUsuariosInput === ""
-                        ? "bg-teal-600 text-white border-teal-600 font-bold shadow-xs"
+                        ? "bg-emerald-500 text-white border-emerald-500 font-bold shadow-xs"
                         : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                     }`}
                   >
@@ -3248,7 +3248,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 <button
                   type="button"
                   onClick={() => abrirModalUsuario(tenantParaUsuariosDirectorio)}
-                  className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs cursor-pointer shadow-xs"
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-xs"
                 >
                   + Agregar Usuario
                 </button>
@@ -3358,7 +3358,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                       onClick={() => setPagoForm({ ...pagoForm, meses: pkg.m, dias: 0, monto: pkg.p })}
                       className={`p-2.5 rounded-xl border font-bold text-center transition-all cursor-pointer ${
                         pagoForm.meses === pkg.m && pagoForm.dias === 0
-                          ? "bg-teal-600 text-white border-teal-600 font-bold shadow-xs"
+                          ? "bg-emerald-500 text-white border-emerald-500 font-bold shadow-xs"
                           : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                       }`}
                     >
@@ -3420,7 +3420,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 <button
                   type="submit"
                   disabled={registrandoPago}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer disabled:opacity-50 shadow-md"
+                  className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-500 text-white font-bold cursor-pointer disabled:opacity-50 shadow-md"
                 >
                   {registrandoPago ? "Acreditando..." : "Confirmar Pago & Activar"}
                 </button>
@@ -3457,7 +3457,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                       onClick={() => setRegaloForm({ ...regaloForm, dias: d })}
                       className={`flex-1 py-2 rounded-xl border font-bold transition-all cursor-pointer ${
                         regaloForm.dias === d
-                          ? "bg-teal-600 text-white border-teal-600 font-bold shadow-xs"
+                          ? "bg-emerald-500 text-white border-emerald-500 font-bold shadow-xs"
                           : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                       }`}
                     >
@@ -3521,7 +3521,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
               <div className="space-y-0.5">
                 <div className="font-black text-emerald-950 text-xs flex items-center gap-1.5">
                   <span>Acceso Total en 1 Clic</span>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-black uppercase">Suite Completa</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-black uppercase">Suite Completa</span>
                 </div>
                 <div className="text-[10px] text-emerald-700 leading-tight">
                   Eleva la licencia a Industrial y activa todos los modulos verticales automaticamente.
@@ -3531,7 +3531,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 type="button"
                 onClick={handleConcederAccesoTotal}
                 disabled={concediendoAccesoTotal}
-                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-xs whitespace-nowrap disabled:opacity-50 transition-all hover:scale-102"
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-xs whitespace-nowrap disabled:opacity-50 transition-all hover:scale-102"
               >
                 {concediendoAccesoTotal ? "Activando..." : "Desbloquear Todo"}
               </button>
@@ -3561,7 +3561,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                         onClick={() => handleToggleModulo(m.id, activo)}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           activo
-                            ? "bg-emerald-600 text-white shadow-xs"
+                            ? "bg-emerald-500 text-white shadow-xs"
                             : "bg-slate-200 text-slate-600 hover:bg-slate-300"
                         }`}
                       >
@@ -3836,7 +3836,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 <button
                   type="submit"
                   disabled={creandoUsuario}
-                  className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold cursor-pointer disabled:opacity-50 shadow-md shadow-teal-600/20"
+                  className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-500 text-white font-bold cursor-pointer disabled:opacity-50 shadow-md shadow-emerald-500/20"
                 >
                   {creandoUsuario ? "Guardando..." : "Crear Usuario"}
                 </button>
@@ -4076,7 +4076,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xs shadow-teal-600/20 cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs shadow-emerald-500/20 cursor-pointer"
                 >
                   {gastoFijoEnEdicion ? "Guardar Cambios" : "Programar Gasto Fijo"}
                 </button>
@@ -4130,7 +4130,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                       onClick={() => setMovimientoForm({ ...movimientoForm, tipo: "INGRESO" })}
                       className={`flex-1 py-1.5 rounded-lg font-bold text-center cursor-pointer transition-all ${
                         movimientoForm.tipo === "INGRESO"
-                          ? "bg-emerald-600 text-white shadow-xs"
+                          ? "bg-emerald-500 text-white shadow-xs"
                           : "text-slate-600 hover:text-slate-900"
                       }`}
                     >
@@ -4273,7 +4273,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   type="submit"
                   className={`px-5 py-2 rounded-xl text-white font-bold text-xs shadow-xs cursor-pointer ${
                     movimientoForm.tipo === "INGRESO"
-                      ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20"
+                      ? "bg-emerald-500 hover:bg-emerald-500 shadow-emerald-600/20"
                       : "bg-rose-600 hover:bg-rose-500 shadow-rose-600/20"
                   }`}
                 >

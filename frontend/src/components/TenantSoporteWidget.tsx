@@ -136,7 +136,7 @@ export default function TenantSoporteWidget() {
         <div className="fixed bottom-5 right-5 z-40">
           <button
             onClick={() => setAbierto(true)}
-            className="flex items-center gap-2.5 px-4 py-3 bg-teal-600 hover:bg-teal-500 text-white rounded-full shadow-lg shadow-teal-600/30 font-bold text-xs transition-all transform hover:scale-105 cursor-pointer"
+            className="flex items-center gap-2.5 px-4 py-3 bg-emerald-500 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/30 font-bold text-xs transition-all transform hover:scale-105 cursor-pointer"
             title="Abrir chat de soporte en vivo con Aurora Plus"
           >
             <div className="relative">
@@ -157,7 +157,7 @@ export default function TenantSoporteWidget() {
       {abierto && (
         <div className="fixed bottom-5 right-5 z-50 w-96 max-w-[calc(100vw-2.5rem)] h-[560px] max-h-[calc(100vh-6rem)] bg-white rounded-3xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden font-sans text-slate-800 animate-fadeIn">
           {/* HEADER DEL WIDGET */}
-          <div className="p-4 bg-teal-600 text-white flex items-center justify-between shadow-xs">
+          <div className="p-4 bg-emerald-500 text-white flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2.5">
               <div className="p-1.5 rounded-xl bg-white/10 flex items-center justify-center">
                 <AuroraLogo size={22} animated={false} />
@@ -167,7 +167,7 @@ export default function TenantSoporteWidget() {
                   <span>Asistencia Aurora</span>
                   <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
                 </div>
-                <div className="text-[10px] text-teal-100 font-medium">
+                <div className="text-[10px] text-emerald-100 font-medium">
                   Chat en vivo con ingenieria
                 </div>
               </div>
@@ -189,7 +189,7 @@ export default function TenantSoporteWidget() {
                 <span className="text-xs font-bold text-slate-700">Tus Casos de Soporte</span>
                 <button
                   onClick={() => setVista("NUEVO")}
-                  className="px-2.5 py-1 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+                  className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
                 >
                   + Abrir Ticket
                 </button>
@@ -211,7 +211,7 @@ export default function TenantSoporteWidget() {
                     </div>
                     <button
                       onClick={() => setVista("NUEVO")}
-                      className="px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold hover:bg-teal-500 transition-all cursor-pointer shadow-xs"
+                      className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-500 transition-all cursor-pointer shadow-xs"
                     >
                       Crear Primer Ticket
                     </button>
@@ -221,7 +221,7 @@ export default function TenantSoporteWidget() {
                     <div
                       key={t.id}
                       onClick={() => handleSeleccionarTicket(t)}
-                      className="p-3 rounded-2xl border border-slate-200 hover:border-teal-500/50 hover:bg-teal-50/30 transition-all cursor-pointer space-y-1.5"
+                      className="p-3 rounded-2xl border border-slate-200 hover:border-emerald-500/50 hover:bg-emerald-50/30 transition-all cursor-pointer space-y-1.5"
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-[10px] font-bold text-slate-400">
@@ -231,7 +231,7 @@ export default function TenantSoporteWidget() {
                           t.estado === "ABIERTO"
                             ? "bg-amber-50 text-amber-700 border-amber-200"
                             : t.estado === "EN_ATENCION"
-                            ? "bg-teal-50 text-teal-700 border-teal-200"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                             : "bg-slate-100 text-slate-600 border-slate-200"
                         }`}>
                           {t.estado}
@@ -248,7 +248,7 @@ export default function TenantSoporteWidget() {
                       <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
                         <span>{t.categoria}</span>
                         {t.mensajesNoLeidos && t.mensajesNoLeidos > 0 ? (
-                          <span className="px-1.5 py-0.2 rounded-full bg-teal-600 text-white font-bold font-mono">
+                          <span className="px-1.5 py-0.2 rounded-full bg-emerald-500 text-white font-bold font-mono">
                             {t.mensajesNoLeidos} nuevos
                           </span>
                         ) : null}
@@ -285,7 +285,7 @@ export default function TenantSoporteWidget() {
                     placeholder="Ej. Problema al generar reporte..."
                     value={nuevoForm.tituloAsunto}
                     onChange={(e) => setNuevoForm({ ...nuevoForm, tituloAsunto: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-800 font-medium focus:border-teal-500 outline-none"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-800 font-medium focus:border-emerald-500 outline-none"
                   />
                 </div>
 
@@ -297,7 +297,7 @@ export default function TenantSoporteWidget() {
                     <select
                       value={nuevoForm.categoria}
                       onChange={(e) => setNuevoForm({ ...nuevoForm, categoria: e.target.value })}
-                      className="w-full px-2.5 py-2 rounded-xl border border-slate-300 text-slate-800 font-medium focus:border-teal-500 outline-none bg-white"
+                      className="w-full px-2.5 py-2 rounded-xl border border-slate-300 text-slate-800 font-medium focus:border-emerald-500 outline-none bg-white"
                     >
                       <option value="SOPORTE_TECNICO">Soporte Tecnico</option>
                       <option value="FACTURACION">Facturacion & Pagos</option>
@@ -314,7 +314,7 @@ export default function TenantSoporteWidget() {
                     <select
                       value={nuevoForm.prioridad}
                       onChange={(e) => setNuevoForm({ ...nuevoForm, prioridad: e.target.value })}
-                      className="w-full px-2.5 py-2 rounded-xl border border-slate-300 text-slate-800 font-medium focus:border-teal-500 outline-none bg-white"
+                      className="w-full px-2.5 py-2 rounded-xl border border-slate-300 text-slate-800 font-medium focus:border-emerald-500 outline-none bg-white"
                     >
                       <option value="BAJA">Baja</option>
                       <option value="MEDIA">Media</option>
@@ -334,7 +334,7 @@ export default function TenantSoporteWidget() {
                     placeholder="Describe claramente que ocurre o que necesitas para que el equipo te responda..."
                     value={nuevoForm.mensajeInicial}
                     onChange={(e) => setNuevoForm({ ...nuevoForm, mensajeInicial: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-800 font-medium focus:border-teal-500 outline-none resize-none"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-800 font-medium focus:border-emerald-500 outline-none resize-none"
                   ></textarea>
                 </div>
 
@@ -342,7 +342,7 @@ export default function TenantSoporteWidget() {
                   <button
                     type="submit"
                     disabled={enviando}
-                    className="w-full py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-teal-600/20 cursor-pointer disabled:opacity-50"
+                    className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-500/20 cursor-pointer disabled:opacity-50"
                   >
                     {enviando ? "Creando caso..." : "Iniciar Chat con Soporte"}
                   </button>
@@ -373,7 +373,7 @@ export default function TenantSoporteWidget() {
                 <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border ${
                   ticketActivo.estado === "RESUELTO"
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-teal-50 text-teal-700 border-teal-200"
+                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
                 }`}>
                   {ticketActivo.estado}
                 </span>
@@ -399,14 +399,14 @@ export default function TenantSoporteWidget() {
                         <div
                           className={`max-w-[84%] p-3 text-xs rounded-2xl shadow-2xs ${
                             esMio
-                              ? "bg-teal-600 text-white rounded-tr-xs"
+                              ? "bg-emerald-500 text-white rounded-tr-xs"
                               : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
                           }`}
                         >
                           <div className="leading-relaxed whitespace-pre-wrap">{m.contenido}</div>
                           <div
                             className={`text-[9px] mt-1 text-right font-mono ${
-                              esMio ? "text-teal-100" : "text-slate-400"
+                              esMio ? "text-emerald-100" : "text-slate-400"
                             }`}
                           >
                             {m.fechaEnvio ? m.fechaEnvio.substring(11, 16) : ""}
@@ -428,12 +428,12 @@ export default function TenantSoporteWidget() {
                   value={nuevoMensaje}
                   onChange={(e) => setNuevoMensaje(e.target.value)}
                   disabled={enviando}
-                  className="flex-1 px-3.5 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-teal-500 font-medium"
+                  className="flex-1 px-3.5 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 font-medium"
                 />
                 <button
                   type="submit"
                   disabled={enviando || !nuevoMensaje.trim()}
-                  className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-2xl transition-all shadow-xs shadow-teal-600/20 cursor-pointer disabled:opacity-40"
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-xs rounded-2xl transition-all shadow-xs shadow-emerald-500/20 cursor-pointer disabled:opacity-40"
                 >
                   Enviar
                 </button>
