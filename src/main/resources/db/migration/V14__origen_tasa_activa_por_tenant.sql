@@ -1,6 +1,4 @@
--- Reemplaza metodo_tasa_automatica (V13, mecanismo propio descartado) por origen_tasa_activa:
--- misma metodología que ya usa Aurora Horeca para decidir qué serie de tasa USD/VES gobierna
--- el cobro en el POS (BCV, USDT o PERSONALIZADA). Se adopta este nombre y semántica para que
--- Comercio, Mediclinic y el resto de verticales queden alineadas con el mismo mecanismo.
+-- Limpia metodo_tasa_automatica (V13, mecanismo propio descartado a favor de la metodología
+-- que ya usaba Aurora Horeca). origen_tasa_activa la agrega V18__origen_tasa_activa_por_tenant.sql
+-- (la de Horeca) — se dejó de duplicar aquí para no chocar con esa migración al fusionar ramas.
 ALTER TABLE licencias_tenant DROP COLUMN metodo_tasa_automatica;
-ALTER TABLE licencias_tenant ADD COLUMN origen_tasa_activa VARCHAR(20) NOT NULL DEFAULT 'USDT';
