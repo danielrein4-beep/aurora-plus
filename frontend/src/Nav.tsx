@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import AuroraLogo from "./AuroraLogo";
+import SpecularButton from "./components/SpecularButton";
 import { useAuth } from "./context/AuthContext";
 
 const LINKS = [
@@ -118,18 +119,38 @@ export default function Nav() {
             </div>
           ) : (
             <div className="flex items-center gap-3">
-              <button
+              <SpecularButton
+                size="sm"
+                radius={999}
+                tint="#F5F5F7"
+                tintOpacity={0.92}
+                blur={14}
+                textColor="#1D1D1F"
+                lineColor="#ffffff"
+                baseColor="#D1D1D6"
+                shineSize={10}
+                shineFade={40}
+                proximity={220}
                 onClick={() => navigate("/auth")}
-                className="text-xs font-semibold text-[#1D1D1F] px-4 py-2 rounded-full hover:bg-[#F5F5F7] transition-colors cursor-pointer"
               >
                 Iniciar sesión
-              </button>
-              <button
+              </SpecularButton>
+              <SpecularButton
+                size="sm"
+                radius={999}
+                tint="#0B3D91"
+                tintOpacity={1}
+                textColor="#ffffff"
+                lineColor="#7ba7f7"
+                baseColor="#0B3D91"
+                shineSize={12}
+                shineFade={45}
+                intensity={1.3}
+                proximity={220}
                 onClick={() => navigate("/onboarding")}
-                className="text-xs font-semibold text-white bg-[#0B3D91] hover:bg-[#082D6C] px-5 py-2.5 rounded-full transition-all shadow-sm active:scale-95 cursor-pointer"
               >
                 Solicitar demo
-              </button>
+              </SpecularButton>
             </div>
           )}
         </div>
