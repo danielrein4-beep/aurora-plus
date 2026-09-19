@@ -110,6 +110,13 @@ interface DatosTienda {
   emailContacto?: string;
   logoBase64?: string;
   tasaVes: number;
+  pagoMovil?: {
+    activo: boolean;
+    banco: string;
+    telefono: string;
+    documento: string;
+    titular: string;
+  };
   productos: ProductoCatalogo[];
 }
 
@@ -822,6 +829,7 @@ export default function CatalogoPublico() {
                           className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-emerald-500/50 focus:outline-none text-xs text-white"
                         >
                           <option value="PAGO_MOVIL">Pago Móvil (Bs.)</option>
+                          <option value="BINANCE">Binance Pay (USDT)</option>
                           <option value="TRANSFERENCIA">Transferencia Bancaria</option>
                           <option value="EFECTIVO_USD">Efectivo Divisas ($ USD)</option>
                           <option value="EFECTIVO_BS">Efectivo Bolívares (Bs.)</option>
@@ -829,6 +837,41 @@ export default function CatalogoPublico() {
                           <option value="PUNTO_VENTA">Punto de Venta al retirar/entregar</option>
                         </select>
                       </div>
+
+                      {metodoPago === "PAGO_MOVIL" && tienda.pagoMovil?.activo && (
+                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between text-emerald-400 font-bold">
+                            <span>Datos oficiales para Pago Móvil</span>
+                            <span className="font-mono text-[11px]">{totalBs.toFixed(2)} Bs.</span>
+                          </div>
+                          <div className="text-slate-300 font-mono text-[11px] space-y-0.5">
+                            <div><span className="text-slate-400 font-sans">Banco:</span> {tienda.pagoMovil.banco}</div>
+                            <div><span className="text-slate-400 font-sans">Teléfono:</span> {tienda.pagoMovil.telefono}</div>
+                            <div><span className="text-slate-400 font-sans">C.I. / RIF:</span> {tienda.pagoMovil.documento}</div>
+                            {tienda.pagoMovil.titular && <div><span className="text-slate-400 font-sans">Titular:</span> {tienda.pagoMovil.titular}</div>}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const txt = `Pago Móvil:\nBanco: ${tienda.pagoMovil?.banco}\nTeléfono: ${tienda.pagoMovil?.telefono}\nRIF: ${tienda.pagoMovil?.documento}\nTitular: ${tienda.pagoMovil?.titular}\nMonto: ${totalBs.toFixed(2)} Bs.`;
+                              navigator.clipboard.writeText(txt);
+                              alert("Datos de Pago Móvil copiados al portapapeles.");
+                            }}
+                            className="w-full py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[11px] font-bold transition-colors"
+                          >
+                            Copiar datos de Pago Móvil
+                          </button>
+                        </div>
+                      )}
+
+                      {metodoPago === "BINANCE" && (
+                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-1">
+                          <span className="font-bold text-amber-400 block">Pago con Binance Pay (USDT)</span>
+                          <p className="text-[11px] text-slate-300">
+                            Al enviar el pedido, te enviaremos el enlace/código QR de Binance Pay para transferir exactamente <strong className="text-white">${totalUsd.toFixed(2)} USDT</strong> sin comisiones.
+                          </p>
+                        </div>
+                      )}
 
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">

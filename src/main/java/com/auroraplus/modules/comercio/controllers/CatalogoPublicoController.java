@@ -105,6 +105,14 @@ public class CatalogoPublicoController {
             productos.addAll(generarCatalogoModelo(tasaVes));
         }
 
+        // 4. Datos de Pago Movil del negocio
+        Map<String, Object> pagoMovil = new LinkedHashMap<>();
+        pagoMovil.put("activo", licencia.isPagoMovilActivo());
+        pagoMovil.put("banco", licencia.getPagoMovilBanco() != null ? licencia.getPagoMovilBanco() : "0102 - Banco de Venezuela");
+        pagoMovil.put("telefono", licencia.getPagoMovilTelefono() != null ? licencia.getPagoMovilTelefono() : (licencia.getTelefonoContacto() != null ? licencia.getTelefonoContacto() : "04141112233"));
+        pagoMovil.put("documento", licencia.getPagoMovilDocumento() != null ? licencia.getPagoMovilDocumento() : (licencia.getRif() != null ? licencia.getRif() : "J-12345678-0"));
+        pagoMovil.put("titular", licencia.getPagoMovilTitular() != null ? licencia.getPagoMovilTitular() : licencia.getNombreEmpresa());
+
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("tenantId", tenantId);
         resp.put("nombreTienda", licencia.getNombreEmpresa());
@@ -113,6 +121,7 @@ public class CatalogoPublicoController {
         resp.put("emailContacto", licencia.getEmailContacto());
         resp.put("logoBase64", licencia.getLogoBase64());
         resp.put("tasaVes", tasaVes);
+        resp.put("pagoMovil", pagoMovil);
         resp.put("productos", productos);
 
         return ResponseEntity.ok(resp);
@@ -173,6 +182,51 @@ public class CatalogoPublicoController {
         public List<LineaPedidoDto> items;
     }
 
+    public static class ConfigPagoMovilRequest {
+        public String banco;
+        public String telefono;
+        public String documento;
+        public String titular;
+        public Boolean activo;
+    }
+
+    @GetMapping("/{tenantId:[0-9]+}/pago-movil")
+    public ResponseEntity<?> obtenerConfigPagoMovil(@PathVariable Long tenantId) {
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
+        if (licencia == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Tienda no encontrada"));
+        }
+        Map<String, Object> pagoMovil = new LinkedHashMap<>();
+        pagoMovil.put("banco", licencia.getPagoMovilBanco() != null ? licencia.getPagoMovilBanco() : "");
+        pagoMovil.put("telefono", licencia.getPagoMovilTelefono() != null ? licencia.getPagoMovilTelefono() : "");
+        pagoMovil.put("documento", licencia.getPagoMovilDocumento() != null ? licencia.getPagoMovilDocumento() : "");
+        pagoMovil.put("titular", licencia.getPagoMovilTitular() != null ? licencia.getPagoMovilTitular() : "");
+        pagoMovil.put("activo", licencia.isPagoMovilActivo());
+        return ResponseEntity.ok(pagoMovil);
+    }
+
+    @PostMapping("/{tenantId:[0-9]+}/pago-movil")
+    public ResponseEntity<?> guardarConfigPagoMovil(@PathVariable Long tenantId, @RequestBody ConfigPagoMovilRequest req) {
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
+        if (licencia == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Tienda no encontrada"));
+        }
+        if (req.banco != null) licencia.setPagoMovilBanco(req.banco.trim());
+        if (req.telefono != null) licencia.setPagoMovilTelefono(req.telefono.trim());
+        if (req.documento != null) licencia.setPagoMovilDocumento(req.documento.trim());
+        if (req.titular != null) licencia.setPagoMovilTitular(req.titular.trim());
+        if (req.activo != null) licencia.setPagoMovilActivo(req.activo);
+        licenciaTenantRepository.save(licencia);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("banco", licencia.getPagoMovilBanco());
+        resp.put("telefono", licencia.getPagoMovilTelefono());
+        resp.put("documento", licencia.getPagoMovilDocumento());
+        resp.put("titular", licencia.getPagoMovilTitular());
+        resp.put("activo", licencia.isPagoMovilActivo());
+        return ResponseEntity.ok(resp);
+    }
+
     @PostMapping("/{tenantId:[0-9]+}/pedidos")
     public ResponseEntity<?> registrarPedidoWeb(@PathVariable Long tenantId, @RequestBody CrearPedidoWebRequest req) {
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
@@ -229,8 +283,21 @@ public class CatalogoPublicoController {
             msgWhatsapp.append("Direccion de Entrega: ").append(pedido.getDireccionEntrega()).append("\n");
         }
         msgWhatsapp.append("Metodo de Pago: ").append(pedido.getMetodoPago()).append("\n");
+
+        // Si es Pago Movil, adjuntar los datos del comercio en el WhatsApp
+        if ("PAGO_MOVIL".equalsIgnoreCase(pedido.getMetodoPago())) {
+            String bco = licencia.getPagoMovilBanco() != null ? licencia.getPagoMovilBanco() : "0102 - Banco de Venezuela";
+            String doc = licencia.getPagoMovilDocumento() != null ? licencia.getPagoMovilDocumento() : (licencia.getRif() != null ? licencia.getRif() : "");
+            String telf = licencia.getPagoMovilTelefono() != null ? licencia.getPagoMovilTelefono() : (licencia.getTelefonoContacto() != null ? licencia.getTelefonoContacto() : "");
+            msgWhatsapp.append("\n*DATOS PAGO MOVIL TIENDA:*\n");
+            msgWhatsapp.append("Banco: ").append(bco).append("\n");
+            msgWhatsapp.append("Documento/RIF: ").append(doc).append("\n");
+            msgWhatsapp.append("Telefono: ").append(telf).append("\n");
+            msgWhatsapp.append("Monto exacto: ").append(pedido.getTotalBs()).append(" Bs.\n");
+        }
+
         if (pedido.getNotas() != null && !pedido.getNotas().isBlank()) {
-            msgWhatsapp.append("Observaciones: ").append(pedido.getNotas()).append("\n");
+            msgWhatsapp.append("\nObservaciones: ").append(pedido.getNotas()).append("\n");
         }
         msgWhatsapp.append("\nAurora Plus - Gestion Comercial");
 

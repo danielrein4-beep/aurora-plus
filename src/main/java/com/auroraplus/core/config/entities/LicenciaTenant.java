@@ -107,6 +107,21 @@ public class LicenciaTenant {
     @Column(name = "binance_pay_activo", nullable = false)
     private boolean binancePayActivo = false;
 
+    @Column(name = "pago_movil_banco", length = 100)
+    private String pagoMovilBanco;
+
+    @Column(name = "pago_movil_telefono", length = 50)
+    private String pagoMovilTelefono;
+
+    @Column(name = "pago_movil_documento", length = 50)
+    private String pagoMovilDocumento;
+
+    @Column(name = "pago_movil_titular", length = 150)
+    private String pagoMovilTitular;
+
+    @Column(name = "pago_movil_activo", nullable = false)
+    private boolean pagoMovilActivo = true;
+
     // WhatsApp Business Cloud API (Meta) del NEGOCIO — cada tenant conecta SU
     // PROPIA cuenta de Meta para automatizar el recordatorio de citas por
     // WhatsApp (antes solo un link wa.me que la secretaria mandaba a mano).
@@ -200,4 +215,15 @@ public class LicenciaTenant {
     public void setLimiteUsuarios(Integer limiteUsuarios) { this.limiteUsuarios = limiteUsuarios; }
     public Long getCantidadUsuarios() { return cantidadUsuarios; }
     public void setCantidadUsuarios(Long cantidadUsuarios) { this.cantidadUsuarios = cantidadUsuarios; }
+
+    public String getPagoMovilBanco() { return pagoMovilBanco; }
+    public void setPagoMovilBanco(String pagoMovilBanco) { this.pagoMovilBanco = pagoMovilBanco; }
+    public String getPagoMovilTelefono() { return pagoMovilTelefono; }
+    public void setPagoMovilTelefono(String pagoMovilTelefono) { this.pagoMovilTelefono = pagoMovilTelefono; }
+    public String getPagoMovilDocumento() { return pagoMovilDocumento; }
+    public void setPagoMovilDocumento(String pagoMovilDocumento) { this.pagoMovilDocumento = pagoMovilDocumento; }
+    public String getPagoMovilTitular() { return pagoMovilTitular; }
+    public void setPagoMovilTitular(String pagoMovilTitular) { this.pagoMovilTitular = pagoMovilTitular; }
+    public boolean isPagoMovilActivo() { return pagoMovilActivo; }
+    public void setPagoMovilActivo(boolean pagoMovilActivo) { this.pagoMovilActivo = pagoMovilActivo; }
 }
