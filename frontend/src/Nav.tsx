@@ -138,14 +138,15 @@ export default function Nav() {
               <SpecularButton
                 size="sm"
                 radius={999}
-                tint="#0B3D91"
+                tint="#2b2b2b"
                 tintOpacity={1}
-                textColor="#ffffff"
-                lineColor="#7ba7f7"
-                baseColor="#0B3D91"
-                shineSize={12}
-                shineFade={45}
-                intensity={1.3}
+                textColor="#f5f5f5"
+                lineColor="#ffffff"
+                baseColor="#525252"
+                shineSize={10}
+                shineFade={40}
+                intensity={1}
+                thickness={1}
                 proximity={220}
                 onClick={() => navigate("/onboarding")}
               >

@@ -121,14 +121,15 @@ export default function Soluciones() {
         <SpecularButton
           size="lg"
           radius={12}
-          tint="#0f766e"
+          tint="#2b2b2b"
           tintOpacity={1}
-          textColor="#ffffff"
-          lineColor="#7cf3e3"
-          baseColor="#0f766e"
-          shineSize={12}
-          shineFade={45}
-          intensity={1.3}
+          textColor="#f5f5f5"
+          lineColor="#ffffff"
+          baseColor="#525252"
+          shineSize={10}
+          shineFade={40}
+          intensity={1}
+          thickness={1}
           proximity={280}
           onClick={() => navigate("/onboarding")}
         >
