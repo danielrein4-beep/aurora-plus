@@ -1826,8 +1826,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       )}
 
       {modalCobro && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setModalCobro(false)}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Cobro en Mostrador</h3>
               <button onClick={() => setModalCobro(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white"><IconClose size={18} /></button>
@@ -2023,8 +2023,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
       {/* ── MODAL RECIBO FINAL CON BOTÓN DE IMPRESIÓN TÉRMICA ── */}
       {ventaReciente && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 text-center">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setVentaReciente(null)}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 text-center cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="w-12 h-12 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center mx-auto">
               <IconCheckCircle size={28} />
             </div>
@@ -2072,8 +2072,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
       {/* ── MODAL AGREGAR PRODUCTO AL INVENTARIO ── */}
       {modalNuevoProducto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setModalNuevoProducto(false)}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Nuevo Producto ({esFarmacia ? "FARMACIA" : "COMERCIO"})</h3>
               <button onClick={() => setModalNuevoProducto(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white"><IconClose size={18} /></button>
@@ -2230,8 +2230,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
       {/* ── MODAL REGISTRAR ABONO A CRÉDITO ── */}
       {clienteAbonoSel && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setClienteAbonoSel(null)}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Registrar Abono a Crédito</h3>
               <button onClick={() => setClienteAbonoSel(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
@@ -2313,8 +2313,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
       {/* ── MODAL KÁRDEX AUDITABLE DE COMERCIO ── */}
       {kardexModalItem && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setKardexModalItem(null)}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold uppercase">Kárdex de Movimientos</span>
@@ -2375,8 +2375,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
       {/* ── MODAL EDITAR PRODUCTO ── */}
       {editarModalItem && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setEditarModalItem(null)}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Editar Producto</h3>
@@ -2484,8 +2484,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
       {/* ── MODAL AJUSTAR STOCK (CORRECCIÓN POR CONTEO FÍSICO) ── */}
       {ajustarStockModalItem && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setAjustarStockModalItem(null)}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4 cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-500 dark:text-amber-300 font-bold uppercase">Ajuste de Inventario</span>
@@ -2546,8 +2546,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
       {/* ── MODAL PRESENTACIONES FRACCIONADAS (CAJA, METRO, KILO, SACO) ── */}
       {presentacionesModalItem && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setPresentacionesModalItem(null)}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase">Presentaciones de Venta</span>
@@ -3156,8 +3156,8 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
       )}
 
       {ultimoCierre && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setUltimoCierre(null)}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4 cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Cierre Z Registrado</h3>
               <button onClick={() => setUltimoCierre(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
@@ -3453,8 +3453,8 @@ function ModalCompraProveedorComercio({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl cursor-default" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div>
             <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase">Entrada de Almacén</span>
@@ -3822,8 +3822,8 @@ function ModalFormularioProveedorComercio({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl cursor-default" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div>
             <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase">Proveedores</span>
@@ -3954,8 +3954,8 @@ function ModalDetalleProveedorComercio({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[85vh] flex flex-col cursor-default" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
           <div className="min-w-0">
             <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
@@ -4076,6 +4076,14 @@ function ModalImportarInventarioComercio({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   const procesarArchivo = async (file: File) => {
     setError(null);
     setResultado(null);
@@ -4136,14 +4144,27 @@ function ModalImportarInventarioComercio({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div>
             <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase">Inventario</span>
             <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white mt-1">Importar Inventario desde Excel/CSV</h3>
           </div>
-          <button onClick={onClose} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="Cerrar ventana"
+          >
+            <IconClose size={18} />
+          </button>
         </div>
 
         {!resultado && (
@@ -4208,6 +4229,16 @@ function ModalImportarInventarioComercio({
                 </button>
               </div>
             )}
+
+            <div className="flex items-center justify-end pt-3 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+              >
+                Cancelar y Salir
+              </button>
+            </div>
           </>
         )}
 
