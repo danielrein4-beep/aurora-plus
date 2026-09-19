@@ -1,3 +1,4 @@
+import BitacoraAuditoria from "./BitacoraAuditoria";
 import { useState, useEffect } from "react";
 import AuroraLogo from "../AuroraLogo";
 import { AuroraGradientDef } from "../Icons";
@@ -234,7 +235,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   });
 
   // Pestaña principal activa
-  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes">("resumen");
+  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
 
   // Sub-vistas Sanidad & Trazabilidad
   const [subSanidad, setSubSanidad] = useState<"individual" | "lotes">("individual");
@@ -1603,6 +1604,18 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             }`}>
             <span>Centro de Reportes</span>
           </button>
+
+          {user?.rol === "DUENO_ADMIN" && (
+            <button
+              onClick={() => setTab("auditoria")}
+              className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                tab === "auditoria"
+                  ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                  : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
+              }`}>
+              <span>Bitácora de Auditoría</span>
+            </button>
+          )}
 
         </div>
       </div>
@@ -4018,6 +4031,10 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             </div>
           );
         })()}
+
+        {tab === "auditoria" && user?.rol === "DUENO_ADMIN" && (
+          <BitacoraAuditoria moduloSugerido="GANADERIA" />
+        )}
 
       </main>
 

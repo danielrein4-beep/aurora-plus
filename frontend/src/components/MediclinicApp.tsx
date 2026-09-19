@@ -1,3 +1,4 @@
+import BitacoraAuditoria from "./BitacoraAuditoria";
 import InboxLaboratorioMedico from "./laboratorio/InboxLaboratorioMedico";
 import {
   useState, useEffect, useMemo } from "react";
@@ -7783,6 +7784,8 @@ function ResumenesFinancieros({
 // CONFIGURACIÓN & PERFIL MÉDICO
 // ══════════════════════════════════════════════════════════════════════════
 function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c: any) => void; user: any }) {
+  const esDueno = user?.rol === "DUENO_ADMIN";
+  const [subTab, setSubTab] = useState<"perfil" | "auditoria">("perfil");
   const [form, setForm] = useState(config);
   const [claveForm, setClaveForm] = useState({ actual: "", nueva: "", confirmar: "" });
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -7828,7 +7831,38 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
+      {esDueno && (
+        <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/5 text-xs w-fit">
+          <button
+            type="button"
+            onClick={() => setSubTab("perfil")}
+            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer ${
+              subTab === "perfil"
+                ? "bg-teal-600 text-white shadow-xs"
+                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
+            }`}
+          >
+            Configuración & Perfil
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab("auditoria")}
+            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              subTab === "auditoria"
+                ? "bg-emerald-500 text-white shadow-xs"
+                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white"
+            }`}
+          >
+            <span>Bitácora de Auditoría</span>
+          </button>
+        </div>
+      )}
+
+      {subTab === "auditoria" && esDueno ? (
+        <BitacoraAuditoria moduloSugerido="SALUD" />
+      ) : (
+        <div className="space-y-6 max-w-2xl">
       {mensaje && (
         <div className="p-3 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-700 dark:text-teal-300 text-xs font-bold">
           {mensaje}
@@ -7947,6 +7981,8 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
       <ConfiguracionWhatsApp />
 
       <HistorialImportacionesSalud claveDoctor={config.claveDoctor} />
+        </div>
+      )}
     </div>
   );
 }
