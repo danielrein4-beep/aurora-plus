@@ -462,10 +462,10 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                       n.premium
                         ? "text-white/30"
                         : pagina === n.id
-                        ? "text-white"
+                        ? "bg-white/10 text-white"
                         : alertaVencimiento
                         ? "text-red-300"
-                        : "text-white/60 hover:text-white"
+                        : "text-white/60 hover:bg-white/5 hover:text-white"
                     }`}
                   >
                     <span className="flex items-center gap-2.5"><n.Icon size={16} /><span>{n.label}</span></span>
