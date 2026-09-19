@@ -62,7 +62,7 @@ public class AgendaVeterinariaController {
 
     @PostMapping("/citas")
     public ResponseEntity<CitaVeterinaria> agendarCita(@RequestParam(required = false) Long tenantId, @RequestBody CitaVeterinaria cita) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         autocompletarVeterinario(tenantActivo, cita);
         return ResponseEntity.ok(agendaVeterinariaService.agendarCita(tenantActivo, cita));
     }
@@ -81,7 +81,7 @@ public class AgendaVeterinariaController {
 
     @PostMapping("/bloqueos")
     public ResponseEntity<BloqueoAgendaVet> registrarBloqueo(@RequestParam(required = false) Long tenantId, @RequestBody BloqueoAgendaVet bloqueo) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         autocompletarVeterinario(tenantActivo, bloqueo);
         return ResponseEntity.ok(agendaVeterinariaService.registrarBloqueo(tenantActivo, bloqueo));
     }

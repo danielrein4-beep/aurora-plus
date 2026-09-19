@@ -30,7 +30,7 @@ public class CotizacionVeterinariaController {
     public ResponseEntity<CotizacionVeterinaria> crear(
             @RequestParam(required = false) Long tenantId,
             @RequestBody CotizacionVeterinaria cotizacion) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }

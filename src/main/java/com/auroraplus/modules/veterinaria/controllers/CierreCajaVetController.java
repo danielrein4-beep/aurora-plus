@@ -25,7 +25,7 @@ public class CierreCajaVetController {
     public ResponseEntity<CierreCajaVet> registrarCierre(
             @RequestParam(required = false) Long tenantId,
             @RequestBody CierreCajaVet cierre) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }

@@ -25,7 +25,7 @@ public class ProcedimientoVeterinarioController {
     public ResponseEntity<ProcedimientoVeterinario> crear(
             @RequestParam(required = false) Long tenantId,
             @RequestBody ProcedimientoVeterinario proc) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }

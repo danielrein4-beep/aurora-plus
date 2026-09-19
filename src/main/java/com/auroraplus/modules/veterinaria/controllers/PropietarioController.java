@@ -28,14 +28,14 @@ public class PropietarioController {
 
     @GetMapping
     public List<Propietario> listar(@RequestParam(required = false) Long tenantId, @RequestParam(required = false) String buscar) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         asegurarFiltroTenant();
         return propietarioService.buscar(tenantActivo, buscar);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Propietario> obtener(@PathVariable Long id, @RequestParam(required = false) Long tenantId) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         asegurarFiltroTenant();
         return propietarioService.obtenerPorId(tenantActivo, id)
             .map(ResponseEntity::ok)
@@ -44,7 +44,7 @@ public class PropietarioController {
 
     @GetMapping("/identificacion/{identificacion}")
     public ResponseEntity<Propietario> buscarPorIdentificacion(@PathVariable String identificacion, @RequestParam(required = false) Long tenantId) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         asegurarFiltroTenant();
         return propietarioService.obtenerPorIdentificacion(tenantActivo, identificacion)
             .map(ResponseEntity::ok)
@@ -53,16 +53,14 @@ public class PropietarioController {
 
     @PostMapping
     public ResponseEntity<Propietario> registrar(@RequestParam(required = false) Long tenantId, @RequestBody Propietario propietario) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
-        if (tenantActivo == null) {
-            throw new RuntimeException("Tenant no identificado en la sesión");
-        }
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
+        propietario.setId(null);
         return ResponseEntity.ok(propietarioService.registrarOActualizar(tenantActivo, propietario));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Propietario> actualizar(@PathVariable Long id, @RequestParam(required = false) Long tenantId, @RequestBody Propietario datos) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         datos.setId(id);
         return ResponseEntity.ok(propietarioService.registrarOActualizar(tenantActivo, datos));
     }

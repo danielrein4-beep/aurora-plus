@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Script: init-baseline-v14.sh
+# Script: init-baseline-v53.sh
 # Objetivo: Bootstrap reproducible para una base de datos Aurora Plus nueva (Linux/Hetzner).
-# Carga el esquema canónico v14 y registra el baseline en flyway_schema_history.
+# Carga el esquema canónico v53 y registra el baseline en flyway_schema_history.
 # Seguridad:
 # - Rechaza contraseñas no provistas (exige PGPASSWORD).
 # - No tiene nombre de base por defecto (parámetro obligatorio).
@@ -37,7 +37,7 @@ if [ -z "${PGPASSWORD:-}" ]; then
 fi
 
 echo "================================================================"
-echo " Bootstrap Aurora Plus - Baseline v14"
+echo " Bootstrap Aurora Plus - Baseline v53"
 echo " Base de datos: ${DB_NAME} en ${DB_HOST}:${DB_PORT} (usuario: ${DB_USER})"
 echo " Modo: $([ "$VERIFY_ONLY" = true ] && echo "VERIFICACIÓN NO DESTRUCTIVA" || echo "INICIALIZACIÓN NUEVA")"
 echo "================================================================"
@@ -52,7 +52,7 @@ if [ "$VERIFY_ONLY" = true ]; then
     fi
     echo "[Verificación] Comprobando estado de '${DB_NAME}'..."
     TABLE_COUNT=$(psql -v ON_ERROR_STOP=1 -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';")
-    FLYWAY_STATUS=$(psql -v ON_ERROR_STOP=1 -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "SELECT version || ' (' || success || ')' FROM public.flyway_schema_history WHERE version='14' ORDER BY installed_rank DESC LIMIT 1;" 2>/dev/null || echo "NO REGISTRADO")
+    FLYWAY_STATUS=$(psql -v ON_ERROR_STOP=1 -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "SELECT version || ' (' || success || ')' FROM public.flyway_schema_history WHERE version='53' ORDER BY installed_rank DESC LIMIT 1;" 2>/dev/null || echo "NO REGISTRADO")
     echo "  > Tablas base en 'public': ${TABLE_COUNT}"
     echo "  > Estado Flyway baseline: ${FLYWAY_STATUS}"
     echo "Verificación no destructiva completada exitosamente."
@@ -71,22 +71,22 @@ echo "[1/3] Creando base de datos limpia '${DB_NAME}'..."
 psql -v ON_ERROR_STOP=1 -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d postgres -c "CREATE DATABASE ${DB_NAME} ENCODING 'UTF8';"
 echo "  > Base de datos creada exitosamente."
 
-# 2. Cargar esquema canónico v14 con ON_ERROR_STOP=1
+# 2. Cargar esquema canónico v53 con ON_ERROR_STOP=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCHEMA_FILE="${SCRIPT_DIR}/../docs/schema-baseline-v14.sql"
+SCHEMA_FILE="${SCRIPT_DIR}/../docs/schema-baseline-v53.sql"
 
 if [ ! -f "${SCHEMA_FILE}" ]; then
     echo "Error: No se encontró el archivo de esquema: ${SCHEMA_FILE}" >&2
     exit 1
 fi
 
-echo "[2/3] Aplicando esquema canónico (docs/schema-baseline-v14.sql) con ON_ERROR_STOP..."
+echo "[2/3] Aplicando esquema canónico (docs/schema-baseline-v53.sql) con ON_ERROR_STOP..."
 psql -v ON_ERROR_STOP=1 -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f "${SCHEMA_FILE}" > /dev/null
 TABLE_COUNT=$(psql -v ON_ERROR_STOP=1 -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';")
 echo "  > DDL aplicado exitosamente (${TABLE_COUNT} tablas generadas)."
 
 # 3. Registrar Baseline en flyway_schema_history
-echo "[3/3] Registrando baseline v14 en flyway_schema_history..."
+echo "[3/3] Registrando baseline v53 en flyway_schema_history..."
 psql -v ON_ERROR_STOP=1 -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" <<EOF
 CREATE TABLE IF NOT EXISTS public.flyway_schema_history (
     installed_rank integer NOT NULL,
@@ -106,11 +106,11 @@ CREATE INDEX IF NOT EXISTS flyway_schema_history_s_idx ON public.flyway_schema_h
 INSERT INTO public.flyway_schema_history (
     installed_rank, version, description, type, script, checksum, installed_by, installed_on, execution_time, success
 )
-SELECT 1, '14', 'Baseline v14 esquema canonico', 'BASELINE', '<< Flyway Baseline >>', NULL, '${DB_USER}', now(), 0, true
-WHERE NOT EXISTS (SELECT 1 FROM public.flyway_schema_history WHERE version = '14' OR installed_rank = 1);
+SELECT 1, '53', 'Baseline v53 esquema canonico', 'BASELINE', '<< Flyway Baseline >>', NULL, '${DB_USER}', now(), 0, true
+WHERE NOT EXISTS (SELECT 1 FROM public.flyway_schema_history WHERE version = '53' OR installed_rank = 1);
 EOF
 
-echo "  > Baseline v14 registrado. Flyway no aplicará migraciones anteriores a V15."
+echo "  > Baseline v53 registrado. Flyway no aplicará migraciones anteriores o iguales a V53."
 echo "================================================================"
 echo " Base de datos '${DB_NAME}' lista para producción con ddl-auto=validate"
 echo "================================================================"

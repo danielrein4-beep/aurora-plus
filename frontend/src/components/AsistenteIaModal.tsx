@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { leerSesion } from "../api";
 
 function SvgClose({ className = "w-5 h-5" }: { className?: string }) {
   return (
@@ -90,7 +91,10 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch(`/api/public/whatsapp/${tenantId}/config`)
+    const sesion = leerSesion();
+    fetch("/api/comercio/whatsapp-ia/config", {
+      headers: sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {}
+    })
       .then((r) => r.json())
       .then((data) => {
         if (data.activa !== undefined) setActiva(data.activa);
@@ -119,9 +123,13 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
     setEnviando(true);
 
     try {
-      const res = await fetch(`/api/public/whatsapp/${tenantId}/simular`, {
+      const sesion = leerSesion();
+      const res = await fetch("/api/comercio/whatsapp-ia/simular", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {})
+        },
         body: JSON.stringify({ mensaje: texto, telefono: "584140000000" })
       });
 
@@ -156,9 +164,13 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
     setGuardandoConfig(true);
     setMsgExitoConfig(null);
     try {
-      const res = await fetch(`/api/public/whatsapp/${tenantId}/config`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const sesion = leerSesion();
+      const res = await fetch("/api/comercio/whatsapp-ia/config", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {})
+        },
         body: JSON.stringify({ 
           activa, 
           saludo: saludo.trim(), 

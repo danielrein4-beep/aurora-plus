@@ -31,7 +31,7 @@ public class MascotaController {
             @RequestParam(required = false) Long tenantId,
             @RequestParam(required = false) Long propietarioId,
             @RequestParam(required = false) String buscar) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         asegurarFiltroTenant();
         if (propietarioId != null) {
             return mascotaService.listarPorPropietario(tenantActivo, propietarioId);
@@ -41,7 +41,7 @@ public class MascotaController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Mascota> obtener(@PathVariable Long id, @RequestParam(required = false) Long tenantId) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         asegurarFiltroTenant();
         return mascotaService.obtenerPorId(tenantActivo, id)
             .map(ResponseEntity::ok)
@@ -50,7 +50,7 @@ public class MascotaController {
 
     @GetMapping("/microchip/{microchip}")
     public ResponseEntity<Mascota> buscarPorMicrochip(@PathVariable String microchip, @RequestParam(required = false) Long tenantId) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         asegurarFiltroTenant();
         return mascotaService.obtenerPorMicrochip(tenantActivo, microchip)
             .map(ResponseEntity::ok)
@@ -59,16 +59,14 @@ public class MascotaController {
 
     @PostMapping
     public ResponseEntity<Mascota> registrar(@RequestParam(required = false) Long tenantId, @RequestBody Mascota mascota) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
-        if (tenantActivo == null) {
-            throw new RuntimeException("Tenant no identificado en la sesión");
-        }
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
+        mascota.setId(null);
         return ResponseEntity.ok(mascotaService.registrarOActualizar(tenantActivo, mascota));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Mascota> actualizar(@PathVariable Long id, @RequestParam(required = false) Long tenantId, @RequestBody Mascota datos) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         datos.setId(id);
         return ResponseEntity.ok(mascotaService.registrarOActualizar(tenantActivo, datos));
     }

@@ -27,7 +27,7 @@ public class SalaEsperaVetController {
 
     @PostMapping("/check-in")
     public ResponseEntity<SalaEsperaVet> checkIn(@RequestParam(required = false) Long tenantId, @RequestBody SalaEsperaVet entrada) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         if (entrada.getVeterinarioId() == null) {
             veterinarioTenantResolver.resolverVeterinarioDelTenant(tenantActivo).ifPresent(v -> {
                 entrada.setVeterinarioId(v.id);

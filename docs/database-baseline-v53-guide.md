@@ -1,4 +1,4 @@
-# Guía de Bootstrap de Base de Datos Reproducible (Baseline v14)
+# Guía de Bootstrap de Base de Datos Reproducible (Baseline v53)
 
 Este documento describe el procedimiento oficial y seguro para inicializar una base de datos PostgreSQL vacía para **Aurora Plus** (desarrollo, staging o producción en Hetzner) sin depender de `ddl-auto=create` en caliente y manteniendo la compatibilidad absoluta con Flyway.
 
@@ -8,7 +8,7 @@ Este documento describe el procedimiento oficial y seguro para inicializar una b
 
 1. **Inexistencia de `V1__init.sql`**: Flyway se introdujo en el proyecto cuando ya existían ~127 tablas previas creadas orgánicamente. Por tanto, las migraciones en `src/main/resources/db/migration/` comienzan desde `V2` (scripts `ALTER TABLE`).
 2. **Fallo en bases vacías**: Al iniciar una base limpia sin tablas, Flyway `V2` fallaba intentando alterar tablas inexistentes (`relation items_venta_retail does not exist`), y Hibernate en modo `validate` no permitía el arranque.
-3. **Solución**: El artefacto [`docs/schema-baseline-v14.sql`](schema-baseline-v14.sql) contiene el esquema canónico completo (148 tablas, índices, secuencias y constraints) correspondiente a la versión 14, sin datos, sin propietarios específicos y excluyendo tablas de sistema.
+3. **Solución**: El artefacto [`docs/schema-baseline-v53.sql`](schema-baseline-v53.sql) contiene el esquema canónico completo (146 tablas, índices, secuencias y constraints) correspondiente a la versión 53, sin datos, sin propietarios específicos y excluyendo tablas de sistema.
 
 ---
 
@@ -29,10 +29,10 @@ Este documento describe el procedimiento oficial y seguro para inicializar una b
 $env:PGPASSWORD = "tu_password_seguro"
 
 # 2. Ejecutar inicialización de base limpia
-.\scripts\init-baseline-v14.ps1 -DbName "aurora_produccion" -DbUser "postgres" -DbHost "localhost" -DbPort 5432
+.\scripts\init-baseline-v53.ps1 -DbName "aurora_produccion" -DbUser "postgres" -DbHost "localhost" -DbPort 5432
 
 # (Opcional) Verificación no destructiva sobre una base ya inicializada:
-.\scripts\init-baseline-v14.ps1 -DbName "aurora_produccion" -VerifyOnly
+.\scripts\init-baseline-v53.ps1 -DbName "aurora_produccion" -VerifyOnly
 ```
 
 ### En Linux / Hetzner (Bash)
@@ -41,18 +41,18 @@ $env:PGPASSWORD = "tu_password_seguro"
 export PGPASSWORD="tu_password_seguro"
 
 # 2. Ejecutar inicialización de base limpia
-chmod +x scripts/init-baseline-v14.sh
-./scripts/init-baseline-v14.sh "aurora_produccion" "postgres" "localhost" 5432
+chmod +x scripts/init-baseline-v53.sh
+./scripts/init-baseline-v53.sh "aurora_produccion" "postgres" "localhost" 5432
 
 # (Opcional) Verificación no destructiva sobre una base ya inicializada:
-./scripts/init-baseline-v14.sh "aurora_produccion" "postgres" "localhost" 5432 --verify-only
+./scripts/init-baseline-v53.sh "aurora_produccion" "postgres" "localhost" 5432 --verify-only
 ```
 
 ---
 
 ## 4. Configuración del Backend para Arranque
 
-Una vez inicializada la base con el baseline v14, el backend Spring Boot arranca con las configuraciones estándar de producción:
+Una vez inicializada la base con el baseline v53, el backend Spring Boot arranca con las configuraciones estándar de producción:
 
 ```properties
 spring.datasource.url=jdbc:postgresql://localhost:5432/aurora_produccion
@@ -62,17 +62,17 @@ spring.datasource.password=${DB_PASSWORD}
 # Validación estricta — Hibernate NO modifica el esquema
 spring.jpa.hibernate.ddl-auto=validate
 
-# Flyway activo — detecta baseline 14 y no aplica nada anterior a V15
+# Flyway activo — detecta baseline 53 y no aplica migraciones anteriores o iguales a V53
 spring.flyway.enabled=true
 ```
 
 ---
 
-## 5. Evolución Futura de Esquema (V15 en adelante)
+## 5. Evolución Futura de Esquema (V54 en adelante)
 
 * A partir de este baseline, cualquier nueva alteración de base de datos se agregará en:
-  `src/main/resources/db/migration/V15__descripcion_del_cambio.sql`
+  `src/main/resources/db/migration/V54__descripcion_del_cambio.sql`
 * Cuando la aplicación arranque:
   * Flyway detectará que la base está en versión `14`.
-  * Aplicará `V15` automáticamente.
+  * Aplicará `V54` automáticamente.
   * Funciona idéntico en bases existentes y en bases nuevas provisionadas con este procedimiento.

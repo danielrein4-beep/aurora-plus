@@ -64,6 +64,9 @@ public class MascotaService {
 
     @Transactional
     public Mascota registrarOActualizar(Long tenantId, Mascota mascota) {
+        if (mascota.getId() != null && mascotaRepository.findByTenantIdAndId(tenantId, mascota.getId()).isEmpty()) {
+            throw new SecurityException("La mascota no existe o no pertenece a esta empresa");
+        }
         if (mascota.getNombre() == null || mascota.getNombre().isBlank()) {
             throw new IllegalArgumentException("El nombre de la mascota es obligatorio.");
         }

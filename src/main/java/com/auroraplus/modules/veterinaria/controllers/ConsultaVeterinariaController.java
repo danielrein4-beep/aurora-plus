@@ -44,7 +44,7 @@ public class ConsultaVeterinariaController {
     @GetMapping("/mascota/{mascotaId}")
     public List<ConsultaVeterinaria> historialPorMascota(@PathVariable Long mascotaId, @RequestParam(required = false) Long tenantId) {
         validarPermisoClinico();
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         return consultaVeterinariaService.historialPorMascota(tenantActivo, mascotaId);
     }
 
@@ -68,7 +68,7 @@ public class ConsultaVeterinariaController {
             @RequestBody ConsultaVeterinaria consulta) {
         validarPermisoClinico();
 
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = com.auroraplus.modules.veterinaria.services.VeterinariaTenantGuard.resolver(tenantId);
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }

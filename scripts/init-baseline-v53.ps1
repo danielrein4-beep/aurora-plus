@@ -1,7 +1,7 @@
 # ==============================================================================
-# Script: init-baseline-v14.ps1
+# Script: init-baseline-v53.ps1
 # Objetivo: Bootstrap reproducible para una base de datos Aurora Plus nueva.
-# Carga el esquema canónico v14 y registra el baseline en flyway_schema_history.
+# Carga el esquema canónico v53 y registra el baseline en flyway_schema_history.
 # Seguridad:
 # - Rechaza contraseñas vacías (exige PGPASSWORD o -DbPassword).
 # - No tiene nombre de base por defecto (parámetro obligatorio).
@@ -46,7 +46,7 @@ if (-not (Get-Command psql -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host " Bootstrap Aurora Plus - Baseline v14" -ForegroundColor Cyan
+Write-Host " Bootstrap Aurora Plus - Baseline v53" -ForegroundColor Cyan
 Write-Host " Base de datos: $DbName en ${DbHost}:${DbPort} (usuario: $DbUser)" -ForegroundColor Cyan
 Write-Host " Modo: $(if ($VerifyOnly) { 'VERIFICACIÓN NO DESTRUCTIVA' } else { 'INICIALIZACIÓN NUEVA' })" -ForegroundColor Cyan
 Write-Host "================================================================" -ForegroundColor Cyan
@@ -67,7 +67,7 @@ if ($VerifyOnly) {
     }
     Write-Host "[Verificación] Comprobando estado de '$DbName'..." -ForegroundColor Yellow
     $tableCount = (& $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d $DbName -t -A -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';").Trim()
-    $flywayStatus = (& $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d $DbName -t -A -c "SELECT version || ' (' || success || ')' FROM public.flyway_schema_history WHERE version='14' ORDER BY installed_rank DESC LIMIT 1;" 2>$null)
+    $flywayStatus = (& $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d $DbName -t -A -c "SELECT version || ' (' || success || ')' FROM public.flyway_schema_history WHERE version='53' ORDER BY installed_rank DESC LIMIT 1;" 2>$null)
     Write-Host "  > Tablas base en 'public': $tableCount" -ForegroundColor Green
     Write-Host "  > Estado Flyway baseline: $(if ($flywayStatus) { $flywayStatus.Trim() } else { 'NO REGISTRADO' })" -ForegroundColor Green
     Write-Host "Verificación no destructiva completada exitosamente." -ForegroundColor Cyan
@@ -90,13 +90,13 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "  > Base de datos creada exitosamente." -ForegroundColor Green
 
 # 6. Cargar esquema canónico con ON_ERROR_STOP
-$schemaFile = Join-Path (Get-Location) "docs\schema-baseline-v14.sql"
+$schemaFile = Join-Path (Get-Location) "docs\schema-baseline-v53.sql"
 if (-not (Test-Path $schemaFile)) {
     Write-Error "No se encontró el archivo de esquema: $schemaFile"
     exit 1
 }
 
-Write-Host "[2/3] Aplicando esquema canónico (docs/schema-baseline-v14.sql) con ON_ERROR_STOP..." -ForegroundColor Yellow
+Write-Host "[2/3] Aplicando esquema canónico (docs/schema-baseline-v53.sql) con ON_ERROR_STOP..." -ForegroundColor Yellow
 & $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d $DbName -f $schemaFile
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Fallo crítico al aplicar el DDL en '$DbName'. La ejecución se detuvo inmediatamente."
@@ -106,7 +106,7 @@ $tableCount = (& $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -
 Write-Host "  > DDL aplicado exitosamente ($tableCount tablas generadas)." -ForegroundColor Green
 
 # 7. Registrar Baseline en flyway_schema_history
-Write-Host "[3/3] Registrando baseline v14 en flyway_schema_history..." -ForegroundColor Yellow
+Write-Host "[3/3] Registrando baseline v53 en flyway_schema_history..." -ForegroundColor Yellow
 $flywayBaselineSql = @"
 CREATE TABLE IF NOT EXISTS public.flyway_schema_history (
     installed_rank integer NOT NULL,
@@ -126,8 +126,8 @@ CREATE INDEX IF NOT EXISTS flyway_schema_history_s_idx ON public.flyway_schema_h
 INSERT INTO public.flyway_schema_history (
     installed_rank, version, description, type, script, checksum, installed_by, installed_on, execution_time, success
 )
-SELECT 1, '14', 'Baseline v14 esquema canonico', 'BASELINE', '<< Flyway Baseline >>', NULL, '$DbUser', now(), 0, true
-WHERE NOT EXISTS (SELECT 1 FROM public.flyway_schema_history WHERE version = '14' OR installed_rank = 1);
+SELECT 1, '53', 'Baseline v53 esquema canonico', 'BASELINE', '<< Flyway Baseline >>', NULL, '$DbUser', now(), 0, true
+WHERE NOT EXISTS (SELECT 1 FROM public.flyway_schema_history WHERE version = '53' OR installed_rank = 1);
 "@
 
 & $psqlPath -v ON_ERROR_STOP=1 -h $DbHost -p $DbPort -U $DbUser -d $DbName -c $flywayBaselineSql
@@ -135,7 +135,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Error "Fallo al registrar el baseline de Flyway en '$DbName'."
     exit 1
 }
-Write-Host "  > Baseline v14 registrado. Flyway no aplicará migraciones anteriores a V15." -ForegroundColor Green
+Write-Host "  > Baseline v53 registrado. Flyway no aplicará migraciones anteriores o iguales a V53." -ForegroundColor Green
 
 Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host " Base de datos '$DbName' lista para producción con ddl-auto=validate" -ForegroundColor Green

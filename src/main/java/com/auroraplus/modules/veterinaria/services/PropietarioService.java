@@ -52,6 +52,9 @@ public class PropietarioService {
 
     @Transactional
     public Propietario registrarOActualizar(Long tenantId, Propietario propietario) {
+        if (propietario.getId() != null && propietarioRepository.findByTenantIdAndId(tenantId, propietario.getId()).isEmpty()) {
+            throw new SecurityException("El propietario no existe o no pertenece a esta empresa");
+        }
         if (propietario.getIdentificacion() == null || propietario.getIdentificacion().isBlank()) {
             throw new IllegalArgumentException("La identificación (Cédula/DNI/Pasaporte) del propietario es obligatoria.");
         }

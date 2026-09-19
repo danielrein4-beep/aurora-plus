@@ -7,11 +7,14 @@ import com.auroraplus.modules.comercio.services.AuroraWhatsappIaService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 @RestController
 @RequestMapping("/api/public/whatsapp")
@@ -27,6 +30,9 @@ public class WhatsAppWebhookController {
     private WhatsAppCloudApiService whatsAppCloudApiService;
 
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    @Value("${whatsapp.meta.app-secret:}")
+    private String metaAppSecret;
 
     /**
      * Verificacion del Webhook exigida por Meta (Hub Challenge).
@@ -45,7 +51,7 @@ public class WhatsAppWebhookController {
 
         String tokenEsperado = licencia.getWhatsappWebhookVerifyToken();
         if (tokenEsperado == null || tokenEsperado.isBlank()) {
-            tokenEsperado = "aurora_token_" + tenantId;
+            return ResponseEntity.status(503).body("Webhook de WhatsApp no configurado");
         }
 
         if ("subscribe".equals(mode) && tokenEsperado.equals(token)) {
@@ -61,7 +67,12 @@ public class WhatsAppWebhookController {
     @PostMapping("/{tenantId:[0-9]+}/webhook")
     public ResponseEntity<?> recibirMensajeMeta(
             @PathVariable Long tenantId,
+            @RequestHeader(value = "X-Hub-Signature-256", required = false) String firma,
             @RequestBody String payloadJson) {
+
+        if (!firmaValida(payloadJson, firma)) {
+            return ResponseEntity.status(401).body("Firma de Meta invalida");
+        }
 
         try {
             JsonNode root = JSON.readTree(payloadJson);
@@ -98,85 +109,24 @@ public class WhatsAppWebhookController {
         return ResponseEntity.ok("EVENT_RECEIVED");
     }
 
-    public static class SimularMensajeRequest {
-        public String mensaje;
-        public String telefono;
-    }
-
-    /**
-     * Simulador interactivo para que el dueño de negocio pruebe como responde la IA.
-     */
-    @PostMapping("/{tenantId:[0-9]+}/simular")
-    public ResponseEntity<?> simularMensajeIa(
-            @PathVariable Long tenantId,
-            @RequestBody SimularMensajeRequest req) {
-
-        String telf = req.telefono != null && !req.telefono.isBlank() ? req.telefono : "584140000000";
-        String msg = req.mensaje != null ? req.mensaje : "";
-
-        AuroraWhatsappIaService.RespuestaIaDTO resp = whatsappIaService.procesarMensaje(tenantId, telf, msg);
-        return ResponseEntity.ok(resp);
-    }
-
-    public static class ConfigIaRequest {
-        public Boolean activa;
-        public String saludo;
-        public String verifyToken;
-        public String politicaDelivery;
-        public String zonasDelivery;
-    }
-
-    @GetMapping("/{tenantId:[0-9]+}/config")
-    public ResponseEntity<?> obtenerConfig(
-            @PathVariable Long tenantId,
-            @RequestHeader(value = "host", required = false) String host) {
-
-        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
-        if (licencia == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "Tienda no encontrada"));
+    private boolean firmaValida(String payload, String firmaRecibida) {
+        if (metaAppSecret == null || metaAppSecret.isBlank() || firmaRecibida == null
+                || !firmaRecibida.startsWith("sha256=")) {
+            return false;
         }
-
-        String baseUrl = host != null ? "https://" + host : "https://auroraplus.app";
-        String webhookUrl = baseUrl + "/api/public/whatsapp/" + tenantId + "/webhook";
-
-        Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("tenantId", tenantId);
-        resp.put("activa", licencia.isWhatsappIaActiva());
-        resp.put("saludo", licencia.getWhatsappIaSaludo());
-        resp.put("verifyToken", licencia.getWhatsappWebhookVerifyToken() != null ? licencia.getWhatsappWebhookVerifyToken() : "aurora_token_" + tenantId);
-        resp.put("webhookUrl", webhookUrl);
-        resp.put("telefonoContacto", licencia.getTelefonoContacto());
-        resp.put("politicaDelivery", licencia.getWhatsappIaPoliticaDelivery());
-        resp.put("zonasDelivery", licencia.getWhatsappIaZonasDelivery());
-        resp.put("domicilioFiscal", licencia.getDomicilioFiscal());
-
-        return ResponseEntity.ok(resp);
-    }
-
-    @PostMapping("/{tenantId:[0-9]+}/config")
-    public ResponseEntity<?> guardarConfig(
-            @PathVariable Long tenantId,
-            @RequestBody ConfigIaRequest req) {
-
-        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
-        if (licencia == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "Tienda no encontrada"));
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(metaAppSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            StringBuilder hex = new StringBuilder("sha256=");
+            for (byte b : mac.doFinal(payload.getBytes(StandardCharsets.UTF_8))) {
+                hex.append(String.format("%02x", b));
+            }
+            return MessageDigest.isEqual(
+                hex.toString().getBytes(StandardCharsets.US_ASCII),
+                firmaRecibida.getBytes(StandardCharsets.US_ASCII)
+            );
+        } catch (Exception e) {
+            return false;
         }
-
-        if (req.activa != null) licencia.setWhatsappIaActiva(req.activa);
-        if (req.saludo != null) licencia.setWhatsappIaSaludo(req.saludo.trim());
-        if (req.verifyToken != null && !req.verifyToken.isBlank()) licencia.setWhatsappWebhookVerifyToken(req.verifyToken.trim());
-        if (req.politicaDelivery != null) licencia.setWhatsappIaPoliticaDelivery(req.politicaDelivery.trim());
-        if (req.zonasDelivery != null) licencia.setWhatsappIaZonasDelivery(req.zonasDelivery.trim());
-        licenciaTenantRepository.save(licencia);
-
-        Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("activa", licencia.isWhatsappIaActiva());
-        resp.put("saludo", licencia.getWhatsappIaSaludo());
-        resp.put("verifyToken", licencia.getWhatsappWebhookVerifyToken());
-        resp.put("politicaDelivery", licencia.getWhatsappIaPoliticaDelivery());
-        resp.put("zonasDelivery", licencia.getWhatsappIaZonasDelivery());
-
-        return ResponseEntity.ok(resp);
     }
 }
