@@ -70,7 +70,7 @@ public class CatalogoGestionController {
             licencia.setNombreEmpresa(req.nombreEmpresa.trim());
         }
         if (req.logoBase64 != null) {
-            licencia.setLogoBase64(req.logoBase64);
+            licencia.setLogoBase64(req.logoBase64.trim().isBlank() ? null : req.logoBase64.trim());
         }
         if (req.telefonoWhatsapp != null) {
             licencia.setTelefonoContacto(req.telefonoWhatsapp.trim());

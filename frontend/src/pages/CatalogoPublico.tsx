@@ -819,12 +819,25 @@ export default function CatalogoPublico() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
           {/* Logo del Comercio / Identidad */}
           <div className="flex items-center gap-4 min-w-0">
-            {tienda.logoBase64 ? (
-              <img
-                src={tienda.logoBase64}
-                alt={tienda.nombreTienda}
-                className="h-10 sm:h-12 w-auto max-w-[160px] sm:max-w-[220px] object-contain"
-              />
+            {tienda.logoBase64 && tienda.logoBase64.trim().length > 15 ? (
+              <div className="flex items-center gap-3">
+                <img
+                  src={tienda.logoBase64}
+                  alt={tienda.nombreTienda}
+                  className="h-10 sm:h-12 w-auto max-w-[140px] sm:max-w-[200px] object-contain rounded-lg"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = 'none';
+                  }}
+                />
+                <div className="hidden sm:block">
+                  <h1 className="font-serif text-lg sm:text-xl font-bold tracking-tight text-neutral-950 uppercase leading-none">
+                    {tienda.nombreTienda}
+                  </h1>
+                  <span className="text-[10px] tracking-[0.25em] text-neutral-400 uppercase block mt-0.5">
+                    Catalogo Oficial
+                  </span>
+                </div>
+              </div>
             ) : (
               <div className="flex items-center gap-3">
                 <div 
