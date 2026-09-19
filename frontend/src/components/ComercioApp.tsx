@@ -3268,6 +3268,8 @@ function ModalCompraProveedorComercio({
     nombre: string;
     cantidad: string;
     costoUnitario: string;
+    precioVenta?: string;
+    margenPorcentaje?: number;
   }
 
   const [lineas, setLineas] = useState<LineaCompraItem[]>([]);
@@ -3276,7 +3278,36 @@ function ModalCompraProveedorComercio({
   );
   const [cantidadInput, setCantidadInput] = useState("10");
   const [costoInput, setCostoInput] = useState("");
+  const [precioVentaInput, setPrecioVentaInput] = useState("");
   const [guardandoCompra, setGuardandoCompra] = useState(false);
+
+  // Precargar costo y precio de venta actual al seleccionar producto
+  useEffect(() => {
+    if (repuestoSelId) {
+      const p = productos.find((item) => String(item.backendId) === repuestoSelId);
+      if (p) {
+        if (p.costo && p.costo > 0 && !costoInput) setCostoInput(String(p.costo));
+        if (p.precio && p.precio > 0 && !precioVentaInput) setPrecioVentaInput(String(p.precio));
+      }
+    }
+  }, [repuestoSelId]);
+
+  const handleCambioRepuesto = (nuevoId: string) => {
+    setRepuestoSelId(nuevoId);
+    const p = productos.find((item) => String(item.backendId) === nuevoId);
+    if (p) {
+      setCostoInput(p.costo && p.costo > 0 ? String(p.costo) : "");
+      setPrecioVentaInput(p.precio && p.precio > 0 ? String(p.precio) : "");
+    }
+  };
+
+  const aplicarMargen = (pct: number) => {
+    const cost = Number(costoInput) || 0;
+    if (cost > 0) {
+      const nuevoPvp = cost * (1 + pct / 100);
+      setPrecioVentaInput(nuevoPvp.toFixed(2));
+    }
+  };
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Carga de factura por foto (OCR con IA) — mismo endpoint genérico
@@ -3302,7 +3333,10 @@ function ModalCompraProveedorComercio({
     const prod = productos.find((p) => p.backendId === rId);
     if (!prod || !rId) return;
     const cant = Number(cantidadInput) || 1;
-    const cost = Number(costoInput) || prod.costo || 1;
+    const cost = Number(costoInput) || prod.costo || 0;
+    const pvp = Number(precioVentaInput) || prod.precio || 0;
+    const margen = cost > 0 && pvp > 0 ? ((pvp - cost) / cost) * 100 : undefined;
+
     setLineas((prev) => [
       ...prev,
       {
@@ -3310,9 +3344,12 @@ function ModalCompraProveedorComercio({
         nombre: prod.nombre,
         cantidad: String(cant),
         costoUnitario: String(cost),
+        precioVenta: pvp > 0 ? String(pvp) : undefined,
+        margenPorcentaje: margen,
       },
     ]);
     setCostoInput("");
+    setPrecioVentaInput("");
   };
 
   const handleCrearProveedor = async (e: React.FormEvent) => {
@@ -3382,11 +3419,16 @@ function ModalCompraProveedorComercio({
         const encontrado = buscarProductoPorDescripcion(it.descripcion);
         if (encontrado && encontrado.backendId) {
           vinculados++;
+          const cUnit = it.precioUnitario ?? encontrado.costo ?? 0;
+          const pv = encontrado.precio ?? 0;
+          const margenOcr = cUnit > 0 && pv > 0 ? ((pv - cUnit) / cUnit) * 100 : undefined;
           nuevasLineas.push({
             repuestoId: encontrado.backendId,
             nombre: encontrado.nombre,
             cantidad: it.cantidad ? String(it.cantidad) : "1",
-            costoUnitario: it.precioUnitario ? String(it.precioUnitario) : String(encontrado.costo || 1),
+            costoUnitario: String(cUnit),
+            precioVenta: pv > 0 ? String(pv) : undefined,
+            margenPorcentaje: margenOcr,
           });
         } else {
           sinCoincidencia++;
@@ -3439,6 +3481,7 @@ function ModalCompraProveedorComercio({
           repuestoId: l.repuestoId,
           cantidad: Number(l.cantidad),
           costoUnitario: Number(l.costoUnitario),
+          precioVenta: l.precioVenta ? Number(l.precioVenta) : undefined,
         })),
         montoPagadoAhora: montoPagadoAhora && montoPagadoAhora > 0 ? montoPagadoAhora : undefined,
         monedaPago: montoPagadoAhora && montoPagadoAhora > 0 ? monedaPago : undefined,
@@ -3589,15 +3632,30 @@ function ModalCompraProveedorComercio({
           </div>
         </div>
 
-        {/* Agregar ítems a la factura */}
-        <div className="p-3.5 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/70 dark:border-slate-700/60 space-y-2">
-          <div className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Añadir Ítems:</div>
+        {/* Agregar ítems a la factura con fijación de Precio de Venta y Margen de Ganancia */}
+        <div className="p-3.5 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/70 dark:border-slate-700/60 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Añadir Ítems:</div>
+            {Number(costoInput) > 0 && Number(precioVentaInput) > 0 && (
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <span className="text-slate-500 dark:text-slate-400 font-semibold">Ganancia estimada:</span>
+                <span className={`px-2.5 py-0.5 rounded-full font-mono font-bold text-xs ${
+                  (Number(precioVentaInput) - Number(costoInput)) >= 0
+                    ? "bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30"
+                    : "bg-red-500/20 text-red-600 dark:text-red-300 border border-red-500/30"
+                }`}>
+                  {(Number(precioVentaInput) - Number(costoInput)) >= 0 ? "+" : ""}${(Number(precioVentaInput) - Number(costoInput)).toFixed(2)} / und ({((Number(precioVentaInput) - Number(costoInput)) / Number(costoInput) * 100).toFixed(1)}% margen)
+                </span>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
-            <div className="sm:col-span-6">
+            <div className="sm:col-span-4">
               <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Artículo</label>
               <select
                 value={repuestoSelId}
-                onChange={(e) => setRepuestoSelId(e.target.value)}
+                onChange={(e) => handleCambioRepuesto(e.target.value)}
                 className="w-full px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
               >
                 {productos.map((p) => (
@@ -3629,6 +3687,17 @@ function ModalCompraProveedorComercio({
               />
             </div>
             <div className="sm:col-span-2">
+              <label className="text-[9px] text-teal-600 dark:text-teal-400 font-bold block mb-0.5">PVP Venta ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={precioVentaInput}
+                onChange={(e) => setPrecioVentaInput(e.target.value)}
+                className="w-full px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-teal-400/60 dark:border-teal-500/60 text-slate-900 dark:text-white text-xs font-mono font-bold"
+              />
+            </div>
+            <div className="sm:col-span-2">
               <button
                 type="button"
                 onClick={handleAgregarLinea}
@@ -3637,6 +3706,23 @@ function ModalCompraProveedorComercio({
                 + Añadir
               </button>
             </div>
+          </div>
+
+          {/* Atajos rápidos de margen de ganancia */}
+          <div className="flex items-center flex-wrap gap-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-700/50">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400">Margen rápido:</span>
+            {[20, 30, 40, 50, 75, 100].map((pct) => (
+              <button
+                key={pct}
+                type="button"
+                onClick={() => aplicarMargen(pct)}
+                disabled={!costoInput || Number(costoInput) <= 0}
+                className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-200/80 hover:bg-teal-500 hover:text-slate-950 dark:bg-slate-700/70 dark:hover:bg-teal-500 dark:hover:text-slate-950 text-slate-700 dark:text-slate-200 transition-colors disabled:opacity-30 cursor-pointer"
+                title={`Calcular precio de venta con ${pct}% de ganancia sobre costo`}
+              >
+                +{pct}%
+              </button>
+            ))}
           </div>
         </div>
 
@@ -3648,34 +3734,56 @@ function ModalCompraProveedorComercio({
                 <th className="p-2.5">Ítem</th>
                 <th className="p-2.5 text-right">Cant.</th>
                 <th className="p-2.5 text-right">Costo Unit.</th>
-                <th className="p-2.5 text-right">Subtotal</th>
+                <th className="p-2.5 text-right">Subtotal Costo</th>
+                <th className="p-2.5 text-right">PVP Venta</th>
+                <th className="p-2.5 text-right">% Margen</th>
                 <th className="p-2.5 text-center"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-600 dark:text-slate-300">
               {lineas.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-4 text-center text-slate-500 dark:text-slate-400 font-sans">
+                  <td colSpan={7} className="p-4 text-center text-slate-500 dark:text-slate-400 font-sans">
                     Añade al menos un producto para procesar la entrada de almacén.
                   </td>
                 </tr>
               ) : (
-                lineas.map((l, idx) => (
-                  <tr key={idx} className="hover:bg-slate-100/60 dark:hover:bg-slate-800/40">
-                    <td className="p-2.5 font-sans font-semibold text-slate-900 dark:text-white">{l.nombre}</td>
-                    <td className="p-2.5 text-right font-bold text-teal-300">{l.cantidad}</td>
-                    <td className="p-2.5 text-right">${Number(l.costoUnitario).toFixed(2)}</td>
-                    <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">${((Number(l.cantidad) || 0) * (Number(l.costoUnitario) || 0)).toFixed(2)}</td>
-                    <td className="p-2.5 text-center">
-                      <button
-                        onClick={() => setLineas((prev) => prev.filter((_, i) => i !== idx))}
-                        className="text-red-400 hover:text-red-300 cursor-pointer"
-                      >
-                        <IconTrash size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                lineas.map((l, idx) => {
+                  const costoNum = Number(l.costoUnitario) || 0;
+                  const pvNum = l.precioVenta ? Number(l.precioVenta) : 0;
+                  const ganancia = pvNum > 0 && costoNum > 0 ? (pvNum - costoNum) : 0;
+                  return (
+                    <tr key={idx} className="hover:bg-slate-100/60 dark:hover:bg-slate-800/40">
+                      <td className="p-2.5 font-sans font-semibold text-slate-900 dark:text-white">{l.nombre}</td>
+                      <td className="p-2.5 text-right font-bold text-teal-600 dark:text-teal-300">{l.cantidad}</td>
+                      <td className="p-2.5 text-right">${costoNum.toFixed(2)}</td>
+                      <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">${((Number(l.cantidad) || 0) * costoNum).toFixed(2)}</td>
+                      <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">
+                        {pvNum > 0 ? `$${pvNum.toFixed(2)}` : "—"}
+                      </td>
+                      <td className="p-2.5 text-right">
+                        {l.margenPorcentaje !== undefined ? (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            l.margenPorcentaje >= 0
+                              ? "bg-teal-500/20 text-teal-700 dark:text-teal-300"
+                              : "bg-red-500/20 text-red-600 dark:text-red-300"
+                          }`}>
+                            {l.margenPorcentaje >= 0 ? "+" : ""}{l.margenPorcentaje.toFixed(1)}% (+${ganancia.toFixed(2)})
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="p-2.5 text-center">
+                        <button
+                          onClick={() => setLineas((prev) => prev.filter((_, i) => i !== idx))}
+                          className="text-red-400 hover:text-red-300 cursor-pointer"
+                          title="Eliminar ítem"
+                        >
+                          <IconTrash size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

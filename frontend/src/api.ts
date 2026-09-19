@@ -3167,6 +3167,7 @@ export interface ItemCompraRepuestoRequest {
   repuestoId: number;
   cantidad: number;
   costoUnitario: number;
+  precioVenta?: number;
 }
 
 export interface CompraRepuestoRequest {

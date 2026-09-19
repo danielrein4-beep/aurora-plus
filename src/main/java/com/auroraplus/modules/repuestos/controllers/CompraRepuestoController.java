@@ -30,6 +30,7 @@ public class CompraRepuestoController {
         public Long repuestoId;
         public java.math.BigDecimal cantidad;
         public java.math.BigDecimal costoUnitario;
+        public java.math.BigDecimal precioVenta;
     }
 
     public static class CompraRequest {
@@ -54,6 +55,7 @@ public class CompraRepuestoController {
             item.repuestoId = i.repuestoId;
             item.cantidad = i.cantidad;
             item.costoUnitario = i.costoUnitario;
+            item.precioVenta = i.precioVenta;
             return item;
         }).toList();
 

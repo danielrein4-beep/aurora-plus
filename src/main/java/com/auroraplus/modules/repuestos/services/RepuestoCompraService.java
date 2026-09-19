@@ -42,6 +42,7 @@ public class RepuestoCompraService {
         public Long repuestoId;
         public BigDecimal cantidad;
         public BigDecimal costoUnitario;
+        public BigDecimal precioVenta;
     }
 
     @Transactional
@@ -98,6 +99,9 @@ public class RepuestoCompraService {
             BigDecimal stockNuevo = stockAnterior.add(itemCompra.cantidad);
             repuesto.setStockActual(stockNuevo);
             repuesto.setCostoUnitario(itemCompra.costoUnitario); // último costo de compra
+            if (itemCompra.precioVenta != null && itemCompra.precioVenta.compareTo(BigDecimal.ZERO) > 0) {
+                repuesto.setPrecioVenta(itemCompra.precioVenta);
+            }
             repuestoItemRepository.save(repuesto);
 
             BigDecimal subtotal = itemCompra.cantidad.multiply(itemCompra.costoUnitario);
