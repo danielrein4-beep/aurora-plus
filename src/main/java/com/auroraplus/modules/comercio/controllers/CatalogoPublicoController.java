@@ -100,8 +100,9 @@ public class CatalogoPublicoController {
             }
         }
 
-        // 3. Si no hay items cargados en BD, catalogo modelo para demostracion inmediata
-        if (productos.isEmpty()) {
+        // 3. Si no hay items cargados en BD, catalogo modelo unicamete para entorno de pruebas (tenantId == 1)
+        // Para cualquier otro tenant en produccion, se respeta estrictamente su inventario real para evitar alucinaciones
+        if (productos.isEmpty() && Long.valueOf(1L).equals(tenantId)) {
             productos.addAll(generarCatalogoModelo(tasaVes));
         }
 
