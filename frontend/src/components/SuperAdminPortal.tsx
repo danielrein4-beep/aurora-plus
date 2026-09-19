@@ -1706,7 +1706,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   setCuentasConfigForm(obtenerCuentasCobro());
                   setShowConfigCuentasModal(true);
                 }}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
                 <span>Configurar Cuentas de Cobro (Banesco / Binance)</span>
@@ -1832,7 +1832,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
                     <th className="pb-3 px-3">Fecha & Hora</th>
                     <th className="pb-3 px-3">Cliente / Negocio</th>
                     <th className="pb-3 px-3">Monto Cobrado</th>
@@ -1883,7 +1883,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                         </td>
                         <td className="py-3 px-3 font-mono text-[11px] text-slate-600">
                           {p.referenciaComprobante ? (
-                            <span className="px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200 text-slate-800">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-300 text-slate-900 font-bold">
                               {p.referenciaComprobante}
                             </span>
                           ) : (
@@ -2124,7 +2124,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
                       <th className="pb-3 px-3">Fecha</th>
                       <th className="pb-3 px-3">Tipo</th>
                       <th className="pb-3 px-3">Concepto & Notas</th>
@@ -2198,7 +2198,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
                       <th className="pb-3 px-3">Concepto & Proveedor</th>
                       <th className="pb-3 px-3">Categoria</th>
                       <th className="pb-3 px-3">Monto USD / Frecuencia</th>
@@ -2714,7 +2714,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
                     <th className="pb-3 px-3">Posicion</th>
                     <th className="pb-3 px-3">Cliente / Tenant</th>
                     <th className="pb-3 px-3">Vertical / Industria</th>
