@@ -15,6 +15,8 @@ import PeriodontogramaInteractivo from "./PeriodontogramaInteractivo";
 import PlanesTratamientoFases from "./PlanesTratamientoFases";
 import VisorRadiografiasDental from "./VisorRadiografiasDental";
 import AgendaSillonesOdontologia from "./AgendaSillonesOdontologia";
+import FichaAnamnesisRiesgo from "./FichaAnamnesisRiesgo";
+import EvolucionClinicaSesiones from "./EvolucionClinicaSesiones";
 
 interface ModuloOdontologiaProps {
   pacientes: Paciente[] | null;
@@ -25,7 +27,14 @@ interface ModuloOdontologiaProps {
   onIrACotizador?: (id: number) => void;
 }
 
-type PestanaOdonto = "odontograma" | "periodonto" | "planes" | "agenda" | "radiografias";
+type PestanaOdonto = 
+  | "anamnesis"
+  | "odontograma" 
+  | "periodonto" 
+  | "evolucion"
+  | "planes" 
+  | "agenda" 
+  | "radiografias";
 
 export default function ModuloOdontologia({
   pacientes,
@@ -92,7 +101,7 @@ export default function ModuloOdontologia({
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-white/60">
-                Odontograma anatomico FDI, periodontograma de 6 puntos, presupuestos por fases, agenda por sillones y visor radiografico
+                Anamnesis quirurgica, odontograma FDI, periodontograma 6 puntos, evolucion en sillon y presupuestos
               </p>
             </div>
           </div>
@@ -221,62 +230,86 @@ export default function ModuloOdontologia({
         <div className="mt-5 pt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center gap-2 overflow-x-auto pb-1">
           <button
             type="button"
+            onClick={() => setPestanaActiva("anamnesis")}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "anamnesis"
+                ? "bg-rose-500 text-white font-black shadow-md shadow-rose-500/20"
+                : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <span>Ficha & Riesgo Quirurgico</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setPestanaActiva("odontograma")}
-            className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
               pestanaActiva === "odontograma"
                 ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
                 : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
             }`}
           >
-            <span>Odontograma FDI & Superficies</span>
+            <span>Odontograma FDI</span>
           </button>
 
           <button
             type="button"
             onClick={() => setPestanaActiva("periodonto")}
-            className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
               pestanaActiva === "periodonto"
                 ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
                 : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
             }`}
           >
-            <span>Periodontograma (6 Puntos & BOP)</span>
+            <span>Periodontograma (6 Puntos)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPestanaActiva("evolucion")}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "evolucion"
+                ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
+                : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <span>Bitacora de Evolucion en Sillon</span>
           </button>
 
           <button
             type="button"
             onClick={() => setPestanaActiva("planes")}
-            className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
               pestanaActiva === "planes"
                 ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
                 : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
             }`}
           >
-            <span>Planes de Tratamiento & Fases</span>
+            <span>Planes de Tratamiento</span>
           </button>
 
           <button
             type="button"
             onClick={() => setPestanaActiva("agenda")}
-            className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
               pestanaActiva === "agenda"
                 ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
                 : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
             }`}
           >
-            <span>Agenda de Sillones & Recordatorios WA</span>
+            <span>Agenda de Sillones</span>
           </button>
 
           <button
             type="button"
             onClick={() => setPestanaActiva("radiografias")}
-            className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
               pestanaActiva === "radiografias"
                 ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
                 : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
             }`}
           >
-            <span>Radiografias & Imagenologia</span>
+            <span>Radiografias</span>
           </button>
         </div>
       </div>
@@ -284,6 +317,13 @@ export default function ModuloOdontologia({
       {/* Vistas segun la pestana activa */}
       {pacienteSeleccionado ? (
         <>
+          {pestanaActiva === "anamnesis" && (
+            <FichaAnamnesisRiesgo
+              pacienteId={pacienteSeleccionado.id}
+              pacienteNombre={pacienteSeleccionado.nombreCompleto}
+            />
+          )}
+
           {pestanaActiva === "odontograma" && (
             <Odontograma
               pacienteId={pacienteSeleccionado.id}
@@ -295,6 +335,13 @@ export default function ModuloOdontologia({
 
           {pestanaActiva === "periodonto" && (
             <PeriodontogramaInteractivo
+              pacienteId={pacienteSeleccionado.id}
+              pacienteNombre={pacienteSeleccionado.nombreCompleto}
+            />
+          )}
+
+          {pestanaActiva === "evolucion" && (
+            <EvolucionClinicaSesiones
               pacienteId={pacienteSeleccionado.id}
               pacienteNombre={pacienteSeleccionado.nombreCompleto}
             />
@@ -331,7 +378,7 @@ export default function ModuloOdontologia({
             Selecciona un Paciente Odontologico
           </h3>
           <p className="text-xs text-slate-500 dark:text-white/60 max-w-md mx-auto">
-            Utiliza el buscador en la barra superior para cargar su odontograma interactivo, periodontograma, planes por fases y radiografias.
+            Utiliza el buscador en la barra superior para cargar su ficha clinica, odontograma interactivo, periodontograma y bitacora de evolucion.
           </p>
         </div>
       )}

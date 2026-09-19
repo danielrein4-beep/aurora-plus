@@ -479,4 +479,157 @@ public class OdontologiaAvanzadaController {
         );
         return ResponseEntity.ok(kits);
     }
+
+    // ==========================================
+    // 7. ANAMNESIS DE RIESGO ESTOMATOLOGICO
+    // ==========================================
+
+    @GetMapping("/anamnesis")
+    public ResponseEntity<?> obtenerAnamnesis(@RequestParam Long pacienteId) {
+        validarPermisoClinico();
+        Long tenantId = TenantContext.getCurrentTenant();
+
+        List<Map<String, Object>> filas = jdbcTemplate.queryForList(
+            "SELECT * FROM salud_odontologia_anamnesis_riesgo WHERE tenant_id = ? AND paciente_id = ?",
+            tenantId, pacienteId
+        );
+
+        if (filas.isEmpty()) {
+            // Retorno inicial por defecto
+            Map<String, Object> def = new HashMap<>();
+            def.put("paciente_id", pacienteId);
+            def.put("alergia_anestesia", false);
+            def.put("toma_anticoagulantes", false);
+            def.put("profilaxis_antibiotica_requerida", false);
+            def.put("trastorno_coagulacion", false);
+            def.put("hipertension", false);
+            def.put("diabetes", false);
+            def.put("embarazo_lactancia", false);
+            def.put("bruxismo_atm", false);
+            def.put("tabaquismo", false);
+            def.put("detalle_alergias", "");
+            def.put("observaciones_medicas", "");
+            return ResponseEntity.ok(def);
+        }
+
+        return ResponseEntity.ok(filas.get(0));
+    }
+
+    public static class ActualizarAnamnesisRequest {
+        public Long pacienteId;
+        public Boolean alergiaAnestesia;
+        public String detalleAlergias;
+        public Boolean tomaAnticoagulantes;
+        public Boolean profilaxisAntibioticaRequerida;
+        public Boolean trastornoCoagulacion;
+        public Boolean hipertension;
+        public Boolean diabetes;
+        public Boolean embarazoLactancia;
+        public Boolean bruxismoAtm;
+        public Boolean tabaquismo;
+        public String observacionesMedicas;
+    }
+
+    @PutMapping("/anamnesis")
+    @Transactional
+    public ResponseEntity<?> actualizarAnamnesis(@RequestBody ActualizarAnamnesisRequest req) {
+        validarPermisoClinico();
+        Long tenantId = TenantContext.getCurrentTenant();
+
+        if (req.pacienteId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente ID requerido.");
+        }
+
+        jdbcTemplate.update(
+            "INSERT INTO salud_odontologia_anamnesis_riesgo (" +
+            "tenant_id, paciente_id, alergia_anestesia, detalle_alergias, toma_anticoagulantes, " +
+            "profilaxis_antibiotica_requerida, trastorno_coagulacion, hipertension, diabetes, " +
+            "embarazo_lactancia, bruxismo_atm, tabaquismo, observaciones_medicas, fecha_actualizacion" +
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now()) " +
+            "ON CONFLICT (tenant_id, paciente_id) DO UPDATE SET " +
+            "alergia_anestesia = EXCLUDED.alergia_anestesia, detalle_alergias = EXCLUDED.detalle_alergias, " +
+            "toma_anticoagulantes = EXCLUDED.toma_anticoagulantes, " +
+            "profilaxis_antibiotica_requerida = EXCLUDED.profilaxis_antibiotica_requerida, " +
+            "trastorno_coagulacion = EXCLUDED.trastorno_coagulacion, hipertension = EXCLUDED.hipertension, " +
+            "diabetes = EXCLUDED.diabetes, embarazo_lactancia = EXCLUDED.embarazo_lactancia, " +
+            "bruxismo_atm = EXCLUDED.bruxismo_atm, tabaquismo = EXCLUDED.tabaquismo, " +
+            "observaciones_medicas = EXCLUDED.observaciones_medicas, fecha_actualizacion = now()",
+            tenantId, req.pacienteId,
+            Boolean.TRUE.equals(req.alergiaAnestesia),
+            req.detalleAlergias,
+            Boolean.TRUE.equals(req.tomaAnticoagulantes),
+            Boolean.TRUE.equals(req.profilaxisAntibioticaRequerida),
+            Boolean.TRUE.equals(req.trastornoCoagulacion),
+            Boolean.TRUE.equals(req.hipertension),
+            Boolean.TRUE.equals(req.diabetes),
+            Boolean.TRUE.equals(req.embarazoLactancia),
+            Boolean.TRUE.equals(req.bruxismoAtm),
+            Boolean.TRUE.equals(req.tabaquismo),
+            req.observacionesMedicas
+        );
+
+        return ResponseEntity.ok(Map.of("mensaje", "Anamnesis de riesgo quirurgico actualizada."));
+    }
+
+    // ==========================================
+    // 8. BITACORA DE EVOLUCION CLINICA POR SESION
+    // ==========================================
+
+    @GetMapping("/evolucion")
+    public ResponseEntity<?> listarEvolucion(@RequestParam Long pacienteId) {
+        validarPermisoClinico();
+        Long tenantId = TenantContext.getCurrentTenant();
+
+        List<Map<String, Object>> sesiones = jdbcTemplate.queryForList(
+            "SELECT * FROM salud_odontologia_evolucion_sesiones WHERE tenant_id = ? AND paciente_id = ? ORDER BY fecha_sesion DESC, id DESC",
+            tenantId, pacienteId
+        );
+        return ResponseEntity.ok(sesiones);
+    }
+
+    public static class RegistrarSesionRequest {
+        public Long pacienteId;
+        public String fechaSesion;
+        public Integer dienteFdi;
+        public String procedimientoRealizado;
+        public String tecnicaAislamiento;
+        public String anestesiaAdministrada;
+        public String conductometriaNotas;
+        public String medicacionIndicada;
+        public String proximaCitaConducta;
+        public String odontologo;
+    }
+
+    @PostMapping("/evolucion")
+    @Transactional
+    public ResponseEntity<?> registrarSesion(@RequestBody RegistrarSesionRequest req) {
+        validarPermisoClinico();
+        Long tenantId = TenantContext.getCurrentTenant();
+
+        if (req.pacienteId == null || req.procedimientoRealizado == null || req.procedimientoRealizado.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente y procedimiento realizado son requeridos.");
+        }
+
+        Long id = jdbcTemplate.queryForObject(
+            "INSERT INTO salud_odontologia_evolucion_sesiones (" +
+            "tenant_id, paciente_id, fecha_sesion, diente_fdi, procedimiento_realizado, " +
+            "tecnica_aislamiento, anestesia_administrada, conductometria_notas, medicacion_indicada, " +
+            "proxima_cita_conducta, odontologo" +
+            ") VALUES (?, ?, COALESCE(?::date, CURRENT_DATE), ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            Long.class,
+            tenantId, req.pacienteId, req.fechaSesion, req.dienteFdi,
+            req.procedimientoRealizado,
+            req.tecnicaAislamiento != null ? req.tecnicaAislamiento : "ABSOLUTO_DIQUE",
+            req.anestesiaAdministrada,
+            req.conductometriaNotas,
+            req.medicacionIndicada,
+            req.proximaCitaConducta,
+            req.odontologo != null ? req.odontologo : "Odontologo Tratante"
+        );
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+            "id", id,
+            "mensaje", "Nota de evolucion clinica registrada con exito."
+        ));
+    }
 }

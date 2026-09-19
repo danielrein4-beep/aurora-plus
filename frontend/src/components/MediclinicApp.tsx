@@ -1374,6 +1374,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 rol={rolActivo}
                 pacienteInicialId={pacienteSeleccionadoId}
                 onVerDocumento={setVisorDocumento}
+                onIrAOdontologia={() => setPagina("odontograma")}
               />
             )}
             {pagina === "odontograma" && (
@@ -3070,6 +3071,7 @@ function HistoriasClinicas({
   rol,
   pacienteInicialId,
   onVerDocumento,
+  onIrAOdontologia,
 }: {
   tenantId: number;
   pacientes: Paciente[] | null;
@@ -3077,6 +3079,7 @@ function HistoriasClinicas({
   rol: RolVista;
   pacienteInicialId?: number | null;
   onVerDocumento?: (payload: DocumentoVisorPayload) => void;
+  onIrAOdontologia?: () => void;
 }) {
   // Mediclinic Odonto: el odontograma solo se muestra para tenants de esta
   // vertical — el resto (Clínica/Veterinaria) sigue exactamente igual.
@@ -3629,12 +3632,30 @@ function HistoriasClinicas({
       )}
 
       {esOdontologia && pacienteSeleccionado && (
-        <Odontograma
-          pacienteId={Number(pacienteSeleccionado.id)}
-          nombrePaciente={pacienteSeleccionado.nombreCompleto}
-          cedulaPaciente={pacienteSeleccionado.identificacion}
-          tasaBcv={Number(config?.tasaBCV) || 36.5}
-        />
+        <div className="apple-glass rounded-3xl p-6 border border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-left shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+              <IconTooth size={26} />
+            </div>
+            <div>
+              <div className="font-['Outfit'] font-black text-slate-900 dark:text-white text-base">
+                Expediente Odontologico Especializado
+              </div>
+              <p className="text-xs text-slate-600 dark:text-white/70 mt-0.5">
+                La historia dental, odontograma anatomico, periodontograma de 6 puntos, bitacora de evolucion en sillon y planes de {pacienteSeleccionado.nombreCompleto} se gestionan en OdontoPlus Pro.
+              </p>
+            </div>
+          </div>
+          {onIrAOdontologia && (
+            <button
+              type="button"
+              onClick={onIrAOdontologia}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black text-xs hover:brightness-110 transition shrink-0 cursor-pointer shadow-lg shadow-emerald-500/20"
+            >
+              Abrir Expediente Odontologico
+            </button>
+          )}
+        </div>
       )}
 
       {/* ── 2.5. TRAZABILIDAD Y EVOLUCIÓN DEL PACIENTE ── */}
