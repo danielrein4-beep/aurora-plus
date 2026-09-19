@@ -2594,7 +2594,19 @@ async function requestSuperAdmin<T>(path: string, options: RequestInit = {}): Pr
   const res = await fetch(path, { ...options, headers });
   if (!res.ok) {
     const errorText = await res.text();
-    throw new Error(errorText || `Error ${res.status}: Fallo en la solicitud SuperAdmin`);
+    let msg = errorText;
+    try {
+      const parsed = JSON.parse(errorText);
+      if (parsed.error) msg = parsed.error;
+    } catch {}
+
+    if (res.status === 401) {
+      borrarSesionSuperAdmin();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("superadmin:expired"));
+      }
+    }
+    throw new Error(msg || `Error ${res.status}: Fallo en la solicitud SuperAdmin`);
   }
   return res.json();
 }

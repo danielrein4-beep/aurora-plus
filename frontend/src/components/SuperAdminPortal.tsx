@@ -546,6 +546,15 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     }
   }, [sesion]);
 
+  useEffect(() => {
+    const onExpired = () => {
+      setSesion(null);
+      avisar("Tu sesion de SuperAdmin ha expirado por seguridad. Por favor ingresa tus credenciales de nuevo.", "error");
+    };
+    window.addEventListener("superadmin:expired", onExpired);
+    return () => window.removeEventListener("superadmin:expired", onExpired);
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
