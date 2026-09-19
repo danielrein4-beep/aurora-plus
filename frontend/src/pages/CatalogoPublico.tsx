@@ -814,7 +814,25 @@ export default function CatalogoPublico() {
     : null;
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-neutral-900 font-['Plus_Jakarta_Sans',sans-serif] selection:bg-neutral-900 selection:text-white">
+    <div className="min-h-screen bg-[#fafafa] text-neutral-900 font-['Plus_Jakarta_Sans',sans-serif] selection:bg-neutral-900 selection:text-white relative">
+      {/* Marca de Agua Fija del Logo del Comercio - Visible durante todo el scroll */}
+      <div 
+        className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden select-none"
+        aria-hidden="true"
+      >
+        {tienda.logoBase64 && tienda.logoBase64.trim().length > 15 ? (
+          <img
+            src={tienda.logoBase64}
+            alt=""
+            className="w-[340px] sm:w-[520px] md:w-[700px] max-h-[75vh] object-contain opacity-[0.055] filter contrast-125 select-none pointer-events-none transform -rotate-6 transition-all duration-700"
+          />
+        ) : (
+          <div className="font-serif text-[20vw] font-bold text-neutral-900 opacity-[0.035] select-none pointer-events-none tracking-widest uppercase transform -rotate-6">
+            {(tienda.nombreTienda || "AP").substring(0, 4)}
+          </div>
+        )}
+      </div>
+
       {/* 1. Header Minimalista de Alta Gama con Marca y Controles */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-neutral-200/60 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
@@ -961,7 +979,7 @@ export default function CatalogoPublico() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Banner de Tienda / Estado Vacío si no hay productos cargados */}
         {productosActivos.length === 0 && (
           <div className="my-10 p-10 sm:p-16 rounded-[2.5rem] bg-white border border-neutral-100 shadow-[0_4px_30px_rgba(0,0,0,0.03)] text-center max-w-2xl mx-auto">
