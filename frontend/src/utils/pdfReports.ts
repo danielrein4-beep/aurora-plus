@@ -1606,6 +1606,7 @@ export interface RecipeReportData {
     alergias?: string;
     fechaConsulta: string;
     expediente?: string;
+    telefono?: string;
   };
   diagnostico?: string;
   cie10?: string;

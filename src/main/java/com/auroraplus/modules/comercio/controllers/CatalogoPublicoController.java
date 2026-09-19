@@ -183,50 +183,12 @@ public class CatalogoPublicoController {
         public List<LineaPedidoDto> items;
     }
 
-    public static class ConfigPagoMovilRequest {
-        public String banco;
-        public String telefono;
-        public String documento;
-        public String titular;
-        public Boolean activo;
-    }
-
-    @GetMapping("/{tenantId:[0-9]+}/pago-movil")
-    public ResponseEntity<?> obtenerConfigPagoMovil(@PathVariable Long tenantId) {
-        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
-        if (licencia == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "Tienda no encontrada"));
-        }
-        Map<String, Object> pagoMovil = new LinkedHashMap<>();
-        pagoMovil.put("banco", licencia.getPagoMovilBanco() != null ? licencia.getPagoMovilBanco() : "");
-        pagoMovil.put("telefono", licencia.getPagoMovilTelefono() != null ? licencia.getPagoMovilTelefono() : "");
-        pagoMovil.put("documento", licencia.getPagoMovilDocumento() != null ? licencia.getPagoMovilDocumento() : "");
-        pagoMovil.put("titular", licencia.getPagoMovilTitular() != null ? licencia.getPagoMovilTitular() : "");
-        pagoMovil.put("activo", licencia.isPagoMovilActivo());
-        return ResponseEntity.ok(pagoMovil);
-    }
-
-    @PostMapping("/{tenantId:[0-9]+}/pago-movil")
-    public ResponseEntity<?> guardarConfigPagoMovil(@PathVariable Long tenantId, @RequestBody ConfigPagoMovilRequest req) {
-        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
-        if (licencia == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "Tienda no encontrada"));
-        }
-        if (req.banco != null) licencia.setPagoMovilBanco(req.banco.trim());
-        if (req.telefono != null) licencia.setPagoMovilTelefono(req.telefono.trim());
-        if (req.documento != null) licencia.setPagoMovilDocumento(req.documento.trim());
-        if (req.titular != null) licencia.setPagoMovilTitular(req.titular.trim());
-        if (req.activo != null) licencia.setPagoMovilActivo(req.activo);
-        licenciaTenantRepository.save(licencia);
-
-        Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("banco", licencia.getPagoMovilBanco());
-        resp.put("telefono", licencia.getPagoMovilTelefono());
-        resp.put("documento", licencia.getPagoMovilDocumento());
-        resp.put("titular", licencia.getPagoMovilTitular());
-        resp.put("activo", licencia.isPagoMovilActivo());
-        return ResponseEntity.ok(resp);
-    }
+    // La configuracion de Pago Movil (GET/POST) y la gestion de pedidos (listar, cambiar
+    // estado) se movieron a CatalogoGestionController bajo /api/comercio/catalogo — estos
+    // endpoints exponian datos de clientes y, mas grave, permitian a cualquiera en internet
+    // reescribir la cuenta bancaria del negocio sin ninguna autenticacion (solo requerian
+    // adivinar el tenantId). Solo la CREACION de un pedido (abajo) es legitimamente publica:
+    // la hace un cliente sin sesion desde el catalogo.
 
     @PostMapping("/{tenantId:[0-9]+}/pedidos")
     public ResponseEntity<?> registrarPedidoWeb(@PathVariable Long tenantId, @RequestBody CrearPedidoWebRequest req) {
@@ -326,21 +288,4 @@ public class CatalogoPublicoController {
         return ResponseEntity.ok(resp);
     }
 
-    @GetMapping("/{tenantId:[0-9]+}/pedidos")
-    public ResponseEntity<List<PedidoWebComercio>> listarPedidos(@PathVariable Long tenantId) {
-        return ResponseEntity.ok(pedidoWebRepository.findByTenantIdOrderByFechaCreacionDesc(tenantId));
-    }
-
-    @PostMapping("/{tenantId:[0-9]+}/pedidos/{pedidoId:[0-9]+}/estado")
-    public ResponseEntity<?> actualizarEstadoPedido(
-            @PathVariable Long tenantId,
-            @PathVariable Long pedidoId,
-            @RequestParam String estado) {
-        PedidoWebComercio p = pedidoWebRepository.findById(pedidoId).orElse(null);
-        if (p == null || !p.getTenantId().equals(tenantId)) {
-            return ResponseEntity.status(404).body(Map.of("error", "Pedido no encontrado"));
-        }
-        p.setEstado(estado);
-        return ResponseEntity.ok(pedidoWebRepository.save(p));
-    }
 }

@@ -1,5 +1,17 @@
 import React, { useState, useEffect, useMemo } from "react";
 
+// El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
+// no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
+function obtenerTokenSesion(): string {
+  try {
+    const raw = localStorage.getItem("aurora_token");
+    if (!raw) return "";
+    return JSON.parse(raw).token || "";
+  } catch {
+    return "";
+  }
+}
+
 function SvgSearch({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -99,7 +111,9 @@ export default function PedidosWebPanel({ tenantId, tasaVes, onCargarAlPos, onVe
   const cargarPedidos = async () => {
     setCargando(true);
     try {
-      const res = await fetch(`/api/public/catalogo/${tenantId}/pedidos`);
+      const res = await fetch(`/api/comercio/catalogo/pedidos`, {
+        headers: { Authorization: `Bearer ${obtenerTokenSesion()}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setPedidos(data || []);
@@ -120,8 +134,9 @@ export default function PedidosWebPanel({ tenantId, tasaVes, onCargarAlPos, onVe
   const cambiarEstado = async (id: number, nuevoEstado: string) => {
     setActualizandoId(id);
     try {
-      const res = await fetch(`/api/public/catalogo/${tenantId}/pedidos/${id}/estado?estado=${nuevoEstado}`, {
-        method: "POST"
+      const res = await fetch(`/api/comercio/catalogo/pedidos/${id}/estado?estado=${nuevoEstado}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${obtenerTokenSesion()}` },
       });
       if (res.ok) {
         setPedidos((prev) =>

@@ -3124,6 +3124,7 @@ function HistoriasClinicas({
     descripcionDiagnostico: "",
     diagnosticoPrincipalCIE10: "",
     planTratamiento: "",
+    indicacionesAdicionales: "",
     proximaCita: "",
   });
   const [guardando, setGuardando] = useState(false);
@@ -3196,6 +3197,7 @@ function HistoriasClinicas({
       descripcionDiagnostico: "",
       diagnosticoPrincipalCIE10: "",
       planTratamiento: "",
+      indicacionesAdicionales: "",
       proximaCita: "",
     });
     setError(null);
@@ -3246,9 +3248,22 @@ function HistoriasClinicas({
       motivoConsulta: form.motivoConsulta || "Control de rutina y evolución clínica",
       evolucionClinica: form.evolucionClinica,
       diagnosticoCIE10: form.descripcionDiagnostico || "Evaluación Clínica General",
-      planTratamiento: form.planTratamiento,
+      planTratamiento: construirTextoPlanTratamiento(),
       proximaCita: form.proximaCita,
     };
+  };
+
+  // Combina el resumen de medicamentos (derivado de itemsRecipe) con las indicaciones
+  // adicionales de texto libre — antes ambos compartian el mismo campo de estado
+  // (form.planTratamiento) y uno borraba al otro cada vez que el medico escribia o
+  // agregaba/quitaba un farmaco del vademecum.
+  const construirTextoPlanTratamiento = (): string => {
+    const resumenMeds = itemsRecipe.length > 0
+      ? itemsRecipe.map((it, idx) => `${idx + 1}. ${it.medicamento} (${it.presentacion}) - ${it.posologia} por ${it.duracionDias} dias.`).join("\n")
+      : "";
+    const adicionales = form.indicacionesAdicionales.trim();
+    if (resumenMeds && adicionales) return `${resumenMeds}\n\n${adicionales}`;
+    return resumenMeds || adicionales;
   };
 
   const ejecutarGuardado = async () => {
@@ -3272,7 +3287,7 @@ function HistoriasClinicas({
         motivoConsulta: form.motivoConsulta,
         descripcionDiagnostico: form.descripcionDiagnostico,
         diagnosticoPrincipalCIE10: form.diagnosticoPrincipalCIE10 || undefined,
-        planTratamiento: form.planTratamiento || (itemsRecipe.length > 0 ? itemsRecipe.map((it, idx) => `${idx + 1}. ${it.medicamento} (${it.presentacion}) - ${it.posologia} por ${it.duracionDias} dias.`).join("\n") : ""),
+        planTratamiento: construirTextoPlanTratamiento(),
         recipeMedicamentos: itemsRecipe.length > 0 ? JSON.stringify(itemsRecipe) : undefined,
         anotacionesPrivadas: form.anotacionesPrivadas,
         talla: form.talla,
@@ -3335,11 +3350,12 @@ function HistoriasClinicas({
         alergias: pacienteSeleccionado.alergias || undefined,
         fechaConsulta: c ? fechaDeConsulta(c) : hoy(),
         expediente: `HC-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
+        telefono: pacienteSeleccionado.telefono || undefined,
       },
       diagnostico: c ? c.descripcionDiagnostico : form.descripcionDiagnostico,
       cie10: c ? c.diagnosticoPrincipalCIE10 : form.diagnosticoPrincipalCIE10,
       medicamentos: medList,
-      indicacionesGenerales: form.planTratamiento || undefined,
+      indicacionesGenerales: (c ? c.planTratamiento : construirTextoPlanTratamiento()) || undefined,
     };
   };
 
@@ -4514,13 +4530,7 @@ function HistoriasClinicas({
               <VademecumPrescriptor
                 alergiasPaciente={pacienteSeleccionado?.alergias || ""}
                 itemsRecipe={itemsRecipe}
-                onChangeItems={(nuevos) => {
-                  setItemsRecipe(nuevos);
-                  if (nuevos.length > 0) {
-                    const resumen = nuevos.map((it, idx) => `${idx + 1}. ${it.medicamento} (${it.presentacion}) - ${it.posologia} por ${it.duracionDias} dias. ${it.indicacionesEspeciales ? `[${it.indicacionesEspeciales}]` : ""}`).join("\n");
-                    setForm((p) => ({ ...p, planTratamiento: resumen }));
-                  }
-                }}
+                onChangeItems={(nuevos) => setItemsRecipe(nuevos)}
                 onGenerarPdfRecipe={() => {
                   const recipeData = construirRecipeReportData();
                   if (recipeData) {
@@ -4548,8 +4558,8 @@ function HistoriasClinicas({
                 <textarea
                   rows={2}
                   placeholder="Instrucciones de dieta, hidratacion, signos de alarma o indicaciones especiales..."
-                  value={form.planTratamiento}
-                  onChange={(e) => setForm({ ...form, planTratamiento: e.target.value })}
+                  value={form.indicacionesAdicionales}
+                  onChange={(e) => setForm({ ...form, indicacionesAdicionales: e.target.value })}
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
                 />
               </div>

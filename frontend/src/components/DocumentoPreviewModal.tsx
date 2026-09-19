@@ -46,7 +46,7 @@ export default function DocumentoPreviewModal({
     payload.tipo === "INFORME_MEDICO"
       ? (payload.data as ConsultaReportData).paciente?.telefono || ""
       : payload.tipo === "RECIPE_MEDICO"
-      ? (payload.data as any).paciente?.telefono || ""
+      ? (payload.data as RecipeReportData).paciente?.telefono || ""
       : payload.tipo === "COTIZACION"
       ? (payload.data as CotizacionData).pacienteTelefono || ""
       : ""

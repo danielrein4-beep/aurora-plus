@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from "react";
 
+// El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
+// no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
+function obtenerTokenSesion(): string {
+  try {
+    const raw = localStorage.getItem("aurora_token");
+    if (!raw) return "";
+    return JSON.parse(raw).token || "";
+  } catch {
+    return "";
+  }
+}
+
 function SvgClose({ className = "w-5 h-5" }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -70,7 +82,9 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(urlPublica)}&color=0f172a&bgcolor=f8fafc`;
 
   useEffect(() => {
-    fetch(`/api/public/catalogo/${tenantId}/pago-movil`)
+    fetch(`/api/comercio/catalogo/pago-movil`, {
+      headers: { Authorization: `Bearer ${obtenerTokenSesion()}` },
+    })
       .then((r) => r.json())
       .then((data) => {
         if (data.banco) setBanco(data.banco);
@@ -92,9 +106,9 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
     setGuardandoPm(true);
     setMensajePm(null);
     try {
-      const res = await fetch(`/api/public/catalogo/${tenantId}/pago-movil`, {
+      const res = await fetch(`/api/comercio/catalogo/pago-movil`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${obtenerTokenSesion()}` },
         body: JSON.stringify({
           banco: banco.trim(),
           telefono: telefono.trim(),
