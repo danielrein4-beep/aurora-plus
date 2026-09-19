@@ -122,6 +122,21 @@ public class LicenciaTenant {
     @Column(name = "pago_movil_activo", nullable = false)
     private boolean pagoMovilActivo = true;
 
+    @Column(name = "whatsapp_ia_activa", nullable = false)
+    private boolean whatsappIaActiva = true;
+
+    @Column(name = "whatsapp_ia_saludo", length = 255)
+    private String whatsappIaSaludo;
+
+    @Column(name = "whatsapp_ia_zonas_delivery", columnDefinition = "TEXT")
+    private String whatsappIaZonasDelivery;
+
+    @Column(name = "whatsapp_ia_politica_delivery", columnDefinition = "TEXT")
+    private String whatsappIaPoliticaDelivery;
+
+    @Column(name = "whatsapp_webhook_verify_token", length = 100)
+    private String whatsappWebhookVerifyToken;
+
     // WhatsApp Business Cloud API (Meta) del NEGOCIO — cada tenant conecta SU
     // PROPIA cuenta de Meta para automatizar el recordatorio de citas por
     // WhatsApp (antes solo un link wa.me que la secretaria mandaba a mano).
@@ -226,4 +241,15 @@ public class LicenciaTenant {
     public void setPagoMovilTitular(String pagoMovilTitular) { this.pagoMovilTitular = pagoMovilTitular; }
     public boolean isPagoMovilActivo() { return pagoMovilActivo; }
     public void setPagoMovilActivo(boolean pagoMovilActivo) { this.pagoMovilActivo = pagoMovilActivo; }
+
+    public boolean isWhatsappIaActiva() { return whatsappIaActiva; }
+    public void setWhatsappIaActiva(boolean whatsappIaActiva) { this.whatsappIaActiva = whatsappIaActiva; }
+    public String getWhatsappIaSaludo() { return whatsappIaSaludo; }
+    public void setWhatsappIaSaludo(String whatsappIaSaludo) { this.whatsappIaSaludo = whatsappIaSaludo; }
+    public String getWhatsappIaZonasDelivery() { return whatsappIaZonasDelivery; }
+    public void setWhatsappIaZonasDelivery(String whatsappIaZonasDelivery) { this.whatsappIaZonasDelivery = whatsappIaZonasDelivery; }
+    public String getWhatsappIaPoliticaDelivery() { return whatsappIaPoliticaDelivery; }
+    public void setWhatsappIaPoliticaDelivery(String whatsappIaPoliticaDelivery) { this.whatsappIaPoliticaDelivery = whatsappIaPoliticaDelivery; }
+    public String getWhatsappWebhookVerifyToken() { return whatsappWebhookVerifyToken; }
+    public void setWhatsappWebhookVerifyToken(String whatsappWebhookVerifyToken) { this.whatsappWebhookVerifyToken = whatsappWebhookVerifyToken; }
 }

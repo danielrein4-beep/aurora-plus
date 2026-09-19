@@ -1,3 +1,4 @@
+import AsistenteIaModal from "./AsistenteIaModal";
 import ModalCatalogoQR from "./ModalCatalogoQR";
 import PedidosWebPanel, { type PedidoWeb } from "./PedidosWebPanel";
 import BitacoraAuditoria from "./BitacoraAuditoria";
@@ -458,6 +459,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   // Tabs de Navegación
   const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "clientes" | "gastos" | "cierre" | "auditoria">("general");
   const [modalQrVisible, setModalQrVisible] = useState(false);
+  const [modalIaVisible, setModalIaVisible] = useState(false);
 
   // Estado del Catálogo y Clientes
   const [productos, setProductos] = useState<ProductoComercio[]>(() => {
@@ -1039,6 +1041,18 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             <span className="flex-1 text-left">Mi Catálogo Online & QR</span>
             <span className="text-[8px] font-black uppercase tracking-wider bg-teal-500/20 text-teal-600 dark:text-teal-300 px-1.5 py-0.5 rounded-full">
               Online
+            </span>
+          </button>
+          <button
+            type="button"
+            title="Atención y ventas automatizadas en WhatsApp con IA conectada a tu inventario"
+            onClick={() => setModalIaVisible(true)}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 transition-colors mt-2"
+          >
+            <IconSettings size={16} />
+            <span className="flex-1 text-left">Asistente IA WhatsApp</span>
+            <span className="text-[8px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded-full">
+              24/7
             </span>
           </button>
         </div>
@@ -1696,6 +1710,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           tenantId={user.tenantId}
           nombreNegocio={user?.empresa || "Mi Comercio"}
           onClose={() => setModalQrVisible(false)}
+        />
+      )}
+
+      {modalIaVisible && user?.tenantId && (
+        <AsistenteIaModal
+          tenantId={user.tenantId}
+          nombreNegocio={user?.empresa || "Mi Comercio"}
+          onClose={() => setModalIaVisible(false)}
         />
       )}
 

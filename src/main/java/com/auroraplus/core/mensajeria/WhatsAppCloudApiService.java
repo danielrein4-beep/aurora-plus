@@ -102,4 +102,44 @@ public class WhatsAppCloudApiService {
             throw new RuntimeException("No se pudo enviar el mensaje de WhatsApp: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * Envia un mensaje de texto libre dentro de la ventana de atencion de 24 horas.
+     * Utilizado para que la IA responda preguntas de stock, precios y coordenadas de pago.
+     */
+    public void enviarTexto(Long tenantId, String telefonoE164, String texto) {
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        if (!licencia.isWhatsappActivo() || licencia.getWhatsappPhoneNumberId() == null
+                || licencia.getWhatsappAccessTokenCifrado() == null) {
+            throw new RuntimeException("WhatsApp no esta configurado/activado para este negocio");
+        }
+        String accessToken = cifradoSimetricoService.descifrar(licencia.getWhatsappAccessTokenCifrado());
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("messaging_product", "whatsapp");
+        body.put("recipient_type", "individual");
+        body.put("to", telefonoE164);
+        body.put("type", "text");
+        body.put("text", Map.of("preview_url", false, "body", texto));
+
+        try {
+            String jsonBody = JSON.writeValueAsString(body);
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/" + licencia.getWhatsappPhoneNumberId() + "/messages"))
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
+                .build();
+
+            HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new RuntimeException("WhatsApp Cloud API respondio " + response.statusCode() + ": " + response.body());
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("No se pudo enviar el mensaje de texto de WhatsApp: " + e.getMessage(), e);
+        }
+    }
 }
