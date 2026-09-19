@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SpecularButton from "../components/SpecularButton";
-import { IconCheck } from "../Icons";
+import {
+  IconCheck, IconClinic, IconHardware,
+  IconRestaurant, IconFarm, IconTooth, IconVet,
+} from "../Icons";
 
 // La única diferencia entre períodos es el descuento por compromiso más largo,
 // no qué módulos incluye — eso lo define el plan (Básico vs Full).
@@ -11,40 +14,32 @@ const PERIODOS = [
   { id: "anual", label: "Anual", meses: 12, descuento: 0.15 },
 ] as const;
 
-const PLANES = [
-  {
-    id: "basico",
-    nombre: "Aurora Básico",
-    precioBase: 25,
-    tagline: "Lo esencial para dejar de operar a mano",
-    destacado: false,
-    features: [
-      "Módulos base de tu vertical (POS/agenda, inventario, caja)",
-      "Acceso web + versión móvil",
-      "Sin costo extra por usuario adicional",
-      "Multi-moneda (USD · VES · COP)",
-      "Reportes esenciales",
-      "Offline con sincronización automática",
-    ],
-    nota: "",
-  },
-  {
-    id: "full",
-    nombre: "Aurora Full",
-    precioBase: 40,
-    tagline: "Todo lo del Básico + nuestras herramientas más fuertes",
-    destacado: true,
-    features: [
-      "Todo lo incluido en Aurora Básico",
-      "Comercio: catálogo público + asistente de IA por WhatsApp",
-      "Mediclinic/Odontología: vademécum y récipe médico oficial en PDF",
-      "Ganadería: mapa satelital de potreros y básculas bluetooth",
-      "Reportes y BI avanzado",
-      "Acompañamiento directo del equipo fundador",
-    ],
-    nota: "Mediclinic Pro Full: $50/mes (incluye vademécum, récipe oficial y firma electrónica).",
-  },
+// El precio de Aurora Básico es el mismo para todas las verticales ($25) — lo que cambia
+// de una a otra es el precio de Full y cuál es su herramienta más fuerte, así que eso
+// se selecciona primero y el precio de la tarjeta Full se ajusta según la elección.
+const VERTICALES = [
+  { id: "comercio", nombre: "Comercio", precioFull: 40, beneficioFull: "Catálogo público + asistente de IA por WhatsApp (precios, stock, tasa BCV y delivery al instante)", Icon: IconHardware, color: "from-orange-400 to-amber-500", ring: "ring-orange-400/50", glow: "rgba(251,146,60,0.35)" },
+  { id: "mediclinic", nombre: "Mediclinic", precioFull: 50, beneficioFull: "Vademécum de 36+ fármacos, récipe médico oficial en PDF y firma electrónica", Icon: IconClinic, color: "from-sky-400 to-blue-500", ring: "ring-sky-400/50", glow: "rgba(56,189,248,0.35)" },
+  { id: "odontologia", nombre: "Odontología", precioFull: 50, beneficioFull: "Odontograma FDI, periodontograma de 6 puntos y planes de tratamiento por fases", Icon: IconTooth, color: "from-cyan-400 to-teal-500", ring: "ring-cyan-400/50", glow: "rgba(34,211,238,0.35)" },
+  { id: "restaurantes", nombre: "Restaurantes", precioFull: 40, beneficioFull: "Turnos de caja con arqueo real, reservas y zonas de cocina configurables", Icon: IconRestaurant, color: "from-rose-400 to-pink-500", ring: "ring-rose-400/50", glow: "rgba(251,113,133,0.35)" },
+  { id: "ganaderia", nombre: "Ganadería", precioFull: 40, beneficioFull: "Mapa satelital de potreros y básculas bluetooth para pesaje en manga", Icon: IconFarm, color: "from-green-400 to-emerald-500", ring: "ring-emerald-400/50", glow: "rgba(52,211,153,0.35)" },
+  { id: "veterinaria", nombre: "Veterinaria", precioFull: 40, beneficioFull: "Historias clínicas, agenda y cotizador para mascotas sobre el motor de Mediclinic", Icon: IconVet, color: "from-violet-400 to-purple-500", ring: "ring-violet-400/50", glow: "rgba(167,139,250,0.35)" },
 ] as const;
+
+const BASICO_PRECIO = 25;
+const BASICO_FEATURES = [
+  "Módulos base de tu vertical (POS/agenda, inventario, caja)",
+  "Acceso web + versión móvil",
+  "Sin costo extra por usuario adicional",
+  "Multi-moneda (USD · VES · COP)",
+  "Reportes esenciales",
+  "Offline con sincronización automática",
+];
+const FULL_FEATURES_COMUNES = [
+  "Todo lo incluido en Aurora Básico",
+  "Reportes y BI avanzado",
+  "Acompañamiento directo del equipo fundador",
+];
 
 const FAQ = [
   { q: "¿Puedo cambiar de período de facturación después?", a: "Sí, puedes pasar de mensual a semestral o anual (o al revés) cuando quieras. El cambio aplica en el siguiente ciclo de facturación." },
@@ -59,9 +54,25 @@ const FAQ = [
 export default function Precios() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [periodoId, setPeriodoId] = useState<(typeof PERIODOS)[number]["id"]>("mensual");
+  const [verticalId, setVerticalId] = useState<(typeof VERTICALES)[number]["id"]>("comercio");
   const navigate = useNavigate();
 
   const periodo = PERIODOS.find((p) => p.id === periodoId) ?? PERIODOS[0];
+  const vertical = VERTICALES.find((v) => v.id === verticalId) ?? VERTICALES[0];
+
+  const PLANES = [
+    {
+      id: "basico", nombre: "Aurora Básico", precioBase: BASICO_PRECIO,
+      tagline: "Lo esencial para dejar de operar a mano", destacado: false,
+      features: BASICO_FEATURES, nota: "",
+    },
+    {
+      id: "full", nombre: "Aurora Full", precioBase: vertical.precioFull,
+      tagline: `Todo lo del Básico + lo más fuerte para ${vertical.nombre}`, destacado: true,
+      features: [FULL_FEATURES_COMUNES[0], vertical.beneficioFull, ...FULL_FEATURES_COMUNES.slice(1)],
+      nota: "",
+    },
+  ];
 
   return (
     <main className="aurora-public-page pt-32 pb-24 relative">
@@ -81,8 +92,38 @@ export default function Precios() {
         </p>
       </section>
 
-      {/* Dos planes con selector de período */}
+      {/* Dos planes con selector de vertical y período */}
       <section className="px-4 sm:px-6 max-w-5xl mx-auto mb-20">
+        {/* Selector de vertical — el precio de Full depende de cuál elijas */}
+        <div className="text-center mb-5">
+          <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase">¿Para qué negocio es?</p>
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5 mb-12 max-w-3xl mx-auto">
+          {VERTICALES.map((v) => {
+            const activo = verticalId === v.id;
+            return (
+              <button
+                key={v.id}
+                onClick={() => setVerticalId(v.id)}
+                className={`group flex flex-col items-center gap-2 py-4 px-2 rounded-2xl transition-all cursor-pointer apple-glass ${
+                  activo
+                    ? `ring-2 ${v.ring} shadow-lg`
+                    : "border border-slate-200/70 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/25"
+                }`}
+              >
+                <div
+                  className={`w-10 h-10 rounded-xl bg-gradient-to-br ${v.color} flex items-center justify-center text-white flex-shrink-0 transition-transform ${activo ? "scale-110 shadow-md" : "opacity-70 group-hover:opacity-100"}`}
+                >
+                  <v.Icon size={18} />
+                </div>
+                <span className={`text-[11px] sm:text-xs font-semibold leading-tight text-center ${activo ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-white/50"}`}>
+                  {v.nombre}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* Selector de período de facturación */}
         <div className="flex items-center justify-center gap-1.5 mb-10 p-1.5 rounded-2xl bg-white/5 border border-white/10 max-w-md mx-auto">
           {PERIODOS.map((p) => (
@@ -114,18 +155,28 @@ export default function Precios() {
             return (
               <div
                 key={plan.id}
-                className={`relative rounded-2xl p-8 sm:p-10 flex flex-col items-center text-center apple-glass shadow-2xl ${
-                  plan.destacado ? "border-2 border-teal-500/50 sm:scale-[1.03]" : "border border-slate-300/60 dark:border-white/10"
+                className={`relative rounded-2xl p-8 sm:p-10 flex flex-col items-center text-center apple-glass shadow-2xl overflow-hidden transition-all ${
+                  plan.destacado ? `border-2 sm:scale-[1.03] ${vertical.ring.replace("ring-", "border-").replace("/50", "/60")}` : "border border-slate-300/60 dark:border-white/10"
                 }`}
               >
                 {plan.destacado && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 g-aurora text-white text-[11px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-md">
-                    LO MÁS FUERTE DE AURORA
+                  <>
+                    <div className="absolute inset-0 opacity-15 pointer-events-none"
+                      style={{ background: `radial-gradient(ellipse at 50% -10%, ${vertical.glow} 0%, transparent 65%)` }} />
+                    <div className={`absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r ${vertical.color} text-white text-[11px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-md`}>
+                      LO MÁS FUERTE PARA {vertical.nombre.toUpperCase()}
+                    </div>
+                  </>
+                )}
+
+                {plan.destacado && (
+                  <div className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${vertical.color} flex items-center justify-center text-white shadow-md mb-4`}>
+                    <vertical.Icon size={22} />
                   </div>
                 )}
 
-                <h2 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-2xl mb-1">{plan.nombre}</h2>
-                <p className="text-slate-500 dark:text-white/35 text-xs mb-5">{plan.tagline}</p>
+                <h2 className="relative font-['Outfit'] font-bold text-slate-900 dark:text-white text-2xl mb-1">{plan.nombre}</h2>
+                <p className="relative text-slate-500 dark:text-white/35 text-xs mb-5">{plan.tagline}</p>
 
                 <div className="flex items-end gap-1 mb-1">
                   <span className="font-['Outfit'] font-black text-6xl text-slate-900 dark:text-white leading-none">
@@ -143,13 +194,22 @@ export default function Precios() {
                   <p className="text-xs text-slate-400 dark:text-white/30 mb-6">Facturado mes a mes</p>
                 )}
 
-                <ul className="space-y-3 mb-8 w-full max-w-xs text-left flex-1">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-3 text-sm text-slate-700 dark:text-white/60 font-medium">
-                      <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${plan.destacado ? "bg-teal-500/15 text-teal-600 dark:text-teal-400" : "bg-slate-500/15 text-slate-600 dark:text-white/60"}`}><IconCheck size={9} /></span>
-                      {f}
-                    </li>
-                  ))}
+                <ul className="relative space-y-3 mb-8 w-full max-w-xs text-left flex-1">
+                  {plan.features.map((f, idx) => {
+                    const esBeneficioClave = plan.destacado && idx === 1;
+                    return (
+                      <li key={f} className={`flex items-start gap-3 text-sm font-medium ${esBeneficioClave ? "text-slate-900 dark:text-white" : "text-slate-700 dark:text-white/60"}`}>
+                        <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          esBeneficioClave
+                            ? `bg-gradient-to-br ${vertical.color} text-white`
+                            : plan.destacado
+                              ? "bg-slate-500/15 text-slate-600 dark:text-white/60"
+                              : "bg-slate-500/15 text-slate-600 dark:text-white/60"
+                        }`}><IconCheck size={9} /></span>
+                        {f}
+                      </li>
+                    );
+                  })}
                 </ul>
 
                 <SpecularButton
@@ -164,10 +224,10 @@ export default function Precios() {
                   shineFade={45}
                   intensity={1.3}
                   proximity={280}
-                  className="w-full max-w-xs"
+                  className="relative w-full max-w-xs"
                   onClick={() => navigate("/onboarding")}
                 >
-                  {plan.destacado ? "Quiero Aurora Full" : "Comenzar con Básico"}
+                  {plan.destacado ? `Quiero Full para ${vertical.nombre}` : "Comenzar con Básico"}
                 </SpecularButton>
 
                 {plan.nota && (
