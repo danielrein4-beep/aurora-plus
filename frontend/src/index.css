@@ -118,6 +118,22 @@ body {
   transform: translateY(-1px) !important;
 }
 
+/* .btn-cyber-neon (Auth/Login, Onboarding...) era un degradado neón sobre
+   fondo oscuro que ya no existe — sin definición quedaba transparente: el
+   botón principal de "Ingresar a la plataforma" se veía como texto suelto,
+   sin ninguna pinta de botón. Mismo tratamiento sólido que apple-btn-primary. */
+.btn-cyber-neon {
+  background-color: #0B3D91 !important;
+  color: #FFFFFF !important;
+  transition: all 0.18s ease-in-out !important;
+  box-shadow: var(--shadow-apple-sm) !important;
+}
+
+.btn-cyber-neon:hover {
+  background-color: #082D6C !important;
+  transform: translateY(-1px) !important;
+}
+
 .apple-btn-secondary {
   background-color: #F5F5F7 !important;
   color: #1D1D1F !important;
@@ -141,9 +157,11 @@ body {
 .bg-\[\#051322\],
 .bg-\[\#071a2e\],
 .bg-\[\#0b2341\],
+.bg-\[\#0d131f\],
 .bg-\[\#060612\],
 .bg-\[\#0c0c20\],
 .bg-\[\#111128\],
+.bg-slate-800,
 .bg-slate-900,
 .bg-slate-950,
 .bg-neutral-900,
@@ -151,6 +169,86 @@ body {
 .bg-black {
   background-color: #FFFFFF !important;
   color: #1D1D1F !important;
+}
+
+/* La regla de arriba solo cubre bg-* plano — un panel armado con
+   bg-gradient-to-* + from-slate-900/via-.../to-slate-900 (ej. el panel
+   principal de Dashboard) pinta su propio degradado oscuro por encima vía
+   background-image, que background-color no puede tapar. Se anulan las
+   variables de degradado de Tailwind (--tw-gradient-from/via/to) de los
+   tonos oscuros usados en la app para que el degradado resultante sea
+   blanco-sobre-blanco en vez de navy oscuro. No toca los degradados de
+   acento de marca (teal/púrpura) que sí tienen contraste suficiente.*/
+.from-slate-900,
+.from-slate-900\/90,
+.from-slate-900\/95,
+.from-slate-950,
+.to-slate-900,
+.to-slate-900\/50,
+.to-slate-900\/60,
+.to-slate-900\/80,
+.to-slate-900\/90,
+.to-slate-900\/95,
+.to-slate-950,
+.via-slate-900,
+.via-slate-900\/60,
+.via-slate-900\/70,
+.via-\[\#07131e\],
+.via-\[\#0a1818\]\/60,
+.via-\[\#0c1424\]\/95 {
+  --tw-gradient-from: #FFFFFF !important;
+  --tw-gradient-via: #FFFFFF !important;
+  --tw-gradient-to: #FFFFFF !important;
+}
+
+/* Contraparte de la neutralización de fondos oscuros de arriba: varias
+   páginas que nunca se rediseñaron para el modo claro (Auth/Login,
+   Dashboard, Onboarding, ResetearClave, Horeca, Ganadería, Finanzas...)
+   siguen usando texto blanco literal (text-white y sus variantes de
+   opacidad) porque fueron construidas asumiendo un fondo oscuro — ese
+   fondo ya no existe (se fuerza blanco arriba), pero el texto nunca se
+   ajustó, así que quedaba blanco sobre blanco, invisible. Mismo patrón
+   de neutralización, mapeando cada nivel de opacidad a un gris legible
+   equivalente en vez de a un blanco invisible. */
+.text-white,
+.text-white\/90,
+.text-white\/85 {
+  color: #1D1D1F !important;
+}
+.text-white\/80,
+.text-white\/70 {
+  color: #33363B !important;
+}
+.text-white\/65,
+.text-white\/60,
+.text-white\/55,
+.text-white\/50 {
+  color: #55585E !important;
+}
+.text-white\/45,
+.text-white\/40,
+.text-white\/35,
+.text-white\/30 {
+  color: #86868B !important;
+}
+.text-white\/25,
+.text-white\/20,
+.text-white\/15 {
+  color: #A1A1A6 !important;
+}
+.placeholder-white\/40::placeholder,
+.placeholder-white\/25::placeholder,
+.placeholder-white\/20::placeholder {
+  color: #A1A1A6 !important;
+}
+
+/* .btn-cyber-neon/.apple-btn-primary ya ponen texto blanco a propósito sobre
+   su propio fondo azul sólido — sin esto, la regla .text-white de arriba
+   (declarada después, misma especificidad) les gana y el texto del botón
+   vuelve a quedar oscuro sobre fondo oscuro-azul, ilegible otra vez. */
+.btn-cyber-neon.text-white,
+.apple-btn-primary.text-white {
+  color: #FFFFFF !important;
 }
 
 .aurora-public-nav {
