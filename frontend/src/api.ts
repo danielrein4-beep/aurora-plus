@@ -2476,8 +2476,29 @@ export function guardarSesionSuperAdmin(sesion: SuperAdminSession) {
 export function leerSesionSuperAdmin(): SuperAdminSession | null {
   try {
     const raw = localStorage.getItem(SUPER_ADMIN_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const sesion = JSON.parse(raw);
+    if (!sesion || !sesion.token) return null;
+
+    // Validacion proactiva: verificar si el token JWT ya expiro
+    const partes = sesion.token.split(".");
+    if (partes.length === 3) {
+      const base64 = partes[1].replace(/-/g, "+").replace(/_/g, "/");
+      const jsonStr = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      const payload = JSON.parse(jsonStr);
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        localStorage.removeItem(SUPER_ADMIN_STORAGE_KEY);
+        return null;
+      }
+    }
+    return sesion;
   } catch {
+    localStorage.removeItem(SUPER_ADMIN_STORAGE_KEY);
     return null;
   }
 }
@@ -2838,7 +2859,11 @@ export async function listarTenantsSuperAdmin(): Promise<LicenciaTenant[]> {
       guardarTenantsLocales(data);
       return data;
     }
-  } catch {}
+  } catch (err: any) {
+    if (err?.message?.includes("Token") || err?.message?.includes("expirado") || err?.message?.includes("401")) {
+      throw err;
+    }
+  }
   return obtenerTenantsLocales();
 }
 

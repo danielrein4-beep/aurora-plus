@@ -310,6 +310,12 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       setTenants(listaTenants);
       setStats(st);
     } catch (err: any) {
+      if (err?.message?.includes("Token") || err?.message?.includes("expirado") || err?.message?.includes("401")) {
+        borrarSesionSuperAdmin();
+        setSesion(null);
+        avisar("Tu sesion de SuperAdmin ha expirado. Por favor ingresa tus credenciales de nuevo.", "error");
+        return;
+      }
       avisar(err?.message || "Error al cargar datos de SuperAdmin", "error");
     } finally {
       setLoadingData(false);
