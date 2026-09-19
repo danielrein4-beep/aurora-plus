@@ -222,7 +222,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center font-bold">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-sm" style={{ backgroundColor: "#0f172a", color: "#ffffff" }}>
               {tab === "qr" ? <SvgQr className="w-4 h-4" /> : tab === "perfil" ? <SvgStore className="w-4 h-4" /> : <SvgPhone className="w-4 h-4" />}
             </div>
             <div>
@@ -307,10 +307,15 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
               <button
                 type="button"
                 onClick={handleCopiar}
-                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95"
+                className="px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
+                style={{ backgroundColor: "#0f172a", color: "#ffffff" }}
               >
-                {copiado ? <SvgCheck className="w-3.5 h-3.5" /> : <SvgCopy className="w-3.5 h-3.5" />}
-                <span>{copiado ? "Copiado" : "Copiar"}</span>
+                {copiado ? (
+                  <SvgCheck className="w-3.5 h-3.5" style={{ color: "#ffffff" }} />
+                ) : (
+                  <SvgCopy className="w-3.5 h-3.5" style={{ color: "#ffffff" }} />
+                )}
+                <span style={{ color: "#ffffff" }}>{copiado ? "Copiado" : "Copiar"}</span>
               </button>
             </div>
 
@@ -430,9 +435,12 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
             <button
               type="submit"
               disabled={guardandoPerfil}
-              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 text-xs font-bold transition-all shadow-md active:scale-98 disabled:opacity-50"
+              className="w-full py-3 rounded-xl text-xs font-bold transition-all shadow-md active:scale-98 disabled:opacity-50"
+              style={{ backgroundColor: "#0f172a", color: "#ffffff" }}
             >
-              {guardandoPerfil ? "Guardando Cambios..." : "Guardar Perfil de Tienda"}
+              <span style={{ color: "#ffffff" }}>
+                {guardandoPerfil ? "Guardando Cambios..." : "Guardar Perfil de Tienda"}
+              </span>
             </button>
           </form>
         )}
@@ -512,9 +520,12 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
             <button
               type="submit"
               disabled={guardandoPm}
-              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 text-xs font-bold transition-all shadow-md active:scale-98 disabled:opacity-50 mt-2"
+              className="w-full py-3 rounded-xl text-xs font-bold transition-all shadow-md active:scale-98 disabled:opacity-50 mt-2"
+              style={{ backgroundColor: "#0f172a", color: "#ffffff" }}
             >
-              {guardandoPm ? "Guardando..." : "Guardar Datos de Pago Móvil"}
+              <span style={{ color: "#ffffff" }}>
+                {guardandoPm ? "Guardando..." : "Guardar Datos de Pago Móvil"}
+              </span>
             </button>
           </form>
         )}
