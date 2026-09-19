@@ -96,7 +96,7 @@ export default function Precios() {
       <section className="px-4 sm:px-6 max-w-5xl mx-auto mb-20">
         {/* Selector de vertical — el precio de Full depende de cuál elijas */}
         <div className="text-center mb-5">
-          <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase">¿Para qué negocio es?</p>
+          <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase">¿Qué negocio manejas?</p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2 mb-12 max-w-3xl mx-auto">
           {VERTICALES.map((v) => {
@@ -149,21 +149,21 @@ export default function Precios() {
             return (
               <div
                 key={plan.id}
-                className={`relative rounded-2xl p-8 sm:p-10 flex flex-col items-center text-center apple-glass shadow-2xl overflow-hidden transition-all ${
-                  plan.destacado ? `border-2 sm:scale-[1.03] ${vertical.ring.replace("ring-", "border-").replace("/50", "/60")}` : "border border-slate-300/60 dark:border-white/10"
+                className={`relative rounded-2xl p-8 sm:p-10 flex flex-col items-center text-center apple-glass shadow-2xl transition-all ${
+                  plan.destacado ? `border-2 sm:scale-[1.03] pt-11 ${vertical.ring.replace("ring-", "border-").replace("/50", "/60")}` : "border border-slate-300/60 dark:border-white/10"
                 }`}
               >
                 {plan.destacado && (
                   <>
-                    <div className="absolute inset-0 opacity-15 pointer-events-none"
+                    <div className="absolute inset-0 rounded-2xl overflow-hidden opacity-15 pointer-events-none"
                       style={{ background: `radial-gradient(ellipse at 50% -10%, ${vertical.glow} 0%, transparent 65%)` }} />
-                    <div className={`absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r ${vertical.color} text-white text-[11px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-md`}>
+                    <div className={`absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r ${vertical.color} text-white text-[11px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-md`}>
                       LO MÁS FUERTE PARA {vertical.nombre.toUpperCase()}
                     </div>
                   </>
                 )}
 
-                <h2 className={`relative font-['Outfit'] font-bold text-slate-900 dark:text-white text-2xl mb-1 ${plan.destacado ? "mt-2" : ""}`}>{plan.nombre}</h2>
+                <h2 className="relative font-['Outfit'] font-bold text-slate-900 dark:text-white text-2xl mb-1">{plan.nombre}</h2>
                 <p className="relative text-slate-500 dark:text-white/35 text-xs mb-5">{plan.tagline}</p>
 
                 <div className="flex items-end gap-1 mb-1">
