@@ -98,27 +98,21 @@ export default function Precios() {
         <div className="text-center mb-5">
           <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase">¿Para qué negocio es?</p>
         </div>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5 mb-12 max-w-3xl mx-auto">
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-12 max-w-3xl mx-auto">
           {VERTICALES.map((v) => {
             const activo = verticalId === v.id;
             return (
               <button
                 key={v.id}
                 onClick={() => setVerticalId(v.id)}
-                className={`group flex flex-col items-center gap-2 py-4 px-2 rounded-2xl transition-all cursor-pointer apple-glass ${
+                className={`relative flex items-center gap-2 py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                   activo
-                    ? `ring-2 ${v.ring} shadow-lg`
-                    : "border border-slate-200/70 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/25"
+                    ? "bg-white text-slate-900 shadow-md"
+                    : "bg-white/5 border border-white/10 text-white/55 hover:text-white hover:border-white/25"
                 }`}
               >
-                <div
-                  className={`w-10 h-10 rounded-xl bg-gradient-to-br ${v.color} flex items-center justify-center text-white flex-shrink-0 transition-transform ${activo ? "scale-110 shadow-md" : "opacity-70 group-hover:opacity-100"}`}
-                >
-                  <v.Icon size={18} />
-                </div>
-                <span className={`text-[11px] sm:text-xs font-semibold leading-tight text-center ${activo ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-white/50"}`}>
-                  {v.nombre}
-                </span>
+                <span className={`w-1.5 h-1.5 rounded-full bg-gradient-to-br ${v.color} flex-shrink-0`} />
+                {v.nombre}
               </button>
             );
           })}
@@ -169,13 +163,7 @@ export default function Precios() {
                   </>
                 )}
 
-                {plan.destacado && (
-                  <div className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${vertical.color} flex items-center justify-center text-white shadow-md mb-4`}>
-                    <vertical.Icon size={22} />
-                  </div>
-                )}
-
-                <h2 className="relative font-['Outfit'] font-bold text-slate-900 dark:text-white text-2xl mb-1">{plan.nombre}</h2>
+                <h2 className={`relative font-['Outfit'] font-bold text-slate-900 dark:text-white text-2xl mb-1 ${plan.destacado ? "mt-2" : ""}`}>{plan.nombre}</h2>
                 <p className="relative text-slate-500 dark:text-white/35 text-xs mb-5">{plan.tagline}</p>
 
                 <div className="flex items-end gap-1 mb-1">
