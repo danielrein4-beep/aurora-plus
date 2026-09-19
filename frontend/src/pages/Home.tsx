@@ -60,14 +60,14 @@ const FEATURES = [
 
 const PLANS = [
   {
-    name: "Aurora Plus", price: "$25", period: "/mes", desc: "Un solo plan, acceso completo — sin niveles ni funciones bloqueadas",
-    features: ["Acceso a TODOS los módulos, sin excepción", "Acceso web + versión móvil", "Sin costo extra por usuario adicional", "Multi-moneda (USD · VES · COP)", "Reportes y BI avanzado"],
-    cta: "Ver planes y precios", highlight: true, badge: "",
+    name: "Aurora Básico", price: "$25", period: "/mes", desc: "Lo esencial de tu vertical para dejar de operar a mano",
+    features: ["Módulos base (POS/agenda, inventario, caja)", "Acceso web + versión móvil", "Sin costo extra por usuario adicional", "Multi-moneda (USD · VES · COP)", "Offline con sincronización automática"],
+    cta: "Comenzar con Básico", highlight: false, badge: "",
   },
   {
-    name: "Página Web", price: "Cotizable", period: "", desc: "Presencia digital profesional",
-    features: ["Diseño personalizado con tu marca", "Catálogo de productos o servicios", "Ventana de pagos integrada", "Dominio y hosting incluido", "Optimización para Google (SEO)", "Integración con Aurora Plus"],
-    cta: "Solicitar cotización", highlight: false, badge: "NUEVO",
+    name: "Aurora Full", price: "Desde $40", period: "/mes", desc: "Todo lo del Básico + nuestras herramientas más fuertes",
+    features: ["Comercio: catálogo público + IA por WhatsApp", "Mediclinic/Odontología: vademécum y récipe oficial", "Ganadería: mapa satelital y básculas bluetooth", "Reportes y BI avanzado", "Acompañamiento del equipo fundador"],
+    cta: "Quiero Aurora Full", highlight: true, badge: "MÁS FUERTE",
   },
 ];
 
