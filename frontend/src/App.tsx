@@ -1,3 +1,4 @@
+import NotFound from "./pages/NotFound";
 import { obtenerDatosImpersonacion, salirDeImpersonacion } from "./api";
 import React, { useState, useEffect } from "react";
 import SuperAdminPortal from "./components/SuperAdminPortal";
@@ -105,6 +106,28 @@ function ImpersonacionBarraFlotante() {
 }
 
 export default function App() {
+  const [showSuperAdminModal, setShowSuperAdminModal] = useState(false);
+
+  useEffect(() => {
+    // Si viene de retorno de soporte con ?admin=true
+    if (window.location.search.includes("admin=true")) {
+      setShowSuperAdminModal(true);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Atajo secreto: Ctrl + Shift + S o Ctrl + Shift + A
+      if (e.ctrlKey && e.shiftKey && (e.key === "S" || e.key === "s" || e.key === "A" || e.key === "a")) {
+        e.preventDefault();
+        setShowSuperAdminModal((prev) => !prev);
+      }
+      if (e.key === "Escape") {
+        setShowSuperAdminModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -130,7 +153,9 @@ export default function App() {
             <Route path="/resetear-clave" element={<AnimatedRoute><ResetearClave /></AnimatedRoute>} />
             <Route path="/onboarding" element={<AnimatedRoute><Onboarding /></AnimatedRoute>} />
             {/* Protected — requiere sesión activa */}
-            <Route path="/superadmin" element={<AnimatedRoute><SuperAdminPortal /></AnimatedRoute>} />
+            {/* Ruta /superadmin eliminada por seguridad: responde 404 a intrusos */}
+            <Route path="/superadmin" element={<NotFound />} />
+            <Route path="*" element={<NotFound />} />
             <Route path="/dashboard"  element={<ProtectedRoute><AnimatedRoute><Dashboard /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/finanzas" element={<ProtectedRoute><AnimatedRoute><CentroFinanciero /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/auditoria" element={<ProtectedRoute><AnimatedRoute><Auditoria /></AnimatedRoute></ProtectedRoute>} />
@@ -142,6 +167,10 @@ export default function App() {
             <Route path="/ganaderia"  element={<ProtectedRoute><AnimatedRoute><GanaderiaPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/ganaderia/animal/:animalId" element={<ProtectedRoute><AnimatedRoute><GanaderiaAnimalPage /></AnimatedRoute></ProtectedRoute>} />
           </Routes>
+          {/* Modal Oculto de SuperAdmin (Invocado solo con Atajo Secreto Ctrl+Shift+S) */}
+          {showSuperAdminModal && (
+            <SuperAdminPortal onClose={() => setShowSuperAdminModal(false)} />
+          )}
         </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>

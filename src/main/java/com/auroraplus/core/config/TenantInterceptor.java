@@ -51,7 +51,13 @@ public class TenantInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            rechazar(response, "Falta el token de autenticación (header Authorization: Bearer <token>)");
+            if (request.getRequestURI().startsWith("/api/super-admin/")) {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"error\":\"Recurso no encontrado\"}");
+                return false;
+            }
+            rechazar(response, "Falta el token de autenticacion");
             return false;
         }
 
@@ -86,7 +92,9 @@ public class TenantInterceptor implements HandlerInterceptor {
         }
 
         if (esRutaSuperAdmin) {
-            rechazar(response, "Se requiere un token de super-admin para esta ruta");
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"error\":\"No encontrado\"}");
             return false;
         }
 
