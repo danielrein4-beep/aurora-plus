@@ -107,7 +107,7 @@ export default function Precios() {
                 onClick={() => setVerticalId(v.id)}
                 className={`relative flex items-center gap-2 py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                   activo
-                    ? "bg-white text-slate-900 shadow-md"
+                    ? "bg-white !text-slate-900 shadow-md"
                     : "bg-white/5 border border-white/10 text-white/55 hover:text-white hover:border-white/25"
                 }`}
               >
