@@ -40,7 +40,7 @@ public class CompraRepuestoController {
 
     @GetMapping
     public List<CompraRepuesto> listar() {
-        return compraRepuestoRepository.findByTenantIdOrderByFechaCompraDesc(TenantContext.getCurrentTenant());
+        return compraRepuestoRepository.listarConProveedor(TenantContext.getCurrentTenant());
     }
 
     @PostMapping

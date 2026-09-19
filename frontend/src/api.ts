@@ -197,6 +197,10 @@ export function obtenerMiNegocio(): Promise<MiNegocio> {
   return request("/api/config/mi-negocio/marca");
 }
 
+export function actualizarLogo(imagenBase64: string): Promise<MiNegocio> {
+  return request("/api/config/mi-negocio/logo", { method: "PUT", body: JSON.stringify({ imagenBase64 }) });
+}
+
 /** Moneda principal del negocio (USD/VES/COP) — la usa todo el motor financiero (tasas, conversiones, caja) como base de precios. Solo el Dueño/Administrador la puede cambiar. */
 export function obtenerMonedaBaseNegocio(): Promise<{ monedaBase: string }> {
   return request("/api/config/mi-negocio/moneda-base");
@@ -518,6 +522,33 @@ export function configurarPinDoctor(pinNuevo: string, pinActual?: string): Promi
   });
 }
 
+// Perfil médico y membrete de documentos (motor de personalización de PDFs) — guardado por
+// tenant en el servidor (ver ConfiguracionMedicaController), no en localStorage de un solo
+// dispositivo. Se inyecta automáticamente en el encabezado y la firma de cada PDF generado.
+export interface PerfilMedicoDocumentos {
+  doctorNombre: string;
+  especialidad: string;
+  matriculaMpps: string;
+  colegioMedicos: string;
+  encabezadoTexto: string;
+  firmaBase64: string | null;
+  /** Borrador editable del recordatorio de cita por WhatsApp (costo, forma de pago, hora de
+   * llegada los define cada médico) — el sistema solo rellena saludo/paciente/fecha/hora. */
+  plantillaRecordatorioCita: string | null;
+}
+
+export function obtenerPerfilMedicoDocumentos(): Promise<PerfilMedicoDocumentos> {
+  return request("/api/salud/config/perfil");
+}
+
+export function actualizarPerfilMedicoDocumentos(datos: Omit<PerfilMedicoDocumentos, "firmaBase64">): Promise<PerfilMedicoDocumentos> {
+  return request("/api/salud/config/perfil", { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function actualizarFirmaMedico(firmaBase64: string): Promise<PerfilMedicoDocumentos> {
+  return request("/api/salud/config/firma", { method: "PUT", body: JSON.stringify({ firmaBase64 }) });
+}
+
 export interface SalaEsperaEntrada {
   id: number;
   paciente: Paciente;
@@ -542,6 +573,11 @@ export async function registrarLlegadaSalaEspera(
 
 export async function finalizarAtencionSalaEspera(id: number): Promise<SalaEsperaEntrada> {
   return request(`/api/salud/sala-espera/${id}/finalizar`, { method: "POST" });
+}
+
+export async function llamarAConsultorioSalaEspera(id: number, consultorio?: string): Promise<SalaEsperaEntrada> {
+  const params = consultorio ? `?consultorio=${encodeURIComponent(consultorio)}` : "";
+  return request(`/api/salud/sala-espera/${id}/llamar${params}`, { method: "POST" });
 }
 
 export interface ProcedimientoMedico {
@@ -624,6 +660,14 @@ export interface ConsultaMedica {
   observacionFisica?: string;
   talla?: string;
   peso?: string;
+  /** "120/80" tal cual la anota el doctor — sin este campo, los informes imprimían un valor inventado. */
+  presionArterial?: string;
+  frecuenciaCardiaca?: number;
+  frecuenciaRespiratoria?: number;
+  temperatura?: number;
+  saturacionOxigeno?: number;
+  /** Calculado y devuelto por el backend a partir de peso/talla — no se envía, solo se lee. */
+  imc?: number;
   evolucionClinica?: string;
   /** Cómo llegó el paciente respecto a su visita anterior — alimenta la gráfica de
    * tendencia de evolución en Historias Clínicas. Solo tiene sentido en consultas de
@@ -682,6 +726,478 @@ export async function actualizarDienteOdontograma(
     body: JSON.stringify({ pacienteId, numeroFdi, ...datos }),
   });
 }
+
+// --- Veterinaria / Aurora Vet ---
+
+export interface Propietario {
+  id: number;
+  nombreCompleto: string;
+  identificacion: string;
+  nombres: string;
+  apellidos: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
+  activo: boolean;
+}
+
+export interface NuevoPropietario {
+  identificacion: string;
+  nombres: string;
+  apellidos: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
+}
+
+export async function listarPropietarios(tenantId: number, buscar?: string): Promise<Propietario[]> {
+  const q = buscar ? `&buscar=${encodeURIComponent(buscar)}` : "";
+  return request<Propietario[]>(`/api/veterinaria/propietarios?tenantId=${tenantId}${q}`);
+}
+
+export async function crearPropietario(tenantId: number, datos: NuevoPropietario): Promise<Propietario> {
+  return request<Propietario>(`/api/veterinaria/propietarios?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function actualizarPropietario(tenantId: number, id: number, datos: NuevoPropietario): Promise<Propietario> {
+  return request<Propietario>(`/api/veterinaria/propietarios/${id}?tenantId=${tenantId}`, {
+    method: "PUT",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function buscarPropietarioPorIdentificacion(tenantId: number, identificacion: string): Promise<Propietario | null> {
+  try {
+    return await request<Propietario>(`/api/veterinaria/propietarios/identificacion/${encodeURIComponent(identificacion)}?tenantId=${tenantId}`);
+  } catch (err) {
+    if (err instanceof ApiError && /404/.test(err.message)) return null;
+    throw err;
+  }
+}
+
+export async function eliminarPropietario(tenantId: number, id: number): Promise<void> {
+  await request(`/api/veterinaria/propietarios/${id}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
+export type EspecieMascota = "PERRO" | "GATO" | "AVE" | "EXOTICO" | "OTRO";
+
+export interface Mascota {
+  id: number;
+  nombre: string;
+  propietario: Propietario;
+  especie: EspecieMascota;
+  raza?: string;
+  sexo?: "MACHO" | "HEMBRA" | string;
+  fechaNacimiento?: string;
+  edadEstimada?: string;
+  edadCalculada?: string;
+  colorSenas?: string;
+  pesoActualKg?: number;
+  microchip?: string;
+  esterilizado: boolean;
+  alergias?: string;
+  antecedentesPatologicos?: string;
+  fallecido: boolean;
+  activo: boolean;
+}
+
+export interface NuevaMascota {
+  nombre: string;
+  propietarioId: number;
+  especie: EspecieMascota;
+  raza?: string;
+  sexo?: string;
+  fechaNacimiento?: string;
+  edadEstimada?: string;
+  colorSenas?: string;
+  pesoActualKg?: number;
+  microchip?: string;
+  esterilizado?: boolean;
+  alergias?: string;
+  antecedentesPatologicos?: string;
+}
+
+export async function listarMascotas(tenantId: number, propietarioId?: number, buscar?: string): Promise<Mascota[]> {
+  let url = `/api/veterinaria/mascotas?tenantId=${tenantId}`;
+  if (propietarioId) url += `&propietarioId=${propietarioId}`;
+  if (buscar) url += `&buscar=${encodeURIComponent(buscar)}`;
+  return request<Mascota[]>(url);
+}
+
+export async function obtenerMascota(tenantId: number, id: number): Promise<Mascota> {
+  return request<Mascota>(`/api/veterinaria/mascotas/${id}?tenantId=${tenantId}`);
+}
+
+export async function crearMascota(tenantId: number, datos: NuevaMascota): Promise<Mascota> {
+  return request<Mascota>(`/api/veterinaria/mascotas?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({
+      propietario: { id: datos.propietarioId },
+      ...datos,
+    }),
+  });
+}
+
+export async function actualizarMascota(tenantId: number, id: number, datos: NuevaMascota): Promise<Mascota> {
+  return request<Mascota>(`/api/veterinaria/mascotas/${id}?tenantId=${tenantId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      propietario: { id: datos.propietarioId },
+      ...datos,
+    }),
+  });
+}
+
+export async function eliminarMascota(tenantId: number, id: number): Promise<void> {
+  await request(`/api/veterinaria/mascotas/${id}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
+export async function marcarMascotaFallecido(tenantId: number, id: number, fallecido: boolean): Promise<void> {
+  await request(`/api/veterinaria/mascotas/${id}/fallecido?tenantId=${tenantId}&fallecido=${fallecido}`, { method: "PATCH" });
+}
+
+export interface CitaVeterinaria {
+  id: number;
+  mascota: Mascota;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+  motivo: string;
+  especialidad: string | null;
+  estado: string;
+  costoEstimado?: number;
+  moneda?: string;
+  notas?: string;
+}
+
+export interface NuevaCitaVet {
+  mascotaId: number;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+  motivo?: string;
+  especialidad?: string;
+  estado?: string;
+  costoEstimado?: number;
+  moneda?: string;
+  notas?: string;
+}
+
+export async function listarCitasVetDelDia(tenantId: number, fecha: string): Promise<CitaVeterinaria[]> {
+  return request<CitaVeterinaria[]>(`/api/veterinaria/agenda?tenantId=${tenantId}&fecha=${fecha}`);
+}
+
+export async function listarCitasVetPorRango(tenantId: number, fechaInicio: string, fechaFin: string): Promise<CitaVeterinaria[]> {
+  return request<CitaVeterinaria[]>(`/api/veterinaria/agenda?tenantId=${tenantId}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
+}
+
+export async function agendarCitaVet(tenantId: number, datos: NuevaCitaVet): Promise<CitaVeterinaria> {
+  return request<CitaVeterinaria>(`/api/veterinaria/agenda/citas?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({
+      mascota: { id: datos.mascotaId },
+      fecha: datos.fecha,
+      horaInicio: datos.horaInicio,
+      horaFin: datos.horaFin,
+      motivo: datos.motivo,
+      especialidad: datos.especialidad,
+      estado: datos.estado || "PROGRAMADA",
+      costoEstimado: datos.costoEstimado,
+      moneda: datos.moneda || "USD",
+      notas: datos.notas,
+    }),
+  });
+}
+
+export function actualizarEstadoCitaVet(tenantId: number, id: number, estado: string): Promise<CitaVeterinaria> {
+  return request<CitaVeterinaria>(`/api/veterinaria/agenda/citas/${id}/estado?tenantId=${tenantId}&estado=${estado}`, { method: "PATCH" });
+}
+
+export function reprogramarCitaVet(tenantId: number, id: number, fecha: string, horaInicio: string, horaFin: string): Promise<CitaVeterinaria> {
+  return request<CitaVeterinaria>(`/api/veterinaria/agenda/citas/${id}/reprogramar?tenantId=${tenantId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ fecha, horaInicio, horaFin }),
+  });
+}
+
+export interface BloqueoAgendaVet {
+  id: number;
+  veterinarioId: number;
+  fechaInicio: string;
+  fechaFin: string;
+  horaInicio: string | null;
+  horaFin: string | null;
+  motivo: string;
+}
+
+export function registrarBloqueoAgendaVet(tenantId: number, datos: { fechaInicio: string; fechaFin: string; motivo: string }): Promise<BloqueoAgendaVet> {
+  return request<BloqueoAgendaVet>(`/api/veterinaria/agenda/bloqueos?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function listarBloqueosAgendaVet(tenantId: number, veterinarioId: number): Promise<BloqueoAgendaVet[]> {
+  return request<BloqueoAgendaVet[]>(`/api/veterinaria/agenda/bloqueos/veterinario/${veterinarioId}?tenantId=${tenantId}`);
+}
+
+export function eliminarBloqueoAgendaVet(tenantId: number, id: number): Promise<void> {
+  return request<void>(`/api/veterinaria/agenda/bloqueos/${id}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
+export interface CobroConsultaVet {
+  id: number;
+  mascota?: Mascota;
+  propietario?: Propietario;
+  concepto: string;
+  montoTotal: number;
+  monedaCobrada: string;
+  montoRecibido: number;
+  monedaPago: string;
+  tasaCambio?: number;
+  metodoPago: "EFECTIVO" | "TRANSFERENCIA" | "PUNTO_VENTA" | "PAGO_MOVIL" | "ZELLE" | "OTRO";
+  referenciaPago?: string;
+  fechaHora: string;
+  cajeroUsuario?: string;
+  estado: string;
+}
+
+export async function listarCobrosVetDelDia(tenantId: number, inicioIso: string, finIso: string): Promise<CobroConsultaVet[]> {
+  try {
+    return await request(`/api/veterinaria/cobros/reporte?tenantId=${tenantId}&inicio=${inicioIso}&fin=${finIso}`);
+  } catch {
+    return [];
+  }
+}
+
+export interface NuevoCobroVet {
+  mascotaId?: number;
+  propietarioId?: number;
+  concepto: string;
+  montoTotal: number;
+  monedaCobrada: string;
+  montoRecibido: number;
+  monedaPago: string;
+  metodoPago: "EFECTIVO" | "TRANSFERENCIA" | "PUNTO_VENTA" | "PAGO_MOVIL" | "ZELLE" | "OTRO";
+  referenciaPago?: string;
+}
+
+export function procesarCobroVet(tenantId: number, datos: NuevoCobroVet, claveIdempotencia?: string): Promise<CobroConsultaVet> {
+  return request<CobroConsultaVet>(`/api/veterinaria/cobros?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({
+      claveIdempotencia: claveIdempotencia || generarClaveIdempotencia(),
+      mascotaId: datos.mascotaId,
+      propietarioId: datos.propietarioId,
+      concepto: datos.concepto,
+      montoTotal: datos.montoTotal,
+      monedaCobrada: datos.monedaCobrada,
+      montoRecibido: datos.montoRecibido,
+      monedaPago: datos.monedaPago,
+      metodoPago: datos.metodoPago,
+      referenciaPago: datos.referenciaPago,
+    }),
+  });
+}
+
+export interface CierreCajaVetRegistro {
+  id: number;
+  fecha: string;
+  horaCierre: string;
+  responsableNombre?: string;
+  tasaBCV?: number;
+  tasaCOP?: number;
+  totalUSD: number;
+  totalVES: number;
+  totalCOP?: number;
+  totalPacientes: number;
+  observaciones?: string;
+}
+
+export function listarCierresCajaVet(tenantId: number): Promise<CierreCajaVetRegistro[]> {
+  return request<CierreCajaVetRegistro[]>(`/api/veterinaria/cierres-caja?tenantId=${tenantId}`);
+}
+
+export function registrarCierreCajaVet(tenantId: number, datos: Omit<CierreCajaVetRegistro, "id">): Promise<CierreCajaVetRegistro> {
+  return request<CierreCajaVetRegistro>(`/api/veterinaria/cierres-caja?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function eliminarCierreCajaVet(tenantId: number, id: number): Promise<void> {
+  return request<void>(`/api/veterinaria/cierres-caja/${id}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
+export interface SalaEsperaVetEntrada {
+  id: number;
+  mascota: Mascota;
+  consultorio: string | null;
+  estado: string;
+  prioridad: string;
+  horaLlegada: string;
+  veterinarioNombre?: string;
+}
+
+export async function listarSalaEsperaVet(tenantId: number): Promise<SalaEsperaVetEntrada[]> {
+  return request<SalaEsperaVetEntrada[]>(`/api/veterinaria/sala-espera?tenantId=${tenantId}`);
+}
+
+export async function registrarLlegadaSalaEsperaVet(
+  tenantId: number,
+  mascotaId: number,
+  consultorio?: string
+): Promise<SalaEsperaVetEntrada> {
+  return request<SalaEsperaVetEntrada>(`/api/veterinaria/sala-espera/check-in?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ mascota: { id: mascotaId }, consultorio }),
+  });
+}
+
+export async function llamarAConsultorioSalaEsperaVet(
+  tenantId: number,
+  id: number,
+  consultorio?: string,
+  veterinarioId?: number,
+  veterinarioNombre?: string
+): Promise<SalaEsperaVetEntrada> {
+  let url = `/api/veterinaria/sala-espera/${id}/llamar?tenantId=${tenantId}`;
+  if (consultorio) url += `&consultorio=${encodeURIComponent(consultorio)}`;
+  if (veterinarioId) url += `&veterinarioId=${veterinarioId}`;
+  if (veterinarioNombre) url += `&veterinarioNombre=${encodeURIComponent(veterinarioNombre)}`;
+  return request<SalaEsperaVetEntrada>(url, { method: "POST" });
+}
+
+export async function finalizarAtencionSalaEsperaVet(tenantId: number, id: number): Promise<SalaEsperaVetEntrada> {
+  return request(`/api/veterinaria/sala-espera/${id}/finalizar?tenantId=${tenantId}`, { method: "POST" });
+}
+
+export interface ProcedimientoVeterinario {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  costo: number;
+  moneda: string;
+  duracionMinutos: number | null;
+}
+
+export async function listarProcedimientosVet(tenantId: number): Promise<ProcedimientoVeterinario[]> {
+  return request<ProcedimientoVeterinario[]>(`/api/veterinaria/procedimientos?tenantId=${tenantId}`);
+}
+
+export async function crearProcedimientoVet(
+  tenantId: number,
+  datos: Omit<ProcedimientoVeterinario, "id">
+): Promise<ProcedimientoVeterinario> {
+  return request<ProcedimientoVeterinario>(`/api/veterinaria/procedimientos?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function eliminarProcedimientoVet(tenantId: number, id: number): Promise<void> {
+  return request<void>(`/api/veterinaria/procedimientos/${id}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
+export interface CotizacionVeterinariaApi {
+  id: number;
+  mascota: Mascota;
+  procedimientoNombre: string;
+  descripcion: string | null;
+  costoUSD: number;
+  costoVES: number | null;
+  costoCOP: number | null;
+  tasaBCV: number | null;
+  tasaCOP: number | null;
+  estado: "COTIZADA" | "PLANIFICADA" | "REALIZADA" | "CANCELADA";
+  fecha: string;
+  fechaPlanificada: string | null;
+}
+
+export interface NuevaCotizacionVet {
+  mascotaId: number;
+  procedimientoNombre: string;
+  descripcion?: string;
+  costoUSD: number;
+  costoVES?: number;
+  costoCOP?: number;
+  tasaBCV?: number;
+  tasaCOP?: number;
+  fechaPlanificada?: string;
+}
+
+export function listarCotizacionesVet(tenantId: number, mascotaId?: number): Promise<CotizacionVeterinariaApi[]> {
+  const q = mascotaId ? `/mascota/${mascotaId}` : "";
+  return request<CotizacionVeterinariaApi[]>(`/api/veterinaria/cotizaciones${q}?tenantId=${tenantId}`);
+}
+
+export function crearCotizacionVet(tenantId: number, datos: NuevaCotizacionVet): Promise<CotizacionVeterinariaApi> {
+  return request<CotizacionVeterinariaApi>(`/api/veterinaria/cotizaciones?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ mascota: { id: datos.mascotaId }, ...datos }),
+  });
+}
+
+export function actualizarEstadoCotizacionVet(tenantId: number, id: number, estado: CotizacionVeterinariaApi["estado"]): Promise<CotizacionVeterinariaApi> {
+  return request<CotizacionVeterinariaApi>(`/api/veterinaria/cotizaciones/${id}/estado?tenantId=${tenantId}&estado=${estado}`, { method: "PATCH" });
+}
+
+export function eliminarCotizacionVet(tenantId: number, id: number): Promise<void> {
+  return request<void>(`/api/veterinaria/cotizaciones/${id}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
+export interface ConsultaVeterinaria {
+  id: number;
+  motivoConsulta: string;
+  enfermedadActual?: string;
+  observacionFisica?: string;
+  evolucionClinica?: string;
+  evolucionEstado?: "MEJORO" | "IGUAL" | "EMPEORO";
+  frecuenciaCardiaca?: number;
+  frecuenciaRespiratoria?: number;
+  temperatura?: number;
+  peso?: string;
+  pesoKg?: number;
+  condicionCorporal?: number; // BCS 1-9
+  diagnosticoPrincipal?: string;
+  descripcionDiagnostico?: string;
+  diagnosticosSecundarios?: string;
+  planTratamiento?: string;
+  recipeMedicamentos?: string;
+  indicacionesGenerales?: string;
+  ordenExamenes?: string;
+  anotacionesPrivadas?: string;
+  fechaHora?: string;
+}
+
+export async function historialConsultasMascota(tenantId: number, mascotaId: number): Promise<ConsultaVeterinaria[]> {
+  return request<ConsultaVeterinaria[]>(`/api/veterinaria/consultas/mascota/${mascotaId}?tenantId=${tenantId}`);
+}
+
+export async function registrarConsultaVet(
+  tenantId: number,
+  mascotaId: number,
+  datos: Partial<ConsultaVeterinaria>
+): Promise<ConsultaVeterinaria> {
+  return request<ConsultaVeterinaria>(`/api/veterinaria/consultas?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ mascota: { id: mascotaId }, ...datos }),
+  });
+}
+
+export async function eliminarConsultaVet(
+  tenantId: number,
+  _mascotaId: number,
+  consultaId: number
+): Promise<void> {
+  await request(`/api/veterinaria/consultas/${consultaId}?tenantId=${tenantId}`, {
+    method: "DELETE",
+  });
+}
+
 
 // --- Horeca / Restaurantes ---
 
@@ -1349,121 +1865,6 @@ export function crearPresentacion(tenantId: number, articuloId: number, datos: {
   return request(`/api/inventario/presentaciones?tenantId=${tenantId}&articuloId=${articuloId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-// --- Aurora Retail (Ferretería / Farmacia / Repuestos) ---
-
-export interface ProveedorRetail {
-  id: number;
-  tenantId: number;
-  nombre: string;
-  rif: string | null;
-  telefono: string | null;
-  contacto: string | null;
-  direccion: string | null;
-  activo: boolean;
-}
-
-export function listarProveedoresRetail(): Promise<ProveedorRetail[]> {
-  return request(`/api/retail/proveedores`);
-}
-
-export function crearProveedorRetail(tenantId: number, datos: { nombre: string; rif?: string; telefono?: string; contacto?: string; direccion?: string }): Promise<ProveedorRetail> {
-  return request(`/api/retail/proveedores?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
-}
-
-export interface ItemCompraRetail {
-  articuloId: number;
-  cantidad: number;
-  costoUnitario: number;
-  monedaCosto?: string;
-  presentacionId?: number;
-  fechaVencimiento?: string;
-}
-
-export interface CompraRetail {
-  id: number;
-  tenantId: number;
-  proveedor: ProveedorRetail;
-  numeroFactura: string | null;
-  fechaCompra: string;
-  total: number;
-  montoPagado: number | null;
-}
-
-export function listarComprasRetail(tenantId: number): Promise<CompraRetail[]> {
-  return request(`/api/retail/compras?tenantId=${tenantId}`);
-}
-
-export function registrarCompraRetail(tenantId: number, datos: { proveedorId: number; numeroFactura: string; items: ItemCompraRetail[]; montoPagadoAhora?: number; monedaPago?: string }): Promise<CompraRetail> {
-  return request(`/api/retail/compras?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
-}
-
-/** Búsqueda unificada del POS de mostrador: código de barras, nombre/SKU, principio activo (Farmacia) o código OEM (Repuestos). */
-export function buscarArticulosRetail(tenantId: number, texto: string): Promise<Articulo[]> {
-  return request(`/api/retail/articulos/buscar?tenantId=${tenantId}&texto=${encodeURIComponent(texto)}`);
-}
-
-export interface ItemVentaRetailRequest {
-  articuloId: number;
-  cantidad: number;
-  presentacionId?: number;
-}
-
-export interface ItemVentaRetail {
-  id: number;
-  articulo: Articulo;
-  presentacion: PresentacionArticulo | null;
-  cantidad: number;
-  precioUnitario: number;
-  costoUnitario: number;
-}
-
-export interface VentaRetail {
-  id: number;
-  tenantId: number;
-  cliente: Cliente | null;
-  total: number;
-  moneda: string;
-  esCredito: boolean;
-  fechaRegistro: string;
-}
-
-export function registrarVentaRetail(tenantId: number, datos: {
-  clienteId?: number; items: ItemVentaRetailRequest[]; esCredito?: boolean;
-  metodoPago?: string; monedaPago?: string; montoRecibido?: number;
-}): Promise<{ venta: VentaRetail; items: ItemVentaRetail[] }> {
-  return request(`/api/retail/ventas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
-}
-
-export function listarVentasRetail(tenantId: number): Promise<VentaRetail[]> {
-  return request(`/api/retail/ventas?tenantId=${tenantId}`);
-}
-
-// --- Catálogo de cruce (Repuestos): qué código OEM/vehículos cruzan con un artículo ---
-
-export interface CruceRepuesto {
-  id: number;
-  tenantId: number;
-  articulo: Articulo;
-  codigoOem: string;
-  marcaVehiculo: string;
-  modeloVehiculo: string;
-  anioDesde: number | null;
-  anioHasta: number | null;
-  notas: string | null;
-}
-
-export function listarCrucesPorArticulo(articuloId: number, tenantId: number): Promise<CruceRepuesto[]> {
-  return request(`/api/retail/cruces?articuloId=${articuloId}&tenantId=${tenantId}`);
-}
-
-export function crearCruceRepuesto(tenantId: number, articuloId: number, datos: { codigoOem: string; marcaVehiculo: string; modeloVehiculo: string; anioDesde?: number; anioHasta?: number; notas?: string }): Promise<CruceRepuesto> {
-  return request(`/api/retail/cruces?tenantId=${tenantId}&articuloId=${articuloId}`, { method: "POST", body: JSON.stringify(datos) });
-}
-
-export function eliminarCruceRepuesto(id: number, tenantId: number): Promise<void> {
-  return request(`/api/retail/cruces/${id}?tenantId=${tenantId}`, { method: "DELETE" });
-}
-
 /** Corrección de inventario: indicá el stock REAL contado y el sistema calcula/ audita la diferencia solo. */
 export function ajustarStockArticulo(articuloId: number, datos: { stockReal: number; motivo?: string }): Promise<Articulo> {
   return request(`/api/inventario/articulos/${articuloId}/ajustar-stock`, { method: "POST", body: JSON.stringify(datos) });
@@ -1807,6 +2208,18 @@ export function actualizarTasa(tenantId: number, datos: { monedaOrigen: string; 
   return request(`/api/financiero/tasas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
+/**
+ * Refresca la tasa USD/VES consultando en vivo una fuente pública (BCV oficial
+ * o Binance P2P) y la registra como tasa nueva. Si la fuente falla, el backend
+ * no escribe nada y esta llamada lanza un error con el motivo real — nunca se
+ * simula un valor. Variante con tenantId explícito (ComercioApp/MediclinicApp);
+ * ver también `actualizarTasaExterna` más abajo, que resuelve el tenant de la sesión.
+ */
+export function actualizarTasaExternaTenant(tenantId: number, fuente: "BCV" | "BINANCE", monedaDestino: string = "VES"): Promise<TasaCambio> {
+  const params = new URLSearchParams({ tenantId: String(tenantId), fuente, monedaDestino });
+  return request(`/api/financiero/tasas/actualizar-externa?${params.toString()}`, { method: "POST" });
+}
+
 export type TipoMovimientoCaja = "INGRESO" | "EGRESO" | "CXC" | "CXP";
 
 export interface MovimientoCaja {
@@ -2140,12 +2553,12 @@ const TENANTS_DEMO_DEFAULT: LicenciaTenant[] = [
   {
     id: 3,
     tenantId: 3,
-    nombreEmpresa: "Corporación Minera El Dorado",
-    moduloPrincipal: "minero",
+    nombreEmpresa: "Ferretería & Repuestos El Tornillo",
+    moduloPrincipal: "repuestos",
     tipoLicencia: "ENTERPRISE",
     activa: true,
     fechaVencimientoPago: "2027-01-01",
-    emailContacto: "operaciones@eldorado-gold.com",
+    emailContacto: "ventas@eltornillo.com",
     telefonoContacto: "+58 412-5554433",
     monedaBase: "USD",
   },
@@ -2483,9 +2896,7 @@ export async function listarModulosTenantSuperAdmin(tenantId: number): Promise<M
   const modulosDefault: ModuloTenant[] = [
     { tenantId, moduloNombre: "salud", activo: true },
     { tenantId, moduloNombre: "horeca", activo: false },
-    { tenantId, moduloNombre: "minero", activo: false },
     { tenantId, moduloNombre: "repuestos", activo: false },
-    { tenantId, moduloNombre: "moda", activo: false },
     { tenantId, moduloNombre: "ganaderia", activo: false },
   ];
   return modulosDefault;
@@ -2659,6 +3070,8 @@ export interface RepuestoItem {
   precioMayorista?: number | null;
   cantidadMinimaMayorista?: number | null;
   costoUnitario?: number;
+  stockMinimo?: number;
+  proveedorPrincipalId?: number | null;
 }
 
 export interface PresentacionRepuesto {
@@ -2703,11 +3116,11 @@ export interface DetalleCompraRepuesto {
 export interface CompraRepuesto {
   id: number;
   tenantId: number;
-  proveedor: ProveedorRepuesto;
+  proveedor: ProveedorRepuesto | null;
   numeroFactura?: string | null;
   fechaCompra: string;
   total: number;
-  detalles?: DetalleCompraRepuesto[];
+  items?: DetalleCompraRepuesto[];
 }
 
 export interface ItemCompraRepuestoRequest {
@@ -2756,6 +3169,11 @@ export function actualizarRepuesto(id: number, datos: Partial<RepuestoItem>): Pr
 
 export function eliminarRepuesto(id: number, tenantId: number): Promise<void> {
   return request(`/api/repuestos/items/${id}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
+/** Corrección de inventario: indicá el stock REAL contado y el sistema calcula/audita la diferencia solo (Kárdex tipo AJUSTE). */
+export function ajustarStockRepuesto(id: number, tenantId: number, datos: { stockReal: number; motivo?: string }): Promise<RepuestoItem> {
+  return request(`/api/repuestos/items/${id}/ajustar-stock?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
 export function historialMovimientosRepuesto(id: number, tenantId: number): Promise<MovimientoRepuesto[]> {

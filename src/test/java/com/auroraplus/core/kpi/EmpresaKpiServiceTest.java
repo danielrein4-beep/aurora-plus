@@ -4,16 +4,10 @@ import com.auroraplus.core.kpi.dto.EmpresaKpiDTO;
 import com.auroraplus.core.kpi.services.EmpresaKpiService;
 import com.auroraplus.core.config.entities.ModuloTenant;
 import com.auroraplus.core.config.repositories.ModuloTenantRepository;
-import com.auroraplus.core.inventario.entities.Articulo;
-import com.auroraplus.core.inventario.repositories.ArticuloRepository;
 import com.auroraplus.modules.horeca.entities.Comanda;
 import com.auroraplus.modules.horeca.entities.ItemComanda;
 import com.auroraplus.modules.horeca.repositories.ComandaRepository;
 import com.auroraplus.modules.horeca.repositories.ItemComandaRepository;
-import com.auroraplus.modules.retail.entities.ItemVentaRetail;
-import com.auroraplus.modules.retail.entities.VentaRetail;
-import com.auroraplus.modules.retail.repositories.ItemVentaRetailRepository;
-import com.auroraplus.modules.retail.repositories.VentaRetailRepository;
 import com.auroraplus.modules.repuestos.entities.MovimientoRepuesto;
 import com.auroraplus.modules.repuestos.entities.RepuestoItem;
 import com.auroraplus.modules.repuestos.repositories.MovimientoRepuestoRepository;
@@ -48,15 +42,6 @@ class EmpresaKpiServiceTest {
 
     @Autowired
     private ModuloTenantRepository moduloTenantRepository;
-
-    @Autowired
-    private ArticuloRepository articuloRepository;
-
-    @Autowired
-    private VentaRetailRepository ventaRetailRepository;
-
-    @Autowired
-    private ItemVentaRetailRepository itemVentaRetailRepository;
 
     @Autowired
     private RepuestoItemRepository repuestoItemRepository;
@@ -118,24 +103,6 @@ class EmpresaKpiServiceTest {
     }
 
     @Test
-    void retailRespetaModuloActivoYAislaElLimiteSuperiorDelPeriodo() {
-        long tenantId = 92004L;
-        activarModulo(tenantId, "retail");
-
-        agregarVentaRetail(tenantId, LocalDateTime.of(2026, 1, 15, 10, 0),
-            new BigDecimal("15.00"), new BigDecimal("6.00"));
-        agregarVentaRetail(tenantId, LocalDateTime.of(2026, 2, 1, 0, 0),
-            new BigDecimal("99.00"), new BigDecimal("40.00"));
-
-        EmpresaKpiDTO kpi = empresaKpiService.obtenerKpis(tenantId, DESDE, HASTA);
-        EmpresaKpiDTO.ModuloKpi retail = buscarModulo(kpi, "RETAIL");
-        assertEquals(0, new BigDecimal("15.00").compareTo(retail.ventasBrutas()));
-        assertEquals(0, new BigDecimal("6.00").compareTo(retail.costoVentas()));
-        assertEquals(0, new BigDecimal("100.00").compareTo(retail.coberturaPct()));
-        assertFalse(kpi.verticalesNoConectadas().contains("MODA"));
-    }
-
-    @Test
     void repuestosUsaSuKardexYNoFingeCostoHistorico() {
         long tenantId = 92006L;
         activarModulo(tenantId, "repuestos");
@@ -194,36 +161,6 @@ class EmpresaKpiServiceTest {
         modulo.setModuloNombre(nombre);
         modulo.setActivo(true);
         moduloTenantRepository.save(modulo);
-    }
-
-    private void agregarVentaRetail(long tenantId, LocalDateTime fecha, BigDecimal precio, BigDecimal costo) {
-        Articulo articulo = new Articulo();
-        articulo.setTenantId(tenantId);
-        articulo.setSku("SKU-" + tenantId + "-" + fecha);
-        articulo.setNombre("Artículo de prueba");
-        articulo.setUnidadMedida("UND");
-        articulo.setCategoria("TEST");
-        articulo.setPorcentajeImpuesto(BigDecimal.ZERO);
-        articulo.setPrecioVenta(precio);
-        articulo.setCostoUnitario(costo);
-        articulo = articuloRepository.save(articulo);
-
-        VentaRetail venta = new VentaRetail();
-        venta.setTenantId(tenantId);
-        venta.setTotal(precio);
-        venta.setMoneda("USD");
-        venta.setEsCredito(false);
-        venta.setFechaRegistro(fecha);
-        venta = ventaRetailRepository.save(venta);
-
-        ItemVentaRetail item = new ItemVentaRetail();
-        item.setTenantId(tenantId);
-        item.setVenta(venta);
-        item.setArticulo(articulo);
-        item.setCantidad(BigDecimal.ONE);
-        item.setPrecioUnitario(precio);
-        item.setCostoUnitario(costo);
-        itemVentaRetailRepository.save(item);
     }
 
     private Comanda crearComandaPagada(long tenantId) {

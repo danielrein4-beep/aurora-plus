@@ -67,7 +67,7 @@ export interface CuentaRegistrada {
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  completarRegistro: (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string }) => Promise<void>;
+  completarRegistro: (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string; industria?: string }) => Promise<void>;
   completeOnboarding: (data: Partial<User>) => void;
   marcarPrimerIngresoCompletado: () => void;
   reportPayment: (payment: Omit<PaymentRecord, "id" | "fecha" | "estado">) => void;
@@ -124,20 +124,19 @@ function marcarTenantVisitado(tenantId: number) {
 // que todavía no tiene su propia plantilla cae en "clinica" por defecto (ver
 // VERTICAL_METADATA en Dashboard.tsx), así que agregar aquí una vertical
 // nueva no rompe nada, solo mejora qué tan preciso se ve el panel.
-// Farmacia/Ferretería/Repuestos NO entran acá a propósito: comparten el mismo
-// motor (Aurora Retail) pero cada una necesita distinguirse de las otras dos
-// dentro de la app (FEFO/Principio Activo en Farmacia, catálogo de cruce en
-// Repuestos, fraccionado en Ferretería) — así que su "industry" es su propio
-// nombre de módulo tal cual, no una categoría compartida. Ver el fallback más
-// abajo y RetailApp.tsx.
+// Farmacia NO entra acá a propósito: comparte el mismo motor (Aurora Retail)
+// que Comercio pero necesita distinguirse dentro de la app (FEFO/Principio
+// Activo, lotes/vencimiento) — así que su "industry" es su propio nombre de
+// módulo tal cual, no una categoría compartida. Ferretería/Repuestos/Retail se
+// unificaron en la UI bajo "Comercio" (ver ComercioApp.tsx), pero el valor de
+// `industry` de cada tenant existente se deja tal cual quedó registrado — el
+// fallback de abajo ya lo pasa tal cual sin necesitar entrada en este mapa.
 const MODULO_A_INDUSTRIA: Record<string, string> = {
   salud: "clinica",
   farmacia: "farmacia",
   horeca: "restaurante",
   restaurante: "restaurante",
   ganaderia: "finca",
-  moda: "ferreteria",
-  minero: "mineria",
   "tamanaco-comercial": "ferreteria",
 };
 
@@ -189,7 +188,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const negocio = await obtenerMiNegocio();
       empresa = negocio.nombreEmpresa || empresa;
-      industry = MODULO_A_INDUSTRIA[negocio.moduloPrincipal] || negocio.moduloPrincipal || "clinica";
+      // moduloPrincipal colapsa varios rubros al mismo módulo backend (ej. clinica/farmacia/
+      // veterinaria comparten "salud"), así que por sí solo no alcanza para distinguirlos. El
+      // rubro exacto elegido en el registro/onboarding SÍ quedó guardado en la cuenta local de
+      // este dispositivo — se prefiere ese valor cuando existe, y solo se cae al mapa colapsado
+      // cuando no hay caché local (ej. primer login desde otro dispositivo).
+      industry = cuentaLocal?.industry || MODULO_A_INDUSTRIA[negocio.moduloPrincipal] || negocio.moduloPrincipal || "clinica";
     } catch {
       // La autenticación ya fue válida — esto solo completa metadata de UI.
       if (cuentaLocal) {
@@ -224,7 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Registro de autoservicio — SIEMPRE contra el backend real, ver esRechazoRealDelBackend arriba.
-  const completarRegistro = async (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string }) => {
+  const completarRegistro = async (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string; industria?: string }) => {
     // El registro SIEMPRE crea el tenant contra el backend real. Un rechazo real (ej. "Ya existe
     // una cuenta con este correo") se muestra tal cual; una falla de conexión real avisa que no
     // hay conexión — nunca se finge que se creó una cuenta que en realidad no existe en el backend.
@@ -237,7 +241,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(MENSAJE_SIN_CONEXION);
     }
 
-    const industry = MODULO_A_INDUSTRIA[datos.moduloPrincipal] || datos.moduloPrincipal || "clinica";
+    // datos.industria trae el rubro EXACTO elegido por la persona (ej. "veterinaria"), que hay que
+    // preservar tal cual — MODULO_A_INDUSTRIA colapsa varios rubros al mismo moduloPrincipal
+    // backend (ej. clinica/farmacia/veterinaria comparten moduloPrincipal="salud") y perdería esa
+    // distinción si se usara como única fuente.
+    const industry = datos.industria || MODULO_A_INDUSTRIA[datos.moduloPrincipal] || datos.moduloPrincipal || "clinica";
     const nombreUsuario = datos.username?.includes("@") ? datos.username.split("@")[0] : datos.username || "Usuario";
 
     // Guardar cuenta registrada localmente

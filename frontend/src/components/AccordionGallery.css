@@ -1,0 +1,103 @@
+/* AccordionGallery (react-bits.dev) — franjas que crecen al pasar el mouse,
+   revelando la imagen completa; las demás se comprimen con un leve tilt en
+   perspectiva y una capa oscura (overlay) por encima. */
+.accordion-gallery {
+  --ag-media-size: 320px;
+  display: flex;
+  width: 100%;
+  gap: var(--ag-gap, 10px);
+  perspective: 1400px;
+}
+
+.accordion-gallery--vertical {
+  flex-direction: column;
+}
+
+.ag-panel {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  cursor: pointer;
+  display: block;
+  text-decoration: none;
+  outline: none;
+  transform-style: preserve-3d;
+  background: #0a0a12;
+}
+
+.ag-panel:focus-visible {
+  box-shadow: 0 0 0 2px var(--ag-accent, #fff);
+}
+
+.ag-panel__frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: block;
+}
+
+.ag-panel__media {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--ag-media-size);
+  height: var(--ag-media-size);
+  --ag-gray: 1;
+  --ag-dim: 0.35;
+}
+
+.ag-panel__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: grayscale(var(--ag-gray)) brightness(calc(1 - var(--ag-dim) * 0.5));
+  transition: filter 0.3s ease;
+  user-select: none;
+  pointer-events: none;
+}
+
+.ag-panel__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, var(--ag-overlay, #060010) 100%);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.ag-panel__label {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ag-text, #fff);
+  pointer-events: none;
+}
+
+.ag-panel__bar {
+  width: 3px;
+  height: 22px;
+  flex-shrink: 0;
+  background: var(--ag-accent, #fff);
+  border-radius: 2px;
+  opacity: 0;
+  transform: translateX(-14px);
+}
+
+.ag-panel__text {
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transform: translateX(-14px);
+}

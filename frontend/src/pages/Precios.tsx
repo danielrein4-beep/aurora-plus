@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import SpecularButton from "../components/SpecularButton";
 import { IconCheck } from "../Icons";
 
 const PRECIO_BASE_MENSUAL = 25;
@@ -116,12 +117,23 @@ export default function Precios() {
             ))}
           </ul>
 
-          <button
+          <SpecularButton
+            size="md"
+            radius={12}
+            tint="#35d7c3"
+            tintOpacity={0.16}
+            textColor="#ffffff"
+            lineColor="#7cf3e3"
+            baseColor="#0f766e"
+            shineSize={12}
+            shineFade={45}
+            intensity={1.3}
+            proximity={280}
+            className="w-full max-w-xs"
             onClick={() => navigate("/onboarding")}
-            className="w-full max-w-xs py-3.5 rounded-xl text-sm font-semibold transition-all cursor-pointer g-aurora text-white hover:opacity-90 shadow-md"
           >
             Comenzar ahora
-          </button>
+          </SpecularButton>
         </div>
       </section>
 
@@ -158,11 +170,22 @@ export default function Precios() {
                   </li>
                 ))}
               </ul>
-              <button
+              <SpecularButton
+                size="md"
+                radius={12}
+                tint="#a855f7"
+                tintOpacity={0.22}
+                textColor="#ffffff"
+                lineColor="#e9d5ff"
+                baseColor="#7c3aed"
+                shineSize={12}
+                shineFade={45}
+                intensity={1.3}
+                proximity={280}
                 onClick={() => navigate("/nosotros")}
-                className="bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm shadow-md cursor-pointer">
+              >
                 Cotizar mi página web →
-              </button>
+              </SpecularButton>
             </div>
             <div className="lg:w-64 flex-shrink-0 apple-glass rounded-2xl p-6 text-center border border-violet-500/20">
               <div className="text-slate-500 dark:text-white/35 text-xs mb-1 font-medium">Inversión única</div>

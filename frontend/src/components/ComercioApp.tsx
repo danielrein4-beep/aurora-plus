@@ -3,14 +3,17 @@ import {
   IconHardware, IconPrescription, IconRetail, IconCard, IconSearch, IconTrash,
   IconCheck, IconWarning, IconClose, IconUsers, IconFileText, IconHourglass,
   IconDownload, IconRefresh, IconCheckCircle, IconBank, IconChart, IconBox, IconLock,
+  IconSettings, IconCoins, IconEdit,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
+import { useBarcodeScanner, decodificarCodigoPesado } from "../hooks/useBarcodeScanner";
 import {
   listarRepuestos,
   crearRepuesto,
   actualizarRepuesto,
   eliminarRepuesto,
+  ajustarStockRepuesto,
   listarPresentacionesRepuesto,
   crearPresentacionRepuesto,
   despacharPorPresentacion,
@@ -21,13 +24,20 @@ import {
   listarComprasRepuesto,
   registrarCompraRepuesto,
   listarMovimientos, registrarMovimiento,
-  tasaVigente, actualizarTasa, actualizarTasaExterna, ApiError,
+  abrirTurno,
+  turnoAbierto,
+  historialTurnos,
+  registrarEgresoTurno,
+  cerrarTurno,
+  tasaVigente, actualizarTasa, actualizarTasaExternaTenant, ApiError,
   obtenerOrigenTasaActiva, actualizarOrigenTasaActiva,
   type RepuestoItem,
   type PresentacionRepuesto,
   type MovimientoRepuesto,
   type ProveedorRepuesto,
+  type CompraRepuesto,
   type MovimientoCaja,
+  type Turno,
   type TasaCambio,
   type OrigenTasaActiva,
 } from "../api";
@@ -35,7 +45,12 @@ import {
 // ══════════════════════════════════════════════════════════════════════════
 // TIPOS Y MODELOS
 // ══════════════════════════════════════════════════════════════════════════
-export type PerfilComercio = "ferreteria" | "farmacia" | "retail" | "repuestos";
+// "comercio" es el nombre unificado para tenants nuevos (Ferretería/Repuestos/Retail
+// bajo una sola identidad — ver comentario en ComercioApp más abajo); "ferreteria",
+// "repuestos" y "retail" se mantienen como alias para tenants ya registrados con esos
+// valores. Todos los cuatro se ven y funcionan exactamente igual. Farmacia es la
+// única rama realmente distinta.
+export type PerfilComercio = "ferreteria" | "farmacia" | "retail" | "repuestos" | "comercio";
 
 export interface ProductoComercio {
   id: string;
@@ -402,97 +417,39 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     user?.industry === "farmacia" ? "farmacia" :
     user?.industry === "retail" ? "retail" :
     user?.industry === "repuestos" ? "repuestos" :
+    user?.industry === "comercio" ? "comercio" :
     "ferreteria";
 
-  // Motor Multi-Tasa Fronterizo (USDT / BCV / COP / Propia) — todo esto vivía SOLO en
-  // localStorage del navegador y nunca tocaba el backend (ni siquiera el botón "Aplicar"
-  // hacía nada): un negocio con dos cajas veía tasas distintas e inventadas en cada una.
-  // Ahora BCV y USDT se consultan en vivo de su fuente pública real y todo se persiste
-  // en tasas_cambio, igual que en Aurora Horeca (ver TasaBadge en RestauranteApp.tsx).
   const tenantId = user?.tenantId;
-  const [tasaPorOrigen, setTasaPorOrigen] = useState<Record<"BCV" | "USDT" | "PERSONALIZADA", TasaCambio | null>>({
-    BCV: null, USDT: null, PERSONALIZADA: null
-  });
+
+  // Ferretería, Repuestos, Retail y Comercio son una sola identidad visual — un
+  // solo nombre, un solo ícono, un solo set de campos — desde que se unificaron
+  // bajo "Comercio". Solo Farmacia sigue siendo genuinamente distinta (lotes,
+  // vencimiento, principio activo). Usar este flag en vez de repetir la
+  // comparación de 4 valores en cada punto donde antes había una rama por rubro.
+  const esFarmacia = perfilActivo === "farmacia";
+  const esComercio = !esFarmacia;
+
+  // Tasas de cambio reales — misma metodología que usa Aurora Horeca (mismo
+  // motor genérico /api/financiero/tasas + /api/config/mi-negocio/origen-tasa):
+  // BCV y USDT se consultan en vivo de su fuente pública real, cada una se
+  // guarda como serie propia, y "origenTasaActiva" decide cuál gobierna el
+  // cobro. Se guarda un historial en el servidor, nunca solo en el navegador.
+  // El popover de edición vive en TasaBadgeComercio (más abajo en este archivo).
+  const [origenTasaActiva, setOrigenTasaActiva] = useState<OrigenTasaActiva | null>(null);
+  const [tasaVes, setTasaVes] = useState<TasaCambio | null>(null);
   const [tasaCopReal, setTasaCopReal] = useState<TasaCambio | null>(null);
-  const [tipoTasaActiva, setTipoTasaActivaState] = useState<OrigenTasaActiva>("USDT");
-  const [popoverTasa, setPopoverTasa] = useState(false);
-  const [tasaCopVal, setTasaCopVal] = useState("");
-  const [tasaPersVal, setTasaPersVal] = useState("");
-  const [actualizandoExterna, setActualizandoExterna] = useState<"BCV" | "USDT" | null>(null);
-  const [guardandoTasa, setGuardandoTasa] = useState(false);
-  const [errorTasa, setErrorTasa] = useState<string | null>(null);
-
   useEffect(() => {
-    if (!tenantId) return;
-    (["BCV", "USDT", "PERSONALIZADA"] as const).forEach((origen) => {
-      tasaVigente(tenantId, "USD", "VES", origen)
-        .then((t) => setTasaPorOrigen((prev) => ({ ...prev, [origen]: t })))
-        .catch(() => setTasaPorOrigen((prev) => ({ ...prev, [origen]: null })));
-    });
-    tasaVigente(tenantId, "USD", "COP").then(setTasaCopReal).catch(() => setTasaCopReal(null));
-    obtenerOrigenTasaActiva().then((r) => setTipoTasaActivaState(r.origenTasaActiva)).catch(() => {});
-  }, [tenantId]);
-
+    if (!user?.tenantId) return;
+    obtenerOrigenTasaActiva().then((r) => setOrigenTasaActiva(r.origenTasaActiva)).catch(() => setOrigenTasaActiva("USDT"));
+    tasaVigente(user.tenantId, "USD", "COP").then(setTasaCopReal).catch(() => setTasaCopReal(null));
+  }, [user?.tenantId]);
   useEffect(() => {
-    if (!popoverTasa) return;
-    setTasaPersVal(tasaPorOrigen.PERSONALIZADA ? String(Number(tasaPorOrigen.PERSONALIZADA.tasa)) : "");
-    setTasaCopVal(tasaCopReal ? String(Number(tasaCopReal.tasa)) : "");
-    setErrorTasa(null);
-  }, [popoverTasa, tasaPorOrigen, tasaCopReal]);
+    if (!user?.tenantId || !origenTasaActiva) return;
+    tasaVigente(user.tenantId, "USD", "VES", origenTasaActiva).then(setTasaVes).catch(() => setTasaVes(null));
+  }, [user?.tenantId, origenTasaActiva]);
 
-  const cambiarTipoTasaActiva = async (tipo: OrigenTasaActiva) => {
-    setTipoTasaActivaState(tipo);
-    try { await actualizarOrigenTasaActiva(tipo); } catch { /* revierte visualmente en el próximo fetch si falla */ }
-  };
-
-  const refrescarTasaExterna = async (tipo: "BCV" | "USDT") => {
-    if (!tenantId) return;
-    setActualizandoExterna(tipo);
-    setErrorTasa(null);
-    try {
-      const fuente = tipo === "USDT" ? "BINANCE" : "BCV";
-      const nueva = await actualizarTasaExterna(fuente, "VES");
-      setTasaPorOrigen((prev) => ({
-        ...prev,
-        [tipo]: {
-          id: nueva.id, tenantId, monedaOrigen: nueva.monedaOrigen, monedaDestino: nueva.monedaDestino,
-          tasa: nueva.tasa, origen: nueva.origenApi, fechaActualizacion: nueva.fechaActualizacion
-        }
-      }));
-    } catch (e) {
-      setErrorTasa(e instanceof ApiError ? e.message : "No se pudo consultar la tasa pública.");
-    } finally {
-      setActualizandoExterna(null);
-    }
-  };
-
-  const guardarTasaManual = async () => {
-    if (!tenantId) return;
-    const vCop = Number(tasaCopVal);
-    const vPers = Number(tasaPersVal);
-    if (vCop <= 0 && vPers <= 0) { setErrorTasa("Ingresa al menos una tasa mayor a cero"); return; }
-    setGuardandoTasa(true);
-    setErrorTasa(null);
-    try {
-      const tareas: Promise<void>[] = [];
-      if (vPers > 0) {
-        tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: vPers, origen: "PERSONALIZADA" })
-          .then((t) => setTasaPorOrigen((prev) => ({ ...prev, PERSONALIZADA: t }))));
-      }
-      if (vCop > 0) {
-        tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: vCop, origen: "MANUAL" })
-          .then(setTasaCopReal));
-      }
-      await Promise.all(tareas);
-      setPopoverTasa(false);
-    } catch (e) {
-      setErrorTasa(e instanceof Error ? e.message : "No se pudo actualizar la tasa");
-    } finally {
-      setGuardandoTasa(false);
-    }
-  };
-
-  const tasaActivaBs = tasaPorOrigen[tipoTasaActiva] ? Number(tasaPorOrigen[tipoTasaActiva]!.tasa) : 0;
+  const tasaActivaBs = tasaVes ? Number(tasaVes.tasa) : 0;
   const tasaCop = tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
@@ -552,6 +509,12 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [guardandoGasto, setGuardandoGasto] = useState(false);
   const [cargandoCompra, setCargandoCompra] = useState(false);
   const [toast, setToast] = useState<{ tipo: "success" | "error" | "info"; mensaje: string } | null>(null);
+  const [editarModalItem, setEditarModalItem] = useState<ProductoComercio | null>(null);
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+  const [ajustarStockModalItem, setAjustarStockModalItem] = useState<ProductoComercio | null>(null);
+  const [guardandoAjuste, setGuardandoAjuste] = useState(false);
+  const [comprasRepuesto, setComprasRepuesto] = useState<CompraRepuesto[] | null>(null);
+  const [cargandoCompras, setCargandoCompras] = useState(false);
 
   const mostrarToast = (mensaje: string, tipo: "success" | "error" | "info" = "success") => {
     setToast({ tipo, mensaje });
@@ -577,7 +540,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             precio: r.precioVenta,
             costo: r.costoUnitario || 0,
             stock: r.stockActual,
-            stockMinimo: 5,
+            stockMinimo: r.stockMinimo ?? 5,
             unidadMedida: r.unidadBase || "UNIDAD",
             codigoParte: r.codigoOriginalOem || undefined,
             precioMayorista: r.precioMayorista || undefined,
@@ -631,13 +594,28 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     }
   };
 
+  // Historial de Compras a Proveedor (mismo patrón que la vista "Compras & Proveedores"
+  // de Horeca) — antes solo existía el modal para REGISTRAR una compra, sin forma de ver
+  // el historial ya registrado. El backend ya filtra por tenant (ver
+  // CompraRepuestoRepository.listarConProveedor); el filtro de acá queda como defensa extra.
+  const cargarComprasRepuesto = () => {
+    if (!user?.tenantId) return;
+    setCargandoCompras(true);
+    listarComprasRepuesto()
+      .then((compras) => setComprasRepuesto(compras.filter((c) => c.tenantId === user.tenantId)))
+      .catch(() => setComprasRepuesto([]))
+      .finally(() => setCargandoCompras(false));
+  };
+
   useEffect(() => {
     if (user?.tenantId) {
       cargarRepuestosBackend();
       listarProveedoresRepuesto().then(setProveedoresRepuesto).catch(() => {});
       cargarIngresosCaja();
       cargarGastosCaja();
+      if (esComercio) cargarComprasRepuesto();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.tenantId, perfilActivo]);
 
   useEffect(() => {
@@ -689,9 +667,6 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [carrito.length, modalCobro, modalNuevoProducto, kardexModalItem, presentacionesModalItem, modalCompraProveedor, ventaReciente, busqueda]);
 
-  // Arqueo Ciego
-  const [desgloseCaja, setDesgloseCaja] = useState({ usd: "", ves: "", punto: "", pagoMovil: "", zelle: "", cop: "" });
-  const [cajaCerradaMsg, setCajaCerradaMsg] = useState<string | null>(null);
 
   // Filtro de productos según perfil y búsqueda
   const productosFiltrados = useMemo(() => {
@@ -808,6 +783,36 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     setCarrito((prev) => prev.filter((item) => (item.presentacionId ? `${item.productoId}-pres-${item.presentacionId}` : item.productoId) !== id));
   };
 
+  // Lectura de código de barras "zero-click": el hook detecta la ráfaga del
+  // lector sin importar dónde esté el foco (ver useBarcodeScanner). Solo
+  // queda activo en la pestaña POS — en Inventario/Clientes/Cierre un
+  // escaneo accidental no debe intentar cobrar nada.
+  const manejarCodigoEscaneado = (codigo: string) => {
+    const pesado = decodificarCodigoPesado(codigo);
+    const claveBusqueda = (pesado ? pesado.plu : codigo).toLowerCase();
+
+    const producto = productos.find((p) => {
+      if (p.rubro !== perfilActivo) return false;
+      return p.codigo.toLowerCase() === claveBusqueda
+        || p.codigo.toLowerCase().endsWith(claveBusqueda)
+        || (p.codigoParte ? p.codigoParte.toLowerCase() === claveBusqueda : false);
+    });
+
+    if (!producto) {
+      mostrarToast(`Código escaneado (${codigo}) no coincide con ningún producto del catálogo.`, "error");
+      return;
+    }
+
+    agregarAlCarrito(producto);
+    if (pesado && pesado.pesoKg !== 1) {
+      cambiarCantidad(producto.id, pesado.pesoKg - 1);
+    }
+    setBusqueda(""); // limpia dígitos que el lector haya tecleado de paso en el buscador enfocado
+    mostrarToast(`${producto.nombre} agregado${pesado ? ` (${pesado.pesoKg.toFixed(3)} kg)` : ""} por escaneo.`, "success");
+  };
+
+  useBarcodeScanner(manejarCodigoEscaneado, tab === "pos");
+
   // Finalizar Cobro
   const ejecutarCobro = async (esCredito = false) => {
     if (carrito.length === 0) return;
@@ -819,8 +824,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     const ingresado = parseFloat(montoRecibido);
     if (!isNaN(ingresado) && ingresado > 0) {
       if (monedaRecibida === "USD") recibidoEnUSD = ingresado;
-      else if (monedaRecibida === "VES") recibidoEnUSD = ingresado / tasaActivaBs;
-      else if (monedaRecibida === "COP") recibidoEnUSD = ingresado / tasaCop;
+      else if (monedaRecibida === "VES" && tasaActivaBs > 0) recibidoEnUSD = ingresado / tasaActivaBs;
+      else if (monedaRecibida === "COP" && tasaCop > 0) recibidoEnUSD = ingresado / tasaCop;
     }
 
     const vueltoUSD = Math.max(0, recibidoEnUSD - totalUSD);
@@ -932,10 +937,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   };
 
   const nombreLocal = user?.empresa || (
-    perfilActivo === "ferreteria" ? "Ferretería & Repuestos El Tornillo" :
-    perfilActivo === "farmacia" ? "Farmacia & Droguería San Cristóbal" :
-    perfilActivo === "repuestos" ? "Repuestos Automotrices El Motor" :
-    "Comercio & Minimarket Express"
+    esFarmacia ? "Farmacia & Droguería San Cristóbal" : "Comercio El Tornillo"
   );
 
   return (
@@ -951,9 +953,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         >
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-400 p-0.5 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform flex-shrink-0">
             <div className="w-full h-full bg-slate-50 dark:bg-slate-950 rounded-[10px] flex items-center justify-center">
-              {perfilActivo === "farmacia" ? <IconPrescription size={18} className="text-teal-400" /> :
-               perfilActivo === "ferreteria" || perfilActivo === "repuestos" ? <IconHardware size={18} className="text-teal-400" /> :
-               <IconRetail size={18} className="text-teal-400" />}
+              {esFarmacia ? <IconPrescription size={18} className="text-teal-400" /> :
+               <IconHardware size={18} className="text-teal-400" />}
             </div>
           </div>
           <div className="min-w-0">
@@ -961,33 +962,50 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               {nombreLocal}
             </div>
             <div className="text-[9px] text-slate-500 dark:text-slate-400 tracking-wider uppercase truncate">
-              Aurora Retail · {perfilActivo.toUpperCase()}
+              Aurora {esFarmacia ? "Farmacia" : "Comercio"}
             </div>
           </div>
         </button>
 
-        {/* Navegación principal */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+        {/* Navegación principal, agrupada (Operación / Gestión) — mismo patrón que Aurora Horeca */}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-4">
           {([
-            { id: "general" as const, Icon: IconChart, etiqueta: "Vista General" },
-            { id: "pos" as const, Icon: IconCard, etiqueta: "POS Mostrador" },
-            { id: "inventario" as const, Icon: IconBox, etiqueta: "Inventario & Stock" },
-            { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
-            { id: "gastos" as const, Icon: IconBank, etiqueta: "Ingresos & Gastos" },
-            { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
-          ]).map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
-                tab === item.id
-                  ? "bg-teal-500 text-slate-950 shadow-md"
-                  : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              <item.Icon size={16} />
-              <span>{item.etiqueta}</span>
-            </button>
+            {
+              titulo: "Operación",
+              items: [
+                { id: "general" as const, Icon: IconChart, etiqueta: "Vista General" },
+                { id: "pos" as const, Icon: IconCard, etiqueta: "POS Mostrador" },
+                { id: "inventario" as const, Icon: IconBox, etiqueta: "Inventario & Stock" },
+              ],
+            },
+            {
+              titulo: "Gestión",
+              items: [
+                { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
+                { id: "gastos" as const, Icon: IconBank, etiqueta: "Ingresos & Gastos" },
+                { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
+              ],
+            },
+          ]).map((grupo) => (
+            <div key={grupo.titulo} className="space-y-1">
+              <div className="px-3.5 text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-600">
+                {grupo.titulo}
+              </div>
+              {grupo.items.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setTab(item.id)}
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+                    tab === item.id
+                      ? "bg-teal-500 text-slate-950 shadow-md"
+                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  <item.Icon size={16} />
+                  <span>{item.etiqueta}</span>
+                </button>
+              ))}
+            </div>
           ))}
 
           <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-800">
@@ -1022,99 +1040,17 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
         {/* ── TOPBAR LIMPIO: SOLO TASAS, TEMA Y PERFIL ── */}
         <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-end gap-2.5 shadow-sm flex-shrink-0">
-          {/* Badge de Tasa Flotante */}
-          <div className="relative">
-            <button
-              onClick={() => setPopoverTasa((v) => !v)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-teal-500/30 text-xs font-mono font-bold hover:border-teal-400 transition-all cursor-pointer shadow-inner"
-              title="Cambiar tasa activa (USDT / BCV / COP)"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-teal-400">{tipoTasaActiva}: {tasaActivaBs > 0 ? `Bs. ${tasaActivaBs.toFixed(2)}` : "Sin tasa"}</span>
-              <span className="text-slate-500 dark:text-slate-400 text-[10px]">· COP {tasaCop > 0 ? tasaCop.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—"}</span>
-              <span className="text-slate-500 dark:text-slate-400 text-[9px]">▼</span>
-            </button>
-
-            {popoverTasa && (
-              <div className="absolute right-0 mt-2 z-50 w-72 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-300 dark:border-slate-700 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white">Tasa Activa para Venta</span>
-                  <button onClick={() => setPopoverTasa(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white"><IconClose size={14} /></button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs">
-                  <button
-                    onClick={() => void cambiarTipoTasaActiva("USDT")}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "USDT" ? "bg-emerald-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
-                  >💎 USDT</button>
-                  <button
-                    onClick={() => void cambiarTipoTasaActiva("BCV")}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "BCV" ? "bg-teal-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
-                  >🏛️ BCV</button>
-                  <button
-                    onClick={() => void cambiarTipoTasaActiva("PERSONALIZADA")}
-                    className={`py-1 rounded-lg font-bold ${tipoTasaActiva === "PERSONALIZADA" ? "bg-amber-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
-                  >✏️ Propia</button>
-                </div>
-
-                {/* USDT/P2P y BCV Oficial son cifras públicas que el negocio no controla — se
-                    consultan en vivo con un clic, nunca se tipean. */}
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Tasa USDT (Bs):</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-slate-800 dark:text-white">
-                        {tasaPorOrigen.USDT ? Number(tasaPorOrigen.USDT.tasa).toFixed(2) : "Sin consultar"}
-                      </span>
-                      <button type="button" onClick={() => void refrescarTasaExterna("USDT")} disabled={actualizandoExterna !== null}
-                        title="Consultar en vivo (Binance P2P)"
-                        className="p-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 disabled:opacity-50 cursor-pointer">
-                        <IconRefresh size={11} className={actualizandoExterna === "USDT" ? "animate-spin" : ""} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Tasa BCV (Bs):</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-slate-800 dark:text-white">
-                        {tasaPorOrigen.BCV ? Number(tasaPorOrigen.BCV.tasa).toFixed(2) : "Sin consultar"}
-                      </span>
-                      <button type="button" onClick={() => void refrescarTasaExterna("BCV")} disabled={actualizandoExterna !== null}
-                        title="Consultar en vivo (BCV oficial)"
-                        className="p-1 rounded-md bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 disabled:opacity-50 cursor-pointer">
-                        <IconRefresh size={11} className={actualizandoExterna === "BCV" ? "animate-spin" : ""} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Pesos COP:</span>
-                    <input
-                      type="number" step="1" value={tasaCopVal}
-                      onChange={(e) => setTasaCopVal(e.target.value)}
-                      placeholder="Ej. 4180"
-                      className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-right text-xs"
-                    />
-                  </div>
-                  {tipoTasaActiva === "PERSONALIZADA" && (
-                    <div className="flex items-center justify-between gap-2 bg-amber-500/10 p-1.5 rounded-lg border border-amber-500/20">
-                      <span className="text-[11px] text-amber-300 font-bold">Propia (Bs):</span>
-                      <input
-                        type="number" step="0.01" placeholder="Ej. 66.50" value={tasaPersVal}
-                        onChange={(e) => setTasaPersVal(e.target.value)}
-                        className="w-24 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-amber-500/40 font-mono text-right text-xs font-bold text-amber-300"
-                      />
-                    </div>
-                  )}
-                </div>
-                {errorTasa && <p className="text-[10px] text-red-500">{errorTasa}</p>}
-                <button
-                  onClick={() => void guardarTasaManual()}
-                  disabled={guardandoTasa}
-                  className="w-full py-1.5 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400 disabled:opacity-60"
-                >{guardandoTasa ? "Guardando…" : "Guardar COP / Propia"}</button>
-              </div>
-            )}
-          </div>
+          {user?.tenantId && (
+            <TasaBadgeComercio
+              tenantId={user.tenantId}
+              origenTasaActiva={origenTasaActiva}
+              tasaVes={tasaVes}
+              tasaCop={tasaCopReal}
+              onOrigenCambiado={(o) => setOrigenTasaActiva(o)}
+              onActualizadaVes={setTasaVes}
+              onActualizadaCop={setTasaCopReal}
+            />
+          )}
 
           <ThemeToggle />
         </header>
@@ -1127,7 +1063,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               ══════════════════════════════════════════════════════════════════ */}
           {tab === "general" && (
             <DashboardGeneralComercio
-              productos={productos}
+              productos={productos.filter((p) => p.rubro === perfilActivo)}
               ingresosCaja={ingresosCaja}
               onIrAInventario={() => setTab("inventario")}
             />
@@ -1151,11 +1087,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                   placeholder={
-                    perfilActivo === "farmacia"
+                    esFarmacia
                       ? "🔍 Buscar por medicamento, principio activo (ej. Acetaminofén), lote o escanear código..."
-                      : perfilActivo === "ferreteria"
-                      ? "🔍 Buscar por producto, código de parte (ej. TORN-38, Hilux), medida o código de barra..."
-                      : "🔍 Buscar producto, marca o escanear código de barras..."
+                      : "🔍 Buscar por producto, código de parte (ej. TORN-38, Hilux), medida o escanear código de barra..."
                   }
                   className="w-full pl-10 pr-20 py-3 rounded-2xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700/80 focus:border-teal-500 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none shadow-inner"
                   autoFocus
@@ -1397,13 +1331,13 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               <div>
                 <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Control de Inventario & Stock</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {perfilActivo === "ferreteria" || perfilActivo === "repuestos" 
+                  {esComercio
                     ? "Kárdex auditable, presentaciones fraccionadas, escala mayorista y compras a proveedores."
                     : "Catálogo de productos, existencias, lotes y precios de venta."}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {(perfilActivo === "ferreteria" || perfilActivo === "repuestos" || perfilActivo === "retail") && (
+                {esComercio && (
                   <>
                     <button
                       onClick={() => cargarRepuestosBackend()}
@@ -1427,7 +1361,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   onClick={() => setModalNuevoProducto(true)}
                   className="px-4 py-2 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400 shadow-md transition-colors"
                 >
-                  + Nuevo {perfilActivo === "ferreteria" || perfilActivo === "repuestos" ? "Repuesto / Artículo" : "Producto"}
+                  + Nuevo {esComercio ? "Producto / Artículo" : "Producto"}
                 </button>
               </div>
             </div>
@@ -1439,15 +1373,15 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     <th className="p-3">Código</th>
                     <th className="p-3">Producto</th>
                     <th className="p-3">Categoría</th>
-                    {perfilActivo === "farmacia" && <th className="p-3">Principio Activo</th>}
-                    {perfilActivo === "farmacia" && <th className="p-3">Lote / Vence</th>}
-                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3">Unidad / Ubicación</th>}
-                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3">Escala Mayorista</th>}
+                    {esFarmacia && <th className="p-3">Principio Activo</th>}
+                    {esFarmacia && <th className="p-3">Lote / Vence</th>}
+                    {esComercio && <th className="p-3">Unidad / Ubicación</th>}
+                    {esComercio && <th className="p-3">Escala Mayorista</th>}
                     <th className="p-3 text-right">Stock</th>
-                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3 text-right">Último Costo</th>}
+                    {esComercio && <th className="p-3 text-right">Último Costo</th>}
                     <th className="p-3 text-right">Precio USD</th>
                     <th className="p-3 text-right">Precio Bs</th>
-                    {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <th className="p-3 text-center">Gestión</th>}
+                    {esComercio && <th className="p-3 text-center">Gestión</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-mono">
@@ -1459,10 +1393,10 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       </td>
                       <td className="p-3 font-sans font-bold text-slate-900 dark:text-white">{p.nombre}</td>
                       <td className="p-3 font-sans text-slate-500 dark:text-slate-400">{p.categoria}</td>
-                      {perfilActivo === "farmacia" && <td className="p-3 text-emerald-400">{p.principioActivo || "—"}</td>}
-                      {perfilActivo === "farmacia" && <td className="p-3 text-slate-600 dark:text-slate-300">{p.lote || "—"} ({p.fechaVencimiento || "—"})</td>}
-                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && <td className="p-3 text-slate-600 dark:text-slate-300">{p.unidadMedida || "Pza"} · {p.ubicacion || "Almacén"}</td>}
-                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
+                      {esFarmacia && <td className="p-3 text-emerald-400">{p.principioActivo || "—"}</td>}
+                      {esFarmacia && <td className="p-3 text-slate-600 dark:text-slate-300">{p.lote || "—"} ({p.fechaVencimiento || "—"})</td>}
+                      {esComercio && <td className="p-3 text-slate-600 dark:text-slate-300">{p.unidadMedida || "Pza"} · {p.ubicacion || "Almacén"}</td>}
+                      {esComercio && (
                         <td className="p-3 text-emerald-400 text-xs">
                           {p.precioMayorista && p.cantidadMinimaMayorista
                             ? `$${p.precioMayorista.toFixed(2)} (≥${p.cantidadMinimaMayorista} ${p.unidadMedida || 'u'})`
@@ -1472,14 +1406,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       <td className={`p-3 text-right font-bold ${p.stock <= p.stockMinimo ? "text-amber-400" : "text-teal-400"}`}>
                         {p.stock}
                       </td>
-                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
+                      {esComercio && (
                         <td className="p-3 text-right text-slate-500 dark:text-slate-400 font-mono">
                           ${p.costo.toFixed(2)}
                         </td>
                       )}
                       <td className="p-3 text-right font-bold text-slate-900 dark:text-white">${p.precio.toFixed(2)}</td>
                       <td className="p-3 text-right text-slate-600 dark:text-slate-300">Bs. {(p.precio * tasaActivaBs).toFixed(2)}</td>
-                      {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
+                      {esComercio && (
                         <td className="p-3 text-center space-x-1.5 whitespace-nowrap">
                           <button
                             onClick={() => setKardexModalItem(p)}
@@ -1495,6 +1429,40 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                           >
                             🏷️ Presentaciones
                           </button>
+                          <button
+                            onClick={() => setAjustarStockModalItem(p)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-amber-400 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
+                            title="Corregir stock tras un conteo físico"
+                            disabled={!p.backendId}
+                          >
+                            ⚖️ Ajustar
+                          </button>
+                          <button
+                            onClick={() => setEditarModalItem(p)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-slate-500 dark:text-slate-300 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
+                            title="Editar datos del producto"
+                            disabled={!p.backendId}
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!p.backendId || !user?.tenantId) return;
+                              if (!confirm(`¿Eliminar "${p.nombre}" del catálogo? Esta acción no se puede deshacer.`)) return;
+                              try {
+                                await eliminarRepuesto(p.backendId, user.tenantId);
+                                setProductos((prev) => prev.filter((x) => x.id !== p.id));
+                                mostrarToast("Producto eliminado del catálogo.", "success");
+                              } catch (err: any) {
+                                mostrarToast(err?.message || "No se pudo eliminar el producto.", "error");
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-[10px] text-rose-400 font-bold border border-rose-500/30 cursor-pointer shadow-sm"
+                            title="Eliminar producto del catálogo"
+                            disabled={!p.backendId}
+                          >
+                            <IconTrash size={11} />
+                          </button>
                         </td>
                       )}
                     </tr>
@@ -1502,6 +1470,54 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 </tbody>
               </table>
             </div>
+
+            {esComercio && (
+              <div className="flex-shrink-0 border-t border-slate-200 dark:border-slate-800 pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">Compras & Proveedores — Historial</h4>
+                  <button
+                    onClick={() => cargarComprasRepuesto()}
+                    disabled={cargandoCompras}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-slate-600 dark:text-slate-300 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer flex items-center gap-1"
+                  >
+                    <IconRefresh size={11} className={cargandoCompras ? "animate-spin" : ""} />
+                    <span>Actualizar</span>
+                  </button>
+                </div>
+                {cargandoCompras && comprasRepuesto === null ? (
+                  <div className="py-4 text-center text-slate-500 dark:text-slate-400 text-xs">Cargando historial de compras...</div>
+                ) : !comprasRepuesto || comprasRepuesto.length === 0 ? (
+                  <div className="py-4 text-center text-slate-500 dark:text-slate-400 text-xs rounded-xl bg-slate-100/60 dark:bg-slate-800/40">
+                    Todavía no hay compras a proveedor registradas. Usá "Registrar Compra (Proveedor)" arriba.
+                  </div>
+                ) : (
+                  <div className="max-h-56 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 sticky top-0 uppercase text-[10px]">
+                        <tr>
+                          <th className="p-2.5">Fecha</th>
+                          <th className="p-2.5">Proveedor</th>
+                          <th className="p-2.5">N° Factura</th>
+                          <th className="p-2.5 text-right">Total</th>
+                          <th className="p-2.5 text-right">Ítems</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-600 dark:text-slate-300">
+                        {comprasRepuesto.map((c) => (
+                          <tr key={c.id} className="hover:bg-slate-100/60 dark:hover:bg-slate-800/40">
+                            <td className="p-2.5 text-[11px] text-slate-500 dark:text-slate-400">{new Date(c.fechaCompra).toLocaleDateString()}</td>
+                            <td className="p-2.5 font-sans font-bold text-slate-900 dark:text-white">{c.proveedor?.nombre || "—"}</td>
+                            <td className="p-2.5">{c.numeroFactura || "—"}</td>
+                            <td className="p-2.5 text-right font-bold text-teal-500 dark:text-teal-400">${c.total.toFixed(2)}</td>
+                            <td className="p-2.5 text-right text-slate-500 dark:text-slate-400">{c.items?.length ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1629,100 +1645,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════
-            TAB 4: CIERRE DE CAJA (CIERRE Z) CON ARQUEO CIEGO
+            TAB 4: CIERRE & REPORTES — TURNOS DE CAJA CON ARQUEO REAL
+            (mismo motor /api/financiero/turnos que usa Aurora Horeca)
             ══════════════════════════════════════════════════════════════════ */}
-        {tab === "cierre" && (
-          <div className="max-w-2xl mx-auto w-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 space-y-5">
-            <div className="border-b border-slate-200 dark:border-slate-800 pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Cierre de Turno de Mostrador (Cierre Z)</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Arqueo ciego de caja: cuenta físicamente el dinero para auditar sobrantes o faltantes.</p>
-              </div>
-              <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-bold font-mono">
-                Arqueo Ciego
-              </span>
-            </div>
-
-            {cajaCerradaMsg ? (
-              <div className="p-4 rounded-2xl bg-teal-500/15 border border-teal-500/30 text-center space-y-2">
-                <IconCheckCircle size={32} className="text-teal-400 mx-auto" />
-                <h4 className="font-bold text-slate-900 dark:text-white text-base">{cajaCerradaMsg}</h4>
-                <p className="text-xs text-slate-600 dark:text-slate-300">El turno ha sido cerrado y auditado. El reporte Z fue guardado.</p>
-                <button
-                  onClick={() => { setCajaCerradaMsg(null); setTab("pos"); }}
-                  className="mt-3 px-5 py-2 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400"
-                >
-                  Abrir Nuevo Turno
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💵 Efectivo USD ($)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.usd}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, usd: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇻🇪 Efectivo Bs</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.ves}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, ves: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💳 Punto de Venta (Bs)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.punto}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, punto: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">📲 Pago Móvil (Bs)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.pagoMovil}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, pagoMovil: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">⚡ Zelle / USDT ($)</label>
-                    <input
-                      type="number" step="0.01" placeholder="0.00" value={desgloseCaja.zelle}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, zelle: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇨🇴 Pesos COP</label>
-                    <input
-                      type="number" step="1" placeholder="0" value={desgloseCaja.cop}
-                      onChange={(e) => setDesgloseCaja((prev) => ({ ...prev, cop: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    const totalUSDContado = (Number(desgloseCaja.usd) || 0) + (Number(desgloseCaja.zelle) || 0) +
-                      ((Number(desgloseCaja.ves) || 0) + (Number(desgloseCaja.punto) || 0) + (Number(desgloseCaja.pagoMovil) || 0)) / tasaActivaBs +
-                      ((Number(desgloseCaja.cop) || 0) / tasaCop);
-
-                    setCajaCerradaMsg(`Cierre Z Generado · Total Contado: $${totalUSDContado.toFixed(2)} USD`);
-                  }}
-                  className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm cursor-pointer shadow-lg"
-                >
-                  Cerrar Turno & Auditar Caja
-                </button>
-              </div>
-            )}
-          </div>
+        {tab === "cierre" && user?.tenantId && (
+          <TurnoCajaComercio tenantId={user.tenantId} tasaUsdVes={tasaActivaBs} tasaUsdCop={tasaCop} />
         )}
 
         </main>
@@ -1879,8 +1806,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 if (isNaN(val) || val <= 0) return null;
                 const recibidoEquivUSD =
                   monedaRecibida === "USD" ? val :
-                  monedaRecibida === "VES" ? val / tasaActivaBs :
-                  val / tasaCop;
+                  monedaRecibida === "VES" ? (tasaActivaBs > 0 ? val / tasaActivaBs : 0) :
+                  (tasaCop > 0 ? val / tasaCop : 0);
                 const diffUSD = recibidoEquivUSD - totalUSD;
 
                 if (diffUSD > 0.005) {
@@ -1979,7 +1906,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Nuevo Producto ({perfilActivo.toUpperCase()})</h3>
+              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Nuevo Producto ({esFarmacia ? "FARMACIA" : "COMERCIO"})</h3>
               <button onClick={() => setModalNuevoProducto(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white"><IconClose size={18} /></button>
             </div>
 
@@ -2026,7 +1953,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   codigo,
                   codigoOem,
                   nombre,
-                  categoria: String(fd.get("categoria") || (perfilActivo === "ferreteria" || perfilActivo === "repuestos" ? "Repuestos & Ferretería" : "General")),
+                  categoria: String(fd.get("categoria") || (esComercio ? "Repuestos & Ferretería" : "General")),
                   rubro: perfilActivo,
                   precio,
                   costo,
@@ -2075,7 +2002,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 </div>
               </div>
 
-              {perfilActivo === "farmacia" && (
+              {esFarmacia && (
                 <div className="p-3 bg-slate-100/60 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 space-y-2">
                   <div>
                     <label className="text-[10px] font-bold text-emerald-400 block mb-1">Principio Activo</label>
@@ -2088,7 +2015,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 </div>
               )}
 
-              {perfilActivo === "ferreteria" || perfilActivo === "repuestos" && (
+              {esComercio && (
                 <div className="space-y-3 p-3.5 bg-slate-100/60 dark:bg-slate-800/50 rounded-2xl border border-slate-300 dark:border-slate-700">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -2215,7 +2142,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         </div>
       )}
 
-      {/* ── MODAL KÁRDEX AUDITABLE DE FERRETERÍA / REPUESTOS ── */}
+      {/* ── MODAL KÁRDEX AUDITABLE DE COMERCIO ── */}
       {kardexModalItem && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
@@ -2273,6 +2200,177 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 Cerrar Kárdex
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL EDITAR PRODUCTO ── */}
+      {editarModalItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Editar Producto</h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">SKU: {editarModalItem.codigo}</p>
+              </div>
+              <button onClick={() => setEditarModalItem(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!editarModalItem.backendId || !user?.tenantId) return;
+                const fd = new FormData(e.currentTarget);
+                const nombre = String(fd.get("nombre") || editarModalItem.nombre);
+                const precio = Number(fd.get("precio")) || editarModalItem.precio;
+                const unidadMedida = String(fd.get("unidadMedida") || editarModalItem.unidadMedida || "UNIDAD");
+                const codigoOem = String(fd.get("codigoOem") || "") || undefined;
+                const stockMinimo = Number(fd.get("stockMinimo")) || editarModalItem.stockMinimo;
+                const precioMayorista = fd.get("precioMayorista") ? Number(fd.get("precioMayorista")) : undefined;
+                const cantidadMinimaMayorista = fd.get("cantidadMinimaMayorista") ? Number(fd.get("cantidadMinimaMayorista")) : undefined;
+
+                setGuardandoEdicion(true);
+                try {
+                  await actualizarRepuesto(editarModalItem.backendId, {
+                    descripcion: nombre,
+                    precioVenta: precio,
+                    unidadBase: unidadMedida,
+                    codigoOriginalOem: codigoOem,
+                    stockMinimo,
+                    precioMayorista,
+                    cantidadMinimaMayorista,
+                  });
+                  setProductos((prev) => prev.map((p) => p.id === editarModalItem.id ? {
+                    ...p, nombre, precio, unidadMedida, codigoOem, stockMinimo, precioMayorista, cantidadMinimaMayorista,
+                  } : p));
+                  mostrarToast("Producto actualizado correctamente.", "success");
+                  setEditarModalItem(null);
+                } catch (err: any) {
+                  mostrarToast(err?.message || "No se pudo actualizar el producto.", "error");
+                } finally {
+                  setGuardandoEdicion(false);
+                }
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Nombre del Producto</label>
+                <input required name="nombre" defaultValue={editarModalItem.nombre} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Precio Detal ($)</label>
+                  <input required name="precio" type="number" step="0.01" defaultValue={editarModalItem.precio} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Stock Mínimo (alerta)</label>
+                  <input name="stockMinimo" type="number" defaultValue={editarModalItem.stockMinimo} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                </div>
+              </div>
+              {esComercio && (
+                <div className="space-y-3 p-3.5 bg-slate-100/60 dark:bg-slate-800/50 rounded-2xl border border-slate-300 dark:border-slate-700">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-teal-400 block mb-1">Unidad de Medida Base</label>
+                      <select name="unidadMedida" defaultValue={editarModalItem.unidadMedida || "UNIDAD"} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white">
+                        <option value="UNIDAD">Pieza / Unidad (UNIDAD)</option>
+                        <option value="METRO">Metro (METRO)</option>
+                        <option value="KILOGRAMO">Kilogramo (KILOGRAMO)</option>
+                        <option value="SACO">Saco / Bulto (SACO)</option>
+                        <option value="GALON">Galón / Litro (GALON)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-teal-400 block mb-1">Código OEM / Fabricante</label>
+                      <input name="codigoOem" defaultValue={editarModalItem.codigoOem || ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-emerald-400 block mb-1">Precio Mayorista ($) (Opcional)</label>
+                      <input name="precioMayorista" type="number" step="0.01" defaultValue={editarModalItem.precioMayorista ?? ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-emerald-400 block mb-1">Cant. Mínima Mayorista</label>
+                      <input name="cantidadMinimaMayorista" type="number" step="1" defaultValue={editarModalItem.cantidadMinimaMayorista ?? ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                    </div>
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                El stock actual y el costo no se editan aquí — se actualizan solos a través de compras, ventas y ajustes (Kárdex), para mantener la auditoría.
+              </p>
+              <div className="pt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setEditarModalItem(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={guardandoEdicion} className="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold cursor-pointer disabled:opacity-60">
+                  {guardandoEdicion ? "Guardando..." : "Guardar Cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL AJUSTAR STOCK (CORRECCIÓN POR CONTEO FÍSICO) ── */}
+      {ajustarStockModalItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-500 dark:text-amber-300 font-bold uppercase">Ajuste de Inventario</span>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white mt-1">{ajustarStockModalItem.nombre}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">Stock en sistema: {ajustarStockModalItem.stock} {ajustarStockModalItem.unidadMedida || 'und'}</p>
+              </div>
+              <button onClick={() => setAjustarStockModalItem(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!ajustarStockModalItem.backendId || !user?.tenantId) return;
+                const fd = new FormData(e.currentTarget);
+                const stockReal = Number(fd.get("stockReal"));
+                const motivo = String(fd.get("motivo") || "");
+                if (Number.isNaN(stockReal) || stockReal < 0) {
+                  mostrarToast("Ingresá un stock real válido.", "error");
+                  return;
+                }
+                setGuardandoAjuste(true);
+                try {
+                  const actualizado = await ajustarStockRepuesto(ajustarStockModalItem.backendId, user.tenantId, { stockReal, motivo });
+                  setProductos((prev) => prev.map((p) => p.id === ajustarStockModalItem.id ? { ...p, stock: actualizado.stockActual } : p));
+                  mostrarToast("Stock ajustado y registrado en el Kárdex.", "success");
+                  setAjustarStockModalItem(null);
+                } catch (err: any) {
+                  mostrarToast(err?.message || "No se pudo ajustar el stock.", "error");
+                } finally {
+                  setGuardandoAjuste(false);
+                }
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Stock Real Contado</label>
+                <input required name="stockReal" type="number" step="0.01" defaultValue={ajustarStockModalItem.stock} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Motivo del Ajuste</label>
+                <input name="motivo" placeholder="Ej. Conteo físico mensual, mercancía dañada..." className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
+              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                El sistema calcula la diferencia solo y la deja registrada en el Kárdex para auditar después. No genera ingreso ni egreso de caja.
+              </p>
+              <div className="pt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setAjustarStockModalItem(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={guardandoAjuste} className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold cursor-pointer disabled:opacity-60">
+                  {guardandoAjuste ? "Guardando..." : "Confirmar Ajuste"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -2374,7 +2472,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
       {/* ── MODAL REGISTRO DE FACTURA DE COMPRA A PROVEEDOR ── */}
       {modalCompraProveedor && (
-        <ModalCompraProveedorFerreteria
+        <ModalCompraProveedorComercio
           tenantId={user?.tenantId || 1}
           productos={productos.filter((p) => p.rubro === perfilActivo)}
           proveedores={proveedoresRepuesto}
@@ -2382,6 +2480,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           onCompraExitosa={() => {
             setModalCompraProveedor(false);
             cargarRepuestosBackend();
+            cargarComprasRepuesto();
             mostrarToast("Factura de compra procesada. Stock y costo promedio actualizados en Kárdex.", "success");
           }}
           onNuevoProveedor={(nuevo) => setProveedoresRepuesto((prev) => [...prev, nuevo])}
@@ -2409,7 +2508,518 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// COMPONENTE: MODAL DE FACTURA DE COMPRA A PROVEEDOR (FERRETERÍA & REPUESTOS)
+// COMPONENTE: BADGE DE TASA DE CAMBIO ACTIVA — misma metodología que usa
+// Aurora Horeca (ver TasaExternaService + LicenciaTenant.origenTasaActiva en
+// el backend, módulo compartido core.financiero): BCV y USDT no se teclean a
+// mano, se consultan en vivo de su fuente pública real bajo demanda ("Actualizar").
+// Solo "Propia" sigue siendo 100% manual. COP no tiene fuente automática — se
+// mantiene manual siempre.
+// ══════════════════════════════════════════════════════════════════════════
+function TasaBadgeComercio({ tenantId, origenTasaActiva, tasaVes, tasaCop, onOrigenCambiado, onActualizadaVes, onActualizadaCop }: {
+  tenantId: number; origenTasaActiva: OrigenTasaActiva | null; tasaVes: TasaCambio | null; tasaCop: TasaCambio | null;
+  onOrigenCambiado: (o: OrigenTasaActiva) => void; onActualizadaVes: (t: TasaCambio) => void; onActualizadaCop: (t: TasaCambio) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [cambiandoOrigen, setCambiandoOrigen] = useState(false);
+  const [actualizandoAhora, setActualizandoAhora] = useState(false);
+  const [tasaCopVal, setTasaCopVal] = useState("");
+  const [tasaPropiaVal, setTasaPropiaVal] = useState("");
+  const [guardandoManual, setGuardandoManual] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    setTasaCopVal(tasaCop ? String(Number(tasaCop.tasa)) : "");
+    setTasaPropiaVal(origenTasaActiva === "PERSONALIZADA" && tasaVes ? String(Number(tasaVes.tasa)) : "");
+    setError(null);
+  }, [abierto, tasaVes, tasaCop, origenTasaActiva]);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) setAbierto(false);
+    };
+    const handlerEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setAbierto(false); };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", handlerEsc);
+    return () => { document.removeEventListener("mousedown", handler); document.removeEventListener("keydown", handlerEsc); };
+  }, [abierto]);
+
+  const elegirOrigen = async (nuevo: OrigenTasaActiva) => {
+    if (nuevo === origenTasaActiva) return;
+    setCambiandoOrigen(true);
+    setError(null);
+    try {
+      await actualizarOrigenTasaActiva(nuevo);
+      onOrigenCambiado(nuevo);
+      if (nuevo !== "PERSONALIZADA") {
+        // Puede que ese origen todavía no tenga ninguna tasa registrada para este tenant.
+        tasaVigente(tenantId, "USD", "VES", nuevo).then(onActualizadaVes).catch(() => {});
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cambiar la fuente de la tasa");
+    } finally {
+      setCambiandoOrigen(false);
+    }
+  };
+
+  const actualizarAhora = async () => {
+    if (origenTasaActiva !== "BCV" && origenTasaActiva !== "USDT") return;
+    setActualizandoAhora(true);
+    setError(null);
+    try {
+      const fuente = origenTasaActiva === "USDT" ? "BINANCE" : "BCV";
+      onActualizadaVes(await actualizarTasaExternaTenant(tenantId, fuente, "VES"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo consultar la tasa pública en este momento");
+    } finally {
+      setActualizandoAhora(false);
+    }
+  };
+
+  const guardarManual = async () => {
+    const vPropia = Number(tasaPropiaVal);
+    const vCop = Number(tasaCopVal);
+    if (!(origenTasaActiva === "PERSONALIZADA" && vPropia > 0) && !(vCop > 0)) {
+      setError("Ingresá al menos una tasa mayor a cero");
+      return;
+    }
+    setGuardandoManual(true);
+    setError(null);
+    try {
+      const tareas: Promise<void>[] = [];
+      if (origenTasaActiva === "PERSONALIZADA" && vPropia > 0) {
+        tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: vPropia, origen: "PERSONALIZADA" }).then(onActualizadaVes));
+      }
+      if (vCop > 0) {
+        tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: vCop, origen: "MANUAL" }).then(onActualizadaCop));
+      }
+      await Promise.all(tareas);
+      setAbierto(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la tasa");
+    } finally {
+      setGuardandoManual(false);
+    }
+  };
+
+  const tasaActivaNumero = tasaVes ? Number(tasaVes.tasa) : 0;
+  const etiquetaOrigen = origenTasaActiva === "BCV" ? "BCV" : origenTasaActiva === "PERSONALIZADA" ? "PROPIA" : "USDT";
+
+  return (
+    <div className="relative" ref={popoverRef}>
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        title="Cambiar la fuente de la tasa (Binance P2P / BCV oficial / Propia)"
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono font-bold cursor-pointer border transition-all shadow-inner ${
+          tasaActivaNumero > 0
+            ? "bg-slate-100 dark:bg-slate-800 border-teal-500/30 hover:border-teal-400 text-teal-600 dark:text-teal-400"
+            : "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
+        }`}
+      >
+        <span className={`w-2 h-2 rounded-full ${tasaActivaNumero > 0 ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+        <span className="text-[10px] px-1 rounded bg-black/5 dark:bg-white/10 uppercase tracking-wider">{etiquetaOrigen}</span>
+        <span>{tasaActivaNumero > 0 ? `Bs. ${tasaActivaNumero.toFixed(2)}` : "Sin tasa"}</span>
+        {tasaCop && (
+          <span className="text-slate-500 dark:text-slate-400 text-[10px] font-normal">· COP {Number(tasaCop.tasa).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+        )}
+        <span className="text-slate-500 dark:text-slate-400 text-[9px]">▼</span>
+      </button>
+
+      {abierto && (
+        <div className="absolute right-0 mt-2 z-50 w-80 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-300 dark:border-slate-700 space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+            <div>
+              <p className="text-xs font-bold text-slate-900 dark:text-white">Fuente de la Tasa (USD → Bs)</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">USDT y BCV vienen de su fuente pública real.</p>
+            </div>
+            <button onClick={() => setAbierto(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={14} /></button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <button type="button" disabled={cambiandoOrigen} onClick={() => elegirOrigen("USDT")}
+              className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "USDT" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
+              <IconCoins size={12} /><span>USDT</span>
+            </button>
+            <button type="button" disabled={cambiandoOrigen} onClick={() => elegirOrigen("BCV")}
+              className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "BCV" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
+              <IconBank size={12} /><span>BCV</span>
+            </button>
+            <button type="button" disabled={cambiandoOrigen} onClick={() => elegirOrigen("PERSONALIZADA")}
+              className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "PERSONALIZADA" ? "bg-amber-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
+              <IconEdit size={12} /><span>Propia</span>
+            </button>
+          </div>
+
+          {origenTasaActiva !== "PERSONALIZADA" ? (
+            <div className="space-y-2 text-xs bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                {origenTasaActiva === "BCV" ? "Tasa oficial publicada en bcv.org.ve:" : "Promedio de las mejores ofertas de Binance P2P (USDT/VES):"}
+              </p>
+              <p className="font-mono font-black text-lg text-teal-600 dark:text-teal-400">
+                {tasaActivaNumero > 0 ? `Bs. ${tasaActivaNumero.toFixed(2)}` : "Sin tasa todavía"}
+              </p>
+              {tasaVes && (
+                <p className="text-[10px] text-slate-400">Actualizado: {new Date(tasaVes.fechaActualizacion).toLocaleString()}</p>
+              )}
+              <button type="button" onClick={actualizarAhora} disabled={actualizandoAhora}
+                className="w-full py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5">
+                <IconRefresh size={12} className={actualizandoAhora ? "animate-spin" : ""} />
+                <span>{actualizandoAhora ? "Consultando…" : "Actualizar Ahora"}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-amber-500/10 p-1.5 rounded-lg border border-amber-500/20">
+              <span className="w-20 text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1"><IconEdit size={12} className="shrink-0" /><span>Propia:</span></span>
+              <input value={tasaPropiaVal} onChange={(e) => setTasaPropiaVal(e.target.value)} type="number" step="0.01" min="0" placeholder="Ej. 66.00"
+                className="flex-1 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-amber-500/40 font-mono font-bold text-xs text-amber-700 dark:text-amber-300" />
+              <span className="text-[10px] text-slate-400">Bs</span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="w-20 text-[10px] font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1"><span className="text-[9px] font-extrabold px-1 rounded bg-sky-500/20 text-sky-500">COP</span><span>Pesos:</span></span>
+            <input value={tasaCopVal} onChange={(e) => setTasaCopVal(e.target.value)} type="number" step="0.01" min="0" placeholder="Ej. 4180"
+              className="flex-1 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono font-bold text-xs text-slate-900 dark:text-white" />
+            <span className="text-[10px] text-slate-400">COP</span>
+          </div>
+          <p className="text-[10px] text-slate-400">El peso colombiano no tiene fuente automática — siempre se fija a mano.</p>
+
+          {error && <p className="text-[10px] text-red-500">{error}</p>}
+
+          <button onClick={guardarManual} disabled={guardandoManual}
+            className="w-full py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold cursor-pointer disabled:opacity-60 shadow-md">
+            {guardandoManual ? "Guardando…" : origenTasaActiva === "PERSONALIZADA" ? "Guardar Tasa Propia y COP" : "Guardar Tasa COP"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMPONENTE: TURNOS DE CAJA & CIERRE Z (mismo motor /api/financiero/turnos
+// que usa Aurora Horeca — apertura con monto base, egresos y arqueo ciego al
+// cierre, con historial y auditoría real en el backend, no solo un cálculo
+// local que se perdía al recargar la página).
+// ══════════════════════════════════════════════════════════════════════════
+function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: number; tasaUsdVes: number; tasaUsdCop: number }) {
+  const MONEDAS = ["USD", "VES", "COP"] as const;
+  const [moneda, setMoneda] = useState<typeof MONEDAS[number]>("USD");
+  const [turno, setTurno] = useState<Turno | null | undefined>(undefined); // undefined = cargando
+  const [historial, setHistorial] = useState<Turno[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [idCajero, setIdCajero] = useState("");
+  const [montoBase, setMontoBase] = useState("");
+  const [abriendo, setAbriendo] = useState(false);
+
+  const [montoEgreso, setMontoEgreso] = useState("");
+  const [conceptoEgreso, setConceptoEgreso] = useState("");
+  const [registrandoEgreso, setRegistrandoEgreso] = useState(false);
+
+  const [montoDeclarado, setMontoDeclarado] = useState("");
+  const [modoArqueo, setModoArqueo] = useState<"DIRECTO" | "DESGLOSADO">("DESGLOSADO");
+  const [desgloseArqueo, setDesgloseArqueo] = useState({ usd: "", ves: "", punto: "", pagoMovil: "", zelle: "", cop: "" });
+  const [cerrando, setCerrando] = useState(false);
+  const [ultimoCierre, setUltimoCierre] = useState<Turno | null>(null);
+
+  const totalDesgloseCalculado = useMemo(() => {
+    const usd = Number(desgloseArqueo.usd) || 0;
+    const zelle = Number(desgloseArqueo.zelle) || 0;
+    const ves = (Number(desgloseArqueo.ves) || 0) + (Number(desgloseArqueo.punto) || 0) + (Number(desgloseArqueo.pagoMovil) || 0);
+    const cop = Number(desgloseArqueo.cop) || 0;
+
+    if (moneda === "USD") {
+      return usd + zelle + (tasaUsdVes > 0 ? ves / tasaUsdVes : 0) + (tasaUsdCop > 0 ? cop / tasaUsdCop : 0);
+    } else if (moneda === "VES") {
+      return ves + (usd + zelle) * tasaUsdVes + (tasaUsdCop > 0 ? (cop / tasaUsdCop) * tasaUsdVes : 0);
+    } else {
+      return cop + (usd + zelle) * tasaUsdCop;
+    }
+  }, [desgloseArqueo, moneda, tasaUsdVes, tasaUsdCop]);
+
+  const montoDeclaradoFinal = modoArqueo === "DESGLOSADO" ? totalDesgloseCalculado : (Number(montoDeclarado) || 0);
+
+  const cargarTurno = () => {
+    setTurno(undefined);
+    turnoAbierto(tenantId, moneda).then(setTurno).catch(() => setTurno(null));
+  };
+  const cargarHistorial = () => { historialTurnos(tenantId).then(setHistorial).catch(() => setHistorial([])); };
+  useEffect(() => { cargarTurno(); }, [tenantId, moneda]);
+  useEffect(() => { cargarHistorial(); }, [tenantId]);
+
+  const abrir = async () => {
+    setError(null);
+    if (!idCajero.trim()) { setError("Indicá quién abre la caja"); return; }
+    if (montoBase === "" || Number(montoBase) < 0) { setError("Indicá el monto base de apertura"); return; }
+    setAbriendo(true);
+    try {
+      await abrirTurno(tenantId, { idCajero: idCajero.trim(), montoBase: Number(montoBase), moneda });
+      setMontoBase("");
+      cargarTurno();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo abrir el turno");
+    } finally {
+      setAbriendo(false);
+    }
+  };
+
+  const registrarEgreso = async () => {
+    if (!turno) return;
+    setError(null);
+    if (!montoEgreso || Number(montoEgreso) <= 0) { setError("Indicá el monto del egreso"); return; }
+    setRegistrandoEgreso(true);
+    try {
+      await registrarEgresoTurno(tenantId, turno.id, Number(montoEgreso), conceptoEgreso.trim() || undefined);
+      setMontoEgreso(""); setConceptoEgreso("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar el egreso");
+    } finally {
+      setRegistrandoEgreso(false);
+    }
+  };
+
+  const cerrar = async () => {
+    if (!turno) return;
+    setError(null);
+    if (montoDeclaradoFinal < 0) { setError("Indicá lo contado físicamente en caja"); return; }
+    if (!window.confirm(`¿Cerrar el turno con monto declarado de ${montoDeclaradoFinal.toFixed(2)} ${moneda}? Esto genera el Cierre Z y no se puede deshacer.`)) return;
+    setCerrando(true);
+    try {
+      const cerrado = await cerrarTurno(tenantId, turno.id, montoDeclaradoFinal);
+      setUltimoCierre(cerrado);
+      setMontoDeclarado("");
+      setDesgloseArqueo({ usd: "", ves: "", punto: "", pagoMovil: "", zelle: "", cop: "" });
+      cargarTurno();
+      cargarHistorial();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cerrar el turno");
+    } finally {
+      setCerrando(false);
+    }
+  };
+
+  const inputCls = "w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-sm text-slate-900 dark:text-white";
+
+  return (
+    <div className="max-w-2xl mx-auto w-full space-y-5">
+      <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-slate-800 text-xs w-fit">
+        {MONEDAS.map((m) => (
+          <button key={m} onClick={() => setMoneda(m)} className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer ${moneda === m ? "bg-teal-500 text-slate-950" : "text-slate-600 dark:text-slate-400"}`}>
+            {m}
+          </button>
+        ))}
+      </div>
+
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      {turno === undefined ? (
+        <p className="text-xs text-slate-500 dark:text-slate-400">Cargando…</p>
+      ) : turno === null ? (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+          <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Abrir turno de caja ({moneda})</h3>
+          <p className="text-slate-500 dark:text-slate-400 text-xs">No hay ninguna caja abierta en {moneda} ahora mismo.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Cajero / Responsable</label>
+              <input value={idCajero} onChange={(e) => setIdCajero(e.target.value)} placeholder="Nombre de quien abre" className={inputCls} />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Monto base de apertura ({moneda})</label>
+              <input value={montoBase} onChange={(e) => setMontoBase(e.target.value)} type="number" step="0.01" placeholder="0.00" className={inputCls} />
+            </div>
+          </div>
+          <button onClick={abrir} disabled={abriendo} className="px-5 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-sm font-bold cursor-pointer disabled:opacity-60">
+            {abriendo ? "Abriendo…" : "Abrir Caja"}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 space-y-1">
+            <div className="flex items-center justify-between">
+              <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Caja abierta ({moneda})</h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-300">ABIERTO</span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Cajero: {turno.idCajero} · Desde {new Date(turno.fechaApertura).toLocaleString()}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Monto base: {Number(turno.montoBase).toFixed(2)} {moneda}</p>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm">Registrar Egreso</h4>
+            <p className="text-slate-500 dark:text-slate-400 text-xs">Pago a proveedor, gasto menor u otra salida de dinero de esta caja.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-3">
+              <input value={montoEgreso} onChange={(e) => setMontoEgreso(e.target.value)} type="number" step="0.01" placeholder={`Monto ${moneda}`} className={inputCls} />
+              <input value={conceptoEgreso} onChange={(e) => setConceptoEgreso(e.target.value)} placeholder="Concepto (ej. Pago a proveedor)" className={inputCls} />
+            </div>
+            <button onClick={registrarEgreso} disabled={registrandoEgreso} className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer disabled:opacity-60 border border-slate-300 dark:border-slate-700">
+              {registrandoEgreso ? "Registrando…" : "− Registrar Egreso"}
+            </button>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-amber-500/30 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-slate-900 dark:text-white text-sm">Cierre de Caja (Cierre Z)</h4>
+                <p className="text-slate-500 dark:text-slate-400 text-xs">Arqueo a ciegas: contá el dinero físico y declará lo que hay para auditar faltantes o sobrantes.</p>
+              </div>
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 flex-shrink-0">
+                Arqueo Ciego
+              </span>
+            </div>
+
+            <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs w-fit">
+              <button
+                type="button"
+                onClick={() => setModoArqueo("DESGLOSADO")}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                  modoArqueo === "DESGLOSADO" ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-300 shadow-sm" : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                Desglose por Método
+              </button>
+              <button
+                type="button"
+                onClick={() => setModoArqueo("DIRECTO")}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                  modoArqueo === "DIRECTO" ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-300 shadow-sm" : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                Monto Directo
+              </button>
+            </div>
+
+            {modoArqueo === "DESGLOSADO" ? (
+              <div className="space-y-3 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  Ingresá lo contado físicamente en cada método para calcular el total sin errores:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💵 Efectivo USD ($)</label>
+                    <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.usd}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, usd: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇻🇪 Efectivo Bs</label>
+                    <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.ves}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, ves: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">💳 Punto de Venta (Bs)</label>
+                    <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.punto}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, punto: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">📲 Pago Móvil (Bs)</label>
+                    <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.pagoMovil}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, pagoMovil: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">⚡ Zelle / USDT ($)</label>
+                    <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.zelle}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, zelle: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">🇨🇴 Pesos COP</label>
+                    <input type="number" step="1" min="0" placeholder="0" value={desgloseArqueo.cop}
+                      onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, cop: e.target.value }))} className={inputCls} />
+                  </div>
+                </div>
+                <div className="pt-2 flex items-center justify-between border-t border-slate-200 dark:border-slate-700">
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Total declarado acumulado:</span>
+                  <span className="font-mono font-black text-base text-teal-600 dark:text-teal-400">{totalDesgloseCalculado.toFixed(2)} {moneda}</span>
+                </div>
+              </div>
+            ) : (
+              <input
+                value={montoDeclarado}
+                onChange={(e) => setMontoDeclarado(e.target.value)}
+                type="number" step="0.01"
+                placeholder={`Monto contado total en ${moneda}`}
+                className={inputCls}
+              />
+            )}
+
+            <button onClick={cerrar} disabled={cerrando} className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm cursor-pointer disabled:opacity-60 shadow-lg">
+              {cerrando ? "Cerrando turno y auditando…" : `Cerrar Turno y Generar Cierre Z (${montoDeclaradoFinal.toFixed(2)} ${moneda})`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {ultimoCierre && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Cierre Z Registrado</h3>
+              <button onClick={() => setUltimoCierre(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="text-slate-500 dark:text-slate-400 text-xs">Esperado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{Number(ultimoCierre.montoEsperado).toFixed(2)} {ultimoCierre.moneda}</div></div>
+              <div><span className="text-slate-500 dark:text-slate-400 text-xs">Declarado</span><div className="font-mono font-bold text-slate-900 dark:text-white">{Number(ultimoCierre.montoDeclarado).toFixed(2)} {ultimoCierre.moneda}</div></div>
+            </div>
+            <div className={`rounded-xl p-3 text-center font-mono font-bold ${
+              Number(ultimoCierre.descuadre) === 0 ? "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+              : Number(ultimoCierre.descuadre) > 0 ? "bg-sky-500/15 text-sky-600 dark:text-sky-300"
+              : "bg-red-500/15 text-red-500"
+            }`}>
+              {Number(ultimoCierre.descuadre) === 0 ? "Caja cuadrada exacta"
+                : Number(ultimoCierre.descuadre) > 0 ? `Sobrante: +${Number(ultimoCierre.descuadre).toFixed(2)} ${ultimoCierre.moneda}`
+                : `Faltante: ${Number(ultimoCierre.descuadre).toFixed(2)} ${ultimoCierre.moneda}`}
+            </div>
+            <button onClick={() => setUltimoCierre(null)} className="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {historial && historial.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5">
+          <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-3">Historial de Turnos</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-400 dark:text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-700">
+                  <th className="py-2 pr-2">Apertura</th>
+                  <th className="py-2 px-2">Cajero</th>
+                  <th className="py-2 px-2">Moneda</th>
+                  <th className="py-2 px-2 text-right">Base</th>
+                  <th className="py-2 px-2 text-right">Esperado</th>
+                  <th className="py-2 px-2 text-right">Declarado</th>
+                  <th className="py-2 pl-2 text-right">Descuadre</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historial.map((t) => (
+                  <tr key={t.id} className="border-b border-slate-100 dark:border-slate-800">
+                    <td className="py-2 pr-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{new Date(t.fechaApertura).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-slate-600 dark:text-slate-400">{t.idCajero}</td>
+                    <td className="py-2 px-2 text-slate-600 dark:text-slate-400">{t.moneda}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-slate-400">{Number(t.montoBase).toFixed(2)}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-slate-400">{t.montoEsperado != null ? Number(t.montoEsperado).toFixed(2) : "—"}</td>
+                    <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-slate-400">{t.montoDeclarado != null ? Number(t.montoDeclarado).toFixed(2) : "—"}</td>
+                    <td className={`py-2 pl-2 text-right font-mono font-bold ${
+                      t.descuadre == null ? "text-slate-400" : Number(t.descuadre) === 0 ? "text-teal-600 dark:text-teal-400" : "text-red-500"
+                    }`}>
+                      {t.descuadre != null ? Number(t.descuadre).toFixed(2) : (t.estado === "ABIERTO" ? "Abierto" : "—")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMPONENTE: MODAL DE FACTURA DE COMPRA A PROVEEDOR (COMERCIO)
 // ══════════════════════════════════════════════════════════════════════════
 interface ModalCompraProveedorProps {
   tenantId: number;
@@ -2420,7 +3030,7 @@ interface ModalCompraProveedorProps {
   onNuevoProveedor: (p: ProveedorRepuesto) => void;
 }
 
-function ModalCompraProveedorFerreteria({
+function ModalCompraProveedorComercio({
   tenantId,
   productos,
   proveedores,

@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
-  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconRestaurant, IconFarm, IconMining,
-  IconEducation, IconRetail, IconConstruction, IconCustomize, IconWarning, IconClose, IconCheck, IconLock,
-  IconCard, IconBank, IconPrescription, IconFactory,
+  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconRestaurant, IconFarm,
+  IconEducation, IconConstruction, IconCustomize, IconWarning, IconClose, IconCheck, IconLock,
+  IconCard, IconBank, IconPrescription,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 
@@ -45,13 +45,13 @@ const INDUSTRIES: IndustryItem[] = [
     tagline: "Vertical Insignia: Farmacia & Insumos",
   },
   {
-    id: "ferreteria",
-    label: "Ferretería & Materiales",
+    id: "comercio",
+    label: "Comercio",
     Icon: IconHardware,
-    desc: "Control de stock, POS mostrador, compras a proveedores y cuentas por cobrar",
+    desc: "POS mostrador con código de barras, inventario en tiempo real, compras a proveedores y cuentas por cobrar",
     badge: "100% DISPONIBLE (Listo)",
     isReady: true,
-    tagline: "Vertical Insignia: FerrePlus ERP",
+    tagline: "Vertical Insignia: Aurora Comercio",
   },
   {
     id: "clinica",
@@ -61,15 +61,6 @@ const INDUSTRIES: IndustryItem[] = [
     badge: "100% DISPONIBLE (Listo)",
     isReady: true,
     tagline: "Vertical Insignia: Mediclinic Pro",
-  },
-  {
-    id: "retail",
-    label: "Retail & Comercio",
-    Icon: IconRetail,
-    desc: "Punto de venta multi-caja, inventario en tiempo real y catálogo de productos",
-    badge: "100% DISPONIBLE (Listo)",
-    isReady: true,
-    tagline: "Vertical Insignia: Retail POS",
   },
   {
     id: "veterinaria",
@@ -90,15 +81,6 @@ const INDUSTRIES: IndustryItem[] = [
     tagline: "Vertical: Mediclinic Odonto",
   },
   {
-    id: "repuestos",
-    label: "Repuestos Automotrices",
-    Icon: IconFactory,
-    desc: "POS mostrador con catálogo de cruce: código OEM y compatibilidad por vehículo",
-    badge: "100% DISPONIBLE (Listo)",
-    isReady: true,
-    tagline: "Vertical Insignia: Aurora Retail",
-  },
-  {
     id: "finca",
     label: "Control de Fincas & Ganado",
     Icon: IconFarm,
@@ -106,14 +88,6 @@ const INDUSTRIES: IndustryItem[] = [
     badge: "100% DISPONIBLE (Listo)",
     isReady: true,
     tagline: "Vertical Insignia: Aurora Ganadería",
-  },
-  {
-    id: "mineria",
-    label: "Minería & Maquinaria",
-    Icon: IconMining,
-    desc: "Control de horas máquina, turnos y seguridad industrial",
-    badge: "Próximamente (Fase 2)",
-    isReady: false,
   },
   {
     id: "educacion",
@@ -202,13 +176,19 @@ const GANADERIA_MODULES = [
 
 // Mapa de "clinica"/"restaurante"/etc. (id del onboarding) al moduloPrincipal
 // real que entiende el backend (ver TenantProvisioningService y
-// LicenciaService.VERTICALES_CONTROLADAS — farmacia/ferreteria/repuestos ya
-// están dadas de alta ahí con ese mismo nombre exacto; "retail" no existe
-// como vertical propia en el backend y cae en "repuestos" como motor base).
+// LicenciaService.VERTICALES_CONTROLADAS). "comercio" es el nombre unificado
+// para tenants nuevos (Ferretería/Repuestos/Retail bajo una sola identidad) en
+// la UI (`industria`/user.industry) — pero el moduloPrincipal que se contrata
+// en el backend sigue siendo "repuestos", porque LicenciaInterceptor gatea
+// /api/repuestos/* por ese segmento exacto de URL (ver LicenciaInterceptor):
+// si se contratara "comercio" en vez de "repuestos", el tenant quedaría con
+// 403 en todo el inventario/POS. "ferreteria"/"retail" se mantienen solo para
+// no romper tenants ya registrados con esos valores.
 const INDUSTRIA_A_MODULO: Record<string, string> = {
   clinica: "salud",
   farmacia: "farmacia",
   restaurante: "horeca",
+  comercio: "repuestos",
   ferreteria: "ferreteria",
   repuestos: "repuestos",
   retail: "repuestos",
@@ -222,6 +202,7 @@ const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
   clinica: CLINIC_MODULES,
   farmacia: PHARMACY_MODULES,
   restaurante: RESTAURANT_MODULES,
+  comercio: RETAIL_MODULES,
   ferreteria: RETAIL_MODULES,
   repuestos: RETAIL_MODULES,
   retail: RETAIL_MODULES,
@@ -235,6 +216,7 @@ const NOMBRE_POR_DEFECTO: Record<string, string> = {
   clinica: "Mi Consultorio Médico",
   farmacia: "Mi Farmacia",
   restaurante: "Mi Restaurante",
+  comercio: "Mi Negocio",
   ferreteria: "Mi Ferretería",
   repuestos: "Mi Casa de Repuestos",
   retail: "Mi Tienda",
@@ -248,9 +230,10 @@ const VERTICAL_LABEL: Record<string, string> = {
   clinica: "Mediclinic Pro (Clínica & Salud)",
   farmacia: "Aurora Retail (Farmacia & Droguería)",
   restaurante: "Aurora Horeca (Restaurante & Gastronomía)",
-  ferreteria: "Aurora Retail (Ferretería & Materiales)",
-  repuestos: "Aurora Retail (Repuestos Automotrices)",
-  retail: "Retail POS (Comercio & Tiendas)",
+  comercio: "Aurora Comercio (Ferretería, Repuestos & Tiendas)",
+  ferreteria: "Aurora Comercio (Ferretería, Repuestos & Tiendas)",
+  repuestos: "Aurora Comercio (Ferretería, Repuestos & Tiendas)",
+  retail: "Aurora Comercio (Ferretería, Repuestos & Tiendas)",
   veterinaria: "Mediclinic Vet",
   odontologia: "Mediclinic Odonto",
   finca: "Aurora Ganadería (Control de Fincas & Ganado)",
@@ -282,13 +265,13 @@ export default function Onboarding() {
   const [errorActivacion, setErrorActivacion] = useState<string | null>(null);
 
   const modulosDisponibles = MODULOS_POR_INDUSTRIA[selectedIndustry] || CLINIC_MODULES;
-  const esRetail = ["ferreteria", "farmacia", "repuestos"].includes(selectedIndustry);
+  const esRetail = ["comercio", "ferreteria", "farmacia", "repuestos", "retail"].includes(selectedIndustry);
   const esGanaderia = selectedIndustry === "finca";
 
   const handleSelectIndustry = (ind: IndustryItem) => {
     if (!ind.isReady) {
       setLockedNotice(
-        `El rubro "${ind.label}" está en fase de desarrollo. Las verticales listas y operativas hoy son Mediclinic Pro (Clínica & Salud, incluye Mediclinic Vet), Aurora Horeca (Restaurante & Gastronomía), Aurora Retail (Ferretería, Farmacia y Repuestos) y Aurora Ganadería (Control de Fincas & Ganado).`
+        `El rubro "${ind.label}" está en fase de desarrollo. Las verticales listas y operativas hoy son Mediclinic Pro (Clínica & Salud, incluye Mediclinic Vet), Aurora Horeca (Restaurante & Gastronomía), Aurora Comercio (Ferretería, Farmacia y Repuestos) y Aurora Ganadería (Control de Fincas & Ganado).`
       );
       return;
     }
@@ -314,7 +297,9 @@ export default function Onboarding() {
     const rutaDestino =
       selectedIndustry === "restaurante"
         ? "/restaurante"
-        : selectedIndustry === "clinica" || selectedIndustry === "farmacia" || selectedIndustry === "veterinaria" || selectedIndustry === "odontologia"
+        : selectedIndustry === "veterinaria"
+        ? "/veterinaria"
+        : selectedIndustry === "clinica" || selectedIndustry === "farmacia" || selectedIndustry === "odontologia"
         ? "/mediclinic"
         : "/dashboard";
 
@@ -327,6 +312,7 @@ export default function Onboarding() {
         await completarRegistro({
           nombreEmpresa: empresaNombre.trim() || nombrePorDefecto,
           moduloPrincipal: INDUSTRIA_A_MODULO[selectedIndustry] || "horeca",
+          industria: selectedIndustry,
           emailContacto: pendingSignup.email,
           username: pendingSignup.email,
           password: pendingSignup.password,

@@ -2,11 +2,17 @@ import { useState, useRef, useEffect, type RefObject } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import AuroraLogo from "../AuroraLogo";
-import MagneticButton from "../components/MagneticButton";
+import TrueFocus from "../components/TrueFocus";
+import SpecularButton from "../components/SpecularButton";
+import ScrollReveal from "../components/ScrollReveal";
+import AccordionGallery from "../components/AccordionGallery";
+import CursorGrid from "../components/CursorGrid";
+import GlareHover from "../components/GlareHover";
+import DepthCarousel from "../components/DepthCarousel";
 import { useAuth } from "../context/AuthContext";
 import {
-  IconClinic, IconHardware, IconMining,
-  IconRestaurant, IconFarm, IconRetail,
+  IconClinic, IconHardware,
+  IconRestaurant, IconFarm,
   IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile,
   IconLaptop, IconPhone, IconPlane, IconCheck,
   IconCard, IconBox, IconBolt, IconShield,
@@ -14,11 +20,16 @@ import {
 
 const INDUSTRIES = [
   { Icon: IconClinic,     name: "Clínicas Médicas",   desc: "Expedientes digitales, agenda de consultas, laboratorio, farmacia y cobranza integrada." },
-  { Icon: IconHardware,   name: "Ferretería",          desc: "Control de stock, proveedores, ventas por mostrador, cotizaciones y reportes de rotación." },
-  { Icon: IconMining,     name: "Minería",             desc: "Gestión de maquinaria, turnos, órdenes de trabajo, seguridad e informes regulatorios." },
+  { Icon: IconHardware,   name: "Comercio",           desc: "POS mostrador, inventario en tiempo real, código de barras, proveedores y cuentas por cobrar." },
   { Icon: IconRestaurant, name: "Restaurantes",        desc: "Comandas digitales, mesas, cocina en tiempo real, inventario y cierres de caja automáticos." },
   { Icon: IconFarm,       name: "Control de Fincas",   desc: "Gestión integral de ganadería, rotación de potreros, registro sanitario, vacunación y trazabilidad animal por lote." },
-  { Icon: IconRetail,     name: "Retail",              desc: "POS multitienda, e-commerce, fidelización de clientes y análisis de ventas por categoría." },
+];
+
+const VERTICAL_PREVIEWS = [
+  { image: "/verticales/mediclinic.png", label: "Mediclinic Pro", link: "/industrias" },
+  { image: "/verticales/restaurante.png", label: "Aurora Horeca", link: "/industrias" },
+  { image: "/verticales/comercio.png", label: "Aurora Comercio", link: "/industrias" },
+  { image: "/verticales/ganaderia.jpg", label: "Control de Fincas", link: "/industrias" },
 ];
 
 // Mismo criterio que VERTICAL_POR_INDUSTRIA en Nav.tsx — este acceso directo
@@ -29,7 +40,7 @@ const SISTEMA_POR_INDUSTRIA: Record<string, { ruta: string; label: string; nombr
   ferreteria: { ruta: "/comercio", label: "Aurora Comercio", nombre: "Aurora Comercio", desc: "Control de stock, proveedores, ventas por mostrador, cotizaciones y reportes de rotación.", Icon: IconHardware },
   repuestos: { ruta: "/comercio", label: "Aurora Comercio", nombre: "Aurora Comercio", desc: "Control de stock, proveedores, ventas por mostrador, cotizaciones y reportes de rotación.", Icon: IconHardware },
   farmacia: { ruta: "/comercio", label: "Aurora Comercio", nombre: "Aurora Comercio", desc: "Control de stock, proveedores, ventas por mostrador, cotizaciones y reportes de rotación.", Icon: IconHardware },
-  retail: { ruta: "/comercio", label: "Aurora Comercio", nombre: "Aurora Comercio", desc: "POS multitienda, e-commerce, fidelización de clientes y análisis de ventas por categoría.", Icon: IconRetail },
+  retail: { ruta: "/comercio", label: "Aurora Comercio", nombre: "Aurora Comercio", desc: "POS multitienda, e-commerce, fidelización de clientes y análisis de ventas por categoría.", Icon: IconHardware },
   finca: { ruta: "/ganaderia", label: "Aurora Ganadería", nombre: "Aurora Ganadería", desc: "Gestión integral de ganadería, rotación de potreros, registro sanitario y trazabilidad animal.", Icon: IconFarm },
   ganaderia: { ruta: "/ganaderia", label: "Aurora Ganadería", nombre: "Aurora Ganadería", desc: "Gestión integral de ganadería, rotación de potreros, registro sanitario y trazabilidad animal.", Icon: IconFarm },
 };
@@ -78,7 +89,7 @@ const heroItem = {
 };
 
 const previewData: Record<string, { metric: string; value: string; sub: string; color: string }[]> = {
-  "Ferretería": [
+  "Comercio": [
     { metric: "Ventas hoy",         value: "$14,820", sub: "+9% vs ayer",           color: "text-teal-500 dark:text-teal-400" },
     { metric: "Artículos en stock", value: "4,231",   sub: "12 bajo mínimo",        color: "text-slate-700 dark:text-white/70" },
     { metric: "Órdenes pendientes", value: "18",      sub: "3 urgentes",            color: "text-slate-700 dark:text-white/70" },
@@ -87,11 +98,6 @@ const previewData: Record<string, { metric: string; value: string; sub: string; 
     { metric: "Citas hoy",          value: "34",      sub: "6 cirugías",            color: "text-teal-500 dark:text-teal-400" },
     { metric: "Pacientes activos",  value: "1,820",   sub: "+12 esta semana",       color: "text-slate-700 dark:text-white/70" },
     { metric: "Stock farmacia",     value: "98%",     sub: "2 alertas",             color: "text-slate-700 dark:text-white/70" },
-  ],
-  "Minería": [
-    { metric: "Equipos activos",    value: "47/52",   sub: "5 en mantención",       color: "text-teal-500 dark:text-teal-400" },
-    { metric: "Toneladas / día",    value: "8,400 t", sub: "+3.2% vs meta",         color: "text-slate-700 dark:text-white/70" },
-    { metric: "Incidentes mes",     value: "0",       sub: "32 días sin accidentes", color: "text-slate-700 dark:text-white/70" },
   ],
 };
 
@@ -215,9 +221,22 @@ function HomePointerAurora({ hostRef }: { hostRef: RefObject<HTMLElement | null>
 
 export default function Home() {
   const homeRef = useRef<HTMLElement>(null);
-  const [activeTab, setActiveTab] = useState("Ferretería");
+  const [activeTab, setActiveTab] = useState("Comercio");
+  const [heroTitleSettled, setHeroTitleSettled] = useState(false);
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
+
+  const featureCarouselItems = FEATURES.map((f) => ({
+    content: (
+      <div className="w-full h-full bg-[#0b1014] border border-white/10 shadow-xl p-6 flex flex-col justify-center">
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 bg-teal-500/10 border border-teal-500/20">
+          <f.Icon size={22} />
+        </div>
+        <h3 className="font-['Outfit'] font-semibold text-white text-lg mb-2">{f.title}</h3>
+        <p className="text-white/45 text-sm leading-relaxed">{f.desc}</p>
+      </div>
+    ),
+  }));
 
   // Parallax sutil: la foto de fondo se desplaza unos pocos píxeles según la
   // posición del mouse dentro del hero, dando sensación de profundidad.
@@ -246,24 +265,84 @@ export default function Home() {
           <motion.div className="home-hero-photo" style={{ x: photoX, y: photoY }} />
         </div>
 
+        <div
+          className="absolute inset-0 z-0 pointer-events-auto transition-opacity duration-[1400ms] ease-out"
+          style={{ opacity: heroTitleSettled ? 1 : 0 }}
+          aria-hidden="true"
+        >
+          <CursorGrid
+            cellSize={65}
+            color="#b2aee3"
+            radius={140}
+            falloff="smooth"
+            holdTime={400}
+            fadeDuration={950}
+            lineWidth={1.2}
+            maxOpacity={0.35}
+            fillOpacity={0}
+            gridOpacity={0}
+            cellRadius={0}
+            clickPulse
+            pulseSpeed={600}
+          />
+        </div>
+
         <motion.div
           variants={heroContainer}
           initial="hidden"
           animate="show"
-          className="relative z-10 w-full max-w-5xl mx-auto pt-28 sm:pt-36">
-          <motion.p variants={heroItem} className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · seis rubros · tres monedas</motion.p>
+          className="relative z-10 w-full max-w-5xl mx-auto">
+          <motion.p variants={heroItem} className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · cuatro rubros · tres monedas</motion.p>
           <motion.h1 variants={heroItem} className="mt-5 max-w-3xl font-['IBM_Plex_Sans'] text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-[-0.055em] text-[#f8f6ef]">
-            Del lápiz y el papel<br />a la <span className="text-[#35d7c3]">automatización</span>
+            <TrueFocus
+              sentence="Automatiza, simplifica, crece..."
+              manualMode={false}
+              blurAmount={6}
+              borderColor="#35d7c3"
+              glowColor="rgba(53, 215, 195, 0.6)"
+              animationDuration={0.3}
+              pauseBetweenAnimations={0.5}
+              onSettle={() => setHeroTitleSettled(true)}
+            />
           </motion.h1>
           <motion.p variants={heroItem} className="mt-8 max-w-xl text-base leading-7 text-[#e5e1d5]/90">
             De la libreta y la hoja de Excel a medianoche, a la comodidad de tu teléfono y tu computadora. Aurora Plus corre la caja, el inventario y la sanidad regulatoria de clínicas, restaurantes, minas, talleres, boutiques y fincas venezolanas.
           </motion.p>
           <motion.div variants={heroItem} className="mt-10 flex flex-wrap gap-3">
-            <MagneticButton onClick={() => navigate("/onboarding")} className="aurora-solid-button px-6 py-3 text-sm font-semibold cursor-pointer">Solicitar demo</MagneticButton>
-            <button onClick={() => navigate("/industrias")} className="aurora-outline-button px-6 py-3 text-sm font-semibold cursor-pointer">Ver los 6 rubros ↓</button>
+            <SpecularButton
+              size="md"
+              radius={10}
+              tint="#35d7c3"
+              tintOpacity={0.16}
+              textColor="#ffffff"
+              lineColor="#7cf3e3"
+              baseColor="#0f766e"
+              shineSize={12}
+              shineFade={45}
+              intensity={1.3}
+              proximity={260}
+              onClick={() => navigate("/onboarding")}
+            >
+              Solicitar demo
+            </SpecularButton>
+            <SpecularButton
+              size="md"
+              radius={10}
+              tint="#ffffff"
+              tintOpacity={0}
+              textColor="#f8f6ef"
+              lineColor="#ffffff"
+              baseColor="#4b4b4b"
+              shineSize={10}
+              shineFade={40}
+              proximity={260}
+              onClick={() => navigate("/industrias")}
+            >
+              Ver los 6 rubros ↓
+            </SpecularButton>
           </motion.div>
 
-          <motion.div variants={heroItem} className="mt-16 grid max-w-4xl grid-cols-2 gap-x-7 gap-y-8 border-t border-white/15 pt-8 sm:grid-cols-4">
+          <motion.div variants={heroItem} className="mt-16 grid w-full max-w-5xl mx-auto grid-cols-2 gap-x-8 gap-y-12 border-t border-white/15 pt-10 sm:grid-cols-4 text-center justify-items-center">
             {[
               ["6", "industrias nativas"],
               ["100%", "resiliente a cortes de conexión"],
@@ -271,29 +350,43 @@ export default function Home() {
               ["RBAC", "roles estrictos"],
             ].map(([value, label]) => (
               <div key={label}>
-                <div className="font-['IBM_Plex_Sans'] text-2xl font-bold text-[#f8f6ef]">{value}</div>
-                <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/85">{label}</div>
+                <div className="font-['IBM_Plex_Sans'] text-4xl sm:text-5xl font-bold text-[#f8f6ef]">{value}</div>
+                <ScrollReveal
+                  baseOpacity={0.15}
+                  enableBlur
+                  baseRotation={2}
+                  blurStrength={3}
+                  containerClassName="mt-2"
+                  textClassName="font-mono text-xs sm:text-sm uppercase tracking-wide text-[#d9d8ce]/85"
+                >
+                  {label}
+                </ScrollReveal>
               </div>
             ))}
           </motion.div>
 
-          <div className="aurora-rate-card mt-16 w-full max-w-md p-7 sm:p-8">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[#d9d8ce]/80">
-              <span>Multi-moneda · motor Aurora</span>
-            </div>
-            <div className="flex items-center justify-center gap-3 pt-6 pb-2">
-              {["USD", "VES", "COP"].map((cur, i) => (
-                <div key={cur} className="flex items-center gap-3">
-                  <span className="font-mono text-lg font-bold text-[#f8f6ef] border border-white/15 rounded-lg px-3 py-1.5">{cur}</span>
-                  {i < 2 && <span className="text-[#3fe0ce] text-sm">⇄</span>}
-                </div>
-              ))}
-            </div>
-            <p className="mt-4 pt-4 border-t border-white/10 text-sm text-[#e9e7df]/85 leading-relaxed">
-              Tú defines la tasa del día en segundos. Si el bolívar se mueve de la mañana a la tarde, tu caja lo refleja al instante — sin hoja de cálculo, sin esperar a nadie.
-            </p>
-            <p className="mt-4 pt-4 border-t border-white/10 font-mono text-[10px] uppercase tracking-wide text-[#d9d8ce]/65">Sin tasa fija · tú la actualizas cuando quieras</p>
-          </div>
+          <motion.div variants={heroItem} className="mt-16 w-full">
+            <AccordionGallery
+              items={VERTICAL_PREVIEWS}
+              defaultIndex={2}
+              expandRatio={0.85}
+              trigger="hover"
+              accentColor="#35d7c3"
+              overlayColor="#04100f"
+              textColor="#ffffff"
+              grayscale
+              showLabels
+              duration={0.6}
+              ease="power3.out"
+              parallax={0.5}
+              tilt={8}
+              stagger={0.06}
+              height={420}
+              gap={10}
+              radius={16}
+              orientation="horizontal"
+            />
+          </motion.div>
 
           {/* ── ACCESO DIRECTO PARA USUARIOS EN SESIÓN ── */}
           {isLoggedIn && (() => {
@@ -390,15 +483,27 @@ export default function Home() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {INDUSTRIES.map((ind) => (
-            <div key={ind.name}
+            <GlareHover
+              key={ind.name}
+              width="100%"
+              height="100%"
+              background="transparent"
+              borderRadius="1rem"
+              borderColor="transparent"
+              glareColor="#35d7c3"
+              glareOpacity={0.3}
+              glareAngle={-45}
+              glareSize={250}
+              transitionDuration={650}
               onClick={() => navigate("/industrias")}
-              className="hover-card apple-glass rounded-2xl p-5 cursor-pointer card-shadow">
+              className="hover-card apple-glass p-5 cursor-pointer card-shadow"
+            >
               <div className="w-10 h-10 rounded-xl bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8 flex items-center justify-center mb-3">
                 <ind.Icon size={20} />
               </div>
               <h3 className="font-['Outfit'] font-semibold text-slate-900 dark:text-white text-base mb-1.5">{ind.name}</h3>
               <p className="text-slate-500 dark:text-white/40 text-xs leading-relaxed">{ind.desc}</p>
-            </div>
+            </GlareHover>
           ))}
         </div>
         <div className="text-center mt-8">
@@ -491,16 +596,29 @@ export default function Home() {
             Construido para la<br /><span className="text-aurora-r">operación real</span>
           </h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="hover-card apple-glass rounded-2xl p-6 card-shadow">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8">
-                <f.Icon size={22} />
-              </div>
-              <h3 className="font-['Outfit'] font-semibold text-slate-900 dark:text-white text-lg mb-2">{f.title}</h3>
-              <p className="text-slate-500 dark:text-white/45 text-sm leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
+        <div style={{ height: 440, position: "relative" }}>
+          <DepthCarousel
+            items={featureCarouselItems}
+            depth={220}
+            spread={90}
+            tilt={22}
+            tiltDirection="right"
+            perspective={1400}
+            visibleCards={4}
+            falloff={0.2}
+            blur={6}
+            autoplay
+            loop
+            cardWidth={300}
+            cardHeight={380}
+            radius={18}
+            tint="#05060a"
+            duration={700}
+            ease="power3.out"
+            autoplayDelay={3200}
+            showControls
+            showIndicators
+          />
         </div>
         <div className="text-center mt-8">
           <button onClick={() => navigate("/soluciones")} className="text-teal-600 dark:text-teal-400 hover:text-teal-500 dark:hover:text-teal-300 text-sm font-semibold transition-colors cursor-pointer">
@@ -680,10 +798,23 @@ export default function Home() {
               Implementación en menos de 2 semanas. Sin migraciones complicadas. Tu equipo trabajando mejor desde el primer día.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button onClick={() => navigate("/precios")}
-                className="g-aurora glow-teal text-white font-semibold px-10 py-4 rounded-xl text-base hover:opacity-90 transition-opacity w-full sm:w-auto shadow-lg cursor-pointer">
+              <SpecularButton
+                size="lg"
+                radius={12}
+                tint="#35d7c3"
+                tintOpacity={0.16}
+                textColor="#ffffff"
+                lineColor="#7cf3e3"
+                baseColor="#0f766e"
+                shineSize={12}
+                shineFade={45}
+                intensity={1.3}
+                proximity={280}
+                className="w-full sm:w-auto"
+                onClick={() => navigate("/precios")}
+              >
                 Solicitar demo gratuita
-              </button>
+              </SpecularButton>
               <button onClick={() => navigate("/nosotros")} className="text-slate-500 dark:text-white/45 hover:text-slate-900 dark:hover:text-white transition-colors text-sm font-semibold cursor-pointer">
                 Hablar con un especialista →
               </button>

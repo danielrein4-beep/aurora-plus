@@ -125,4 +125,17 @@ public class RepuestoItemController {
             "esMayorista", resultado.isEsMayorista()
         ));
     }
+
+    public static class AjusteStockRequest {
+        public BigDecimal stockReal;
+        public String motivo;
+    }
+
+    /** Corrección de inventario tras un conteo físico — ver RepuestoConversionService.ajustarStock. */
+    @PostMapping("/{id}/ajustar-stock")
+    public ResponseEntity<RepuestoItem> ajustarStock(@PathVariable Long id, @RequestParam Long tenantId,
+                                                       @RequestBody AjusteStockRequest datos) {
+        RepuestoItem actualizado = repuestoConversionService.ajustarStock(id, tenantId, datos.stockReal, datos.motivo);
+        return ResponseEntity.ok(actualizado);
+    }
 }

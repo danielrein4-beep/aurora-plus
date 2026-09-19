@@ -1,0 +1,41 @@
+/* GlareHover (react-bits.dev) — un brillo diagonal barre la tarjeta al pasar
+   el mouse, moviendo un gradiente de fondo (más grande que la propia caja)
+   de una esquina a la otra. */
+.glare-hover {
+  position: relative;
+  width: var(--gh-width);
+  height: var(--gh-height);
+  background: var(--gh-bg);
+  border-radius: var(--gh-br);
+  border: 1px solid var(--gh-border);
+  overflow: hidden;
+}
+
+.glare-hover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    var(--gh-angle),
+    transparent 38%,
+    var(--gh-rgba) 50%,
+    transparent 62%
+  );
+  background-size: var(--gh-size) var(--gh-size);
+  background-repeat: no-repeat;
+  background-position: -120% -120%;
+  transition: background-position var(--gh-duration) ease;
+}
+
+.glare-hover:hover::before {
+  background-position: 120% 120%;
+}
+
+.glare-hover--play-once::before {
+  transition: background-position var(--gh-duration) ease;
+}
+
+.glare-hover--play-once:not(:hover)::before {
+  transition: none;
+}

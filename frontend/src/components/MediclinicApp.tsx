@@ -6,7 +6,7 @@ import {
   IconStethoscope, IconUsers, IconFileText, IconPrescription, IconHourglass, IconCalendar,
   IconCard, IconCustomize, IconSearch, IconUser, IconCheck, IconTrash, IconRefresh,
   IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconUnlock, IconWarning, IconClose, IconBank,
-  IconWhatsApp, IconMail, IconChart
+  IconWhatsApp, IconMail, IconChart, IconCoins, IconEdit
 } from "../Icons";
 import ThemeToggle from "./ThemeToggle";
 import CanalEndemico from "./CanalEndemico";
@@ -18,20 +18,27 @@ import {
   contadorInboxExamenesRecibidos, listarExamenesRecibidosPorPaciente, type ExamenRecibidoPaciente,
   listarPacientes, crearPaciente, actualizarPaciente, eliminarPaciente, buscarPacientePorIdentificacion,
   listarCitasDelDia, listarCitasPorRango, agendarCita, actualizarEstadoCita, reprogramarCita, listarCobrosDelDia,
-  listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera, procesarCobro,
+  listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera, llamarAConsultorioSalaEspera, procesarCobro,
   listarCierresCaja, registrarCierreCaja,
   estadoPinDoctor, verificarPinDoctor, configurarPinDoctor,
   listarProcedimientos, crearProcedimiento, historialConsultasPaciente, registrarConsulta, eliminarConsulta,
   listarCotizaciones, crearCotizacion, actualizarEstadoCotizacion, eliminarCotizacion as eliminarCotizacionApi,
   obtenerEstadoWhatsApp, guardarWhatsApp, type EstadoWhatsApp,
+  tasaVigente, actualizarTasa, obtenerOrigenTasaActiva, actualizarOrigenTasaActiva, actualizarTasaExternaTenant,
+  obtenerPerfilMedicoDocumentos, actualizarPerfilMedicoDocumentos, actualizarFirmaMedico,
+  obtenerMiNegocio, actualizarLogo, enviarEmailDocumento,
   type Paciente, type CitaMedica, type SalaEsperaEntrada, type ProcedimientoMedico, type ConsultaMedica,
-  type CierreCajaRegistro, type CotizacionMedicaApi,
+  type CierreCajaRegistro, type CotizacionMedicaApi, type TasaCambio, type OrigenTasaActiva,
+  type PerfilMedicoDocumentos,
 } from "../api";
 import {
   generarPdfCierreCaja, generarPdfInformeConsulta, generarTextoWhatsAppConsulta,
   generarPdfCotizacion, generarTextoWhatsAppCotizacion,
   abrirWhatsAppDirecto, formatearTelefonoParaWhatsApp,
-  type CobroItem, type CierreCajaData, type ConsultaReportData, type CotizacionData, type CotizacionItem
+  obtenerBase64PdfComprobantePago, generarTextoEmailComprobante,
+  generarTextoRecordatorioCita, PLANTILLA_RECORDATORIO_CITA_POR_DEFECTO,
+  type CobroItem, type CierreCajaData, type ConsultaReportData, type CotizacionData, type CotizacionItem,
+  type ComprobantePagoData,
 } from "../utils/pdfReports";
 import DocumentoPreviewModal, { type DocumentoVisorPayload } from "./DocumentoPreviewModal";
 import {
@@ -113,6 +120,12 @@ export const claveSalaEsperaTurnos = (tenantId: number) => `aurora_mediclinic_sa
 
 export interface TurnoSalaEspera {
   id: string;
+  // ID real en `salud_sala_espera` — cuando existe, este turno está sincronizado
+  // con el backend y sus cambios de estado se ven en cualquier dispositivo
+  // (recepción y doctor en PCs distintos). Sin backendId, el turno vive solo en
+  // este navegador (no debería pasar ya que la admisión siempre crea/vincula un
+  // paciente real, pero se deja como fallback defensivo).
+  backendId?: number;
   turnoNumero: number;
   codigoTurno: string;
   pacienteId: number | null;
@@ -366,23 +379,25 @@ function ModalClaveDoctor({
   const [mostrarClave, setMostrarClave] = useState(false);
   const [verificando, setVerificando] = useState(false);
 
-  // El PIN se valida en el servidor (ConfiguracionMedicaController) — nunca se compara
-  // en el navegador. Antes esto se comparaba contra un valor en localStorage, texto
-  // plano, saltable con las herramientas de desarrollador.
+  // El PIN nunca se guarda ni se compara en el navegador — se valida contra el hash
+  // real en el servidor (ver ConfiguracionMedicaController). Antes se comparaba en el
+  // cliente contra un valor de localStorage, lo que permitía leerlo o saltárselo con
+  // las herramientas de desarrollador.
   const validar = async (e: React.FormEvent) => {
     e.preventDefault();
+    const input = clave.trim();
     setVerificando(true);
     setError(null);
     try {
-      const { valido } = await verificarPinDoctor(clave.trim());
+      const { valido } = await verificarPinDoctor(input);
       if (valido) {
         onExito();
       } else {
         setError("Contraseña o PIN incorrecto. Intenta de nuevo.");
         setClave("");
       }
-    } catch {
-      setError("No se pudo verificar el PIN. Intenta de nuevo.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo verificar el PIN — intenta de nuevo.");
     } finally {
       setVerificando(false);
     }
@@ -459,7 +474,7 @@ function ModalClaveDoctor({
             <button
               type="submit"
               disabled={verificando}
-              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-lg flex items-center gap-2 text-white disabled:opacity-50"
+              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-lg flex items-center gap-2 text-white disabled:opacity-60"
             >
               <IconCheck size={16} />
               <span>{verificando ? "Verificando…" : "Entrar al Panel Médico"}</span>
@@ -607,8 +622,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [modalClaveDoctor, setModalClaveDoctor] = useState(false);
   const [accionPendienteDoctor, setAccionPendienteDoctor] = useState<(() => void) | null>(null);
 
-  // Si el PIN del médico ya fue personalizado — se resuelve contra el servidor, nunca
-  // contra localStorage (ver ConfiguracionMedicaController). null mientras carga.
+  // El PIN del Médico Titular se valida en el servidor (ver ConfiguracionMedicaController) —
+  // "personalizada" indica si ya eligió uno propio o sigue en el PIN de fábrica "1234".
   const [pinPersonalizado, setPinPersonalizado] = useState<boolean | null>(null);
   useEffect(() => {
     estadoPinDoctor().then((r) => setPinPersonalizado(r.personalizada)).catch(() => setPinPersonalizado(false));
@@ -646,6 +661,56 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     setConfigPerfil(nuevaConfig);
     try { localStorage.setItem(claveConfigPerfil(tenantId), JSON.stringify(nuevaConfig)); } catch {}
   };
+
+  // Tasas de cambio reales — misma metodología que usa Aurora Horeca (mismo
+  // motor genérico /api/financiero/tasas + /api/config/mi-negocio/origen-tasa):
+  // BCV y USDT se consultan en vivo de su fuente pública real, cada una se
+  // guarda como serie propia, y "origenTasaActiva" decide cuál gobierna el
+  // cobro. Antes tasaBCV/tasaCOP vivían solo en configPerfil (localStorage de
+  // este dispositivo, nunca sincronizadas entre secretaria/doctor). Se guarda
+  // un historial en el servidor y siempre se usa la más reciente.
+  const [origenTasaActiva, setOrigenTasaActiva] = useState<OrigenTasaActiva | null>(null);
+  const [tasaBcv, setTasaBcv] = useState<TasaCambio | null>(null);
+  const [tasaCopReal, setTasaCopReal] = useState<TasaCambio | null>(null);
+  useEffect(() => {
+    if (!tenantId) return;
+    obtenerOrigenTasaActiva().then((r) => setOrigenTasaActiva(r.origenTasaActiva)).catch(() => setOrigenTasaActiva("USDT"));
+    tasaVigente(tenantId, "USD", "COP").then(setTasaCopReal).catch(() => setTasaCopReal(null));
+  }, [tenantId]);
+  useEffect(() => {
+    if (!tenantId || !origenTasaActiva) return;
+    tasaVigente(tenantId, "USD", "VES", origenTasaActiva).then(setTasaBcv).catch(() => setTasaBcv(null));
+  }, [tenantId, origenTasaActiva]);
+
+  // Motor de personalización de PDFs — membrete guardado por tenant en el servidor (ver
+  // ConfiguracionMedicaController), no en localStorage de un solo dispositivo: logo,
+  // firma electrónica, texto de encabezado y datos del doctor se inyectan automáticamente
+  // en cada PDF (historias, récipes, cotizaciones, comprobantes de pago).
+  const [perfilDocs, setPerfilDocs] = useState<PerfilMedicoDocumentos | null>(null);
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  useEffect(() => {
+    if (!tenantId) return;
+    obtenerPerfilMedicoDocumentos().then(setPerfilDocs).catch(() => setPerfilDocs(null));
+    obtenerMiNegocio().then((r) => setLogoBase64(r.logoBase64)).catch(() => setLogoBase64(null));
+  }, [tenantId]);
+
+  // Único punto de lectura para el resto de la app (cotizaciones, cierres de
+  // caja, PDFs) — mismo objeto configPerfil de siempre, pero con tasaBCV/
+  // tasaCOP y el membrete de documentos siempre reemplazados por el valor
+  // real del backend cuando existe.
+  const configPerfilConTasas = useMemo(() => ({
+    ...configPerfil,
+    tasaBCV: tasaBcv ? Number(tasaBcv.tasa) : configPerfil.tasaBCV,
+    tasaCOP: tasaCopReal ? Number(tasaCopReal.tasa) : configPerfil.tasaCOP,
+    doctorNombre: perfilDocs?.doctorNombre || configPerfil.doctorNombre,
+    especialidad: perfilDocs?.especialidad || configPerfil.especialidad,
+    matriculaMPPS: perfilDocs?.matriculaMpps || configPerfil.matriculaMPPS,
+    colegioMedicos: perfilDocs?.colegioMedicos || configPerfil.colegioMedicos,
+    encabezadoTexto: perfilDocs?.encabezadoTexto || "",
+    firmaBase64: perfilDocs?.firmaBase64 || null,
+    logoBase64,
+    plantillaRecordatorioCita: perfilDocs?.plantillaRecordatorioCita || PLANTILLA_RECORDATORIO_CITA_POR_DEFECTO,
+  }), [configPerfil, tasaBcv, tasaCopReal, perfilDocs, logoBase64]);
 
   const seleccionarDoctor = () => {
     setModalClaveDoctor(true);
@@ -747,29 +812,78 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   });
 
   const [modalTasasRapidas, setModalTasasRapidas] = useState(false);
-  const [tasaBCVInput, setTasaBCVInput] = useState<string>("");
   const [tasaCOPInput, setTasaCOPInput] = useState<string>("");
+  const [tasaPropiaInput, setTasaPropiaInput] = useState<string>("");
   const [toastTasa, setToastTasa] = useState<string | null>(null);
 
+  // Fuente que sigue la tasa USD->Bs de este tenant — misma metodología que usa Aurora
+  // Horeca: USDT y BCV ya no se teclean, se consultan en vivo de su fuente pública real
+  // bajo demanda (ver TasaExternaService en el backend). Solo "Propia" es manual.
+  const [cambiandoMetodoTasa, setCambiandoMetodoTasa] = useState(false);
+  const [actualizandoTasaAhora, setActualizandoTasaAhora] = useState(false);
+  const [guardandoTasasRapidas, setGuardandoTasasRapidas] = useState(false);
+
   const abrirModalTasas = () => {
-    setTasaBCVInput(String(configPerfil.tasaBCV || 56.40));
-    setTasaCOPInput(String(configPerfil.tasaCOP || 4200));
+    setTasaCOPInput(tasaCopReal ? String(Number(tasaCopReal.tasa)) : "");
+    setTasaPropiaInput(origenTasaActiva === "PERSONALIZADA" && tasaBcv ? String(Number(tasaBcv.tasa)) : "");
     setModalTasasRapidas(true);
   };
 
-  const guardarTasasRapidas = (e?: React.FormEvent) => {
+  const elegirMetodoTasa = async (nuevo: OrigenTasaActiva) => {
+    if (nuevo === origenTasaActiva) return;
+    setCambiandoMetodoTasa(true);
+    try {
+      await actualizarOrigenTasaActiva(nuevo);
+      setOrigenTasaActiva(nuevo);
+      if (nuevo !== "PERSONALIZADA") {
+        tasaVigente(tenantId, "USD", "VES", nuevo).then(setTasaBcv).catch(() => {});
+      }
+    } catch (err) {
+      setToastTasa(err instanceof Error ? err.message : "No se pudo cambiar la fuente de la tasa");
+      setTimeout(() => setToastTasa(null), 3500);
+    } finally {
+      setCambiandoMetodoTasa(false);
+    }
+  };
+
+  const actualizarTasaAhoraModal = async () => {
+    if (origenTasaActiva !== "BCV" && origenTasaActiva !== "USDT") return;
+    setActualizandoTasaAhora(true);
+    try {
+      const fuente = origenTasaActiva === "USDT" ? "BINANCE" : "BCV";
+      setTasaBcv(await actualizarTasaExternaTenant(tenantId, fuente, "VES"));
+    } catch (err) {
+      setToastTasa(err instanceof Error ? err.message : "No se pudo consultar la tasa en este momento");
+      setTimeout(() => setToastTasa(null), 3500);
+    } finally {
+      setActualizandoTasaAhora(false);
+    }
+  };
+
+  const guardarTasasRapidas = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const bcv = parseFloat(tasaBCVInput) || configPerfil.tasaBCV || 56.40;
-    const cop = parseFloat(tasaCOPInput) || configPerfil.tasaCOP || 4200;
-    const nuevaConfig = {
-      ...configPerfil,
-      tasaBCV: bcv,
-      tasaCOP: cop,
-    };
-    guardarConfigPerfil(nuevaConfig);
-    setModalTasasRapidas(false);
-    setToastTasa(`Tasas actualizadas: BCV Bs. ${bcv.toFixed(2)} | COP $${cop.toLocaleString()}`);
-    setTimeout(() => setToastTasa(null), 3500);
+    const propia = parseFloat(tasaPropiaInput);
+    const cop = parseFloat(tasaCOPInput);
+    if (!(origenTasaActiva === "PERSONALIZADA" && propia > 0) && !(cop > 0)) {
+      setToastTasa("Ingresá al menos una tasa mayor a cero");
+      setTimeout(() => setToastTasa(null), 3500);
+      return;
+    }
+    setGuardandoTasasRapidas(true);
+    try {
+      const tareas: Promise<void>[] = [];
+      if (origenTasaActiva === "PERSONALIZADA" && propia > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: propia, origen: "PERSONALIZADA" }).then(setTasaBcv));
+      if (cop > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: cop, origen: "MANUAL" }).then(setTasaCopReal));
+      await Promise.all(tareas);
+      setModalTasasRapidas(false);
+      setToastTasa(`Tasas actualizadas: Bs. ${(propia || Number(tasaBcv?.tasa) || 0).toFixed(2)} | COP $${(cop || Number(tasaCopReal?.tasa) || 0).toLocaleString()}`);
+      setTimeout(() => setToastTasa(null), 3500);
+    } catch (err) {
+      setToastTasa(err instanceof Error ? err.message : "No se pudo actualizar la tasa");
+      setTimeout(() => setToastTasa(null), 3500);
+    } finally {
+      setGuardandoTasasRapidas(false);
+    }
   };
 
   useEffect(() => {
@@ -842,9 +956,24 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   };
 
   useEffect(() => {
+    // No disparar la carga inicial con el tenantId de respaldo (1) — si el
+    // usuario recién inició sesión, user.tenantId puede tardar un render en
+    // hidratarse; pedir datos con el tenant equivocado dispara un 401 que el
+    // interceptor global interpreta como "sesión vencida" y desloguea.
+    if (!user?.tenantId) return;
     recargarTodo();
     const interval = setInterval(cargarContadorLab, 30000);
-    return () => clearInterval(interval);
+    // Sala de espera en vivo: sin esto, lo que admite/llama/atiende la secretaria
+    // en su PC nunca le llega al doctor en la suya (y viceversa) hasta que alguien
+    // recargue la página — cada quien se queda mirando la foto de cuando entró.
+    // No hay WebSocket en el proyecto, así que se resuelve con polling corto.
+    const intervalSalaEspera = setInterval(() => {
+      listarSalaEspera().then(setSalaEspera).catch(() => {});
+    }, 6000);
+    return () => {
+      clearInterval(interval);
+      clearInterval(intervalSalaEspera);
+    };
   }, [tenantId]);
 
   // Si no hay perfil activo seleccionado, renderizar la pantalla estilo Netflix
@@ -858,7 +987,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
           onSeleccionarSecretaria={seleccionarSecretaria}
           onSalir={handleSalirAlHub}
         />
-        {modalClaveDoctor && !pinPersonalizado && (
+        {modalClaveDoctor && pinPersonalizado === false && (
           <ModalConfigurarClavePrimeraVez
             doctorNombre={configPerfil.doctorNombre}
             onConfigurado={() => {
@@ -871,7 +1000,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             }}
           />
         )}
-        {modalClaveDoctor && pinPersonalizado && (
+        {modalClaveDoctor && pinPersonalizado === true && (
           <ModalClaveDoctor
             doctorNombre={configPerfil.doctorNombre}
             onExito={() => {
@@ -1059,17 +1188,19 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               </button>
             )}
 
-            <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/70 dark:bg-white/5 border border-slate-300/60 dark:border-white/15 shadow-sm text-xs">
+            <div className={`flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border shadow-sm text-xs ${
+              tasaBcv ? "bg-white/70 dark:bg-white/5 border-slate-300/60 dark:border-white/15" : "bg-amber-500/10 border-amber-500/30"
+            }`}>
               <span className="font-bold text-slate-700 dark:text-white/80 flex items-center gap-1.5">
                 <IconBank size={14} className="text-teal-600 dark:text-teal-400" />
                 <span>Tasas del Día:</span>
               </span>
               <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                VES: Bs. {Number(configPerfil.tasaBCV || 56.4).toFixed(2)}
+                VES: {tasaBcv ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa"}
               </span>
               <span className="text-slate-300 dark:text-white/20">|</span>
               <span className="font-mono font-bold text-sky-600 dark:text-sky-400">
-                COP: ${Number(configPerfil.tasaCOP || 4200).toLocaleString()}
+                COP: {tasaCopReal ? `$${Number(tasaCopReal.tasa).toLocaleString()}` : "Sin tasa"}
               </span>
 
               <button
@@ -1110,7 +1241,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         )}
 
         {/* MODAL DE AUTENTICACIÓN MÉDICA PARA SECCIONES RESTRINGIDAS */}
-        {modalClaveDoctor && !pinPersonalizado && (
+        {modalClaveDoctor && pinPersonalizado === false && (
           <ModalConfigurarClavePrimeraVez
             doctorNombre={configPerfil.doctorNombre}
             onConfigurado={() => {
@@ -1123,7 +1254,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             }}
           />
         )}
-        {modalClaveDoctor && pinPersonalizado && (
+        {modalClaveDoctor && pinPersonalizado === true && (
           <ModalClaveDoctor
             doctorNombre={configPerfil.doctorNombre}
             onExito={() => {
@@ -1177,7 +1308,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               <HistoriasClinicas
                 tenantId={tenantId}
                 pacientes={pacientes}
-                config={configPerfil}
+                config={configPerfilConTasas}
                 rol={rolActivo}
                 pacienteInicialId={pacienteSeleccionadoId}
                 onVerDocumento={setVisorDocumento}
@@ -1188,7 +1319,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 tenantId={tenantId}
                 procedimientos={procedimientos}
                 pacientes={pacientes}
-                config={configPerfil}
+                config={configPerfilConTasas}
                 onCambio={recargarTodo}
                 pacienteInicialId={pacienteSeleccionadoId}
                 onVerDocumento={setVisorDocumento}
@@ -1203,7 +1334,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onAgregarCobro={agregarCobroLocal}
                 onAgregarCierre={agregarCierreAuditado}
                 onCambio={recargarTodo}
-                config={configPerfil}
+                config={configPerfilConTasas}
                 onNavegar={setPagina}
                 onSeleccionarPacienteParaConsulta={(id) => {
                   setPacienteSeleccionadoId(id);
@@ -1223,7 +1354,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               }}
             />
           )}
-          {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} />}
+          {pagina === "agenda" && <AgendaMedica tenantId={tenantId} pacientes={pacientes} citasHoy={citasHoy} onCambio={recargarTodo} config={configPerfilConTasas} />}
             {pagina === "canal-endemico" && <CanalEndemico modo="medico" clinicaNombre={configPerfil.clinicaNombre} doctorNombre={configPerfil.doctorNombre} />}
             {pagina === "financiero" && (
               <ResumenesFinancieros
@@ -1231,7 +1362,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 citasHoy={citasHoy}
                 cobrosLocales={cobrosLocales}
                 historialCierres={historialCierres}
-                config={configPerfil}
+                config={configPerfilConTasas}
                 rol={rolActivo}
                 onEliminarCobro={eliminarCobroLocal}
                 onLimpiarCobros={limpiarCobrosLocales}
@@ -1240,7 +1371,23 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onVerDocumento={setVisorDocumento}
               />
             )}
-            {pagina === "configuracion" && <Configuracion config={configPerfil} onGuardar={guardarConfigPerfil} user={user} />}
+            {pagina === "configuracion" && (
+              <Configuracion
+                config={configPerfilConTasas}
+                onGuardar={guardarConfigPerfil}
+                user={user}
+                tasaBcv={tasaBcv}
+                tasaCop={tasaCopReal}
+                origenTasaActiva={origenTasaActiva}
+                onActualizarTasas={async (bcv, cop) => {
+                  if (bcv > 0) setTasaBcv(await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: bcv, origen: "PERSONALIZADA" }));
+                  if (cop > 0) setTasaCopReal(await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: cop, origen: "MANUAL" }));
+                }}
+                pinPersonalizado={pinPersonalizado}
+                onPerfilDocsActualizado={setPerfilDocs}
+                onLogoActualizado={setLogoBase64}
+              />
+            )}
           </div>
         </div>
       </main>
@@ -1256,8 +1403,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   <IconBank size={22} />
                 </div>
                 <div>
-                  <h3 className="font-['Outfit'] font-black text-lg leading-tight">Tasas de Cambio Oficiales</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-white/50">Ajuste manual e instantáneo para cobros y caja</p>
+                  <h3 className="font-['Outfit'] font-black text-lg leading-tight">Fuente de la Tasa (USD → Bs)</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-white/50">USDT y BCV vienen de su fuente pública real.</p>
                 </div>
               </div>
               <button
@@ -1270,46 +1417,57 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             </div>
 
             <form onSubmit={guardarTasasRapidas} className="space-y-4">
-              {/* Tasa BCV */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-white/80 flex items-center justify-between">
-                  <span>Tasa BCV (Bs. / USD)</span>
-                  <span className="text-[10px] font-mono text-teal-600 dark:text-teal-400">Bolívares por Dólar</span>
-                </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3.5 text-xs font-mono font-bold text-slate-400">Bs.</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    required
-                    autoFocus
-                    value={tasaBCVInput}
-                    onChange={(e) => setTasaBCVInput(e.target.value)}
-                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-slate-50 dark:bg-black/20 text-slate-900 dark:text-white font-mono font-bold text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
-                    placeholder="Ej. 56.40"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5 pt-1 flex-wrap">
-                  <span className="text-[10px] text-slate-400">Ajuste rápido:</span>
-                  {[56.40, 57.50, 58.00, 60.00].map((val) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setTasaBCVInput(String(val))}
-                      className="text-[10px] px-2 py-0.5 rounded bg-slate-200/70 dark:bg-white/10 hover:bg-teal-500 hover:text-white transition-colors font-mono cursor-pointer font-bold"
-                    >
-                      Bs. {val.toFixed(2)}
-                    </button>
-                  ))}
-                </div>
+              <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-white/10 p-1 rounded-xl">
+                <button type="button" disabled={cambiandoMetodoTasa} onClick={() => elegirMetodoTasa("USDT")}
+                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "USDT" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
+                  <IconCoins size={12} /><span>USDT</span>
+                </button>
+                <button type="button" disabled={cambiandoMetodoTasa} onClick={() => elegirMetodoTasa("BCV")}
+                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "BCV" ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
+                  <IconBank size={12} /><span>BCV</span>
+                </button>
+                <button type="button" disabled={cambiandoMetodoTasa} onClick={() => elegirMetodoTasa("PERSONALIZADA")}
+                  className={`py-1.5 text-center text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 disabled:opacity-60 ${origenTasaActiva === "PERSONALIZADA" ? "bg-amber-600 text-white shadow-sm" : "text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"}`}>
+                  <IconEdit size={12} /><span>Propia</span>
+                </button>
               </div>
 
-              {/* Tasa COP */}
+              {origenTasaActiva !== "PERSONALIZADA" ? (
+                <div className="space-y-2 text-xs bg-slate-100 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/10">
+                  <p className="text-[10px] text-slate-500 dark:text-white/50">
+                    {origenTasaActiva === "BCV" ? "Tasa oficial publicada en bcv.org.ve:" : "Promedio de las mejores ofertas de Binance P2P (USDT/VES):"}
+                  </p>
+                  <p className="font-mono font-black text-lg text-teal-600 dark:text-teal-400">
+                    {tasaBcv ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa todavía"}
+                  </p>
+                  {tasaBcv && <p className="text-[10px] text-slate-400">Actualizado: {new Date(tasaBcv.fechaActualizacion).toLocaleString()}</p>}
+                  <button type="button" onClick={actualizarTasaAhoraModal} disabled={actualizandoTasaAhora}
+                    className="w-full py-1.5 rounded-lg bg-slate-200/70 dark:bg-white/10 hover:bg-teal-500 hover:text-white transition-colors text-[11px] font-bold cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5">
+                    <IconRefresh size={12} className={actualizandoTasaAhora ? "animate-spin" : ""} />
+                    <span>{actualizandoTasaAhora ? "Consultando…" : "Actualizar Ahora"}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-white/80">Tu Tasa Propia (Bs. / USD)</label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3.5 text-xs font-mono font-bold text-slate-400">Bs.</span>
+                    <input
+                      type="number" step="0.01" min="0.01" autoFocus
+                      value={tasaPropiaInput}
+                      onChange={(e) => setTasaPropiaInput(e.target.value)}
+                      className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-amber-400/60 bg-amber-50 dark:bg-amber-500/10 text-slate-900 dark:text-white font-mono font-bold text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all"
+                      placeholder="Ej. 66.00"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Tasa COP — sin fuente automática, siempre manual */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-white/80 flex items-center justify-between">
                   <span>Tasa TRM (Pesos COP / USD)</span>
-                  <span className="text-[10px] font-mono text-teal-600 dark:text-teal-400">Pesos por Dólar</span>
+                  <span className="text-[10px] font-mono text-teal-600 dark:text-teal-400">Siempre manual</span>
                 </label>
                 <div className="relative flex items-center">
                   <span className="absolute left-3.5 text-xs font-mono font-bold text-slate-400">$</span>
@@ -1317,7 +1475,6 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                     type="number"
                     step="1"
                     min="1"
-                    required
                     value={tasaCOPInput}
                     onChange={(e) => setTasaCOPInput(e.target.value)}
                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-slate-50 dark:bg-black/20 text-slate-900 dark:text-white font-mono font-bold text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
@@ -1345,7 +1502,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   Simulación de Conversión ($10.00 USD):
                 </div>
                 <div className="flex items-center justify-between text-teal-700 dark:text-teal-300 font-bold">
-                  <span>Bs. {((parseFloat(tasaBCVInput) || 0) * 10).toFixed(2)} VES</span>
+                  <span>Bs. {((origenTasaActiva === "PERSONALIZADA" ? parseFloat(tasaPropiaInput) || 0 : Number(tasaBcv?.tasa) || 0) * 10).toFixed(2)} VES</span>
                   <span>${((parseFloat(tasaCOPInput) || 0) * 10).toLocaleString()} COP</span>
                 </div>
               </div>
@@ -1361,10 +1518,11 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-md hover:shadow-teal-500/20 transition-all cursor-pointer flex items-center gap-1.5"
+                  disabled={guardandoTasasRapidas}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-md hover:shadow-teal-500/20 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-60"
                 >
                   <IconCheck size={16} />
-                  <span>Guardar Tasas</span>
+                  <span>{guardandoTasasRapidas ? "Guardando…" : origenTasaActiva === "PERSONALIZADA" ? "Guardar Tasa Propia y COP" : "Guardar Tasa COP"}</span>
                 </button>
               </div>
             </form>
@@ -2863,6 +3021,15 @@ function HistoriasClinicas({
     motivoConsulta: "",
     talla: "1.75",
     peso: "70.0",
+    // Antes no existían — los informes médicos imprimían "120/80, 75bpm,
+    // 36.8°C, 99% SatO2" fijos para CUALQUIER paciente porque no había dónde
+    // capturarlos de verdad. El backend (ConsultaMedica.java) ya los guarda;
+    // solo faltaba el formulario.
+    presionArterial: "",
+    frecuenciaCardiaca: "",
+    frecuenciaRespiratoria: "",
+    temperatura: "",
+    saturacionOxigeno: "",
     observacionFisica: "",
     evolucionClinica: "",
     evolucionEstado: "" as "" | "MEJORO" | "IGUAL" | "EMPEORO",
@@ -2929,6 +3096,11 @@ function HistoriasClinicas({
       motivoConsulta: "",
       talla: "1.75",
       peso: "70.0",
+      presionArterial: "",
+      frecuenciaCardiaca: "",
+      frecuenciaRespiratoria: "",
+      temperatura: "",
+      saturacionOxigeno: "",
       observacionFisica: "",
       evolucionClinica: "",
       evolucionEstado: "",
@@ -2958,27 +3130,30 @@ function HistoriasClinicas({
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
+      logoBase64: config.logoBase64,
+      firmaBase64: config.firmaBase64,
+      encabezadoTexto: config.encabezadoTexto,
       paciente: {
         expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
         nombreCompleto: pacienteSeleccionado.nombreCompleto,
         identificacion: pacienteSeleccionado.identificacion,
         edad: pacienteSeleccionado.fechaNacimiento
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
-          : pacienteSeleccionado.edad || 34,
+          : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: hoy(),
       },
       signosVitales: {
-        ta: "120/80",
-        fc: "75",
-        fr: "18",
-        temp: "36.8",
+        ta: form.presionArterial.trim() || "No registrado",
+        fc: form.frecuenciaCardiaca || "No registrado",
+        fr: form.frecuenciaRespiratoria || "No registrado",
+        temp: form.temperatura || "No registrado",
         peso: `${form.peso || "70"} kg`,
         talla: `${form.talla || "1.75"} m`,
         imc: imcCalc,
-        satO2: "99%",
+        satO2: form.saturacionOxigeno ? `${form.saturacionOxigeno}%` : "No registrado",
       },
       motivoConsulta: form.motivoConsulta || "Control de rutina y evolución clínica",
       evolucionClinica: form.evolucionClinica,
@@ -3013,6 +3188,11 @@ function HistoriasClinicas({
         anotacionesPrivadas: form.anotacionesPrivadas,
         talla: form.talla,
         peso: form.peso,
+        presionArterial: form.presionArterial.trim() || undefined,
+        frecuenciaCardiaca: form.frecuenciaCardiaca ? Number(form.frecuenciaCardiaca) : undefined,
+        frecuenciaRespiratoria: form.frecuenciaRespiratoria ? Number(form.frecuenciaRespiratoria) : undefined,
+        temperatura: form.temperatura ? Number(form.temperatura) : undefined,
+        saturacionOxigeno: form.saturacionOxigeno ? Number(form.saturacionOxigeno) : undefined,
         observacionFisica: form.observacionFisica,
         evolucionClinica: form.evolucionClinica,
         evolucionEstado: form.evolucionEstado || undefined,
@@ -3064,30 +3244,33 @@ function HistoriasClinicas({
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
+      logoBase64: config.logoBase64,
+      firmaBase64: config.firmaBase64,
+      encabezadoTexto: config.encabezadoTexto,
       paciente: {
         expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
         nombreCompleto: pacienteSeleccionado.nombreCompleto,
         identificacion: pacienteSeleccionado.identificacion,
         edad: pacienteSeleccionado.fechaNacimiento
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
-          : pacienteSeleccionado.edad || 34,
+          : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
-        ta: "120/80",
-        fc: "75",
-        fr: "18",
-        temp: "36.8",
-        peso: "70 kg",
-        talla: "1.75 m",
-        imc: "22.8",
-        satO2: "99%",
+        ta: c.presionArterial || "No registrado",
+        fc: c.frecuenciaCardiaca != null ? String(c.frecuenciaCardiaca) : "No registrado",
+        fr: c.frecuenciaRespiratoria != null ? String(c.frecuenciaRespiratoria) : "No registrado",
+        temp: c.temperatura != null ? String(c.temperatura) : "No registrado",
+        peso: c.peso ? `${c.peso} kg` : "No registrado",
+        talla: c.talla ? `${c.talla} m` : "No registrado",
+        imc: c.imc != null ? String(c.imc) : "No registrado",
+        satO2: c.saturacionOxigeno != null ? `${c.saturacionOxigeno}%` : "No registrado",
       },
       motivoConsulta: c.motivoConsulta || "Consulta Médica",
-      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      evolucionClinica: c.evolucionClinica || "Sin notas de evolución registradas.",
       diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
       planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
       proximaCita: undefined,
@@ -3112,30 +3295,33 @@ function HistoriasClinicas({
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
+      logoBase64: config.logoBase64,
+      firmaBase64: config.firmaBase64,
+      encabezadoTexto: config.encabezadoTexto,
       paciente: {
         expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
         nombreCompleto: pacienteSeleccionado.nombreCompleto,
         identificacion: pacienteSeleccionado.identificacion,
         edad: pacienteSeleccionado.fechaNacimiento
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
-          : pacienteSeleccionado.edad || 34,
+          : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
-        ta: "120/80",
-        fc: "75",
-        fr: "18",
-        temp: "36.8",
-        peso: "70 kg",
-        talla: "1.75 m",
-        imc: "22.8",
-        satO2: "99%",
+        ta: c.presionArterial || "No registrado",
+        fc: c.frecuenciaCardiaca != null ? String(c.frecuenciaCardiaca) : "No registrado",
+        fr: c.frecuenciaRespiratoria != null ? String(c.frecuenciaRespiratoria) : "No registrado",
+        temp: c.temperatura != null ? String(c.temperatura) : "No registrado",
+        peso: c.peso ? `${c.peso} kg` : "No registrado",
+        talla: c.talla ? `${c.talla} m` : "No registrado",
+        imc: c.imc != null ? String(c.imc) : "No registrado",
+        satO2: c.saturacionOxigeno != null ? `${c.saturacionOxigeno}%` : "No registrado",
       },
       motivoConsulta: c.motivoConsulta || "Consulta Médica",
-      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      evolucionClinica: c.evolucionClinica || "Sin notas de evolución registradas.",
       diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
       planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
       proximaCita: undefined,
@@ -3163,30 +3349,33 @@ function HistoriasClinicas({
       especialidad: config.especialidad || "Dermatología / Medicina General",
       matriculaMPPS: config.matriculaMPPS || "109842",
       colegioMedicos: config.colegioMedicos || "5421",
+      logoBase64: config.logoBase64,
+      firmaBase64: config.firmaBase64,
+      encabezadoTexto: config.encabezadoTexto,
       paciente: {
         expediente: `HC-2026-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
         nombreCompleto: pacienteSeleccionado.nombreCompleto,
         identificacion: pacienteSeleccionado.identificacion,
         edad: pacienteSeleccionado.fechaNacimiento
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
-          : pacienteSeleccionado.edad || 34,
+          : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
         origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
-        ta: "120/80",
-        fc: "75",
-        fr: "18",
-        temp: "36.8",
-        peso: "70 kg",
-        talla: "1.75 m",
-        imc: "22.8",
-        satO2: "99%",
+        ta: c.presionArterial || "No registrado",
+        fc: c.frecuenciaCardiaca != null ? String(c.frecuenciaCardiaca) : "No registrado",
+        fr: c.frecuenciaRespiratoria != null ? String(c.frecuenciaRespiratoria) : "No registrado",
+        temp: c.temperatura != null ? String(c.temperatura) : "No registrado",
+        peso: c.peso ? `${c.peso} kg` : "No registrado",
+        talla: c.talla ? `${c.talla} m` : "No registrado",
+        imc: c.imc != null ? String(c.imc) : "No registrado",
+        satO2: c.saturacionOxigeno != null ? `${c.saturacionOxigeno}%` : "No registrado",
       },
       motivoConsulta: c.motivoConsulta || "Consulta Médica",
-      evolucionClinica: "Consulta registrada en el sistema médico Mediclinic Pro.",
+      evolucionClinica: c.evolucionClinica || "Sin notas de evolución registradas.",
       diagnosticoCIE10: c.descripcionDiagnostico || "Evaluación Médica",
       planTratamiento: c.planTratamiento || "Indicaciones según prescripción.",
       proximaCita: undefined,
@@ -3722,6 +3911,31 @@ function HistoriasClinicas({
                             Peso: {consultaSeleccionadaFicha.peso} kg
                           </span>
                         )}
+                        {consultaSeleccionadaFicha.presionArterial && (
+                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                            TA: {consultaSeleccionadaFicha.presionArterial}
+                          </span>
+                        )}
+                        {consultaSeleccionadaFicha.frecuenciaCardiaca != null && (
+                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                            FC: {consultaSeleccionadaFicha.frecuenciaCardiaca} bpm
+                          </span>
+                        )}
+                        {consultaSeleccionadaFicha.frecuenciaRespiratoria != null && (
+                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                            FR: {consultaSeleccionadaFicha.frecuenciaRespiratoria} rpm
+                          </span>
+                        )}
+                        {consultaSeleccionadaFicha.temperatura != null && (
+                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                            Temp: {consultaSeleccionadaFicha.temperatura}°C
+                          </span>
+                        )}
+                        {consultaSeleccionadaFicha.saturacionOxigeno != null && (
+                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                            SatO2: {consultaSeleccionadaFicha.saturacionOxigeno}%
+                          </span>
+                        )}
                         {consultaSeleccionadaFicha.observacionFisica && (
                           <span className="bg-white/10 border border-white/15 text-slate-200 px-2.5 py-0.5 rounded-lg">
                             {consultaSeleccionadaFicha.observacionFisica}
@@ -3916,6 +4130,72 @@ function HistoriasClinicas({
                     value={form.observacionFisica}
                     onChange={(e) => setForm({ ...form, observacionFisica: e.target.value })}
                     className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2b. Signos Vitales — sin estos campos, los informes que se imprimen/
+                envían por WhatsApp o correo mostraban valores inventados (120/80,
+                75bpm, 36.8°C, 99% SatO2) para cualquier paciente. Todos opcionales:
+                si el doctor no los toma, el informe dice "No registrado" en vez de
+                fabricar un dato médico falso. */}
+            <div className="rounded-2xl p-4 border border-rose-200/80 dark:border-rose-500/20 bg-rose-50/40 dark:bg-rose-950/20 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-rose-700 dark:text-rose-300">
+                <IconStethoscope size={14} />
+                <span>Signos Vitales</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Presión Arterial</span>
+                  <input
+                    type="text"
+                    placeholder="Ej. 120/80"
+                    value={form.presionArterial}
+                    onChange={(e) => setForm({ ...form, presionArterial: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Frec. Cardíaca (bpm)</span>
+                  <input
+                    type="number"
+                    placeholder="Ej. 75"
+                    value={form.frecuenciaCardiaca}
+                    onChange={(e) => setForm({ ...form, frecuenciaCardiaca: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Frec. Respiratoria (rpm)</span>
+                  <input
+                    type="number"
+                    placeholder="Ej. 18"
+                    value={form.frecuenciaRespiratoria}
+                    onChange={(e) => setForm({ ...form, frecuenciaRespiratoria: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Temperatura (°C)</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    placeholder="Ej. 36.8"
+                    value={form.temperatura}
+                    onChange={(e) => setForm({ ...form, temperatura: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-white/60">Saturación O2 (%)</span>
+                  <input
+                    type="number"
+                    placeholder="Ej. 98"
+                    value={form.saturacionOxigeno}
+                    onChange={(e) => setForm({ ...form, saturacionOxigeno: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/40 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
               </div>
@@ -4315,6 +4595,7 @@ function Procedimientos({
   const [modalTasas, setModalTasas] = useState(false);
   const [tempTasaBCV, setTempTasaBCV] = useState(config?.tasaBCV || 950);
   const [tempTasaCOP, setTempTasaCOP] = useState(config?.tasaCOP || 4000);
+  const [guardandoTasasModal, setGuardandoTasasModal] = useState(false);
 
   // Filtros del Historial
   const [filtroTexto, setFiltroTexto] = useState("");
@@ -4452,6 +4733,7 @@ function Procedimientos({
     const dataCot: CotizacionData = {
       clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config?.doctorNombre || "Médico Titular",
+      logoBase64: config?.logoBase64,
       pacienteNombre: cot.pacienteNombre,
       pacienteCedula: cot.pacienteCedula,
       pacienteTelefono: cot.pacienteTelefono,
@@ -4484,6 +4766,7 @@ function Procedimientos({
     const dataCot: CotizacionData = {
       clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config?.doctorNombre || "Médico Titular",
+      logoBase64: config?.logoBase64,
       pacienteNombre: cot.pacienteNombre,
       pacienteCedula: cot.pacienteCedula,
       pacienteTelefono: cot.pacienteTelefono,
@@ -5156,21 +5439,26 @@ function Procedimientos({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (config) {
-                    config.tasaBCV = tempTasaBCV;
-                    config.tasaCOP = tempTasaCOP;
-                    try {
-                      localStorage.setItem("aurora_mediclinic_config_perfil", JSON.stringify(config));
-                    } catch {}
+                disabled={guardandoTasasModal}
+                onClick={async () => {
+                  setGuardandoTasasModal(true);
+                  try {
+                    const tareas: Promise<unknown>[] = [];
+                    if (tempTasaBCV > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: tempTasaBCV, origen: "PERSONALIZADA" }));
+                    if (tempTasaCOP > 0) tareas.push(actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: tempTasaCOP, origen: "MANUAL" }));
+                    await Promise.all(tareas);
+                    setModalTasas(false);
+                    dispararToast("Tasas actualizadas correctamente.");
+                    onCambio();
+                  } catch (err) {
+                    dispararToast(err instanceof Error ? err.message : "No se pudo actualizar la tasa.");
+                  } finally {
+                    setGuardandoTasasModal(false);
                   }
-                  setModalTasas(false);
-                  dispararToast("Tasas actualizadas correctamente.");
-                  onCambio();
                 }}
-                className="flex-1 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold cursor-pointer"
+                className="flex-1 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60"
               >
-                Guardar Tasas
+                {guardandoTasasModal ? "Guardando…" : "Guardar Tasas"}
               </button>
             </div>
           </div>
@@ -5183,29 +5471,6 @@ function Procedimientos({
 // ══════════════════════════════════════════════════════════════════════════
 // SALA DE ESPERA & GESTIÓN DE TURNOS EN TIEMPO REAL
 // ══════════════════════════════════════════════════════════════════════════
-
-export interface TurnoSalaEspera {
-  id: string;
-  turnoNumero: number;
-  codigoTurno: string;
-  pacienteId: number | null;
-  pacienteNombre: string;
-  pacienteCedula: string;
-  pacienteTelefono: string;
-  horaLlegada: string;
-  fecha: string;
-  motivo: string;
-  consultorio: string;
-  estado: "EN_ESPERA" | "EN_CONSULTA" | "ATENDIDO" | "CANCELADO";
-  estadoPago: "PAGADO" | "PENDIENTE" | "EXONERADO" | "PARCIAL";
-  metodoPago?: string;
-  moneda?: "USD" | "VES" | "COP";
-  montoCobrado?: number;
-  montoUSD?: number;
-  montoVES?: number;
-  montoCOP?: number;
-  referenciaPago?: string;
-}
 
 const MOTIVOS_CONSULTA_SUGERIDOS = [
   "Consulta Médica General",
@@ -5261,6 +5526,68 @@ function SalaEspera({
     } catch {}
   }, [turnos, tenantId]);
 
+  // Sincroniza contra el backend (fuente de verdad para el ESTADO) cada vez que
+  // llega un `entradas` fresco — ya sea por el polling del padre (cada 6s) o
+  // porque esta misma pantalla acaba de hacer un cambio. Así lo que admite o
+  // atiende la secretaria en su PC le aparece al doctor en la suya, y viceversa,
+  // sin depender de que ambos tengan el mismo localStorage (que nunca comparten).
+  useEffect(() => {
+    if (!entradas) return;
+    setTurnos((prev) => {
+      const porBackendId = new Map(
+        prev.filter((t) => t.backendId != null).map((t) => [t.backendId as number, t])
+      );
+      const activosIds = new Set(entradas.map((e) => e.id));
+      let proximoNumero = prev.reduce((max, t) => Math.max(max, t.turnoNumero || 0), 0) + 1;
+
+      // Turnos activos según el backend: actualiza el estado si ya existían
+      // localmente, o los sintetiza si llegaron de otro dispositivo.
+      const activos: TurnoSalaEspera[] = entradas.map((entrada) => {
+        const existente = porBackendId.get(entrada.id);
+        if (existente) {
+          return {
+            ...existente,
+            estado: entrada.estado as TurnoSalaEspera["estado"],
+            consultorio: entrada.consultorio || existente.consultorio,
+          };
+        }
+        const numero = proximoNumero++;
+        return {
+          id: `sync-${entrada.id}`,
+          backendId: entrada.id,
+          turnoNumero: numero,
+          codigoTurno: `T-${String(numero).padStart(2, "0")}`,
+          pacienteId: entrada.paciente?.id ?? null,
+          pacienteNombre: entrada.paciente?.nombreCompleto || "Paciente",
+          pacienteCedula: entrada.paciente?.identificacion || "S/C",
+          pacienteTelefono: entrada.paciente?.telefono || "S/T",
+          horaLlegada: entrada.horaLlegada
+            ? new Date(entrada.horaLlegada).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          fecha: hoy(),
+          motivo: "Consulta Médica General",
+          consultorio: entrada.consultorio || "Consultorio 1 (Doctor)",
+          estado: entrada.estado as TurnoSalaEspera["estado"],
+          estadoPago: "PENDIENTE",
+        };
+      });
+
+      // Turnos con backendId que ya no están activos en el backend: si se
+      // acaban de finalizar (en este u otro dispositivo), se conservan en la
+      // lista marcados ATENDIDO en vez de desaparecer de golpe; si ya estaban
+      // en un estado terminal, se dejan tal cual.
+      const yaNoActivos = prev
+        .filter((t) => t.backendId != null && !activosIds.has(t.backendId as number))
+        .map((t) => (t.estado === "ATENDIDO" || t.estado === "CANCELADO" ? t : { ...t, estado: "ATENDIDO" as const }));
+
+      // Turnos puramente locales (sin backendId todavía) — no debería pasar en
+      // uso normal, pero se conservan como red de seguridad.
+      const soloLocales = prev.filter((t) => t.backendId == null);
+
+      return [...activos, ...yaNoActivos, ...soloLocales];
+    });
+  }, [entradas]);
+
   // Modales
   const [modalAdmitir, setModalAdmitir] = useState(false);
   const [modalPago, setModalPago] = useState<TurnoSalaEspera | null>(null);
@@ -5291,6 +5618,9 @@ function SalaEspera({
   const [pagoMetodo, setPagoMetodo] = useState("Efectivo USD");
   const [pagoMontoUSD, setPagoMontoUSD] = useState("25");
   const [pagoReferencia, setPagoReferencia] = useState("");
+  const [pagoEmail, setPagoEmail] = useState("");
+  const [enviandoComprobante, setEnviandoComprobante] = useState(false);
+  const [comprobanteMsg, setComprobanteMsg] = useState<string | null>(null);
 
   const tasaBCV = Number(config?.tasaBCV) || 950;
 
@@ -5339,6 +5669,34 @@ function SalaEspera({
   };
 
   // Ejecutar admisión de nuevo paciente a sala de espera
+  // Busca el paciente por cédula (en la lista cargada o en el backend) y si no
+  // existe lo crea — así un walk-in sin ficha previa queda igual admitido con
+  // un paciente REAL, requisito de `salud_sala_espera.paciente_id` (not null).
+  // Antes, sin cédula/paciente elegido del combo, la admisión nunca llegaba al
+  // backend y solo el navegador de quien la creó sabía que ese turno existía.
+  const resolverPacienteAdmision = async (): Promise<number> => {
+    if (admitirPacienteId) return Number(admitirPacienteId);
+    const cedula = admitirCedulaManual.trim();
+    if (cedula && pacientes) {
+      const cedulaLimpia = cedula.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const match = pacientes.find((p) => (p.identificacion || "").toLowerCase().replace(/[^a-z0-9]/g, "") === cedulaLimpia);
+      if (match) return match.id;
+    }
+    if (cedula) {
+      const encontrado = await buscarPacientePorIdentificacion(cedula);
+      if (encontrado) return encontrado.id;
+    }
+    const nombreCompleto = admitirNombreManual.trim();
+    const [primerNombre, ...resto] = nombreCompleto.split(/\s+/);
+    const creado = await crearPaciente({
+      identificacion: cedula || `SC-${Date.now()}`,
+      nombres: primerNombre || nombreCompleto,
+      apellidos: resto.join(" ") || "-",
+      telefono: admitirTelefono.trim() || undefined,
+    });
+    return creado.id;
+  };
+
   const handleGuardarAdmision = async (e: React.FormEvent) => {
     e.preventDefault();
     const nombreFinal = admitirNombreManual.trim();
@@ -5349,6 +5707,7 @@ function SalaEspera({
 
     setGuardandoAdmision(true);
     try {
+      const pacienteIdResuelto = await resolverPacienteAdmision();
       const maxNumero = turnos.reduce((max, t) => Math.max(max, t.turnoNumero || 0), 0);
       const nuevoNumero = maxNumero + 1;
       const codigoTurno = `T-${String(nuevoNumero).padStart(2, "0")}`;
@@ -5376,7 +5735,7 @@ function SalaEspera({
         id: `turno-${Date.now()}`,
         turnoNumero: nuevoNumero,
         codigoTurno,
-        pacienteId: admitirPacienteId ? Number(admitirPacienteId) : null,
+        pacienteId: pacienteIdResuelto,
         pacienteNombre: nombreFinal,
         pacienteCedula: admitirCedulaManual.trim() || "S/C",
         pacienteTelefono: admitirTelefono.trim() || "S/T",
@@ -5415,7 +5774,7 @@ function SalaEspera({
         onAgregarCobro(cobroItem);
         try {
           await procesarCobro({
-            pacienteId: admitirPacienteId ? Number(admitirPacienteId) : undefined,
+            pacienteId: pacienteIdResuelto,
             concepto: admitirMotivo.trim() || "Consulta Médica",
             montoTotal: montoNum,
             monedaCobrada: monedaCobro,
@@ -5429,15 +5788,19 @@ function SalaEspera({
         }
       }
 
-      // Backend sync
-      if (admitirPacienteId && tenantId) {
-        registrarLlegadaSalaEspera(Number(admitirPacienteId), admitirConsultorio).catch((err) => {
-          dispararToast(`⚠️ El paciente quedó en la sala de espera local, pero no se pudo registrar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
-        });
+      // Backend sync — se espera la respuesta (no fire-and-forget) para capturar
+      // el ID real de `salud_sala_espera` en `backendId`: sin él, este turno
+      // nunca se reconciliaría con lo que ve el doctor en su propia pantalla.
+      let backendId: number | undefined;
+      try {
+        const entradaCreada = await registrarLlegadaSalaEspera(pacienteIdResuelto, admitirConsultorio);
+        backendId = entradaCreada.id;
+      } catch (err) {
+        dispararToast(`⚠️ El paciente quedó en la sala de espera local, pero no se pudo registrar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
       }
 
       // Agregar al final (los nuevos van abajo, el primero queda arriba)
-      setTurnos((prev) => [...prev, nuevoTurno]);
+      setTurnos((prev) => [...prev, { ...nuevoTurno, backendId }]);
       dispararToast(`¡Paciente admitido con Turno ${codigoTurno}!`);
 
       // Limpiar formulario y cerrar modal
@@ -5453,12 +5816,27 @@ function SalaEspera({
     }
   };
 
-  // Cambiar estado de turno
+  // Cambiar estado de turno — actualiza optimistamente en pantalla Y en el
+  // backend real (cuando el turno tiene backendId), para que el cambio de
+  // estado se vea en cualquier otro dispositivo, no solo en este navegador.
   const handleCambiarEstado = (id: string, nuevoEstado: TurnoSalaEspera["estado"]) => {
+    const turno = turnos.find((t) => t.id === id);
     setTurnos((prev) =>
       prev.map((t) => (t.id === id ? { ...t, estado: nuevoEstado } : t))
     );
     dispararToast(`Turno actualizado a: ${nuevoEstado.replace("_", " ")}`);
+
+    if (turno?.backendId != null) {
+      const sync =
+        nuevoEstado === "EN_CONSULTA"
+          ? llamarAConsultorioSalaEspera(turno.backendId, turno.consultorio)
+          : nuevoEstado === "ATENDIDO"
+          ? finalizarAtencionSalaEspera(turno.backendId)
+          : null; // EN_ESPERA/CANCELADO: sin endpoint de retroceso/anulación en el backend, se queda local.
+      sync?.catch((err) => {
+        dispararToast(`⚠️ Se actualizó en pantalla, pero no se pudo sincronizar con el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+      });
+    }
     onCambio();
   };
 
@@ -5546,6 +5924,61 @@ function SalaEspera({
     onCambio();
   };
 
+  // Comprobante de Pago (NO fiscal — regla estricta, ver pdfReports.ts): se arma con el
+  // membrete personalizado del tenant (config.logoBase64/firmaBase64/encabezadoTexto, ver
+  // Configuración & Perfil) y se envía por el mismo servicio SMTP que ya usa Mediclinic
+  // para informes de consulta (SaludEmailService — nunca se toca Horeca/Comercio).
+  const construirComprobanteData = (): ComprobantePagoData | null => {
+    if (!modalPago) return null;
+    const montoNum = parseFloat(pagoMontoUSD) || 0;
+    const moneda: "USD" | "VES" | "COP" =
+      pagoMetodo.includes("VES") || pagoMetodo.includes("Punto") || pagoMetodo.includes("Pago Móvil") ? "VES" :
+      pagoMetodo.includes("COP") ? "COP" : "USD";
+    return {
+      clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
+      doctorNombre: config?.doctorNombre || "Médico Titular",
+      logoBase64: config?.logoBase64,
+      firmaBase64: config?.firmaBase64,
+      encabezadoTexto: config?.encabezadoTexto,
+      numeroComprobante: `${new Date().getFullYear()}-${String(modalPago.turnoNumero).padStart(4, "0")}`,
+      fecha: new Date().toLocaleDateString("es-VE", { day: "2-digit", month: "2-digit", year: "numeric" }),
+      paciente: {
+        nombreCompleto: modalPago.pacienteNombre,
+        identificacion: modalPago.pacienteCedula,
+        email: pagoEmail.trim() || undefined,
+      },
+      concepto: modalPago.motivo || "Consulta Médica",
+      montoCobrado: montoNum,
+      moneda,
+      metodoPago: pagoMetodo,
+      referencia: pagoReferencia.trim() || undefined,
+    };
+  };
+
+  const handleEnviarComprobantePago = async () => {
+    const data = construirComprobanteData();
+    if (!data) return;
+    const email = pagoEmail.trim();
+    if (!email || !email.includes("@")) {
+      setComprobanteMsg("⚠️ Ingresa un correo válido del paciente.");
+      return;
+    }
+    setEnviandoComprobante(true);
+    setComprobanteMsg(null);
+    try {
+      const { base64, nombreArchivo } = obtenerBase64PdfComprobantePago(data);
+      const { subject, body } = generarTextoEmailComprobante(data);
+      await enviarEmailDocumento({ destinatario: email, asunto: subject, cuerpo: body, pdfBase64: base64, nombreArchivo });
+      setComprobanteMsg("✓ Comprobante enviado por correo exitosamente.");
+    } catch (err) {
+      setComprobanteMsg(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo enviar el comprobante.");
+    } finally {
+      setEnviandoComprobante(false);
+      setTimeout(() => setComprobanteMsg(null), 4000);
+    }
+  };
+
+
   // Eliminar turno
   const handleEliminarTurno = (id: string) => {
     if (confirm("¿Estás seguro de eliminar este turno de la sala de espera?")) {
@@ -5574,6 +6007,7 @@ function SalaEspera({
     const dataCierre: CierreCajaData = {
       clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
       doctorNombre: config?.doctorNombre || "Médico Titular",
+      logoBase64: config?.logoBase64,
       responsableNombre: config?.secretariaNombre || "Recepción / Asistente",
       fecha: hoy(),
       horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -5923,6 +6357,8 @@ function SalaEspera({
                             onClick={() => {
                               setModalPago(t);
                               setPagoMontoUSD("25");
+                              setPagoEmail(pacientes?.find((p) => p.id === t.pacienteId)?.email || "");
+                              setComprobanteMsg(null);
                             }}
                             className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-400/30 font-bold text-[10px] hover:bg-amber-500/25 cursor-pointer"
                             title="Haz clic para registrar cobro"
@@ -6294,6 +6730,31 @@ function SalaEspera({
                 </button>
               </div>
             </form>
+
+            {/* Comprobante de Pago (NO fiscal) — solo por correo, con PDF adjunto real vía SMTP.
+                No se envía por WhatsApp: por decisión de negocio, no se automatiza ese canal. */}
+            <div className="pt-3 border-t border-slate-200 dark:border-white/10 space-y-2">
+              <label className="font-bold text-slate-700 dark:text-white/80 text-xs">Comprobante de Pago (no fiscal)</label>
+              <input
+                type="email"
+                placeholder="correo@paciente.com"
+                value={pagoEmail}
+                onChange={(e) => setPagoEmail(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-black/30 text-xs"
+              />
+              {comprobanteMsg && <p className="text-[11px] font-bold">{comprobanteMsg}</p>}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={enviandoComprobante}
+                  onClick={handleEnviarComprobantePago}
+                  className="flex-1 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-md cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
+                >
+                  <IconMail size={13} />
+                  <span>{enviandoComprobante ? "Enviando…" : "Enviar comprobante de pago vía correo"}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -6449,11 +6910,13 @@ function AgendaMedica({
   pacientes,
   citasHoy,
   onCambio,
+  config,
 }: {
   tenantId: number;
   pacientes: Paciente[] | null;
   citasHoy: CitaMedica[] | null;
   onCambio: () => void;
+  config?: any;
 }) {
   // Fecha seleccionada actual (YYYY-MM-DD)
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(() => hoy());
@@ -7027,7 +7490,13 @@ function AgendaMedica({
                     type="button"
                     onClick={() => {
                       const [my, mm, md] = mañana().split("-");
-                      const msg = `Hola ${cita.pacienteNombre}, le recordamos su cita médica programada para mañana ${md}/${mm}/${my} a las ${cita.hora}.`;
+                      const msg = generarTextoRecordatorioCita(config?.plantillaRecordatorioCita, {
+                        paciente: cita.pacienteNombre,
+                        fecha: `${md}/${mm}/${my}`,
+                        hora: cita.hora,
+                        clinica: config?.clinicaNombre || "nuestro consultorio",
+                        doctor: config?.doctorNombre || "Médico Titular",
+                      });
                       abrirWhatsAppDirecto(cita.pacienteTelefono, msg);
                     }}
                     className="text-emerald-600 hover:text-emerald-500 font-bold flex items-center gap-1 cursor-pointer"
@@ -7215,7 +7684,13 @@ function AgendaMedica({
                         <button
                           type="button"
                           onClick={() => {
-                            const msg = `Hola ${cita.pacienteNombre}, le recordamos su cita médica programada para el día ${fechaCortaFmt} a las ${cita.hora}.`;
+                            const msg = generarTextoRecordatorioCita(config?.plantillaRecordatorioCita, {
+                              paciente: cita.pacienteNombre,
+                              fecha: fechaCortaFmt,
+                              hora: cita.hora,
+                              clinica: config?.clinicaNombre || "nuestro consultorio",
+                              doctor: config?.doctorNombre || "Médico Titular",
+                            });
                             abrirWhatsAppDirecto(cita.pacienteTelefono, msg);
                           }}
                           className="text-emerald-600 hover:text-emerald-500 font-bold flex items-center gap-1 text-[10px] cursor-pointer hover:underline"
@@ -7593,6 +8068,7 @@ function ResumenesFinancieros({
                 const dataHoy: CierreCajaData = {
                   clinicaNombre: config?.clinicaNombre || "Mi Consultorio Médico",
                   doctorNombre: config?.doctorNombre || "Médico Titular",
+                  logoBase64: config?.logoBase64,
                   responsableNombre: config?.secretariaNombre || config?.doctorNombre || "Recepción y Caja",
                   fecha: hoy(),
                   horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -7782,19 +8258,125 @@ function ResumenesFinancieros({
 // ══════════════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN & PERFIL MÉDICO
 // ══════════════════════════════════════════════════════════════════════════
-function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c: any) => void; user: any }) {
+function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, origenTasaActiva, onActualizarTasas, pinPersonalizado, onPerfilDocsActualizado, onLogoActualizado }: {
+  config: any; onGuardar: (c: any) => void; user: any;
+  tasaBcv?: TasaCambio | null; tasaCop?: TasaCambio | null; origenTasaActiva?: OrigenTasaActiva | null;
+  onActualizarTasas?: (bcv: number, cop: number) => Promise<void>; pinPersonalizado?: boolean | null;
+  onPerfilDocsActualizado?: (p: PerfilMedicoDocumentos) => void;
+  onLogoActualizado?: (b64: string | null) => void;
+}) {
   const [form, setForm] = useState(config);
   const [claveForm, setClaveForm] = useState({ actual: "", nueva: "", confirmar: "" });
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [subiendoLogo, setSubiendoLogo] = useState(false);
+  const [subiendoFirma, setSubiendoFirma] = useState(false);
 
-  const guardar = (e: React.FormEvent) => {
+  const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
-    onGuardar(form);
-    setMensaje("✓ Configuración y perfil guardados exitosamente.");
-    setTimeout(() => setMensaje(null), 3500);
+    setGuardando(true);
+    try {
+      // Las tasas se guardan por separado en /api/financiero/tasas (mismo motor real
+      // que Horeca/Comercio, con historial) — solo se envían si el usuario las cambió.
+      // BCV solo es editable a mano cuando la fuente activa es "PERSONALIZADA" (ver
+      // TasaBadge de arriba); si sigue en BCV/USDT, este campo queda de solo lectura.
+      const bcvCambio = origenTasaActiva === "PERSONALIZADA" && Number(form.tasaBCV) !== (tasaBcv ? Number(tasaBcv.tasa) : undefined);
+      const copCambio = Number(form.tasaCOP) !== (tasaCop ? Number(tasaCop.tasa) : undefined);
+      if (onActualizarTasas && (bcvCambio || copCambio)) {
+        await onActualizarTasas(bcvCambio ? Number(form.tasaBCV) || 0 : 0, copCambio ? Number(form.tasaCOP) || 0 : 0);
+      }
+      // Motor de personalización de PDFs: el membrete (nombre, especialidad, matrícula,
+      // colegio, texto de encabezado) se guarda por tenant en el servidor — antes se
+      // quedaba solo en localStorage de este dispositivo (ver ConfiguracionMedicaController).
+      const perfilActualizado = await actualizarPerfilMedicoDocumentos({
+        doctorNombre: form.doctorNombre || "",
+        especialidad: form.especialidad || "",
+        matriculaMpps: form.matriculaMPPS || "",
+        colegioMedicos: form.colegioMedicos || "",
+        encabezadoTexto: form.encabezadoTexto || "",
+        plantillaRecordatorioCita: form.plantillaRecordatorioCita || "",
+      });
+      onPerfilDocsActualizado?.(perfilActualizado);
+      onGuardar(form);
+      setMensaje("✓ Configuración y perfil guardados exitosamente.");
+    } catch (err) {
+      setMensaje(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo guardar la tasa.");
+    } finally {
+      setGuardando(false);
+      setTimeout(() => setMensaje(null), 3500);
+    }
   };
 
   const [guardandoClave, setGuardandoClave] = useState(false);
+
+  const leerImagenComoBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const subirLogo = async (file: File | null) => {
+    if (!file) return;
+    setSubiendoLogo(true);
+    setMensaje(null);
+    try {
+      const b64 = await leerImagenComoBase64(file);
+      await actualizarLogo(b64);
+      onLogoActualizado?.(b64);
+      setMensaje("✓ Logo actualizado — ya se usará en los próximos PDF generados.");
+    } catch (err) {
+      setMensaje(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo subir el logo.");
+    } finally {
+      setSubiendoLogo(false);
+      setTimeout(() => setMensaje(null), 3500);
+    }
+  };
+
+  const subirFirma = async (file: File | null) => {
+    if (!file) return;
+    setSubiendoFirma(true);
+    setMensaje(null);
+    try {
+      const b64 = await leerImagenComoBase64(file);
+      const perfilActualizado = await actualizarFirmaMedico(b64);
+      onPerfilDocsActualizado?.(perfilActualizado);
+      setMensaje("✓ Firma electrónica actualizada — ya se usará en los próximos PDF generados.");
+    } catch (err) {
+      setMensaje(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo subir la firma.");
+    } finally {
+      setSubiendoFirma(false);
+      setTimeout(() => setMensaje(null), 3500);
+    }
+  };
+
+  const [guardandoPlantilla, setGuardandoPlantilla] = useState(false);
+
+  // Borrador del recordatorio de cita por WhatsApp — costo, método de pago y hora de
+  // llegada los escribe cada médico a su gusto; el sistema solo rellena las llaves
+  // {saludo}/{paciente}/{fecha}/{hora}/{clinica} al enviar (ver generarTextoRecordatorioCita).
+  const guardarPlantillaRecordatorio = async () => {
+    setGuardandoPlantilla(true);
+    setMensaje(null);
+    try {
+      const perfilActualizado = await actualizarPerfilMedicoDocumentos({
+        doctorNombre: form.doctorNombre || "",
+        especialidad: form.especialidad || "",
+        matriculaMpps: form.matriculaMPPS || "",
+        colegioMedicos: form.colegioMedicos || "",
+        encabezadoTexto: form.encabezadoTexto || "",
+        plantillaRecordatorioCita: form.plantillaRecordatorioCita || "",
+      });
+      onPerfilDocsActualizado?.(perfilActualizado);
+      setMensaje("✓ Plantilla de recordatorio guardada.");
+    } catch (err) {
+      setMensaje(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo guardar la plantilla.");
+    } finally {
+      setGuardandoPlantilla(false);
+      setTimeout(() => setMensaje(null), 3500);
+    }
+  };
 
   const guardarClave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -7810,8 +8392,9 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
     setGuardandoClave(true);
     try {
       // Se valida y guarda en el servidor (ConfiguracionMedicaController) — pide el PIN
-      // actual para cambiarlo, igual que cualquier cambio de contraseña real.
-      await configurarPinDoctor(nueva, claveForm.actual.trim());
+      // actual para cambiarlo, salvo que aún no se haya personalizado (sigue en el PIN
+      // de fábrica "1234"), igual que cualquier cambio de contraseña real.
+      await configurarPinDoctor(nueva, pinPersonalizado ? claveForm.actual.trim() : undefined);
       // Copia local de respaldo — solo la usa el confirm-dialog de borrado de
       // importaciones del Canal Endémico, que igual está protegido en el backend.
       const configActualizada = { ...form, claveDoctor: nueva, claveDoctorPersonalizada: true };
@@ -7820,11 +8403,11 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
       setMensaje("✓ PIN del Doctor actualizado exitosamente.");
       setClaveForm({ actual: "", nueva: "", confirmar: "" });
     } catch (err) {
-      setMensaje(`❌ ${err instanceof Error ? err.message : "No se pudo actualizar el PIN."}`);
+      setMensaje(err instanceof Error ? `❌ ${err.message}` : "❌ No se pudo actualizar el PIN.");
     } finally {
       setGuardandoClave(false);
+      setTimeout(() => setMensaje(null), 3500);
     }
-    setTimeout(() => setMensaje(null), 3500);
   };
 
   return (
@@ -7864,6 +8447,13 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
             <label className="text-[10px] text-slate-400 uppercase font-mono">Colegio de Médicos</label>
             <input value={form.colegioMedicos} onChange={(e) => setForm({ ...form, colegioMedicos: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs" />
           </div>
+          <div className="sm:col-span-2">
+            <label className="text-[10px] text-slate-400 uppercase font-mono">Texto de Encabezado (dirección, teléfono, RIF, horario…)</label>
+            <textarea value={form.encabezadoTexto || ""} onChange={(e) => setForm({ ...form, encabezadoTexto: e.target.value })} rows={2}
+              placeholder="Ej. Av. Principal, Torre Médica, Piso 3 — Tel. 0212-1234567"
+              className="w-full mt-1 px-3 py-2 rounded-lg border text-xs resize-none" />
+            <p className="text-[9px] text-slate-400 mt-0.5">Aparece en el encabezado de historias, récipes, cotizaciones y comprobantes de pago.</p>
+          </div>
         </div>
 
         <div className="pt-2 border-t border-slate-200 dark:border-white/10">
@@ -7871,7 +8461,12 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] text-slate-400 uppercase font-mono">Tasa BCV (Bs. / USD)</label>
-              <input type="number" step="0.01" value={form.tasaBCV} onChange={(e) => setForm({ ...form, tasaBCV: parseFloat(e.target.value) || 0 })} className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono font-bold" />
+              <input type="number" step="0.01" value={form.tasaBCV} disabled={origenTasaActiva !== "PERSONALIZADA"}
+                onChange={(e) => setForm({ ...form, tasaBCV: parseFloat(e.target.value) || 0 })}
+                className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono font-bold disabled:opacity-50 disabled:cursor-not-allowed" />
+              {origenTasaActiva !== "PERSONALIZADA" && (
+                <p className="text-[9px] text-slate-400 mt-0.5">Gobernada por {origenTasaActiva === "BCV" ? "BCV" : "USDT"} — cambiala en el badge de tasa arriba.</p>
+              )}
             </div>
             <div>
               <label className="text-[10px] text-slate-400 uppercase font-mono">Tasa TRM (Pesos COP / USD)</label>
@@ -7880,10 +8475,104 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
           </div>
         </div>
 
-        <button type="submit" className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer">
-          Guardar Cambios de Perfil
+        <button type="submit" disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-60">
+          {guardando ? "Guardando…" : "Guardar Cambios de Perfil"}
         </button>
       </form>
+
+      {/* Motor de Personalización de PDFs: logo y firma electrónica, inyectados automáticamente
+          en el encabezado y el pie de página de CADA documento (historias, récipes, cotizaciones,
+          comprobantes de pago) — ver pdfReports.ts y ConfiguracionMedicaController. */}
+      <div className="apple-glass rounded-2xl p-6 space-y-4">
+        <div>
+          <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+            <IconFileText size={16} className="text-teal-500" />
+            <span>Motor de Personalización de PDFs</span>
+          </h4>
+          <p className="text-[11px] text-slate-500 dark:text-white/50 mt-0.5">
+            Tu logo y firma quedan guardados en el servidor y se insertan solos en cada documento — no hay que repetir esto por cada consulta.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Logo (Clínica / Doctor)</label>
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 flex items-center justify-center overflow-hidden shrink-0">
+                {config.logoBase64 ? (
+                  <img src={config.logoBase64} alt="Logo" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-[9px] text-slate-400 text-center px-1">Sin logo</span>
+                )}
+              </div>
+              <label className={`text-xs font-bold px-3 py-2 rounded-lg border cursor-pointer ${subiendoLogo ? "opacity-60 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-white/5"} border-slate-300 dark:border-white/15 text-slate-700 dark:text-white/80`}>
+                {subiendoLogo ? "Subiendo…" : "Subir Logo"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => subirLogo(e.target.files?.[0] || null)} />
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Firma Electrónica</label>
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 flex items-center justify-center overflow-hidden shrink-0">
+                {config.firmaBase64 ? (
+                  <img src={config.firmaBase64} alt="Firma" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-[9px] text-slate-400 text-center px-1">Sin firma</span>
+                )}
+              </div>
+              <label className={`text-xs font-bold px-3 py-2 rounded-lg border cursor-pointer ${subiendoFirma ? "opacity-60 pointer-events-none" : "hover:bg-slate-100 dark:hover:bg-white/5"} border-slate-300 dark:border-white/15 text-slate-700 dark:text-white/80`}>
+                {subiendoFirma ? "Subiendo…" : "Subir Firma"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => subirFirma(e.target.files?.[0] || null)} />
+              </label>
+            </div>
+          </div>
+        </div>
+        <p className="text-[9px] text-slate-400">Usa imágenes con fondo transparente (PNG) para mejor resultado — la firma se inserta a tamaño reducido sobre la línea de firma del documento.</p>
+      </div>
+
+      {/* Recordatorio de Cita por WhatsApp — 100% editable, sin API oficial de Meta (no se
+          paga ni se espera aprobación): se abre wa.me número por número con este texto. */}
+      <div className="apple-glass rounded-2xl p-6 space-y-3">
+        <div>
+          <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+            <IconWhatsApp size={16} className="text-emerald-500" />
+            <span>Recordatorio de Cita por WhatsApp</span>
+          </h4>
+          <p className="text-[11px] text-slate-500 dark:text-white/50 mt-0.5">
+            Este es tu borrador — ajústalo a tu costo de consulta, forma de pago y horario de llegada. Se usa cada vez que envías un recordatorio desde la Agenda.
+          </p>
+        </div>
+
+        <textarea
+          value={form.plantillaRecordatorioCita ?? ""}
+          onChange={(e) => setForm({ ...form, plantillaRecordatorioCita: e.target.value })}
+          rows={8}
+          className="w-full px-3 py-2 rounded-lg border text-xs font-mono resize-y"
+        />
+        <p className="text-[9px] text-slate-400">
+          Llaves disponibles (se rellenan solas al enviar): <code className="font-mono">{"{saludo}"}</code> · <code className="font-mono">{"{paciente}"}</code> · <code className="font-mono">{"{fecha}"}</code> · <code className="font-mono">{"{hora}"}</code> · <code className="font-mono">{"{clinica}"}</code> · <code className="font-mono">{"{doctor}"}</code>. El costo y el método de pago los escribes tú directo en el texto.
+        </p>
+
+        <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+          <p className="text-[9px] font-bold text-slate-400 uppercase font-mono mb-1">Vista previa</p>
+          <p className="text-[11px] text-slate-700 dark:text-white/70 whitespace-pre-line">
+            {generarTextoRecordatorioCita(form.plantillaRecordatorioCita, {
+              paciente: "Carlos Pérez",
+              fecha: "24/09/2026",
+              hora: "2:00 p. m.",
+              clinica: form.clinicaNombre || "tu consultorio",
+              doctor: form.doctorNombre || "Médico Titular",
+            })}
+          </p>
+        </div>
+
+        <button type="button" disabled={guardandoPlantilla} onClick={guardarPlantillaRecordatorio}
+          className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-60">
+          {guardandoPlantilla ? "Guardando…" : "Guardar Plantilla"}
+        </button>
+      </div>
 
       {/* Cambio de PIN / Contraseña del Doctor */}
       <form onSubmit={guardarClave} className="apple-glass rounded-2xl p-6 space-y-4 border border-teal-500/30">
@@ -7898,19 +8587,21 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="sm:col-span-2">
-            <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">PIN Actual *</label>
-            <input
-              type="password"
-              inputMode="numeric"
-              required
-              maxLength={4}
-              placeholder="••••"
-              value={claveForm.actual}
-              onChange={(e) => setClaveForm({ ...claveForm, actual: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-              className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono tracking-[0.3em] text-center"
-            />
-          </div>
+          {pinPersonalizado && (
+            <div className="sm:col-span-2">
+              <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">PIN Actual *</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                required
+                maxLength={4}
+                placeholder="••••"
+                value={claveForm.actual}
+                onChange={(e) => setClaveForm({ ...claveForm, actual: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                className="w-full mt-1 px-3 py-2 rounded-lg border text-xs font-mono tracking-[0.3em] text-center"
+              />
+            </div>
+          )}
           <div>
             <label className="text-[10px] text-slate-400 uppercase font-mono font-bold">Nuevo PIN (4 dígitos) *</label>
             <input
@@ -7939,8 +8630,8 @@ function Configuracion({ config, onGuardar, user }: { config: any; onGuardar: (c
           </div>
         </div>
 
-        <button type="submit" disabled={guardandoClave} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-50">
-          {guardandoClave ? "Guardando…" : "Actualizar PIN del Doctor"}
+        <button type="submit" disabled={guardandoClave} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-60">
+          {guardandoClave ? "Actualizando…" : "Actualizar PIN del Doctor"}
         </button>
       </form>
 

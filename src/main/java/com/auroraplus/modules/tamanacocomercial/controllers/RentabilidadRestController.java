@@ -10,6 +10,7 @@ import com.auroraplus.modules.tamanacocomercial.repositories.GastoRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.MinaRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.NominaRepository;
 import com.auroraplus.modules.tamanacocomercial.repositories.RentabilidadParametrosRepository;
+import com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -69,6 +70,7 @@ public class RentabilidadRestController {
 
     @PostMapping("/parametros-semana")
     public ResponseEntity<?> guardarParametrosSemana(@RequestBody Map<String, Object> body) {
+        TamanacoAccessService.exigirDuenoAdmin();
         try {
             LocalDate fechaInicio = LocalDate.parse(body.get("fechaInicio").toString());
             LocalDate fechaFin = LocalDate.parse(body.get("fechaFin").toString());

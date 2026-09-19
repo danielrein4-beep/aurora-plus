@@ -4,7 +4,7 @@ import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconLock,
   IconRestaurant, IconPrescription, IconHardware, IconClinic,
-  IconRetail, IconVet, IconTooth, IconFarm, IconBank,
+  IconVet, IconTooth, IconFarm, IconBank,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import { solicitarRecuperacionClave } from "../api";
@@ -26,10 +26,13 @@ interface RubroNegocioItem {
 const RUBROS_REGISTRO: RubroNegocioItem[] = [
   { id: "restaurante", label: "Restaurante & Cafetería", sub: "Comandas, KDS, mesas y delivery", Icon: IconRestaurant, modulo: "horeca", ruta: "/restaurante", nombreDefault: "Mi Restaurante" },
   { id: "farmacia", label: "Farmacia & Droguería", sub: "Medicamentos, lotes y mostrador", Icon: IconPrescription, modulo: "salud", ruta: "/comercio", nombreDefault: "Mi Farmacia" },
-  { id: "ferreteria", label: "Ferretería & Materiales", sub: "POS, inventario y retail", Icon: IconHardware, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Ferretería" },
+  // modulo:"repuestos" (no "comercio") a propósito: el backend gatea /api/repuestos/*
+  // por el segmento de URL (ver LicenciaInterceptor), así que el módulo contratado
+  // real DEBE ser "repuestos" para que el tenant pueda usar esos endpoints. "comercio"
+  // solo existe como `industria`/user.industry, para la identidad unificada en la UI.
+  { id: "comercio", label: "Comercio", sub: "POS mostrador, código de barras e inventario", Icon: IconHardware, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Negocio" },
   { id: "clinica", label: "Clínica & Consultorios", sub: "Historias clínicas y citas", Icon: IconClinic, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Consultorio" },
-  { id: "retail", label: "Comercio & Tienda Retail", sub: "Venta mostrador y stock", Icon: IconRetail, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Tienda" },
-  { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "Fichas, vacunas y petshop", Icon: IconVet, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Veterinaria" },
+  { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "Fichas, vacunas y petshop", Icon: IconVet, modulo: "salud", ruta: "/veterinaria", nombreDefault: "Mi Veterinaria" },
   { id: "odontologia", label: "Odontología", sub: "Historia clínica y odontograma FDI", Icon: IconTooth, modulo: "odontologia", ruta: "/mediclinic", nombreDefault: "Mi Consultorio Dental" },
   { id: "finca", label: "Finca & Ganadería", sub: "Potreros, vacunas y animales", Icon: IconFarm, modulo: "ganaderia", ruta: "/dashboard", nombreDefault: "Mi Finca" },
   { id: "otro", label: "Otro Rubro Comercial", sub: "ERP y suite administrativa", Icon: IconBank, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Empresa" },
@@ -120,6 +123,7 @@ export default function Auth() {
         await completarRegistro({
           nombreEmpresa: form.empresa.trim() || rubroActual.nombreDefault,
           moduloPrincipal: rubroActual.modulo,
+          industria: rubroActual.id,
           emailContacto: form.email,
           username: form.email,
           password: form.password,
@@ -144,8 +148,9 @@ export default function Auth() {
           if (rawU) {
             const u = JSON.parse(rawU);
             if (u.industry === "restaurante") rutaDestino = "/restaurante";
-            else if (u.industry === "ferreteria" || u.industry === "farmacia" || u.industry === "retail") rutaDestino = "/comercio";
+            else if (u.industry === "ferreteria" || u.industry === "repuestos" || u.industry === "retail" || u.industry === "comercio" || u.industry === "farmacia") rutaDestino = "/comercio";
             else if (u.industry === "clinica") rutaDestino = "/mediclinic";
+            else if (u.industry === "veterinaria") rutaDestino = "/veterinaria";
           }
         } catch {}
 
@@ -462,7 +467,7 @@ export default function Auth() {
               <div className="mt-6 pt-5 border-t border-white/10 space-y-2 text-xs text-white/50">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                  <span>6 verticales nativas — Clínicas, Restaurantes, Minería, Repuestos, Moda y Ganadería</span>
+                  <span>4 verticales nativas — Clínicas, Restaurantes, Comercio y Ganadería</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />

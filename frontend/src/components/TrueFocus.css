@@ -1,0 +1,64 @@
+/* TrueFocus (react-bits.dev) — cada palabra queda borrosa salvo la que tiene
+   el foco (automático o al pasar el mouse en manualMode); un marco con
+   esquinas en L se desliza hacia la palabra activa. */
+.focus-container {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  row-gap: 0.15em;
+  column-gap: 0.28em;
+  transform: scale(1);
+  transform-origin: left center;
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.focus-container.settled {
+  transform: scale(1.05);
+}
+
+.focus-word {
+  position: relative;
+  cursor: default;
+  will-change: filter;
+}
+
+.focus-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.corner {
+  position: absolute;
+  width: 0.55em;
+  height: 0.55em;
+  filter: drop-shadow(0 0 6px var(--glow-color, rgba(53, 215, 195, 0.6)));
+}
+
+.corner.top-left {
+  top: -0.28em;
+  left: -0.28em;
+  border-top: 3px solid var(--border-color, #35d7c3);
+  border-left: 3px solid var(--border-color, #35d7c3);
+}
+.corner.top-right {
+  top: -0.28em;
+  right: -0.28em;
+  border-top: 3px solid var(--border-color, #35d7c3);
+  border-right: 3px solid var(--border-color, #35d7c3);
+}
+.corner.bottom-left {
+  bottom: -0.28em;
+  left: -0.28em;
+  border-bottom: 3px solid var(--border-color, #35d7c3);
+  border-left: 3px solid var(--border-color, #35d7c3);
+}
+.corner.bottom-right {
+  bottom: -0.28em;
+  right: -0.28em;
+  border-bottom: 3px solid var(--border-color, #35d7c3);
+  border-right: 3px solid var(--border-color, #35d7c3);
+}

@@ -1,0 +1,16 @@
+/* ScrollReveal (react-bits.dev) — el texto se endereza y sus palabras pasan
+   de borrosas/translúcidas a nítidas a medida que el bloque cruza el
+   viewport durante el scroll. */
+.scroll-reveal {
+  margin: 0;
+}
+
+.scroll-reveal-text {
+  margin: 0;
+  display: inline;
+}
+
+.scroll-reveal-text .word {
+  display: inline-block;
+  will-change: opacity, filter;
+}

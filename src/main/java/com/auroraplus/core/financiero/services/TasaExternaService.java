@@ -30,6 +30,11 @@ import java.util.List;
  * escribir esto), que corre sola una vez al día por tenant — son dos caminos
  * de escritura complementarios sobre la misma serie con origen "BCV", no
  * duplicados entre sí.
+ *
+ * Misma metodología que usa Aurora Horeca (ver TasaCambioController de esa
+ * vertical) — vive en el módulo compartido core.financiero para que Comercio,
+ * Mediclinic y cualquier otra vertical se rijan por el mismo mecanismo en vez
+ * de mantener una fuente de datos distinta por vertical.
  */
 @Service
 public class TasaExternaService {

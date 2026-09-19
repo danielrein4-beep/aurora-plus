@@ -766,17 +766,17 @@ html.light .aurora-public-nav {
   align-items: center;
   gap: .42rem;
 }
-.aurora-nav-link::after {
+.aurora-nav-link::before {
   content: "+";
   color: #35d7c3;
   font-family: 'IBM Plex Mono', monospace;
   font-weight: 600;
   opacity: 0;
-  transform: translateX(-4px) rotate(-20deg);
+  transform: translateX(4px) rotate(20deg);
   transition: opacity .18s ease, transform .18s ease;
 }
-.aurora-nav-link:hover::after,
-.aurora-nav-link:focus-visible::after {
+.aurora-nav-link:hover::before,
+.aurora-nav-link:focus-visible::before {
   opacity: 1;
   transform: translateX(0) rotate(0);
 }
@@ -1009,7 +1009,7 @@ html.light .aurora-access-page .text-white { color: #f8f6ef !important; }
 @media (prefers-reduced-motion: reduce) {
   .aurora-public-page::before { animation: none; }
   .aurora-access-page::before { animation: none; }
-  .aurora-nav-link::after { transition: none; }
+  .aurora-nav-link::before { transition: none; }
 }
 @media (max-width: 640px) {
   .aurora-home-hero { min-height: 1140px; }
