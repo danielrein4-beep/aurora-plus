@@ -4090,8 +4090,23 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   <input
                     type="number"
                     min="1"
-                    value={nuevoForm.mesesVigencia}
-                    onChange={(e) => setNuevoForm({ ...nuevoForm, mesesVigencia: Number(e.target.value) })}
+                    value={nuevoForm.mesesVigencia ?? ""}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setNuevoForm({ ...nuevoForm, mesesVigencia: "" as any });
+                        return;
+                      }
+                      const clean = raw.replace(/^0+(?=\d)/, "");
+                      const num = parseInt(clean, 10);
+                      setNuevoForm({ ...nuevoForm, mesesVigencia: isNaN(num) ? 1 : num });
+                    }}
+                    onBlur={() => {
+                      if (!nuevoForm.mesesVigencia || Number(nuevoForm.mesesVigencia) < 1) {
+                        setNuevoForm({ ...nuevoForm, mesesVigencia: 1 });
+                      }
+                    }}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono"
                   />
                 </div>
@@ -4101,8 +4116,18 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                     type="number"
                     min="1"
                     placeholder="Vacio = Ilimitado"
-                    value={nuevoForm.limiteUsuarios || ""}
-                    onChange={(e) => setNuevoForm({ ...nuevoForm, limiteUsuarios: e.target.value ? Number(e.target.value) : undefined })}
+                    value={nuevoForm.limiteUsuarios ?? ""}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setNuevoForm({ ...nuevoForm, limiteUsuarios: undefined });
+                        return;
+                      }
+                      const clean = raw.replace(/^0+(?=\d)/, "");
+                      const num = parseInt(clean, 10);
+                      setNuevoForm({ ...nuevoForm, limiteUsuarios: isNaN(num) ? undefined : num });
+                    }}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono"
                   />
                 </div>
