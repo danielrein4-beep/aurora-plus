@@ -210,6 +210,21 @@ function EstiloClasico() {
         background: #ffffff !important;
         border-color: #e2e8f0 !important;
       }
+      .mediclinic-clasico aside .text-white { color: #0f172a !important; }
+      .mediclinic-clasico aside .text-white\\/70,
+      .mediclinic-clasico aside .text-white\\/60 { color: #64748b !important; }
+      .mediclinic-clasico aside .text-white\\/50,
+      .mediclinic-clasico aside .text-white\\/40,
+      .mediclinic-clasico aside .text-white\\/30 { color: #94a3b8 !important; }
+      .mediclinic-clasico aside .border-white\\/10 { border-color: #e2e8f0 !important; }
+      .mediclinic-clasico aside .bg-white\\/5 { background-color: #f1f5f9 !important; }
+      .mediclinic-clasico aside .bg-white\\/10 { background-color: #e2e8f0 !important; }
+      .mediclinic-clasico aside .hover\\:bg-white\\/5:hover,
+      .mediclinic-clasico aside .hover\\:bg-white\\/10:hover { background-color: #f1f5f9 !important; }
+      .mediclinic-clasico aside .hover\\:text-white:hover { color: #0f172a !important; }
+      .mediclinic-clasico aside .sidebar-glare::before {
+        background: linear-gradient(115deg, transparent 42%, rgba(15, 23, 42, 0.06) 50%, transparent 58%) !important;
+      }
       .mediclinic-clasico header {
         background: #ffffff !important;
         border-color: #e2e8f0 !important;
