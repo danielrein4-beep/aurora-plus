@@ -38,10 +38,13 @@ public class AuroraWhatsappIaService {
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired(required = false)
+    private GeminiBudgetService geminiBudgetService;
+
     @org.springframework.beans.factory.annotation.Value("${gemini.api.key:}")
     private String geminiApiKey;
 
-    @org.springframework.beans.factory.annotation.Value("${gemini.model:gemini-1.5-flash}")
+    @org.springframework.beans.factory.annotation.Value("${gemini.model:gemini-3.5-flash-lite}")
     private String geminiModel;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuroraWhatsappIaService.class);
@@ -254,16 +257,17 @@ public class AuroraWhatsappIaService {
             return resp;
         }
 
-        // 12. Generacion Asistida con Google Gemini 1.5 Flash (Capa de Razonamiento Conversacional)
+        // 12. Generacion asistida con Gemini 3.5 Flash-Lite. Se exige tanto el limite
+        // horario como una reserva atomica dentro del presupuesto mensual del tenant.
         // Techo de costo: sin esto, un cliente escribiendo rapido (o un abuso deliberado) puede
         // disparar llamadas ilimitadas a la API paga de Gemini y el negocio se entera al recibir
         // la factura. LIMITE_GEMINI_POR_HORA es por tenant, no por cliente, a proposito: es el
         // negocio quien paga la cuenta de Gemini, sin importar cuantos clientes distintos escriban.
-        String respuestaGemini = superoLimiteGeminiPorHora(tenantId)
+        String respuestaGemini = superoLimiteGeminiPorHora(tenantId) || geminiBudgetService == null
             ? null
-            : consultarGemini15Flash(tenantId, nombreTienda, tasaVes, mensajeCliente, licencia);
+            : consultarGemini(tenantId, nombreTienda, tasaVes, mensajeCliente, licencia);
         if (respuestaGemini != null && !respuestaGemini.isBlank()) {
-            resp.intencion = "IA_GEMINI_15_FLASH";
+            resp.intencion = "IA_GEMINI_35_FLASH_LITE";
             resp.textoRespuesta = respuestaGemini;
             guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
             return resp;
@@ -368,19 +372,26 @@ public class AuroraWhatsappIaService {
     }
 
     /**
-     * Invocacion directa a la API de Google Gemini 1.5 Flash
+     * Invocacion directa a la API de Google Gemini 3.5 Flash-Lite.
      * Proporciona respuestas contextualizadas de comercio electronico cuando
      * las intenciones estaticas y busqueda local no encuentran un resultado exacto.
      */
-    private String consultarGemini15Flash(Long tenantId, String nombreTienda, BigDecimal tasaVes, String mensajeCliente, LicenciaTenant licencia) {
+    private String consultarGemini(Long tenantId, String nombreTienda, BigDecimal tasaVes, String mensajeCliente, LicenciaTenant licencia) {
         String key = (geminiApiKey != null) ? geminiApiKey.trim() : "";
         if (key.isEmpty() || key.equalsIgnoreCase("TU_API_KEY_AQUI")) {
             log.debug("Gemini API Key no configurada. Omitiendo invocacion generativa.");
             return null;
         }
 
+        if (!geminiBudgetService.reservar(tenantId)) {
+            log.info("Tenant {} alcanzo su presupuesto mensual operativo de Gemini", tenantId);
+            return null;
+        }
+
+        boolean reservaConciliada = false;
         try {
-            String modelo = (geminiModel != null && !geminiModel.isBlank()) ? geminiModel.trim() : "gemini-1.5-flash";
+            String modelo = (geminiModel != null && !geminiModel.isBlank()) ? geminiModel.trim() : "gemini-3.5-flash-lite";
+            String mensajeSeguro = mensajeCliente == null ? "" : mensajeCliente.substring(0, Math.min(2000, mensajeCliente.length()));
             String promptSistema = "Eres el Asistente Virtual Comercial de '" + nombreTienda + "' para atencion por WhatsApp en Venezuela.\n"
                     + "Tu funcion es asesorar al cliente de forma amable, precisa y profesional.\n"
                     + "Datos del negocio:\n"
@@ -393,7 +404,7 @@ public class AuroraWhatsappIaService {
                     + "3. PROHIBIDO usar emojis. Responde estrictamente con texto plano limpio.\n"
                     + "4. Si el cliente tiene dudas sobre aplicacion tecnica, medidas o materiales, orientalo con criterio basico comercial.\n";
 
-            String promptUsuario = "Pregunta del cliente: " + mensajeCliente;
+            String promptUsuario = "Pregunta del cliente: " + mensajeSeguro;
 
             Map<String, Object> partSistema = Map.of("text", promptSistema);
             Map<String, Object> partUsuario = Map.of("text", promptUsuario);
@@ -402,8 +413,8 @@ public class AuroraWhatsappIaService {
             Map<String, Object> requestBodyMap = Map.of(
                     "contents", List.of(content),
                     "generationConfig", Map.of(
-                            "temperature", 0.3,
-                            "maxOutputTokens", 250
+                            "maxOutputTokens", 180,
+                            "thinkingConfig", Map.of("thinkingLevel", "LOW")
                     )
             );
 
@@ -420,6 +431,12 @@ public class AuroraWhatsappIaService {
             java.net.http.HttpResponse<String> response = httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString(java.nio.charset.StandardCharsets.UTF_8));
             if (response.statusCode() == 200) {
                 com.fasterxml.jackson.databind.JsonNode rootNode = objectMapper.readTree(response.body());
+                com.fasterxml.jackson.databind.JsonNode usage = rootNode.path("usageMetadata");
+                long tokensEntrada = usage.path("promptTokenCount").asLong(0);
+                long tokensSalida = usage.path("candidatesTokenCount").asLong(0)
+                    + usage.path("thoughtsTokenCount").asLong(0);
+                geminiBudgetService.conciliar(tenantId, tokensEntrada, tokensSalida);
+                reservaConciliada = true;
                 com.fasterxml.jackson.databind.JsonNode candidates = rootNode.path("candidates");
                 if (candidates.isArray() && candidates.size() > 0) {
                     com.fasterxml.jackson.databind.JsonNode parts = candidates.get(0).path("content").path("parts");
@@ -433,10 +450,14 @@ public class AuroraWhatsappIaService {
                     }
                 }
             } else {
-                log.warn("Gemini 1.5 Flash devolvio HTTP {}: {}", response.statusCode(), response.body());
+                log.warn("Gemini 3.5 Flash-Lite devolvio HTTP {}", response.statusCode());
             }
         } catch (Exception e) {
-            log.error("Excepcion al consultar Gemini 1.5 Flash: {}", e.getMessage());
+            log.error("Excepcion al consultar Gemini 3.5 Flash-Lite: {}", e.getMessage());
+        } finally {
+            if (!reservaConciliada) {
+                geminiBudgetService.reembolsarReserva(tenantId);
+            }
         }
 
         return null;
@@ -449,7 +470,7 @@ public class AuroraWhatsappIaService {
         try {
             Integer llamadas = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM comercio_whatsapp_conversaciones " +
-                "WHERE tenant_id = ? AND intencion = 'IA_GEMINI_15_FLASH' AND fecha_hora > now() - interval '1 hour'",
+                "WHERE tenant_id = ? AND intencion = 'IA_GEMINI_35_FLASH_LITE' AND fecha_hora > now() - interval '1 hour'",
                 Integer.class, tenantId
             );
             if (llamadas != null && llamadas >= LIMITE_GEMINI_POR_HORA) {
