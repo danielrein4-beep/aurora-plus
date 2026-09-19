@@ -54,10 +54,15 @@ public class JwtService {
     }
 
     public String generarTokenSuperAdmin(String username) {
+        return generarTokenSuperAdmin(username, 0);
+    }
+
+    public String generarTokenSuperAdmin(String username, int tokenVersion) {
         Instant ahora = Instant.now();
         return Jwts.builder()
             .subject(username)
             .claim("tipo", "SUPER_ADMIN")
+            .claim("tokenVersion", tokenVersion)
             .issuedAt(Date.from(ahora))
             .expiration(Date.from(ahora.plusSeconds(expiracionHorasSuperAdmin * 3600)))
             .signWith(signingKey())

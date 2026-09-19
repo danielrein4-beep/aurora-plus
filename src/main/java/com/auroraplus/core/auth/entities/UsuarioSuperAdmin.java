@@ -4,9 +4,9 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * Administrador de la PLATAFORMA (no de un tenant) — quien gestiona altas de
- * clientes, licencias y módulos desde /api/super-admin/**. Separado de
- * Usuario a propósito: no tiene tenantId, y su alcance es todo el sistema.
+ * Administrador de la PLATAFORMA (no de un tenant) - quien gestiona altas de
+ * clientes, licencias y modulos desde /api/super-admin/**. Separado de
+ * Usuario a proposito: no tiene tenantId, y su alcance es todo el sistema.
  */
 @Entity
 @Table(name = "usuarios_super_admin")
@@ -25,6 +25,9 @@ public class UsuarioSuperAdmin {
     @Column(nullable = false)
     private boolean activo = true;
 
+    @Column(name = "token_version", nullable = false)
+    private int tokenVersion = 0;
+
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();
 
@@ -36,6 +39,8 @@ public class UsuarioSuperAdmin {
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public boolean isActivo() { return activo; }
     public void setActivo(boolean activo) { this.activo = activo; }
+    public int getTokenVersion() { return tokenVersion; }
+    public void setTokenVersion(int tokenVersion) { this.tokenVersion = tokenVersion; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
 }

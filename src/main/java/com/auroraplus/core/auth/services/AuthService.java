@@ -26,6 +26,18 @@ public class AuthService {
     @Autowired
     private UsuarioSuperAdminRepository usuarioSuperAdminRepository;
 
+    @Autowired(required = false)
+    private com.auroraplus.core.auditoria.services.RegistroAuditoriaService registroAuditoriaService;
+
+    private static final int MAX_INTENTOS_SUPERADMIN = 5;
+    private static final long BLOQUEO_SUPERADMIN_MS = 15 * 60 * 1000L;
+    private final java.util.concurrent.ConcurrentHashMap<String, IntentosSuperAdmin> intentosSuperAdmin = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static class IntentosSuperAdmin {
+        int fallos = 0;
+        long bloqueadoHasta = 0;
+    }
+
     @Autowired
     private TokenRecuperacionClaveRepository tokenRecuperacionClaveRepository;
 
@@ -123,14 +135,51 @@ public class AuthService {
     }
 
     public String loginSuperAdmin(String username, String password) {
-        UsuarioSuperAdmin admin = usuarioSuperAdminRepository.findByUsername(username)
-            .orElseThrow(() -> new RuntimeException("Usuario o contraseña incorrectos"));
+        String userKey = username != null ? username.trim().toLowerCase() : "";
+        long ahora = System.currentTimeMillis();
+        IntentosSuperAdmin intentos = intentosSuperAdmin.computeIfAbsent(userKey, k -> new IntentosSuperAdmin());
 
-        if (!admin.isActivo() || !passwordEncoder.matches(password, admin.getPasswordHash())) {
-            throw new RuntimeException("Usuario o contraseña incorrectos");
+        synchronized (intentos) {
+            if (intentos.bloqueadoHasta > ahora) {
+                long minutosRestantes = Math.max(1, (intentos.bloqueadoHasta - ahora) / 60000 + 1);
+                throw new RuntimeException("Acceso bloqueado por reiterados intentos fallidos. Intente de nuevo en " + minutosRestantes + " minutos.");
+            }
         }
 
-        return jwtService.generarTokenSuperAdmin(admin.getUsername());
+        UsuarioSuperAdmin admin = usuarioSuperAdminRepository.findByUsername(username)
+            .orElse(null);
+
+        if (admin == null || !admin.isActivo() || !passwordEncoder.matches(password, admin.getPasswordHash())) {
+            int numFallos;
+            synchronized (intentos) {
+                intentos.fallos++;
+                numFallos = intentos.fallos;
+                if (intentos.fallos >= MAX_INTENTOS_SUPERADMIN) {
+                    intentos.bloqueadoHasta = ahora + BLOQUEO_SUPERADMIN_MS;
+                }
+            }
+            if (registroAuditoriaService != null) {
+                registroAuditoriaService.registrar(
+                    0L,
+                    "SUPER_ADMIN",
+                    "ACCESO_FALLIDO_SUPERADMIN",
+                    "UsuarioSuperAdmin",
+                    username,
+                    "Intento fallido de acceso administrativo #" + numFallos + " contra el usuario '" + username + "'"
+                );
+            }
+            if (numFallos >= MAX_INTENTOS_SUPERADMIN) {
+                throw new RuntimeException("Demasiados intentos fallidos. Su cuenta ha sido bloqueada temporalmente por 15 minutos.");
+            }
+            throw new RuntimeException("Usuario o contrasenia incorrectos");
+        }
+
+        synchronized (intentos) {
+            intentos.fallos = 0;
+            intentos.bloqueadoHasta = 0;
+        }
+
+        return jwtService.generarTokenSuperAdmin(admin.getUsername(), admin.getTokenVersion());
     }
 
     public Usuario crearUsuario(Long tenantId, String username, String password, Usuario.Rol rol, String nombreCompleto) {

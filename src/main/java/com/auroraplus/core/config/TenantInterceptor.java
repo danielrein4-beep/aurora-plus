@@ -44,6 +44,9 @@ public class TenantInterceptor implements HandlerInterceptor {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired(required = false)
+    private com.auroraplus.core.auth.repositories.UsuarioSuperAdminRepository usuarioSuperAdminRepository;
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
         String authHeader = request.getHeader("Authorization");
@@ -68,6 +71,15 @@ public class TenantInterceptor implements HandlerInterceptor {
             if (!esRutaSuperAdmin) {
                 rechazar(response, "Este token de super-admin no aplica a este recurso");
                 return false;
+            }
+            Integer tokenVersionClaim = claims.get("tokenVersion", Integer.class);
+            if (tokenVersionClaim != null && usuarioSuperAdminRepository != null) {
+                com.auroraplus.core.auth.entities.UsuarioSuperAdmin admin = usuarioSuperAdminRepository
+                    .findByUsername(claims.getSubject()).orElse(null);
+                if (admin == null || !admin.isActivo() || admin.getTokenVersion() != tokenVersionClaim) {
+                    rechazar(response, "Sesion administrativa invalidada o expirada. Inicie sesion de nuevo");
+                    return false;
+                }
             }
             AuthContext.set(claims.getSubject(), "SUPER_ADMIN");
             return true;
