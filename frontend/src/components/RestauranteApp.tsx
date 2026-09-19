@@ -458,7 +458,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                   <button
                     key={n.id}
                     onClick={() => irA(n.id)}
-                    className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    className={`sidebar-glare w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                       n.premium
                         ? "text-white/30 hover:bg-white/10"
                         : pagina === n.id

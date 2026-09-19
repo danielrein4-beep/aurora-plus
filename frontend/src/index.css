@@ -11,6 +11,28 @@
    Ver: https://tailwindcss.com/docs/dark-mode */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Efecto "glare hover" (basado en react-bits GlareHover) para los ítems de
+   navegación del sidebar en las 4 verticales — un destello diagonal que
+   cruza el botón al pasar el mouse, en vez del bloque plano/duro anterior. */
+.sidebar-glare {
+  position: relative;
+  overflow: hidden;
+}
+.sidebar-glare::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.32) 50%, transparent 58%);
+  background-size: 220% 220%;
+  background-position: -120% -120%;
+  transition: background-position 650ms ease;
+}
+.sidebar-glare:hover::before {
+  background-position: 120% 120%;
+}
+
 /* ==========================================================================
    AURORA PLUS — PALETA INSTITUCIONAL (arquitectura de tokens, no por archivo)
    Directiva: erradicar el turquesa/cian "neón" heredado (#00FFC2, #00C9A7,
