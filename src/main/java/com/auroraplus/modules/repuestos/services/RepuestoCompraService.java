@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -44,6 +46,20 @@ public class RepuestoCompraService {
 
     @Transactional
     public CompraRepuesto registrarCompra(Long tenantId, Long proveedorId, String numeroFactura, List<ItemCompra> items) {
+        return registrarCompra(tenantId, proveedorId, numeroFactura, items, null, null, null);
+    }
+
+    /**
+     * @param montoPagadoAhora cuánto se le pagó al proveedor de una vez, en `monedaPago` — null/0 = factura entera
+     *                         a crédito. Si es menor al total, la diferencia queda como cuenta por pagar (CXP)
+     *                         normal; si cubre el total, no se crea CXP alguna (factura saldada de una). Mismo
+     *                         patrón que CompraInsumoHorecaService.registrarCompra.
+     * @param diasCredito      plazo de crédito pactado con el proveedor — se guarda como fecha de vencimiento
+     *                         = hoy + diasCredito en la CXP resultante. Null/0 = sin plazo pactado.
+     */
+    @Transactional
+    public CompraRepuesto registrarCompra(Long tenantId, Long proveedorId, String numeroFactura, List<ItemCompra> items,
+                                           BigDecimal montoPagadoAhora, String monedaPago, Integer diasCredito) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("La compra debe tener al menos un ítem");
         }
@@ -107,15 +123,34 @@ public class RepuestoCompraService {
         }
 
         compra.setTotal(totalCompra);
+
+        // Si se pagó algo de una vez, sale de caja como EGRESO real (en la moneda en la
+        // que físicamente se entregó) y solo la diferencia (si queda) se registra como
+        // deuda (CXP) — antes SIEMPRE se cargaba el total entero a cuenta por pagar,
+        // aunque el negocio le hubiera pagado de contado al proveedor. Mismo patrón que
+        // CompraInsumoHorecaService.registrarCompra.
+        BigDecimal montoPagadoBase = BigDecimal.ZERO;
+        if (montoPagadoAhora != null && montoPagadoAhora.compareTo(BigDecimal.ZERO) > 0) {
+            String monedaEfectiva = (monedaPago != null && !monedaPago.isBlank()) ? monedaPago : motorFinancieroService.obtenerMonedaBase(tenantId);
+            montoPagadoBase = monedaEfectiva.equals(motorFinancieroService.obtenerMonedaBase(tenantId))
+                ? montoPagadoAhora
+                : motorFinancieroService.convertirAMonedaBase(tenantId, montoPagadoAhora, monedaEfectiva);
+            if (montoPagadoBase.compareTo(totalCompra) > 0) {
+                throw new RuntimeException("El monto pagado (" + montoPagadoBase + ") no puede ser mayor al total de la factura (" + totalCompra + ")");
+            }
+            motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
+                montoPagadoAhora, monedaEfectiva, "Pago a proveedor " + proveedor.getNombre() + " — Factura " + numeroFactura);
+            compra.setMontoPagado(montoPagadoBase.setScale(2, RoundingMode.HALF_UP));
+        }
         CompraRepuesto guardada = compraRepuestoRepository.save(compra);
 
-        // Comprar a un proveedor genera una deuda (Cuenta por Pagar), no un
-        // egreso de caja inmediato — la mayoría de ferreterías compran a
-        // crédito y pagan después. El egreso real se registra al pagar.
-        // La deuda queda en la moneda base del tenant (el proveedor factura en la
-        // moneda con la que el negocio opera) — sin conversión, no aplica pago aquí.
-        motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.CXP,
-            totalCompra, null, null, "Compra factura " + numeroFactura + " — Proveedor: " + proveedor.getNombre());
+        BigDecimal saldoPendiente = totalCompra.subtract(montoPagadoBase).setScale(2, RoundingMode.HALF_UP);
+        if (saldoPendiente.compareTo(BigDecimal.ZERO) > 0) {
+            LocalDate fechaVencimiento = (diasCredito != null && diasCredito > 0) ? LocalDate.now().plusDays(diasCredito) : null;
+            motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.CXP,
+                saldoPendiente, null, null, "Compra factura " + numeroFactura + " — Proveedor: " + proveedor.getNombre(),
+                "COMERCIO", "CompraRepuesto", guardada.getId(), fechaVencimiento);
+        }
 
         return guardada;
     }

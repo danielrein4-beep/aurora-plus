@@ -11,11 +11,14 @@ import com.auroraplus.modules.repuestos.services.RepuestoConversionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * CRUD y búsqueda del catálogo masivo de repuestos (Subfase 5.1) y venta
@@ -137,5 +140,85 @@ public class RepuestoItemController {
                                                        @RequestBody AjusteStockRequest datos) {
         RepuestoItem actualizado = repuestoConversionService.ajustarStock(id, tenantId, datos.stockReal, datos.motivo);
         return ResponseEntity.ok(actualizado);
+    }
+
+    public static class ItemImportacion {
+        public String codigoSku;
+        public String descripcion;
+        public String unidadBase;
+        public BigDecimal costoUnitario;
+        public BigDecimal precioVenta;
+        public BigDecimal stockInicial; // opcional — si viene, registra un movimiento de Kárdex de una vez
+    }
+
+    public static class FilaConError {
+        public int fila;
+        public String motivo;
+        public FilaConError(int fila, String motivo) { this.fila = fila; this.motivo = motivo; }
+    }
+
+    public static class ResultadoImportacion {
+        public int creados = 0;
+        public int actualizados = 0;
+        public List<FilaConError> errores = new ArrayList<>();
+    }
+
+    /**
+     * Carga masiva de repuestos desde Excel/CSV (mismo patrón que
+     * ArticuloController.importarLote de Horeca — el frontend parsea el
+     * archivo con SheetJS y manda esta lista ya como JSON, no el archivo
+     * crudo). Por SKU: si ya existe para este tenant, ACTUALIZA descripción/
+     * unidad/costo/precio; si no existe, lo CREA. Una fila con error no
+     * aborta el resto del lote — se acumula en `errores` con el número de
+     * fila para que el usuario pueda corregir solo esas líneas.
+     */
+    @PostMapping("/importar-lote")
+    @Transactional
+    public ResponseEntity<ResultadoImportacion> importarLote(@RequestParam Long tenantId, @RequestBody List<ItemImportacion> items) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
+        ResultadoImportacion resultado = new ResultadoImportacion();
+        for (int i = 0; i < items.size(); i++) {
+            ItemImportacion item = items.get(i);
+            try {
+                if (item.codigoSku == null || item.codigoSku.isBlank()) throw new RuntimeException("Falta el SKU");
+                if (item.descripcion == null || item.descripcion.isBlank()) throw new RuntimeException("Falta el nombre/descripción");
+
+                Optional<RepuestoItem> existente = repuestoItemRepository.findByCodigoSkuAndTenantId(item.codigoSku.trim(), tenantId);
+                RepuestoItem repuesto = existente.orElseGet(RepuestoItem::new);
+                boolean esNuevo = repuesto.getId() == null;
+
+                repuesto.setTenantId(tenantId);
+                repuesto.setCodigoSku(item.codigoSku.trim());
+                repuesto.setDescripcion(item.descripcion.trim());
+                repuesto.setUnidadBase(item.unidadBase != null && !item.unidadBase.isBlank() ? item.unidadBase.trim().toUpperCase() : "UNIDAD");
+                if (item.costoUnitario != null) repuesto.setCostoUnitario(item.costoUnitario);
+                if (item.precioVenta != null) repuesto.setPrecioVenta(item.precioVenta);
+                else if (esNuevo) throw new RuntimeException("Falta el precio de venta");
+
+                BigDecimal stockAnterior = esNuevo ? BigDecimal.ZERO : repuesto.getStockActual();
+                repuesto = repuestoItemRepository.save(repuesto);
+
+                if (item.stockInicial != null && item.stockInicial.compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal stockNuevo = stockAnterior.add(item.stockInicial);
+                    repuesto.setStockActual(stockNuevo);
+                    repuesto = repuestoItemRepository.save(repuesto);
+
+                    MovimientoRepuesto movimiento = new MovimientoRepuesto();
+                    movimiento.setTenantId(tenantId);
+                    movimiento.setRepuesto(repuesto);
+                    movimiento.setTipo(MovimientoRepuesto.TipoMovimiento.COMPRA);
+                    movimiento.setCantidad(item.stockInicial);
+                    movimiento.setStockAnterior(stockAnterior);
+                    movimiento.setStockNuevo(stockNuevo);
+                    movimiento.setMotivo("Carga masiva de inventario");
+                    movimientoRepuestoRepository.save(movimiento);
+                }
+
+                if (esNuevo) resultado.creados++; else resultado.actualizados++;
+            } catch (Exception e) {
+                resultado.errores.add(new FilaConError(i + 1, e.getMessage()));
+            }
+        }
+        return ResponseEntity.ok(resultado);
     }
 }

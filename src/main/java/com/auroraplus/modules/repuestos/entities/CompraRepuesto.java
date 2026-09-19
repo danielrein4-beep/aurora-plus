@@ -38,6 +38,12 @@ public class CompraRepuesto {
     @Column(nullable = false, precision = 18, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
+    // Cuánto se le pagó de una vez al proveedor al registrar esta factura (null = nada
+    // pagado, factura entera a crédito). El saldo (total - montoPagado) es lo que queda
+    // como Cuenta por Pagar — ver RepuestoCompraService.registrarCompra.
+    @Column(name = "monto_pagado", precision = 18, scale = 2)
+    private BigDecimal montoPagado;
+
     @OneToMany(mappedBy = "compra", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference
     private List<DetalleCompraRepuesto> items = new ArrayList<>();
@@ -59,6 +65,8 @@ public class CompraRepuesto {
     public void setFechaCompra(LocalDateTime fechaCompra) { this.fechaCompra = fechaCompra; }
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }
+    public BigDecimal getMontoPagado() { return montoPagado; }
+    public void setMontoPagado(BigDecimal montoPagado) { this.montoPagado = montoPagado; }
     public List<DetalleCompraRepuesto> getItems() { return items; }
     public void setItems(List<DetalleCompraRepuesto> items) { this.items = items; }
 }

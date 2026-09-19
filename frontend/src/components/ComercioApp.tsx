@@ -3,6 +3,7 @@ import ModalCatalogoQR from "./ModalCatalogoQR";
 import PedidosWebPanel, { type PedidoWeb } from "./PedidosWebPanel";
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import { useState, useMemo, useEffect, useRef } from "react";
+import * as XLSX from "xlsx";
 import {
   IconHardware, IconPrescription, IconRetail, IconCard, IconSearch, IconTrash,
   IconCheck, IconWarning, IconClose, IconUsers, IconFileText, IconHourglass,
@@ -29,6 +30,7 @@ import {
   actualizarProveedorRepuesto,
   listarComprasRepuesto,
   registrarCompraRepuesto,
+  importarRepuestosLote,
   extraerFacturaOcr,
   listarMovimientos, registrarMovimiento,
   abrirTurno,
@@ -48,6 +50,8 @@ import {
   type TasaCambio,
   type OrigenTasaActiva,
   type FacturaExtraidaOcr,
+  type ItemImportacionRepuesto,
+  type ResultadoImportacionRepuestos,
 } from "../api";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -512,6 +516,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [presentacionesLista, setPresentacionesLista] = useState<PresentacionRepuesto[]>([]);
   const [presentacionesCargando, setPresentacionesCargando] = useState(false);
   const [modalCompraProveedor, setModalCompraProveedor] = useState(false);
+  const [modalImportarInventario, setModalImportarInventario] = useState(false);
   const [proveedoresRepuesto, setProveedoresRepuesto] = useState<ProveedorRepuesto[]>([]);
   const [ingresosCaja, setIngresosCaja] = useState<MovimientoCaja[]>([]);
   const [gastosCaja, setGastosCaja] = useState<MovimientoCaja[]>([]);
@@ -1393,6 +1398,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     >
                       <IconRefresh size={14} className={cargandoBackend ? "animate-spin" : ""} />
                       <span>{cargandoBackend ? "Sincronizando..." : "Sincronizar DB"}</span>
+                    </button>
+                    <button
+                      onClick={() => setModalImportarInventario(true)}
+                      className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs cursor-pointer border border-slate-300 dark:border-slate-700 flex items-center gap-1.5 transition-colors"
+                      title="Cargar varios artículos de una vez desde un Excel/CSV"
+                    >
+                      <IconDownload size={14} />
+                      <span>Importar Excel/CSV</span>
                     </button>
                     <button
                       onClick={() => setModalCompraProveedor(true)}
@@ -2643,6 +2656,15 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         />
       )}
 
+      {/* ── MODAL IMPORTACIÓN MASIVA DE INVENTARIO (Excel/CSV) ── */}
+      {modalImportarInventario && user?.tenantId && (
+        <ModalImportarInventarioComercio
+          tenantId={user.tenantId}
+          onClose={() => setModalImportarInventario(false)}
+          onImportado={() => cargarRepuestosBackend()}
+        />
+      )}
+
       {/* ── MODAL ALTA DE PROVEEDOR (pestaña Proveedores) ── */}
       {modalNuevoProveedor && (
         <ModalFormularioProveedorComercio
@@ -3230,7 +3252,17 @@ function ModalCompraProveedorComercio({
   const [creandoProv, setCreandoProv] = useState(false);
 
   const [numeroFactura, setNumeroFactura] = useState(`FAC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
-  
+
+  // Forma de pago de la factura — de contado por defecto (la mayoría de las
+  // compras a proveedor en Comercio se pagan de una vez): el total pagado
+  // sale de caja como EGRESO real. Si se cambia a "a crédito", solo se paga
+  // lo que el usuario indique (o nada) y el resto queda como Cuenta por
+  // Pagar (CXP) — mismo patrón que Registrar Compra de Horeca.
+  const [pagoDeContado, setPagoDeContado] = useState(true);
+  const [montoPagadoParcial, setMontoPagadoParcial] = useState("");
+  const [monedaPago, setMonedaPago] = useState("USD");
+  const [diasCredito, setDiasCredito] = useState("");
+
   interface LineaCompraItem {
     repuestoId: number;
     nombre: string;
@@ -3397,6 +3429,9 @@ function ModalCompraProveedorComercio({
     }
     setGuardandoCompra(true);
     try {
+      const montoPagadoAhora = pagoDeContado
+        ? totalFactura
+        : (montoPagadoParcial ? Number(montoPagadoParcial) : undefined);
       await registrarCompraRepuesto(tenantId, {
         proveedorId: Number(proveedorSelId),
         numeroFactura: numeroFactura.trim(),
@@ -3405,6 +3440,9 @@ function ModalCompraProveedorComercio({
           cantidad: Number(l.cantidad),
           costoUnitario: Number(l.costoUnitario),
         })),
+        montoPagadoAhora: montoPagadoAhora && montoPagadoAhora > 0 ? montoPagadoAhora : undefined,
+        monedaPago: montoPagadoAhora && montoPagadoAhora > 0 ? monedaPago : undefined,
+        diasCredito: !pagoDeContado && diasCredito ? Number(diasCredito) : undefined,
       });
       onCompraExitosa();
     } catch (err: any) {
@@ -3641,6 +3679,60 @@ function ModalCompraProveedorComercio({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Forma de pago — de contado (sale de caja como EGRESO) o a crédito (Cuenta por Pagar) */}
+        <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/70 dark:border-slate-700/60 space-y-2.5">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPagoDeContado(true)}
+              className={`flex-1 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
+                pagoDeContado ? "bg-teal-500 text-slate-950 shadow-md" : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+              }`}
+            >
+              De Contado (se descuenta de Caja)
+            </button>
+            <button
+              type="button"
+              onClick={() => setPagoDeContado(false)}
+              className={`flex-1 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
+                !pagoDeContado ? "bg-amber-500 text-slate-950 shadow-md" : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+              }`}
+            >
+              A Crédito (Cuenta por Pagar)
+            </button>
+          </div>
+          {pagoDeContado ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">Se registrará un egreso de caja por</span>
+              <span className="text-xs font-mono font-black text-teal-500 dark:text-teal-400">${totalFactura.toFixed(2)}</span>
+              <select value={monedaPago} onChange={(e) => setMonedaPago(e.target.value)}
+                className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-[11px] font-bold">
+                {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Abono ahora (opcional)</label>
+                <input type="number" step="0.01" placeholder="0.00" value={montoPagadoParcial} onChange={(e) => setMontoPagadoParcial(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono" />
+              </div>
+              <div>
+                <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Moneda del abono</label>
+                <select value={monedaPago} onChange={(e) => setMonedaPago(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold">
+                  {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Días de crédito</label>
+                <input type="number" placeholder="Ej. 15" value={diasCredito} onChange={(e) => setDiasCredito(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono" />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Resumen Total y Botón Procesar */}
@@ -3943,6 +4035,206 @@ function ModalDetalleProveedorComercio({
             <IconEdit size={13} /> Editar Proveedor
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMPONENTE: MODAL IMPORTACIÓN MASIVA DE INVENTARIO (COMERCIO)
+// Mismo patrón que ModalImportarInventario de Aurora Horeca (SheetJS parsea
+// el Excel/CSV en el navegador, el backend hace upsert por SKU) — adaptado a
+// las columnas reales que existe en RepuestoItem (codigoSku/descripcion/
+// unidadBase, sin "categoría": ese campo es solo cosmético en el frontend de
+// Comercio y no tiene columna en el backend, así que no se ofrece acá para no
+// prometer una carga que después se descarta en silencio).
+// ══════════════════════════════════════════════════════════════════════════
+function ModalImportarInventarioComercio({
+  tenantId,
+  onClose,
+  onImportado,
+}: {
+  tenantId: number;
+  onClose: () => void;
+  onImportado: () => void;
+}) {
+  const ALIAS: Record<string, string[]> = {
+    codigoSku: ["sku", "codigo"],
+    descripcion: ["nombre", "producto", "descripcion", "articulo"],
+    unidadBase: ["unidad de medida", "unidad", "und", "um"],
+    costoUnitario: ["costo unitario", "costo", "precio costo"],
+    precioVenta: ["precio de venta", "precio venta", "precio", "pvp", "precio publico"],
+    stockInicial: ["stock inicial", "stock", "cantidad", "existencia"],
+  };
+  const normalizar = (s: string) => s.toString().trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [arrastrando, setArrastrando] = useState(false);
+  const [filas, setFilas] = useState<ItemImportacionRepuesto[] | null>(null);
+  const [procesando, setProcesando] = useState(false);
+  const [resultado, setResultado] = useState<ResultadoImportacionRepuestos | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const procesarArchivo = async (file: File) => {
+    setError(null);
+    setResultado(null);
+    setFilas(null);
+    setArchivo(file);
+    try {
+      const buffer = await file.arrayBuffer();
+      const libro = XLSX.read(buffer, { type: "array" });
+      const hoja = libro.Sheets[libro.SheetNames[0]];
+      const filasCrudas: Record<string, unknown>[] = XLSX.utils.sheet_to_json(hoja, { defval: "" });
+      if (filasCrudas.length === 0) { setError("El archivo no tiene filas de datos"); return; }
+
+      const encabezados = Object.keys(filasCrudas[0]);
+      const columna: Record<string, string> = {};
+      for (const [campo, alias] of Object.entries(ALIAS)) {
+        const encontrada = encabezados.find((h) => alias.includes(normalizar(h)));
+        if (encontrada) columna[campo] = encontrada;
+      }
+      if (!columna.codigoSku || !columna.descripcion) {
+        setError('El archivo debe tener al menos columnas "SKU" y "Nombre" en la primera fila.');
+        return;
+      }
+
+      const procesadas: ItemImportacionRepuesto[] = filasCrudas
+        .map((fila) => ({
+          codigoSku: String(fila[columna.codigoSku] ?? "").trim(),
+          descripcion: String(fila[columna.descripcion] ?? "").trim(),
+          unidadBase: columna.unidadBase ? String(fila[columna.unidadBase] ?? "").trim() || undefined : undefined,
+          costoUnitario: columna.costoUnitario && fila[columna.costoUnitario] !== "" ? Number(fila[columna.costoUnitario]) : undefined,
+          precioVenta: columna.precioVenta && fila[columna.precioVenta] !== "" ? Number(fila[columna.precioVenta]) : undefined,
+          stockInicial: columna.stockInicial && fila[columna.stockInicial] !== "" ? Number(fila[columna.stockInicial]) : undefined,
+        }))
+        .filter((f) => f.codigoSku && f.descripcion);
+
+      if (procesadas.length === 0) {
+        setError("Ninguna fila tiene SKU y Nombre completos — revisa el archivo.");
+        return;
+      }
+      setFilas(procesadas);
+    } catch {
+      setError("No se pudo leer el archivo — verifica que sea un .xlsx, .xls o .csv válido.");
+    }
+  };
+
+  const confirmarImportacion = async () => {
+    if (!filas || filas.length === 0) return;
+    setProcesando(true);
+    setError(null);
+    try {
+      const res = await importarRepuestosLote(tenantId, filas);
+      setResultado(res);
+      onImportado();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo importar el archivo");
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+          <div>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase">Inventario</span>
+            <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white mt-1">Importar Inventario desde Excel/CSV</h3>
+          </div>
+          <button onClick={onClose} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+        </div>
+
+        {!resultado && (
+          <>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setArrastrando(true); }}
+              onDragLeave={() => setArrastrando(false)}
+              onDrop={(e) => {
+                e.preventDefault(); setArrastrando(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) procesarArchivo(file);
+              }}
+              onClick={() => inputRef.current?.click()}
+              className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+                arrastrando ? "border-teal-500 bg-teal-500/10" : "border-slate-300 dark:border-slate-700 hover:border-teal-400 dark:hover:border-teal-500"
+              }`}
+            >
+              <div className="flex justify-center mb-2 text-slate-400"><IconDownload size={28} /></div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                {archivo ? archivo.name : "Arrastra tu archivo aquí o haz click para elegirlo"}
+              </p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">.xlsx, .xls o .csv — columnas: SKU, Nombre, Unidad, Costo, Precio de Venta, Stock Inicial</p>
+              <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) procesarArchivo(f); }} />
+            </div>
+
+            {error && (
+              <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-semibold flex items-center gap-1.5">
+                <IconWarning size={13} className="flex-shrink-0" /> {error}
+              </div>
+            )}
+
+            {filas && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">{filas.length} fila{filas.length === 1 ? "" : "s"} detectada{filas.length === 1 ? "" : "s"} — vista previa:</p>
+                <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 max-h-48 overflow-y-auto">
+                  <table className="w-full text-[11px] font-mono">
+                    <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 sticky top-0">
+                      <tr className="text-left uppercase text-[10px]">
+                        <th className="py-1.5 px-2">SKU</th><th className="py-1.5 px-2 font-sans">Nombre</th><th className="py-1.5 px-2">Unidad</th>
+                        <th className="py-1.5 px-2 text-right">Costo</th><th className="py-1.5 px-2 text-right">Precio venta</th><th className="py-1.5 px-2 text-right">Stock inicial</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-600 dark:text-slate-300">
+                      {filas.slice(0, 8).map((f, i) => (
+                        <tr key={i}>
+                          <td className="py-1.5 px-2">{f.codigoSku}</td>
+                          <td className="py-1.5 px-2 font-sans">{f.descripcion}</td>
+                          <td className="py-1.5 px-2">{f.unidadBase || "—"}</td>
+                          <td className="py-1.5 px-2 text-right">{f.costoUnitario ?? "—"}</td>
+                          <td className="py-1.5 px-2 text-right">{f.precioVenta ?? "—"}</td>
+                          <td className="py-1.5 px-2 text-right">{f.stockInicial ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {filas.length > 8 && <p className="text-[10px] text-slate-400 dark:text-slate-500">…y {filas.length - 8} filas más.</p>}
+                <button onClick={confirmarImportacion} disabled={procesando}
+                  className="w-full py-3 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-slate-950 font-black text-sm cursor-pointer shadow-lg">
+                  {procesando ? "Importando..." : `Importar ${filas.length} artículo${filas.length === 1 ? "" : "s"}`}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {resultado && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0"><IconCheckCircle size={22} /></div>
+              <div>
+                <div className="font-['Outfit'] font-bold text-slate-900 dark:text-white">Importación completada</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  {resultado.creados} creado{resultado.creados === 1 ? "" : "s"} · {resultado.actualizados} actualizado{resultado.actualizados === 1 ? "" : "s"}
+                  {resultado.errores.length > 0 ? ` · ${resultado.errores.length} con error` : ""}
+                </div>
+              </div>
+            </div>
+            {resultado.errores.length > 0 && (
+              <div className="max-h-32 overflow-y-auto bg-red-500/5 border border-red-500/20 rounded-xl p-3 space-y-1">
+                {resultado.errores.map((e, i) => (
+                  <p key={i} className="text-[11px] text-red-500">Fila {e.fila}: {e.motivo}</p>
+                ))}
+              </div>
+            )}
+            <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
+              Cerrar
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

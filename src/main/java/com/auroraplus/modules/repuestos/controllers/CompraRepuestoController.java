@@ -36,6 +36,9 @@ public class CompraRepuestoController {
         public Long proveedorId;
         public String numeroFactura;
         public List<ItemCompraRequest> items;
+        public java.math.BigDecimal montoPagadoAhora;
+        public String monedaPago;
+        public Integer diasCredito;
     }
 
     @GetMapping
@@ -54,7 +57,8 @@ public class CompraRepuestoController {
             return item;
         }).toList();
 
-        CompraRepuesto compra = repuestoCompraService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, items);
+        CompraRepuesto compra = repuestoCompraService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, items,
+            request.montoPagadoAhora, request.monedaPago, request.diasCredito);
         return ResponseEntity.ok(compra);
     }
 }

@@ -3159,6 +3159,7 @@ export interface CompraRepuesto {
   numeroFactura?: string | null;
   fechaCompra: string;
   total: number;
+  montoPagado?: number | null;
   items?: DetalleCompraRepuesto[];
 }
 
@@ -3172,6 +3173,9 @@ export interface CompraRepuestoRequest {
   proveedorId: number;
   numeroFactura: string;
   items: ItemCompraRepuestoRequest[];
+  montoPagadoAhora?: number;
+  monedaPago?: string;
+  diasCredito?: number;
 }
 
 export interface ResultadoVentaRepuestoVolumen {
@@ -3311,6 +3315,26 @@ export function registrarCompraRepuesto(tenantId: number, compra: CompraRepuesto
     method: "POST",
     body: JSON.stringify(compra),
   });
+}
+
+export interface ItemImportacionRepuesto {
+  codigoSku: string;
+  descripcion: string;
+  unidadBase?: string;
+  costoUnitario?: number;
+  precioVenta?: number;
+  stockInicial?: number;
+}
+
+export interface ResultadoImportacionRepuestos {
+  creados: number;
+  actualizados: number;
+  errores: FilaImportacionError[];
+}
+
+/** Carga masiva de repuestos (desde Excel/CSV parseado en el navegador con SheetJS) — crea o actualiza por SKU. Mismo patrón que importarArticulosLote (Horeca). */
+export function importarRepuestosLote(tenantId: number, items: ItemImportacionRepuesto[]): Promise<ResultadoImportacionRepuestos> {
+  return request(`/api/repuestos/items/importar-lote?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(items) });
 }
 
 // ─────────────────────────────────────────────────────────────
