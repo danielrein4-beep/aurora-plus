@@ -140,6 +140,13 @@ public class LicenciaTenant {
     @Column(name = "slug_catalogo", unique = true, length = 100)
     private String slugCatalogo;
 
+    // Costo fijo que se suma al total del carrito en el catálogo público cuando
+    // el cliente elige "Delivery" (0 = gratis, el comportamiento de antes de
+    // que este campo existiera). No hay tarifa por distancia — solo un monto
+    // fijo configurable por el dueño de la tienda.
+    @Column(name = "costo_envio_delivery", nullable = false, precision = 18, scale = 2)
+    private java.math.BigDecimal costoEnvioDelivery = java.math.BigDecimal.ZERO;
+
     // WhatsApp Business Cloud API (Meta) del NEGOCIO — cada tenant conecta SU
     // PROPIA cuenta de Meta para automatizar el recordatorio de citas por
     // WhatsApp (antes solo un link wa.me que la secretaria mandaba a mano).
@@ -258,4 +265,6 @@ public class LicenciaTenant {
 
     public String getSlugCatalogo() { return slugCatalogo; }
     public void setSlugCatalogo(String slugCatalogo) { this.slugCatalogo = slugCatalogo; }
+    public java.math.BigDecimal getCostoEnvioDelivery() { return costoEnvioDelivery; }
+    public void setCostoEnvioDelivery(java.math.BigDecimal costoEnvioDelivery) { this.costoEnvioDelivery = costoEnvioDelivery; }
 }

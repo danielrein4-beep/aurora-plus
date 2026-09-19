@@ -91,6 +91,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
   const [telefonoWhatsapp, setTelefonoWhatsapp] = useState("");
   const [emailContacto, setEmailContacto] = useState("");
   const [slogan, setSlogan] = useState("");
+  const [costoEnvioDelivery, setCostoEnvioDelivery] = useState("0");
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [mensajePerfil, setMensajePerfil] = useState<string | null>(null);
   const [errorPerfil, setErrorPerfil] = useState(false);
@@ -104,9 +105,14 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
   const [guardandoPm, setGuardandoPm] = useState(false);
   const [mensajePm, setMensajePm] = useState<string | null>(null);
 
-  const identificadorActivo = slugCatalogo || (tenantId ? String(tenantId) : "");
-  const urlPublica = `${window.location.origin}/catalogo/${identificadorActivo}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(urlPublica)}&color=0f172a&bgcolor=f8fafc`;
+  // El catálogo público ya solo resuelve por slug (ver CatalogoPublicoController.
+  // resolverLicencia) — un link armado con el tenantId numérico como fallback
+  // daría 404. Mientras el slug real todavía no cargó del backend, mejor no
+  // mostrar ningún link que con uno roto.
+  const urlPublica = slugCatalogo ? `${window.location.origin}/catalogo/${slugCatalogo}` : "";
+  const qrUrl = urlPublica
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(urlPublica)}&color=0f172a&bgcolor=f8fafc`
+    : "";
 
   useEffect(() => {
     // Cargar config de Pago Movil
@@ -134,6 +140,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
         if (data.telefonoWhatsapp) setTelefonoWhatsapp(data.telefonoWhatsapp);
         if (data.emailContacto) setEmailContacto(data.emailContacto);
         if (data.domicilioFiscal) setSlogan(data.domicilioFiscal);
+        if (data.costoEnvioDelivery != null) setCostoEnvioDelivery(String(data.costoEnvioDelivery));
       })
       .catch(() => {});
   }, [tenantId]);
@@ -177,7 +184,8 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
           logoBase64: logoBase64,
           telefonoWhatsapp: telefonoWhatsapp.trim(),
           emailContacto: emailContacto.trim(),
-          domicilioFiscal: slogan.trim()
+          domicilioFiscal: slogan.trim(),
+          costoEnvioDelivery: Number(costoEnvioDelivery) || 0
         })
       });
       const data = await res.json().catch(() => ({}));
@@ -467,6 +475,24 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
                 placeholder="Ej: Lentes exclusivos, monturas y accesorios con despacho inmediato"
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:border-slate-900 dark:focus:border-white"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Costo de Envío por Delivery (USD)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={costoEnvioDelivery}
+                onChange={(e) => setCostoEnvioDelivery(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-mono font-medium focus:outline-none focus:border-slate-900 dark:focus:border-white"
+              />
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Se suma automáticamente al total cuando el cliente elige "Delivery" en el catálogo. Déjalo en 0 si el envío es gratis o se cobra aparte.
+              </p>
             </div>
 
             <button

@@ -354,6 +354,7 @@ interface DatosTienda {
   logoBase64?: string;
   tasaVes: number;
   domicilioFiscal?: string;
+  costoEnvioDelivery?: number;
   pagoMovil?: {
     activo: boolean;
     banco: string;
@@ -523,10 +524,20 @@ export default function CatalogoPublico() {
   const [enviandoPedido, setEnviandoPedido] = useState(false);
   const [pedidoConfirmado, setPedidoConfirmado] = useState<{
     numeroPedido: string;
-    whatsappUrl: string;
+    whatsappUrl: string | null;
   } | null>(null);
 
   useEffect(() => {
+    // Navegar de una tienda a otra sin recarga completa (dos links de
+    // catálogo distintos en la misma pestaña) no reseteaba nada de esto —
+    // el carrito, el modal de producto y los datos del formulario de la
+    // tienda anterior seguían visibles mezclados con el catálogo nuevo.
+    setCarrito([]);
+    setDrawerAbierto(false);
+    setProductoDetalle(null);
+    setPedidoConfirmado(null);
+    setTienda(null);
+
     const fetchCatalogo = async () => {
       setCargando(true);
       setError(null);
@@ -554,11 +565,15 @@ export default function CatalogoPublico() {
   const productosActivos = useMemo<ProductoCatalogo[]>(() => {
     if (!tienda) return [];
     if (tienda.productos && tienda.productos.length > 0) {
-      return tienda.productos.map((p, idx) => ({
+      // Antes se le forzaba a TODO producto real (tornillos, filtros de
+      // aceite, repuestos...) tallas de perfume/calzado ("50ml", "EU 42")
+      // sin importar el rubro de la tienda — el tamaño elegido terminaba
+      // metido tal cual en el nombre del pedido que recibe el comerciante
+      // ("Filtro de Aceite [100ml]"). Sin `tallas`, el selector de tamaño no
+      // se muestra (ver el condicional más abajo) y el pedido usa "Estándar".
+      return tienda.productos.map((p) => ({
         ...p,
-        marca: p.categoria || "Atelier",
-        tallas: ["50ml", "100ml", "Estándar"],
-        tipoVisual: idx % 2 === 0 ? "baccarat" : "balenciaga"
+        marca: p.categoria || "Atelier"
       }));
     }
     if (mostrarDemo) {
@@ -674,9 +689,19 @@ export default function CatalogoPublico() {
     );
   };
 
-  const totalUsd = useMemo(() => {
+  const subtotalUsd = useMemo(() => {
     return carrito.reduce((acc, item) => acc + item.producto.precioUsd * item.cantidad, 0);
   }, [carrito]);
+
+  // Elegir "Delivery" no sumaba ningún costo de envío al total, sin importar
+  // qué configurara la tienda — el backend ahora recalcula esto mismo server-side
+  // al registrar el pedido (nunca confía en lo que mande el cliente); esto es
+  // solo para que el cliente vea el total real ANTES de confirmar.
+  const costoEnvio = tipoEntrega === "DELIVERY" ? (tienda?.costoEnvioDelivery || 0) : 0;
+
+  const totalUsd = useMemo(() => {
+    return subtotalUsd + costoEnvio;
+  }, [subtotalUsd, costoEnvio]);
 
   const totalBs = useMemo(() => {
     return totalUsd * tasa;
@@ -712,7 +737,11 @@ export default function CatalogoPublico() {
 
     setEnviandoPedido(true);
     try {
-      const tid = tienda?.tenantId || 2;
+      // Mismo identificador de la URL con el que se cargó el catálogo (el slug
+      // público) — el backend ya no resuelve tiendas por tenantId numérico
+      // (ver resolverLicencia), así que reusar ese id evita un 404 al enviar
+      // el pedido.
+      const tid = tenantId || "2";
       const payload = {
         clienteNombre: nombreCliente.trim(),
         clienteTelefono: telefonoCliente.trim(),
@@ -740,36 +769,28 @@ export default function CatalogoPublico() {
         body: JSON.stringify(payload)
       });
 
-      let numPedido = "PED-" + Math.floor(1000 + Math.random() * 9000);
-      let waUrl = "";
-
-      if (res.ok) {
-        const data = await res.json();
-        numPedido = data.numeroPedido;
-        waUrl = data.whatsappUrl;
+      // Antes, si el backend rechazaba el pedido (stock insuficiente, tienda no
+      // encontrada, error de validación), este código seguía de largo: inventaba
+      // un número de pedido y mostraba "orden confirmada" igual, sin que el
+      // pedido hubiera quedado guardado en ningún lado. Ahora un fallo real
+      // se muestra como lo que es.
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error || "No se pudo registrar el pedido. Intenta de nuevo.");
       }
-
-      if (!waUrl) {
-        const lineas = carrito
-          .map(
-            (it) =>
-              `- ${it.cantidad}x ${it.producto.nombre} (${it.tallaSeleccionada}) — $${(it.producto.precioUsd * it.cantidad).toFixed(2)}`
-          )
-          .join("\n");
-
-        const refText = numeroReferencia.trim() ? `\nReferencia Pago: ${numeroReferencia.trim()}` : "";
-        const mensajeWa = `*SOLICITUD DE PEDIDO - ${tienda?.nombreTienda.toUpperCase()}*\nPedido: #${numPedido}\nCliente: ${nombreCliente.trim()}\nTeléfono: ${telefonoCliente.trim()}\nEntrega: ${tipoEntrega === "DELIVERY" ? "Delivery a " + direccionEntrega.trim() : "Retiro en boutique"}\nMétodo de Pago: ${metodoPago}${refText}\n\n*Artículos:* \n${lineas}\n\nTotal USD: $${totalUsd.toFixed(2)}\nTotal Bs.: ${totalBs.toFixed(2)} Bs. (Tasa Oficial BCV ${tasa.toFixed(2)})\nNotas: ${notas.trim() || "Sin observaciones"}`;
-        const phone = tienda?.telefonoWhatsapp?.replace(/\D/g, "") || "584141234567";
-        waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(mensajeWa)}`;
-      }
+      const data = await res.json();
 
       setPedidoConfirmado({
-        numeroPedido: numPedido,
-        whatsappUrl: waUrl
+        numeroPedido: data.numeroPedido,
+        // El backend solo arma este link cuando la tienda configuró un
+        // teléfono de contacto real — si no, queda null y la pantalla de
+        // confirmación lo indica en vez de ofrecer un chat que no le llega
+        // a nadie (antes se fabricaba un número falso acá mismo).
+        whatsappUrl: data.whatsappUrl || null
       });
 
-      if (directoAWhatsApp && waUrl) {
-        window.open(waUrl, "_blank");
+      if (directoAWhatsApp && data.whatsappUrl) {
+        window.open(data.whatsappUrl, "_blank");
       }
       setCarrito([]);
     } catch (err: any) {
@@ -1319,19 +1340,23 @@ export default function CatalogoPublico() {
                   #{pedidoConfirmado.numeroPedido}
                 </h4>
                 <p className="text-xs text-neutral-500 mt-2 max-w-xs leading-relaxed">
-                  Tu orden ha sido registrada con los datos de entrega y monto oficial. Puedes abrir el chat de WhatsApp para coordinar el despacho inmediato.
+                  {pedidoConfirmado.whatsappUrl
+                    ? "Tu orden ha sido registrada con los datos de entrega y monto oficial. Puedes abrir el chat de WhatsApp para coordinar el despacho inmediato."
+                    : "Tu orden ha sido registrada con los datos de entrega y monto oficial. La tienda se pondrá en contacto contigo al teléfono que dejaste."}
                 </p>
 
                 <div className="w-full mt-6 space-y-3">
-                  <a
-                    href={pedidoConfirmado.whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg shadow-emerald-500/25 transition-all"
-                  >
-                    <SvgWhatsApp className="w-5 h-5" />
-                    <span>Abrir en WhatsApp</span>
-                  </a>
+                  {pedidoConfirmado.whatsappUrl && (
+                    <a
+                      href={pedidoConfirmado.whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg shadow-emerald-500/25 transition-all"
+                    >
+                      <SvgWhatsApp className="w-5 h-5" />
+                      <span>Abrir en WhatsApp</span>
+                    </a>
+                  )}
 
                   <button
                     type="button"
@@ -1623,6 +1648,16 @@ export default function CatalogoPublico() {
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs text-neutral-500 font-mono">
                     <span>Subtotal Divisas:</span>
+                    <span className="font-bold text-neutral-900">${subtotalUsd.toFixed(2)} USD</span>
+                  </div>
+                  {costoEnvio > 0 && (
+                    <div className="flex justify-between text-xs text-neutral-500 font-mono">
+                      <span>Envío (Delivery):</span>
+                      <span className="font-bold text-neutral-900">${costoEnvio.toFixed(2)} USD</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xs text-neutral-500 font-mono">
+                    <span>Total Divisas:</span>
                     <span className="font-bold text-neutral-900">${totalUsd.toFixed(2)} USD</span>
                   </div>
                   <div className="flex justify-between text-xs text-neutral-500 font-mono">

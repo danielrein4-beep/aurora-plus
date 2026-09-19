@@ -103,6 +103,15 @@ public class TenantProvisioningService {
         if (request.limiteUsuarios != null && request.limiteUsuarios > 0) {
             licencia.setLimiteUsuarios(request.limiteUsuarios);
         }
+        // El catálogo público (CatalogoPublicoController) solo resuelve tiendas por
+        // slug — nunca por tenantId numérico, para no permitir enumeración
+        // secuencial (IDOR). Sin esto, cada tenant nuevo nacía con slugCatalogo nulo
+        // y quedaba con el catálogo público inaccesible hasta que el dueño entrara
+        // manualmente a "Perfil de Tienda" a configurar uno — en la práctica, la
+        // mayoría nunca lo haría. Se genera acá, dentro del mismo advisory lock que
+        // ya serializa las altas de tenant, así la verificación de unicidad no tiene
+        // condición de carrera entre altas simultáneas.
+        licencia.setSlugCatalogo(generarSlugUnico(request.nombreEmpresa, nuevoTenantId));
 
         LicenciaTenant guardada = licenciaTenantRepository.save(licencia);
 
@@ -150,6 +159,26 @@ public class TenantProvisioningService {
         }
 
         return guardada;
+    }
+
+    /**
+     * Genera un slug de catálogo público único a partir del nombre comercial —
+     * misma normalización que la migración V52 (minúsculas, no-alfanumérico a
+     * guión, sin guiones al borde) para que un tenant migrado y uno nuevo se
+     * vean iguales. Si el nombre queda vacío tras normalizar, o ya existe, se
+     * le agrega el tenantId para garantizar unicidad sin volver a colisionar.
+     */
+    private String generarSlugUnico(String nombreEmpresa, Long tenantId) {
+        String base = nombreEmpresa == null ? "" : nombreEmpresa.trim().toLowerCase()
+            .replaceAll("[^a-z0-9]+", "-")
+            .replaceAll("^-+|-+$", "");
+        if (base.isBlank()) {
+            base = "tienda-" + tenantId;
+        }
+        if (licenciaTenantRepository.findBySlugCatalogo(base).isEmpty()) {
+            return base;
+        }
+        return base + "-" + tenantId;
     }
 
     private static final Set<String> VARIANTES_DE_SALUD = Set.of("odontologia");

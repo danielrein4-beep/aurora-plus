@@ -7,6 +7,7 @@ import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.modules.comercio.entities.PedidoWebComercio;
 import com.auroraplus.modules.comercio.repositories.PedidoWebComercioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,11 +38,18 @@ public class CatalogoGestionController {
         public String emailContacto;
         public String domicilioFiscal;
         public String slugCatalogo;
+        public java.math.BigDecimal costoEnvioDelivery;
     }
 
     @GetMapping("/perfil-tienda")
     public ResponseEntity<?> obtenerPerfilTienda() {
-        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO", "ADMINISTRADOR");
+        // "MEDICO" y "ADMINISTRADOR" quedaron acá por error (copy-paste): MEDICO
+        // es un rol exclusivo del módulo clínico sin motivo para tocar la
+        // configuración de Comercio, y "ADMINISTRADOR" no existe como rol válido
+        // en ningún otro controller (ver Usuario.Rol) — en un tenant con ambos
+        // módulos activos, un usuario MEDICO podía entrar a configurar la cuenta
+        // de Pago Móvil y ver/gestionar los pedidos web del negocio.
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
@@ -56,12 +64,13 @@ public class CatalogoGestionController {
         resp.put("domicilioFiscal", licencia.getDomicilioFiscal() != null ? licencia.getDomicilioFiscal() : "");
         resp.put("moduloPrincipal", licencia.getModuloPrincipal());
         resp.put("rif", licencia.getRif());
+        resp.put("costoEnvioDelivery", licencia.getCostoEnvioDelivery());
         return ResponseEntity.ok(resp);
     }
 
     @PostMapping("/perfil-tienda")
     public ResponseEntity<?> guardarPerfilTienda(@RequestBody PerfilTiendaRequest req) {
-        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO", "ADMINISTRADOR");
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
@@ -80,6 +89,9 @@ public class CatalogoGestionController {
         }
         if (req.domicilioFiscal != null) {
             licencia.setDomicilioFiscal(req.domicilioFiscal.trim());
+        }
+        if (req.costoEnvioDelivery != null && req.costoEnvioDelivery.compareTo(java.math.BigDecimal.ZERO) >= 0) {
+            licencia.setCostoEnvioDelivery(req.costoEnvioDelivery);
         }
         if (req.slugCatalogo != null && !req.slugCatalogo.isBlank()) {
             String nuevoSlug = req.slugCatalogo.trim().toLowerCase()
@@ -100,7 +112,17 @@ public class CatalogoGestionController {
             licencia.setSlugCatalogo(autoSlug);
         }
 
-        licenciaTenantRepository.save(licencia);
+        try {
+            licenciaTenantRepository.save(licencia);
+        } catch (DataIntegrityViolationException e) {
+            // El chequeo de unicidad de arriba (findBySlugCatalogo) no es atomico con
+            // este save — dos tenants pidiendo el mismo slug casi al mismo tiempo
+            // pueden pasar ambos ese chequeo antes de que ninguno haya guardado. El
+            // indice unico de la BD (V52) sigue siendo la garantia real; esto solo
+            // convierte esa colision, antes un 500 sin explicar, en el mismo
+            // mensaje amigable que ya se le muestra al usuario en el caso normal.
+            return ResponseEntity.badRequest().body(Map.of("error", "El enlace personalizado ya esta en uso por otro comercio — proba con otro."));
+        }
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("tenantId", tenantId);
@@ -110,6 +132,7 @@ public class CatalogoGestionController {
         resp.put("telefonoWhatsapp", licencia.getTelefonoContacto());
         resp.put("emailContacto", licencia.getEmailContacto());
         resp.put("domicilioFiscal", licencia.getDomicilioFiscal());
+        resp.put("costoEnvioDelivery", licencia.getCostoEnvioDelivery());
         return ResponseEntity.ok(resp);
     }
 
@@ -123,7 +146,7 @@ public class CatalogoGestionController {
 
     @GetMapping("/pago-movil")
     public ResponseEntity<?> obtenerConfigPagoMovil() {
-        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO", "ADMINISTRADOR");
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
@@ -139,7 +162,7 @@ public class CatalogoGestionController {
 
     @PostMapping("/pago-movil")
     public ResponseEntity<?> guardarConfigPagoMovil(@RequestBody ConfigPagoMovilRequest req) {
-        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO", "ADMINISTRADOR");
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
@@ -162,14 +185,14 @@ public class CatalogoGestionController {
 
     @GetMapping("/pedidos")
     public ResponseEntity<List<PedidoWebComercio>> listarPedidos() {
-        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO", "ADMINISTRADOR");
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(pedidoWebRepository.findByTenantIdOrderByFechaCreacionDesc(tenantId));
     }
 
     @PostMapping("/pedidos/{pedidoId:[0-9]+}/estado")
     public ResponseEntity<?> actualizarEstadoPedido(@PathVariable Long pedidoId, @RequestParam String estado) {
-        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO", "ADMINISTRADOR");
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         PedidoWebComercio p = pedidoWebRepository.findById(pedidoId).orElse(null);
         if (p == null || !p.getTenantId().equals(tenantId)) {

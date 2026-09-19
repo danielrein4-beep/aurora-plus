@@ -40,38 +40,21 @@ public class CatalogoPublicoController {
     private PedidoWebComercioRepository pedidoWebRepository;
 
     /**
-     * Resolucion segura de la tienda por slug publico (ej: "daniel-reina")
-     * o por identificador autorizado. Bloquea la enumeracion secuencial de IDs (IDOR).
+     * Resolucion segura de la tienda EXCLUSIVAMENTE por su slug publico (ej:
+     * "daniel-reina") — nunca por tenantId numerico. Antes existia un
+     * fallback que permitia el acceso por ID crudo si el tenant no tenia
+     * slug configurado (o si su slug coincidia con el patron "tienda-ID"),
+     * lo que dejaba a CUALQUIER tenant nuevo — el estado por defecto justo
+     * despues de registrarse, antes de entrar a "Perfil de Tienda" — enumerable
+     * secuencialmente via /catalogo/2, /3, /4... Ahora TenantProvisioningService
+     * genera un slug automaticamente para todo tenant nuevo (ver
+     * generarSlugUnico), asi que ya no hace falta ningun fallback: el catalogo
+     * publico solo es accesible por el slug real.
      */
     private LicenciaTenant resolverLicencia(String identificador) {
         if (identificador == null || identificador.isBlank()) return null;
         String ident = identificador.trim().toLowerCase();
-
-        // 1. Busqueda prioritaria por slug unico de catalogo
-        Optional<LicenciaTenant> porSlug = licenciaTenantRepository.findBySlugCatalogo(ident);
-        if (porSlug.isPresent()) {
-            return porSlug.get();
-        }
-
-        // 2. Si el identificador es numerico:
-        // Proteccion IDOR: solo se permite fallback numerico si el tenantId es 1 (demo/desarrollo)
-        // o si el slug configurado coincide con "tienda-ID". Si la tienda tiene un slug personalizado,
-        // no se permite acceder adivinando numeros secuenciales (ej: cambiar 47 por 48).
-        if (ident.matches("\\d+")) {
-            try {
-                Long tid = Long.parseLong(ident);
-                Optional<LicenciaTenant> porId = licenciaTenantRepository.findByTenantId(tid);
-                if (porId.isPresent()) {
-                    LicenciaTenant lic = porId.get();
-                    if (Long.valueOf(1L).equals(tid) || lic.getSlugCatalogo() == null || lic.getSlugCatalogo().equalsIgnoreCase("tienda-" + tid)) {
-                        return lic;
-                    }
-                    // Forzar el uso del slug oficial
-                    return null;
-                }
-            } catch (NumberFormatException ignored) {}
-        }
-        return null;
+        return licenciaTenantRepository.findBySlugCatalogo(ident).orElse(null);
     }
 
     @GetMapping("/{identificador}")
@@ -141,24 +124,35 @@ public class CatalogoPublicoController {
             productos.addAll(generarCatalogoModelo(tasaVes));
         }
 
-        // 4. Datos de Pago Movil del negocio
+        // 4. Datos de Pago Movil del negocio — "activo" exige que el tenant haya
+        // configurado su PROPIO telefono de Pago Movil, no solo tildado el
+        // interruptor. Antes, si faltaba, se rellenaba con un telefono/documento
+        // inventado ("04141112233") y se mostraba igual como si fuera la cuenta
+        // real — un cliente podia transferir dinero real a un numero que no le
+        // pertenece a nadie. El frontend ya oculta todo el bloque de Pago Movil
+        // cuando "activo" es false, asi que negarlo aca es suficiente.
+        boolean pagoMovilConfigurado = licencia.getPagoMovilTelefono() != null && !licencia.getPagoMovilTelefono().isBlank();
         Map<String, Object> pagoMovil = new LinkedHashMap<>();
-        pagoMovil.put("activo", licencia.isPagoMovilActivo());
-        pagoMovil.put("banco", licencia.getPagoMovilBanco() != null ? licencia.getPagoMovilBanco() : "0102 - Banco de Venezuela");
-        pagoMovil.put("telefono", licencia.getPagoMovilTelefono() != null ? licencia.getPagoMovilTelefono() : (licencia.getTelefonoContacto() != null ? licencia.getTelefonoContacto() : "04141112233"));
-        pagoMovil.put("documento", licencia.getPagoMovilDocumento() != null ? licencia.getPagoMovilDocumento() : (licencia.getRif() != null ? licencia.getRif() : "J-12345678-0"));
+        pagoMovil.put("activo", licencia.isPagoMovilActivo() && pagoMovilConfigurado);
+        pagoMovil.put("banco", licencia.getPagoMovilBanco() != null ? licencia.getPagoMovilBanco() : "");
+        pagoMovil.put("telefono", licencia.getPagoMovilTelefono() != null ? licencia.getPagoMovilTelefono() : "");
+        pagoMovil.put("documento", licencia.getPagoMovilDocumento() != null ? licencia.getPagoMovilDocumento() : (licencia.getRif() != null ? licencia.getRif() : ""));
         pagoMovil.put("titular", licencia.getPagoMovilTitular() != null ? licencia.getPagoMovilTitular() : licencia.getNombreEmpresa());
 
         Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("tenantId", tenantId);
-        resp.put("slugCatalogo", licencia.getSlugCatalogo() != null ? licencia.getSlugCatalogo() : "tienda-" + tenantId);
+        // Nunca se expone el tenantId real en la respuesta publica — antes se
+        // devolvia siempre, lo que le regalaba a cualquiera el mapeo slug->id
+        // necesario para intentar la enumeracion numerica que resolverLicencia
+        // ya bloquea. El frontend usa el slug de la URL para todo, no este campo.
+        resp.put("slugCatalogo", licencia.getSlugCatalogo());
         resp.put("nombreTienda", licencia.getNombreEmpresa());
         resp.put("slogan", licencia.getDomicilioFiscal() != null ? licencia.getDomicilioFiscal() : "");
         resp.put("moduloPrincipal", licencia.getModuloPrincipal());
-        resp.put("telefonoWhatsapp", licencia.getTelefonoContacto() != null ? licencia.getTelefonoContacto() : "04141234567");
+        resp.put("telefonoWhatsapp", licencia.getTelefonoContacto());
         resp.put("emailContacto", licencia.getEmailContacto());
         resp.put("logoBase64", licencia.getLogoBase64());
         resp.put("tasaVes", tasaVes);
+        resp.put("costoEnvioDelivery", licencia.getCostoEnvioDelivery());
         resp.put("pagoMovil", pagoMovil);
         resp.put("productos", productos);
 
@@ -220,24 +214,41 @@ public class CatalogoPublicoController {
         public List<LineaPedidoDto> items;
     }
 
-    private BigDecimal resolverPrecioReal(Long tenantId, String productoId, BigDecimal tasaVes) {
+    /** Precio y stock reales de un producto, leidos de la BD en el momento del pedido — nunca de lo que mande el cliente. */
+    private static class ProductoResuelto {
+        BigDecimal precio;
+        BigDecimal stock; // null = sin control de stock (catalogo modelo de demo)
+    }
+
+    private ProductoResuelto resolverProductoReal(Long tenantId, String productoId, BigDecimal tasaVes) {
         if (productoId == null) return null;
         try {
             if (productoId.startsWith("rep-") && repuestoItemRepository != null) {
                 Long id = Long.parseLong(productoId.substring(4));
                 RepuestoItem item = repuestoItemRepository.findById(id).orElse(null);
                 if (item == null || !tenantId.equals(item.getTenantId())) return null;
-                return item.getPrecioVenta() != null ? item.getPrecioVenta() : BigDecimal.ZERO;
+                ProductoResuelto r = new ProductoResuelto();
+                r.precio = item.getPrecioVenta() != null ? item.getPrecioVenta() : BigDecimal.ZERO;
+                r.stock = item.getStockActual() != null ? item.getStockActual() : BigDecimal.ZERO;
+                return r;
             }
             if (productoId.startsWith("art-") && articuloRepository != null) {
                 Long id = Long.parseLong(productoId.substring(4));
                 Articulo art = articuloRepository.findById(id).orElse(null);
                 if (art == null || !tenantId.equals(art.getTenantId())) return null;
-                return art.getPrecioVenta() != null ? art.getPrecioVenta() : BigDecimal.ZERO;
+                ProductoResuelto r = new ProductoResuelto();
+                r.precio = art.getPrecioVenta() != null ? art.getPrecioVenta() : BigDecimal.ZERO;
+                r.stock = art.getStockActual() != null ? art.getStockActual() : BigDecimal.ZERO;
+                return r;
             }
             if (productoId.startsWith("mod-") && Long.valueOf(1L).equals(tenantId)) {
                 for (Map<String, Object> p : generarCatalogoModelo(tasaVes)) {
-                    if (productoId.equals(p.get("id"))) return (BigDecimal) p.get("precioUsd");
+                    if (productoId.equals(p.get("id"))) {
+                        ProductoResuelto r = new ProductoResuelto();
+                        r.precio = (BigDecimal) p.get("precioUsd");
+                        r.stock = null; // catalogo de demo, sin inventario real que controlar
+                        return r;
+                    }
                 }
             }
         } catch (NumberFormatException ignored) { /* id malformado -> item descartado */ }
@@ -287,20 +298,40 @@ public class CatalogoPublicoController {
 
         BigDecimal totalUsdReal = BigDecimal.ZERO;
         for (LineaPedidoDto it : req.items) {
-            BigDecimal precioReal = resolverPrecioReal(tenantId, it.productoId, tasaVes);
-            if (precioReal == null) continue;
+            ProductoResuelto producto = resolverProductoReal(tenantId, it.productoId, tasaVes);
+            if (producto == null) continue;
             BigDecimal cantidad = it.cantidad != null && it.cantidad.compareTo(BigDecimal.ZERO) > 0 ? it.cantidad : BigDecimal.ONE;
-            BigDecimal subtotal = precioReal.multiply(cantidad).setScale(2, RoundingMode.HALF_UP);
+            String nombre = it.nombre != null ? it.nombre : "Articulo";
+
+            // El limite de cantidad en el carrito es solo del lado del cliente
+            // (facil de saltarse mandando el POST directo) — sin esto se podia
+            // pedir cualquier cantidad de un articulo con stock 5, por ejemplo.
+            if (producto.stock != null && cantidad.compareTo(producto.stock) > 0) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "error", "No hay suficiente stock de \"" + nombre + "\" — disponible: " + producto.stock + ", solicitado: " + cantidad
+                ));
+            }
+
+            BigDecimal subtotal = producto.precio.multiply(cantidad).setScale(2, RoundingMode.HALF_UP);
             totalUsdReal = totalUsdReal.add(subtotal);
 
-            String nombre = it.nombre != null ? it.nombre : "Articulo";
-            itemsTxt.append(cantidad).append("x ").append(nombre).append(" ($").append(precioReal).append("); ");
+            itemsTxt.append(cantidad).append("x ").append(nombre).append(" ($").append(producto.precio).append("); ");
             msgWhatsapp.append("- ").append(cantidad).append("x ").append(nombre)
                     .append(" ($").append(subtotal).append(" USD)\n");
         }
 
         if (totalUsdReal.compareTo(BigDecimal.ZERO) == 0) {
             return ResponseEntity.badRequest().body(Map.of("error", "Ninguno de los articulos del pedido pudo validarse contra el catalogo real."));
+        }
+
+        // El costo de envio nunca se sumaba a nada — elegir "Delivery" o "Retiro"
+        // daba exactamente el mismo total. Se recalcula server-side (nunca se
+        // confia en lo que mande el cliente) y solo aplica si eligio Delivery.
+        if ("DELIVERY".equalsIgnoreCase(pedido.getTipoEntrega()) && licencia.getCostoEnvioDelivery() != null
+                && licencia.getCostoEnvioDelivery().compareTo(BigDecimal.ZERO) > 0) {
+            totalUsdReal = totalUsdReal.add(licencia.getCostoEnvioDelivery());
+            itemsTxt.append("Envio: $").append(licencia.getCostoEnvioDelivery()).append("; ");
+            msgWhatsapp.append("- Costo de envio: $").append(licencia.getCostoEnvioDelivery()).append(" USD\n");
         }
 
         pedido.setTotalUsd(totalUsdReal);
@@ -326,9 +357,9 @@ public class CatalogoPublicoController {
         msgWhatsapp.append("Metodo de Pago: ").append(pedido.getMetodoPago()).append("\n");
 
         if ("PAGO_MOVIL".equalsIgnoreCase(pedido.getMetodoPago())) {
-            String bco = licencia.getPagoMovilBanco() != null ? licencia.getPagoMovilBanco() : "0102 - Banco de Venezuela";
-            String doc = licencia.getPagoMovilDocumento() != null ? licencia.getPagoMovilDocumento() : (licencia.getRif() != null ? licencia.getRif() : "");
-            String telf = licencia.getPagoMovilTelefono() != null ? licencia.getPagoMovilTelefono() : (licencia.getTelefonoContacto() != null ? licencia.getTelefonoContacto() : "");
+            String bco = licencia.getPagoMovilBanco() != null ? licencia.getPagoMovilBanco() : "(sin configurar)";
+            String doc = licencia.getPagoMovilDocumento() != null ? licencia.getPagoMovilDocumento() : (licencia.getRif() != null ? licencia.getRif() : "(sin configurar)");
+            String telf = licencia.getPagoMovilTelefono() != null ? licencia.getPagoMovilTelefono() : "(sin configurar)";
             msgWhatsapp.append("\n*DATOS PAGO MOVIL TIENDA:*\n");
             msgWhatsapp.append("Banco: ").append(bco).append("\n");
             msgWhatsapp.append("Documento/RIF: ").append(doc).append("\n");
@@ -341,19 +372,22 @@ public class CatalogoPublicoController {
         }
         msgWhatsapp.append("\nAurora Plus - Gestion Comercial");
 
-        String destPhone = licencia.getTelefonoContacto();
-        if (destPhone == null || destPhone.isBlank()) {
-            destPhone = "584140000000";
+        // El pedido YA quedo guardado arriba pase lo que pase con el telefono —
+        // el WhatsApp es solo un aviso rapido al comerciante, nunca la fuente de
+        // verdad. Antes, si no tenia telefono de contacto configurado, se
+        // fabricaba un numero falso ("584140000000") y se generaba igual un
+        // link de WhatsApp que no le llegaba a nadie, sin avisar de eso.
+        String whatsappUrl = null;
+        if (licencia.getTelefonoContacto() != null && !licencia.getTelefonoContacto().isBlank()) {
+            String cleanPhone = licencia.getTelefonoContacto().replaceAll("[^0-9]", "");
+            if (cleanPhone.startsWith("0")) {
+                cleanPhone = "58" + cleanPhone.substring(1);
+            } else if (!cleanPhone.startsWith("58") && cleanPhone.length() == 10) {
+                cleanPhone = "58" + cleanPhone;
+            }
+            String encodedMsg = URLEncoder.encode(msgWhatsapp.toString(), StandardCharsets.UTF_8);
+            whatsappUrl = "https://wa.me/" + cleanPhone + "?text=" + encodedMsg;
         }
-        String cleanPhone = destPhone.replaceAll("[^0-9]", "");
-        if (cleanPhone.startsWith("0")) {
-            cleanPhone = "58" + cleanPhone.substring(1);
-        } else if (!cleanPhone.startsWith("58") && cleanPhone.length() == 10) {
-            cleanPhone = "58" + cleanPhone;
-        }
-
-        String encodedMsg = URLEncoder.encode(msgWhatsapp.toString(), StandardCharsets.UTF_8);
-        String whatsappUrl = "https://wa.me/" + cleanPhone + "?text=" + encodedMsg;
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("pedidoId", guardado.getId());
