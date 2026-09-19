@@ -39,12 +39,48 @@ public class CatalogoPublicoController {
     @Autowired
     private PedidoWebComercioRepository pedidoWebRepository;
 
-    @GetMapping("/{tenantId:[0-9]+}")
-    public ResponseEntity<?> obtenerCatalogoPublico(@PathVariable Long tenantId) {
-        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
+    /**
+     * Resolucion segura de la tienda por slug publico (ej: "daniel-reina")
+     * o por identificador autorizado. Bloquea la enumeracion secuencial de IDs (IDOR).
+     */
+    private LicenciaTenant resolverLicencia(String identificador) {
+        if (identificador == null || identificador.isBlank()) return null;
+        String ident = identificador.trim().toLowerCase();
+
+        // 1. Busqueda prioritaria por slug unico de catalogo
+        Optional<LicenciaTenant> porSlug = licenciaTenantRepository.findBySlugCatalogo(ident);
+        if (porSlug.isPresent()) {
+            return porSlug.get();
+        }
+
+        // 2. Si el identificador es numerico:
+        // Proteccion IDOR: solo se permite fallback numerico si el tenantId es 1 (demo/desarrollo)
+        // o si el slug configurado coincide con "tienda-ID". Si la tienda tiene un slug personalizado,
+        // no se permite acceder adivinando numeros secuenciales (ej: cambiar 47 por 48).
+        if (ident.matches("\\d+")) {
+            try {
+                Long tid = Long.parseLong(ident);
+                Optional<LicenciaTenant> porId = licenciaTenantRepository.findByTenantId(tid);
+                if (porId.isPresent()) {
+                    LicenciaTenant lic = porId.get();
+                    if (Long.valueOf(1L).equals(tid) || lic.getSlugCatalogo() == null || lic.getSlugCatalogo().equalsIgnoreCase("tienda-" + tid)) {
+                        return lic;
+                    }
+                    // Forzar el uso del slug oficial
+                    return null;
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+        return null;
+    }
+
+    @GetMapping("/{identificador}")
+    public ResponseEntity<?> obtenerCatalogoPublico(@PathVariable String identificador) {
+        LicenciaTenant licencia = resolverLicencia(identificador);
         if (licencia == null) {
             return ResponseEntity.status(404).body(Map.of("error", "Tienda no encontrada"));
         }
+        Long tenantId = licencia.getTenantId();
 
         BigDecimal tasaVes = BigDecimal.valueOf(50.0);
         if (tasaCambioRepository != null) {
@@ -100,8 +136,7 @@ public class CatalogoPublicoController {
             }
         }
 
-        // 3. Si no hay items cargados en BD, catalogo modelo unicamete para entorno de pruebas (tenantId == 1)
-        // Para cualquier otro tenant en produccion, se respeta estrictamente su inventario real para evitar alucinaciones
+        // 3. Si no hay items cargados en BD, catalogo modelo unicamente para entorno de pruebas (tenantId == 1)
         if (productos.isEmpty() && Long.valueOf(1L).equals(tenantId)) {
             productos.addAll(generarCatalogoModelo(tasaVes));
         }
@@ -116,7 +151,9 @@ public class CatalogoPublicoController {
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("tenantId", tenantId);
+        resp.put("slugCatalogo", licencia.getSlugCatalogo() != null ? licencia.getSlugCatalogo() : "tienda-" + tenantId);
         resp.put("nombreTienda", licencia.getNombreEmpresa());
+        resp.put("slogan", licencia.getDomicilioFiscal() != null ? licencia.getDomicilioFiscal() : "");
         resp.put("moduloPrincipal", licencia.getModuloPrincipal());
         resp.put("telefonoWhatsapp", licencia.getTelefonoContacto() != null ? licencia.getTelefonoContacto() : "04141234567");
         resp.put("emailContacto", licencia.getEmailContacto());
@@ -183,17 +220,6 @@ public class CatalogoPublicoController {
         public List<LineaPedidoDto> items;
     }
 
-    // La configuracion de Pago Movil (GET/POST) y la gestion de pedidos (listar, cambiar
-    // estado) se movieron a CatalogoGestionController bajo /api/comercio/catalogo — estos
-    // endpoints exponian datos de clientes y, mas grave, permitian a cualquiera en internet
-    // reescribir la cuenta bancaria del negocio sin ninguna autenticacion (solo requerian
-    // adivinar el tenantId). Solo la CREACION de un pedido (abajo) es legitimamente publica:
-    // la hace un cliente sin sesion desde el catalogo.
-
-    /** Precio real en USD de un producto del catalogo, resuelto en el servidor a partir de
-     * su id ("rep-N", "art-N" o "mod-N" para el catalogo de demo) — nunca del precio que
-     * manda el navegador, que cualquiera puede alterar antes de enviarlo. Null si el id no
-     * corresponde a ningun producto real: ese item se descarta del pedido. */
     private BigDecimal resolverPrecioReal(Long tenantId, String productoId, BigDecimal tasaVes) {
         if (productoId == null) return null;
         try {
@@ -218,12 +244,14 @@ public class CatalogoPublicoController {
         return null;
     }
 
-    @PostMapping("/{tenantId:[0-9]+}/pedidos")
-    public ResponseEntity<?> registrarPedidoWeb(@PathVariable Long tenantId, @RequestBody CrearPedidoWebRequest req) {
-        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
+    @PostMapping("/{identificador}/pedidos")
+    public ResponseEntity<?> registrarPedidoWeb(@PathVariable String identificador, @RequestBody CrearPedidoWebRequest req) {
+        LicenciaTenant licencia = resolverLicencia(identificador);
         if (licencia == null) {
             return ResponseEntity.status(404).body(Map.of("error", "Tienda no encontrada"));
         }
+        Long tenantId = licencia.getTenantId();
+
         if (req.items == null || req.items.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "El pedido no tiene articulos."));
         }
@@ -251,9 +279,6 @@ public class CatalogoPublicoController {
         pedido.setTasaCambio(tasaVes);
         pedido.setNotas(req.notas != null ? req.notas : "");
 
-        // Recalcular cada linea y el total a partir del precio REAL en el catalogo — nunca
-        // confiar en precioUnitarioUsd/subtotalUsd/totalUsd que manda el navegador, que
-        // cualquiera puede editar antes de enviar el pedido para pagar de menos.
         StringBuilder itemsTxt = new StringBuilder();
         StringBuilder msgWhatsapp = new StringBuilder();
         msgWhatsapp.append("*NUEVO PEDIDO WEB - ").append(licencia.getNombreEmpresa().toUpperCase()).append("*\n");
@@ -263,7 +288,7 @@ public class CatalogoPublicoController {
         BigDecimal totalUsdReal = BigDecimal.ZERO;
         for (LineaPedidoDto it : req.items) {
             BigDecimal precioReal = resolverPrecioReal(tenantId, it.productoId, tasaVes);
-            if (precioReal == null) continue; // producto invalido/de otro tenant: se ignora
+            if (precioReal == null) continue;
             BigDecimal cantidad = it.cantidad != null && it.cantidad.compareTo(BigDecimal.ZERO) > 0 ? it.cantidad : BigDecimal.ONE;
             BigDecimal subtotal = precioReal.multiply(cantidad).setScale(2, RoundingMode.HALF_UP);
             totalUsdReal = totalUsdReal.add(subtotal);
@@ -300,7 +325,6 @@ public class CatalogoPublicoController {
         }
         msgWhatsapp.append("Metodo de Pago: ").append(pedido.getMetodoPago()).append("\n");
 
-        // Si es Pago Movil, adjuntar los datos del comercio en el WhatsApp
         if ("PAGO_MOVIL".equalsIgnoreCase(pedido.getMetodoPago())) {
             String bco = licencia.getPagoMovilBanco() != null ? licencia.getPagoMovilBanco() : "0102 - Banco de Venezuela";
             String doc = licencia.getPagoMovilDocumento() != null ? licencia.getPagoMovilDocumento() : (licencia.getRif() != null ? licencia.getRif() : "");
@@ -340,5 +364,4 @@ public class CatalogoPublicoController {
 
         return ResponseEntity.ok(resp);
     }
-
 }

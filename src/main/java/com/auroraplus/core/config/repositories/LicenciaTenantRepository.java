@@ -12,6 +12,7 @@ import java.util.Optional;
 @Repository
 public interface LicenciaTenantRepository extends JpaRepository<LicenciaTenant, Long> {
     Optional<LicenciaTenant> findByTenantId(Long tenantId);
+    Optional<LicenciaTenant> findBySlugCatalogo(String slugCatalogo);
 
     @Query("SELECT COALESCE(MAX(l.tenantId), 0) FROM LicenciaTenant l")
     Long buscarMaximoTenantId();

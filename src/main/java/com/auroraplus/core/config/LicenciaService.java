@@ -124,9 +124,15 @@ public class LicenciaService {
             boolean habilitado = moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, pathModulo)
                 .map(ModuloTenant::isActivo)
                 .orElse(false);
+            if (!habilitado && "comercio".equals(pathModulo)) {
+                habilitado = moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "ferreteria").map(ModuloTenant::isActivo).orElse(false)
+                        || moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "repuestos").map(ModuloTenant::isActivo).orElse(false)
+                        || moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "moda").map(ModuloTenant::isActivo).orElse(false)
+                        || moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "tamanaco-comercial").map(ModuloTenant::isActivo).orElse(false);
+            }
             if (!habilitado) {
                 return ResultadoValidacion.bloqueado(403,
-                    "Este negocio no tiene contratado el módulo '" + pathModulo
+                    "Este negocio no tiene contratado el modulo '" + pathModulo
                         + "'. Contacte al administrador si desea activarlo.");
             }
         }

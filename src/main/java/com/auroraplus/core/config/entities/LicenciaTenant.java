@@ -137,6 +137,9 @@ public class LicenciaTenant {
     @Column(name = "whatsapp_webhook_verify_token", length = 100)
     private String whatsappWebhookVerifyToken;
 
+    @Column(name = "slug_catalogo", unique = true, length = 100)
+    private String slugCatalogo;
+
     // WhatsApp Business Cloud API (Meta) del NEGOCIO — cada tenant conecta SU
     // PROPIA cuenta de Meta para automatizar el recordatorio de citas por
     // WhatsApp (antes solo un link wa.me que la secretaria mandaba a mano).
@@ -252,4 +255,7 @@ public class LicenciaTenant {
     public void setWhatsappIaPoliticaDelivery(String whatsappIaPoliticaDelivery) { this.whatsappIaPoliticaDelivery = whatsappIaPoliticaDelivery; }
     public String getWhatsappWebhookVerifyToken() { return whatsappWebhookVerifyToken; }
     public void setWhatsappWebhookVerifyToken(String whatsappWebhookVerifyToken) { this.whatsappWebhookVerifyToken = whatsappWebhookVerifyToken; }
+
+    public String getSlugCatalogo() { return slugCatalogo; }
+    public void setSlugCatalogo(String slugCatalogo) { this.slugCatalogo = slugCatalogo; }
 }

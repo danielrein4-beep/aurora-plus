@@ -86,12 +86,14 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
 
   // Perfil Tienda
   const [nombreEmpresa, setNombreEmpresa] = useState(nombreNegocio || "");
+  const [slugCatalogo, setSlugCatalogo] = useState("");
   const [logoBase64, setLogoBase64] = useState("");
   const [telefonoWhatsapp, setTelefonoWhatsapp] = useState("");
   const [emailContacto, setEmailContacto] = useState("");
   const [slogan, setSlogan] = useState("");
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [mensajePerfil, setMensajePerfil] = useState<string | null>(null);
+  const [errorPerfil, setErrorPerfil] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Formulario Pago Movil
@@ -102,7 +104,8 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
   const [guardandoPm, setGuardandoPm] = useState(false);
   const [mensajePm, setMensajePm] = useState<string | null>(null);
 
-  const urlPublica = `${window.location.origin}/catalogo/${tenantId}`;
+  const identificadorActivo = slugCatalogo || (tenantId ? String(tenantId) : "");
+  const urlPublica = `${window.location.origin}/catalogo/${identificadorActivo}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(urlPublica)}&color=0f172a&bgcolor=f8fafc`;
 
   useEffect(() => {
@@ -126,6 +129,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
       .then((r) => r.json())
       .then((data) => {
         if (data.nombreEmpresa) setNombreEmpresa(data.nombreEmpresa);
+        if (data.slugCatalogo) setSlugCatalogo(data.slugCatalogo);
         if (data.logoBase64) setLogoBase64(data.logoBase64);
         if (data.telefonoWhatsapp) setTelefonoWhatsapp(data.telefonoWhatsapp);
         if (data.emailContacto) setEmailContacto(data.emailContacto);
@@ -162,26 +166,33 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
     e.preventDefault();
     setGuardandoPerfil(true);
     setMensajePerfil(null);
+    setErrorPerfil(false);
     try {
       const res = await fetch(`/api/comercio/catalogo/perfil-tienda`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${obtenerTokenSesion()}` },
         body: JSON.stringify({
           nombreEmpresa: nombreEmpresa.trim(),
+          slugCatalogo: slugCatalogo.trim(),
           logoBase64: logoBase64,
           telefonoWhatsapp: telefonoWhatsapp.trim(),
           emailContacto: emailContacto.trim(),
           domicilioFiscal: slogan.trim()
         })
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setMensajePerfil("Perfil y Logo del catálogo actualizados con éxito.");
+        if (data.slugCatalogo) setSlugCatalogo(data.slugCatalogo);
+        setErrorPerfil(false);
+        setMensajePerfil("Perfil y enlace del catalogo actualizados con exito.");
         setTimeout(() => setMensajePerfil(null), 4000);
       } else {
-        throw new Error("Error al guardar perfil");
+        setErrorPerfil(true);
+        setMensajePerfil(data.error || "No se pudo guardar la configuracion de la tienda.");
       }
     } catch {
-      setMensajePerfil("No se pudo guardar la configuración de la tienda.");
+      setErrorPerfil(true);
+      setMensajePerfil("No se pudo conectar con el servidor para guardar la tienda.");
     } finally {
       setGuardandoPerfil(false);
     }
@@ -337,7 +348,11 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
         {tab === "perfil" && (
           <form onSubmit={handleGuardarPerfil} className="space-y-4">
             {mensajePerfil && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold text-center">
+              <div className={`p-3 rounded-xl border text-xs font-bold text-center ${
+                errorPerfil
+                  ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+              }`}>
                 {mensajePerfil}
               </div>
             )}
@@ -401,6 +416,27 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
                 placeholder="Ej: Óptica Visión Real / Ferretería Central"
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:border-slate-900 dark:focus:border-white"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Enlace Personalizado del Catalogo (Slug Branded)
+              </label>
+              <div className="flex items-center rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 focus-within:border-slate-900 dark:focus-within:border-white">
+                <span className="text-xs text-slate-400 font-mono select-none mr-1 truncate max-w-[200px] sm:max-w-none">
+                  {typeof window !== 'undefined' ? `${window.location.origin}/catalogo/` : '/catalogo/'}
+                </span>
+                <input
+                  type="text"
+                  value={slugCatalogo}
+                  onChange={(e) => setSlugCatalogo(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="daniel-reina"
+                  className="bg-transparent flex-1 text-xs text-slate-900 dark:text-white font-mono outline-none"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Enlace exclusivo para tus clientes. Protege el ID de base de datos contra accesos secuenciales indebidos.
+              </p>
             </div>
 
             <div>
