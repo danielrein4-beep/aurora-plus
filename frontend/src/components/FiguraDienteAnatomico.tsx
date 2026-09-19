@@ -81,8 +81,8 @@ export default function FiguraDienteAnatomico({
     estado === "ENDODONCIA" ? "#a855f7" :
     estado === "EXTRACCION_INDICADA" ? "#f97316" :
     estado === "IMPLANTE" ? "#14b8a6" :
-    estado === "AUSENTE" ? "#64748b" :
-    "#10b981"; // Sano
+    estado === "AUSENTE" ? "#94a3b8" :
+    "#64748b"; // Sano: contorno anatomico neutro
 
   const rellenoEsmalte =
     estado === "AUSENTE" ? "transparent" :
@@ -140,7 +140,8 @@ export default function FiguraDienteAnatomico({
           strokeDasharray={strokeDash}
           strokeLinecap="round"
           strokeLinejoin="round"
-          opacity={estado === "AUSENTE" ? 0.4 : 0.9}
+          fill={estado === "AUSENTE" ? "none" : "#f1f5f9"}
+          opacity={estado === "AUSENTE" ? 0.4 : 1}
         >
           {/* INCISIVO */}
           {tipo === "incisivo" && (
@@ -206,7 +207,7 @@ export default function FiguraDienteAnatomico({
         strokeDasharray={strokeDash}
         strokeLinecap="round"
         strokeLinejoin="round"
-        fill={estado === "CORONA" ? "#fef08a" : "none"}
+        fill={estado === "CORONA" ? "#fef08a" : estado === "AUSENTE" ? "none" : "#ffffff"}
       >
         {/* INCISIVO */}
         {tipo === "incisivo" && (

@@ -17,7 +17,7 @@ const ARCADA_SUPERIOR_DECIDUA = [55, 54, 53, 52, 51, 61, 62, 63, 64, 65];
 const ARCADA_INFERIOR_DECIDUA = [85, 84, 83, 82, 81, 71, 72, 73, 74, 75];
 
 export const ESTADO_INFO: Record<EstadoDiente, { label: string; color: string; bg: string; badge: string }> = {
-  SANO: { label: "Sano", color: "#10b981", bg: "bg-emerald-100/60 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400", badge: "border-emerald-500/30" },
+  SANO: { label: "Sano", color: "#10b981", bg: "bg-white hover:bg-slate-50 dark:bg-slate-800/90 dark:hover:bg-slate-700/90 text-slate-800 dark:text-white border-slate-200/90 dark:border-white/15 shadow-xs", badge: "border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
   CARIES: { label: "Caries", color: "#ef4444", bg: "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400", badge: "border-red-500/30" },
   OBTURADO: { label: "Obturado", color: "#0ea5e9", bg: "bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400", badge: "border-sky-500/30" },
   AUSENTE: { label: "Ausente", color: "#64748b", bg: "bg-slate-200 dark:bg-white/5 text-slate-500 dark:text-slate-400", badge: "border-slate-500/30" },
