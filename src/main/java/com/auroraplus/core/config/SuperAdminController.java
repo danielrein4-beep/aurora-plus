@@ -67,6 +67,9 @@ public class SuperAdminController {
     @Autowired(required = false)
     private com.auroraplus.core.auditoria.services.RegistroAuditoriaService registroAuditoriaService;
 
+    @Autowired(required = false)
+    private com.auroraplus.core.auditoria.repositories.RegistroAuditoriaRepository registroAuditoriaRepository;
+
     @GetMapping
     public List<LicenciaTenant> listar() {
         List<LicenciaTenant> lista = licenciaTenantRepository.findAll();
@@ -361,7 +364,18 @@ public class SuperAdminController {
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
         licencia.setActiva(true);
-        return ResponseEntity.ok(licenciaTenantRepository.save(licencia));
+        LicenciaTenant res = licenciaTenantRepository.save(licencia);
+        if (registroAuditoriaService != null) {
+            registroAuditoriaService.registrar(
+                tenantId,
+                "SUPER_ADMIN",
+                "ACTIVAR",
+                "LicenciaTenant",
+                tenantId,
+                "Reactivacion administrativa del negocio: " + licencia.getNombreEmpresa()
+            );
+        }
+        return ResponseEntity.ok(res);
     }
 
     @PostMapping("/{tenantId}/desactivar")
@@ -369,7 +383,18 @@ public class SuperAdminController {
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
         licencia.setActiva(false);
-        return ResponseEntity.ok(licenciaTenantRepository.save(licencia));
+        LicenciaTenant res = licenciaTenantRepository.save(licencia);
+        if (registroAuditoriaService != null) {
+            registroAuditoriaService.registrar(
+                tenantId,
+                "SUPER_ADMIN",
+                "SUSPENDER",
+                "LicenciaTenant",
+                tenantId,
+                "Suspension administrativa del negocio: " + licencia.getNombreEmpresa()
+            );
+        }
+        return ResponseEntity.ok(res);
     }
 
     @PostMapping("/{tenantId}/renovar")
@@ -1074,4 +1099,38 @@ public class SuperAdminController {
         return ResponseEntity.ok(respuesta);
     }
 
+
+    @GetMapping("/auditoria")
+    public ResponseEntity<Map<String, Object>> listarAuditoriaGlobal(
+            @RequestParam(required = false) Long tenantId,
+            @RequestParam(required = false) String modulo,
+            @RequestParam(required = false) String accion,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "50") int tamano) {
+        if (registroAuditoriaRepository == null) {
+            return ResponseEntity.ok(Map.of("content", Collections.emptyList(), "totalElements", 0, "totalPages", 0, "number", 0));
+        }
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                pagina, Math.min(tamano, 200), org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "fecha"));
+
+        org.springframework.data.domain.Page<com.auroraplus.core.auditoria.entities.RegistroAuditoria> page;
+        if (tenantId != null && modulo != null && !modulo.isBlank()) {
+            page = registroAuditoriaRepository.findByTenantIdAndModuloOrderByFechaDesc(tenantId, modulo, pageable);
+        } else if (tenantId != null) {
+            page = registroAuditoriaRepository.findByTenantIdOrderByFechaDesc(tenantId, pageable);
+        } else if (modulo != null && !modulo.isBlank()) {
+            page = registroAuditoriaRepository.findByModuloOrderByFechaDesc(modulo, pageable);
+        } else if (accion != null && !accion.isBlank()) {
+            page = registroAuditoriaRepository.findByAccionOrderByFechaDesc(accion, pageable);
+        } else {
+            page = registroAuditoriaRepository.findAllByOrderByFechaDesc(pageable);
+        }
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("content", page.getContent());
+        resp.put("totalElements", page.getTotalElements());
+        resp.put("totalPages", page.getTotalPages());
+        resp.put("number", page.getNumber());
+        return ResponseEntity.ok(resp);
+    }
 }

@@ -4423,3 +4423,57 @@ export async function enviarMensajeTicketTenant(ticketId: number, contenido: str
   if (!res.ok) throw new Error("Error al enviar mensaje");
   return res.json();
 }
+
+// ==========================================
+// AUDITORIA GLOBAL Y SOPORTE IMPERSONACION (SUPERADMIN)
+// ==========================================
+
+export interface RegistroAuditoriaItem {
+  id: number;
+  tenantId: number;
+  fecha: string;
+  modulo: string;
+  accion: string;
+  entidad: string;
+  entidadId?: string;
+  descripcion: string;
+  usuario: string;
+  rolUsuario?: string;
+}
+
+export async function listarAuditoriaGlobalSuperAdmin(params?: {
+  tenantId?: number;
+  modulo?: string;
+  accion?: string;
+  pagina?: number;
+  tamano?: number;
+}): Promise<{ content: RegistroAuditoriaItem[]; totalElements: number; totalPages: number; number: number }> {
+  const qs = new URLSearchParams();
+  if (params?.tenantId) qs.append("tenantId", String(params.tenantId));
+  if (params?.modulo) qs.append("modulo", params.modulo);
+  if (params?.accion) qs.append("accion", params.accion);
+  if (params?.pagina !== undefined) qs.append("pagina", String(params.pagina));
+  if (params?.tamano) qs.append("tamano", String(params.tamano));
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return requestSuperAdmin(`/api/super-admin/tenants/auditoria${query}`);
+}
+
+export function estaImpersonando(): boolean {
+  return sessionStorage.getItem("aurora_impersonando") === "true";
+}
+
+export function obtenerDatosImpersonacion(): { tenantNombre: string; tenantId: string } | null {
+  if (!estaImpersonando()) return null;
+  return {
+    tenantNombre: sessionStorage.getItem("aurora_impersonando_tenant_nombre") || "Negocio",
+    tenantId: sessionStorage.getItem("aurora_impersonando_tenant_id") || "",
+  };
+}
+
+export function salirDeImpersonacion(): void {
+  sessionStorage.removeItem("aurora_impersonando");
+  sessionStorage.removeItem("aurora_impersonando_tenant_nombre");
+  sessionStorage.removeItem("aurora_impersonando_tenant_id");
+  cerrarSesion();
+  window.location.href = "/superadmin";
+}

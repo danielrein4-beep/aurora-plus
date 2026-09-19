@@ -14,4 +14,10 @@ public interface RegistroAuditoriaRepository extends JpaRepository<RegistroAudit
     Page<RegistroAuditoria> findByTenantIdAndAccionOrderByFechaDesc(Long tenantId, String accion, Pageable pageable);
 
     Page<RegistroAuditoria> findByTenantIdAndModuloAndAccionOrderByFechaDesc(Long tenantId, String modulo, String accion, Pageable pageable);
+
+    Page<RegistroAuditoria> findByModuloOrderByFechaDesc(String modulo, Pageable pageable);
+
+    Page<RegistroAuditoria> findByAccionOrderByFechaDesc(String accion, Pageable pageable);
+
+    Page<RegistroAuditoria> findAllByOrderByFechaDesc(Pageable pageable);
 }

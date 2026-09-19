@@ -20,6 +20,10 @@ import {
   registrarPagoSuperAdmin,
   regalarTiempoSuperAdmin,
   impersonarTenantSuperAdmin,
+  listarAuditoriaGlobalSuperAdmin,
+  RegistroAuditoriaItem,
+  estaImpersonando,
+  salirDeImpersonacion,
   crearTenantSuperAdmin,
   activarTenantSuperAdmin,
   desactivarTenantSuperAdmin,
@@ -121,6 +125,27 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   const [filtroTexto, setFiltroTexto] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<"TODOS" | "ACTIVOS" | "SUSPENDIDOS" | "POR_VENCER">("TODOS");
   const [filtroModulo, setFiltroModulo] = useState<string>("TODOS");
+  // ESTADOS DE AUDITORIA DE SEGURIDAD GLOBAL
+  const [auditoriaLogs, setAuditoriaLogs] = useState<RegistroAuditoriaItem[]>([]);
+  const [totalAuditoria, setTotalAuditoria] = useState(0);
+  const [cargandoAuditoria, setCargandoAuditoria] = useState(false);
+  const [filtroAuditoriaTenant, setFiltroAuditoriaTenant] = useState("TODOS");
+  const [filtroAuditoriaModulo, setFiltroAuditoriaModulo] = useState("TODOS");
+  const [filtroAuditoriaAccion, setFiltroAuditoriaAccion] = useState("TODAS");
+  const [filtroAuditoriaTexto, setFiltroAuditoriaTexto] = useState("");
+  const [paginaAuditoria, setPaginaAuditoria] = useState(0);
+
+  // CONTROL DE SEGURIDAD ESTRICTA (PIN / AUTORIZACION MAESTRA)
+  const [showMasterLockModal, setShowMasterLockModal] = useState(false);
+  const [masterLockPassword, setMasterLockPassword] = useState("");
+  const [masterLockError, setMasterLockError] = useState("");
+  const [masterLockCallback, setMasterLockCallback] = useState<(() => void) | null>(null);
+
+  // MODAL DE RECIBO OFICIAL DE COBRO SAAS
+  const [reciboCobroSeleccionado, setReciboCobroSeleccionado] = useState<PagoSuscripcion | null>(null);
+  const [showReciboModal, setShowReciboModal] = useState(false);
+  const [copiadoWhatsapp, setCopiadoWhatsapp] = useState(false);
+
 
   // Modales
   const [showNuevoModal, setShowNuevoModal] = useState(false);
@@ -205,7 +230,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
   // VISTA PRINCIPAL (TENANTS vs FINANZAS)
   // VISTA PRINCIPAL (TENANTS vs PAGOS vs FINANZAS)
-  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "FINANZAS" | "SOPORTE">("TENANTS");
+  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "FINANZAS" | "SOPORTE" | "AUDITORIA">("TENANTS");
 
   // FILTROS Y ESTADOS DEL MODULO DEDICADO DE HISTORIAL DE PAGOS
   const [filtroPagosTenant, setFiltroPagosTenant] = useState<number | "TODOS">("TODOS");
@@ -589,6 +614,96 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     } catch (err: any) {
       avisar(err?.message || "Error al cambiar plan", "error");
     }
+  };
+
+  
+  const ejecutarConAutorizacionMaestra = (callback: () => void) => {
+    const desbloqueado = sessionStorage.getItem("aurora_superadmin_master_unlocked") === "true";
+    if (desbloqueado) {
+      callback();
+    } else {
+      setMasterLockCallback(() => callback);
+      setMasterLockPassword("");
+      setMasterLockError("");
+      setShowMasterLockModal(true);
+    }
+  };
+
+  const handleConfirmarMasterLock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await loginSuperAdminApi(sesion?.username || "admin", masterLockPassword);
+      if (res && res.token) {
+        sessionStorage.setItem("aurora_superadmin_master_unlocked", "true");
+        setShowMasterLockModal(false);
+        avisar("Autorizacion Maestra concedida para esta sesion");
+        if (masterLockCallback) {
+          masterLockCallback();
+          setMasterLockCallback(null);
+        }
+      }
+    } catch {
+      setMasterLockError("Contrasena maestra incorrecta. Acceso restringido unicamente a personal autorizado.");
+    }
+  };
+
+  const cargarAuditoria = async (pag = 0) => {
+    setCargandoAuditoria(true);
+    try {
+      const res = await listarAuditoriaGlobalSuperAdmin({
+        tenantId: filtroAuditoriaTenant !== "TODOS" ? Number(filtroAuditoriaTenant) : undefined,
+        modulo: filtroAuditoriaModulo !== "TODOS" ? filtroAuditoriaModulo : undefined,
+        accion: filtroAuditoriaAccion !== "TODAS" ? filtroAuditoriaAccion : undefined,
+        pagina: pag,
+        tamano: 50,
+      });
+      setAuditoriaLogs(res.content || []);
+      setTotalAuditoria(res.totalElements || 0);
+      setPaginaAuditoria(res.number || 0);
+    } catch (err: any) {
+      avisar(err?.message || "Error al cargar bitacora de auditoria", "error");
+    } finally {
+      setCargandoAuditoria(false);
+    }
+  };
+
+  useEffect(() => {
+    if (sesion && vistaPrincipal === "AUDITORIA") {
+      cargarAuditoria(paginaAuditoria);
+    }
+  }, [sesion, vistaPrincipal, filtroAuditoriaTenant, filtroAuditoriaModulo, filtroAuditoriaAccion]);
+
+  const auditoriaFiltrada = useMemo(() => {
+    if (!filtroAuditoriaTexto.trim()) return auditoriaLogs;
+    const txt = filtroAuditoriaTexto.toLowerCase();
+    return auditoriaLogs.filter(
+      (a) =>
+        (a.descripcion && a.descripcion.toLowerCase().includes(txt)) ||
+        (a.usuario && a.usuario.toLowerCase().includes(txt)) ||
+        (a.entidad && a.entidad.toLowerCase().includes(txt))
+    );
+  }, [auditoriaLogs, filtroAuditoriaTexto]);
+
+  const copiarReciboWhatsapp = (p: PagoSuscripcion) => {
+    const texto = [
+      "*AURORA PLUS ECOSYSTEM - COMPROBANTE OFICIAL DE COBRO*",
+      `Recibo: #REC-2026-${String(p.id).padStart(4, '0')}`,
+      `Fecha: ${p.fechaPago ? p.fechaPago.replace('T', ' ').substring(0, 16) : '-'}`,
+      `Cliente: ${p.nombreEmpresa} (Tenant #${p.tenantId})`,
+      `Monto Acreditado: $${Number(p.monto).toFixed(2)} ${p.moneda}`,
+      `Metodo de Pago: ${p.metodoPago}`,
+      `Referencia Bancaria: ${p.referenciaComprobante || 'N/A'}`,
+      `Tiempo Renovado: ${p.mesesAcreditados > 0 ? `+${p.mesesAcreditados} mes(es)` : `+${p.diasAcreditados} dias`}`,
+      "Estado: CONFIRMADO & LICENCIA ACTIVA",
+      "",
+      "Agradecemos su suscripcion continua. Sistema operativo en linea.",
+      "https://aurora-plus.com"
+    ].join("\n");
+
+    navigator.clipboard.writeText(texto);
+    setCopiadoWhatsapp(true);
+    avisar("Recibo copiado al portapapeles listo para enviar por WhatsApp");
+    setTimeout(() => setCopiadoWhatsapp(false), 3000);
   };
 
   const handleImpersonar = async (tenantId: number) => {
@@ -1313,7 +1428,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   ? "Metricas & Business Intelligence"
                   : vistaPrincipal === "FINANZAS"
                   ? "Finanzas & Contabilidad SaaS"
-                  : "Centro de Soporte & Chat en Vivo"}
+                  : vistaPrincipal === "AUDITORIA" ? "Seguridad & Auditoria Global" : "Centro de Soporte & Chat en Vivo"}
               </span>
             </div>
             <h1 className="font-['Outfit'] font-black text-xl text-slate-900 mt-0.5">
@@ -1325,7 +1440,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 ? "Metricas, Estadisticas y Rendimiento SaaS"
                 : vistaPrincipal === "FINANZAS"
                 ? "Finanzas, Gastos Fijos y Flujo de Caja"
-                : "Mesa de Ayuda, Tickets y Chat con Tenants"}
+                : vistaPrincipal === "AUDITORIA" ? "Bitacora Inmutable de Seguridad y Trazabilidad Global" : "Mesa de Ayuda, Tickets y Chat con Tenants"}
             </h1>
           </div>
 
@@ -1631,7 +1746,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
                           {/* Impersonar Soporte */}
                           <button
-                            onClick={() => handleImpersonar(t.tenantId)}
+                            onClick={() => ejecutarConAutorizacionMaestra(() => handleImpersonar(t.tenantId))}
                             className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[10px] cursor-pointer transition-colors shadow-2xs"
                             title="Acceso de soporte tecnico directo"
                           >
@@ -3044,7 +3159,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                       </button>
 
                       <button
-                        onClick={() => handleImpersonar(ticketSeleccionado.tenantId)}
+                        onClick={() => ejecutarConAutorizacionMaestra(() => handleImpersonar(ticketSeleccionado.tenantId))}
                         className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
                         title="Abrir sesion de soporte en pantalla para este tenant"
                       >
@@ -3154,6 +3269,256 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
         </div>
       </div>
+
+
+      {/* VISTA: SEGURIDAD & AUDITORIA GLOBAL */}
+      {vistaPrincipal === "AUDITORIA" && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* HEADER AUDITORIA */}
+          <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black text-[10px] uppercase tracking-wider border border-emerald-200">
+                  Control Estricto & Trazabilidad
+                </span>
+                <span className="text-xs text-slate-500 font-medium">Append-Only / Solo Lectura</span>
+              </div>
+              <h2 className="font-['Outfit'] font-black text-2xl text-slate-900 mt-1">
+                Bitacora Inmutable de Seguridad
+              </h2>
+              <p className="text-xs text-slate-500">
+                Auditoria de acciones de alto impacto, cobros, activaciones, suspensiones e inicios de soporte tecnico en todo el ecosistema.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => cargarAuditoria(paginaAuditoria)}
+                disabled={cargandoAuditoria}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-xs transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                <span>{cargandoAuditoria ? "Actualizando..." : "Refrescar Auditoria"}</span>
+              </button>
+              <span className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold text-xs">
+                {totalAuditoria} eventos registrados
+              </span>
+            </div>
+          </div>
+
+          {/* FILTROS DE AUDITORIA */}
+          <div className="p-4 bg-white rounded-3xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Filtro Tenant */}
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-slate-500 text-[10px] uppercase">Negocio:</span>
+                <select
+                  value={filtroAuditoriaTenant}
+                  onChange={(e) => {
+                    setFiltroAuditoriaTenant(e.target.value);
+                    setPaginaAuditoria(0);
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 font-medium text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-emerald-500"
+                >
+                  <option value="TODOS">Todos los Negocios ({tenants.length})</option>
+                  {tenants.map((t) => (
+                    <option key={t.tenantId} value={String(t.tenantId)}>
+                      #{t.tenantId} - {t.nombreEmpresa}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro Modulo */}
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-slate-500 text-[10px] uppercase">Modulo:</span>
+                <select
+                  value={filtroAuditoriaModulo}
+                  onChange={(e) => {
+                    setFiltroAuditoriaModulo(e.target.value);
+                    setPaginaAuditoria(0);
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 font-medium text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-emerald-500"
+                >
+                  <option value="TODOS">Todos los Modulos</option>
+                  <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                  <option value="HORECA">HORECA</option>
+                  <option value="COMERCIO">COMERCIO</option>
+                  <option value="GANADERIA">GANADERIA</option>
+                  <option value="SALUD">SALUD / MEDICLINIC</option>
+                  <option value="TAMANACO_COMERCIAL">TAMANACO COMERCIAL</option>
+                  <option value="PERSONAL">PERSONAL</option>
+                </select>
+              </div>
+
+              {/* Filtro Accion */}
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-slate-500 text-[10px] uppercase">Accion:</span>
+                <select
+                  value={filtroAuditoriaAccion}
+                  onChange={(e) => {
+                    setFiltroAuditoriaAccion(e.target.value);
+                    setPaginaAuditoria(0);
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 font-medium text-slate-800 bg-slate-50 cursor-pointer focus:outline-hidden focus:border-emerald-500"
+                >
+                  <option value="TODAS">Todas las Acciones</option>
+                  <option value="IMPERSONATE">IMPERSONATE (Soporte)</option>
+                  <option value="COBRO_REGISTRADO">COBRO_REGISTRADO</option>
+                  <option value="REGALO_TIEMPO">REGALO_TIEMPO</option>
+                  <option value="ACTIVAR">ACTIVAR TENANT</option>
+                  <option value="SUSPENDER">SUSPENDER TENANT</option>
+                  <option value="CAMBIAR_PLAN">CAMBIAR PLAN</option>
+                  <option value="CREAR">CREAR</option>
+                  <option value="EDITAR">EDITAR</option>
+                  <option value="ELIMINAR">ELIMINAR</option>
+                </select>
+              </div>
+
+              {/* Buscador de texto */}
+              <input
+                type="text"
+                placeholder="Buscar por usuario, entidad o descripcion..."
+                value={filtroAuditoriaTexto}
+                onChange={(e) => setFiltroAuditoriaTexto(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:outline-hidden focus:border-emerald-500 w-64"
+              />
+
+              {(filtroAuditoriaTenant !== "TODOS" || filtroAuditoriaModulo !== "TODOS" || filtroAuditoriaAccion !== "TODAS" || filtroAuditoriaTexto) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroAuditoriaTenant("TODOS");
+                    setFiltroAuditoriaModulo("TODOS");
+                    setFiltroAuditoriaAccion("TODAS");
+                    setFiltroAuditoriaTexto("");
+                    setPaginaAuditoria(0);
+                  }}
+                  className="text-xs text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const p = Math.max(0, paginaAuditoria - 1);
+                  cargarAuditoria(p);
+                }}
+                disabled={paginaAuditoria === 0 || cargandoAuditoria}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-30 font-bold"
+              >
+                Anterior
+              </button>
+              <span className="font-mono font-bold text-slate-600">Pagina {paginaAuditoria + 1}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const p = paginaAuditoria + 1;
+                  cargarAuditoria(p);
+                }}
+                disabled={auditoriaLogs.length < 50 || cargandoAuditoria}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-30 font-bold"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+
+          {/* TABLA PRINCIPAL DE AUDITORIA */}
+          <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                    <th className="pb-3 px-3">Fecha & Hora</th>
+                    <th className="pb-3 px-3">Tenant</th>
+                    <th className="pb-3 px-3">Modulo</th>
+                    <th className="pb-3 px-3">Accion</th>
+                    <th className="pb-3 px-3">Entidad</th>
+                    <th className="pb-3 px-3">Usuario & Rol</th>
+                    <th className="pb-3 px-3">Descripcion de la Operacion</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {cargandoAuditoria ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        Consultando bitacora de auditoria del ecosistema...
+                      </td>
+                    </tr>
+                  ) : auditoriaFiltrada.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        No se encontraron registros de auditoria con los filtros seleccionados.
+                      </td>
+                    </tr>
+                  ) : (
+                    auditoriaFiltrada.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-3 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                          {item.fecha ? item.fecha.replace("T", " ").substring(0, 19) : "-"}
+                        </td>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-bold border border-slate-200">
+                            #{item.tenantId}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold font-mono border ${
+                            item.modulo === "SUPER_ADMIN" || item.modulo === "super-admin"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : item.modulo === "SALUD"
+                              ? "bg-sky-50 text-sky-800 border-sky-200"
+                              : item.modulo === "GANADERIA"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : item.modulo === "HORECA"
+                              ? "bg-rose-50 text-rose-800 border-rose-200"
+                              : "bg-indigo-50 text-indigo-800 border-indigo-200"
+                          }`}>
+                            {item.modulo}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold font-mono border ${
+                            item.accion === "IMPERSONATE"
+                              ? "bg-purple-100 text-purple-900 border-purple-300"
+                              : item.accion === "COBRO_REGISTRADO" || item.accion === "ACTIVAR"
+                              ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                              : item.accion === "SUSPENDER" || item.accion === "ELIMINAR"
+                              ? "bg-rose-100 text-rose-900 border-rose-300"
+                              : "bg-slate-100 text-slate-800 border-slate-300"
+                          }`}>
+                            {item.accion}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                          {item.entidad} {item.entidadId ? `(#${item.entidadId})` : ""}
+                        </td>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-800">{item.usuario || "sistema"}</span>
+                            {item.rolUsuario && (
+                              <span className="text-[9px] text-slate-400 font-mono">{item.rolUsuario}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-slate-700 font-medium text-[11px] leading-snug">
+                          {item.descripcion}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: DIRECTÓRIO DE USUARIOS Y LÍMITE DE CUOTA */}
       {showUsuariosDirectorioModal && tenantParaUsuariosDirectorio && (
@@ -4524,6 +4889,186 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         </div>
       )}
 
-    </div>
+    
+      {/* MODAL DE SEGURIDAD ESTRICTA: AUTORIZACION MAESTRA */}
+      {showMasterLockModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border-2 border-emerald-500/40 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 shrink-0">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div>
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 leading-tight">
+                  Autorizacion Maestra Requerida
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Acceso restringido a administradores verificados.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed">
+              <strong>Zona de Seguridad Protegida:</strong> Para ver la bitacora global o ejecutar acciones de alto impacto (impersonacion o suspensiones), confirme sus credenciales de SuperAdmin.
+            </div>
+
+            <form onSubmit={handleConfirmarMasterLock} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Contrasena de SuperAdmin
+                </label>
+                <input
+                  type="password"
+                  placeholder="Ingrese clave de administrador..."
+                  value={masterLockPassword}
+                  onChange={(e) => {
+                    setMasterLockPassword(e.target.value);
+                    setMasterLockError("");
+                  }}
+                  autoFocus
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-hidden focus:border-emerald-500 bg-slate-50"
+                />
+                {masterLockError && (
+                  <p className="text-xs text-rose-600 font-bold mt-1.5">{masterLockError}</p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMasterLockModal(false);
+                    setMasterLockCallback(null);
+                  }}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-500/20 cursor-pointer transition-all"
+                >
+                  Verificar y Desbloquear
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: RECIBO OFICIAL DE COBRO SAAS */}
+      {showReciboModal && reciboCobroSeleccionado && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-slate-200 shadow-2xl space-y-6 text-slate-900">
+            {/* Membrete Oficial */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <AuroraLogo className="w-9 h-9" />
+                <div>
+                  <h4 className="font-['Outfit'] font-black text-base text-slate-900">
+                    Aurora Plus Ecosystem
+                  </h4>
+                  <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">
+                    Comprobante Oficial de Suscripcion Cloud
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="inline-block px-2.5 py-1 rounded-lg bg-emerald-100 border border-emerald-300 text-emerald-900 font-mono font-black text-xs">
+                  #REC-2026-{String(reciboCobroSeleccionado.id).padStart(4, '0')}
+                </span>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  {reciboCobroSeleccionado.fechaPago ? reciboCobroSeleccionado.fechaPago.replace("T", " ").substring(0, 16) : "-"}
+                </p>
+              </div>
+            </div>
+
+            {/* Datos del Cliente */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Cliente / Razon Social:</span>
+                <span className="font-bold text-slate-900">{reciboCobroSeleccionado.nombreEmpresa}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Identificador de Tenant:</span>
+                <span className="font-mono font-bold text-slate-700">Tenant #{reciboCobroSeleccionado.tenantId}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Concepto Facturado:</span>
+                <span className="font-bold text-emerald-800">Licencia de Operacion SaaS</span>
+              </div>
+            </div>
+
+            {/* Desglose Financiero */}
+            <div className="border border-slate-200 rounded-2xl p-4 space-y-2.5 text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <span className="text-slate-600 font-medium">Metodo de Pago:</span>
+                <span className="px-2 py-0.5 rounded-md bg-slate-100 font-mono font-bold text-slate-800">
+                  {reciboCobroSeleccionado.metodoPago}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <span className="text-slate-600 font-medium">Comprobante / Referencia:</span>
+                <span className="font-mono font-bold text-slate-800">
+                  {reciboCobroSeleccionado.referenciaComprobante || "N/A"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <span className="text-slate-600 font-medium">Tiempo Acreditado:</span>
+                <span className="font-bold text-emerald-700">
+                  {reciboCobroSeleccionado.mesesAcreditados > 0
+                    ? `+${reciboCobroSeleccionado.mesesAcreditados} mes(es) (${reciboCobroSeleccionado.mesesAcreditados * 30} dias)`
+                    : `+${reciboCobroSeleccionado.diasAcreditados} dias`}
+                </span>
+              </div>
+              <div className="flex justify-between items-baseline pt-1">
+                <span className="font-bold text-slate-800 text-sm">Total Pagado:</span>
+                <div className="font-['Outfit'] text-2xl font-black text-emerald-700 font-mono">
+                  ${Number(reciboCobroSeleccionado.monto).toFixed(2)}
+                  <span className="text-xs text-slate-400 font-normal"> {reciboCobroSeleccionado.moneda}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Sello de Validez Digital */}
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+              <span><strong>ESTADO: CONFIRMADO & LICENCIA EN LINEA.</strong> Operacion acreditada formalmente.</span>
+            </div>
+
+            {/* Acciones del Recibo */}
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => copiarReciboWhatsapp(reciboCobroSeleccionado)}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span>{copiadoWhatsapp ? "Copiado!" : "Copiar para WhatsApp"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="py-2.5 px-4 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+                <span>Imprimir PDF</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowReciboModal(false)}
+                className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+</div>
   );
 }
