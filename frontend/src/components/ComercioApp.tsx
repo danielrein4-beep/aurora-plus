@@ -466,6 +466,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
   // Tabs de Navegación
   const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "gastos" | "cierre" | "auditoria">("general");
+  // El sidebar de w-64 fijo aplastaba todo el contenido en pantallas angostas
+  // (celular) — no había forma de navegar sin hacer scroll horizontal. En
+  // móvil ahora vive fuera de flujo (fixed) y entra/sale con un botón
+  // hamburguesa; en desktop (lg:) sigue fijo en el layout como siempre.
+  const [sidebarAbierto, setSidebarAbierto] = useState(false);
   const [modalQrVisible, setModalQrVisible] = useState(false);
   const [modalIaVisible, setModalIaVisible] = useState(false);
 
@@ -976,8 +981,19 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   return (
     <div className="h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-['Inter'] selection:bg-teal-500 selection:text-white overflow-hidden">
 
-      {/* ══════════════════════ SIDEBAR FIJO ══════════════════════ */}
-      <aside className="w-64 flex-shrink-0 h-screen flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-lg">
+      {/* ══════════════════════ SIDEBAR (drawer en móvil, fijo en desktop) ══════════════════════ */}
+      {sidebarAbierto && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarAbierto(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-lg fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+          sidebarAbierto ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         {/* Logo + Nombre del Negocio */}
         <button
           onClick={onSalir}
@@ -1029,7 +1045,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               {grupo.items.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setTab(item.id)}
+                  onClick={() => { setTab(item.id); setSidebarAbierto(false); }}
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
                     tab === item.id
                       ? "bg-teal-500 text-slate-950 shadow-md"
@@ -1047,7 +1063,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           <button
             type="button"
             title="Tu catálogo digital público con precios y código QR para que tus clientes pidan por WhatsApp"
-            onClick={() => setModalQrVisible(true)}
+            onClick={() => { setModalQrVisible(true); setSidebarAbierto(false); }}
             className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-teal-600 dark:text-teal-400 bg-teal-500/10 hover:bg-teal-500/20 transition-colors"
           >
             <IconShoppingBag size={16} />
@@ -1059,7 +1075,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           <button
             type="button"
             title="Atencion y ventas automatizadas en WhatsApp con IA conectada a tu inventario en tiempo real"
-            onClick={() => setModalIaVisible(true)}
+            onClick={() => { setModalIaVisible(true); setSidebarAbierto(false); }}
             className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 hover:scale-[1.01] active:scale-[0.99] transition-all mt-2 border border-indigo-500/20 shadow-sm"
           >
             <div className="w-4 h-4 flex items-center justify-center text-indigo-500">
@@ -1090,7 +1106,19 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
 
         {/* ── TOPBAR LIMPIO: SOLO TASAS, TEMA Y PERFIL ── */}
-        <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-end gap-2.5 shadow-sm flex-shrink-0">
+        <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-between lg:justify-end gap-2.5 shadow-sm flex-shrink-0">
+          <button
+            onClick={() => setSidebarAbierto(true)}
+            className="lg:hidden p-2 -ml-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+            aria-label="Abrir menú"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-2.5">
           {user?.tenantId && (
             <TasaBadgeComercio
               tenantId={user.tenantId}
@@ -1104,6 +1132,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           )}
 
           <ThemeToggle />
+          </div>
         </header>
 
         {/* ── CONTENIDO SEGÚN LA PESTAÑA SELECCIONADA ── */}
