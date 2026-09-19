@@ -4,24 +4,33 @@ import SpecularButton from "../components/SpecularButton";
 import {
   IconClinic, IconHardware,
   IconRestaurant, IconFarm, IconCheck,
+  IconTooth, IconVet,
 } from "../Icons";
 
 const INDUSTRIES = [
   {
     Icon: IconClinic,
-    name: "Clínicas Médicas",
+    name: "Mediclinic Pro",
     color: "from-sky-400 to-blue-500",
     tagline: "Atención al paciente sin papeles",
-    desc: "Expedientes digitales, agenda médica, gestión de laboratorio, farmacia interna y cobranza integrada en una sola plataforma.",
-    modulos: ["Historia clínica digital", "Agenda por especialista", "Módulo de laboratorio", "Farmacia interna", "Cobranza y seguros", "Reportes de productividad médica"],
+    desc: "Expedientes digitales, agenda médica, sala de espera reactiva y cobranza multidivisa — con vademécum de fármacos y récipe médico oficial en PDF integrados a la consulta.",
+    modulos: ["Historia clínica digital", "Agenda por especialista", "Sala de espera en vivo (secretaria ↔ doctor)", "Vademécum de 36+ fármacos con alergias cruzadas", "Récipe médico oficial en PDF", "Cobranza multidivisa (USD·VES·COP)"],
+  },
+  {
+    Icon: IconTooth,
+    name: "Odontología",
+    color: "from-cyan-400 to-teal-500",
+    tagline: "El consultorio dental, sin hojas sueltas",
+    desc: "Odontograma internacional FDI con figuras anatómicas por tipo de diente, periodontograma de sondaje real y planes de tratamiento presupuestados por fases.",
+    modulos: ["Odontograma FDI interactivo (32 piezas)", "Periodontograma de sondaje de 6 puntos", "Planes de tratamiento por fases", "Presupuesto dental dual USD/Bs.", "Agenda por sillón/consultorio", "Historial clínico unificado con Mediclinic"],
   },
   {
     Icon: IconHardware,
     name: "Comercio",
     color: "from-orange-400 to-amber-500",
-    tagline: "Tu mostrador y tu inventario bajo control total",
-    desc: "Punto de venta por mostrador, código de barras, inventario en tiempo real, gestión de proveedores y cuentas por cobrar — para ferreterías, tiendas y comercios de todo tipo.",
-    modulos: ["POS por mostrador con escáner de código de barras", "Inventario con alertas de stock", "Gestión de proveedores", "Cotizaciones y órdenes de compra", "Cuentas por cobrar", "Reportes de rotación de productos"],
+    tagline: "Tu mostrador, tu inventario y tu WhatsApp, en un solo lugar",
+    desc: "Punto de venta por mostrador, inventario en tiempo real, catálogo público con pedidos por WhatsApp, y un asistente de IA que responde precios y stock sin que nadie esté pegado al teléfono.",
+    modulos: ["POS por mostrador con escáner de código de barras", "Catálogo público con pedidos por WhatsApp", "Asistente de IA (precios, stock, tasa BCV, delivery)", "Inventario con alertas de stock", "Gestión de proveedores y cuentas por cobrar", "Reportes de rotación de productos"],
   },
   {
     Icon: IconRestaurant,
@@ -36,8 +45,16 @@ const INDUSTRIES = [
     name: "Control de Fincas",
     color: "from-green-400 to-emerald-500",
     tagline: "Tu ganado y tus potreros, organizados",
-    desc: "Registro sanitario por animal, vacunación, rotación de potreros, control de inventario ganadero y trazabilidad completa desde nacimiento.",
-    modulos: ["Registro individual por animal", "Calendario de vacunación", "Rotación y control de potreros", "Inventario de insumos agrícolas", "Trazabilidad de lotes", "Reportes de producción ganadera"],
+    desc: "Mapa satelital de potreros, básculas bluetooth para pesaje en manga, y control sanitario que impide vender un animal todavía en período de retiro por vacuna o medicamento.",
+    modulos: ["Mapa satelital de potreros con cálculo de hectáreas", "Pesaje en manga vía báscula bluetooth/USB", "Calendario de vacunación con refuerzos automáticos", "Bloqueo de venta en período de retiro sanitario", "Trazabilidad individual por animal desde nacimiento", "Modo offline de campo con sincronización posterior"],
+  },
+  {
+    Icon: IconVet,
+    name: "Veterinaria",
+    color: "from-violet-400 to-purple-500",
+    tagline: "El mismo motor de Mediclinic, para mascotas",
+    desc: "Agenda, historias clínicas, sala de espera y cotizador para clínicas veterinarias — construido sobre el mismo motor probado de Mediclinic Pro.",
+    modulos: ["Historia clínica por mascota y propietario", "Agenda de citas y cirugías", "Sala de espera en vivo", "Cotizador de procedimientos", "Cobros y caja diaria", "Cierres de caja"],
   },
 ];
 
@@ -53,7 +70,7 @@ export default function Industrias() {
       <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-16">
         <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-4 py-1.5 text-xs text-teal-600 dark:text-teal-300 mb-6 font-medium">
           <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-          4 industrias con módulos propios
+          6 industrias con módulos propios
         </div>
         <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 dark:text-white mb-5">
           Hecho para tu industria,<br />

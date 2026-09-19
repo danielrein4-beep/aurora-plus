@@ -16,13 +16,16 @@ import {
   IconCustomize, IconChart, IconLink, IconCloud, IconLock, IconMobile,
   IconLaptop, IconPhone, IconPlane, IconCheck,
   IconCard, IconBox, IconBolt, IconShield,
+  IconTooth, IconVet,
 } from "../Icons";
 
 const INDUSTRIES = [
-  { Icon: IconClinic,     name: "Clínicas Médicas",   desc: "Expedientes digitales, agenda de consultas, laboratorio, farmacia y cobranza integrada." },
-  { Icon: IconHardware,   name: "Comercio",           desc: "POS mostrador, inventario en tiempo real, código de barras, proveedores y cuentas por cobrar." },
+  { Icon: IconClinic,     name: "Mediclinic Pro",      desc: "Historias clínicas, agenda, sala de espera en vivo, cotizador multidivisa, vademécum de fármacos y récipe médico oficial en PDF." },
+  { Icon: IconTooth,      name: "Odontología",         desc: "Odontograma FDI interactivo, periodontograma de 6 puntos, planes de tratamiento por fases y presupuesto dental dual USD/Bs." },
+  { Icon: IconHardware,   name: "Comercio",            desc: "POS mostrador, inventario en tiempo real, catálogo público con pedidos por WhatsApp, y asistente de IA que responde precios y stock 24/7." },
   { Icon: IconRestaurant, name: "Restaurantes",        desc: "Comandas digitales, mesas, cocina en tiempo real, inventario y cierres de caja automáticos." },
-  { Icon: IconFarm,       name: "Control de Fincas",   desc: "Gestión integral de ganadería, rotación de potreros, registro sanitario, vacunación y trazabilidad animal por lote." },
+  { Icon: IconFarm,       name: "Control de Fincas",   desc: "Mapa satelital de potreros, básculas bluetooth para pesaje en manga, y control sanitario que bloquea la venta de un animal en período de retiro." },
+  { Icon: IconVet,        name: "Veterinaria",         desc: "Agenda, historias clínicas, sala de espera y cotizador para clínicas de mascotas — el mismo motor de Mediclinic, adaptado." },
 ];
 
 const VERTICAL_PREVIEWS = [
@@ -47,12 +50,12 @@ const SISTEMA_POR_INDUSTRIA: Record<string, { ruta: string; label: string; nombr
 const SISTEMA_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro", nombre: "Mediclinic Pro — Espacio Clínico", desc: "Historias clínicas digitales, agenda médica, sala de espera reactiva, cotizador y caja diaria.", Icon: IconClinic };
 
 const FEATURES = [
-  { Icon: IconCustomize, title: "100% Personalizable",    desc: "Cada módulo se adapta al flujo exacto de tu negocio. Sin código extra, sin consultores costosos." },
-  { Icon: IconChart,     title: "Reportes en Tiempo Real", desc: "Paneles con KPIs críticos actualizados al instante. Toma decisiones con datos, no intuición." },
-  { Icon: IconLink,      title: "Módulos Integrados",      desc: "Ventas, inventario, RRHH, contabilidad y operaciones hablan entre sí sin fricciones." },
-  { Icon: IconCloud,     title: "Nube + Local",            desc: "Trabaja con o sin internet. Sincronización automática cuando vuelvas a conectarte." },
-  { Icon: IconLock,      title: "Seguridad Empresarial",   desc: "Roles y permisos granulares. Auditoría completa de cada acción dentro del sistema." },
-  { Icon: IconMobile,    title: "Web y Móvil",             desc: "Accede desde cualquier dispositivo. Versión móvil optimizada incluida en todos los planes." },
+  { Icon: IconCustomize, title: "Asistente de IA por WhatsApp", desc: "En Comercio: responde precios, stock y tasa BCV al instante y sin costo. Solo usa IA generativa real cuando la pregunta lo amerita, con límite de costo por negocio." },
+  { Icon: IconFarm,      title: "Control Sanitario que Bloquea Ventas", desc: "En Ganadería: si un animal sigue en período de retiro por vacuna o medicamento, el sistema impide venderlo — no es solo una alerta, es una traba real." },
+  { Icon: IconTooth,     title: "Récipe Médico y Vademécum",      desc: "En Mediclinic y Odontología: más de 36 fármacos con posología, detección de alergias cruzadas y récipe oficial en PDF listo para imprimir o enviar." },
+  { Icon: IconLink,      title: "Módulos Integrados",      desc: "Ventas, inventario, caja y auditoría hablan entre sí — sin planillas paralelas ni datos duplicados." },
+  { Icon: IconCloud,     title: "Nube + Local",            desc: "Trabaja con o sin internet. Sincronización automática cuando vuelvas a conectarte — pensado para el campo y las fincas." },
+  { Icon: IconLock,      title: "Seguridad Empresarial",   desc: "Roles y permisos granulares por tenant, con auditoría completa de cada acción dentro del sistema." },
 ];
 
 const PLANS = [
@@ -292,7 +295,7 @@ export default function Home() {
           initial="hidden"
           animate="show"
           className="relative z-10 w-full max-w-5xl mx-auto">
-          <motion.p variants={heroItem} className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · cuatro rubros · tres monedas</motion.p>
+          <motion.p variants={heroItem} className="font-mono text-[11px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-[#3fe0ce]">• Un motor · seis rubros · tres monedas</motion.p>
           <motion.h1 variants={heroItem} className="mt-5 max-w-3xl font-['IBM_Plex_Sans'] text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-[-0.055em] text-[#f8f6ef]">
             <TrueFocus
               sentence="Automatiza, simplifica, crece..."
@@ -306,7 +309,7 @@ export default function Home() {
             />
           </motion.h1>
           <motion.p variants={heroItem} className="mt-8 max-w-xl text-base leading-7 text-[#e5e1d5]/90">
-            De la libreta y la hoja de Excel a medianoche, a la comodidad de tu teléfono y tu computadora. Aurora Plus corre la caja, el inventario y la sanidad regulatoria de clínicas, restaurantes, minas, talleres, boutiques y fincas venezolanas.
+            De la libreta y la hoja de Excel a medianoche, a la comodidad de tu teléfono y tu computadora. Aurora Plus corre la caja, el inventario, la agenda clínica y el control sanitario de consultorios, clínicas dentales, restaurantes, comercios, fincas ganaderas y veterinarias venezolanas.
           </motion.p>
           <motion.div variants={heroItem} className="mt-10 flex flex-wrap gap-3">
             <SpecularButton
@@ -481,7 +484,7 @@ export default function Home() {
           </h2>
           <p className="text-slate-500 dark:text-white/40 text-base mt-4 max-w-xl mx-auto">Módulos preconfigurados y flujos adaptados a cada operación.</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {INDUSTRIES.map((ind) => (
             <GlareHover
               key={ind.name}
