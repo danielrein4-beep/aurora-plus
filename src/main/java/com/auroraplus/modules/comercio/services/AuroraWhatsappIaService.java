@@ -38,6 +38,18 @@ public class AuroraWhatsappIaService {
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
 
+    @org.springframework.beans.factory.annotation.Value("${gemini.api.key:}")
+    private String geminiApiKey;
+
+    @org.springframework.beans.factory.annotation.Value("${gemini.model:gemini-1.5-flash}")
+    private String geminiModel;
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuroraWhatsappIaService.class);
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+    private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+            .connectTimeout(java.time.Duration.ofSeconds(10))
+            .build();
+
     public static class RespuestaIaDTO {
         public String intencion;
         public String textoRespuesta;
@@ -241,7 +253,16 @@ public class AuroraWhatsappIaService {
             return resp;
         }
 
-        // 12. Respuesta por defecto orientadora
+        // 12. Generacion Asistida con Google Gemini 1.5 Flash (Capa de Razonamiento Conversacional)
+        String respuestaGemini = consultarGemini15Flash(tenantId, nombreTienda, tasaVes, mensajeCliente, licencia);
+        if (respuestaGemini != null && !respuestaGemini.isBlank()) {
+            resp.intencion = "IA_GEMINI_15_FLASH";
+            resp.textoRespuesta = respuestaGemini;
+            guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
+            return resp;
+        }
+
+        // 13. Respuesta por defecto orientadora (Fallback seguro)
         resp.intencion = "ORIENTACION_GENERAL";
         resp.textoRespuesta = "Gracias por contactar a " + nombreTienda + ". Puedo ayudarte con disponibilidad de inventario, precios en USD/Bs., tasa BCV del dia o datos de Pago Movil. Tambien puedes ver nuestro catalogo digital en: https://auroraplus.app/catalogo/" + tenantId;
         guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
@@ -334,6 +355,81 @@ public class AuroraWhatsappIaService {
             return "Actualmente no encontramos ese articulo en el inventario registrado de " + nombreTienda + ".\n\n"
                 + "Puedes consultar los productos disponibles en nuestro catalogo oficial: https://auroraplus.app/catalogo/" + tenantId + "\n"
                 + "O si lo deseas, escribe 'asesor' para que un encargado verifique reposicion o existencia en almacen.";
+        }
+
+        return null;
+    }
+
+    /**
+     * Invocacion directa a la API de Google Gemini 1.5 Flash
+     * Proporciona respuestas contextualizadas de comercio electronico cuando
+     * las intenciones estaticas y busqueda local no encuentran un resultado exacto.
+     */
+    private String consultarGemini15Flash(Long tenantId, String nombreTienda, BigDecimal tasaVes, String mensajeCliente, LicenciaTenant licencia) {
+        String key = (geminiApiKey != null) ? geminiApiKey.trim() : "";
+        if (key.isEmpty() || key.equalsIgnoreCase("TU_API_KEY_AQUI")) {
+            log.debug("Gemini API Key no configurada. Omitiendo invocacion generativa.");
+            return null;
+        }
+
+        try {
+            String modelo = (geminiModel != null && !geminiModel.isBlank()) ? geminiModel.trim() : "gemini-1.5-flash";
+            String promptSistema = "Eres el Asistente Virtual Comercial de '" + nombreTienda + "' para atencion por WhatsApp en Venezuela.\n"
+                    + "Tu funcion es asesorar al cliente de forma amable, precisa y profesional.\n"
+                    + "Datos del negocio:\n"
+                    + "- Nombre: " + nombreTienda + "\n"
+                    + "- Tasa de cambio oficial del dia: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$\n"
+                    + "- Catalogo online: https://auroraplus.app/catalogo/" + tenantId + "\n"
+                    + "Reglas estrictas de respuesta:\n"
+                    + "1. Responde de forma concisa (maximo 2 a 3 oraciones cortas).\n"
+                    + "2. No inventes precios exactos si no los conoces; sugiere consultar el catalogo o comunicarse con un asesor escribiendo 'asesor'.\n"
+                    + "3. PROHIBIDO usar emojis. Responde estrictamente con texto plano limpio.\n"
+                    + "4. Si el cliente tiene dudas sobre aplicacion tecnica, medidas o materiales, orientalo con criterio basico comercial.\n";
+
+            String promptUsuario = "Pregunta del cliente: " + mensajeCliente;
+
+            Map<String, Object> partSistema = Map.of("text", promptSistema);
+            Map<String, Object> partUsuario = Map.of("text", promptUsuario);
+
+            Map<String, Object> content = Map.of("parts", List.of(partSistema, partUsuario));
+            Map<String, Object> requestBodyMap = Map.of(
+                    "contents", List.of(content),
+                    "generationConfig", Map.of(
+                            "temperature", 0.3,
+                            "maxOutputTokens", 250
+                    )
+            );
+
+            String jsonPayload = objectMapper.writeValueAsString(requestBodyMap);
+            String endpointUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + modelo + ":generateContent?key=" + key;
+
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(endpointUrl))
+                    .timeout(java.time.Duration.ofSeconds(12))
+                    .header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(jsonPayload, java.nio.charset.StandardCharsets.UTF_8))
+                    .build();
+
+            java.net.http.HttpResponse<String> response = httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString(java.nio.charset.StandardCharsets.UTF_8));
+            if (response.statusCode() == 200) {
+                com.fasterxml.jackson.databind.JsonNode rootNode = objectMapper.readTree(response.body());
+                com.fasterxml.jackson.databind.JsonNode candidates = rootNode.path("candidates");
+                if (candidates.isArray() && candidates.size() > 0) {
+                    com.fasterxml.jackson.databind.JsonNode parts = candidates.get(0).path("content").path("parts");
+                    if (parts.isArray() && parts.size() > 0) {
+                        String rawText = parts.get(0).path("text").asText("");
+                        // Sanitizar cualquier emoji que el modelo haya podido generar
+                        String cleanText = rawText.replaceAll("[\\p{So}\\p{Cn}]", "").trim();
+                        if (!cleanText.isEmpty()) {
+                            return cleanText;
+                        }
+                    }
+                }
+            } else {
+                log.warn("Gemini 1.5 Flash devolvio HTTP {}: {}", response.statusCode(), response.body());
+            }
+        } catch (Exception e) {
+            log.error("Excepcion al consultar Gemini 1.5 Flash: {}", e.getMessage());
         }
 
         return null;
