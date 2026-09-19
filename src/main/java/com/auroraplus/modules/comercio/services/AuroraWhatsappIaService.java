@@ -221,6 +221,7 @@ public class AuroraWhatsappIaService {
             resp.intencion = "TRANSFERENCIA_HUMANO";
             resp.textoRespuesta = "Entendido. He transferido tu conversacion a un asesor de " + nombreTienda + ". En breves momentos te respondera una persona de nuestro equipo.";
             guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
+            notificarAsesorHumano(tenantId, telefonoCliente, mensajeCliente, licencia);
             return resp;
         }
 
@@ -254,7 +255,13 @@ public class AuroraWhatsappIaService {
         }
 
         // 12. Generacion Asistida con Google Gemini 1.5 Flash (Capa de Razonamiento Conversacional)
-        String respuestaGemini = consultarGemini15Flash(tenantId, nombreTienda, tasaVes, mensajeCliente, licencia);
+        // Techo de costo: sin esto, un cliente escribiendo rapido (o un abuso deliberado) puede
+        // disparar llamadas ilimitadas a la API paga de Gemini y el negocio se entera al recibir
+        // la factura. LIMITE_GEMINI_POR_HORA es por tenant, no por cliente, a proposito: es el
+        // negocio quien paga la cuenta de Gemini, sin importar cuantos clientes distintos escriban.
+        String respuestaGemini = superoLimiteGeminiPorHora(tenantId)
+            ? null
+            : consultarGemini15Flash(tenantId, nombreTienda, tasaVes, mensajeCliente, licencia);
         if (respuestaGemini != null && !respuestaGemini.isBlank()) {
             resp.intencion = "IA_GEMINI_15_FLASH";
             resp.textoRespuesta = respuestaGemini;
@@ -433,6 +440,45 @@ public class AuroraWhatsappIaService {
         }
 
         return null;
+    }
+
+    private static final int LIMITE_GEMINI_POR_HORA = 30;
+
+    private boolean superoLimiteGeminiPorHora(Long tenantId) {
+        if (jdbcTemplate == null) return false;
+        try {
+            Integer llamadas = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM comercio_whatsapp_conversaciones " +
+                "WHERE tenant_id = ? AND intencion = 'IA_GEMINI_15_FLASH' AND fecha_hora > now() - interval '1 hour'",
+                Integer.class, tenantId
+            );
+            if (llamadas != null && llamadas >= LIMITE_GEMINI_POR_HORA) {
+                log.warn("Tenant {} alcanzo el limite de {} llamadas a Gemini en la ultima hora — se omite la capa generativa.", tenantId, LIMITE_GEMINI_POR_HORA);
+                return true;
+            }
+        } catch (Exception e) {
+            // Si la consulta falla, no bloqueamos el flujo por un problema de conteo
+        }
+        return false;
+    }
+
+    /** Avisa por WhatsApp al numero de contacto del propio negocio que un cliente pidio
+     * hablar con un humano — antes esto solo se lo decia al cliente y quedaba enterrado
+     * en la bitacora de conversaciones, sin que nadie del negocio se enterara realmente. */
+    private void notificarAsesorHumano(Long tenantId, String telefonoCliente, String mensajeCliente, LicenciaTenant licencia) {
+        if (whatsAppCloudApiService == null) return;
+        String telefonoNegocio = licencia.getTelefonoContacto();
+        if (telefonoNegocio == null || telefonoNegocio.isBlank()) return;
+        try {
+            if (!whatsAppCloudApiService.estaActivoParaTenant(tenantId)) return;
+            String aviso = "*Cliente solicita atencion humana*\n"
+                + "Telefono: " + telefonoCliente + "\n"
+                + "Ultimo mensaje: \"" + mensajeCliente + "\"\n\n"
+                + "Responde directamente a este numero desde WhatsApp Business.";
+            whatsAppCloudApiService.enviarTexto(tenantId, telefonoNegocio, aviso);
+        } catch (Exception e) {
+            log.warn("No se pudo notificar al negocio (tenant {}) sobre solicitud de asesor: {}", tenantId, e.getMessage());
+        }
     }
 
     private void guardarConversacion(Long tenantId, String telefono, String mensaje, String respuesta, String intencion) {
