@@ -11,13 +11,13 @@ export interface SaasCuentasCobroConfig {
 
 export const DEFAULT_SAAS_CUENTAS_COBRO: SaasCuentasCobroConfig = {
   banco: "Banesco (0134)",
-  telefono: "0414-1234567",
-  cedula: "V-28.123.456",
-  titular: "Administrador Aurora Plus",
-  tipoCuenta: "Corriente / Pago Movil",
-  binanceUsdt: "TQ3j8K9vP2sL... (TRC-20)",
-  zelle: "pagos@auroraplus.com",
-  instrucciones: "Realizar Pago Movil a la tasa oficial BCV del dia. Al transferir, reportar la referencia bancaria para activacion inmediata.",
+  telefono: "0424-7643733",
+  cedula: "V-26.407.131",
+  titular: "DANIEL EDUARDO REINA PORRAS",
+  tipoCuenta: "Cuenta Corriente / Pago Movil",
+  binanceUsdt: "danielrein4@gmail.com (Binance Pay / Correo)",
+  zelle: "danielrein4@gmail.com",
+  instrucciones: "Realizar Pago Movil a la tasa oficial BCV del dia. Al transferir, reportar la referencia bancaria para activacion inmediata de la licencia.",
 };
 
 const STORAGE_KEY = "aurora_saas_cuentas_pago";
