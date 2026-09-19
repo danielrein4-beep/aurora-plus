@@ -67,6 +67,8 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
   // Estado de Configuracion
   const [activa, setActiva] = useState(true);
   const [saludo, setSaludo] = useState("");
+  const [politicaDelivery, setPoliticaDelivery] = useState("");
+  const [zonasDelivery, setZonasDelivery] = useState("");
   const [verifyToken, setVerifyToken] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [guardandoConfig, setGuardandoConfig] = useState(false);
@@ -93,6 +95,8 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
       .then((data) => {
         if (data.activa !== undefined) setActiva(data.activa);
         if (data.saludo) setSaludo(data.saludo);
+        if (data.politicaDelivery) setPoliticaDelivery(data.politicaDelivery);
+        if (data.zonasDelivery) setZonasDelivery(data.zonasDelivery);
         if (data.verifyToken) setVerifyToken(data.verifyToken);
         if (data.webhookUrl) setWebhookUrl(data.webhookUrl);
       })
@@ -155,7 +159,13 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
       const res = await fetch(`/api/public/whatsapp/${tenantId}/config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activa, saludo: saludo.trim(), verifyToken: verifyToken.trim() })
+        body: JSON.stringify({ 
+          activa, 
+          saludo: saludo.trim(), 
+          verifyToken: verifyToken.trim(),
+          politicaDelivery: politicaDelivery.trim(),
+          zonasDelivery: zonasDelivery.trim()
+        })
       });
       if (res.ok) {
         setMsgExitoConfig("Configuracion de IA guardada exitosamente.");
@@ -290,7 +300,10 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
                 "¿Tienes taladro percutor y cuánto cuesta?",
                 "¿A qué tasa reciben hoy?",
                 "Pásame los datos de Pago Móvil",
-                "¿Aceptan Binance Pay?",
+                "¿Hacen delivery y cuánto cuesta?",
+                "¿Dónde están ubicados?",
+                "¿Qué métodos de pago aceptan?",
+                "Quiero hablar con un asesor",
                 "Quiero ver el catálogo completo"
               ].map((sug, i) => (
                 <button
@@ -354,15 +367,49 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
                 Saludo de Bienvenida Personalizado
               </label>
               <textarea
-                rows={3}
+                rows={2}
                 value={saludo}
                 onChange={(e) => setSaludo(e.target.value)}
                 placeholder="Hola, bienvenido a nuestro negocio. Estamos a tu orden con disponibilidad inmediata..."
                 className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none"
               />
               <span className="text-[11px] text-slate-500 mt-1 block">
-                Se enviará cuando un cliente salude por primera vez o escriba "Hola".
+                Se enviara cuando un cliente salude por primera vez o escriba "Hola".
               </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Politica de Delivery / Tarifas
+                </label>
+                <textarea
+                  rows={2}
+                  value={politicaDelivery}
+                  onChange={(e) => setPoliticaDelivery(e.target.value)}
+                  placeholder="Ej: Delivery gratis en compras mayores a $20, o $2 tarifa plana en el casco central."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none"
+                />
+                <span className="text-[11px] text-slate-500 mt-0.5 block">
+                  La IA respondera con esta politica cuando pregunten por envios.
+                </span>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Zonas de Cobertura
+                </label>
+                <textarea
+                  rows={2}
+                  value={zonasDelivery}
+                  onChange={(e) => setZonasDelivery(e.target.value)}
+                  placeholder="Ej: Casco central, Zona Norte, Zona Este y envios nacionales por Zoom/MRW."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none"
+                />
+                <span className="text-[11px] text-slate-500 mt-0.5 block">
+                  Sectores o ciudades donde el negocio realiza entregas.
+                </span>
+              </div>
             </div>
 
             {msgExitoConfig && (

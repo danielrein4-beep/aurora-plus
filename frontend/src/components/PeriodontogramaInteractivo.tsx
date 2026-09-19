@@ -158,46 +158,46 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
   const indiceBop = totalPiezasRegistradas > 0 ? Math.round((piezasConSangrado / totalPiezasRegistradas) * 100) : 0;
 
   const colorProfundidad = (mm: number) => {
-    if (mm <= 3) return "text-emerald-400 bg-emerald-500/10 border-emerald-500/30";
-    if (mm <= 5) return "text-amber-400 bg-amber-500/15 border-amber-500/40";
-    return "text-rose-400 bg-rose-500/20 border-rose-500/50 font-bold";
+    if (mm <= 3) return "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30";
+    if (mm <= 5) return "text-amber-600 dark:text-amber-400 bg-amber-500/15 border-amber-500/40";
+    return "text-rose-600 dark:text-rose-400 bg-rose-500/20 border-rose-500/50 font-bold";
   };
 
   const cur = getDiente(dienteActivo);
 
   return (
-    <div className="space-y-6 text-slate-100 text-left">
+    <div className="space-y-6 text-slate-900 dark:text-slate-100 text-left">
       {/* Cabecera y Metricas Periodontales */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-3xl bg-slate-900/80 border border-white/10 backdrop-blur-md">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 backdrop-blur-md">
         <div>
-          <h3 className="font-['Outfit'] font-black text-xl text-white flex items-center gap-2">
+          <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
             <span>Periodontograma Clinico (Sondaje de 6 Puntos)</span>
-            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40">
+            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/40">
               Profundidad & BOP
             </span>
           </h3>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Evaluacion milimetrica de bolsas periodontales para {pacienteNombre || "Paciente Activo"}
           </p>
         </div>
 
         {/* Tarjetas de Diagnostico Rapido */}
         <div className="flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-center min-w-[90px]">
-            <div className="text-[10px] uppercase text-slate-400 font-semibold">BOP Sangrado</div>
-            <div className={`text-xl font-black font-['Outfit'] ${indiceBop > 25 ? "text-rose-400" : "text-emerald-400"}`}>
+          <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-center min-w-[90px]">
+            <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-semibold">BOP Sangrado</div>
+            <div className={`text-xl font-black font-['Outfit'] ${indiceBop > 25 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
               {indiceBop}%
             </div>
           </div>
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-center min-w-[90px]">
-            <div className="text-[10px] uppercase text-slate-400 font-semibold">Bolsas &ge; 5mm</div>
-            <div className={`text-xl font-black font-['Outfit'] ${bolsasProfundas > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+          <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-center min-w-[90px]">
+            <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-semibold">Bolsas &ge; 5mm</div>
+            <div className={`text-xl font-black font-['Outfit'] ${bolsasProfundas > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
               {bolsasProfundas}
             </div>
           </div>
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-center min-w-[90px]">
-            <div className="text-[10px] uppercase text-slate-400 font-semibold">Piezas</div>
-            <div className="text-xl font-black font-['Outfit'] text-white">
+          <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-center min-w-[90px]">
+            <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-semibold">Piezas</div>
+            <div className="text-xl font-black font-['Outfit'] text-slate-900 dark:text-white">
               {totalPiezasRegistradas}/32
             </div>
           </div>
@@ -205,9 +205,9 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
       </div>
 
       {/* Selector de Arcadas Dentales */}
-      <div className="space-y-4 p-5 rounded-3xl bg-slate-900/60 border border-white/10">
+      <div className="space-y-4 p-5 rounded-3xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-white/10">
         <div>
-          <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">
+          <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
             Arcada Superior (Maxilar)
           </span>
           <div className="grid grid-cols-8 sm:grid-cols-16 gap-1.5 mt-2">
@@ -223,14 +223,14 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
                   onClick={() => setDienteActivo(fdi)}
                   className={`p-2 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 ${
                     esActivo
-                      ? "bg-emerald-500/25 border-emerald-400 text-white ring-2 ring-emerald-500/40"
-                      : "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
+                      ? "bg-emerald-500/25 border-emerald-400 text-slate-900 dark:text-white ring-2 ring-emerald-500/40"
+                      : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-slate-300"
                   }`}
                 >
                   <span className="text-xs font-black">{fdi}</span>
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                      maxSondaje >= 5 ? "bg-rose-500/30 text-rose-300" : (maxSondaje >= 4 ? "bg-amber-500/30 text-amber-300" : "bg-emerald-500/20 text-emerald-300")
+                      maxSondaje >= 5 ? "bg-rose-500/30 text-rose-700 dark:text-rose-300" : (maxSondaje >= 4 ? "bg-amber-500/30 text-amber-700 dark:text-amber-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300")
                     }`}
                   >
                     {maxSondaje}mm
@@ -242,8 +242,8 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
           </div>
         </div>
 
-        <div className="pt-3 border-t border-white/10">
-          <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">
+        <div className="pt-3 border-t border-slate-200 dark:border-white/10">
+          <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
             Arcada Inferior (Mandibula)
           </span>
           <div className="grid grid-cols-8 sm:grid-cols-16 gap-1.5 mt-2">
@@ -259,14 +259,14 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
                   onClick={() => setDienteActivo(fdi)}
                   className={`p-2 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 ${
                     esActivo
-                      ? "bg-emerald-500/25 border-emerald-400 text-white ring-2 ring-emerald-500/40"
-                      : "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
+                      ? "bg-emerald-500/25 border-emerald-400 text-slate-900 dark:text-white ring-2 ring-emerald-500/40"
+                      : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-slate-300"
                   }`}
                 >
                   <span className="text-xs font-black">{fdi}</span>
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                      maxSondaje >= 5 ? "bg-rose-500/30 text-rose-300" : (maxSondaje >= 4 ? "bg-amber-500/30 text-amber-300" : "bg-emerald-500/20 text-emerald-300")
+                      maxSondaje >= 5 ? "bg-rose-500/30 text-rose-700 dark:text-rose-300" : (maxSondaje >= 4 ? "bg-amber-500/30 text-amber-700 dark:text-amber-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300")
                     }`}
                   >
                     {maxSondaje}mm
@@ -280,24 +280,24 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
       </div>
 
       {/* Editor Clinico Detallado de la Pieza Activa */}
-      <div className="p-6 rounded-3xl bg-slate-900/90 border border-emerald-500/30 shadow-xl space-y-6">
-        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-emerald-500/30 shadow-xl space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-4">
           <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 font-black text-lg flex items-center justify-center border border-emerald-500/30">
+            <span className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-black text-lg flex items-center justify-center border border-emerald-500/30">
               {dienteActivo}
             </span>
             <div>
-              <h4 className="font-['Outfit'] font-black text-lg text-white">
+              <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
                 Detalle Periodontal - Diente FDI {dienteActivo}
               </h4>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Sondaje en mm por cara anatómica, sangrado gingival y movilidad
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {mensaje && <span className="text-xs text-emerald-400 font-bold mr-2">{mensaje}</span>}
+            {mensaje && <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold mr-2">{mensaje}</span>}
             <button
               type="button"
               onClick={() => guardarDienteActual(dienteActivo)}
@@ -312,13 +312,13 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
         {/* Cuadricula de 6 puntos de sondaje */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Cara Vestibular (3 puntos) */}
-          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+          <div className="p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-3">
+            <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block">
               Cara Vestibular (3 Sitios)
             </span>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Mesio-Vestibular</label>
+                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Mesio-Vestibular</label>
                 <input
                   type="number"
                   min="1"
@@ -329,7 +329,7 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
                 />
               </div>
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Medio-Vestibular</label>
+                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Medio-Vestibular</label>
                 <input
                   type="number"
                   min="1"
@@ -340,7 +340,7 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
                 />
               </div>
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Disto-Vestibular</label>
+                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Disto-Vestibular</label>
                 <input
                   type="number"
                   min="1"
@@ -354,13 +354,13 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
           </div>
 
           {/* Cara Palatina / Lingual (3 puntos) */}
-          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+          <div className="p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-3">
+            <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block">
               Cara Lingual / Palatina (3 Sitios)
             </span>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Mesio-Lingual</label>
+                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Mesio-Lingual</label>
                 <input
                   type="number"
                   min="1"
@@ -371,7 +371,7 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
                 />
               </div>
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Medio-Lingual</label>
+                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Medio-Lingual</label>
                 <input
                   type="number"
                   min="1"
@@ -382,7 +382,7 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
                 />
               </div>
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Disto-Lingual</label>
+                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Disto-Lingual</label>
                 <input
                   type="number"
                   min="1"
@@ -404,8 +404,8 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
             onClick={() => actualizarValor(dienteActivo, "sangradoBop", !cur.sangradoBop)}
             className={`p-3 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-2 ${
               cur.sangradoBop
-                ? "bg-rose-500/20 border-rose-500 text-rose-300 ring-1 ring-rose-500/50"
-                : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                ? "bg-rose-500/20 border-rose-500 text-rose-700 dark:text-rose-300 ring-1 ring-rose-500/50"
+                : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-white/10"
             }`}
           >
             <span className={`w-2.5 h-2.5 rounded-full ${cur.sangradoBop ? "bg-rose-500 animate-pulse" : "bg-slate-600"}`}></span>
@@ -418,8 +418,8 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
             onClick={() => actualizarValor(dienteActivo, "placa", !cur.placa)}
             className={`p-3 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-2 ${
               cur.placa
-                ? "bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500/50"
-                : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                ? "bg-amber-500/20 border-amber-500 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/50"
+                : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-white/10"
             }`}
           >
             <span className={`w-2.5 h-2.5 rounded-full ${cur.placa ? "bg-amber-500" : "bg-slate-600"}`}></span>
@@ -427,12 +427,12 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
           </button>
 
           {/* Movilidad */}
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
-            <span className="text-slate-400 font-semibold">Movilidad:</span>
+          <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-between text-xs">
+            <span className="text-slate-500 dark:text-slate-400 font-semibold">Movilidad:</span>
             <select
               value={cur.movilidad}
               onChange={(e) => actualizarValor(dienteActivo, "movilidad", Number(e.target.value))}
-              className="bg-slate-800 border border-white/20 rounded-xl px-2 py-1 text-emerald-400 font-bold"
+              className="bg-slate-800 border border-slate-300 dark:border-white/20 rounded-xl px-2 py-1 text-emerald-600 dark:text-emerald-400 font-bold"
             >
               <option value="0">Grado 0 (Normal)</option>
               <option value="1">Grado 1 (&le; 1mm)</option>
@@ -442,12 +442,12 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
           </div>
 
           {/* Furca */}
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
-            <span className="text-slate-400 font-semibold">Lesion Furca:</span>
+          <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-between text-xs">
+            <span className="text-slate-500 dark:text-slate-400 font-semibold">Lesion Furca:</span>
             <select
               value={cur.furca}
               onChange={(e) => actualizarValor(dienteActivo, "furca", Number(e.target.value))}
-              className="bg-slate-800 border border-white/20 rounded-xl px-2 py-1 text-emerald-400 font-bold"
+              className="bg-slate-800 border border-slate-300 dark:border-white/20 rounded-xl px-2 py-1 text-emerald-600 dark:text-emerald-400 font-bold"
             >
               <option value="0">Sin lesion</option>
               <option value="1">Clase I</option>
@@ -459,13 +459,13 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
 
         {/* Notas clinicas del diente */}
         <div>
-          <label className="text-[11px] text-slate-400 block mb-1">Notas de evolucion periodontal:</label>
+          <label className="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Notas de evolucion periodontal:</label>
           <input
             type="text"
             value={cur.notas}
             onChange={(e) => actualizarValor(dienteActivo, "notas", e.target.value)}
             placeholder="Ej: Compromiso oseo interproximal, margen gingival retraido 2mm..."
-            className="w-full p-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
+            className="w-full p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
           />
         </div>
       </div>

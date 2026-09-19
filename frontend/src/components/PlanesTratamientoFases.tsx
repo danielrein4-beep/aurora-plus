@@ -43,15 +43,20 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
   const [notasNuevoPlan, setNotasNuevoPlan] = useState("");
   const [notificacion, setNotificacion] = useState("");
 
-  // Items provisionales al crear plan
+  // Items del plan que el odontologo arma a mano para ESTE paciente — nunca una
+  // plantilla fija: cada paciente necesita piezas, procedimientos y costos distintos.
+  const itemVacio = { fase: "FASE_1_HIGIENE", dienteFdi: "", cara: "", procedimiento: "", costoUsd: "" };
   const [itemsNuevos, setItemsNuevos] = useState<
-    { fase: string; dienteFdi: number; cara: string; procedimiento: string; costoUsd: number }[]
-  >([
-    { fase: "FASE_1_HIGIENE", dienteFdi: 11, cara: "Oclusal", procedimiento: "Profilaxis y Destartraje Ultrasonico", costoUsd: 35.0 },
-    { fase: "FASE_1_HIGIENE", dienteFdi: 16, cara: "Oclusal", procedimiento: "Restauracion Resina Compuesta", costoUsd: 40.0 },
-    { fase: "FASE_2_QUIRURGICA", dienteFdi: 24, cara: "General", procedimiento: "Tratamiento de Conducto (Endodoncia)", costoUsd: 120.0 },
-    { fase: "FASE_3_REHABILITACION", dienteFdi: 24, cara: "Total", procedimiento: "Corona de Zirconio Libre de Metal", costoUsd: 250.0 },
-  ]);
+    { fase: string; dienteFdi: string; cara: string; procedimiento: string; costoUsd: string }[]
+  >([{ ...itemVacio }]);
+
+  const actualizarItemNuevo = (idx: number, campo: keyof typeof itemVacio, valor: string) => {
+    setItemsNuevos((prev) => prev.map((it, i) => (i === idx ? { ...it, [campo]: valor } : it)));
+  };
+
+  const agregarItemNuevo = () => setItemsNuevos((prev) => [...prev, { ...itemVacio }]);
+
+  const quitarItemNuevo = (idx: number) => setItemsNuevos((prev) => prev.filter((_, i) => i !== idx));
 
   useEffect(() => {
     cargarPlanes();
@@ -79,6 +84,13 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
     e.preventDefault();
     if (!nombreNuevoPlan.trim()) return;
 
+    const itemsValidos = itemsNuevos.filter((it) => it.procedimiento.trim() && it.costoUsd.trim());
+    if (itemsValidos.length === 0) {
+      setNotificacion("Agrega al menos un procedimiento con su costo antes de crear el plan.");
+      setTimeout(() => setNotificacion(""), 3500);
+      return;
+    }
+
     try {
       const token = localStorage.getItem("aurora_token") || "";
       const res = await fetch("/api/salud/odontologia/planes", {
@@ -91,7 +103,13 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
           pacienteId,
           nombrePlan: nombreNuevoPlan,
           notas: notasNuevoPlan,
-          items: itemsNuevos,
+          items: itemsValidos.map((it) => ({
+            fase: it.fase,
+            dienteFdi: it.dienteFdi.trim() ? Number(it.dienteFdi) : null,
+            cara: it.cara.trim() || null,
+            procedimiento: it.procedimiento.trim(),
+            costoUsd: Number(it.costoUsd),
+          })),
         }),
       });
 
@@ -99,6 +117,7 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
         setModalNuevoPlan(false);
         setNombreNuevoPlan("");
         setNotasNuevoPlan("");
+        setItemsNuevos([{ ...itemVacio }]);
         setNotificacion("Plan de tratamiento creado con exito.");
         cargarPlanes();
         setTimeout(() => setNotificacion(""), 3500);
@@ -151,17 +170,17 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
   };
 
   return (
-    <div className="space-y-6 text-slate-100 text-left">
+    <div className="space-y-6 text-slate-900 dark:text-slate-100 text-left">
       {/* Cabecera */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-3xl bg-slate-900/80 border border-white/10 backdrop-blur-md">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 backdrop-blur-md">
         <div>
-          <h3 className="font-['Outfit'] font-black text-xl text-white flex items-center gap-2">
+          <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
             <span>Planes de Tratamiento & Presupuestacion por Fases</span>
-            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40">
               Presupuesto Dual USD/Bs.
             </span>
           </h3>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Planes progresivos para {pacienteNombre || "Paciente Activo"} con descarga automatica de insumos
           </p>
         </div>
@@ -179,14 +198,14 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
       </div>
 
       {notificacion && (
-        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold animate-fadeIn">
+        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold animate-fadeIn">
           {notificacion}
         </div>
       )}
 
       {/* Listado de Planes */}
       {planes.length === 0 ? (
-        <div className="p-8 rounded-3xl bg-slate-900/40 border border-white/10 text-center text-slate-400 text-xs">
+        <div className="p-8 rounded-3xl bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-white/10 text-center text-slate-500 dark:text-slate-400 text-xs">
           No hay planes de tratamiento formulados para este paciente. Haga clic en "Formular Nuevo Plan por Fases" para comenzar.
         </div>
       ) : (
@@ -202,25 +221,25 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
           return (
             <div
               key={plan.id}
-              className="p-6 rounded-3xl bg-slate-900/90 border border-white/10 space-y-5 shadow-xl"
+              className="p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-white/10 space-y-5 shadow-xl"
             >
               {/* Encabezado del Plan */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-white/10 pb-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-emerald-400 font-bold">#PLAN-{plan.id}</span>
-                    <h4 className="font-['Outfit'] font-black text-lg text-white">{plan.nombre_plan}</h4>
+                    <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold">#PLAN-{plan.id}</span>
+                    <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{plan.nombre_plan}</h4>
                     <span
                       className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
                         plan.estado === "APROBADO"
-                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                          : "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                          ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                          : "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40"
                       }`}
                     >
                       {plan.estado}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-400 mt-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     Creado el {new Date(plan.fecha_creacion).toLocaleDateString()} &bull; Tasa BCV aplicable: {tasaBcv.toFixed(2)} Bs/$
                   </div>
                 </div>
@@ -228,11 +247,11 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                 {/* Resumen financiero */}
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <div className="text-xs text-slate-400">Total Presupuesto</div>
-                    <div className="text-lg font-black font-['Outfit'] text-emerald-400">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Total Presupuesto</div>
+                    <div className="text-lg font-black font-['Outfit'] text-emerald-600 dark:text-emerald-400">
                       ${totalUsd.toFixed(2)} USD
                     </div>
-                    <div className="text-[11px] text-slate-400">
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
                       {totalVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
                     </div>
                   </div>
@@ -241,7 +260,7 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                     <button
                       type="button"
                       onClick={() => handleAprobarPlan(plan.id)}
-                      className="px-3.5 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold hover:bg-emerald-500/30 transition cursor-pointer"
+                      className="px-3.5 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-500/30 transition cursor-pointer"
                     >
                       Aprobar Plan
                     </button>
@@ -256,12 +275,12 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                   const subtotalFase = itemsFase.reduce((acc, curr) => acc + Number(curr.costo_usd || 0), 0);
 
                   return (
-                    <div key={fase} className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
-                      <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                        <span className="text-xs font-bold text-teal-300 uppercase tracking-wider">
+                    <div key={fase} className="rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-200/70 dark:border-white/5 pb-2">
+                        <span className="text-xs font-bold text-teal-700 dark:text-teal-300 uppercase tracking-wider">
                           {fName(fase)}
                         </span>
-                        <span className="text-xs font-black text-white font-mono">
+                        <span className="text-xs font-black text-slate-900 dark:text-white font-mono">
                           Subtotal: ${subtotalFase.toFixed(2)} USD
                         </span>
                       </div>
@@ -273,20 +292,20 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                           return (
                             <div
                               key={item.id}
-                              className="flex items-center justify-between p-3 rounded-xl bg-black/30 border border-white/5 text-xs"
+                              className="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-black/30 border border-slate-200/70 dark:border-white/5 text-xs"
                             >
                               <div className="flex items-center gap-3">
                                 {item.diente_fdi && (
-                                  <span className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 font-black text-xs flex items-center justify-center border border-emerald-500/30 font-mono">
+                                  <span className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-black text-xs flex items-center justify-center border border-emerald-500/30 font-mono">
                                     {item.diente_fdi}
                                   </span>
                                 )}
                                 <div>
-                                  <div className="font-bold text-white">{item.procedimiento}</div>
-                                  <div className="text-[11px] text-slate-400">
+                                  <div className="font-bold text-slate-900 dark:text-white">{item.procedimiento}</div>
+                                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
                                     Cara: {item.cara || "General"} &bull; Responsable: {item.odontologo_responsable || "Dra. Titular"}
                                     {item.kit_descargado && (
-                                      <span className="text-emerald-400 font-bold ml-2">
+                                      <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-2">
                                         &bull; Insumos descontados de stock
                                       </span>
                                     )}
@@ -295,19 +314,19 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                               </div>
 
                               <div className="flex items-center gap-3">
-                                <span className="font-black text-white font-mono text-sm">
+                                <span className="font-black text-slate-900 dark:text-white font-mono text-sm">
                                   ${Number(item.costo_usd).toFixed(2)}
                                 </span>
 
                                 {esRealizado ? (
-                                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+                                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
                                     Realizado
                                   </span>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={() => handleMarcarRealizado(item.id)}
-                                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-emerald-500/20 hover:border-emerald-500/40 border border-white/10 text-slate-300 hover:text-emerald-300 text-[11px] font-bold transition cursor-pointer"
+                                    className="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-white/10 hover:bg-emerald-500/20 hover:border-emerald-500/40 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-emerald-300 text-[11px] font-bold transition cursor-pointer"
                                   >
                                     Marcar Realizado & Descargar Kit
                                   </button>
@@ -329,39 +348,86 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
       {/* Modal Nuevo Plan */}
       {modalNuevoPlan && (
         <div className="fixed inset-0 z-[2500] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-          <div className="bg-slate-900 border border-white/20 rounded-3xl p-6 max-w-lg w-full text-left space-y-4 shadow-2xl">
-            <h4 className="font-['Outfit'] font-black text-xl text-white">Formular Nuevo Plan de Tratamiento</h4>
+          <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-3xl p-6 max-w-lg w-full text-left space-y-4 shadow-2xl">
+            <h4 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Formular Nuevo Plan de Tratamiento</h4>
             <form onSubmit={handleCrearPlan} className="space-y-4 text-xs">
               <div>
-                <label className="text-slate-400 block mb-1">Nombre del Plan Clinico *</label>
+                <label className="text-slate-500 dark:text-slate-400 block mb-1">Nombre del Plan Clinico *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej: Rehabilitacion Integral y Control Periodontal"
                   value={nombreNuevoPlan}
                   onChange={(e) => setNombreNuevoPlan(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-white/5 border border-white/15 text-white"
+                  className="w-full p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Notas y Diagnostico Principal</label>
+                <label className="text-slate-500 dark:text-slate-400 block mb-1">Notas y Diagnostico Principal</label>
                 <textarea
                   rows={2}
                   value={notasNuevoPlan}
                   onChange={(e) => setNotasNuevoPlan(e.target.value)}
                   placeholder="Observaciones de presupuesto, compromiso oseo o preferencias del paciente..."
-                  className="w-full p-3 rounded-xl bg-white/5 border border-white/15 text-white"
+                  className="w-full p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white"
                 />
               </div>
 
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                <div className="font-bold text-slate-300 mb-2">Procedimientos Iniciales por Fases (Plantilla):</div>
-                <div className="space-y-1.5 text-[11px] text-slate-400">
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-slate-600 dark:text-slate-300">Procedimientos de este plan *</div>
+                  <button
+                    type="button"
+                    onClick={agregarItemNuevo}
+                    className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                  >
+                    + Agregar procedimiento
+                  </button>
+                </div>
+                <div className="space-y-2">
                   {itemsNuevos.map((it, idx) => (
-                    <div key={idx} className="flex justify-between">
-                      <span>Pieza {it.dienteFdi}: {it.procedimiento}</span>
-                      <span className="font-mono text-emerald-400 font-bold">${it.costoUsd}</span>
+                    <div key={idx} className="grid grid-cols-12 gap-1.5 items-center">
+                      <select
+                        value={it.fase}
+                        onChange={(e) => actualizarItemNuevo(idx, "fase", e.target.value)}
+                        className="col-span-3 p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white text-[10px]"
+                      >
+                        <option value="FASE_1_HIGIENE">Fase 1: Higiene</option>
+                        <option value="FASE_2_QUIRURGICA">Fase 2: Quirurgica</option>
+                        <option value="FASE_3_REHABILITACION">Fase 3: Rehabilitacion</option>
+                      </select>
+                      <input
+                        type="number"
+                        placeholder="Pieza"
+                        value={it.dienteFdi}
+                        onChange={(e) => actualizarItemNuevo(idx, "dienteFdi", e.target.value)}
+                        className="col-span-2 p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white text-[10px]"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Procedimiento *"
+                        value={it.procedimiento}
+                        onChange={(e) => actualizarItemNuevo(idx, "procedimiento", e.target.value)}
+                        className="col-span-4 p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white text-[10px]"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Costo $ *"
+                        value={it.costoUsd}
+                        onChange={(e) => actualizarItemNuevo(idx, "costoUsd", e.target.value)}
+                        className="col-span-2 p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white text-[10px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => quitarItemNuevo(idx)}
+                        disabled={itemsNuevos.length === 1}
+                        className="col-span-1 text-rose-500 dark:text-rose-400 disabled:opacity-30 text-xs font-bold"
+                        title="Quitar procedimiento"
+                      >
+                        &times;
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -370,8 +436,11 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setModalNuevoPlan(false)}
-                  className="px-4 py-2.5 rounded-xl bg-white/10 text-slate-300 font-bold"
+                  onClick={() => {
+                    setModalNuevoPlan(false);
+                    setItemsNuevos([{ ...itemVacio }]);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 font-bold"
                 >
                   Cancelar
                 </button>

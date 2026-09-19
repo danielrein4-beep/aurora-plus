@@ -1045,13 +1045,17 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           </button>
           <button
             type="button"
-            title="Atención y ventas automatizadas en WhatsApp con IA conectada a tu inventario"
+            title="Atencion y ventas automatizadas en WhatsApp con IA conectada a tu inventario en tiempo real"
             onClick={() => setModalIaVisible(true)}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 transition-colors mt-2"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 hover:scale-[1.01] active:scale-[0.99] transition-all mt-2 border border-indigo-500/20 shadow-sm"
           >
-            <IconSettings size={16} />
-            <span className="flex-1 text-left">Asistente IA WhatsApp</span>
-            <span className="text-[8px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded-full">
+            <div className="w-4 h-4 flex items-center justify-center text-indigo-500">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <span className="flex-1 text-left font-semibold">Asistente IA WhatsApp</span>
+            <span className="text-[8px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded-full border border-indigo-500/30">
               24/7
             </span>
           </button>

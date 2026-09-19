@@ -107,17 +107,17 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
   };
 
   return (
-    <div className="space-y-6 text-slate-100 text-left">
+    <div className="space-y-6 text-slate-900 dark:text-slate-100 text-left">
       {/* Cabecera */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-3xl bg-slate-900/80 border border-white/10 backdrop-blur-md">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 backdrop-blur-md">
         <div>
-          <h3 className="font-['Outfit'] font-black text-xl text-white flex items-center gap-2">
+          <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
             <span>Visor Radiografico Dental de Alto Contraste</span>
             <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
               Filtro Negativo & Zoom
             </span>
           </h3>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Galeria documental e imagenologia dental para {pacienteNombre || "Paciente Activo"}
           </p>
         </div>
@@ -136,14 +136,14 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
 
       {/* Galeria y Visor Principal */}
       {estudios.length === 0 ? (
-        <div className="p-8 rounded-3xl bg-slate-900/40 border border-white/10 text-center text-slate-400 text-xs">
+        <div className="p-8 rounded-3xl bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-white/10 text-center text-slate-500 dark:text-slate-400 text-xs">
           No hay estudios radiograficos registrados para este paciente. Haga clic en "Adjuntar Radiografia" para comenzar.
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Columna Lateral: Listado de Estudios */}
           <div className="space-y-3 lg:col-span-1">
-            <div className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-2">
+            <div className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-2">
               Estudios Disponibles ({estudios.length})
             </div>
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
@@ -160,17 +160,17 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     }}
                     className={`w-full p-3.5 rounded-2xl border text-left transition flex flex-col gap-1 ${
                       esActivo
-                        ? "bg-cyan-500/20 border-cyan-400 text-white ring-2 ring-cyan-500/30"
-                        : "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
+                        ? "bg-cyan-500/20 border-cyan-400 text-slate-900 dark:text-white ring-2 ring-cyan-500/30"
+                        : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-slate-300"
                     }`}
                   >
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-bold text-cyan-300">{est.tipo_estudio}</span>
-                      <span className="text-slate-400">{est.fecha_toma}</span>
+                      <span className="text-slate-500 dark:text-slate-400">{est.fecha_toma}</span>
                     </div>
                     <div className="font-bold text-xs truncate">{est.titulo}</div>
                     {est.diente_asociado && (
-                      <div className="text-[10px] text-slate-400">Pieza FDI: {est.diente_asociado}</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Pieza FDI: {est.diente_asociado}</div>
                     )}
                   </button>
                 );
@@ -181,12 +181,12 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
           {/* Visor Interactivo Central */}
           <div className="lg:col-span-3 space-y-4">
             {seleccionado && (
-              <div className="p-6 rounded-3xl bg-slate-900/90 border border-white/10 space-y-4 shadow-2xl">
+              <div className="p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-white/10 space-y-4 shadow-2xl">
                 {/* Barra de herramientas del visor */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-white/10 pb-4">
                   <div>
-                    <h4 className="font-['Outfit'] font-black text-lg text-white">{seleccionado.titulo}</h4>
-                    <span className="text-xs text-slate-400">
+                    <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{seleccionado.titulo}</h4>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
                       Tipo: {seleccionado.tipo_estudio} &bull; Fecha: {seleccionado.fecha_toma}
                       {seleccionado.diente_asociado && ` • Pieza FDI: ${seleccionado.diente_asociado}`}
                     </span>
@@ -201,7 +201,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                       className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 ${
                         invertido
                           ? "bg-cyan-500 text-slate-950 border-cyan-400"
-                          : "bg-white/10 text-slate-200 border-white/15 hover:bg-white/15"
+                          : "bg-slate-200 dark:bg-white/10 text-slate-200 border-slate-300 dark:border-white/15 hover:bg-white/15"
                       }`}
                     >
                       <span>Modo Negativo</span>
@@ -211,7 +211,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     <button
                       type="button"
                       onClick={() => setZoom((z) => Math.min(z + 0.25, 3))}
-                      className="p-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold"
+                      className="p-2 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold"
                       title="Acercar Zoom"
                     >
                       + Zoom
@@ -219,7 +219,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     <button
                       type="button"
                       onClick={() => setZoom((z) => Math.max(z - 0.25, 0.75))}
-                      className="p-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold"
+                      className="p-2 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold"
                       title="Alejar Zoom"
                     >
                       - Zoom
@@ -229,7 +229,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     <button
                       type="button"
                       onClick={() => setRotacion((r) => (r + 90) % 360)}
-                      className="p-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold"
+                      className="p-2 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold"
                       title="Rotar 90 grados"
                     >
                       Rotar
@@ -239,7 +239,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     <button
                       type="button"
                       onClick={resetearFiltros}
-                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 text-xs"
+                      className="p-2 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-white/10 text-slate-500 dark:text-slate-400 text-xs"
                       title="Restablecer"
                     >
                       Reset
@@ -248,9 +248,9 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                 </div>
 
                 {/* Sliders de Brillo y Contraste */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white/5 p-3 rounded-2xl border border-white/10 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-100 dark:bg-white/5 p-3 rounded-2xl border border-slate-200 dark:border-white/10 text-xs">
                   <div className="flex items-center gap-3">
-                    <span className="text-slate-400 min-w-[70px]">Brillo: {brillo}%</span>
+                    <span className="text-slate-500 dark:text-slate-400 min-w-[70px]">Brillo: {brillo}%</span>
                     <input
                       type="range"
                       min="50"
@@ -261,7 +261,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     />
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-slate-400 min-w-[70px]">Contraste: {contraste}%</span>
+                    <span className="text-slate-500 dark:text-slate-400 min-w-[70px]">Contraste: {contraste}%</span>
                     <input
                       type="range"
                       min="50"
@@ -289,7 +289,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     className="select-none pointer-events-auto cursor-grab active:cursor-grabbing"
                   />
 
-                  <div className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/75 border border-white/20 text-[10px] text-slate-300 font-mono">
+                  <div className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/75 border border-slate-300 dark:border-white/20 text-[10px] text-slate-600 dark:text-slate-300 font-mono">
                     Zoom: {Math.round(zoom * 100)}% &bull; Rot: {rotacion}&deg; &bull; Negativo: {invertido ? "ON" : "OFF"}
                   </div>
                 </div>
@@ -312,28 +312,28 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
       {/* Modal Subir Radiografia */}
       {modalSubir && (
         <div className="fixed inset-0 z-[2500] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-          <div className="bg-slate-900 border border-white/20 rounded-3xl p-6 max-w-lg w-full text-left space-y-4 shadow-2xl">
-            <h4 className="font-['Outfit'] font-black text-xl text-white">Adjuntar Estudio Radiografico</h4>
+          <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-3xl p-6 max-w-lg w-full text-left space-y-4 shadow-2xl">
+            <h4 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Adjuntar Estudio Radiografico</h4>
             <form onSubmit={handleGuardarRadiografia} className="space-y-4 text-xs">
               <div>
-                <label className="text-slate-400 block mb-1">Titulo del Estudio *</label>
+                <label className="text-slate-500 dark:text-slate-400 block mb-1">Titulo del Estudio *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej: Radiografia Panoramica Inicial o Periapical Pieza 24"
                   value={nuevoTitulo}
                   onChange={(e) => setNuevoTitulo(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-white/5 border border-white/15 text-white"
+                  className="w-full p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1">Tipo de Estudio *</label>
+                  <label className="text-slate-500 dark:text-slate-400 block mb-1">Tipo de Estudio *</label>
                   <select
                     value={nuevoTipo}
                     onChange={(e) => setNuevoTipo(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-slate-800 border border-white/15 text-white font-bold"
+                    className="w-full p-3 rounded-xl bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-bold"
                   >
                     <option value="PANORAMICA">Panoramica (Ortopanto)</option>
                     <option value="PERIAPICAL">Periapical</option>
@@ -343,7 +343,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                   </select>
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1">Pieza FDI Asociada (Opcional)</label>
+                  <label className="text-slate-500 dark:text-slate-400 block mb-1">Pieza FDI Asociada (Opcional)</label>
                   <input
                     type="number"
                     min="11"
@@ -351,31 +351,31 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     placeholder="Ej: 24"
                     value={nuevoDiente}
                     onChange={(e) => setNuevoDiente(e.target.value ? Number(e.target.value) : "")}
-                    className="w-full p-3 rounded-xl bg-white/5 border border-white/15 text-white text-center font-bold font-mono"
+                    className="w-full p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white text-center font-bold font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">URL de la Imagen o Archivo *</label>
+                <label className="text-slate-500 dark:text-slate-400 block mb-1">URL de la Imagen o Archivo *</label>
                 <input
                   type="text"
                   required
                   placeholder="https://... o ruta de archivo en la nube"
                   value={nuevaUrl}
                   onChange={(e) => setNuevaUrl(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-white/5 border border-white/15 text-white"
+                  className="w-full p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Hallazgos y Diagnostico Radiologico</label>
+                <label className="text-slate-500 dark:text-slate-400 block mb-1">Hallazgos y Diagnostico Radiologico</label>
                 <textarea
                   rows={2}
                   value={nuevosHallazgos}
                   onChange={(e) => setNuevosHallazgos(e.target.value)}
                   placeholder="Zona radiolucida apical compatible con lesion periapical, reabsorcion osea horizontal leve..."
-                  className="w-full p-3 rounded-xl bg-white/5 border border-white/15 text-white"
+                  className="w-full p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white"
                 />
               </div>
 
@@ -383,7 +383,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                 <button
                   type="button"
                   onClick={() => setModalSubir(false)}
-                  className="px-4 py-2.5 rounded-xl bg-white/10 text-slate-300 font-bold"
+                  className="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 font-bold"
                 >
                   Cancelar
                 </button>

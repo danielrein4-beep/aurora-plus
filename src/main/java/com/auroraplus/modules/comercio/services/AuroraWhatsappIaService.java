@@ -75,7 +75,7 @@ public class AuroraWhatsappIaService {
         String nombreTienda = licencia.getNombreEmpresa();
 
         // 1. Deteccion de Intencion: TASA DE CAMBIO
-        if (msgLower.contains("tasa") || msgLower.contains("dolar") || msgLower.contains("dólar") || msgLower.contains("bcv") || msgLower.contains("a como reciben")) {
+        if (msgLower.contains("tasa") || msgLower.contains("dolar") || msgLower.contains("dólar") || msgLower.contains("bcv") || msgLower.contains("a como reciben") || msgLower.contains("a cuánto")) {
             resp.intencion = "CONSULTA_TASA";
             resp.textoRespuesta = "Hola. En " + nombreTienda + " estamos trabajando con la tasa oficial BCV de " 
                 + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$. ¿En que articulo o producto te podemos ayudar hoy?";
@@ -85,7 +85,7 @@ public class AuroraWhatsappIaService {
 
         // 2. Deteccion de Intencion: PAGO MOVIL / DATOS BANCARIOS (100% aislado por Tenant)
         if (msgLower.contains("pago movil") || msgLower.contains("pago móvil") || msgLower.contains("pagomovil") 
-                || msgLower.contains("transferir") || msgLower.contains("cuenta") || msgLower.contains("datos bancarios")) {
+                || msgLower.contains("transferir") || msgLower.contains("cuenta") || msgLower.contains("datos bancarios") || msgLower.contains("coordenadas")) {
             resp.intencion = "CONSULTA_PAGO_MOVIL";
 
             boolean tieneDatos = licencia.getPagoMovilBanco() != null && !licencia.getPagoMovilBanco().isBlank()
@@ -135,7 +135,66 @@ public class AuroraWhatsappIaService {
             return resp;
         }
 
-        // 4. Deteccion de Intencion: CATALOGO / LINK DE COMPRA
+        // 4. Deteccion de Intencion: METODOS DE PAGO GENERALES
+        if (msgLower.contains("metodos de pago") || msgLower.contains("métodos de pago") || msgLower.contains("formas de pago") 
+                || msgLower.contains("como pagar") || msgLower.contains("cómo pagar") || msgLower.contains("que aceptan") || msgLower.contains("qué aceptan")) {
+            resp.intencion = "CONSULTA_METODOS_PAGO";
+            resp.textoRespuesta = "En " + nombreTienda + " aceptamos:\n"
+                + "- Pago Movil (a tasa oficial BCV de " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$)\n"
+                + "- Efectivo (USD y Bolivares)\n"
+                + "- Binance Pay (USDT)\n"
+                + "- Transferencias bancarias nacionales\n"
+                + "- Punto de venta en tienda\n\n"
+                + "Indicanos que articulo deseas o solicita 'pago movil' para enviarte los datos de cancelacion.";
+            guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
+            return resp;
+        }
+
+        // 5. Deteccion de Intencion: DELIVERY / ENVIOS
+        if (msgLower.contains("delivery") || msgLower.contains("envio") || msgLower.contains("envíos") || msgLower.contains("envian") 
+                || msgLower.contains("envían") || msgLower.contains("despacho") || msgLower.contains("domicilio") || msgLower.contains("mandar")) {
+            resp.intencion = "CONSULTA_DELIVERY";
+            String pol = licencia.getWhatsappIaPoliticaDelivery();
+            String zon = licencia.getWhatsappIaZonasDelivery();
+            if (pol != null && !pol.isBlank()) {
+                resp.textoRespuesta = "En " + nombreTienda + ": " + pol + (zon != null && !zon.isBlank() ? "\nZonas cubiertas: " + zon : "") 
+                    + "\n\nPor favor indicanos tu direccion o sector para coordinar el envio.";
+            } else {
+                resp.textoRespuesta = "Si, en " + nombreTienda + " contamos con servicio de entregas a domicilio (delivery) y envios con cobro a destino (MRW, Zoom, Tealca).\n\n"
+                    + "Indicanos que articulos requieres y tu ubicacion exacta para cotizar el despacho.";
+            }
+            guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
+            return resp;
+        }
+
+        // 6. Deteccion de Intencion: UBICACION / DIRECCION FISICA
+        if (msgLower.contains("ubicacion") || msgLower.contains("ubicación") || msgLower.contains("direccion") || msgLower.contains("dirección") 
+                || msgLower.contains("donde estan") || msgLower.contains("dónde están") || msgLower.contains("donde queda") || msgLower.contains("dónde queda") 
+                || msgLower.contains("tienda fisica") || msgLower.contains("tienda física") || msgLower.contains("sede")) {
+            resp.intencion = "CONSULTA_UBICACION";
+            String dir = licencia.getDomicilioFiscal();
+            if (dir != null && !dir.isBlank()) {
+                resp.textoRespuesta = "Nuestra ubicacion en " + nombreTienda + " es:\n" + dir + "\n\n"
+                    + "Tambien puedes ver todos nuestros articulos y pedir online con despacho en: https://auroraplus.app/catalogo/" + tenantId;
+            } else {
+                resp.textoRespuesta = "En " + nombreTienda + " atendemos pedidos en tienda y con entregas a domicilio.\n\n"
+                    + "Puedes explorar nuestros articulos y pedir online directamente en: https://auroraplus.app/catalogo/" + tenantId + "\n"
+                    + "O si lo prefieres, escribe 'asesor' para contactar directamente a un encargado.";
+            }
+            guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
+            return resp;
+        }
+
+        // 7. Deteccion de Intencion: HORARIO DE ATENCION
+        if (msgLower.contains("horario") || msgLower.contains("abren") || msgLower.contains("cierran") || msgLower.contains("abierto") || msgLower.contains("hora de trabajo")) {
+            resp.intencion = "CONSULTA_HORARIO";
+            resp.textoRespuesta = "En " + nombreTienda + " laboramos habitualmente en horario comercial de Lunes a Sabado.\n\n"
+                + "Escribenos el articulo o pedido que necesitas y con gusto te asistimos.";
+            guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
+            return resp;
+        }
+
+        // 8. Deteccion de Intencion: CATALOGO / LINK DE COMPRA
         if (msgLower.contains("catalogo") || msgLower.contains("catálogo") || msgLower.contains("lista de precios") || msgLower.contains("que venden") || msgLower.contains("qué venden")) {
             resp.intencion = "CONSULTA_CATALOGO";
             resp.textoRespuesta = "Puedes explorar todo nuestro catalogo disponible con precios en $ y Bs. directamente aqui: "
@@ -145,7 +204,7 @@ public class AuroraWhatsappIaService {
             return resp;
         }
 
-        // 5. Deteccion de Intencion: ASESOR HUMANO
+        // 9. Deteccion de Intencion: ASESOR HUMANO
         if (msgLower.contains("humano") || msgLower.contains("persona") || msgLower.contains("vendedor") || msgLower.contains("asesor") || msgLower.contains("encargado")) {
             resp.intencion = "TRANSFERENCIA_HUMANO";
             resp.textoRespuesta = "Entendido. He transferido tu conversacion a un asesor de " + nombreTienda + ". En breves momentos te respondera una persona de nuestro equipo.";
@@ -153,8 +212,11 @@ public class AuroraWhatsappIaService {
             return resp;
         }
 
-        // 6. Deteccion de Intencion: SALUDO INICIAL
-        if (msgLower.equals("hola") || msgLower.equals("buenos dias") || msgLower.equals("buenas tardes") || msgLower.equals("buenas") || msgLower.equals("hola buenas")) {
+        // 10. Deteccion de Intencion: SALUDO INICIAL
+        boolean esSaludo = msgLower.startsWith("hola") || msgLower.startsWith("buenos dias") || msgLower.startsWith("buenos días") 
+                || msgLower.startsWith("buenas tardes") || msgLower.startsWith("buenas noches") || msgLower.startsWith("buenas") 
+                || msgLower.startsWith("saludos") || msgLower.equals("que tal") || msgLower.equals("hola!");
+        if (esSaludo) {
             resp.intencion = "SALUDO";
             String saludoPers = licencia.getWhatsappIaSaludo();
             if (saludoPers != null && !saludoPers.isBlank()) {
@@ -166,7 +228,7 @@ public class AuroraWhatsappIaService {
             return resp;
         }
 
-        // 7. Busqueda en Inventario (RAG sobre productos y repuestos)
+        // 11. Busqueda en Inventario (RAG sobre productos y repuestos)
         String respuestaStock = buscarEnInventario(tenantId, msgLower, tasaVes, nombreTienda);
         if (respuestaStock != null) {
             resp.intencion = "COTIZACION_PRODUCTO";
@@ -175,13 +237,12 @@ public class AuroraWhatsappIaService {
             return resp;
         }
 
-        // 8. Respuesta por defecto orientadora
+        // 12. Respuesta por defecto orientadora
         resp.intencion = "ORIENTACION_GENERAL";
         resp.textoRespuesta = "Gracias por contactar a " + nombreTienda + ". Puedo ayudarte con disponibilidad de inventario, precios en USD/Bs., tasa BCV del dia o datos de Pago Movil. Tambien puedes ver nuestro catalogo digital en: https://auroraplus.app/catalogo/" + tenantId;
         guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
         return resp;
     }
-
     private String buscarEnInventario(Long tenantId, String consulta, BigDecimal tasaVes, String nombreTienda) {
         String[] palabras = consulta.replaceAll("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ ]", "").split("\\s+");
         List<String> keywords = new ArrayList<>();

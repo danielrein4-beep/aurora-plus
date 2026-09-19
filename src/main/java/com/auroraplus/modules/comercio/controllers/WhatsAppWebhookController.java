@@ -122,6 +122,8 @@ public class WhatsAppWebhookController {
         public Boolean activa;
         public String saludo;
         public String verifyToken;
+        public String politicaDelivery;
+        public String zonasDelivery;
     }
 
     @GetMapping("/{tenantId:[0-9]+}/config")
@@ -144,6 +146,9 @@ public class WhatsAppWebhookController {
         resp.put("verifyToken", licencia.getWhatsappWebhookVerifyToken() != null ? licencia.getWhatsappWebhookVerifyToken() : "aurora_token_" + tenantId);
         resp.put("webhookUrl", webhookUrl);
         resp.put("telefonoContacto", licencia.getTelefonoContacto());
+        resp.put("politicaDelivery", licencia.getWhatsappIaPoliticaDelivery());
+        resp.put("zonasDelivery", licencia.getWhatsappIaZonasDelivery());
+        resp.put("domicilioFiscal", licencia.getDomicilioFiscal());
 
         return ResponseEntity.ok(resp);
     }
@@ -161,12 +166,16 @@ public class WhatsAppWebhookController {
         if (req.activa != null) licencia.setWhatsappIaActiva(req.activa);
         if (req.saludo != null) licencia.setWhatsappIaSaludo(req.saludo.trim());
         if (req.verifyToken != null && !req.verifyToken.isBlank()) licencia.setWhatsappWebhookVerifyToken(req.verifyToken.trim());
+        if (req.politicaDelivery != null) licencia.setWhatsappIaPoliticaDelivery(req.politicaDelivery.trim());
+        if (req.zonasDelivery != null) licencia.setWhatsappIaZonasDelivery(req.zonasDelivery.trim());
         licenciaTenantRepository.save(licencia);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("activa", licencia.isWhatsappIaActiva());
         resp.put("saludo", licencia.getWhatsappIaSaludo());
         resp.put("verifyToken", licencia.getWhatsappWebhookVerifyToken());
+        resp.put("politicaDelivery", licencia.getWhatsappIaPoliticaDelivery());
+        resp.put("zonasDelivery", licencia.getWhatsappIaZonasDelivery());
 
         return ResponseEntity.ok(resp);
     }
