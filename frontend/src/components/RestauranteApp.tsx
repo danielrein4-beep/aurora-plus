@@ -1,3 +1,4 @@
+import BitacoraAuditoria from "./BitacoraAuditoria";
 import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -10104,7 +10105,9 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
 // ADMINISTRACIÓN — ingresos/gastos + cuentas x cobrar/pagar + cierre de caja, unidos
 // ══════════════════════════════════════════════════════════════════════════
 function Administracion({ tenantId, monedasActivas }: { tenantId: number; monedasActivas: typeof MONEDAS_POR_DEFECTO }) {
-  const [tab, setTab] = useState<"turnos" | "finanzas" | "cuentas" | "cierre" | "resumen" | "nomina">("finanzas");
+  const { user } = useAuth();
+  const esDueno = user?.rol === "DUENO_ADMIN";
+  const [tab, setTab] = useState<"turnos" | "finanzas" | "cuentas" | "cierre" | "resumen" | "nomina" | "auditoria">("finanzas");
 
   return (
     <div className="space-y-5">
@@ -10116,6 +10119,7 @@ function Administracion({ tenantId, monedasActivas }: { tenantId: number; moneda
           { id: "cierre", label: "Cierre de Caja" },
           { id: "resumen", label: "Resumen Diario" },
           { id: "nomina", label: "Nómina de Personal" },
+          ...(esDueno ? [{ id: "auditoria" as const, label: "Bitácora de Auditoría" }] : []),
         ].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id as typeof tab)}
             className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer ${tab === t.id ? "bg-teal-600 text-white shadow-xs" : "text-slate-600 dark:text-white/60"}`}>
@@ -10130,6 +10134,7 @@ function Administracion({ tenantId, monedasActivas }: { tenantId: number; moneda
       {tab === "cierre" && <CierreDeCaja tenantId={tenantId} />}
       {tab === "resumen" && <ResumenDiario tenantId={tenantId} />}
       {tab === "nomina" && <NominaPersonal tenantId={tenantId} monedasActivas={monedasActivas} />}
+      {tab === "auditoria" && esDueno && <BitacoraAuditoria moduloSugerido="HORECA" />}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import BitacoraAuditoria from "./BitacoraAuditoria";
 import { useState, useMemo, useEffect, useRef } from "react";
 import {
   IconHardware, IconPrescription, IconRetail, IconCard, IconSearch, IconTrash,
@@ -453,7 +454,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const tasaCop = tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
-  const [tab, setTab] = useState<"general" | "pos" | "inventario" | "clientes" | "gastos" | "cierre">("general");
+  const [tab, setTab] = useState<"general" | "pos" | "inventario" | "clientes" | "gastos" | "cierre" | "auditoria">("general");
 
   // Estado del Catálogo y Clientes
   const [productos, setProductos] = useState<ProductoComercio[]>(() => {
@@ -984,6 +985,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
                 { id: "gastos" as const, Icon: IconBank, etiqueta: "Ingresos & Gastos" },
                 { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
+                ...(user?.rol === "DUENO_ADMIN" ? [{ id: "auditoria" as const, Icon: IconFileText, etiqueta: "Bitácora de Auditoría" }] : []),
               ],
             },
           ]).map((grupo) => (
@@ -1650,6 +1652,12 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "cierre" && user?.tenantId && (
           <TurnoCajaComercio tenantId={user.tenantId} tasaUsdVes={tasaActivaBs} tasaUsdCop={tasaCop} />
+        )}
+
+        {tab === "auditoria" && user?.rol === "DUENO_ADMIN" && (
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+            <BitacoraAuditoria moduloSugerido="COMERCIO" />
+          </div>
         )}
 
         </main>
