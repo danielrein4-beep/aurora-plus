@@ -310,13 +310,131 @@ export function IconHourglass({ size = 24, className, stroke }: IconProps) {
   );
 }
 
-export function IconUsers({ size = 24 }: IconProps) {
+// Grupo de personas, silueta sólida gris — sin degradado, dibujado a mano (sin depender de
+// ningún paquete de íconos externo). Usado en la sección de Pacientes.
+export function IconUsers({ size = 24, className }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <circle cx="9" cy="8" r="3" {...s} />
-      <path d="M3 20a6 6 0 0 1 12 0" {...s} />
-      <path d="M16 6.5a3 3 0 0 1 0 5.8" {...s} />
-      <path d="M15 14.2a6 6 0 0 1 6 5.8" {...s} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={className ? "currentColor" : "#6B7280"} className={className}>
+      <circle cx="5.8" cy="8.2" r="2" />
+      <ellipse cx="5.8" cy="21" rx="3.6" ry="4.4" />
+      <circle cx="18.2" cy="8.2" r="2" />
+      <ellipse cx="18.2" cy="21" rx="3.6" ry="4.4" />
+      <circle cx="12" cy="8.8" r="3.1" />
+      <ellipse cx="12" cy="21.5" rx="6.4" ry="5.4" />
+    </svg>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// SET DE ÍCONOS DEL PANEL LATERAL DE MEDICLINIC — misma estética que IconUsers:
+// silueta sólida gris (currentColor si hay className, si no #6B7280), CERO
+// degradados. Los detalles internos (líneas de texto, tapa de frasco, dientes
+// de engranaje...) se logran con el MISMO color a menor opacidad, nunca con
+// un segundo color ni con degradado — así se distinguen sin "ensuciar" nada.
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Vista General — cuadrícula de panel/dashboard. */
+export function IconDashboardGrid({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={className ? "currentColor" : "#6B7280"} className={className}>
+      <rect x="3" y="3" width="8.5" height="8.5" rx="2" />
+      <rect x="12.5" y="3" width="8.5" height="8.5" rx="2" />
+      <rect x="3" y="12.5" width="8.5" height="8.5" rx="2" />
+      <rect x="12.5" y="12.5" width="8.5" height="8.5" rx="2" />
+    </svg>
+  );
+}
+
+/** Historias Clínicas — hoja con esquina doblada y líneas de texto. */
+export function IconDocumentoMedico({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={className ? "currentColor" : "#6B7280"} className={className}>
+      <path d="M5 2.5A1.5 1.5 0 0 1 6.5 1H14l6 6v14.5A1.5 1.5 0 0 1 18.5 23h-12A1.5 1.5 0 0 1 5 21.5V2.5Z" />
+      <path d="M14 1v4.5A1.5 1.5 0 0 0 15.5 7H20L14 1Z" opacity="0.45" />
+      <rect x="8" y="12" width="8" height="1.8" rx="0.9" opacity="0.5" />
+      <rect x="8" y="15.6" width="8" height="1.8" rx="0.9" opacity="0.5" />
+      <rect x="8" y="19.2" width="5" height="1.8" rx="0.9" opacity="0.5" />
+    </svg>
+  );
+}
+
+/** Red Laboratorios & Inbox — frasco de laboratorio con muestra. */
+export function IconFrascoLab({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={className ? "currentColor" : "#6B7280"} className={className}>
+      <path d="M10 2h4a1 1 0 0 1 0 2v4.4l5 8.7A2.3 2.3 0 0 1 17 20.8H7A2.3 2.3 0 0 1 5 17.1l5-8.7V4a1 1 0 0 1 0-2Z" />
+      <path d="M7.6 14.5h8.8l1.9 3.3a.8.8 0 0 1-.7 1.2H6.4a.8.8 0 0 1-.7-1.2l1.9-3.3Z" opacity="0.45" />
+      <circle cx="14.2" cy="11.6" r="0.9" opacity="0.7" />
+    </svg>
+  );
+}
+
+/** Procedimientos & Cotizador — tablilla con check. */
+export function IconClipboardCheck({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={className ? "currentColor" : "#6B7280"} className={className}>
+      <rect x="4.5" y="3" width="15" height="19" rx="2.4" />
+      <rect x="8.5" y="1" width="7" height="4.2" rx="1.4" opacity="0.5" />
+      <path d="M8.2 12.6l2.6 2.6 5-5.3" stroke="#fff" strokeWidth="1.9" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Sala de Espera & Caja — reloj de arena. */
+export function IconRelojArena({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={className ? "currentColor" : "#6B7280"} className={className}>
+      <path d="M5 2h14a1 1 0 0 1 0 2h-1.2c-.3 3-1.9 5.6-4.4 7-2.5 1.4-4.1 4-4.4 7H19a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2h1.2c.3-3 1.9-5.6 4.4-7C13.1 9.6 14.7 7 15 4H5a1 1 0 0 1 0-2Z" />
+      <path d="M8.6 18.6c.5-2 1.7-3.7 3.4-4.6 1.7.9 2.9 2.6 3.4 4.6H8.6Z" opacity="0.5" />
+    </svg>
+  );
+}
+
+/** Agenda Médica & Calendario — calendario con anillas. */
+export function IconCalendarSolido({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={className ? "currentColor" : "#6B7280"} className={className}>
+      <rect x="3" y="4.5" width="18" height="17" rx="2.4" />
+      <rect x="3" y="4.5" width="18" height="4.5" rx="2.4" opacity="0.5" />
+      <rect x="6.5" y="1.5" width="2" height="5" rx="1" />
+      <rect x="15.5" y="1.5" width="2" height="5" rx="1" />
+      <circle cx="12" cy="15" r="2.4" opacity="0.65" />
+    </svg>
+  );
+}
+
+/** Canal Endémico — barras de tendencia ascendentes. */
+export function IconChartTrend({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={className ? "currentColor" : "#6B7280"} className={className}>
+      <rect x="3" y="14" width="4" height="8" rx="1.2" opacity="0.5" />
+      <rect x="10" y="9" width="4" height="13" rx="1.2" opacity="0.75" />
+      <rect x="17" y="4" width="4" height="18" rx="1.2" />
+    </svg>
+  );
+}
+
+/** Resúmenes Financieros — billetera / tarjeta. */
+export function IconWallet({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={className ? "currentColor" : "#6B7280"} className={className}>
+      <rect x="2.5" y="6" width="19" height="14" rx="2.4" />
+      <rect x="2.5" y="6" width="19" height="4" rx="2.4" opacity="0.5" />
+      <circle cx="17" cy="14" r="1.7" opacity="0.7" />
+    </svg>
+  );
+}
+
+/** Configuración & Perfil — engranaje. */
+export function IconGearSolido({ size = 24, className }: IconProps) {
+  const dientes = [0, 45, 90, 135, 180, 225, 270, 315];
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={className ? "currentColor" : "#6B7280"} className={className}>
+      {dientes.map((deg) => (
+        <rect key={deg} x="10.5" y="0.5" width="3" height="6" rx="1" transform={`rotate(${deg} 12 12)`} />
+      ))}
+      <circle cx="12" cy="12" r="7.4" />
+      <circle cx="12" cy="12" r="3.2" opacity="0.5" />
     </svg>
   );
 }

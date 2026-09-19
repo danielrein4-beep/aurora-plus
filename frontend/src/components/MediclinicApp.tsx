@@ -7,10 +7,13 @@ import {
   IconStethoscope, IconUsers, IconFileText, IconPrescription, IconHourglass, IconCalendar,
   IconCard, IconCustomize, IconSearch, IconUser, IconCheck, IconTrash, IconRefresh,
   IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconUnlock, IconWarning, IconClose, IconBank,
-  IconWhatsApp, IconMail, IconChart, IconCoins, IconEdit, IconTooth
+  IconWhatsApp, IconMail, IconChart, IconCoins, IconEdit, IconTooth,
+  IconDashboardGrid, IconDocumentoMedico, IconFrascoLab, IconClipboardCheck, IconRelojArena,
+  IconCalendarSolido, IconChartTrend, IconWallet, IconGearSolido,
 } from "../Icons";
 import ModuloOdontologia from "./ModuloOdontologia";
 import ThemeToggle from "./ThemeToggle";
+import SpecularButton from "./SpecularButton";
 import CanalEndemico from "./CanalEndemico";
 import Cie10Buscador from "./Cie10Buscador";
 import Odontograma from "./Odontograma";
@@ -51,16 +54,16 @@ type Pagina = "general" | "pacientes" | "historias" | "odontograma" | "laborator
 type RolVista = "MEDICO" | "SECRETARIA";
 
 const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; roles?: RolVista[] }[] = [
-  { id: "general", label: "Vista General", Icon: IconCustomize },
+  { id: "general", label: "Vista General", Icon: IconDashboardGrid },
   { id: "pacientes", label: "Gestión de Pacientes", Icon: IconUsers },
-  { id: "historias", label: "Historias Clínicas", Icon: IconFileText },
-  { id: "laboratorio", label: "Red Laboratorios & Inbox", Icon: IconPrescription },
-  { id: "procedimientos", label: "Procedimientos & Cotizador", Icon: IconPrescription },
-  { id: "sala-espera", label: "Sala de Espera & Caja", Icon: IconHourglass },
-  { id: "agenda", label: "Agenda Médica & Calendario", Icon: IconCalendar },
-  { id: "canal-endemico", label: "Canal Endémico", Icon: IconChart, roles: ["MEDICO"] },
-  { id: "financiero", label: "Resúmenes Financieros", Icon: IconCard, roles: ["MEDICO"] },
-  { id: "configuracion", label: "Configuración & Perfil", Icon: IconCustomize, roles: ["MEDICO"] },
+  { id: "historias", label: "Historias Clínicas", Icon: IconDocumentoMedico },
+  { id: "laboratorio", label: "Red Laboratorios & Inbox", Icon: IconFrascoLab },
+  { id: "procedimientos", label: "Procedimientos & Cotizador", Icon: IconClipboardCheck },
+  { id: "sala-espera", label: "Sala de Espera & Caja", Icon: IconRelojArena },
+  { id: "agenda", label: "Agenda Médica & Calendario", Icon: IconCalendarSolido },
+  { id: "canal-endemico", label: "Canal Endémico", Icon: IconChartTrend, roles: ["MEDICO"] },
+  { id: "financiero", label: "Resúmenes Financieros", Icon: IconWallet, roles: ["MEDICO"] },
+  { id: "configuracion", label: "Configuración & Perfil", Icon: IconGearSolido, roles: ["MEDICO"] },
 ];
 
 const hoy = () => new Date().toISOString().slice(0, 10);
@@ -147,6 +150,44 @@ export interface TurnoSalaEspera {
   montoVES?: number;
   montoCOP?: number;
   referenciaPago?: string;
+}
+
+// Botón principal con el mismo efecto de "vidrio" (brillo WebGL que recorre el borde
+// siguiendo el cursor, sobre fondo semi-transparente con blur) que ya usa el botón
+// "Iniciar sesión" de la página principal de Aurora — ver SpecularButton.tsx. Solo se
+// usa en los CTA importantes de cada pantalla, no en los botones repetidos de tablas
+// (un render WebGL por botón sale caro si se multiplica por fila).
+const PALETA_BOTON_PRINCIPAL = {
+  teal: { tint: "#35d7c3", lineColor: "#7cf3e3", baseColor: "#0f766e" },
+  azul: { tint: "#38bdf8", lineColor: "#bae6fd", baseColor: "#0369a1" },
+} as const;
+
+function BotonPrincipal({ children, onClick, type = "button", disabled, className, color = "teal" }: {
+  children: React.ReactNode; onClick?: () => void; type?: "button" | "submit"; disabled?: boolean; className?: string;
+  color?: keyof typeof PALETA_BOTON_PRINCIPAL;
+}) {
+  const p = PALETA_BOTON_PRINCIPAL[color];
+  return (
+    <SpecularButton
+      size="md"
+      radius={12}
+      tint={p.tint}
+      tintOpacity={0.16}
+      textColor="#ffffff"
+      lineColor={p.lineColor}
+      baseColor={p.baseColor}
+      shineSize={12}
+      shineFade={45}
+      intensity={1.3}
+      proximity={220}
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      className={className}
+    >
+      {children}
+    </SpecularButton>
+  );
 }
 
 function EstiloClasico() {
@@ -473,14 +514,9 @@ function ModalClaveDoctor({
             >
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={verificando}
-              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-lg flex items-center gap-2 text-white disabled:opacity-60"
-            >
-              <IconCheck size={16} />
-              <span>{verificando ? "Verificando…" : "Entrar al Panel Médico"}</span>
-            </button>
+            <BotonPrincipal type="submit" disabled={verificando}>
+              <span className="flex items-center gap-2"><IconCheck size={16} />{verificando ? "Verificando…" : "Entrar al Panel Médico"}</span>
+            </BotonPrincipal>
           </div>
         </form>
       </div>
@@ -591,14 +627,9 @@ function ModalConfigurarClavePrimeraVez({
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={guardando}
-            className="w-full btn-electric-blue text-xs font-bold px-6 py-3 rounded-xl cursor-pointer shadow-lg flex items-center justify-center gap-2 text-white disabled:opacity-50"
-          >
-            <IconCheck size={16} />
-            <span>{guardando ? "Guardando…" : "Guardar mi PIN y entrar al Panel Médico"}</span>
-          </button>
+          <BotonPrincipal type="submit" disabled={guardando} className="w-full">
+            <span className="flex items-center justify-center gap-2"><IconCheck size={16} />{guardando ? "Guardando…" : "Guardar mi PIN y entrar al Panel Médico"}</span>
+          </BotonPrincipal>
         </form>
       </div>
     </div>
@@ -2611,13 +2642,9 @@ function GestionPacientes({
             >
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={guardando}
-              className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl disabled:opacity-50 cursor-pointer shadow-md"
-            >
+            <BotonPrincipal type="submit" disabled={guardando}>
               {guardando ? "Guardando…" : pacienteEditandoId ? "Guardar Cambios" : "Guardar Paciente"}
-            </button>
+            </BotonPrincipal>
           </div>
         </form>
       )}
@@ -6705,13 +6732,9 @@ function SalaEspera({
                 >
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  disabled={guardandoAdmision}
-                  className="px-5 py-2 rounded-xl text-white bg-teal-600 hover:bg-teal-500 font-bold shadow-md transition-all cursor-pointer disabled:opacity-50"
-                >
+                <BotonPrincipal type="submit" disabled={guardandoAdmision}>
                   {guardandoAdmision ? "Admitiendo..." : "Admitir y Asignar Turno"}
-                </button>
+                </BotonPrincipal>
               </div>
             </form>
           </div>
@@ -6793,12 +6816,9 @@ function SalaEspera({
                 >
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-md cursor-pointer"
-                >
+                <BotonPrincipal type="submit" className="flex-1">
                   Confirmar Cobro
-                </button>
+                </BotonPrincipal>
               </div>
             </form>
 
@@ -6815,15 +6835,9 @@ function SalaEspera({
               />
               {comprobanteMsg && <p className="text-[11px] font-bold">{comprobanteMsg}</p>}
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={enviandoComprobante}
-                  onClick={handleEnviarComprobantePago}
-                  className="flex-1 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-md cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
-                >
-                  <IconMail size={13} />
-                  <span>{enviandoComprobante ? "Enviando…" : "Enviar comprobante de pago vía correo"}</span>
-                </button>
+                <BotonPrincipal color="azul" disabled={enviandoComprobante} onClick={handleEnviarComprobantePago} className="flex-1">
+                  <span className="flex items-center justify-center gap-1.5"><IconMail size={13} />{enviandoComprobante ? "Enviando…" : "Enviar comprobante de pago vía correo"}</span>
+                </BotonPrincipal>
               </div>
             </div>
           </div>
@@ -8579,9 +8593,9 @@ function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, origenTasaAc
           </div>
         </div>
 
-        <button type="submit" disabled={guardando} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-60">
+        <BotonPrincipal type="submit" disabled={guardando}>
           {guardando ? "Guardando…" : "Guardar Cambios de Perfil"}
-        </button>
+        </BotonPrincipal>
       </form>
 
       {/* Motor de Personalización de PDFs: logo y firma electrónica, inyectados automáticamente
@@ -8672,10 +8686,9 @@ function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, origenTasaAc
           </p>
         </div>
 
-        <button type="button" disabled={guardandoPlantilla} onClick={guardarPlantillaRecordatorio}
-          className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-60">
+        <BotonPrincipal disabled={guardandoPlantilla} onClick={guardarPlantillaRecordatorio}>
           {guardandoPlantilla ? "Guardando…" : "Guardar Plantilla"}
-        </button>
+        </BotonPrincipal>
       </div>
 
       {/* Cambio de PIN / Contraseña del Doctor */}
@@ -8734,9 +8747,9 @@ function Configuracion({ config, onGuardar, user, tasaBcv, tasaCop, origenTasaAc
           </div>
         </div>
 
-        <button type="submit" disabled={guardandoClave} className="btn-electric-blue text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer disabled:opacity-60">
+        <BotonPrincipal type="submit" disabled={guardandoClave}>
           {guardandoClave ? "Actualizando…" : "Actualizar PIN del Doctor"}
-        </button>
+        </BotonPrincipal>
       </form>
 
       <ConfiguracionWhatsApp />
