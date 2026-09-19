@@ -911,7 +911,7 @@ export function abrirWhatsAppDirecto(telefono: string, texto: string, codigoPais
 }
 
 export function obtenerArchivoPdfDocumento(
-  tipo: "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION",
+  tipo: "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION" | "RECIPE_MEDICO",
   data: any,
   qrDataUrl?: string
 ): File {
@@ -923,6 +923,10 @@ export function obtenerArchivoPdfDocumento(
     const nombrePaciente = (data as ConsultaReportData).paciente?.nombreCompleto?.replace(/[^a-zA-Z0-9_-]/g, "_") || "Paciente";
     const expediente = (data as ConsultaReportData).paciente?.expediente || "HC";
     nombreArchivo = `Informe_${expediente}_${nombrePaciente}.pdf`;
+  } else if (tipo === "RECIPE_MEDICO") {
+    doc = construirDocRecipeMedico(data as RecipeReportData);
+    const nombrePaciente = (data as RecipeReportData).paciente?.nombre?.replace(/[^a-zA-Z0-9_-]/g, "_") || "Paciente";
+    nombreArchivo = `Recipe_${nombrePaciente}.pdf`;
   } else if (tipo === "CIERRE_CAJA") {
     doc = construirDocCierreCaja(data as CierreCajaData);
     nombreArchivo = `Cierre_Caja_${(data as CierreCajaData).fecha || "Hoy"}.pdf`;
@@ -963,7 +967,7 @@ export async function compartirNativoConArchivo(
 }
 
 export function obtenerBase64PdfDocumento(
-  tipo: "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION",
+  tipo: "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION" | "RECIPE_MEDICO",
   data: any,
   qrDataUrl?: string
 ): { base64: string; nombreArchivo: string } {
@@ -975,6 +979,10 @@ export function obtenerBase64PdfDocumento(
     const nombrePaciente = (data as ConsultaReportData).paciente?.nombreCompleto?.replace(/[^a-zA-Z0-9_-]/g, "_") || "Paciente";
     const expediente = (data as ConsultaReportData).paciente?.expediente || "HC";
     nombreArchivo = `Informe_${expediente}_${nombrePaciente}.pdf`;
+  } else if (tipo === "RECIPE_MEDICO") {
+    doc = construirDocRecipeMedico(data as RecipeReportData);
+    const nombrePaciente = (data as RecipeReportData).paciente?.nombre?.replace(/[^a-zA-Z0-9_-]/g, "_") || "Paciente";
+    nombreArchivo = `Recipe_${nombrePaciente}.pdf`;
   } else if (tipo === "CIERRE_CAJA") {
     doc = construirDocCierreCaja(data as CierreCajaData);
     nombreArchivo = `Cierre_Caja_${(data as CierreCajaData).fecha || "Hoy"}.pdf`;
@@ -1565,4 +1573,302 @@ export function generarPdfCanalEndemico(data: CanalEndemicoPdfData) {
   const doc = construirDocCanalEndemico(data);
   const ts = Date.now() % 100000;
   doc.save(`Canal_Endemico_${data.cie10}_${data.anio}_${ts}.pdf`);
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RÉCIPE MÉDICO OFICIAL & PRESCRIPCIÓN FARMACOLÓGICA (Rx)
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface RecipeItemData {
+  medicamento: string;
+  presentacion: string;
+  via: string;
+  posologia: string;
+  duracionDias: number;
+  indicacionesEspeciales?: string;
+}
+
+export interface RecipeReportData {
+  clinicaNombre?: string;
+  doctorNombre?: string;
+  especialidad?: string;
+  matriculaMPPS?: string;
+  colegioMedicos?: string;
+  telefonoContacto?: string;
+  direccionClinica?: string;
+  logoBase64?: string;
+  paciente: {
+    nombre: string;
+    identificacion: string;
+    edad?: string | number;
+    sexo?: string;
+    alergias?: string;
+    fechaConsulta: string;
+    expediente?: string;
+  };
+  diagnostico?: string;
+  cie10?: string;
+  medicamentos: RecipeItemData[];
+  indicacionesGenerales?: string;
+}
+
+export function construirDocRecipeMedico(data: RecipeReportData): jsPDF {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // ── MEMBRETE SUPERIOR CLÍNICO ──
+  doc.setFillColor(13, 148, 136); // Teal 600
+  doc.rect(0, 0, pageWidth, 28, "F");
+
+  const tieneLogo = !!data.logoBase64;
+  const textoX = tieneLogo ? 30 : 14;
+  if (tieneLogo) {
+    try {
+      doc.addImage(data.logoBase64 as string, "PNG", 12, 5, 14, 18, undefined, "FAST");
+    } catch { /* ignorar error de logo corrupto */ }
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(255, 255, 255);
+  doc.text((data.clinicaNombre || "CENTRO MÉDICO ESPECIALIZADO").toUpperCase(), textoX, 10);
+
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Dr(a). ${data.doctorNombre || "Médico Tratante"} — ${data.especialidad || "Medicina General"}`, textoX, 16);
+  doc.text(`MPPS: ${data.matriculaMPPS || "N/A"} | Col. Médicos: ${data.colegioMedicos || "N/A"}`, textoX, 21);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text("RÉCIPE MÉDICO OFICIAL", pageWidth - 14, 11, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text(`Fecha: ${data.paciente.fechaConsulta}`, pageWidth - 14, 16, { align: "right" });
+  if (data.paciente.expediente) {
+    doc.text(`Expediente: ${data.paciente.expediente}`, pageWidth - 14, 21, { align: "right" });
+  }
+
+  // ── DATOS DEL PACIENTE ──
+  let y = 33;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(14, y, pageWidth - 28, 18, 2, 2, "FD");
+
+  doc.setFontSize(8.5);
+  doc.setTextColor(15, 23, 42);
+  doc.setFont("helvetica", "bold");
+  doc.text("PACIENTE:", 18, y + 5.5);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.paciente.nombre.toUpperCase(), 38, y + 5.5);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("C.I. / DOC:", 18, y + 11);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.paciente.identificacion, 38, y + 11);
+
+  if (data.paciente.edad) {
+    doc.setFont("helvetica", "bold");
+    doc.text("EDAD:", 95, y + 5.5);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${data.paciente.edad} años`, 110, y + 5.5);
+  }
+
+  if (data.paciente.sexo) {
+    doc.setFont("helvetica", "bold");
+    doc.text("SEXO:", 95, y + 11);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.paciente.sexo, 110, y + 11);
+  }
+
+  // Alerta de Alergias
+  const tieneAlergias = data.paciente.alergias && !data.paciente.alergias.toLowerCase().includes("niega") && !data.paciente.alergias.toLowerCase().includes("ninguna");
+  if (tieneAlergias) {
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(185, 28, 28);
+    doc.text("ALERGIAS:", 145, y + 5.5);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.paciente.alergias as string, 163, y + 5.5, { maxWidth: pageWidth - 177 });
+  } else {
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(71, 85, 105);
+    doc.text("ALERGIAS:", 145, y + 5.5);
+    doc.setFont("helvetica", "normal");
+    doc.text("No refiere conocidas", 163, y + 5.5);
+  }
+
+  if (data.diagnostico) {
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(71, 85, 105);
+    doc.text("DX:", 145, y + 11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${data.diagnostico}${data.cie10 ? ` (${data.cie10})` : ""}`, 155, y + 11, { maxWidth: pageWidth - 170 });
+  }
+
+  // ── SECCIÓN 1: CUERPO DE PRESCRIPCIÓN (Rp / Medicamentos) ──
+  y = 56;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(13, 148, 136);
+  doc.text("Rp /", 14, y);
+
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text("PRESCRIPCIÓN FARMACOLÓGICA", 26, y);
+  y += 5;
+
+  doc.setDrawColor(203, 213, 225);
+  doc.line(14, y, pageWidth - 14, y);
+  y += 5;
+
+  if (data.medicamentos.length === 0) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184);
+    doc.text("No se registraron medicamentos en esta consulta.", 18, y + 5);
+    y += 15;
+  } else {
+    data.medicamentos.forEach((item, idx) => {
+      // Bloque de medicamento
+      doc.setFillColor(idx % 2 === 0 ? 255 : 248, idx % 2 === 0 ? 255 : 250, idx % 2 === 0 ? 255 : 252);
+      doc.roundedRect(14, y - 1, pageWidth - 28, 14, 1.5, 1.5, "F");
+
+      // Número
+      doc.setFillColor(13, 148, 136);
+      doc.circle(18, y + 4, 3, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.text(String(idx + 1), 18, y + 5.5, { align: "center" });
+
+      // Medicamento y Presentación
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.text(item.medicamento, 24, y + 3.5);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`[${item.presentacion} — Vía: ${item.via}]`, 24 + doc.getTextWidth(item.medicamento) + 3, y + 3.5);
+
+      // Posología
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 41, 59);
+      doc.text(`Tomar: ${item.posologia} (Duración: ${item.duracionDias} días)`, 24, y + 9);
+
+      if (item.indicacionesEspeciales) {
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Nota: ${item.indicacionesEspeciales}`, 24, y + 13, { maxWidth: pageWidth - 42 });
+        y += 4;
+      }
+
+      y += 15;
+    });
+  }
+
+  // ── SECCIÓN 2: INDICACIONES Y CUIDADOS GENERALES ──
+  y = Math.max(y + 2, 160);
+  doc.setDrawColor(226, 232, 240);
+  doc.line(14, y, pageWidth - 14, y);
+  y += 6;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+  doc.setTextColor(13, 148, 136);
+  doc.text("INDICACIONES Y CUIDADOS AL PACIENTE", 14, y);
+  y += 5;
+
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(14, y, pageWidth - 28, 26, 2, 2, "F");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  const textoIndicaciones = data.indicacionesGenerales || 
+    "1. Cumplir estrictamente el horario y duración de las dosis prescritas.\n" +
+    "2. Mantener adecuada hidratación y reposo relativo según evolución clínica.\n" +
+    "3. No suspender antibióticos antes de tiempo ni automedicarse.\n" +
+    "4. En caso de fiebre persistente (>38.5°C), dolor severo o reacción adversa, acudir a urgencias.";
+  doc.text(textoIndicaciones, 18, y + 5.5, { maxWidth: pageWidth - 36 });
+
+  // ── SECCIÓN DE FIRMA Y SELLO ──
+  const yFirma = pageHeight - 42;
+  const xFirma = pageWidth - 75;
+
+  doc.setDrawColor(100, 116, 139);
+  doc.line(xFirma, yFirma, pageWidth - 14, yFirma);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Dr(a). ${data.doctorNombre || "Médico Tratante"}`, xFirma + 30, yFirma + 4.5, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`${data.especialidad || "Medicina General"}`, xFirma + 30, yFirma + 8.5, { align: "center" });
+  doc.text(`MPPS: ${data.matriculaMPPS || "N/A"} | Col. Médicos: ${data.colegioMedicos || "N/A"}`, xFirma + 30, yFirma + 12.5, { align: "center" });
+
+  // Cuadro de Sello Húmedo
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineDashPattern([2, 2], 0);
+  doc.roundedRect(14, yFirma - 6, 45, 22, 2, 2, "D");
+  doc.setLineDashPattern([], 0);
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text("Espacio para Sello Húmedo", 36.5, yFirma + 5, { align: "center" });
+
+  // ── PIE LEGAL Y FECHA DE VENCIMIENTO ──
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text(
+    `Documento médico emitido conforme a las regulaciones sanitarias vigentes. Válido por 30 días a partir de su emisión (${data.paciente.fechaConsulta}).`,
+    14,
+    pageHeight - 8
+  );
+
+  return doc;
+}
+
+export function generarPdfRecipeMedico(data: RecipeReportData) {
+  const doc = construirDocRecipeMedico(data);
+  const nombreLimpio = data.paciente.nombre.replace(/[^a-zA-Z0-9]/g, "_");
+  doc.save(`Recipe_Medico_${nombreLimpio}_${Date.now() % 100000}.pdf`);
+}
+
+export async function obtenerBase64PdfRecipe(data: RecipeReportData): Promise<string> {
+  const doc = construirDocRecipeMedico(data);
+  const dataUri = doc.output("datauristring");
+  return dataUri.split(",")[1];
+}
+
+export function generarTextoWhatsAppRecipe(data: RecipeReportData): string {
+  let txt = `*RECIPE MEDICO — ${data.clinicaNombre || "CENTRO MEDICO"}*\n`;
+  txt += `Dr(a). ${data.doctorNombre || "Medico Tratante"} (MPPS: ${data.matriculaMPPS || "N/A"})\n\n`;
+  txt += `*Paciente:* ${data.paciente.nombre}\n`;
+  txt += `*Fecha:* ${data.paciente.fechaConsulta}\n\n`;
+  txt += `*MEDICAMENTOS PRESCRITOS (Rp):*\n`;
+
+  if (data.medicamentos.length === 0) {
+    txt += `(Sin medicamentos indicados en esta sesion)\n`;
+  } else {
+    data.medicamentos.forEach((m, idx) => {
+      txt += `${idx + 1}. *${m.medicamento}* (${m.presentacion})\n`;
+      txt += `   Tomar: ${m.posologia} por ${m.duracionDias} dias.\n`;
+      if (m.indicacionesEspeciales) {
+        txt += `   Nota: ${m.indicacionesEspeciales}\n`;
+      }
+    });
+  }
+
+  if (data.indicacionesGenerales) {
+    txt += `\n*Indicaciones Generales:*\n${data.indicacionesGenerales}\n`;
+  }
+
+  txt += `\n_Conserve este mensaje o el PDF adjunto para presentarlo en la farmacia._`;
+  return txt;
 }

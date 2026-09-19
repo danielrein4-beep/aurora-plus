@@ -18,6 +18,13 @@ import CanalEndemico from "./CanalEndemico";
 import Cie10Buscador from "./Cie10Buscador";
 import Odontograma from "./Odontograma";
 import HistorialImportacionesSalud from "./HistorialImportacionesSalud";
+import { VademecumPrescriptor, type ItemRecipePrescrito } from "./VademecumPrescriptor";
+import {
+  generarPdfRecipeMedico,
+  generarTextoWhatsAppRecipe,
+  type RecipeReportData,
+  type RecipeItemData,
+} from "../utils/pdfReports";
 import { useAuth } from "../context/AuthContext";
 import {
   contadorInboxExamenesRecibidos, listarExamenesRecibidosPorPaciente, type ExamenRecibidoPaciente,
@@ -3096,6 +3103,7 @@ function HistoriasClinicas({
   const [consultaDetalle, setConsultaDetalle] = useState<ConsultaMedica | null>(null);
   const [consultaSeleccionadaFicha, setConsultaSeleccionadaFicha] = useState<ConsultaMedica | null>(null);
 
+  const [itemsRecipe, setItemsRecipe] = useState<ItemRecipePrescrito[]>([]);
   const [form, setForm] = useState({
     motivoConsulta: "",
     talla: "1.75",
@@ -3171,6 +3179,7 @@ function HistoriasClinicas({
   };
 
   const limpiarFormulario = () => {
+    setItemsRecipe([]);
     setForm({
       motivoConsulta: "",
       talla: "1.75",
@@ -3263,7 +3272,8 @@ function HistoriasClinicas({
         motivoConsulta: form.motivoConsulta,
         descripcionDiagnostico: form.descripcionDiagnostico,
         diagnosticoPrincipalCIE10: form.diagnosticoPrincipalCIE10 || undefined,
-        planTratamiento: form.planTratamiento,
+        planTratamiento: form.planTratamiento || (itemsRecipe.length > 0 ? itemsRecipe.map((it, idx) => `${idx + 1}. ${it.medicamento} (${it.presentacion}) - ${it.posologia} por ${it.duracionDias} dias.`).join("\n") : ""),
+        recipeMedicamentos: itemsRecipe.length > 0 ? JSON.stringify(itemsRecipe) : undefined,
         anotacionesPrivadas: form.anotacionesPrivadas,
         talla: form.talla,
         peso: form.peso,
@@ -3291,6 +3301,76 @@ function HistoriasClinicas({
       return null;
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const construirRecipeReportData = (itemsCustom?: ItemRecipePrescrito[], c?: ConsultaMedica): RecipeReportData | null => {
+    if (!pacienteSeleccionado) return null;
+    const listaItems = itemsCustom || itemsRecipe;
+    const medList: RecipeItemData[] = listaItems.map((it) => ({
+      medicamento: it.medicamento,
+      presentacion: it.presentacion,
+      via: it.via,
+      posologia: it.posologia,
+      duracionDias: it.duracionDias,
+      indicacionesEspeciales: it.indicacionesEspeciales,
+    }));
+
+    return {
+      clinicaNombre: config.clinicaNombre || "Centro Medico Especializado",
+      doctorNombre: config.doctorNombre || "Medico Tratante",
+      especialidad: config.especialidad || "Medicina General / Especialidades",
+      matriculaMPPS: config.matriculaMPPS || "109842",
+      colegioMedicos: config.colegioMedicos || "5421",
+      telefonoContacto: config.telefonoContacto || pacienteSeleccionado.telefono,
+      direccionClinica: config.direccionClinica,
+      logoBase64: config.logoBase64,
+      paciente: {
+        nombre: pacienteSeleccionado.nombreCompleto,
+        identificacion: pacienteSeleccionado.identificacion,
+        edad: pacienteSeleccionado.fechaNacimiento
+          ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
+          : pacienteSeleccionado.edad ?? "",
+        sexo: pacienteSeleccionado.sexo || "No especificado",
+        alergias: pacienteSeleccionado.alergias || undefined,
+        fechaConsulta: c ? fechaDeConsulta(c) : hoy(),
+        expediente: `HC-${String(pacienteSeleccionado.id).padStart(4, "0")}`,
+      },
+      diagnostico: c ? c.descripcionDiagnostico : form.descripcionDiagnostico,
+      cie10: c ? c.diagnosticoPrincipalCIE10 : form.diagnosticoPrincipalCIE10,
+      medicamentos: medList,
+      indicacionesGenerales: form.planTratamiento || undefined,
+    };
+  };
+
+  const handleGuardarYGenerarRecipe = async () => {
+    const repData = await ejecutarGuardado();
+    if (repData) {
+      const recipeData = construirRecipeReportData();
+      if (recipeData) {
+        if (onVerDocumento) {
+          onVerDocumento({ tipo: "RECIPE_MEDICO", data: recipeData });
+        } else {
+          generarPdfRecipeMedico(recipeData);
+        }
+      }
+    }
+  };
+
+  const handleDescargarPdfRecipe = (c: ConsultaMedica) => {
+    let itemsParsed: ItemRecipePrescrito[] = [];
+    if (c.recipeMedicamentos) {
+      try {
+        itemsParsed = JSON.parse(c.recipeMedicamentos);
+      } catch {}
+    }
+    const recipeData = construirRecipeReportData(itemsParsed, c);
+    if (recipeData) {
+      if (onVerDocumento) {
+        onVerDocumento({ tipo: "RECIPE_MEDICO", data: recipeData });
+      } else {
+        generarPdfRecipeMedico(recipeData);
+      }
     }
   };
 
@@ -3883,6 +3963,14 @@ function HistoriasClinicas({
                             <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                               <button
                                 type="button"
+                                title="Emitir / Ver Récipe Médico (Rx)"
+                                onClick={() => handleDescargarPdfRecipe(c)}
+                                className="w-7 h-7 rounded-lg bg-teal-500/20 hover:bg-teal-600 hover:text-white text-teal-600 dark:text-teal-400 flex items-center justify-center transition-colors cursor-pointer"
+                              >
+                                <IconPrescription size={13} />
+                              </button>
+                              <button
+                                type="button"
                                 title="Descargar Informe PDF"
                                 onClick={() => handleDescargarPdfConsulta(c)}
                                 className="w-7 h-7 rounded-lg bg-teal-500/10 hover:bg-teal-600 hover:text-white text-teal-700 dark:text-teal-300 flex items-center justify-center transition-colors cursor-pointer"
@@ -4117,11 +4205,20 @@ function HistoriasClinicas({
                     <div className="flex items-center gap-2 flex-wrap">
                       <button
                         type="button"
-                        onClick={() => handleDescargarPdfConsulta(consultaSeleccionadaFicha)}
+                        onClick={() => handleDescargarPdfRecipe(consultaSeleccionadaFicha)}
                         className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                        title="Ver o imprimir el récipe médico oficial"
+                      >
+                        <IconPrescription size={14} />
+                        <span>Récipe (Rx)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDescargarPdfConsulta(consultaSeleccionadaFicha)}
+                        className="px-3.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
                       >
                         <IconFileText size={14} />
-                        <span>Ver Informe / PDF</span>
+                        <span>Informe PDF</span>
                       </button>
                       <button
                         type="button"
@@ -4412,18 +4509,50 @@ function HistoriasClinicas({
               </div>
             </div>
 
-            {/* 5. Prescripción Farmacológica / Récipe (Rx) */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-white/90">
-                Prescripción Farmacológica / Récipe (Rx)
-              </label>
-              <textarea
-                rows={3}
-                placeholder={"1. Medicamento A - 500mg cada 8 horas por 7 días\n2. Medicamento B - 1 comprimido diario en ayunas"}
-                value={form.planTratamiento}
-                onChange={(e) => setForm({ ...form, planTratamiento: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-teal-500 shadow-xs"
+                        {/* 5. VADEMÉCUM CLÍNICO & PRESCRIPCIÓN ASISTIDA (100% COMPLETITUD) */}
+            <div className="pt-2 border-t border-slate-200/80 dark:border-white/10 space-y-3">
+              <VademecumPrescriptor
+                alergiasPaciente={pacienteSeleccionado?.alergias || ""}
+                itemsRecipe={itemsRecipe}
+                onChangeItems={(nuevos) => {
+                  setItemsRecipe(nuevos);
+                  if (nuevos.length > 0) {
+                    const resumen = nuevos.map((it, idx) => `${idx + 1}. ${it.medicamento} (${it.presentacion}) - ${it.posologia} por ${it.duracionDias} dias. ${it.indicacionesEspeciales ? `[${it.indicacionesEspeciales}]` : ""}`).join("\n");
+                    setForm((p) => ({ ...p, planTratamiento: resumen }));
+                  }
+                }}
+                onGenerarPdfRecipe={() => {
+                  const recipeData = construirRecipeReportData();
+                  if (recipeData) {
+                    if (onVerDocumento) {
+                      onVerDocumento({ tipo: "RECIPE_MEDICO", data: recipeData });
+                    } else {
+                      generarPdfRecipeMedico(recipeData);
+                    }
+                  }
+                }}
+                onEnviarWhatsAppRecipe={() => {
+                  const recipeData = construirRecipeReportData();
+                  if (recipeData && pacienteSeleccionado?.telefono) {
+                    const msg = generarTextoWhatsAppRecipe(recipeData);
+                    abrirWhatsAppDirecto(pacienteSeleccionado.telefono, msg);
+                  }
+                }}
               />
+
+              {/* Indicaciones no farmacológicas o notas adicionales */}
+              <div className="space-y-1 pt-2">
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block">
+                  Indicaciones Adicionales / Cuidados Generales al Paciente (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Instrucciones de dieta, hidratacion, signos de alarma o indicaciones especiales..."
+                  value={form.planTratamiento}
+                  onChange={(e) => setForm({ ...form, planTratamiento: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 shadow-xs"
+                />
+              </div>
             </div>
 
             {/* 6. Fecha Sugerida de Próxima Cita (Control) */}
@@ -4462,12 +4591,23 @@ function HistoriasClinicas({
 
                 <button
                   type="button"
+                  onClick={handleGuardarYGenerarRecipe}
+                  disabled={guardando}
+                  className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-2 shadow-md disabled:opacity-50 cursor-pointer transition-all"
+                  title="Guarda la consulta y emite el Récipe Médico oficial (Rx) con membrete y sello"
+                >
+                  <IconPrescription size={15} />
+                  <span>Guardar y Emitir Recipe (Rx)</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleGuardarYGenerarPdf}
                   disabled={guardando}
                   className="btn-electric-blue px-5 py-2.5 rounded-xl text-white font-bold text-xs flex items-center gap-2 shadow-md disabled:opacity-50 cursor-pointer transition-all"
                 >
                   <IconFileText size={15} />
-                  <span>Guardar y Generar PDF</span>
+                  <span>Informe Medico PDF</span>
                 </button>
               </div>
             </div>
@@ -4556,12 +4696,25 @@ function HistoriasClinicas({
                   onClick={() => {
                     const c = consultaDetalle;
                     setConsultaDetalle(null);
-                    handleDescargarPdfConsulta(c);
+                    handleDescargarPdfRecipe(c);
                   }}
                   className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                  title="Ver o imprimir el récipe médico oficial (Rx)"
+                >
+                  <IconPrescription size={14} />
+                  <span>Récipe Médico (Rx)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = consultaDetalle;
+                    setConsultaDetalle(null);
+                    handleDescargarPdfConsulta(c);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
                 >
                   <IconFileText size={14} />
-                  <span>Ver Informe / Imprimir</span>
+                  <span>Informe PDF</span>
                 </button>
                 <button
                   type="button"

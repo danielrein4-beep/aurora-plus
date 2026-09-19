@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from "react";
 
+// El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
+// no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
+function obtenerTokenSesion(): string {
+  try {
+    const raw = localStorage.getItem("aurora_token");
+    if (!raw) return "";
+    return JSON.parse(raw).token || "";
+  } catch {
+    return "";
+  }
+}
+
+
 interface EvolucionClinicaSesionesProps {
   pacienteId: number;
   pacienteNombre?: string;
@@ -45,7 +58,7 @@ export const EvolucionClinicaSesiones: React.FC<EvolucionClinicaSesionesProps> =
   const cargarSesiones = async () => {
     setCargando(true);
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch(`/api/salud/odontologia/evolucion?pacienteId=${pacienteId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -65,7 +78,7 @@ export const EvolucionClinicaSesiones: React.FC<EvolucionClinicaSesionesProps> =
     if (!procedimiento.trim()) return;
 
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch("/api/salud/odontologia/evolucion", {
         method: "POST",
         headers: {
@@ -95,10 +108,13 @@ export const EvolucionClinicaSesiones: React.FC<EvolucionClinicaSesionesProps> =
         setDienteFdi("");
         setMensaje("Nota de evolucion clinica guardada en expediente.");
         cargarSesiones();
-        setTimeout(() => setMensaje(""), 3500);
+      } else {
+        setMensaje(`No se pudo guardar la sesion (error ${res.status}).`);
       }
+      setTimeout(() => setMensaje(""), 3500);
     } catch {
-      setMensaje("Error al guardar la sesion.");
+      setMensaje("Fallo de conexion — la sesion NO se guardo.");
+      setTimeout(() => setMensaje(""), 3500);
     }
   };
 
@@ -137,7 +153,11 @@ export const EvolucionClinicaSesiones: React.FC<EvolucionClinicaSesionesProps> =
       </div>
 
       {mensaje && (
-        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
+        <div className={`p-3.5 rounded-2xl text-xs font-bold ${
+          mensaje.includes("NO se") || mensaje.includes("No se pudo")
+            ? "bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300"
+            : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+        }`}>
           {mensaje}
         </div>
       )}

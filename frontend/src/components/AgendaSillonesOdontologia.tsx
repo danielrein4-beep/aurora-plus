@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { type Paciente } from "../api";
 
+// El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
+// no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
+function obtenerTokenSesion(): string {
+  try {
+    const raw = localStorage.getItem("aurora_token");
+    if (!raw) return "";
+    return JSON.parse(raw).token || "";
+  } catch {
+    return "";
+  }
+}
+
+
 interface AgendaSillonesOdontologiaProps {
   pacientes: Paciente[] | null;
   pacienteActivoId?: number | null;
@@ -58,7 +71,7 @@ export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps>
   const cargarCitas = async () => {
     setCargando(true);
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch(`/api/salud/odontologia/agenda?fecha=${fechaSeleccionada}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -78,7 +91,7 @@ export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps>
     setErrorColision("");
 
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch("/api/salud/odontologia/agenda", {
         method: "POST",
         headers: {
@@ -114,7 +127,7 @@ export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps>
 
   const handleEnviarRecordatorioWhatsApp = async (citaId: number) => {
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch(`/api/salud/odontologia/agenda/${citaId}/whatsapp-recordatorio`, {
         headers: { Authorization: `Bearer ${token}` },
       });

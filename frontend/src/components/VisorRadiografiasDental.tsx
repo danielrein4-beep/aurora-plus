@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from "react";
 
+// El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
+// no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
+function obtenerTokenSesion(): string {
+  try {
+    const raw = localStorage.getItem("aurora_token");
+    if (!raw) return "";
+    return JSON.parse(raw).token || "";
+  } catch {
+    return "";
+  }
+}
+
+
 interface VisorRadiografiasDentalProps {
   pacienteId: number;
   pacienteNombre?: string;
@@ -38,6 +51,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
   const [nuevosHallazgos, setNuevosHallazgos] = useState("");
   const [nuevaUrl, setNuevaUrl] = useState("");
   const [subiendoArchivo, setSubiendoArchivo] = useState(false);
+  const [mensaje, setMensaje] = useState("");
 
   const leerImagenComoBase64 = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -66,7 +80,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
   const cargarEstudios = async () => {
     setCargando(true);
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch(`/api/salud/odontologia/radiografias?pacienteId=${pacienteId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -89,7 +103,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
     if (!nuevoTitulo.trim() || !nuevaUrl.trim()) return;
 
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch("/api/salud/odontologia/radiografias", {
         method: "POST",
         headers: {
@@ -112,10 +126,15 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
         setNuevaUrl("");
         setNuevosHallazgos("");
         setNuevoDiente("");
+        setMensaje("Radiografia guardada en el expediente.");
         cargarEstudios();
+      } else {
+        setMensaje(`No se pudo guardar la radiografia (error ${res.status}).`);
       }
+      setTimeout(() => setMensaje(""), 3500);
     } catch {
-      // Error
+      setMensaje("Fallo de conexion — la radiografia NO se guardo.");
+      setTimeout(() => setMensaje(""), 3500);
     }
   };
 
@@ -154,6 +173,12 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
           <span>Adjuntar Radiografia o Foto Clinica</span>
         </button>
       </div>
+
+      {mensaje && (
+        <div className="p-3.5 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-700 dark:text-cyan-300 text-xs font-bold">
+          {mensaje}
+        </div>
+      )}
 
       {/* Galeria y Visor Principal */}
       {estudios.length === 0 ? (

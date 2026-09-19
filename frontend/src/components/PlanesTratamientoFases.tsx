@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from "react";
 
+// El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
+// no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
+function obtenerTokenSesion(): string {
+  try {
+    const raw = localStorage.getItem("aurora_token");
+    if (!raw) return "";
+    return JSON.parse(raw).token || "";
+  } catch {
+    return "";
+  }
+}
+
+
 interface PlanesTratamientoFasesProps {
   pacienteId: number;
   pacienteNombre?: string;
@@ -65,7 +78,7 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
   const cargarPlanes = async () => {
     setCargando(true);
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch(`/api/salud/odontologia/planes?pacienteId=${pacienteId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -92,7 +105,7 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
     }
 
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch("/api/salud/odontologia/planes", {
         method: "POST",
         headers: {
@@ -120,16 +133,19 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
         setItemsNuevos([{ ...itemVacio }]);
         setNotificacion("Plan de tratamiento creado con exito.");
         cargarPlanes();
-        setTimeout(() => setNotificacion(""), 3500);
+      } else {
+        setNotificacion(`No se pudo crear el plan (error ${res.status}). Intenta de nuevo.`);
       }
+      setTimeout(() => setNotificacion(""), 3500);
     } catch {
-      setNotificacion("Error al crear el plan.");
+      setNotificacion("Fallo de conexion — el plan NO se creo. Verifica tu internet e intenta de nuevo.");
+      setTimeout(() => setNotificacion(""), 3500);
     }
   };
 
   const handleAprobarPlan = async (planId: number) => {
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch(`/api/salud/odontologia/planes/${planId}/aprobar`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -137,16 +153,19 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
       if (res.ok) {
         setNotificacion("Plan aprobado por el paciente.");
         cargarPlanes();
-        setTimeout(() => setNotificacion(""), 3000);
+      } else {
+        setNotificacion(`No se pudo aprobar el plan (error ${res.status}).`);
       }
+      setTimeout(() => setNotificacion(""), 3000);
     } catch {
-      setNotificacion("Error al aprobar plan.");
+      setNotificacion("Fallo de conexion — el plan NO se aprobo.");
+      setTimeout(() => setNotificacion(""), 3000);
     }
   };
 
   const handleMarcarRealizado = async (itemId: number) => {
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch(`/api/salud/odontologia/planes/items/${itemId}/realizar`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -155,10 +174,13 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
         const data = await res.json();
         setNotificacion(data.mensaje || "Procedimiento completado.");
         cargarPlanes();
-        setTimeout(() => setNotificacion(""), 4000);
+      } else {
+        setNotificacion(`No se pudo marcar el procedimiento (error ${res.status}).`);
       }
+      setTimeout(() => setNotificacion(""), 4000);
     } catch {
-      setNotificacion("Error al marcar procedimiento.");
+      setNotificacion("Fallo de conexion — el procedimiento NO se marco.");
+      setTimeout(() => setNotificacion(""), 4000);
     }
   };
 
@@ -198,7 +220,11 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
       </div>
 
       {notificacion && (
-        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold animate-fadeIn">
+        <div className={`p-3.5 rounded-2xl text-xs font-bold animate-fadeIn ${
+          notificacion.includes("NO se") || notificacion.includes("No se pudo") || notificacion.includes("Agrega al menos")
+            ? "bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300"
+            : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+        }`}>
           {notificacion}
         </div>
       )}

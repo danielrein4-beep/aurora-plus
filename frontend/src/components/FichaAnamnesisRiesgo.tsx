@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from "react";
 
+// El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
+// no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
+function obtenerTokenSesion(): string {
+  try {
+    const raw = localStorage.getItem("aurora_token");
+    if (!raw) return "";
+    return JSON.parse(raw).token || "";
+  } catch {
+    return "";
+  }
+}
+
+
 interface FichaAnamnesisRiesgoProps {
   pacienteId: number;
   pacienteNombre?: string;
@@ -48,7 +61,7 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
   const cargarAnamnesis = async () => {
     setCargando(true);
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch(`/api/salud/odontologia/anamnesis?pacienteId=${pacienteId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -79,7 +92,7 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
     e.preventDefault();
     setGuardando(true);
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch("/api/salud/odontologia/anamnesis", {
         method: "PUT",
         headers: {
@@ -104,10 +117,13 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
 
       if (res.ok) {
         setMensaje("Ficha de anamnesis odontologica actualizada.");
-        setTimeout(() => setMensaje(""), 3500);
+      } else {
+        setMensaje(`No se pudo guardar la anamnesis (error ${res.status}).`);
       }
+      setTimeout(() => setMensaje(""), 3500);
     } catch {
-      setMensaje("Error al guardar la anamnesis.");
+      setMensaje("Fallo de conexion — la anamnesis NO se guardo.");
+      setTimeout(() => setMensaje(""), 3500);
     } finally {
       setGuardando(false);
     }
@@ -160,7 +176,11 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
-            {mensaje && <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">{mensaje}</span>}
+            {mensaje && (
+              <span className={`text-xs font-bold ${mensaje.includes("NO se") || mensaje.includes("No se pudo") ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                {mensaje}
+              </span>
+            )}
             <button
               type="submit"
               disabled={guardando}

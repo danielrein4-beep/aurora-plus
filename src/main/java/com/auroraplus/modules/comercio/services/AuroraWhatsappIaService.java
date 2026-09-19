@@ -212,10 +212,14 @@ public class AuroraWhatsappIaService {
             return resp;
         }
 
-        // 10. Deteccion de Intencion: SALUDO INICIAL
-        boolean esSaludo = msgLower.startsWith("hola") || msgLower.startsWith("buenos dias") || msgLower.startsWith("buenos días") 
-                || msgLower.startsWith("buenas tardes") || msgLower.startsWith("buenas noches") || msgLower.startsWith("buenas") 
-                || msgLower.startsWith("saludos") || msgLower.equals("que tal") || msgLower.equals("hola!");
+        // 10. Deteccion de Intencion: SALUDO INICIAL — solo si el mensaje ES el saludo (pocas
+        // palabras). Un "Hola, tienen taladro?" no debe secuestrar el intent y saltarse la
+        // busqueda de inventario: sigue el flujo normal hasta el paso 11.
+        boolean pareceSoloSaludo = msgLower.trim().split("\\s+").length <= 3;
+        boolean esSaludo = pareceSoloSaludo && (
+                msgLower.startsWith("hola") || msgLower.startsWith("buenos dias") || msgLower.startsWith("buenos días")
+                || msgLower.startsWith("buenas tardes") || msgLower.startsWith("buenas noches") || msgLower.startsWith("buenas")
+                || msgLower.startsWith("saludos") || msgLower.equals("que tal") || msgLower.equals("hola!"));
         if (esSaludo) {
             resp.intencion = "SALUDO";
             String saludoPers = licencia.getWhatsappIaSaludo();

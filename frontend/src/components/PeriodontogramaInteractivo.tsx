@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from "react";
 
+// El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
+// no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
+function obtenerTokenSesion(): string {
+  try {
+    const raw = localStorage.getItem("aurora_token");
+    if (!raw) return "";
+    return JSON.parse(raw).token || "";
+  } catch {
+    return "";
+  }
+}
+
+
 interface PeriodontogramaInteractivoProps {
   pacienteId: number;
   pacienteNombre?: string;
@@ -48,7 +61,7 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
   const cargarPeriodontograma = async () => {
     setCargando(true);
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch(`/api/salud/odontologia/periodontograma?pacienteId=${pacienteId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -111,11 +124,21 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
     }));
   };
 
+  // Los inputs de sondaje son type="text" (no type="number") a proposito: con
+  // type="number" React no siempre redibuja el "03" residual al escribir un digito
+  // despues de un 0, porque Number("03") === 3 y React ve el mismo valor. Con texto
+  // controlamos el string mostrado directamente y el glitch desaparece.
+  const manejarCambioSondaje = (campo: keyof FilaPeriodonto, texto: string) => {
+    const soloDigitos = texto.replace(/\D/g, "");
+    const num = soloDigitos === "" ? 0 : Math.min(12, parseInt(soloDigitos, 10));
+    actualizarValor(dienteActivo, campo, num);
+  };
+
   const guardarDienteActual = async (fdi: number) => {
     setGuardando(true);
     const d = getDiente(fdi);
     try {
-      const token = localStorage.getItem("aurora_token") || "";
+      const token = obtenerTokenSesion();
       const res = await fetch("/api/salud/odontologia/periodontograma", {
         method: "PUT",
         headers: {
@@ -140,11 +163,13 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
       });
       if (res.ok) {
         setMensaje(`Pieza ${fdi} guardada.`);
-        setTimeout(() => setMensaje(""), 2500);
+      } else {
+        setMensaje(`No se pudo guardar la pieza ${fdi} (error ${res.status}). Intenta de nuevo.`);
       }
+      setTimeout(() => setMensaje(""), 3500);
     } catch {
-      setMensaje(`Guardado localmente.`);
-      setTimeout(() => setMensaje(""), 2500);
+      setMensaje("Fallo de conexion — la medicion NO se guardo. Verifica tu internet e intenta de nuevo.");
+      setTimeout(() => setMensaje(""), 3500);
     } finally {
       setGuardando(false);
     }
@@ -324,7 +349,11 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
           </div>
 
           <div className="flex items-center gap-2">
-            {mensaje && <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold mr-2">{mensaje}</span>}
+            {mensaje && (
+              <span className={`text-xs font-bold mr-2 ${mensaje.includes("NO se") || mensaje.includes("No se pudo") ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                {mensaje}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => guardarDienteActual(dienteActivo)}
@@ -347,33 +376,30 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
               <div>
                 <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Mesio-Vestibular</label>
                 <input
-                  type="number"
-                  min="1"
-                  max="12"
-                  value={cur.sondajeMv}
-                  onChange={(e) => actualizarValor(dienteActivo, "sondajeMv", Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  value={cur.sondajeMv === 0 ? "" : String(cur.sondajeMv)}
+                  onChange={(e) => manejarCambioSondaje("sondajeMv", e.target.value)}
                   className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeMv)}`}
                 />
               </div>
               <div>
                 <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Medio-Vestibular</label>
                 <input
-                  type="number"
-                  min="1"
-                  max="12"
-                  value={cur.sondajeV}
-                  onChange={(e) => actualizarValor(dienteActivo, "sondajeV", Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  value={cur.sondajeV === 0 ? "" : String(cur.sondajeV)}
+                  onChange={(e) => manejarCambioSondaje("sondajeV", e.target.value)}
                   className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeV)}`}
                 />
               </div>
               <div>
                 <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Disto-Vestibular</label>
                 <input
-                  type="number"
-                  min="1"
-                  max="12"
-                  value={cur.sondajeDv}
-                  onChange={(e) => actualizarValor(dienteActivo, "sondajeDv", Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  value={cur.sondajeDv === 0 ? "" : String(cur.sondajeDv)}
+                  onChange={(e) => manejarCambioSondaje("sondajeDv", e.target.value)}
                   className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeDv)}`}
                 />
               </div>
@@ -389,33 +415,30 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
               <div>
                 <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Mesio-Lingual</label>
                 <input
-                  type="number"
-                  min="1"
-                  max="12"
-                  value={cur.sondajeMl}
-                  onChange={(e) => actualizarValor(dienteActivo, "sondajeMl", Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  value={cur.sondajeMl === 0 ? "" : String(cur.sondajeMl)}
+                  onChange={(e) => manejarCambioSondaje("sondajeMl", e.target.value)}
                   className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeMl)}`}
                 />
               </div>
               <div>
                 <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Medio-Lingual</label>
                 <input
-                  type="number"
-                  min="1"
-                  max="12"
-                  value={cur.sondajeL}
-                  onChange={(e) => actualizarValor(dienteActivo, "sondajeL", Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  value={cur.sondajeL === 0 ? "" : String(cur.sondajeL)}
+                  onChange={(e) => manejarCambioSondaje("sondajeL", e.target.value)}
                   className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeL)}`}
                 />
               </div>
               <div>
                 <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Disto-Lingual</label>
                 <input
-                  type="number"
-                  min="1"
-                  max="12"
-                  value={cur.sondajeDl}
-                  onChange={(e) => actualizarValor(dienteActivo, "sondajeDl", Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  value={cur.sondajeDl === 0 ? "" : String(cur.sondajeDl)}
+                  onChange={(e) => manejarCambioSondaje("sondajeDl", e.target.value)}
                   className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeDl)}`}
                 />
               </div>

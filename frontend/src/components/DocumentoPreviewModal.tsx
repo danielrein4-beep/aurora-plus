@@ -23,11 +23,14 @@ import {
   compartirNativoConArchivo,
 } from "../utils/pdfReports";
 
-export type TipoDocumento = "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION";
+import type { RecipeReportData } from "../utils/pdfReports";
+import { generarTextoWhatsAppRecipe } from "../utils/pdfReports";
+
+export type TipoDocumento = "INFORME_MEDICO" | "CIERRE_CAJA" | "COTIZACION" | "RECIPE_MEDICO";
 
 export interface DocumentoVisorPayload {
   tipo: TipoDocumento;
-  data: ConsultaReportData | CierreCajaData | CotizacionData;
+  data: ConsultaReportData | CierreCajaData | CotizacionData | RecipeReportData;
 }
 
 export default function DocumentoPreviewModal({
@@ -42,6 +45,8 @@ export default function DocumentoPreviewModal({
   const [telefonoWhatsApp, setTelefonoWhatsApp] = useState<string>(
     payload.tipo === "INFORME_MEDICO"
       ? (payload.data as ConsultaReportData).paciente?.telefono || ""
+      : payload.tipo === "RECIPE_MEDICO"
+      ? (payload.data as any).paciente?.telefono || ""
       : payload.tipo === "COTIZACION"
       ? (payload.data as CotizacionData).pacienteTelefono || ""
       : ""
@@ -102,6 +107,8 @@ export default function DocumentoPreviewModal({
     try {
       if (payload.tipo === "INFORME_MEDICO") {
         return generarTextoWhatsAppConsulta(docData);
+      } else if (payload.tipo === "RECIPE_MEDICO") {
+        return generarTextoWhatsAppRecipe(docData as RecipeReportData);
       } else if (payload.tipo === "CIERRE_CAJA") {
         return generarTextoWhatsAppCierre(docData);
       } else {
