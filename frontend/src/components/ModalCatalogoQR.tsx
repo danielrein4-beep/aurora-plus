@@ -335,10 +335,11 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
                 href={urlPublica}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm hover:opacity-90"
+                style={{ backgroundColor: "#0f172a", color: "#ffffff" }}
               >
-                <SvgExternal className="w-4 h-4" />
-                <span>Abrir Catálogo en Nueva Pestaña</span>
+                <SvgExternal className="w-4 h-4" style={{ color: "#ffffff" }} />
+                <span style={{ color: "#ffffff" }}>Abrir Catálogo en Nueva Pestaña</span>
               </a>
             </div>
           </div>
