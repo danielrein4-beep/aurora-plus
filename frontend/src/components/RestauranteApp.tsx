@@ -477,7 +477,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                       n.premium
                         ? "text-white/30"
                         : pagina === n.id
-                        ? "bg-white/10 text-white"
+                        ? "sidebar-glare--active bg-white/10 text-white"
                         : alertaVencimiento
                         ? "text-red-300"
                         : "text-white/60 hover:bg-white/5 hover:text-white"

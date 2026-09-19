@@ -224,7 +224,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('general')}
             className={"sidebar-glare flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'general' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+              pagina === 'general' ? 'sidebar-glare--active bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
             )}
           >
             <IconVet size={18} />
@@ -234,7 +234,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('pacientes')}
             className={"sidebar-glare flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'pacientes' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+              pagina === 'pacientes' ? 'sidebar-glare--active bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
             )}
           >
             <IconUsers size={18} />
@@ -244,7 +244,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('historias')}
             className={"sidebar-glare flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'historias' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+              pagina === 'historias' ? 'sidebar-glare--active bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
             )}
           >
             <IconFileText size={18} />
@@ -254,7 +254,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('procedimientos')}
             className={"sidebar-glare flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'procedimientos' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+              pagina === 'procedimientos' ? 'sidebar-glare--active bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
             )}
           >
             <IconPrescription size={18} />
@@ -264,7 +264,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('sala-espera')}
             className={"sidebar-glare flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'sala-espera' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+              pagina === 'sala-espera' ? 'sidebar-glare--active bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
             )}
           >
             <IconHourglass size={18} />
@@ -274,7 +274,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('agenda')}
             className={"sidebar-glare flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'agenda' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+              pagina === 'agenda' ? 'sidebar-glare--active bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
             )}
           >
             <IconCalendar size={18} />
@@ -284,7 +284,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('financiero')}
             className={"sidebar-glare flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'financiero' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+              pagina === 'financiero' ? 'sidebar-glare--active bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
             )}
           >
             <IconCard size={18} />
@@ -294,7 +294,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('configuracion')}
             className={"sidebar-glare flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'configuracion' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+              pagina === 'configuracion' ? 'sidebar-glare--active bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
             )}
           >
             <IconSettings size={18} />
