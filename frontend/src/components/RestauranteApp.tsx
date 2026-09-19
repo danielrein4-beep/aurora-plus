@@ -434,10 +434,10 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
       <AuroraGradientDef />
       {modoClasico && <EstiloClasico />}
       {/* SIDEBAR */}
-      <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1">
-        <div className="px-2 pb-4 mb-2 border-b border-slate-300/60 dark:border-white/10">
+      <aside className="w-64 flex-shrink-0 border-r border-white/10 flex flex-col p-4 space-y-1 bg-[#0D3B3D]">
+        <div className="px-2 pb-4 mb-2 border-b border-white/10">
           <div className="flex items-center justify-between">
-            <div className="font-['Outfit'] font-black text-lg text-aurora">Aurora Horeca</div>
+            <div className="font-['Outfit'] font-black text-lg text-white">Aurora Horeca</div>
             {/* El badge "N en cocina" depende del módulo KDS, que está
                 detrás del paywall Pro — en Plan Base no debe existir en
                 el DOM, ni siquiera oculto por CSS. */}
@@ -445,13 +445,13 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 font-mono font-bold">{kdsCounts} en cocina</span>
             )}
           </div>
-          <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mt-0.5">{config.nombreLocal}</div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider mt-0.5">{config.nombreLocal}</div>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-4 pr-0.5">
           {NAV_GRUPOS.map((grupo) => (
             <div key={grupo.titulo} className="space-y-1">
-              <div className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/25">{grupo.titulo}</div>
+              <div className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-white/30">{grupo.titulo}</div>
               {sidebarItemsVisibles(grupo.items).filter((n) => n.id !== "recetas" || recetasActivas).map((n) => {
                 const alertaVencimiento = n.id === "inventario" && (lotesPorVencer || []).length > 0;
                 return (
@@ -460,12 +460,12 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                     onClick={() => irA(n.id)}
                     className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                       n.premium
-                        ? "text-slate-400 dark:text-white/30 hover:bg-slate-200/40 dark:hover:bg-white/5"
+                        ? "text-white/30 hover:bg-white/10"
                         : pagina === n.id
-                        ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 shadow-sm"
+                        ? "bg-[#177E89] text-white shadow-md"
                         : alertaVencimiento
-                        ? "text-red-600 dark:text-red-300 hover:bg-red-500/10"
-                        : "text-slate-600 dark:text-white/60 hover:bg-slate-200/60 dark:hover:bg-white/5"
+                        ? "text-red-300 hover:bg-red-500/10"
+                        : "text-white/60 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     <span className="flex items-center gap-2.5"><n.Icon size={16} /><span>{n.label}</span></span>
@@ -484,12 +484,12 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
         </div>
 
         {/* Switch Modo Clásico / Aurora */}
-        <div className="p-2.5 rounded-xl bg-slate-100/60 dark:bg-white/5 border border-slate-300/60 dark:border-white/10 text-xs mb-2">
+        <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-xs mb-2">
           <div className="flex items-center justify-between">
-            <span className="text-slate-600 dark:text-white/70 text-[11px] font-medium">Modo Clásico</span>
+            <span className="text-white/70 text-[11px] font-medium">Modo Clásico</span>
             <button
               onClick={alternarModo}
-              className={`w-9 h-5 rounded-full transition-colors relative p-0.5 cursor-pointer ${modoClasico ? "bg-teal-600" : "bg-slate-400/40"}`}
+              className={`w-9 h-5 rounded-full transition-colors relative p-0.5 cursor-pointer ${modoClasico ? "bg-[#177E89]" : "bg-white/20"}`}
             >
               <div className={`w-4 h-4 rounded-full bg-white transition-transform ${modoClasico ? "translate-x-4" : "translate-x-0"}`} />
             </button>
@@ -498,7 +498,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
 
         <button
           onClick={onSalir}
-          className="w-full px-3 py-2.5 rounded-xl text-xs font-semibold text-left text-slate-500 dark:text-white/40 hover:bg-slate-200/60 dark:hover:bg-white/5 cursor-pointer"
+          className="w-full px-3 py-2.5 rounded-xl text-xs font-semibold text-left text-white/70 hover:bg-white/10 cursor-pointer"
         >
           ← Volver al Hub
         </button>

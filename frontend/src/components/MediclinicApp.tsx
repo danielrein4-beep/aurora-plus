@@ -1091,31 +1091,31 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       <AuroraGradientDef />
       {modoClasico && <EstiloClasico />}
       
-      <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1.5 bg-slate-50/50 dark:bg-black/10">
-        <div className="px-2 pb-3 mb-2 border-b border-slate-300/60 dark:border-white/10">
+      <aside className="w-64 flex-shrink-0 border-r border-white/10 flex flex-col p-4 space-y-1.5 bg-[#0D3B3D]">
+        <div className="px-2 pb-3 mb-2 border-b border-white/10">
           <div className="flex items-center justify-between">
             {esOdontologia ? (
-              <div className="font-['Outfit'] font-black text-lg text-emerald-500 flex items-center gap-1.5">
-                <IconTooth size={20} className="text-emerald-500" />
+              <div className="font-['Outfit'] font-black text-lg text-[#5BC0BE] flex items-center gap-1.5">
+                <IconTooth size={20} className="text-[#5BC0BE]" />
                 <span>Mediclinic Odonto</span>
               </div>
             ) : (
-              <div className="font-['Outfit'] font-black text-lg text-aurora">Mediclinic Pro</div>
+              <div className="font-['Outfit'] font-black text-lg text-white">Mediclinic Pro</div>
             )}
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
               rolActivo === "MEDICO"
-                ? (esOdontologia ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300" : "bg-teal-500/20 text-teal-700 dark:text-teal-300")
-                : "bg-sky-500/20 text-sky-700 dark:text-sky-300"
+                ? "bg-[#177E89]/30 text-[#5BC0BE]"
+                : "bg-white/10 text-white/70"
             }`}>
               {rolActivo === "MEDICO" ? (esOdontologia ? "ODONTÓLOGO" : "DOCTOR") : "SECRETARIA"}
             </span>
           </div>
-          <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mt-0.5">
+          <div className="text-[10px] text-white/40 uppercase tracking-wider mt-0.5">
             {configPerfil.clinicaNombre}
           </div>
         </div>
 
-        <div className="px-2 pb-1 text-[11px] font-bold text-slate-400 dark:text-white/40 uppercase tracking-wider">
+        <div className="px-2 pb-1 text-[11px] font-bold text-white/30 uppercase tracking-wider">
           {rolActivo === "MEDICO" ? (esOdontologia ? "PANEL ODONTOLÓGICO" : "PANEL DEL DOCTOR") : "PANEL DE RECEPCIÓN"}
         </div>
 
@@ -1130,8 +1130,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onClick={() => intentarNavegar(n.id)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                   activo
-                    ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 font-bold border-l-4 border-sky-600 dark:border-sky-400 shadow-xs"
-                    : "text-slate-600 dark:text-white/60 hover:bg-slate-200/60 dark:hover:bg-white/5"
+                    ? "bg-[#177E89] text-white shadow-md"
+                    : "text-white/60 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -1145,7 +1145,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                     </span>
                   )}
                   {esProtegida && (
-                    <span title="Requiere clave del Doctor" className="p-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    <span title="Requiere clave del Doctor" className="p-1 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
                       <IconLock size={12} />
                     </span>
                   )}
@@ -1159,12 +1159,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
         <MiniCalendarioSidebar />
 
-        <div className="p-2 rounded-xl bg-slate-200/50 dark:bg-white/5 border border-slate-300/60 dark:border-white/10 text-xs mt-2">
+        <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-xs mt-2">
           <div className="flex items-center justify-between">
-            <span className="text-slate-600 dark:text-white/70 text-[11px] font-medium">Modo Clásico</span>
+            <span className="text-white/70 text-[11px] font-medium">Modo Clásico</span>
             <button
               onClick={alternarModo}
-              className={`w-9 h-5 rounded-full transition-colors relative p-0.5 cursor-pointer ${modoClasico ? "bg-teal-600" : "bg-slate-400/40"}`}
+              className={`w-9 h-5 rounded-full transition-colors relative p-0.5 cursor-pointer ${modoClasico ? "bg-[#177E89]" : "bg-white/20"}`}
             >
               <div className={`w-4 h-4 rounded-full bg-white transition-transform ${modoClasico ? "translate-x-4" : "translate-x-0"}`} />
             </button>
@@ -1174,7 +1174,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         <div className="space-y-1 pt-1">
           <button
             onClick={cerrarSesionPerfil}
-            className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-teal-600 dark:text-teal-400 hover:bg-teal-500/10 flex items-center gap-2 cursor-pointer transition-colors"
+            className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-[#5BC0BE] hover:bg-white/10 flex items-center gap-2 cursor-pointer transition-colors"
             title="Volver a la selección de perfiles de Mediclinic"
           >
             <IconLock size={14} />
@@ -1183,7 +1183,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
           <button
             onClick={handleSalirAlHub}
-            className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-slate-500 dark:text-white/40 hover:bg-slate-200/60 dark:hover:bg-white/5 cursor-pointer"
+            className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-white/70 hover:bg-white/10 cursor-pointer"
           >
             ← Volver a Aurora Hub
           </button>

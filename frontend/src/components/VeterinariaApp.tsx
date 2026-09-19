@@ -209,14 +209,14 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans">
-      <aside className="w-full md:w-64 bg-slate-900/80 border-r border-slate-800 p-4 flex flex-col gap-6">
+      <aside className="w-full md:w-64 bg-[#0D3B3D] border-r border-white/10 p-4 flex flex-col gap-6">
         <div className="flex items-center gap-3 px-2 py-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-500/20">
+          <div className="w-10 h-10 rounded-xl bg-[#177E89] flex items-center justify-center text-white font-black shadow-lg shadow-[#177E89]/20">
             <IconVet size={24} />
           </div>
           <div>
             <h1 className="font-bold text-base tracking-tight text-white leading-none">Aurora Vet</h1>
-            <p className="text-[11px] text-emerald-400 font-medium mt-1">Clínica Veterinaria</p>
+            <p className="text-[11px] text-[#5BC0BE] font-medium mt-1">Clínica Veterinaria</p>
           </div>
         </div>
 
@@ -224,7 +224,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('general')}
             className={"flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'general' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              pagina === 'general' ? 'bg-[#177E89] text-white shadow-md' : 'text-white/60 hover:bg-white/10 hover:text-white'
             )}
           >
             <IconVet size={18} />
@@ -234,7 +234,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('pacientes')}
             className={"flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'pacientes' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              pagina === 'pacientes' ? 'bg-[#177E89] text-white shadow-md' : 'text-white/60 hover:bg-white/10 hover:text-white'
             )}
           >
             <IconUsers size={18} />
@@ -244,7 +244,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('historias')}
             className={"flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'historias' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              pagina === 'historias' ? 'bg-[#177E89] text-white shadow-md' : 'text-white/60 hover:bg-white/10 hover:text-white'
             )}
           >
             <IconFileText size={18} />
@@ -254,7 +254,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('procedimientos')}
             className={"flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'procedimientos' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              pagina === 'procedimientos' ? 'bg-[#177E89] text-white shadow-md' : 'text-white/60 hover:bg-white/10 hover:text-white'
             )}
           >
             <IconPrescription size={18} />
@@ -264,7 +264,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('sala-espera')}
             className={"flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'sala-espera' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              pagina === 'sala-espera' ? 'bg-[#177E89] text-white shadow-md' : 'text-white/60 hover:bg-white/10 hover:text-white'
             )}
           >
             <IconHourglass size={18} />
@@ -274,7 +274,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('agenda')}
             className={"flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'agenda' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              pagina === 'agenda' ? 'bg-[#177E89] text-white shadow-md' : 'text-white/60 hover:bg-white/10 hover:text-white'
             )}
           >
             <IconCalendar size={18} />
@@ -284,7 +284,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('financiero')}
             className={"flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'financiero' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              pagina === 'financiero' ? 'bg-[#177E89] text-white shadow-md' : 'text-white/60 hover:bg-white/10 hover:text-white'
             )}
           >
             <IconCard size={18} />
@@ -294,7 +294,7 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           <button
             onClick={() => setPagina('configuracion')}
             className={"flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition " + (
-              pagina === 'configuracion' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              pagina === 'configuracion' ? 'bg-[#177E89] text-white shadow-md' : 'text-white/60 hover:bg-white/10 hover:text-white'
             )}
           >
             <IconSettings size={18} />
@@ -302,11 +302,11 @@ export default function VeterinariaApp({ onSalir }: { onSalir?: () => void }) {
           </button>
         </nav>
 
-        <div className="pt-4 border-t border-slate-800/80 flex flex-col gap-2">
+        <div className="pt-4 border-t border-white/10 flex flex-col gap-2">
           {onSalir && (
             <button
               onClick={onSalir}
-              className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 rounded-xl transition"
+              className="w-full text-left px-3 py-2 text-xs text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition"
             >
               Volver al Hub Principal
             </button>
