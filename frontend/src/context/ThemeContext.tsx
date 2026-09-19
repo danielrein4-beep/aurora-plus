@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "dark" | "light";
+type Theme = "light";
 
 interface ThemeContextType {
   theme: Theme;
@@ -11,32 +11,22 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    const saved = localStorage.getItem("aurora-theme");
-    if (saved === "light" || saved === "dark") return saved;
-    return "light"; // default to light — elegant white first impression
-  });
+  const [theme] = useState<Theme>("light");
 
   useEffect(() => {
-    localStorage.setItem("aurora-theme", theme);
+    localStorage.setItem("aurora-theme", "light");
     const root = document.documentElement;
-    if (theme === "light") {
-      root.classList.remove("dark");
-      root.classList.add("light");
-      root.setAttribute("data-theme", "light");
-    } else {
-      root.classList.remove("light");
-      root.classList.add("dark");
-      root.setAttribute("data-theme", "dark");
-    }
-  }, [theme]);
+    root.classList.remove("dark");
+    root.classList.add("light");
+    root.setAttribute("data-theme", "light");
+  }, []);
 
   const toggleTheme = () => {
-    setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
+    // Modo Claro exclusivo Apple-Aesthetic permanente
   };
 
-  const setTheme = (t: Theme) => {
-    setThemeState(t);
+  const setTheme = () => {
+    // Modo Claro exclusivo Apple-Aesthetic permanente
   };
 
   return (
