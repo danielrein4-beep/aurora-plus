@@ -827,14 +827,17 @@ export default function CatalogoPublico() {
               />
             ) : (
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-neutral-950 text-white flex items-center justify-center font-serif text-base tracking-widest shadow-sm">
+                <div 
+                  className="w-11 h-11 rounded-2xl bg-gradient-to-br from-white to-neutral-100 border border-neutral-200/90 flex items-center justify-center font-serif text-base font-bold tracking-wider shadow-sm"
+                  style={{ color: '#171717' }}
+                >
                   {tienda.nombreTienda.substring(0, 2).toUpperCase()}
                 </div>
                 <div>
                   <h1 className="text-lg sm:text-xl font-['Cormorant_Garamond',serif] font-semibold tracking-wide text-neutral-950 uppercase leading-none">
                     {tienda.nombreTienda}
                   </h1>
-                  <span className="text-[9px] font-semibold text-neutral-400 tracking-[0.25em] uppercase block mt-0.5">
+                  <span className="text-[9px] font-bold text-neutral-400 tracking-[0.25em] uppercase block mt-0.5">
                     Catálogo Oficial
                   </span>
                 </div>
@@ -850,26 +853,26 @@ export default function CatalogoPublico() {
             </div>
 
             {/* Toggle de Moneda */}
-            <div className="flex items-center p-0.5 rounded-full bg-neutral-100 border border-neutral-200/60 text-xs">
+            <div className="flex items-center p-1 rounded-full bg-neutral-100 border border-neutral-200 text-xs">
               <button
                 type="button"
                 onClick={() => setMoneda("USD")}
-                className={`px-3 py-1 rounded-full transition-all text-xs font-semibold ${
-                  moneda === "USD"
-                    ? "bg-neutral-950 text-white shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-900"
-                }`}
+                className="px-3.5 py-1 rounded-full transition-all text-xs font-bold shadow-sm"
+                style={{
+                  backgroundColor: moneda === "USD" ? "#1e293b" : "transparent",
+                  color: moneda === "USD" ? "#ffffff" : "#64748b"
+                }}
               >
                 USD ($)
               </button>
               <button
                 type="button"
                 onClick={() => setMoneda("VES")}
-                className={`px-3 py-1 rounded-full transition-all text-xs font-semibold ${
-                  moneda === "VES"
-                    ? "bg-neutral-950 text-white shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-900"
-                }`}
+                className="px-3.5 py-1 rounded-full transition-all text-xs font-bold shadow-sm"
+                style={{
+                  backgroundColor: moneda === "VES" ? "#1e293b" : "transparent",
+                  color: moneda === "VES" ? "#ffffff" : "#64748b"
+                }}
               >
                 VES (Bs.)
               </button>
@@ -879,12 +882,15 @@ export default function CatalogoPublico() {
             <button
               type="button"
               onClick={() => setDrawerAbierto(true)}
-              className="relative w-11 h-11 rounded-2xl bg-neutral-950 hover:bg-neutral-800 text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
+              className="relative w-11 h-11 rounded-2xl bg-white hover:bg-neutral-100 border border-neutral-200/90 text-neutral-800 flex items-center justify-center transition-all shadow-sm active:scale-95"
               title="Ver Bolsa de Compras"
             >
-              <SvgBag className="w-5 h-5 text-white" />
+              <SvgBag className="w-5 h-5" />
               {totalItems > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 text-white font-bold text-[10px] rounded-full flex items-center justify-center shadow-md animate-scale-up">
+                <span 
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 font-bold text-[10px] rounded-full flex items-center justify-center shadow-md animate-scale-up"
+                  style={{ color: '#ffffff' }}
+                >
                   {totalItems}
                 </span>
               )}
@@ -902,11 +908,12 @@ export default function CatalogoPublico() {
                   key={cat}
                   type="button"
                   onClick={() => setCategoriaSeleccionada(cat)}
-                  className={`px-5 py-1.5 rounded-full text-[11px] font-semibold tracking-[0.15em] uppercase transition-all duration-200 ${
-                    active
-                      ? "bg-neutral-950 text-white shadow-sm"
-                      : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-950"
-                  }`}
+                  className="px-5 py-1.5 rounded-full text-[11px] font-bold tracking-[0.15em] uppercase transition-all duration-200 border"
+                  style={{
+                    backgroundColor: active ? "#1e293b" : "#f1f5f9",
+                    color: active ? "#ffffff" : "#475569",
+                    borderColor: active ? "#1e293b" : "#e2e8f0"
+                  }}
                 >
                   {cat}
                 </button>
@@ -1029,7 +1036,10 @@ export default function CatalogoPublico() {
                     </span>
 
                     {prod.esNuevo && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-neutral-950 text-white text-[9px] font-bold tracking-[0.2em] uppercase">
+                      <span 
+                        className="px-2.5 py-0.5 rounded-full border text-[9px] font-bold tracking-[0.2em] uppercase"
+                        style={{ backgroundColor: "#f8fafc", color: "#334155", borderColor: "#cbd5e1" }}
+                      >
                         Nuevo
                       </span>
                     )}
@@ -1091,7 +1101,7 @@ export default function CatalogoPublico() {
                     <button
                       type="button"
                       onClick={() => agregarAlCarritoConTalla(prod, tallaDefault, 1)}
-                      className="w-11 h-11 rounded-2xl bg-neutral-100 hover:bg-neutral-950 text-neutral-800 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-90"
+                      className="w-11 h-11 rounded-2xl bg-neutral-100 hover:bg-slate-800 hover:text-white text-slate-800 border border-neutral-200/80 flex items-center justify-center transition-all shadow-sm active:scale-90"
                       title="Añadir a la bolsa"
                     >
                       <SvgBag className="w-5 h-5" />
@@ -1223,11 +1233,11 @@ export default function CatalogoPublico() {
                       agregarAlCarritoConTalla(productoDetalle, tallaModal, cantidadModal);
                       setTimeout(() => cerrarDetalle(), 700);
                     }}
-                    className={`w-full py-3.5 rounded-full font-bold text-xs tracking-[0.15em] uppercase transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 ${
-                      agregadoAnim
-                        ? "bg-emerald-600 text-white shadow-emerald-500/25"
-                        : "bg-neutral-950 hover:bg-neutral-800 text-white shadow-neutral-950/20"
-                    }`}
+                    className="w-full py-3.5 rounded-full font-bold text-xs tracking-[0.15em] uppercase transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                    style={{
+                      backgroundColor: agregadoAnim ? "#059669" : "#1e293b",
+                      color: "#ffffff"
+                    }}
                   >
                     <SvgBag className="w-4 h-4" />
                     <span>{agregadoAnim ? "Añadido a la Bolsa" : "Añadir a la Bolsa"}</span>
@@ -1591,7 +1601,8 @@ export default function CatalogoPublico() {
                     type="button"
                     onClick={() => procesarPedido(false)}
                     disabled={enviandoPedido}
-                    className="w-full py-3 rounded-full bg-neutral-950 hover:bg-neutral-800 text-white font-bold text-xs uppercase tracking-[0.15em] transition-all shadow-md active:scale-95 disabled:opacity-50"
+                    className="w-full py-3 rounded-full font-bold text-xs uppercase tracking-[0.15em] transition-all shadow-md active:scale-95 disabled:opacity-50"
+                    style={{ backgroundColor: "#1e293b", color: "#ffffff" }}
                   >
                     {enviandoPedido ? "Procesando..." : "Confirmar Orden"}
                   </button>
