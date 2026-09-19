@@ -7,8 +7,9 @@ import {
   IconStethoscope, IconUsers, IconFileText, IconPrescription, IconHourglass, IconCalendar,
   IconCard, IconCustomize, IconSearch, IconUser, IconCheck, IconTrash, IconRefresh,
   IconChevronLeft, IconChevronRight, IconCheckCircle, IconLock, IconUnlock, IconWarning, IconClose, IconBank,
-  IconWhatsApp, IconMail, IconChart, IconCoins, IconEdit
+  IconWhatsApp, IconMail, IconChart, IconCoins, IconEdit, IconTooth
 } from "../Icons";
+import ModuloOdontologia from "./ModuloOdontologia";
 import ThemeToggle from "./ThemeToggle";
 import CanalEndemico from "./CanalEndemico";
 import Cie10Buscador from "./Cie10Buscador";
@@ -46,7 +47,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 
-type Pagina = "general" | "pacientes" | "historias" | "laboratorio" | "procedimientos" | "sala-espera" | "agenda" | "canal-endemico" | "financiero" | "configuracion";
+type Pagina = "general" | "pacientes" | "historias" | "odontograma" | "laboratorio" | "procedimientos" | "sala-espera" | "agenda" | "canal-endemico" | "financiero" | "configuracion";
 type RolVista = "MEDICO" | "SECRETARIA";
 
 const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; roles?: RolVista[] }[] = [
@@ -614,6 +615,30 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   };
   const { user } = useAuth();
   const tenantId = user?.tenantId || 1;
+  const esOdontologia = user?.industry === "odontologia";
+
+  const navItems = useMemo(() => {
+    if (!esOdontologia) {
+      return NAV;
+    }
+    const items = [];
+    for (const n of NAV) {
+      if (n.id === "canal-endemico") continue;
+      if (n.id === "agenda") {
+        items.push({ ...n, label: "Agenda Dental & Calendario" });
+        continue;
+      }
+      items.push(n);
+      if (n.id === "historias") {
+        items.push({
+          id: "odontograma" as Pagina,
+          label: "Odontograma & Plan Dental",
+          Icon: IconTooth,
+        });
+      }
+    }
+    return items;
+  }, [esOdontologia]);
   const [pagina, setPagina] = useState<Pagina>("general");
   
   // Estado del perfil activo: siempre null al montar para mostrar la pantalla de selección estilo Netflix
@@ -1029,13 +1054,20 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       <aside className="w-64 flex-shrink-0 border-r border-slate-300/60 dark:border-white/10 flex flex-col p-4 space-y-1.5 bg-slate-50/50 dark:bg-black/10">
         <div className="px-2 pb-3 mb-2 border-b border-slate-300/60 dark:border-white/10">
           <div className="flex items-center justify-between">
-            <div className="font-['Outfit'] font-black text-lg text-aurora">Mediclinic Pro</div>
+            {esOdontologia ? (
+              <div className="font-['Outfit'] font-black text-lg text-emerald-500 flex items-center gap-1.5">
+                <IconTooth size={20} className="text-emerald-500" />
+                <span>Mediclinic Odonto</span>
+              </div>
+            ) : (
+              <div className="font-['Outfit'] font-black text-lg text-aurora">Mediclinic Pro</div>
+            )}
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
               rolActivo === "MEDICO"
-                ? "bg-teal-500/20 text-teal-700 dark:text-teal-300"
+                ? (esOdontologia ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300" : "bg-teal-500/20 text-teal-700 dark:text-teal-300")
                 : "bg-sky-500/20 text-sky-700 dark:text-sky-300"
             }`}>
-              {rolActivo === "MEDICO" ? "DOCTOR" : "SECRETARIA"}
+              {rolActivo === "MEDICO" ? (esOdontologia ? "ODONTÓLOGO" : "DOCTOR") : "SECRETARIA"}
             </span>
           </div>
           <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mt-0.5">
@@ -1044,11 +1076,11 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         </div>
 
         <div className="px-2 pb-1 text-[11px] font-bold text-slate-400 dark:text-white/40 uppercase tracking-wider">
-          {rolActivo === "MEDICO" ? "PANEL DEL DOCTOR" : "PANEL DE RECEPCIÓN"}
+          {rolActivo === "MEDICO" ? (esOdontologia ? "PANEL ODONTOLÓGICO" : "PANEL DEL DOCTOR") : "PANEL DE RECEPCIÓN"}
         </div>
 
         <div className="space-y-1">
-          {NAV.map((n) => {
+          {navItems.map((n) => {
             const activo = pagina === n.id;
             const esProtegida = perfilActivo !== "MEDICO" && rolActivo === "SECRETARIA" && (n.id === "financiero" || n.id === "configuracion");
 
@@ -1313,6 +1345,24 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 rol={rolActivo}
                 pacienteInicialId={pacienteSeleccionadoId}
                 onVerDocumento={setVisorDocumento}
+              />
+            )}
+            {pagina === "odontograma" && (
+              <ModuloOdontologia
+                pacientes={pacientes}
+                pacienteInicialId={pacienteSeleccionadoId}
+                config={configPerfilConTasas}
+                onSeleccionarPaciente={(id) => {
+                  setPacienteSeleccionadoId(id);
+                }}
+                onIrAHistorias={(id) => {
+                  setPacienteSeleccionadoId(id);
+                  setPagina("historias");
+                }}
+                onIrACotizador={(id) => {
+                  setPacienteSeleccionadoId(id);
+                  setPagina("procedimientos");
+                }}
               />
             )}
             {pagina === "procedimientos" && (
@@ -3554,7 +3604,12 @@ function HistoriasClinicas({
       )}
 
       {esOdontologia && pacienteSeleccionado && (
-        <Odontograma pacienteId={Number(pacienteSeleccionado.id)} />
+        <Odontograma
+          pacienteId={Number(pacienteSeleccionado.id)}
+          nombrePaciente={pacienteSeleccionado.nombreCompleto}
+          cedulaPaciente={pacienteSeleccionado.cedula}
+          tasaBcv={Number(config?.tasaBCV) || 36.5}
+        />
       )}
 
       {/* ── 2.5. TRAZABILIDAD Y EVOLUCIÓN DEL PACIENTE ── */}
@@ -4528,6 +4583,19 @@ export interface CotizacionGuardada {
   fechaPlanificada?: string;
 }
 
+const PROCEDIMIENTOS_SUGERIDOS_ODONTO = [
+  { nombre: "Profilaxis y Limpieza Dental con Ultrasonido", precio: 25, desc: "Tartrectomía con cavitron, pulido coronario con pasta profiláctica y aplicación tópica de flúor" },
+  { nombre: "Restauración con Resina Fotocurada (1 Cara)", precio: 30, desc: "Aislamiento, grabado ácido selectivo, sistema adhesivo y resina fotocurada con pulido estético" },
+  { nombre: "Restauración con Resina Compuesta (2 o más Caras)", precio: 45, desc: "Reconstrucción anatómica proximal con matriz seccional, fotocurado estratificado y ajuste oclusal" },
+  { nombre: "Tratamiento de Conducto / Endodoncia Unirradicular", precio: 80, desc: "Apertura cameral, instrumentación rotatoria biomecánica, irrigación y obturación tridimensional" },
+  { nombre: "Tratamiento de Conducto / Endodoncia Multirradicular", precio: 120, desc: "Tratamiento de conductos en piezas posteriores multirradiculares con selle biocerámico" },
+  { nombre: "Exodoncia Dental Simple", precio: 25, desc: "Extracción atraumática con sindesmotomía, luxación y colocación de hemostático local" },
+  { nombre: "Exodoncia Quirúrgica / Cirugía de Cordal", precio: 70, desc: "Cirugía de tercer molar retenido o impactado con ostectomía, odontosección y sutura no reabsorbible" },
+  { nombre: "Corona de Porcelana / Zirconio Libre de Metal", precio: 150, desc: "Preparación protésica, toma de impresión siliconada de alta precisión y cementado adhesivo definitivo" },
+  { nombre: "Blanqueamiento Dental Profesional en Consultorio", precio: 90, desc: "Aclaramiento dental seguro con peróxido activado por lámpara LED dental de alta potencia" },
+  { nombre: "Implante Dental Oseointegrado de Titanio", precio: 350, desc: "Fase quirúrgica de colocación de implante de titanio con protocolo estéril y colgajo mucoperióstico" },
+];
+
 const PROCEDIMIENTOS_SUGERIDOS = [
   { nombre: "Cirugía Menor Ambulatoria", precio: 250, desc: "Intervención ambulatoria con anestesia local y curación" },
   { nombre: "Resección de quiste sebáceo", precio: 180, desc: "Resección quirúrgica completa con hemostasia y sutura intradérmica" },
@@ -4558,6 +4626,10 @@ function Procedimientos({
   // Lista de Cotizaciones Guardadas — scopeadas por tenant (ver claveCotizaciones); sin datos de
   // demostración por defecto, una clínica nueva empieza con la lista real vacía, no con una
   // paciente inventada que parecería un registro real.
+  const { user } = useAuth();
+  const esOdontologia = user?.industry === "odontologia";
+  const listaProcedimientosSugeridos = esOdontologia ? PROCEDIMIENTOS_SUGERIDOS_ODONTO : PROCEDIMIENTOS_SUGERIDOS;
+
   const [cotizaciones, setCotizaciones] = useState<CotizacionGuardada[]>(() => {
     try {
       const guardado = localStorage.getItem(claveCotizaciones(tenantId));
@@ -5023,7 +5095,7 @@ function Procedimientos({
 
               {/* Sugerencias Rápidas de Procedimientos Comunes */}
               <div className="pt-1 flex flex-wrap gap-1.5">
-                {PROCEDIMIENTOS_SUGERIDOS.slice(0, 4).map((sug) => (
+                {listaProcedimientosSugeridos.slice(0, esOdontologia ? 6 : 4).map((sug) => (
                   <button
                     key={sug.nombre}
                     type="button"
