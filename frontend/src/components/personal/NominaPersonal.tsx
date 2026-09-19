@@ -209,7 +209,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             <h4 className="font-semibold text-xs text-[#94a3b8] uppercase tracking-wider">
               Períodos de Nómina
             </h4>
-            <span className="font-mono text-xs text-[#35d7c3]">{periodos.length} Ciclos</span>
+            <span className="font-mono text-xs text-[#177E89]">{periodos.length} Ciclos</span>
           </div>
 
           <div className="space-y-2">
@@ -221,12 +221,12 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                   onClick={() => setPeriodoActivo(p)}
                   className={`p-3 rounded-xl border cursor-pointer transition-all ${
                     esSeleccionado
-                      ? 'bg-[#1a2438] border-[#35d7c3] text-[#f8fafc]'
-                      : 'bg-[#0f172a] border-[#1e293b] text-[#cbd5e1] hover:border-[#35d7c3]/40'
+                      ? 'bg-[#1a2438] border-[#177E89] text-[#f8fafc]'
+                      : 'bg-[#0f172a] border-[#1e293b] text-[#cbd5e1] hover:border-[#177E89]/40'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="font-mono text-xs font-semibold text-[#35d7c3]">
+                    <span className="font-mono text-xs font-semibold text-[#177E89]">
                       {p.codigoPeriodo}
                     </span>
                     <EstadoNominaBadge estado={p.estado} />
@@ -234,7 +234,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                   <h5 className="font-medium text-xs text-[#f8fafc]">{p.nombre}</h5>
                   <div className="flex items-center justify-between text-[11px] text-[#94a3b8] mt-2 font-mono">
                     <span>{p.totalEmpleados} colaboradores</span>
-                    <span className="text-[#35d7c3] font-bold">
+                    <span className="text-[#177E89] font-bold">
                       {ocultarSueldo ? '••••••' : formatearMoneda(p.montoTotalNeto, p.monedaPrincipal)}
                     </span>
                   </div>
@@ -265,7 +265,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                   onClick={() => setModalRevisionAbierto(true)}
                   className={`px-3.5 py-2 rounded-lg font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white ${
                     nominaHabilitada
-                      ? 'bg-[#35d7c3] hover:bg-[#28b8a6] text-black cursor-pointer'
+                      ? 'bg-[#177E89] hover:bg-[#28b8a6] text-black cursor-pointer'
                       : 'bg-[#1e293b] text-[#64748b] border border-[#334155] cursor-not-allowed opacity-60'
                   }`}
                   title={!nominaHabilitada ? 'Habilite el módulo de nómina para autorizar revisiones' : ''}
@@ -309,7 +309,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             </div>
             <div className="p-3 bg-[#0f172a] rounded-xl border border-[#1e293b]">
               <span className="text-xs text-[#64748b] block">Monto Neto a Desembolsar</span>
-              <span className="font-mono text-sm sm:text-base font-bold text-[#35d7c3]">
+              <span className="font-mono text-sm sm:text-base font-bold text-[#177E89]">
                 {ocultarSueldo ? '••••••' : formatearMoneda(periodoActivo.montoTotalNeto, periodoActivo.monedaPrincipal)}
               </span>
             </div>
@@ -329,7 +329,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 <div
                   key={recibo.id}
                   onClick={() => setReciboDetalle(recibo)}
-                  className="p-3 bg-[#0f172a] border border-[#1e293b] rounded-xl flex items-center justify-between gap-3 text-xs cursor-pointer hover:border-[#35d7c3]/50 transition-colors"
+                  className="p-3 bg-[#0f172a] border border-[#1e293b] rounded-xl flex items-center justify-between gap-3 text-xs cursor-pointer hover:border-[#177E89]/50 transition-colors"
                 >
                   <div>
                     <div className="flex items-center gap-2">
@@ -343,14 +343,14 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
 
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <span className="font-mono font-bold text-[#35d7c3] text-sm block">
+                      <span className="font-mono font-bold text-[#177E89] text-sm block">
                         {ocultarSueldo ? '••••••' : formatearMoneda(recibo.montoNetoPagar, recibo.moneda)}
                       </span>
                       <span className="text-[10px] text-[#94a3b8]">
                         {recibo.conceptosDesglosados.length} conceptos
                       </span>
                     </div>
-                    <span className="text-[#35d7c3] font-mono">Ver</span>
+                    <span className="text-[#177E89] font-mono">Ver</span>
                   </div>
                 </div>
               ))}
@@ -367,7 +367,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 {periodoActivo.historialAjustes.map((h) => (
                   <div key={h.id} className="py-2 space-y-0.5">
                     <div className="flex items-center justify-between font-mono text-[11px]">
-                      <span className="text-[#35d7c3] font-semibold">{h.tipoAccion}</span>
+                      <span className="text-[#177E89] font-semibold">{h.tipoAccion}</span>
                       <span className="text-[#64748b]">{h.fecha}</span>
                     </div>
                     <p className="text-[#cbd5e1]">{h.motivoJustificado}</p>
@@ -399,7 +399,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
               <button
                 ref={btnCerrarDesgloseRef}
                 onClick={() => setReciboDetalle(null)}
-                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3] rounded p-1"
+                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
                 aria-label="Cerrar desglose"
               >
                 ✕
@@ -411,7 +411,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             <div className="flex justify-end pt-3 border-t border-[#1e2d48]">
               <button
                 onClick={() => setReciboDetalle(null)}
-                className="px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#334155] text-xs text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
+                className="px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#334155] text-xs text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#177E89]"
               >
                 Cerrar Desglose
               </button>
@@ -441,7 +441,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
               <button
                 ref={btnCerrarRevisionRef}
                 onClick={() => setModalRevisionAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3] rounded p-1"
+                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
                 aria-label="Cerrar revisión"
               >
                 ✕
@@ -472,8 +472,8 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-[#1e293b] text-sm">
-                  <span className="text-[#35d7c3] font-bold">Total Neto a Pagar:</span>
-                  <span className="text-[#35d7c3] font-bold">
+                  <span className="text-[#177E89] font-bold">Total Neto a Pagar:</span>
+                  <span className="text-[#177E89] font-bold">
                     {ocultarSueldo ? '••••••' : formatearMoneda(periodoActivo.montoTotalNeto, periodoActivo.monedaPrincipal)}
                   </span>
                 </div>
@@ -487,13 +487,13 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             <div className="flex justify-end gap-2 pt-3 border-t border-[#1e2d48]">
               <button
                 onClick={() => setModalRevisionAbierto(false)}
-                className="px-4 py-2 rounded-lg bg-[#1e293b] text-xs text-[#cbd5e1] hover:bg-[#334155] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
+                className="px-4 py-2 rounded-lg bg-[#1e293b] text-xs text-[#cbd5e1] hover:bg-[#334155] focus:outline-none focus:ring-2 focus:ring-[#177E89]"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleAprobarPeriodo}
-                className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs focus:outline-none focus:ring-2 focus:ring-white"
+                className="px-4 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-semibold text-xs focus:outline-none focus:ring-2 focus:ring-white"
               >
                 Confirmar y Congelar Nómina
               </button>
@@ -518,7 +518,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
               <button
                 ref={btnCerrarAjusteRef}
                 onClick={() => setModalAjusteAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3] rounded p-1"
+                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
                 aria-label="Cerrar modal"
               >
                 ✕
@@ -537,7 +537,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                   value={motivoAjuste}
                   onChange={(e) => setMotivoAjuste(e.target.value)}
                   placeholder="Ej. Corrección por reporte tardío de jornada extraordinaria..."
-                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] text-xs focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
+                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] text-xs focus:outline-none focus:ring-2 focus:ring-[#177E89]"
                 />
               </div>
             </div>
@@ -545,7 +545,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-[#1e2d48]">
               <button
                 onClick={() => handleRegistrarAjuste('AJUSTE_POSTERIOR')}
-                className="px-3.5 py-2 rounded-lg bg-[#1e293b] hover:bg-[#334155] border border-[#334155] text-[#35d7c3] font-medium text-xs focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
+                className="px-3.5 py-2 rounded-lg bg-[#1e293b] hover:bg-[#334155] border border-[#334155] text-[#177E89] font-medium text-xs focus:outline-none focus:ring-2 focus:ring-[#177E89]"
               >
                 Registrar Nota de Ajuste
               </button>

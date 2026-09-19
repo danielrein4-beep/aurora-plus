@@ -31,7 +31,7 @@ export default function TrueFocus({
   separator = " ",
   manualMode = false,
   blurAmount = 5,
-  borderColor = "#35d7c3",
+  borderColor = "#177E89",
   glowColor = "rgba(53, 215, 195, 0.6)",
   animationDuration = 0.5,
   pauseBetweenAnimations = 1,

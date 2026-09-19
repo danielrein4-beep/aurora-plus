@@ -196,9 +196,9 @@ export default function Auth() {
       <button
         type="button"
         onClick={() => navigate("/")}
-        className="absolute top-6 left-6 z-30 apple-glass-pill px-4 py-2 rounded-full text-xs font-semibold text-white/80 hover:text-white hover:border-[#00FFC2]/60 hover:bg-white/10 transition-all duration-300 flex items-center gap-2 cursor-pointer group shadow-xl"
+        className="absolute top-6 left-6 z-30 apple-glass-pill px-4 py-2 rounded-full text-xs font-semibold text-white/80 hover:text-white hover:border-[#177E89]/60 hover:bg-white/10 transition-all duration-300 flex items-center gap-2 cursor-pointer group shadow-xl"
         title="Volver a la página principal">
-        <svg className="w-4 h-4 transition-transform duration-300 group-hover:-translate-x-1 text-[#00FFC2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-4 h-4 transition-transform duration-300 group-hover:-translate-x-1 text-[#177E89]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
         </svg>
         <span>Volver a la página principal</span>
@@ -228,9 +228,9 @@ export default function Auth() {
             <button
               type="button"
               onClick={() => navigate("/")}
-              className="apple-glass-pill px-3.5 py-1.5 rounded-full text-xs font-semibold text-white/70 hover:text-white hover:border-[#00FFC2]/50 hover:bg-white/10 transition-all duration-300 flex items-center gap-1.5 cursor-pointer group shadow-sm"
+              className="apple-glass-pill px-3.5 py-1.5 rounded-full text-xs font-semibold text-white/70 hover:text-white hover:border-[#177E89]/50 hover:bg-white/10 transition-all duration-300 flex items-center gap-1.5 cursor-pointer group shadow-sm"
               title="Volver al inicio">
-              <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#00FFC2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#177E89]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
               <span>Inicio</span>
@@ -257,7 +257,7 @@ export default function Auth() {
                     ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]"
                     : "text-white/50 hover:text-white"
                 }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${mode === "register" ? "bg-[#00FFC2] animate-pulse" : "bg-white/30"}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${mode === "register" ? "bg-[#177E89] animate-pulse" : "bg-white/30"}`} />
                 Registrarse
               </button>
             </div>
@@ -274,7 +274,7 @@ export default function Auth() {
                 {mode === "register" ? "Crea tu cuenta" : "Bienvenido de vuelta"}
               </h2>
               {/* Barra de acento aurora estilo futurista */}
-              <div className="h-1 w-20 bg-gradient-to-r from-[#00FFC2] via-[#00C9A7] to-[#0B3D91] rounded-full mt-2 shadow-[0_0_12px_rgba(0,255,194,0.5)]" />
+              <div className="h-1 w-20 bg-gradient-to-r from-[#177E89] via-[#177E89] to-[#0B3D91] rounded-full mt-2 shadow-[0_0_12px_rgba(0,255,194,0.5)]" />
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">

@@ -245,21 +245,21 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
   const todosRecibos = periodosNomina.flatMap((p) => p.recibos);
 
   return (
-    <div className={`${embedded ? 'aurora-embedded-light min-h-0 bg-transparent text-[#172033]' : 'min-h-screen bg-[#0b111e] text-[#f8fafc]'} font-sans antialiased selection:bg-[#35d7c3] selection:text-black`}>
+    <div className={`${embedded ? 'aurora-embedded-light min-h-0 bg-transparent text-[#172033]' : 'min-h-screen bg-[#0b111e] text-[#f8fafc]'} font-sans antialiased selection:bg-[#177E89] selection:text-black`}>
       {/* Contenedor Principal Responsive (desde 360px) */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
-        {!embedded && <Link to="/dashboard" className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium text-[#94a3b8] hover:text-[#35d7c3] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]">
+        {!embedded && <Link to="/dashboard" className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium text-[#94a3b8] hover:text-[#177E89] focus:outline-none focus:ring-2 focus:ring-[#177E89]">
           ← Volver al Hub
         </Link>}
         {/* Cabecera Superior del Módulo */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#1e2d48]">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#35d7c3]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#177E89]" />
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#f8fafc]">
                 Gestión de Personal & Aurora Nómina
               </h1>
-              <span className="px-2 py-0.5 rounded bg-[#35d7c3]/15 text-[#35d7c3] font-mono text-xs font-semibold border border-[#35d7c3]/30">
+              <span className="px-2 py-0.5 rounded bg-[#177E89]/15 text-[#177E89] font-mono text-xs font-semibold border border-[#177E89]/30">
                 PILOTO
               </span>
             </div>
@@ -273,10 +273,10 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
             {/* Modo Privacidad Salarial (Protegido por defecto) */}
             {capacidades?.puedeVerMontosNomina && <button
               onClick={() => setOcultarSueldo(!ocultarSueldo)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#35d7c3] ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89] ${
                 ocultarSueldo
                   ? 'bg-[#1e293b] border-[#334155] text-[#94a3b8]'
-                  : 'bg-[#35d7c3]/15 border-[#35d7c3]/40 text-[#35d7c3]'
+                  : 'bg-[#177E89]/15 border-[#177E89]/40 text-[#177E89]'
               }`}
               title="Alternar privacidad de remuneraciones"
             >
@@ -297,9 +297,9 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
                 aria-selected={esActiva}
                 aria-controls={`panel-personal-${p.id}`}
                 onClick={() => setSeccionActiva(p.id)}
-                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors focus:outline-none focus:ring-2 focus:ring-[#35d7c3] ${
+                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89] ${
                   esActiva
-                    ? 'bg-[#131c2e] text-[#35d7c3] border border-[#35d7c3]/40 shadow-sm'
+                    ? 'bg-[#131c2e] text-[#177E89] border border-[#177E89]/40 shadow-sm'
                     : 'text-[#94a3b8] hover:text-[#f8fafc] hover:bg-[#131c2e]/50'
                 }`}
               >
@@ -317,7 +317,7 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
         {/* Renderizado de la Sección Activa */}
         <main id={`panel-personal-${seccionActiva}`} role="tabpanel" aria-labelledby={`tab-personal-${seccionActiva}`} className="space-y-6">
           {cargandoDatos && (
-            <div className="rounded-xl border border-white/10 bg-[#0b2341] p-4 font-mono text-xs text-[#35d7c3]">
+            <div className="rounded-xl border border-white/10 bg-[#0b2341] p-4 font-mono text-xs text-[#177E89]">
               Cargando datos autorizados de Personal…
             </div>
           )}

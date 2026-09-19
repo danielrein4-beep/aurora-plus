@@ -62,7 +62,7 @@ export const TasaCambioWidget: React.FC = () => {
               type="button"
               onClick={() => void handleActualizar(f.id)}
               disabled={actualizando !== null}
-              className="flex items-center gap-1.5 rounded-lg border border-[#35d7c3]/40 bg-[#35d7c3]/15 px-3 py-2 text-xs font-semibold text-[#35d7c3] transition-colors hover:bg-[#35d7c3]/25 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg border border-[#177E89]/40 bg-[#177E89]/15 px-3 py-2 text-xs font-semibold text-[#177E89] transition-colors hover:bg-[#177E89]/25 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <IconRefresh size={14} className={actualizando === f.id ? 'animate-spin' : ''} />
               {actualizando === f.id ? 'Consultando…' : `Actualizar desde ${f.label}`}

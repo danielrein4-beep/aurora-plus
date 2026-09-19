@@ -37,7 +37,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
       {/* Estado de las fuentes del módulo */}
       <div className="p-3 bg-[#131c2e] border border-[#1e2d48] rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded bg-[#35d7c3]/15 text-[#35d7c3] font-mono font-semibold border border-[#35d7c3]/30">
+          <span className="px-2 py-0.5 rounded bg-[#177E89]/15 text-[#177E89] font-mono font-semibold border border-[#177E89]/30">
             EN LÍNEA
           </span>
           <span className="text-[#94a3b8]">
@@ -45,7 +45,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#35d7c3] animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-[#177E89] animate-pulse" />
           <span className="text-[#f8fafc] font-medium font-mono">Personal & Nómina</span>
         </div>
       </div>
@@ -55,14 +55,14 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
         {/* Total Equipo */}
         <div
           onClick={() => onNavegarSeccion('empleados')}
-          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#35d7c3]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#35d7c3]"
+          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#177E89]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#177E89]"
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('empleados')}
         >
           <div className="flex items-center justify-between text-xs text-[#94a3b8] mb-1">
             <span>Total Colaboradores</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#0b111e] font-mono text-[#35d7c3]">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#0b111e] font-mono text-[#177E89]">
               {activosCount} Activos
             </span>
           </div>
@@ -73,7 +73,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             <span className="text-xs text-[#64748b]">registrados</span>
           </div>
           <div className="mt-2 text-xs text-[#94a3b8] flex items-center gap-2">
-            <span className="text-[#35d7c3]">&bull;</span>
+            <span className="text-[#177E89]">&bull;</span>
             <span>{vacacionesCount} de vacaciones</span>
           </div>
         </div>
@@ -81,7 +81,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
         {/* Asistencia de Hoy */}
         <div
           onClick={() => onNavegarSeccion('asistencia')}
-          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#35d7c3]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#35d7c3]"
+          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#177E89]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#177E89]"
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('asistencia')}
@@ -102,7 +102,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             {retardoHoy > 0 ? (
               <span className="text-[#fbbf24] font-medium">{retardoHoy} con retardo registrado</span>
             ) : asistenciasHoy.length > 0 ? (
-              <span className="text-[#35d7c3]">Sin retardos registrados</span>
+              <span className="text-[#177E89]">Sin retardos registrados</span>
             ) : (
               <span className="text-[#64748b]">Sin marcajes en el período consultado</span>
             )}
@@ -112,7 +112,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
         {/* Turnos en Curso */}
         <div
           onClick={() => onNavegarSeccion('turnos')}
-          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#35d7c3]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#35d7c3]"
+          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#177E89]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#177E89]"
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('turnos')}
@@ -137,7 +137,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
         {/* Período de Nómina Actual */}
         <div
           onClick={() => onNavegarSeccion('nomina')}
-          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#35d7c3]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#35d7c3]"
+          className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl cursor-pointer hover:border-[#177E89]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#177E89]"
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('nomina')}
@@ -153,7 +153,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             )}
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-xl sm:text-2xl font-bold font-mono text-[#35d7c3]">
+            <span className="text-xl sm:text-2xl font-bold font-mono text-[#177E89]">
               {ocultarSueldo ? '••••••' : formatearMoneda(periodoActual.montoTotalNeto, periodoActual.monedaPrincipal)}
             </span>
             <span className="text-xs text-[#64748b]">neto</span>
@@ -175,7 +175,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             </div>
             <button
               onClick={() => onNavegarSeccion('empleados')}
-              className="text-xs text-[#35d7c3] hover:underline font-medium"
+              className="text-xs text-[#177E89] hover:underline font-medium"
             >
               Ver todos &rarr;
             </button>
@@ -194,7 +194,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
                   </div>
                   <div className="w-full bg-[#0b111e] h-2 rounded-full overflow-hidden">
                     <div
-                      className="bg-[#35d7c3] h-full rounded-full transition-all duration-300"
+                      className="bg-[#177E89] h-full rounded-full transition-all duration-300"
                       style={{ width: `${porcentaje}%` }}
                     />
                   </div>
@@ -213,7 +213,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             </div>
             <button
               onClick={() => onNavegarSeccion('turnos')}
-              className="text-xs text-[#35d7c3] hover:underline font-medium"
+              className="text-xs text-[#177E89] hover:underline font-medium"
             >
               Gestionar matriz &rarr;
             </button>
@@ -237,8 +237,8 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
 
                 <div>
                   {t.estado === 'EN_CURSO' ? (
-                    <span className="inline-flex items-center gap-1 text-[#35d7c3] font-medium font-mono text-[11px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#35d7c3] animate-pulse" />
+                    <span className="inline-flex items-center gap-1 text-[#177E89] font-medium font-mono text-[11px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#177E89] animate-pulse" />
                       En Servicio
                     </span>
                   ) : (

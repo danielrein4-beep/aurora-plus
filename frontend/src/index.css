@@ -12,6 +12,59 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ==========================================================================
+   AURORA PLUS — PALETA INSTITUCIONAL (arquitectura de tokens, no por archivo)
+   Directiva: erradicar el turquesa/cian "neón" heredado (#00FFC2, #00C9A7,
+   #35d7c3, teal-400/cyan-400 de Tailwind, etc.) en favor de tres colores
+   institucionales — software serio tipo banca/B2B, no una app de moda:
+
+     1. Turquesa Corporativo #177E89 — acento primario (botones, topbars,
+        íconos destacados, badges). Sereno, no reactivo a la vista.
+     2. Verde Abisal        #0D3B3D — texto/base oscura (títulos, sidebar).
+     3. Turquesa Claro      #5BC0BE — SOLO hover de CTAs / enlaces puntuales,
+        nunca como fondo de un contenedor grande (por eso no tiene su propia
+        clase de fondo de página, solo aparece en :hover y en la escala
+        clara del remapeo de abajo).
+
+   En vez de perseguir cientos de usos sueltos de bg-teal-500/text-cyan-400
+   por los ~20 archivos que los usan (RestauranteApp, ComercioApp,
+   MediclinicApp, GanaderiaApp...), se remapea la escala teal/cyan de
+   Tailwind entera vía @theme: CADA bg-teal-500, text-cyan-400,
+   border-teal-500/30, shadow-teal-500/20, etc. que ya existe en el código
+   pasa a resolver a estos hex automáticamente, sin tocar un solo componente.
+   Esta es la fuente de verdad — variables nuevas para código nuevo
+   (bg-aurora-primary/dark/light) y remapeo para todo el código heredado.
+   ========================================================================== */
+@theme {
+  --color-aurora-primary: #177E89;
+  --color-aurora-dark: #0D3B3D;
+  --color-aurora-light: #5BC0BE;
+
+  --color-teal-50: #EAF4F4;
+  --color-teal-100: #D3E8E8;
+  --color-teal-200: #A8D2D1;
+  --color-teal-300: #7FC2C0;
+  --color-teal-400: #5BC0BE;
+  --color-teal-500: #177E89;
+  --color-teal-600: #146E78;
+  --color-teal-700: #115960;
+  --color-teal-800: #0F484E;
+  --color-teal-900: #0D3B3D;
+  --color-teal-950: #082224;
+
+  --color-cyan-50: #EAF4F4;
+  --color-cyan-100: #D3E8E8;
+  --color-cyan-200: #A8D2D1;
+  --color-cyan-300: #7FC2C0;
+  --color-cyan-400: #5BC0BE;
+  --color-cyan-500: #177E89;
+  --color-cyan-600: #146E78;
+  --color-cyan-700: #115960;
+  --color-cyan-800: #0F484E;
+  --color-cyan-900: #0D3B3D;
+  --color-cyan-950: #082224;
+}
+
+/* ==========================================================================
    AURORA PLUS — APPLE-AESTHETIC LIGHT DESIGN SYSTEM
    100% Light Mode, Pure White & Cloud Gray Surfaces, Zero Glow, Zero Dark
    ========================================================================== */
@@ -30,17 +83,17 @@
   --text-secondary: #86868B;
   --text-tertiary: #A1A1A6;
 
-  --accent-midnight: #0B3D91;
-  --accent-midnight-hover: #082D6C;
+  --accent-midnight: #177E89;
+  --accent-midnight-hover: #115960;
 
-  --aurora-cyan: #0B3D91;
-  --aurora-turquoise: #0284c7;
-  --aurora-teal: #0d9488;
-  --aurora-midnight: #0B3D91;
-  --aurora-abyssal: #1D1D1F;
+  --aurora-cyan: #177E89;
+  --aurora-turquoise: #177E89;
+  --aurora-teal: #177E89;
+  --aurora-midnight: #0D3B3D;
+  --aurora-abyssal: #0D3B3D;
 
-  --teal: #0B3D91;
-  --blue: #0284c7;
+  --teal: #177E89;
+  --blue: #177E89;
   --purple: #4338ca;
   --deep: #FFFFFF;
   --surface: #F5F5F7;
@@ -100,7 +153,7 @@ body {
 
 /* Clean Apple Buttons */
 .apple-btn-primary {
-  background-color: #0B3D91 !important;
+  background-color: #177E89 !important;
   color: #FFFFFF !important;
   font-weight: 600 !important;
   border-radius: 9999px !important;
@@ -114,7 +167,7 @@ body {
 }
 
 .apple-btn-primary:hover {
-  background-color: #082D6C !important;
+  background-color: #5BC0BE !important;
   transform: translateY(-1px) !important;
 }
 
@@ -123,14 +176,14 @@ body {
    botón principal de "Ingresar a la plataforma" se veía como texto suelto,
    sin ninguna pinta de botón. Mismo tratamiento sólido que apple-btn-primary. */
 .btn-cyber-neon {
-  background-color: #0B3D91 !important;
+  background-color: #177E89 !important;
   color: #FFFFFF !important;
   transition: all 0.18s ease-in-out !important;
   box-shadow: var(--shadow-apple-sm) !important;
 }
 
 .btn-cyber-neon:hover {
-  background-color: #082D6C !important;
+  background-color: #5BC0BE !important;
   transform: translateY(-1px) !important;
 }
 
@@ -150,6 +203,17 @@ body {
 
 .apple-btn-secondary:hover {
   background-color: #E5E5EA !important;
+}
+
+/* Directiva: "botones planos y sólidos, sin efectos de resplandor (glow)".
+   El remapeo de teal/cyan de arriba ya retiñe estas sombras a institucional,
+   pero seguirían siendo una sombra DE COLOR (un glow turquesa en vez de uno
+   neón) — se aplanan del todo a la sombra neutra estándar de la app. */
+.shadow-teal-500\/10,
+.shadow-teal-500\/20,
+.shadow-teal-500\/25,
+.shadow-cyan-500\/20 {
+  box-shadow: var(--shadow-apple-sm) !important;
 }
 
 /* Neutralize legacy dark/gradient classes */
@@ -265,9 +329,9 @@ input, select, textarea {
 }
 
 input:focus, select:focus, textarea:focus {
-  border-color: #0B3D91 !important;
+  border-color: #177E89 !important;
   outline: none !important;
-  box-shadow: 0 0 0 3px rgba(11, 61, 145, 0.12) !important;
+  box-shadow: 0 0 0 3px rgba(23, 126, 137, 0.16) !important;
 }
 
 /* Animations */

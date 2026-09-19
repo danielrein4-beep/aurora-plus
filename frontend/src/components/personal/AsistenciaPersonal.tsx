@@ -142,7 +142,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
               type="date"
               value={fechaFiltro}
               onChange={(e) => setFechaFiltro(e.target.value)}
-              className="bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-1.5 text-xs text-[#f8fafc] font-mono focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
+              className="bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-1.5 text-xs text-[#f8fafc] font-mono focus:outline-none focus:ring-2 focus:ring-[#177E89]"
             />
           </div>
 
@@ -154,7 +154,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
               id="depto-asistencia"
               value={deptoFiltro}
               onChange={(e) => setDeptoFiltro(e.target.value)}
-              className="bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-1.5 text-xs text-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
+              className="bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-1.5 text-xs text-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-[#177E89]"
             >
               {departamentos.map((d) => (
                 <option key={d} value={d}>
@@ -167,7 +167,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
 
         {puedeRegistrar && <button
           onClick={() => setModalMarcajeAbierto(true)}
-          className="px-3.5 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white"
+          className="px-3.5 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white"
         >
           ⏱️ Registrar marcaje
         </button>}
@@ -177,7 +177,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
       <div className="bg-[#131c2e] border border-[#1e2d48] rounded-xl overflow-hidden">
         <div className="p-4 bg-[#0f172a] border-b border-[#1e2d48] flex items-center justify-between text-xs">
           <span className="font-semibold text-[#f8fafc]">
-            Marcaciones registradas el <span className="font-mono text-[#35d7c3]">{fechaFiltro}</span>
+            Marcaciones registradas el <span className="font-mono text-[#177E89]">{fechaFiltro}</span>
           </span>
           <span className="text-[#94a3b8] font-mono">{filtradas.length} Registros</span>
         </div>
@@ -210,7 +210,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                     <td className="py-3 px-4 font-mono text-[#cbd5e1]">
                       {ast.horaEntradaProgramada} - {ast.horaSalidaProgramada}
                     </td>
-                    <td className="py-3 px-4 font-mono text-[#35d7c3]">
+                    <td className="py-3 px-4 font-mono text-[#177E89]">
                       {ast.horaEntradaReal || '--:--'} - {ast.horaSalidaReal || '--:--'}
                       {ast.minutosRetardo > 0 && (
                         <span className="block text-[11px] text-[#fbbf24] font-sans">
@@ -273,7 +273,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
               <button
                 ref={btnCerrarModalRef}
                 onClick={() => setModalMarcajeAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3] rounded p-1"
+                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
                 aria-label="Cerrar modal"
               >
                 ✕
@@ -304,7 +304,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                     onClick={() => setTipoMarcaje('ENTRADA')}
                     className={`py-2 rounded-lg font-medium border text-center transition-colors ${
                       tipoMarcaje === 'ENTRADA'
-                        ? 'bg-[#35d7c3]/20 border-[#35d7c3] text-[#35d7c3]'
+                        ? 'bg-[#177E89]/20 border-[#177E89] text-[#177E89]'
                         : 'bg-[#0b111e] border-[#1e293b] text-[#94a3b8]'
                     }`}
                   >
@@ -359,7 +359,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
               <button
                 onClick={handleRegistrarMarcaje}
                 disabled={guardando}
-                className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs"
+                className="px-4 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-semibold text-xs"
               >
                 {guardando ? 'Guardando…' : 'Confirmar registro'}
               </button>

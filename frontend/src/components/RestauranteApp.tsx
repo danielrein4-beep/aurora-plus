@@ -172,11 +172,11 @@ function EstiloClasico() {
       .horeca-clasico .dark\\:text-white\\/40 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
       .horeca-clasico .dark\\:text-white\\/30 { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
       .horeca-clasico .dark\\:text-white { color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; }
-      /* Un solo tono sólido de marca (#35d7c3), sin el degradado azul→verde→morado
+      /* Un solo tono sólido de marca (#177E89), sin el degradado azul→verde→morado
          de antes — ese era exactamente el look genérico de "app de IA" que ya se
          quitó del resto del sitio (ver .btn-cyber-neon en index.css). */
       .horeca-clasico .btn-cyber-neon {
-        background: #35D7C3 !important;
+        background: #177E89 !important;
         border: 1px solid rgba(53, 215, 195, .72) !important;
         box-shadow: 0 4px 14px rgba(53,215,195,0.35) !important;
         color: #062323 !important;
@@ -4198,7 +4198,7 @@ function ModalEditarReceta({
                     const isEditing = d.id === editandoDetalleId;
 
                     return (
-                      <tr key={d.id} className={isEditing ? "bg-[#35d7c3]/5 dark:bg-[#35d7c3]/10" : "hover:bg-slate-50 dark:hover:bg-white/5"}>
+                      <tr key={d.id} className={isEditing ? "bg-[#177E89]/5 dark:bg-[#177E89]/10" : "hover:bg-slate-50 dark:hover:bg-white/5"}>
                         {/* Nombre del insumo */}
                         <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-white">
                           <div>{met.nombre}</div>
@@ -5431,7 +5431,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
             </div>
           }
           sub={`Artículos distintos en ${categorias.length} categoría${categorias.length === 1 ? "" : "s"}`}
-          color="#35d7c3"
+          color="#177E89"
         />
         <KpiCard label="Alertas de Stock" val={String(alertasStock)} sub="Bajo mínimo o agotado" color={alertasStock > 0 ? "#ef4444" : "#64748b"} />
       </div>

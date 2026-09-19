@@ -281,7 +281,7 @@ export default function GanaderiaMapa({
             width: ${isFirst ? "22px" : "18px"};
             height: ${isFirst ? "22px" : "18px"};
             border-radius: 9999px;
-            background: ${isFirst ? "#00FFC2" : "#38BDF8"};
+            background: ${isFirst ? "#177E89" : "#38BDF8"};
             border: 2px solid #ffffff;
             box-shadow: 0 0 10px ${isFirst ? "rgba(0,255,194,0.9)" : "rgba(56,189,248,0.8)"};
             display: flex;
@@ -303,7 +303,7 @@ export default function GanaderiaMapa({
 
     if (verticesTrazado.length >= 2) {
       const polyline = L.polyline(verticesTrazado, {
-        color: "#00FFC2",
+        color: "#177E89",
         weight: 3,
         dashArray: "6, 6",
       });
@@ -312,9 +312,9 @@ export default function GanaderiaMapa({
 
     if (verticesTrazado.length >= 3) {
       const polygonPreview = L.polygon(verticesTrazado, {
-        color: "#00FFC2",
+        color: "#177E89",
         weight: 2,
-        fillColor: "#00FFC2",
+        fillColor: "#177E89",
         fillOpacity: 0.25,
       });
       group.addLayer(polygonPreview);
@@ -377,8 +377,8 @@ export default function GanaderiaMapa({
       if (!coords) return;
 
       const enDescanso = pot.estado === "EN_DESCANSO";
-      const colorBorde = pot.color || (enDescanso ? "#F59E0B" : "#00FFC2");
-      const colorRelleno = pot.color || (enDescanso ? "#F59E0B" : "#00C9A7");
+      const colorBorde = pot.color || (enDescanso ? "#F59E0B" : "#177E89");
+      const colorRelleno = pot.color || (enDescanso ? "#F59E0B" : "#177E89");
 
       const polygon = L.polygon(coords, {
         color: colorBorde,
@@ -425,7 +425,7 @@ export default function GanaderiaMapa({
             <span style="width: 7px; height: 7px; border-radius: 9999px; background: ${colorBorde};"></span>
             <span>${pot.nombre}</span>
             <span style="opacity: 0.65; font-size: 10px;">• ${pot.areaHectareas} ha</span>
-            ${animalesEnPotrero.length > 0 ? `<span style="background: rgba(0,255,194,0.2); color: #00FFC2; border-radius: 9999px; padding: 1px 6px; font-size: 10px;">${animalesEnPotrero.length} anim.</span>` : ""}
+            ${animalesEnPotrero.length > 0 ? `<span style="background: rgba(0,255,194,0.2); color: #177E89; border-radius: 9999px; padding: 1px 6px; font-size: 10px;">${animalesEnPotrero.length} anim.</span>` : ""}
           </div>
         `,
       });

@@ -15,7 +15,7 @@ export const MOCK_TURNOS_HORARIOS: TurnoHorario[] = [
     horaInicio: '07:00',
     horaFin: '15:00',
     horasJornada: 8,
-    color: '#35d7c3',
+    color: '#177E89',
     descripcion: 'Consultas, apertura de restaurante y ordeño matutino',
   },
   {

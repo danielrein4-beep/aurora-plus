@@ -25,7 +25,7 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
           <div className="flex items-center gap-2">
             <span
               className={`w-2 h-2 rounded-full ${
-                c.tipo === 'PERCEPCION' ? 'bg-[#35d7c3]' : 'bg-[#f87171]'
+                c.tipo === 'PERCEPCION' ? 'bg-[#177E89]' : 'bg-[#f87171]'
               }`}
             />
             <span className="font-medium text-[#f8fafc]">{c.concepto}</span>
@@ -49,7 +49,7 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
           <span className="text-[10px] text-[#64748b] block sm:hidden">Resultado:</span>
           <span
             className={`font-mono text-sm font-semibold ${
-              c.tipo === 'PERCEPCION' ? 'text-[#35d7c3]' : 'text-[#f87171]'
+              c.tipo === 'PERCEPCION' ? 'text-[#177E89]' : 'text-[#f87171]'
             }`}
           >
             {ocultarSueldo
@@ -82,7 +82,7 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
           </div>
           <div className="text-right pl-3 border-l border-[#1e2d48]">
             <span className="text-[#64748b] block text-[10px]">Neto a liquidar</span>
-            <span className="font-mono font-bold text-[#35d7c3] text-xs">
+            <span className="font-mono font-bold text-[#177E89] text-xs">
               {ocultarSueldo ? '••••••' : formatearMoneda(recibo.montoNetoPagar, recibo.moneda)}
             </span>
           </div>
@@ -93,10 +93,10 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-[#94a3b8]">
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded bg-[#35d7c3]" />
+            <span className="w-2 h-2 rounded bg-[#177E89]" />
             Percepciones y Asignaciones
           </span>
-          <span className="font-mono text-[#35d7c3]">
+          <span className="font-mono text-[#177E89]">
             {ocultarSueldo ? '••••••' : `+${formatearMoneda(recibo.totalPercepciones, recibo.moneda)}`}
           </span>
         </div>
@@ -128,7 +128,7 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
         <span className="text-[#64748b]">
           Fórmula de liquidación: <span className="font-mono text-[#94a3b8]">Neto = Total Percepciones - Total Deducciones</span>
         </span>
-        <span className="font-mono font-bold text-[#35d7c3]">
+        <span className="font-mono font-bold text-[#177E89]">
           {ocultarSueldo ? '••••••' : formatearMoneda(recibo.montoNetoPagar, recibo.moneda)}
         </span>
       </div>

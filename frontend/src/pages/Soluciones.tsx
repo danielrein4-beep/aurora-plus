@@ -121,11 +121,11 @@ export default function Soluciones() {
         <SpecularButton
           size="lg"
           radius={12}
-          tint="#2b2b2b"
+          tint="#177E89"
           tintOpacity={1}
           textColor="#f5f5f5"
-          lineColor="#ffffff"
-          baseColor="#525252"
+          lineColor="#5BC0BE"
+          baseColor="#177E89"
           shineSize={10}
           shineFade={40}
           intensity={1}

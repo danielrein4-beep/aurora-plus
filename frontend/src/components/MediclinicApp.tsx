@@ -167,8 +167,8 @@ export interface TurnoSalaEspera {
 // usa en los CTA importantes de cada pantalla, no en los botones repetidos de tablas
 // (un render WebGL por botón sale caro si se multiplica por fila).
 const PALETA_BOTON_PRINCIPAL = {
-  teal: { tint: "#35d7c3", lineColor: "#7cf3e3", baseColor: "#0f766e" },
-  azul: { tint: "#38bdf8", lineColor: "#bae6fd", baseColor: "#0369a1" },
+  teal: { tint: "#177E89", lineColor: "#5BC0BE", baseColor: "#177E89" },
+  azul: { tint: "#0D3B3D", lineColor: "#5BC0BE", baseColor: "#0D3B3D" },
 } as const;
 
 function BotonPrincipal({ children, onClick, type = "button", disabled, className, color = "teal" }: {
@@ -234,7 +234,7 @@ function EstiloClasico() {
       .mediclinic-clasico .text-slate-900 { color: #0f172a !important; }
       .mediclinic-clasico .text-slate-500, .mediclinic-clasico .text-slate-600 { color: #64748b !important; }
       .mediclinic-clasico .btn-electric-blue {
-        background: #35d7c3 !important;
+        background: #177E89 !important;
         border: 1px solid rgba(53, 215, 195, .72) !important;
         box-shadow: 0 2px 7px rgba(2, 35, 42, .18) !important;
         color: #062323 !important;
@@ -271,20 +271,20 @@ function SelectorPerfilesNetflix({
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 dark:bg-[#051322] dark:text-white flex flex-col justify-between p-6 sm:p-10 relative overflow-hidden select-none transition-colors duration-300">
       {/* Luces de fondo ambient */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-teal-500/10 dark:bg-[#00FFC2]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-teal-500/10 dark:bg-[#177E89]/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-sky-500/10 dark:bg-[#0B3D91]/30 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header Superior */}
       <div className="flex items-center justify-between w-full max-w-6xl mx-auto z-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-teal-500 to-sky-600 dark:from-[#00FFC2] dark:to-[#0B3D91] flex items-center justify-center p-0.5 shadow-md">
-            <div className="w-full h-full bg-white dark:bg-[#051322] rounded-[14px] flex items-center justify-center text-teal-600 dark:text-[#00FFC2]">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-teal-500 to-sky-600 dark:from-[#177E89] dark:to-[#0B3D91] flex items-center justify-center p-0.5 shadow-md">
+            <div className="w-full h-full bg-white dark:bg-[#051322] rounded-[14px] flex items-center justify-center text-teal-600 dark:text-[#177E89]">
               <IconStethoscope size={20} />
             </div>
           </div>
           <div>
             <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white tracking-tight">
-              Mediclinic <span className="text-teal-600 dark:text-[#00FFC2]">Pro</span>
+              Mediclinic <span className="text-teal-600 dark:text-[#177E89]">Pro</span>
             </div>
             <div className="text-[10px] text-slate-500 dark:text-white/50 uppercase font-mono tracking-widest">
               {configPerfil.clinicaNombre || "Mi Consultorio Médico"}
@@ -306,7 +306,7 @@ function SelectorPerfilesNetflix({
       {/* Contenido Central: ¿Quién eres? */}
       <div className="w-full max-w-4xl mx-auto py-8 sm:py-12 flex flex-col items-center text-center z-10 space-y-10">
         <div className="space-y-3">
-          <span className="px-3.5 py-1 rounded-full bg-teal-500/10 dark:bg-teal-500/15 text-teal-700 dark:text-[#00FFC2] border border-teal-500/30 text-xs font-bold font-mono tracking-wider uppercase">
+          <span className="px-3.5 py-1 rounded-full bg-teal-500/10 dark:bg-teal-500/15 text-teal-700 dark:text-[#177E89] border border-teal-500/30 text-xs font-bold font-mono tracking-wider uppercase">
             Gestión Segura por Roles & Seguridad
           </span>
           <h1 className="font-['Outfit'] font-black text-3xl sm:text-5xl text-slate-900 dark:text-white tracking-tight">
@@ -322,16 +322,16 @@ function SelectorPerfilesNetflix({
           {/* Perfil 1: Doctor / Médico Titular */}
           <div
             onClick={onSeleccionarDoctor}
-            className="group relative p-7 rounded-3xl bg-white dark:bg-white/[0.04] hover:bg-teal-50/40 dark:hover:bg-white/[0.08] border-2 border-slate-200 dark:border-white/10 hover:border-teal-500 dark:hover:border-[#00FFC2] shadow-xl hover:shadow-[0_20px_40px_rgba(20,184,166,0.18)] dark:hover:shadow-[0_20px_40px_rgba(0,255,194,0.15)] transition-all duration-300 transform hover:-translate-y-2 cursor-pointer flex flex-col items-center text-center space-y-4"
+            className="group relative p-7 rounded-3xl bg-white dark:bg-white/[0.04] hover:bg-teal-50/40 dark:hover:bg-white/[0.08] border-2 border-slate-200 dark:border-white/10 hover:border-teal-500 dark:hover:border-[#177E89] shadow-xl hover:shadow-[0_20px_40px_rgba(20,184,166,0.18)] dark:hover:shadow-[0_20px_40px_rgba(0,255,194,0.15)] transition-all duration-300 transform hover:-translate-y-2 cursor-pointer flex flex-col items-center text-center space-y-4"
           >
             {/* Indicador de Lock */}
-            <div className="absolute top-4 right-4 p-2 rounded-xl bg-teal-500/10 text-teal-600 dark:text-[#00FFC2] border border-teal-500/20 dark:border-teal-500/30 group-hover:scale-110 transition-transform">
+            <div className="absolute top-4 right-4 p-2 rounded-xl bg-teal-500/10 text-teal-600 dark:text-[#177E89] border border-teal-500/20 dark:border-teal-500/30 group-hover:scale-110 transition-transform">
               <IconLock size={15} />
             </div>
 
             {/* Avatar Grande */}
-            <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-teal-400 via-teal-600 to-indigo-700 dark:from-[#00FFC2] dark:via-[#008B8B] dark:to-[#0B3D91] p-1 shadow-2xl group-hover:ring-4 group-hover:ring-teal-500/40 dark:group-hover:ring-[#00FFC2]/40 transition-all flex items-center justify-center">
-              <div className="w-full h-full rounded-[22px] bg-slate-100 dark:bg-[#051322] flex items-center justify-center text-teal-600 dark:text-[#00FFC2]">
+            <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-teal-400 via-teal-600 to-indigo-700 dark:from-[#177E89] dark:via-[#177E89] dark:to-[#0B3D91] p-1 shadow-2xl group-hover:ring-4 group-hover:ring-teal-500/40 dark:group-hover:ring-[#177E89]/40 transition-all flex items-center justify-center">
+              <div className="w-full h-full rounded-[22px] bg-slate-100 dark:bg-[#051322] flex items-center justify-center text-teal-600 dark:text-[#177E89]">
                 <svg width={52} height={52} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4.5 3v5a4.5 4.5 0 0 0 9 0V3" />
                   <path d="M4.5 3H3m1.5 0H6m6 0h1.5m0 0H15" />
@@ -342,7 +342,7 @@ function SelectorPerfilesNetflix({
             </div>
 
             <div className="space-y-1">
-              <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-[#00FFC2] transition-colors">
+              <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-[#177E89] transition-colors">
                 {configPerfil.doctorNombre || "Médico Titular"}
               </h3>
               <p className="text-xs text-teal-600 dark:text-teal-300/90 font-medium">
@@ -354,7 +354,7 @@ function SelectorPerfilesNetflix({
             </div>
 
             <div className="pt-2 w-full">
-              <div className="w-full py-2.5 px-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 dark:bg-gradient-to-r dark:from-[#00FFC2]/20 dark:to-[#008B8B]/20 dark:border-[#00FFC2]/40 dark:text-[#00FFC2] text-xs font-bold flex items-center justify-center gap-2 group-hover:bg-teal-600 group-hover:text-white dark:group-hover:bg-[#00FFC2] dark:group-hover:text-[#051322] transition-all shadow-sm">
+              <div className="w-full py-2.5 px-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 dark:bg-gradient-to-r dark:from-[#177E89]/20 dark:to-[#177E89]/20 dark:border-[#177E89]/40 dark:text-[#177E89] text-xs font-bold flex items-center justify-center gap-2 group-hover:bg-teal-600 group-hover:text-white dark:group-hover:bg-[#177E89] dark:group-hover:text-[#051322] transition-all shadow-sm">
                 <IconLock size={14} />
                 <span>Ingresar con PIN / Clave</span>
               </div>
@@ -460,7 +460,7 @@ function ModalClaveDoctor({
       <div className="relative w-full max-w-md rounded-3xl p-6 sm:p-7 bg-white dark:bg-[#071a2e] border border-slate-200 dark:border-teal-500/30 text-slate-900 dark:text-white space-y-5 shadow-2xl transition-colors duration-300 animate-modal-enter">
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-[#00FFC2] flex items-center justify-center border border-teal-500/20 dark:border-teal-500/30">
+            <div className="w-12 h-12 rounded-2xl bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-[#177E89] flex items-center justify-center border border-teal-500/20 dark:border-teal-500/30">
               <IconLock size={22} />
             </div>
             <div>
@@ -579,7 +579,7 @@ function ModalConfigurarClavePrimeraVez({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/75 backdrop-blur-md animate-fade-smooth">
       <div className="relative w-full max-w-md rounded-3xl p-6 sm:p-7 bg-white dark:bg-[#071a2e] border border-teal-500/40 text-slate-900 dark:text-white space-y-5 shadow-2xl transition-colors duration-300 animate-modal-enter">
         <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-white/10">
-          <div className="w-12 h-12 rounded-2xl bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-[#00FFC2] flex items-center justify-center border border-teal-500/20 dark:border-teal-500/30">
+          <div className="w-12 h-12 rounded-2xl bg-teal-500/10 dark:bg-teal-500/20 text-teal-600 dark:text-[#177E89] flex items-center justify-center border border-teal-500/20 dark:border-teal-500/30">
             <IconLock size={22} />
           </div>
           <div>

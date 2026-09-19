@@ -99,6 +99,6 @@
   transition: background 0.2s ease, transform 0.2s ease;
 }
 .depth-carousel__dot.is-active {
-  background: #35d7c3;
+  background: #177E89;
   transform: scale(1.3);
 }

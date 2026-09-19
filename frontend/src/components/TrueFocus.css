@@ -41,24 +41,24 @@
 .corner.top-left {
   top: -0.28em;
   left: -0.28em;
-  border-top: 3px solid var(--border-color, #35d7c3);
-  border-left: 3px solid var(--border-color, #35d7c3);
+  border-top: 3px solid var(--border-color, #177E89);
+  border-left: 3px solid var(--border-color, #177E89);
 }
 .corner.top-right {
   top: -0.28em;
   right: -0.28em;
-  border-top: 3px solid var(--border-color, #35d7c3);
-  border-right: 3px solid var(--border-color, #35d7c3);
+  border-top: 3px solid var(--border-color, #177E89);
+  border-right: 3px solid var(--border-color, #177E89);
 }
 .corner.bottom-left {
   bottom: -0.28em;
   left: -0.28em;
-  border-bottom: 3px solid var(--border-color, #35d7c3);
-  border-left: 3px solid var(--border-color, #35d7c3);
+  border-bottom: 3px solid var(--border-color, #177E89);
+  border-left: 3px solid var(--border-color, #177E89);
 }
 .corner.bottom-right {
   bottom: -0.28em;
   right: -0.28em;
-  border-bottom: 3px solid var(--border-color, #35d7c3);
-  border-right: 3px solid var(--border-color, #35d7c3);
+  border-bottom: 3px solid var(--border-color, #177E89);
+  border-right: 3px solid var(--border-color, #177E89);
 }

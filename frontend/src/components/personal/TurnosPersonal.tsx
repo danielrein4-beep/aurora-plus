@@ -128,7 +128,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
             </h3>
             <p className="text-xs text-[#64748b]">Esquemas horarios adaptados a salud, gastronomía y campo</p>
           </div>
-          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#131c2e] text-[#35d7c3] border border-[#1e2d48]">
+          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#131c2e] text-[#177E89] border border-[#1e2d48]">
             PLANTILLAS
           </span>
         </div>
@@ -141,7 +141,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
             >
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-[#f8fafc]">{th.nombre}</span>
-                <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-[#0b111e] text-[#35d7c3]">
+                <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-[#0b111e] text-[#177E89]">
                   {th.horasJornada > 0 ? `${th.horasJornada}h` : 'Descanso'}
                 </span>
               </div>
@@ -167,7 +167,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
               type="date"
               value={fechaSeleccionada}
               onChange={(e) => setFechaSeleccionada(e.target.value)}
-              className="bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-1.5 text-xs text-[#f8fafc] font-mono focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
+              className="bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-1.5 text-xs text-[#f8fafc] font-mono focus:outline-none focus:ring-2 focus:ring-[#177E89]"
             />
           </div>
 
@@ -179,7 +179,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
               id="depto-turnos"
               value={deptoFiltro}
               onChange={(e) => setDeptoFiltro(e.target.value)}
-              className="bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-1.5 text-xs text-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
+              className="bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-1.5 text-xs text-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-[#177E89]"
             >
               {departamentos.map((d) => (
                 <option key={d} value={d}>
@@ -192,7 +192,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
 
         <button
           onClick={() => setModalAsignarAbierto(true)}
-          className="px-3.5 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white"
+          className="px-3.5 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white"
         >
           + Asignar turno
         </button>
@@ -202,7 +202,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
       <div className="bg-[#131c2e] border border-[#1e2d48] rounded-xl overflow-hidden">
         <div className="p-4 bg-[#0f172a] border-b border-[#1e2d48] flex items-center justify-between text-xs">
           <span className="font-semibold text-[#f8fafc]">
-            Turnos Programados para el <span className="font-mono text-[#35d7c3]">{fechaSeleccionada}</span>
+            Turnos Programados para el <span className="font-mono text-[#177E89]">{fechaSeleccionada}</span>
           </span>
           <span className="text-[#94a3b8] font-mono">{asignacionesFiltradas.length} Asignaciones</span>
         </div>
@@ -257,7 +257,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
               <button
                 ref={btnCerrarModalRef}
                 onClick={() => setModalAsignarAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#35d7c3] rounded p-1"
+                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
                 aria-label="Cerrar modal"
               >
                 ✕
@@ -316,7 +316,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
               <button
                 onClick={handleCrearAsignacion}
                 disabled={guardando}
-                className="px-4 py-2 rounded-lg bg-[#35d7c3] hover:bg-[#28b8a6] text-black font-semibold text-xs"
+                className="px-4 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-semibold text-xs"
               >
                 {guardando ? 'Guardando…' : 'Confirmar asignación'}
               </button>

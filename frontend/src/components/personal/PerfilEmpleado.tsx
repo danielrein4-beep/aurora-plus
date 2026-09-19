@@ -60,7 +60,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
         {/* Cabecera del Perfil */}
         <div className="p-4 sm:p-6 bg-[#0f172a] border-b border-[#1e2d48] flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[#1e293b] border border-[#35d7c3]/30 flex items-center justify-center font-mono font-bold text-lg text-[#35d7c3]">
+            <div className="w-12 h-12 rounded-xl bg-[#1e293b] border border-[#177E89]/30 flex items-center justify-center font-mono font-bold text-lg text-[#177E89]">
               {empleado.nombre[0]}
               {empleado.apellidos[0]}
             </div>
@@ -69,7 +69,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                 <h3 id="perfil-titulo" className="text-base sm:text-lg font-bold text-[#f8fafc]">
                   {empleado.nombre} {empleado.apellidos}
                 </h3>
-                <span className="text-xs px-2 py-0.5 rounded bg-[#35d7c3]/15 text-[#35d7c3] font-mono">
+                <span className="text-xs px-2 py-0.5 rounded bg-[#177E89]/15 text-[#177E89] font-mono">
                   {empleado.codigoEmpleado}
                 </span>
               </div>
@@ -82,7 +82,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
           <button
             ref={btnCerrarRef}
             onClick={onCerrar}
-            className="p-1.5 rounded-lg text-[#94a3b8] hover:text-[#f8fafc] hover:bg-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
+            className="p-1.5 rounded-lg text-[#94a3b8] hover:text-[#f8fafc] hover:bg-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#177E89]"
             aria-label="Cerrar ficha de colaborador"
           >
             ✕
@@ -95,7 +95,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
             onClick={() => setPestanaActiva('info')}
             className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
               pestanaActiva === 'info'
-                ? 'border-[#35d7c3] text-[#35d7c3] font-semibold'
+                ? 'border-[#177E89] text-[#177E89] font-semibold'
                 : 'border-transparent hover:text-[#f8fafc]'
             }`}
           >
@@ -105,7 +105,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
             onClick={() => setPestanaActiva('asistencia')}
             className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
               pestanaActiva === 'asistencia'
-                ? 'border-[#35d7c3] text-[#35d7c3] font-semibold'
+                ? 'border-[#177E89] text-[#177E89] font-semibold'
                 : 'border-transparent hover:text-[#f8fafc]'
             }`}
           >
@@ -115,7 +115,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
             onClick={() => setPestanaActiva('metas')}
             className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
               pestanaActiva === 'metas'
-                ? 'border-[#35d7c3] text-[#35d7c3] font-semibold'
+                ? 'border-[#177E89] text-[#177E89] font-semibold'
                 : 'border-transparent hover:text-[#f8fafc]'
             }`}
           >
@@ -125,7 +125,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
             onClick={() => setPestanaActiva('recibos')}
             className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
               pestanaActiva === 'recibos'
-                ? 'border-[#35d7c3] text-[#35d7c3] font-semibold'
+                ? 'border-[#177E89] text-[#177E89] font-semibold'
                 : 'border-transparent hover:text-[#f8fafc]'
             }`}
           >
@@ -182,7 +182,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                   </div>
                   <div>
                     <span className="text-xs text-[#64748b] block">Sueldo pactado</span>
-                    <span className="font-mono text-[#35d7c3] font-bold text-sm sm:text-base">
+                    <span className="font-mono text-[#177E89] font-bold text-sm sm:text-base">
                       {ocultarSueldo
                         ? '••••••'
                         : `${formatearMoneda(empleado.salarioBaseReferencial, empleado.moneda)} / mes`}
@@ -220,7 +220,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-[#cbd5e1] font-semibold">{a.fecha}</span>
-                          <span className="px-2 py-0.2 rounded text-[10px] font-medium bg-[#1e293b] text-[#35d7c3]">
+                          <span className="px-2 py-0.2 rounded text-[10px] font-medium bg-[#1e293b] text-[#177E89]">
                             {a.estado}
                           </span>
                         </div>
@@ -232,7 +232,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                         )}
                       </div>
                       <div className="text-right">
-                        <span className="font-mono text-[#35d7c3] font-medium">
+                        <span className="font-mono text-[#177E89] font-medium">
                           {a.horasTrabajadas}h laboradas
                         </span>
                         {a.horasExtras > 0 && (
@@ -280,14 +280,14 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                           </div>
                           <p className="text-[#94a3b8] text-xs mt-0.5">{m.descripcion}</p>
                         </div>
-                        <span className="font-mono text-[#35d7c3] font-bold">
+                        <span className="font-mono text-[#177E89] font-bold">
                           {m.progresoActual == null ? 'Sin seguimiento' : `${m.progresoActual} / ${m.metaValor} ${m.unidadMedida}`}
                         </span>
                       </div>
 
                       <div className="w-full bg-[#0b111e] h-2 rounded-full overflow-hidden">
                         <div
-                          className="bg-[#35d7c3] h-full rounded-full transition-all duration-300"
+                          className="bg-[#177E89] h-full rounded-full transition-all duration-300"
                           style={{
                             width: `${m.progresoActual == null || m.metaValor <= 0 ? 0 : Math.min(100, Math.round((m.progresoActual / m.metaValor) * 100))}%`,
                           }}
@@ -296,7 +296,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
 
                       <div className="flex items-center justify-between text-[11px] text-[#64748b]">
                         <span>Métrica: {m.origenMetrica}</span>
-                        <span className="text-[#35d7c3]">Regla no punitiva garantizada</span>
+                        <span className="text-[#177E89]">Regla no punitiva garantizada</span>
                       </div>
                     </div>
                   ))}
@@ -333,7 +333,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
         <div className="p-4 bg-[#0f172a] border-t border-[#1e2d48] flex justify-end">
           <button
             onClick={onCerrar}
-            className="px-4 py-2 bg-[#1e293b] hover:bg-[#334155] text-xs font-medium text-[#f8fafc] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#35d7c3]"
+            className="px-4 py-2 bg-[#1e293b] hover:bg-[#334155] text-xs font-medium text-[#f8fafc] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89]"
           >
             Cerrar Ficha
           </button>

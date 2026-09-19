@@ -203,12 +203,12 @@ export default function Precios() {
                 <SpecularButton
                   size="md"
                   radius={12}
-                  tint={plan.destacado ? "#2b2b2b" : "#F5F5F7"}
+                  tint={plan.destacado ? "#177E89" : "#F5F5F7"}
                   tintOpacity={plan.destacado ? 1 : 0.92}
                   blur={plan.destacado ? 0 : 14}
                   textColor={plan.destacado ? "#f5f5f5" : "#1D1D1F"}
-                  lineColor="#ffffff"
-                  baseColor={plan.destacado ? "#525252" : "#4b4b4b"}
+                  lineColor={plan.destacado ? "#5BC0BE" : "#ffffff"}
+                  baseColor={plan.destacado ? "#177E89" : "#4b4b4b"}
                   shineSize={10}
                   shineFade={40}
                   intensity={1}
@@ -267,11 +267,11 @@ export default function Precios() {
               <SpecularButton
                 size="md"
                 radius={12}
-                tint="#2b2b2b"
+                tint="#177E89"
                 tintOpacity={1}
                 textColor="#f5f5f5"
-                lineColor="#ffffff"
-                baseColor="#525252"
+                lineColor="#5BC0BE"
+                baseColor="#177E89"
                 shineSize={10}
                 shineFade={40}
                 intensity={1}
