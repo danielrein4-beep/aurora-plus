@@ -4474,6 +4474,6 @@ export function salirDeImpersonacion(): void {
   sessionStorage.removeItem("aurora_impersonando");
   sessionStorage.removeItem("aurora_impersonando_tenant_nombre");
   sessionStorage.removeItem("aurora_impersonando_tenant_id");
-  cerrarSesion();
+  borrarSesion();
   window.location.href = "/?admin=true";
 }

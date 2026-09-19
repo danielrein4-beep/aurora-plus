@@ -11,6 +11,10 @@ import {
 } from "../Icons";
 import { type Paciente } from "../api";
 import Odontograma from "./Odontograma";
+import PeriodontogramaInteractivo from "./PeriodontogramaInteractivo";
+import PlanesTratamientoFases from "./PlanesTratamientoFases";
+import VisorRadiografiasDental from "./VisorRadiografiasDental";
+import AgendaSillonesOdontologia from "./AgendaSillonesOdontologia";
 
 interface ModuloOdontologiaProps {
   pacientes: Paciente[] | null;
@@ -20,6 +24,8 @@ interface ModuloOdontologiaProps {
   onIrAHistorias?: (id: number) => void;
   onIrACotizador?: (id: number) => void;
 }
+
+type PestanaOdonto = "odontograma" | "periodonto" | "planes" | "agenda" | "radiografias";
 
 export default function ModuloOdontologia({
   pacientes,
@@ -35,57 +41,63 @@ export default function ModuloOdontologia({
     return null;
   });
 
+  const [pestanaActiva, setPestanaActiva] = useState<PestanaOdonto>("odontograma");
   const [busqueda, setBusqueda] = useState("");
 
   const pacienteSeleccionado = useMemo(() => {
-    if (!pacienteId || !pacientes) return null;
+    if (!pacientes || !pacienteId) return null;
     return pacientes.find((p) => p.id === pacienteId) || null;
-  }, [pacienteId, pacientes]);
-
-  const pacientesFiltrados = useMemo(() => {
-    if (!pacientes) return [];
-    const q = busqueda.trim().toLowerCase();
-    if (!q) return pacientes;
-    return pacientes.filter(
-      (p) =>
-        p.nombreCompleto.toLowerCase().includes(q) ||
-        (p.cedula && p.cedula.toLowerCase().includes(q)) ||
-        (p.telefono && p.telefono.toLowerCase().includes(q))
-    );
-  }, [pacientes, busqueda]);
+  }, [pacientes, pacienteId]);
 
   const seleccionarPaciente = (id: number) => {
     setPacienteId(id);
     if (onSeleccionarPaciente) onSeleccionarPaciente(id);
   };
 
-  const tasaBcvNum = Number(config?.tasaBCV) || 36.5;
+  const pacientesFiltrados = useMemo(() => {
+    if (!pacientes) return [];
+    if (!busqueda.trim()) return pacientes.slice(0, 8);
+    const q = busqueda.toLowerCase().trim();
+    return pacientes
+      .filter(
+        (p) =>
+          p.nombreCompleto.toLowerCase().includes(q) ||
+          (p.identificacion && p.identificacion.toLowerCase().includes(q))
+      )
+      .slice(0, 10);
+  }, [pacientes, busqueda]);
+
+  const tasaBcvNum = useMemo(() => {
+    if (config?.tasaBcv && typeof config.tasaBcv === "number") return config.tasaBcv;
+    if (config?.tasaCambio && typeof config.tasaCambio === "number") return config.tasaCambio;
+    return 50.0;
+  }, [config]);
 
   return (
     <div className="space-y-6">
-      {/* Barra Superior del Módulo Odontológico */}
-      <div className="apple-glass rounded-3xl p-5 sm:p-6 border border-slate-300/70 dark:border-white/10 shadow-sm bg-white/90 dark:bg-[#071322]/80">
+      {/* Cabecera Principal del Modulo Dental */}
+      <div className="apple-glass rounded-3xl p-6 border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-[#071322]/70 text-left shadow-sm">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/30">
               <IconTooth size={26} />
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="font-['Outfit'] font-black text-slate-900 dark:text-white text-xl">
-                  Módulo de Odontología & Salud Bucal
+              <div className="flex items-center gap-2">
+                <h2 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white leading-tight">
+                  Odontologia Especializada & Clinica Dental
                 </h2>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                  Mediclinic Odonto
+                <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-mono">
+                  OdontoPlus Pro
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-white/60">
-                Gestión clínica dental, odontograma internacional FDI, superficies dentales y planes de tratamiento
+                Odontograma anatomico FDI, periodontograma de 6 puntos, presupuestos por fases, agenda por sillones y visor radiografico
               </p>
             </div>
           </div>
 
-          {/* Selector / Buscador Rápido de Paciente */}
+          {/* Selector / Buscador Rapido de Paciente */}
           <div className="w-full md:w-80 relative">
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
@@ -96,7 +108,7 @@ export default function ModuloOdontologia({
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 placeholder="Buscar paciente por nombre o CI..."
-                className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white"
               />
               {busqueda && (
                 <button
@@ -108,7 +120,7 @@ export default function ModuloOdontologia({
               )}
             </div>
 
-            {/* Dropdown flotante si se está buscando */}
+            {/* Dropdown flotante si se esta buscando */}
             {busqueda.trim().length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-1.5 z-40 bg-white dark:bg-[#0c1421] border border-slate-200 dark:border-white/15 rounded-2xl shadow-xl max-h-56 overflow-y-auto p-1">
                 {pacientesFiltrados.length === 0 ? (
@@ -127,7 +139,7 @@ export default function ModuloOdontologia({
                     >
                       <div>
                         <span className="font-bold text-slate-900 dark:text-white block">{p.nombreCompleto}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">CI: {p.cedula || "S/C"}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">CI: {p.identificacion || "S/C"}</span>
                       </div>
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-400">
                         Cargar
@@ -140,7 +152,7 @@ export default function ModuloOdontologia({
           </div>
         </div>
 
-        {/* Ficha Rápida del Paciente Seleccionado */}
+        {/* Ficha Rapida del Paciente Seleccionado */}
         {pacienteSeleccionado ? (
           <div className="mt-4 pt-4 border-t border-slate-200/80 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -153,7 +165,7 @@ export default function ModuloOdontologia({
                     {pacienteSeleccionado.nombreCompleto}
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300">
-                    CI: {pacienteSeleccionado.cedula || "No registrada"}
+                    CI: {pacienteSeleccionado.identificacion || "No registrada"}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-white/60 mt-0.5">
@@ -180,10 +192,10 @@ export default function ModuloOdontologia({
                   type="button"
                   onClick={() => onIrAHistorias(pacienteSeleccionado.id)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-100 dark:hover:bg-white/5 text-xs font-semibold transition-all"
-                  title="Ver expediente clínico completo en Historias Clínicas"
+                  title="Ver expediente clinico completo en Historias Clinicas"
                 >
                   <IconFileText size={14} />
-                  <span>Historia Clínica</span>
+                  <span>Historia Clinica</span>
                 </button>
               )}
               {onIrACotizador && (
@@ -201,29 +213,125 @@ export default function ModuloOdontologia({
           </div>
         ) : (
           <div className="mt-4 pt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs text-slate-400">
-            <span>Ningún paciente seleccionado. Busca un paciente arriba o selecciónalo de la lista para ver su odontograma.</span>
+            <span>Ningun paciente seleccionado. Busca un paciente arriba para cargar su expediente odontologico.</span>
           </div>
         )}
+
+        {/* Barra de Pestanas de Navegacion Clinica */}
+        <div className="mt-5 pt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center gap-2 overflow-x-auto pb-1">
+          <button
+            type="button"
+            onClick={() => setPestanaActiva("odontograma")}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "odontograma"
+                ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
+                : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <span>Odontograma FDI & Superficies</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPestanaActiva("periodonto")}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "periodonto"
+                ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
+                : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <span>Periodontograma (6 Puntos & BOP)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPestanaActiva("planes")}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "planes"
+                ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
+                : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <span>Planes de Tratamiento & Fases</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPestanaActiva("agenda")}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "agenda"
+                ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
+                : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <span>Agenda de Sillones & Recordatorios WA</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPestanaActiva("radiografias")}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "radiografias"
+                ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
+                : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <span>Radiografias & Imagenologia</span>
+          </button>
+        </div>
       </div>
 
-      {/* Odontograma del Paciente Seleccionado */}
+      {/* Vistas segun la pestana activa */}
       {pacienteSeleccionado ? (
-        <Odontograma
-          pacienteId={pacienteSeleccionado.id}
-          nombrePaciente={pacienteSeleccionado.nombreCompleto}
-          cedulaPaciente={pacienteSeleccionado.cedula}
-          tasaBcv={tasaBcvNum}
-        />
+        <>
+          {pestanaActiva === "odontograma" && (
+            <Odontograma
+              pacienteId={pacienteSeleccionado.id}
+              nombrePaciente={pacienteSeleccionado.nombreCompleto}
+              cedulaPaciente={pacienteSeleccionado.identificacion}
+              tasaBcv={tasaBcvNum}
+            />
+          )}
+
+          {pestanaActiva === "periodonto" && (
+            <PeriodontogramaInteractivo
+              pacienteId={pacienteSeleccionado.id}
+              pacienteNombre={pacienteSeleccionado.nombreCompleto}
+            />
+          )}
+
+          {pestanaActiva === "planes" && (
+            <PlanesTratamientoFases
+              pacienteId={pacienteSeleccionado.id}
+              pacienteNombre={pacienteSeleccionado.nombreCompleto}
+              tasaBcv={tasaBcvNum}
+            />
+          )}
+
+          {pestanaActiva === "agenda" && (
+            <AgendaSillonesOdontologia
+              pacientes={pacientes}
+              pacienteActivoId={pacienteSeleccionado.id}
+            />
+          )}
+
+          {pestanaActiva === "radiografias" && (
+            <VisorRadiografiasDental
+              pacienteId={pacienteSeleccionado.id}
+              pacienteNombre={pacienteSeleccionado.nombreCompleto}
+            />
+          )}
+        </>
       ) : (
         <div className="apple-glass rounded-3xl p-8 border border-dashed border-slate-300 dark:border-white/10 text-center space-y-3 bg-white/50 dark:bg-[#071322]/40">
           <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 dark:bg-white/5 text-slate-400 flex items-center justify-center">
             <IconUser size={24} />
           </div>
           <h3 className="font-['Outfit'] font-bold text-slate-800 dark:text-white text-base">
-            Selecciona un Paciente Odontológico
+            Selecciona un Paciente Odontologico
           </h3>
           <p className="text-xs text-slate-500 dark:text-white/60 max-w-md mx-auto">
-            Utiliza el buscador en la barra superior o selecciona un paciente registrado en el consultorio para cargar su odontograma interactivo, registrar superficies y generar presupuestos.
+            Utiliza el buscador en la barra superior para cargar su odontograma interactivo, periodontograma, planes por fases y radiografias.
           </p>
         </div>
       )}

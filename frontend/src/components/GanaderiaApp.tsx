@@ -1300,7 +1300,11 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           });
         },
         aplicar_vacuna: async (acc) => {
-          await aplicarVacunaGanaderia(acc.payload.vacunaId, tenantId, acc.payload.animalId || 0, acc.payload.dosis || "1 dosis");
+          await aplicarVacunaGanaderia(tenantId, {
+            animalId: acc.payload.animalId || 0,
+            vacunaId: acc.payload.vacunaId,
+            fechaAplicacion: new Date(acc.creadaEn).toISOString().slice(0, 10),
+          });
         }
       });
 

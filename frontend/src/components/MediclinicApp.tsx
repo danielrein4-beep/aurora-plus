@@ -3632,7 +3632,7 @@ function HistoriasClinicas({
         <Odontograma
           pacienteId={Number(pacienteSeleccionado.id)}
           nombrePaciente={pacienteSeleccionado.nombreCompleto}
-          cedulaPaciente={pacienteSeleccionado.cedula}
+          cedulaPaciente={pacienteSeleccionado.identificacion}
           tasaBcv={Number(config?.tasaBCV) || 36.5}
         />
       )}

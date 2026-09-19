@@ -633,7 +633,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     e.preventDefault();
     try {
       const res = await loginSuperAdminApi(sesion?.username || "admin", masterLockPassword);
-      if (res && res.token) {
+      if (res) {
         sessionStorage.setItem("aurora_superadmin_master_unlocked", "true");
         setShowMasterLockModal(false);
         avisar("Autorizacion Maestra concedida para esta sesion");
@@ -693,7 +693,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       `Monto Acreditado: $${Number(p.monto).toFixed(2)} ${p.moneda}`,
       `Metodo de Pago: ${p.metodoPago}`,
       `Referencia Bancaria: ${p.referenciaComprobante || 'N/A'}`,
-      `Tiempo Renovado: ${p.mesesAcreditados > 0 ? `+${p.mesesAcreditados} mes(es)` : `+${p.diasAcreditados} dias`}`,
+      `Tiempo Renovado: ${p.mesesPagados > 0 ? `+${p.mesesPagados} mes(es)` : `+${p.diasAcreditados} dias`}`,
       "Estado: CONFIRMADO & LICENCIA ACTIVA",
       "",
       "Agradecemos su suscripcion continua. Sistema operativo en linea.",
@@ -4964,7 +4964,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             {/* Membrete Oficial */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <AuroraLogo className="w-9 h-9" />
+                <AuroraLogo size={36} />
                 <div>
                   <h4 className="font-['Outfit'] font-black text-base text-slate-900">
                     Aurora Plus Ecosystem
@@ -5017,8 +5017,8 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
               <div className="flex justify-between items-center pb-2 border-b border-slate-100">
                 <span className="text-slate-600 font-medium">Tiempo Acreditado:</span>
                 <span className="font-bold text-emerald-700">
-                  {reciboCobroSeleccionado.mesesAcreditados > 0
-                    ? `+${reciboCobroSeleccionado.mesesAcreditados} mes(es) (${reciboCobroSeleccionado.mesesAcreditados * 30} dias)`
+                  {reciboCobroSeleccionado.mesesPagados > 0
+                    ? `+${reciboCobroSeleccionado.mesesPagados} mes(es) (${reciboCobroSeleccionado.mesesPagados * 30} dias)`
                     : `+${reciboCobroSeleccionado.diasAcreditados} dias`}
                 </span>
               </div>

@@ -7,7 +7,7 @@ import {
   IconHardware, IconPrescription, IconRetail, IconCard, IconSearch, IconTrash,
   IconCheck, IconWarning, IconClose, IconUsers, IconFileText, IconHourglass,
   IconDownload, IconRefresh, IconCheckCircle, IconBank, IconChart, IconBox, IconLock,
-  IconSettings, IconCoins, IconEdit,
+  IconSettings, IconCoins, IconEdit, IconShoppingBag,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
