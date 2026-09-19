@@ -96,6 +96,24 @@ export default function Odontograma({
   const [mostrarPresupuesto, setMostrarPresupuesto] = useState(false);
   const [itemsPresupuesto, setItemsPresupuesto] = useState<PresupuestoItem[]>([]);
   const [notaPresupuesto, setNotaPresupuesto] = useState("Plan de tratamiento sujeto a evolución clínica y radiográfica.");
+  const [nuevoItemDesc, setNuevoItemDesc] = useState("");
+  const [nuevoItemPrecio, setNuevoItemPrecio] = useState<number | "">("");
+
+  const agregarItemManual = () => {
+    if (!nuevoItemDesc.trim()) return;
+    const precio = typeof nuevoItemPrecio === "number" ? nuevoItemPrecio : 0;
+    setItemsPresupuesto((prev) => [
+      ...prev,
+      {
+        id: `manual-${Date.now()}`,
+        descripcion: nuevoItemDesc.trim(),
+        cantidad: 1,
+        precioUnitario: Math.max(0, precio),
+      },
+    ]);
+    setNuevoItemDesc("");
+    setNuevoItemPrecio("");
+  };
 
   const cargar = () => listarOdontograma(pacienteId).then(setDientes).catch(() => setDientes([]));
   useEffect(() => { cargar(); }, [pacienteId]);
@@ -720,6 +738,36 @@ export default function Odontograma({
                     </div>
                   ))
                 )}
+              </div>
+
+              {/* Agregar procedimiento manual al presupuesto */}
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  placeholder="Agregar servicio adicional (ej. Radiografía, Férula...)"
+                  value={nuevoItemDesc}
+                  onChange={(e) => setNuevoItemDesc(e.target.value)}
+                  className="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Precio"
+                    value={nuevoItemPrecio}
+                    onChange={(e) => setNuevoItemPrecio(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                    className="w-24 pl-5 pr-2 py-1.5 rounded-xl border border-slate-300 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-right font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={agregarItemManual}
+                  disabled={!nuevoItemDesc.trim()}
+                  className="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-emerald-600 hover:text-white text-slate-700 dark:text-white/80 font-semibold text-xs transition-colors disabled:opacity-50"
+                >
+                  + Agregar
+                </button>
               </div>
             </div>
 
