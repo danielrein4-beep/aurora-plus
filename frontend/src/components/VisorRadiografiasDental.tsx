@@ -37,6 +37,27 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
   const [nuevoDiente, setNuevoDiente] = useState<number | "">("");
   const [nuevosHallazgos, setNuevosHallazgos] = useState("");
   const [nuevaUrl, setNuevaUrl] = useState("");
+  const [subiendoArchivo, setSubiendoArchivo] = useState(false);
+
+  const leerImagenComoBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleSeleccionarArchivo = async (file: File | null) => {
+    if (!file) return;
+    setSubiendoArchivo(true);
+    try {
+      const b64 = await leerImagenComoBase64(file);
+      setNuevaUrl(b64);
+      if (!nuevoTitulo.trim()) setNuevoTitulo(file.name.replace(/\.[^.]+$/, ""));
+    } finally {
+      setSubiendoArchivo(false);
+    }
+  };
 
   useEffect(() => {
     cargarEstudios();
@@ -113,7 +134,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
         <div>
           <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
             <span>Visor Radiografico Dental de Alto Contraste</span>
-            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/40">
               Filtro Negativo & Zoom
             </span>
           </h3>
@@ -161,11 +182,11 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     className={`w-full p-3.5 rounded-2xl border text-left transition flex flex-col gap-1 ${
                       esActivo
                         ? "bg-cyan-500/20 border-cyan-400 text-slate-900 dark:text-white ring-2 ring-cyan-500/30"
-                        : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-slate-300"
+                        : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
                     }`}
                   >
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold text-cyan-300">{est.tipo_estudio}</span>
+                      <span className="font-bold text-cyan-700 dark:text-cyan-300">{est.tipo_estudio}</span>
                       <span className="text-slate-500 dark:text-slate-400">{est.fecha_toma}</span>
                     </div>
                     <div className="font-bold text-xs truncate">{est.titulo}</div>
@@ -201,7 +222,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                       className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 ${
                         invertido
                           ? "bg-cyan-500 text-slate-950 border-cyan-400"
-                          : "bg-slate-200 dark:bg-white/10 text-slate-200 border-slate-300 dark:border-white/15 hover:bg-white/15"
+                          : "bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-white/15 hover:bg-slate-300 dark:hover:bg-white/15"
                       }`}
                     >
                       <span>Modo Negativo</span>
@@ -211,7 +232,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     <button
                       type="button"
                       onClick={() => setZoom((z) => Math.min(z + 0.25, 3))}
-                      className="p-2 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold"
+                      className="p-2 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/15 text-slate-700 dark:text-slate-200 text-xs font-bold"
                       title="Acercar Zoom"
                     >
                       + Zoom
@@ -219,7 +240,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     <button
                       type="button"
                       onClick={() => setZoom((z) => Math.max(z - 0.25, 0.75))}
-                      className="p-2 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold"
+                      className="p-2 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/15 text-slate-700 dark:text-slate-200 text-xs font-bold"
                       title="Alejar Zoom"
                     >
                       - Zoom
@@ -229,7 +250,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     <button
                       type="button"
                       onClick={() => setRotacion((r) => (r + 90) % 360)}
-                      className="p-2 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold"
+                      className="p-2 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/15 text-slate-700 dark:text-slate-200 text-xs font-bold"
                       title="Rotar 90 grados"
                     >
                       Rotar
@@ -239,7 +260,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     <button
                       type="button"
                       onClick={resetearFiltros}
-                      className="p-2 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-white/10 text-slate-500 dark:text-slate-400 text-xs"
+                      className="p-2 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 text-xs"
                       title="Restablecer"
                     >
                       Reset
@@ -297,10 +318,10 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                 {/* Hallazgos e interpretacion clinica */}
                 {seleccionado.hallazgos && (
                   <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-xs space-y-1">
-                    <span className="font-bold text-cyan-300 uppercase tracking-wider text-[10px]">
+                    <span className="font-bold text-cyan-700 dark:text-cyan-300 uppercase tracking-wider text-[10px]">
                       Interpretacion Radiologica & Hallazgos:
                     </span>
-                    <p className="text-slate-200">{seleccionado.hallazgos}</p>
+                    <p className="text-slate-700 dark:text-slate-200">{seleccionado.hallazgos}</p>
                   </div>
                 )}
               </div>
@@ -333,7 +354,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                   <select
                     value={nuevoTipo}
                     onChange={(e) => setNuevoTipo(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-bold"
+                    className="w-full p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-bold"
                   >
                     <option value="PANORAMICA">Panoramica (Ortopanto)</option>
                     <option value="PERIAPICAL">Periapical</option>
@@ -357,15 +378,27 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
               </div>
 
               <div>
-                <label className="text-slate-500 dark:text-slate-400 block mb-1">URL de la Imagen o Archivo *</label>
+                <label className="text-slate-500 dark:text-slate-400 block mb-1">Imagen del Estudio *</label>
                 <input
-                  type="text"
-                  required
-                  placeholder="https://... o ruta de archivo en la nube"
-                  value={nuevaUrl}
-                  onChange={(e) => setNuevaUrl(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleSeleccionarArchivo(e.target.files?.[0] || null)}
+                  className="w-full p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white text-[11px] file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-cyan-500 file:text-slate-950 file:font-bold file:cursor-pointer cursor-pointer"
                 />
+                {subiendoArchivo && <p className="text-[11px] text-cyan-600 dark:text-cyan-400 mt-1">Cargando imagen...</p>}
+                {nuevaUrl && !subiendoArchivo && (
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">Imagen lista para guardar.</p>
+                )}
+                <details className="mt-1.5">
+                  <summary className="text-[10px] text-slate-500 dark:text-slate-400 cursor-pointer">O pegar una URL en vez de subir el archivo</summary>
+                  <input
+                    type="text"
+                    placeholder="https://..."
+                    value={nuevaUrl.startsWith("data:") ? "" : nuevaUrl}
+                    onChange={(e) => setNuevaUrl(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white mt-1.5"
+                  />
+                </details>
               </div>
 
               <div>

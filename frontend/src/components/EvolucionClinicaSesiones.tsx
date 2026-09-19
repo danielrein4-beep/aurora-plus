@@ -201,7 +201,7 @@ export const EvolucionClinicaSesiones: React.FC<EvolucionClinicaSesionesProps> =
               {/* Medicacion indicada y proxima cita */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {s.medicacion_indicada && (
-                  <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-200">
+                  <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-900 dark:text-teal-200">
                     <span className="text-[10px] text-teal-600 dark:text-teal-400 font-bold uppercase block mb-0.5">
                       Prescripcion Post-Atencion:
                     </span>
@@ -210,8 +210,8 @@ export const EvolucionClinicaSesiones: React.FC<EvolucionClinicaSesionesProps> =
                 )}
 
                 {s.proxima_cita_conducta && (
-                  <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-200">
-                    <span className="text-[10px] text-cyan-400 font-bold uppercase block mb-0.5">
+                  <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-900 dark:text-cyan-200">
+                    <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-bold uppercase block mb-0.5">
                       Proxima Cita & Plan a Seguir:
                     </span>
                     <span>{s.proxima_cita_conducta}</span>
@@ -272,7 +272,7 @@ export const EvolucionClinicaSesiones: React.FC<EvolucionClinicaSesionesProps> =
                   <select
                     value={aislamiento}
                     onChange={(e) => setAislamiento(e.target.value)}
-                    className="w-full p-2.5 rounded-xl bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-bold"
+                    className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-bold"
                   >
                     <option value="ABSOLUTO_DIQUE">Absoluto (Dique de Goma)</option>
                     <option value="RELATIVO_ALGODON">Relativo (Rollos)</option>

@@ -123,14 +123,14 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
     <div className="space-y-6 text-slate-900 dark:text-slate-100 text-left">
       {/* Alerta Quirurgica en Sillon */}
       {tieneRiesgoCritico ? (
-        <div className="p-5 rounded-3xl bg-rose-500/20 border-2 border-rose-500 text-rose-200 space-y-2 shadow-xl animate-pulse">
+        <div className="p-5 rounded-3xl bg-rose-500/20 border-2 border-rose-500 text-rose-900 dark:text-rose-200 space-y-2 shadow-xl animate-pulse">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-rose-500"></span>
             <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
               ALERTA CLINICA EN SILLON: Paciente con Riesgo Quirurgico
             </h4>
           </div>
-          <p className="text-xs text-rose-200">
+          <p className="text-xs font-semibold text-rose-900 dark:text-rose-200">
             {datos.alergia_anestesia && "ATENCION: Alergia a anestesicos locales registrada. Verificar formulacion sin parabenos o alternativa. "}
             {datos.toma_anticoagulantes && "PRECAUCION: Toma anticoagulantes. Riesgo de hemorragia en exodoncia/cirugia. "}
             {datos.profilaxis_antibiotica_requerida && "REQUERIMIENTO: Requiere profilaxis antibiotica previa al procedimiento. "}
@@ -185,11 +185,11 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
               className={`p-3.5 rounded-2xl border text-xs font-bold text-left transition flex items-center justify-between ${
                 datos.alergia_anestesia
                   ? "bg-rose-500/20 border-rose-500 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/40"
-                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-white/10"
+                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
               }`}
             >
               <span>Alergia a Anestesicos</span>
-              <span className={`w-3 h-3 rounded-full ${datos.alergia_anestesia ? "bg-rose-500" : "bg-slate-700"}`}></span>
+              <span className={`w-3 h-3 rounded-full ${datos.alergia_anestesia ? "bg-rose-500" : "bg-slate-300 dark:bg-slate-700"}`}></span>
             </button>
 
             {/* Anticoagulantes */}
@@ -199,11 +199,11 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
               className={`p-3.5 rounded-2xl border text-xs font-bold text-left transition flex items-center justify-between ${
                 datos.toma_anticoagulantes
                   ? "bg-rose-500/20 border-rose-500 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/40"
-                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-white/10"
+                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
               }`}
             >
               <span>Toma Anticoagulantes</span>
-              <span className={`w-3 h-3 rounded-full ${datos.toma_anticoagulantes ? "bg-rose-500" : "bg-slate-700"}`}></span>
+              <span className={`w-3 h-3 rounded-full ${datos.toma_anticoagulantes ? "bg-rose-500" : "bg-slate-300 dark:bg-slate-700"}`}></span>
             </button>
 
             {/* Profilaxis Antibiotica */}
@@ -213,11 +213,11 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
               className={`p-3.5 rounded-2xl border text-xs font-bold text-left transition flex items-center justify-between ${
                 datos.profilaxis_antibiotica_requerida
                   ? "bg-amber-500/20 border-amber-500 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/40"
-                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-white/10"
+                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
               }`}
             >
               <span>Profilaxis Antibiotica</span>
-              <span className={`w-3 h-3 rounded-full ${datos.profilaxis_antibiotica_requerida ? "bg-amber-500" : "bg-slate-700"}`}></span>
+              <span className={`w-3 h-3 rounded-full ${datos.profilaxis_antibiotica_requerida ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-700"}`}></span>
             </button>
 
             {/* Trastorno Coagulacion */}
@@ -227,11 +227,11 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
               className={`p-3.5 rounded-2xl border text-xs font-bold text-left transition flex items-center justify-between ${
                 datos.trastorno_coagulacion
                   ? "bg-rose-500/20 border-rose-500 text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/40"
-                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-white/10"
+                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
               }`}
             >
               <span>Trastorno Coagulacion</span>
-              <span className={`w-3 h-3 rounded-full ${datos.trastorno_coagulacion ? "bg-rose-500" : "bg-slate-700"}`}></span>
+              <span className={`w-3 h-3 rounded-full ${datos.trastorno_coagulacion ? "bg-rose-500" : "bg-slate-300 dark:bg-slate-700"}`}></span>
             </button>
           </div>
 
@@ -265,11 +265,11 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
               className={`p-3.5 rounded-2xl border text-xs font-bold text-left transition flex items-center justify-between ${
                 datos.hipertension
                   ? "bg-amber-500/20 border-amber-500 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/40"
-                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-white/10"
+                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
               }`}
             >
               <span>Hipertension Arterial</span>
-              <span className={`w-3 h-3 rounded-full ${datos.hipertension ? "bg-amber-500" : "bg-slate-700"}`}></span>
+              <span className={`w-3 h-3 rounded-full ${datos.hipertension ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-700"}`}></span>
             </button>
 
             <button
@@ -278,11 +278,11 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
               className={`p-3.5 rounded-2xl border text-xs font-bold text-left transition flex items-center justify-between ${
                 datos.diabetes
                   ? "bg-amber-500/20 border-amber-500 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/40"
-                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-white/10"
+                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
               }`}
             >
               <span>Diabetes Mellitus</span>
-              <span className={`w-3 h-3 rounded-full ${datos.diabetes ? "bg-amber-500" : "bg-slate-700"}`}></span>
+              <span className={`w-3 h-3 rounded-full ${datos.diabetes ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-700"}`}></span>
             </button>
 
             <button
@@ -291,11 +291,11 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
               className={`p-3.5 rounded-2xl border text-xs font-bold text-left transition flex items-center justify-between ${
                 datos.embarazo_lactancia
                   ? "bg-purple-500/20 border-purple-500 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500/40"
-                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-white/10"
+                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
               }`}
             >
               <span>Embarazo / Lactancia</span>
-              <span className={`w-3 h-3 rounded-full ${datos.embarazo_lactancia ? "bg-purple-500" : "bg-slate-700"}`}></span>
+              <span className={`w-3 h-3 rounded-full ${datos.embarazo_lactancia ? "bg-purple-500" : "bg-slate-300 dark:bg-slate-700"}`}></span>
             </button>
 
             <button
@@ -304,11 +304,24 @@ export const FichaAnamnesisRiesgo: React.FC<FichaAnamnesisRiesgoProps> = ({
               className={`p-3.5 rounded-2xl border text-xs font-bold text-left transition flex items-center justify-between ${
                 datos.bruxismo_atm
                   ? "bg-teal-500/20 border-teal-500 text-teal-700 dark:text-teal-300 ring-2 ring-teal-500/40"
-                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-white/10"
+                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
               }`}
             >
               <span>Bruxismo / Trastorno ATM</span>
-              <span className={`w-3 h-3 rounded-full ${datos.bruxismo_atm ? "bg-teal-500" : "bg-slate-700"}`}></span>
+              <span className={`w-3 h-3 rounded-full ${datos.bruxismo_atm ? "bg-teal-500" : "bg-slate-300 dark:bg-slate-700"}`}></span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDatos((p) => ({ ...p, tabaquismo: !p.tabaquismo }))}
+              className={`p-3.5 rounded-2xl border text-xs font-bold text-left transition flex items-center justify-between ${
+                datos.tabaquismo
+                  ? "bg-amber-500/20 border-amber-500 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/40"
+                  : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
+              }`}
+            >
+              <span>Tabaquismo</span>
+              <span className={`w-3 h-3 rounded-full ${datos.tabaquismo ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-700"}`}></span>
             </button>
           </div>
         </div>

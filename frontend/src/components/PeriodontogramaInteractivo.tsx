@@ -24,6 +24,13 @@ interface FilaPeriodonto {
 const DIENTES_SUPERIORES = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 const DIENTES_INFERIORES = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
+// Solo los molares (ultimo digito FDI 6, 7 u 8) son multirradiculares — incisivos,
+// caninos y premolares tienen raiz unica y no pueden presentar lesion de furca.
+const esPiezaMultirradicular = (fdi: number): boolean => {
+  const p = fdi % 10;
+  return p >= 6 && p <= 8;
+};
+
 export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProps> = ({
   pacienteId,
   pacienteNombre,
@@ -212,6 +219,7 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
           </span>
           <div className="grid grid-cols-8 sm:grid-cols-16 gap-1.5 mt-2">
             {DIENTES_SUPERIORES.map((fdi) => {
+              const medido = datos[fdi] !== undefined;
               const d = getDiente(fdi);
               const maxSondaje = Math.max(d.sondajeMv, d.sondajeV, d.sondajeDv, d.sondajeMl, d.sondajeL, d.sondajeDl);
               const esActivo = dienteActivo === fdi;
@@ -224,17 +232,26 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
                   className={`p-2 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 ${
                     esActivo
                       ? "bg-emerald-500/25 border-emerald-400 text-slate-900 dark:text-white ring-2 ring-emerald-500/40"
-                      : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-slate-300"
+                      : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
                   }`}
                 >
                   <span className="text-xs font-black">{fdi}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                      maxSondaje >= 5 ? "bg-rose-500/30 text-rose-700 dark:text-rose-300" : (maxSondaje >= 4 ? "bg-amber-500/30 text-amber-700 dark:text-amber-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300")
-                    }`}
-                  >
-                    {maxSondaje}mm
-                  </span>
+                  {medido ? (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                        maxSondaje >= 5 ? "bg-rose-500/30 text-rose-700 dark:text-rose-300" : (maxSondaje >= 4 ? "bg-amber-500/30 text-amber-700 dark:text-amber-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300")
+                      }`}
+                    >
+                      {maxSondaje}mm
+                    </span>
+                  ) : (
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-slate-400"
+                      title="Pieza sin sondaje registrado"
+                    >
+                      Sin medir
+                    </span>
+                  )}
                   {d.sangradoBop && <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>}
                 </button>
               );
@@ -248,6 +265,7 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
           </span>
           <div className="grid grid-cols-8 sm:grid-cols-16 gap-1.5 mt-2">
             {DIENTES_INFERIORES.map((fdi) => {
+              const medido = datos[fdi] !== undefined;
               const d = getDiente(fdi);
               const maxSondaje = Math.max(d.sondajeMv, d.sondajeV, d.sondajeDv, d.sondajeMl, d.sondajeL, d.sondajeDl);
               const esActivo = dienteActivo === fdi;
@@ -260,17 +278,26 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
                   className={`p-2 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 ${
                     esActivo
                       ? "bg-emerald-500/25 border-emerald-400 text-slate-900 dark:text-white ring-2 ring-emerald-500/40"
-                      : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-slate-300"
+                      : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
                   }`}
                 >
                   <span className="text-xs font-black">{fdi}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                      maxSondaje >= 5 ? "bg-rose-500/30 text-rose-700 dark:text-rose-300" : (maxSondaje >= 4 ? "bg-amber-500/30 text-amber-700 dark:text-amber-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300")
-                    }`}
-                  >
-                    {maxSondaje}mm
-                  </span>
+                  {medido ? (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                        maxSondaje >= 5 ? "bg-rose-500/30 text-rose-700 dark:text-rose-300" : (maxSondaje >= 4 ? "bg-amber-500/30 text-amber-700 dark:text-amber-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300")
+                      }`}
+                    >
+                      {maxSondaje}mm
+                    </span>
+                  ) : (
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-slate-400"
+                      title="Pieza sin sondaje registrado"
+                    >
+                      Sin medir
+                    </span>
+                  )}
                   {d.sangradoBop && <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>}
                 </button>
               );
@@ -405,10 +432,10 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
             className={`p-3 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-2 ${
               cur.sangradoBop
                 ? "bg-rose-500/20 border-rose-500 text-rose-700 dark:text-rose-300 ring-1 ring-rose-500/50"
-                : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-white/10"
+                : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10"
             }`}
           >
-            <span className={`w-2.5 h-2.5 rounded-full ${cur.sangradoBop ? "bg-rose-500 animate-pulse" : "bg-slate-600"}`}></span>
+            <span className={`w-2.5 h-2.5 rounded-full ${cur.sangradoBop ? "bg-rose-500 animate-pulse" : "bg-slate-300 dark:bg-slate-600"}`}></span>
             <span>Sangrado al Sondaje (BOP)</span>
           </button>
 
@@ -419,10 +446,10 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
             className={`p-3 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-2 ${
               cur.placa
                 ? "bg-amber-500/20 border-amber-500 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/50"
-                : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-white/10"
+                : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10"
             }`}
           >
-            <span className={`w-2.5 h-2.5 rounded-full ${cur.placa ? "bg-amber-500" : "bg-slate-600"}`}></span>
+            <span className={`w-2.5 h-2.5 rounded-full ${cur.placa ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-600"}`}></span>
             <span>Placa Bacteriana</span>
           </button>
 
@@ -432,7 +459,7 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
             <select
               value={cur.movilidad}
               onChange={(e) => actualizarValor(dienteActivo, "movilidad", Number(e.target.value))}
-              className="bg-slate-800 border border-slate-300 dark:border-white/20 rounded-xl px-2 py-1 text-emerald-600 dark:text-emerald-400 font-bold"
+              className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/20 rounded-xl px-2 py-1 text-emerald-600 dark:text-emerald-400 font-bold"
             >
               <option value="0">Grado 0 (Normal)</option>
               <option value="1">Grado 1 (&le; 1mm)</option>
@@ -441,19 +468,26 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
             </select>
           </div>
 
-          {/* Furca */}
+          {/* Furca — solo aplica a piezas multirradiculares (molares); un incisivo, canino o
+              premolar tiene raiz unica y no puede tener compromiso de furcacion. */}
           <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-between text-xs">
             <span className="text-slate-500 dark:text-slate-400 font-semibold">Lesion Furca:</span>
-            <select
-              value={cur.furca}
-              onChange={(e) => actualizarValor(dienteActivo, "furca", Number(e.target.value))}
-              className="bg-slate-800 border border-slate-300 dark:border-white/20 rounded-xl px-2 py-1 text-emerald-600 dark:text-emerald-400 font-bold"
-            >
-              <option value="0">Sin lesion</option>
-              <option value="1">Clase I</option>
-              <option value="2">Clase II</option>
-              <option value="3">Clase III</option>
-            </select>
+            {esPiezaMultirradicular(dienteActivo) ? (
+              <select
+                value={cur.furca}
+                onChange={(e) => actualizarValor(dienteActivo, "furca", Number(e.target.value))}
+                className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/20 rounded-xl px-2 py-1 text-emerald-600 dark:text-emerald-400 font-bold"
+              >
+                <option value="0">Sin lesion</option>
+                <option value="1">Clase I</option>
+                <option value="2">Clase II</option>
+                <option value="3">Clase III</option>
+              </select>
+            ) : (
+              <span className="text-slate-400 dark:text-slate-500 font-semibold italic">
+                No aplica (raiz unica)
+              </span>
+            )}
           </div>
         </div>
 

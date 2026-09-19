@@ -26,7 +26,7 @@ interface CitaOdontologica {
 const SILLONES = [
   { id: "SILLON_1", nombre: "Sillon 1 - Operatoria & Preventiva", color: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
   { id: "SILLON_2", nombre: "Sillon 2 - Endodoncia & Periodoncia", color: "border-teal-500/40 bg-teal-500/10 text-teal-700 dark:text-teal-300" },
-  { id: "BOX_QUIRURGICO", nombre: "Box Quirurgico - Implantes & Cirugia", color: "border-cyan-500/40 bg-cyan-500/10 text-cyan-300" },
+  { id: "BOX_QUIRURGICO", nombre: "Box Quirurgico - Implantes & Cirugia", color: "border-cyan-500/40 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300" },
 ];
 
 export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps> = ({
@@ -188,7 +188,7 @@ export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps>
 
               <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] pr-1">
                 {citasSillon.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-slate-100 dark:bg-white/5 text-center text-slate-500 text-xs italic">
+                  <div className="p-6 rounded-2xl bg-slate-100 dark:bg-white/5 text-center text-slate-500 dark:text-slate-400 text-xs italic">
                     Sillon disponible para esta fecha.
                   </div>
                 ) : (
@@ -253,11 +253,11 @@ export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps>
                 <select
                   value={pacienteId}
                   onChange={(e) => setPacienteId(Number(e.target.value))}
-                  className="w-full p-3 rounded-xl bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-bold"
+                  className="w-full p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-bold"
                 >
                   {(pacientes || []).map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.nombre} - C.I. {p.cedula}
+                      {p.nombreCompleto} - C.I. {p.identificacion}
                     </option>
                   ))}
                 </select>
@@ -269,7 +269,7 @@ export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps>
                   <select
                     value={sillonBox}
                     onChange={(e) => setSillonBox(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-bold"
+                    className="w-full p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-bold"
                   >
                     <option value="SILLON_1">Sillon 1 - Operatoria</option>
                     <option value="SILLON_2">Sillon 2 - Endodoncia</option>

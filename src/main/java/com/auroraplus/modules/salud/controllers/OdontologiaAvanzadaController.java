@@ -304,7 +304,7 @@ public class OdontologiaAvanzadaController {
         List<Map<String, Object>> citas;
         if (pacienteId != null) {
             citas = jdbcTemplate.queryForList(
-                "SELECT c.*, p.nombre as nombre_paciente, p.cedula as cedula_paciente, p.telefono as telefono_paciente " +
+                "SELECT c.*, (p.nombres || ' ' || p.apellidos) as nombre_paciente, p.identificacion as cedula_paciente, p.telefono as telefono_paciente " +
                 "FROM salud_odontologia_citas_agenda c " +
                 "JOIN salud_pacientes p ON c.paciente_id = p.id " +
                 "WHERE c.tenant_id = ? AND c.paciente_id = ? ORDER BY c.fecha_cita ASC, c.hora_inicio ASC",
@@ -312,7 +312,7 @@ public class OdontologiaAvanzadaController {
             );
         } else {
             citas = jdbcTemplate.queryForList(
-                "SELECT c.*, p.nombre as nombre_paciente, p.cedula as cedula_paciente, p.telefono as telefono_paciente " +
+                "SELECT c.*, (p.nombres || ' ' || p.apellidos) as nombre_paciente, p.identificacion as cedula_paciente, p.telefono as telefono_paciente " +
                 "FROM salud_odontologia_citas_agenda c " +
                 "JOIN salud_pacientes p ON c.paciente_id = p.id " +
                 "WHERE c.tenant_id = ? AND c.fecha_cita = ?::date ORDER BY c.sillon_box ASC, c.hora_inicio ASC",
@@ -377,7 +377,7 @@ public class OdontologiaAvanzadaController {
         Long tenantId = TenantContext.getCurrentTenant();
 
         List<Map<String, Object>> filas = jdbcTemplate.queryForList(
-            "SELECT c.*, p.nombre as nombre_paciente, p.telefono as telefono_paciente " +
+            "SELECT c.*, (p.nombres || ' ' || p.apellidos) as nombre_paciente, p.telefono as telefono_paciente " +
             "FROM salud_odontologia_citas_agenda c " +
             "JOIN salud_pacientes p ON c.paciente_id = p.id " +
             "WHERE c.tenant_id = ? AND c.id = ?",
