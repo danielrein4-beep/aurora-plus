@@ -798,9 +798,10 @@ export default function CatalogoPublico() {
         <p className="text-xs text-neutral-500 max-w-md mb-6">{error || "No se ha encontrado la tienda solicitada."}</p>
         <Link
           to="/"
-          className="px-6 py-2.5 rounded-full bg-neutral-900 text-white text-[11px] font-bold tracking-[0.2em] uppercase transition-all hover:bg-neutral-800"
+          className="px-6 py-2.5 rounded-full text-[11px] font-bold tracking-[0.2em] uppercase transition-all hover:opacity-90"
+          style={{ backgroundColor: "#171717", color: "#ffffff" }}
         >
-          Volver al Inicio
+          <span style={{ color: "#ffffff" }}>Volver al Inicio</span>
         </Link>
       </div>
     );
@@ -872,22 +873,22 @@ export default function CatalogoPublico() {
                 onClick={() => setMoneda("USD")}
                 className="px-3.5 py-1 rounded-full transition-all text-xs font-bold shadow-sm"
                 style={{
-                  backgroundColor: moneda === "USD" ? "#1e293b" : "transparent",
+                  backgroundColor: moneda === "USD" ? "#171717" : "transparent",
                   color: moneda === "USD" ? "#ffffff" : "#64748b"
                 }}
               >
-                USD ($)
+                <span style={{ color: moneda === "USD" ? "#ffffff" : "#64748b" }}>USD ($)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setMoneda("VES")}
                 className="px-3.5 py-1 rounded-full transition-all text-xs font-bold shadow-sm"
                 style={{
-                  backgroundColor: moneda === "VES" ? "#1e293b" : "transparent",
+                  backgroundColor: moneda === "VES" ? "#171717" : "transparent",
                   color: moneda === "VES" ? "#ffffff" : "#64748b"
                 }}
               >
-                VES (Bs.)
+                <span style={{ color: moneda === "VES" ? "#ffffff" : "#64748b" }}>VES (Bs.)</span>
               </button>
             </div>
 
@@ -923,12 +924,12 @@ export default function CatalogoPublico() {
                   onClick={() => setCategoriaSeleccionada(cat)}
                   className="px-5 py-1.5 rounded-full text-[11px] font-bold tracking-[0.15em] uppercase transition-all duration-200 border"
                   style={{
-                    backgroundColor: active ? "#1e293b" : "#f1f5f9",
+                    backgroundColor: active ? "#171717" : "#f1f5f9",
                     color: active ? "#ffffff" : "#475569",
-                    borderColor: active ? "#1e293b" : "#e2e8f0"
+                    borderColor: active ? "#171717" : "#e2e8f0"
                   }}
                 >
-                  {cat}
+                  <span style={{ color: active ? "#ffffff" : "#475569" }}>{cat}</span>
                 </button>
               );
             })}
@@ -986,10 +987,11 @@ export default function CatalogoPublico() {
                   href={phoneHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-neutral-950 hover:bg-neutral-800 text-white font-bold text-xs tracking-[0.15em] uppercase transition-all shadow-md active:scale-95"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-bold text-xs tracking-[0.15em] uppercase transition-all shadow-md active:scale-95 hover:opacity-90"
+                  style={{ backgroundColor: "#171717", color: "#ffffff" }}
                 >
-                  <SvgWhatsApp className="w-4 h-4" />
-                  <span>Consultar por WhatsApp</span>
+                  <SvgWhatsApp className="w-4 h-4" style={{ color: "#ffffff" }} />
+                  <span style={{ color: "#ffffff" }}>Consultar por WhatsApp</span>
                 </a>
               )}
 
@@ -1195,13 +1197,13 @@ export default function CatalogoPublico() {
                           key={t}
                           type="button"
                           onClick={() => setTallaModal(t)}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                            tallaModal === t
-                              ? "bg-neutral-950 text-white shadow-sm"
-                              : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                          }`}
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                          style={{
+                            backgroundColor: tallaModal === t ? "#171717" : "#f5f5f5",
+                            color: tallaModal === t ? "#ffffff" : "#525252"
+                          }}
                         >
-                          {t}
+                          <span style={{ color: tallaModal === t ? "#ffffff" : "#525252" }}>{t}</span>
                         </button>
                       ))}
                     </div>
@@ -1418,26 +1420,28 @@ export default function CatalogoPublico() {
                       <button
                         type="button"
                         onClick={() => setTipoEntrega("DELIVERY")}
-                        className={`py-2.5 rounded-2xl border text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
-                          tipoEntrega === "DELIVERY"
-                            ? "bg-neutral-950 text-white border-neutral-950 shadow-sm"
-                            : "bg-neutral-50 text-neutral-600 border-neutral-200 hover:bg-neutral-100"
-                        }`}
+                        className="py-2.5 rounded-2xl border text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+                        style={{
+                          backgroundColor: tipoEntrega === "DELIVERY" ? "#171717" : "#f5f5f5",
+                          color: tipoEntrega === "DELIVERY" ? "#ffffff" : "#525252",
+                          borderColor: tipoEntrega === "DELIVERY" ? "#171717" : "#e5e5e5"
+                        }}
                       >
-                        <SvgTruck className="w-4 h-4" />
-                        <span>Delivery</span>
+                        <SvgTruck className="w-4 h-4" style={{ color: tipoEntrega === "DELIVERY" ? "#ffffff" : "#525252" }} />
+                        <span style={{ color: tipoEntrega === "DELIVERY" ? "#ffffff" : "#525252" }}>Delivery</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setTipoEntrega("PICKUP")}
-                        className={`py-2.5 rounded-2xl border text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
-                          tipoEntrega === "PICKUP"
-                            ? "bg-neutral-950 text-white border-neutral-950 shadow-sm"
-                            : "bg-neutral-50 text-neutral-600 border-neutral-200 hover:bg-neutral-100"
-                        }`}
+                        className="py-2.5 rounded-2xl border text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+                        style={{
+                          backgroundColor: tipoEntrega === "PICKUP" ? "#171717" : "#f5f5f5",
+                          color: tipoEntrega === "PICKUP" ? "#ffffff" : "#525252",
+                          borderColor: tipoEntrega === "PICKUP" ? "#171717" : "#e5e5e5"
+                        }}
                       >
-                        <SvgStore className="w-4 h-4" />
-                        <span>Retiro en Boutique</span>
+                        <SvgStore className="w-4 h-4" style={{ color: tipoEntrega === "PICKUP" ? "#ffffff" : "#525252" }} />
+                        <span style={{ color: tipoEntrega === "PICKUP" ? "#ffffff" : "#525252" }}>Retiro en Boutique</span>
                       </button>
                     </div>
 
@@ -1624,10 +1628,11 @@ export default function CatalogoPublico() {
                     type="button"
                     onClick={() => procesarPedido(true)}
                     disabled={enviandoPedido}
-                    className="w-full py-3 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-[0.15em] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                    className="w-full py-3 rounded-full font-bold text-xs uppercase tracking-[0.15em] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                    style={{ backgroundColor: "#059669", color: "#ffffff" }}
                   >
-                    <SvgWhatsApp className="w-4 h-4" />
-                    <span>Pedir por WhatsApp</span>
+                    <SvgWhatsApp className="w-4 h-4" style={{ color: "#ffffff" }} />
+                    <span style={{ color: "#ffffff" }}>Pedir por WhatsApp</span>
                   </button>
                 </div>
               </div>
@@ -1638,14 +1643,15 @@ export default function CatalogoPublico() {
 
       {/* 6. Botón Flotante de WhatsApp en la esquina inferior derecha */}
       {phoneHref && (
-        <a
+                <a
           href={phoneHref}
           target="_blank"
           rel="noopener noreferrer"
-          title="Atención directa por WhatsApp"
-          className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shadow-2xl shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all duration-300"
+          title="Atencion directa por WhatsApp"
+          className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300"
+          style={{ backgroundColor: "#059669", color: "#ffffff" }}
         >
-          <SvgWhatsApp className="w-7 h-7" />
+          <SvgWhatsApp className="w-7 h-7" style={{ color: "#ffffff" }} />
         </a>
       )}
     </div>
