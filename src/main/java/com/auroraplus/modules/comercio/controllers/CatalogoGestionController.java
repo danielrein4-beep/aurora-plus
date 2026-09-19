@@ -31,6 +31,67 @@ public class CatalogoGestionController {
     @Autowired
     private PedidoWebComercioRepository pedidoWebRepository;
 
+    public static class PerfilTiendaRequest {
+        public String nombreEmpresa;
+        public String logoBase64;
+        public String telefonoWhatsapp;
+        public String emailContacto;
+        public String domicilioFiscal;
+    }
+
+    @GetMapping("/perfil-tienda")
+    public ResponseEntity<?> obtenerPerfilTienda() {
+        AuthContext.exigirRol("DUENO_ADMIN");
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("tenantId", tenantId);
+        resp.put("nombreEmpresa", licencia.getNombreEmpresa());
+        resp.put("logoBase64", licencia.getLogoBase64());
+        resp.put("telefonoWhatsapp", licencia.getTelefonoContacto() != null ? licencia.getTelefonoContacto() : "");
+        resp.put("emailContacto", licencia.getEmailContacto() != null ? licencia.getEmailContacto() : "");
+        resp.put("domicilioFiscal", licencia.getDomicilioFiscal() != null ? licencia.getDomicilioFiscal() : "");
+        resp.put("moduloPrincipal", licencia.getModuloPrincipal());
+        resp.put("rif", licencia.getRif());
+        return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/perfil-tienda")
+    public ResponseEntity<?> guardarPerfilTienda(@RequestBody PerfilTiendaRequest req) {
+        AuthContext.exigirRol("DUENO_ADMIN");
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+
+        if (req.nombreEmpresa != null && !req.nombreEmpresa.isBlank()) {
+            licencia.setNombreEmpresa(req.nombreEmpresa.trim());
+        }
+        if (req.logoBase64 != null) {
+            licencia.setLogoBase64(req.logoBase64);
+        }
+        if (req.telefonoWhatsapp != null) {
+            licencia.setTelefonoContacto(req.telefonoWhatsapp.trim());
+        }
+        if (req.emailContacto != null) {
+            licencia.setEmailContacto(req.emailContacto.trim());
+        }
+        if (req.domicilioFiscal != null) {
+            licencia.setDomicilioFiscal(req.domicilioFiscal.trim());
+        }
+        licenciaTenantRepository.save(licencia);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("tenantId", tenantId);
+        resp.put("nombreEmpresa", licencia.getNombreEmpresa());
+        resp.put("logoBase64", licencia.getLogoBase64());
+        resp.put("telefonoWhatsapp", licencia.getTelefonoContacto());
+        resp.put("emailContacto", licencia.getEmailContacto());
+        resp.put("domicilioFiscal", licencia.getDomicilioFiscal());
+        return ResponseEntity.ok(resp);
+    }
+
     public static class ConfigPagoMovilRequest {
         public String banco;
         public String telefono;
