@@ -142,8 +142,8 @@ export default function Industrias() {
               <SpecularButton
                 size="md"
                 radius={12}
-                tint="#35d7c3"
-                tintOpacity={0.16}
+                tint="#0f766e"
+                tintOpacity={1}
                 textColor="#ffffff"
                 lineColor="#7cf3e3"
                 baseColor="#0f766e"
@@ -158,14 +158,16 @@ export default function Industrias() {
               <SpecularButton
                 size="md"
                 radius={12}
-                tint="#ffffff"
-                tintOpacity={0}
-                textColor="#f8f6ef"
+                tint="#F5F5F7"
+                tintOpacity={0.92}
+                blur={14}
+                textColor="#1D1D1F"
                 lineColor="#ffffff"
                 baseColor="#4b4b4b"
                 shineSize={10}
                 shineFade={40}
                 proximity={280}
+                className="shadow-sm"
                 onClick={() => navigate("/precios")}
               >
                 Ver precios →

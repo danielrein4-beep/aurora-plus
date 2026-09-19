@@ -203,16 +203,17 @@ export default function Precios() {
                 <SpecularButton
                   size="md"
                   radius={12}
-                  tint={plan.destacado ? "#35d7c3" : "#ffffff"}
-                  tintOpacity={plan.destacado ? 0.16 : 0}
-                  textColor={plan.destacado ? "#ffffff" : "#f8f6ef"}
+                  tint={plan.destacado ? "#0f766e" : "#F5F5F7"}
+                  tintOpacity={plan.destacado ? 1 : 0.92}
+                  blur={plan.destacado ? 0 : 14}
+                  textColor={plan.destacado ? "#ffffff" : "#1D1D1F"}
                   lineColor={plan.destacado ? "#7cf3e3" : "#ffffff"}
                   baseColor={plan.destacado ? "#0f766e" : "#4b4b4b"}
                   shineSize={12}
                   shineFade={45}
                   intensity={1.3}
                   proximity={280}
-                  className="relative w-full max-w-xs"
+                  className="relative w-full max-w-xs shadow-sm"
                   onClick={() => navigate("/onboarding")}
                 >
                   {plan.destacado ? `Quiero Full para ${vertical.nombre}` : "Comenzar con Básico"}
@@ -265,8 +266,8 @@ export default function Precios() {
               <SpecularButton
                 size="md"
                 radius={12}
-                tint="#a855f7"
-                tintOpacity={0.22}
+                tint="#7c3aed"
+                tintOpacity={1}
                 textColor="#ffffff"
                 lineColor="#e9d5ff"
                 baseColor="#7c3aed"

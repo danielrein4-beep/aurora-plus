@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
+import SpecularButton from "../components/SpecularButton";
 import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware,
@@ -83,18 +84,40 @@ export default function Home() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto mb-16">
-            <button
+            <SpecularButton
+              size="lg"
+              radius={999}
+              tint="#0B3D91"
+              tintOpacity={1}
+              textColor="#ffffff"
+              lineColor="#7ba7f7"
+              baseColor="#0B3D91"
+              shineSize={12}
+              shineFade={45}
+              intensity={1.3}
+              proximity={280}
+              className="w-full sm:w-auto"
               onClick={() => navigate("/onboarding")}
-              className="w-full sm:w-auto bg-[#0B3D91] hover:bg-[#082D6C] text-white text-base font-semibold px-8 py-3.5 rounded-full transition-all duration-200 shadow-sm active:scale-95 cursor-pointer"
             >
               Solicitar demo gratis
-            </button>
-            <button
+            </SpecularButton>
+            <SpecularButton
+              size="lg"
+              radius={999}
+              tint="#F5F5F7"
+              tintOpacity={0.92}
+              blur={14}
+              textColor="#1D1D1F"
+              lineColor="#ffffff"
+              baseColor="#D1D1D6"
+              shineSize={10}
+              shineFade={40}
+              proximity={280}
+              className="w-full sm:w-auto shadow-sm"
               onClick={() => navigate("/industrias")}
-              className="w-full sm:w-auto bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] text-base font-semibold px-8 py-3.5 rounded-full border border-[#E5E5EA] transition-all duration-200 active:scale-95 cursor-pointer"
             >
               Ver los 6 rubros
-            </button>
+            </SpecularButton>
           </div>
 
           {/* Acceso Directo de Sesión (si está logueado) */}

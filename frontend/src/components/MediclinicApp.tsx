@@ -180,8 +180,8 @@ function BotonPrincipal({ children, onClick, type = "button", disabled, classNam
     <SpecularButton
       size="md"
       radius={12}
-      tint={p.tint}
-      tintOpacity={0.16}
+      tint={p.baseColor}
+      tintOpacity={1}
       textColor="#ffffff"
       lineColor={p.lineColor}
       baseColor={p.baseColor}
