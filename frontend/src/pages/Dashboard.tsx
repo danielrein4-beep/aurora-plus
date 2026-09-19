@@ -1,3 +1,4 @@
+import { obtenerCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
 import TenantSoporteWidget from "../components/TenantSoporteWidget";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -291,6 +292,18 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"vertical" | "billing" | "team" | "settings">("vertical");
   const [workspaceTab, setWorkspaceTab] = useState<"kpis" | "patients" | "agenda" | "pos">("kpis");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [cuentasCobro, setCuentasCobro] = useState<SaasCuentasCobroConfig>(obtenerCuentasCobro);
+  const [copiadoCampo, setCopiadoCampo] = useState<string | null>(null);
+
+  const copiarTexto = (txt: string, campo: string) => {
+    try {
+      navigator.clipboard.writeText(txt);
+      setCopiadoCampo(campo);
+      setTimeout(() => setCopiadoCampo(null), 2500);
+    } catch {}
+  };
+
+  const tasaBcv = 45.0;
   const [paymentForm, setPaymentForm] = useState({
     metodo: "Pago Móvil (Bolívares - Tasa BCV)",
     monto: "$35.00",
@@ -1543,18 +1556,107 @@ export default function Dashboard() {
               <form onSubmit={handleReportPaymentSubmit} className="space-y-4">
 
                 {/* Datos bancarios oficiales para transferir */}
-                <div className="p-4 rounded-2xl bg-slate-200/60 dark:bg-white/5 border border-slate-300/80 dark:border-white/10 text-xs space-y-1.5 font-mono">
-                  <div className="font-bold text-teal-600 dark:text-teal-300 font-sans text-xs mb-1.5 flex items-center gap-1.5">
-                    <IconBank size={13} /> Cuentas Oficiales para Transferir:
+                <div className="p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-300/80 dark:border-white/10 text-xs space-y-2.5">
+                  <div className="font-bold text-emerald-600 dark:text-emerald-400 font-sans text-xs flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <IconBank size={14} /> Cuentas Oficiales para Transferir:
+                    </div>
+                    <span className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                      Tasa BCV Oficial: {tasaBcv.toFixed(2)} Bs/$
+                    </span>
                   </div>
-                  <div>• <strong>Pago Móvil:</strong> Banesco (0134) · CI: 28.123.456 · Tel: 0414-1234567</div>
-                  <div>• <strong>Binance USDT (TRC-20):</strong> TQ3j8K9vP2sL... [Copiar]</div>
-                  <div>• <strong>Zelle:</strong> pagos@auroraplus.com</div>
+
+                  {/* Pago Movil Banesco */}
+                  <div className="p-3 rounded-xl bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 space-y-1.5 font-mono text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="font-sans font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        Pago Movil {cuentasCobro.banco || "Banesco (0134)"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => copiarTexto(`${cuentasCobro.telefono} ${cuentasCobro.cedula}`, "todo")}
+                        className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer font-sans"
+                      >
+                        {copiadoCampo === "todo" ? "Copiado!" : "Copiar Datos"}
+                      </button>
+                    </div>
+
+                    <div className="text-slate-700 dark:text-slate-300 space-y-0.5">
+                      <div className="flex justify-between items-center">
+                        <span>Telefono: <strong>{cuentasCobro.telefono}</strong></span>
+                        <button
+                          type="button"
+                          onClick={() => copiarTexto(cuentasCobro.telefono, "tel")}
+                          className="text-[9px] text-slate-400 hover:text-emerald-500 cursor-pointer"
+                        >
+                          {copiadoCampo === "tel" ? "OK" : "Copiar"}
+                        </button>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Cedula / RIF: <strong>{cuentasCobro.cedula}</strong></span>
+                        <button
+                          type="button"
+                          onClick={() => copiarTexto(cuentasCobro.cedula, "ci")}
+                          className="text-[9px] text-slate-400 hover:text-emerald-500 cursor-pointer"
+                        >
+                          {copiadoCampo === "ci" ? "OK" : "Copiar"}
+                        </button>
+                      </div>
+                      {cuentasCobro.titular && (
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                          Titular: {cuentasCobro.titular}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Total equivalente en Bs */}
+                    <div className="pt-1.5 border-t border-slate-200 dark:border-white/10 flex items-center justify-between text-[11px] font-sans">
+                      <span className="text-slate-500 dark:text-slate-400">Monto exacto a transferir:</span>
+                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs">
+                        Bs. {((parseFloat(paymentForm.monto.replace(/[^0-9.]/g, "")) || 35.0) * tasaBcv).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Binance USDT si existe */}
+                  {cuentasCobro.binanceUsdt && (
+                    <div className="p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 flex items-center justify-between text-[11px]">
+                      <span className="font-mono truncate mr-2">Binance USDT: {cuentasCobro.binanceUsdt}</span>
+                      <button
+                        type="button"
+                        onClick={() => copiarTexto(cuentasCobro.binanceUsdt, "binance")}
+                        className="text-[10px] text-sky-500 font-bold hover:underline cursor-pointer flex-shrink-0"
+                      >
+                        {copiadoCampo === "binance" ? "Copiado!" : "Copiar"}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Zelle si existe */}
+                  {cuentasCobro.zelle && (
+                    <div className="p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 flex items-center justify-between text-[11px]">
+                      <span className="font-mono truncate mr-2">Zelle: {cuentasCobro.zelle}</span>
+                      <button
+                        type="button"
+                        onClick={() => copiarTexto(cuentasCobro.zelle, "zelle")}
+                        className="text-[10px] text-purple-500 font-bold hover:underline cursor-pointer flex-shrink-0"
+                      >
+                        {copiadoCampo === "zelle" ? "Copiado!" : "Copiar"}
+                      </button>
+                    </div>
+                  )}
+
+                  {cuentasCobro.instrucciones && (
+                    <p className="text-[10px] text-slate-500 dark:text-white/50 italic font-sans pt-0.5">
+                      {cuentasCobro.instrucciones}
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-white/70 mb-1">
-                    Método de Pago Utilizado
+                    Metodo de Pago Utilizado
                   </label>
                   <select
                     value={paymentForm.metodo}

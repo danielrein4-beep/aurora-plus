@@ -1,3 +1,4 @@
+import { obtenerCuentasCobro, guardarCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
 import React, { useState, useEffect, useMemo } from "react";
 import AuroraLogo from "../AuroraLogo";
 import {
@@ -124,6 +125,8 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   // Modales
   const [showNuevoModal, setShowNuevoModal] = useState(false);
   const [showPagoModal, setShowPagoModal] = useState(false);
+  const [showConfigCuentasModal, setShowConfigCuentasModal] = useState(false);
+  const [cuentasConfigForm, setCuentasConfigForm] = useState<SaasCuentasCobroConfig>(obtenerCuentasCobro);
   const [showRegaloModal, setShowRegaloModal] = useState(false);
   const [showModulosModal, setShowModulosModal] = useState(false);
   const [showUsuarioModal, setShowUsuarioModal] = useState(false);
@@ -1695,6 +1698,18 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-xs transition-all cursor-pointer disabled:opacity-50"
               >
                 {loadingPagos ? "Cargando..." : "Refrescar"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCuentasConfigForm(obtenerCuentasCobro());
+                  setShowConfigCuentasModal(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                <span>Configurar Cuentas de Cobro (Banesco / Binance)</span>
               </button>
 
               <button
@@ -4357,6 +4372,158 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           </div>
         </div>
       )}
+
+      {/* MODAL CONFIGURAR CUENTAS OFICIALES DE COBRO */}
+      {showConfigCuentasModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-xl w-full border border-slate-200 shadow-2xl text-left space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                </div>
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
+                    Cuentas Oficiales de Cobro SaaS
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Estos datos bancarios se mostraran a todos los clientes al pagar o renovar suscripciones.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfigCuentasModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                guardarCuentasCobro(cuentasConfigForm);
+                avisar("Cuentas de cobro actualizadas exitosamente. Los clientes ya ven los datos.");
+                setShowConfigCuentasModal(false);
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/70 text-emerald-800 text-[11px] font-medium">
+                Al guardar, la informacion de Pago Movil Banesco y metodos digitales se actualizara inmediatamente en la pantalla de pago de todos los inquilinos.
+              </div>
+
+              <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] font-mono border-b border-slate-100 pb-1">
+                Datos de Pago Movil (Nacional)
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Banco Destino</label>
+                  <input
+                    type="text"
+                    required
+                    value={cuentasConfigForm.banco}
+                    onChange={(e) => setCuentasConfigForm({ ...cuentasConfigForm, banco: e.target.value })}
+                    placeholder="Ej. Banesco (0134)"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Telefono Pago Movil</label>
+                  <input
+                    type="text"
+                    required
+                    value={cuentasConfigForm.telefono}
+                    onChange={(e) => setCuentasConfigForm({ ...cuentasConfigForm, telefono: e.target.value })}
+                    placeholder="Ej. 0414-1234567"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Cedula o RIF del Titular</label>
+                  <input
+                    type="text"
+                    required
+                    value={cuentasConfigForm.cedula}
+                    onChange={(e) => setCuentasConfigForm({ ...cuentasConfigForm, cedula: e.target.value })}
+                    placeholder="Ej. V-28.123.456"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Nombre Completo del Titular</label>
+                  <input
+                    type="text"
+                    value={cuentasConfigForm.titular}
+                    onChange={(e) => setCuentasConfigForm({ ...cuentasConfigForm, titular: e.target.value })}
+                    placeholder="Ej. Administrador"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] font-mono border-b border-slate-100 pt-2 pb-1">
+                Metodos Digitales / Internacionales (Opcionales)
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Binance Pay / USDT (TRC-20)</label>
+                  <input
+                    type="text"
+                    value={cuentasConfigForm.binanceUsdt}
+                    onChange={(e) => setCuentasConfigForm({ ...cuentasConfigForm, binanceUsdt: e.target.value })}
+                    placeholder="Direccion TRC-20 o Pay ID"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Correo Zelle</label>
+                  <input
+                    type="text"
+                    value={cuentasConfigForm.zelle}
+                    onChange={(e) => setCuentasConfigForm({ ...cuentasConfigForm, zelle: e.target.value })}
+                    placeholder="ejemplo@correo.com"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Instrucciones o Mensaje para el Cliente</label>
+                <textarea
+                  rows={2}
+                  value={cuentasConfigForm.instrucciones}
+                  onChange={(e) => setCuentasConfigForm({ ...cuentasConfigForm, instrucciones: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none text-xs"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowConfigCuentasModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold shadow-xs shadow-emerald-500/20 cursor-pointer"
+                >
+                  Guardar Cuentas Oficiales
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
