@@ -3331,7 +3331,7 @@ function HistoriasClinicas({
         edad: pacienteSeleccionado.fechaNacimiento
           ? calcularEdadAnios(pacienteSeleccionado.fechaNacimiento)
           : pacienteSeleccionado.edad ?? "",
-        sexo: pacienteSeleccionado.sexo || "No especificado",
+        sexo: pacienteSeleccionado.genero || "No especificado",
         alergias: pacienteSeleccionado.alergias || undefined,
         fechaConsulta: c ? fechaDeConsulta(c) : hoy(),
         expediente: `HC-${String(pacienteSeleccionado.id).padStart(4, "0")}`,

@@ -675,6 +675,8 @@ export interface ConsultaMedica {
   evolucionEstado?: "MEJORO" | "IGUAL" | "EMPEORO";
   fechaHora?: string;
   fechaConsulta?: string;
+  /** Listado de farmacos prescritos (JSON serializado desde VademecumPrescriptor). */
+  recipeMedicamentos?: string;
 }
 
 export async function historialConsultasPaciente(pacienteId: number): Promise<ConsultaMedica[]> {
