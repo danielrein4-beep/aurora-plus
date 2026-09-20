@@ -29,8 +29,28 @@ public class IdempotenciaConstruccionService {
     // Hook determinista para pruebas concurrentes
     private static volatile Runnable postPreClaimHook = null;
 
+    /**
+     * Hook exclusivo para pruebas de concurrencia deterministas.
+     * Rechaza cualquier invocación que no provenga de un contexto de pruebas unitarias o de integración.
+     */
     public static void setPostPreClaimHook(Runnable hook) {
+        if (hook != null && !esEntornoDePruebas()) {
+            throw new SecurityException("postPreClaimHook solo puede configurarse durante la ejecución de pruebas");
+        }
         postPreClaimHook = hook;
+    }
+
+    private static boolean esEntornoDePruebas() {
+        for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
+            String className = element.getClassName();
+            if (className.startsWith("org.junit.") ||
+                className.startsWith("org.springframework.test.") ||
+                className.endsWith("Test") ||
+                className.contains("Test$")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public Optional<IdempotenciaConstruccionEntity> buscar(Long tenantId, String idempotencyKey) {
@@ -78,7 +98,7 @@ public class IdempotenciaConstruccionService {
         });
 
         if (Boolean.TRUE.equals(insertado)) {
-            if (postPreClaimHook != null) {
+            if (postPreClaimHook != null && esEntornoDePruebas()) {
                 postPreClaimHook.run();
             }
             return Optional.empty(); // Reclamada exitosamente por este hilo

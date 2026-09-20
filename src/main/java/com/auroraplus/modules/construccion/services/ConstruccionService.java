@@ -321,9 +321,9 @@ public class ConstruccionService {
             idempotenciaService.completarClave(tenantId, idempotencyKey, guardada.getId(), json);
 
             return guardada;
-        } catch (Throwable t) {
+        } catch (Exception ex) {
             idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-            throw t;
+            throw ex;
         }
     }
 
@@ -429,9 +429,9 @@ public class ConstruccionService {
             idempotenciaService.completarClave(tenantId, idempotencyKey, insumoId, json);
 
             return insumoPostConsumo;
-        } catch (Throwable t) {
+        } catch (Exception ex) {
             idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-            throw t;
+            throw ex;
         }
     }
 
@@ -505,9 +505,9 @@ public class ConstruccionService {
             idempotenciaService.completarClave(tenantId, idempotencyKey, guardada.getId(), json);
 
             return guardada;
-        } catch (Throwable t) {
+        } catch (Exception ex) {
             idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-            throw t;
+            throw ex;
         }
     }
 
