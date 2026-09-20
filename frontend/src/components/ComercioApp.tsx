@@ -1008,10 +1008,10 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             </div>
           </div>
           <div className="min-w-0">
-            <div className="font-['Outfit'] font-black text-sm text-white leading-tight truncate">
+            <div className="font-['Outfit'] font-black text-sm !text-white leading-tight truncate">
               {nombreLocal}
             </div>
-            <div className="text-[9px] text-white/50 tracking-wider uppercase truncate">
+            <div className="text-[9px] !text-[#8FD8D2] tracking-wider uppercase truncate font-semibold">
               Aurora {esFarmacia ? "Farmacia" : "Comercio"}
             </div>
           </div>
@@ -1040,7 +1040,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             },
           ]).map((grupo) => (
             <div key={grupo.titulo} className="space-y-1">
-              <div className="px-3.5 text-[10px] font-black uppercase tracking-wider text-white/30">
+              <div className="px-3.5 text-[10px] font-black uppercase tracking-wider !text-[#5BA8A2]">
                 {grupo.titulo}
               </div>
               {grupo.items.map((item) => (
@@ -1049,8 +1049,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   onClick={() => { setTab(item.id); setSidebarAbierto(false); }}
                   className={`sidebar-glare w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
                     tab === item.id
-                      ? "sidebar-glare--active bg-white/10 text-white"
-                      : "text-white/60 hover:bg-white/5 hover:text-white"
+                      ? "sidebar-glare--active bg-white/10 !text-white"
+                      : "!text-[#B9DEDA] hover:bg-white/5 hover:!text-white"
                   }`}
                 >
                   <item.Icon size={16} />
@@ -1068,8 +1068,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-[#5BC0BE] bg-white/5 hover:bg-white/10 transition-colors"
           >
             <IconShoppingBag size={16} />
-            <span className="flex-1 text-left">Mi Catálogo Online & QR</span>
-            <span className="text-[8px] font-black uppercase tracking-wider bg-[#177E89]/30 text-[#5BC0BE] px-1.5 py-0.5 rounded-full">
+            <span className="flex-1 text-left !text-white">Mi Catálogo Online & QR</span>
+            <span className="text-[8px] font-black uppercase tracking-wider bg-[#177E89]/30 !text-[#8FE8E0] px-1.5 py-0.5 rounded-full">
               Online
             </span>
           </button>
@@ -1077,7 +1077,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             type="button"
             title="Atencion y ventas automatizadas en WhatsApp con IA conectada a tu inventario en tiempo real"
             onClick={() => { setModalIaVisible(true); setSidebarAbierto(false); }}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-white/80 bg-white/5 hover:bg-white/10 hover:scale-[1.01] active:scale-[0.99] transition-all mt-2 border border-white/10 shadow-sm"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer !text-white bg-white/5 hover:bg-white/10 hover:scale-[1.01] active:scale-[0.99] transition-all mt-2 border border-white/10 shadow-sm"
           >
             <div className="w-4 h-4 flex items-center justify-center text-[#5BC0BE]">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1085,7 +1085,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               </svg>
             </div>
             <span className="flex-1 text-left font-semibold">Asistente IA WhatsApp</span>
-            <span className="text-[8px] font-black uppercase tracking-wider bg-white/10 text-white/70 px-1.5 py-0.5 rounded-full border border-white/10">
+            <span className="text-[8px] font-black uppercase tracking-wider bg-white/10 !text-[#CFEFEC] px-1.5 py-0.5 rounded-full border border-white/10">
               24/7
             </span>
           </button>
@@ -1096,7 +1096,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         <div className="p-3 border-t border-white/10">
           <button
             onClick={onSalir}
-            className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 transition-colors cursor-pointer"
+            className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 !text-[#B9DEDA] hover:!text-white transition-colors cursor-pointer"
           >
             ← Salir al Hub
           </button>
