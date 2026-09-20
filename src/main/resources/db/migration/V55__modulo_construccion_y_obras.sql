@@ -163,3 +163,16 @@ VALUES
 ('E.511.100.000', 'CAP-05', 'Instalaciones Sanitarias', 'Suministro e instalación de tubería de aguas negras PVC sanitario de diam. 4 pulg', 'ml', 12.80, 28.0),
 ('E.611.100.000', 'CAP-06', 'Instalaciones Eléctricas', 'Punto de tomacorriente doble 110V polarizado empotrado en tubería EMT de 1/2 pulg', 'pto', 22.00, 14.0)
 ON CONFLICT (codigo_covenin) DO NOTHING;
+
+
+-- 9. Control de Idempotencia para Operaciones Críticas (Valuaciones, Bitácora, Consumo de Insumos)
+CREATE TABLE IF NOT EXISTS idempotencia_construccion (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    idempotency_key VARCHAR(100) NOT NULL,
+    recurso_tipo VARCHAR(50) NOT NULL, -- VALUACION, BITACORA, CONSUMO_INSUMO
+    recurso_id BIGINT,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_idemp_tenant_key UNIQUE (tenant_id, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS idx_idemp_tenant_key ON idempotencia_construccion(tenant_id, idempotency_key);

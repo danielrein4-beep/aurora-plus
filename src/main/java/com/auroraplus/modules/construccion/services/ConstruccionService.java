@@ -42,6 +42,9 @@ public class ConstruccionService {
     @Autowired
     private CatalogoCoveninRepository catalogoRepository;
 
+    @Autowired
+    private IdempotenciaConstruccionRepository idempotenciaRepository;
+
     // --- PROYECTOS ---
 
     public List<ProyectoConstruccionEntity> listarProyectos(Long tenantId) {
@@ -120,6 +123,10 @@ public class ConstruccionService {
     public CapituloConstruccionEntity guardarCapitulo(Long tenantId, CapituloConstruccionEntity capitulo) {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        if (capitulo.getProyectoId() != null) {
+            proyectoRepository.findByTenantIdAndId(tenantId, capitulo.getProyectoId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
         }
         // Ignorar IDs en creación
         capitulo.setId(null);
@@ -207,9 +214,26 @@ public class ConstruccionService {
     }
 
     public ValuacionConstruccionEntity guardarValuacion(Long tenantId, Long proyectoId, ValuacionConstruccionEntity valuacion) {
+        return guardarValuacion(tenantId, proyectoId, valuacion, null);
+    }
+
+    @Transactional
+    public ValuacionConstruccionEntity guardarValuacion(Long tenantId, Long proyectoId, ValuacionConstruccionEntity valuacion, String idempotencyKey) {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
+
+        // Idempotencia: si ya fue procesada, retornar el recurso existente sin duplicar
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            Optional<IdempotenciaConstruccionEntity> idempOpt = idempotenciaRepository.findByTenantIdAndIdempotencyKey(tenantId, idempotencyKey.trim());
+            if (idempOpt.isPresent() && idempOpt.get().getRecursoId() != null) {
+                Optional<ValuacionConstruccionEntity> prevVal = valuacionRepository.findByTenantIdAndId(tenantId, idempOpt.get().getRecursoId());
+                if (prevVal.isPresent()) {
+                    return prevVal.get();
+                }
+            }
+        }
+
         // Validar pertenencia del proyecto
         proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
@@ -230,7 +254,13 @@ public class ConstruccionService {
         valuacion.setProyectoId(proyectoId);
         valuacion.setEstado(valuacion.getEstado().toUpperCase());
 
-        return valuacionRepository.save(valuacion);
+        ValuacionConstruccionEntity guardada = valuacionRepository.save(valuacion);
+
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            idempotenciaRepository.save(new IdempotenciaConstruccionEntity(tenantId, idempotencyKey.trim(), "VALUACION", guardada.getId()));
+        }
+
+        return guardada;
     }
 
     public Optional<ValuacionConstruccionEntity> actualizarEstadoValuacion(Long tenantId, Long valuacionId, String nuevoEstado) {
@@ -278,6 +308,11 @@ public class ConstruccionService {
     }
 
     public InsumoConstruccionEntity registrarConsumoInsumo(Long tenantId, Long insumoId, BigDecimal cantidad) {
+        return registrarConsumoInsumo(tenantId, insumoId, cantidad, null);
+    }
+
+    @Transactional
+    public InsumoConstruccionEntity registrarConsumoInsumo(Long tenantId, Long insumoId, BigDecimal cantidad, String idempotencyKey) {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
@@ -285,18 +320,33 @@ public class ConstruccionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad a consumir debe ser estrictamente mayor a cero");
         }
 
-        // Buscar primero por (tenantId, id)
-        InsumoConstruccionEntity insumo = insumoRepository.findByTenantIdAndId(tenantId, insumoId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado para este tenant"));
+        // Idempotencia: si la acción ya fue ejecutada, no volver a descontar inventario
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            Optional<IdempotenciaConstruccionEntity> idempOpt = idempotenciaRepository.findByTenantIdAndIdempotencyKey(tenantId, idempotencyKey.trim());
+            if (idempOpt.isPresent()) {
+                return insumoRepository.findByTenantIdAndId(tenantId, insumoId)
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado"));
+            }
+        }
 
-        BigDecimal stockActual = insumo.getStockActual() != null ? insumo.getStockActual() : BigDecimal.ZERO;
-        if (stockActual.compareTo(cantidad) < 0) {
+        // UPDATE atómico concurrente: descuenta únicamente si stock_actual >= cantidad y pertenece al tenant
+        int filasAfectadas = insumoRepository.descontarStockAtomico(tenantId, insumoId, cantidad);
+
+        if (filasAfectadas == 0) {
+            InsumoConstruccionEntity insumoExistente = insumoRepository.findByTenantIdAndId(tenantId, insumoId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado para este tenant"));
+
+            BigDecimal stockActual = insumoExistente.getStockActual() != null ? insumoExistente.getStockActual() : BigDecimal.ZERO;
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Stock insuficiente: no se permite stock negativo (stock actual: " + stockActual + ", consumo: " + cantidad + ")");
         }
 
-        insumo.setStockActual(stockActual.subtract(cantidad));
-        return insumoRepository.save(insumo);
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            idempotenciaRepository.save(new IdempotenciaConstruccionEntity(tenantId, idempotencyKey.trim(), "CONSUMO_INSUMO", insumoId));
+        }
+
+        return insumoRepository.findByTenantIdAndId(tenantId, insumoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado tras descuento"));
     }
 
     // --- BITÁCORA ---
@@ -313,9 +363,26 @@ public class ConstruccionService {
     }
 
     public BitacoraConstruccionEntity agregarEntradaBitacora(Long tenantId, Long proyectoId, BitacoraConstruccionEntity entrada) {
+        return agregarEntradaBitacora(tenantId, proyectoId, entrada, null);
+    }
+
+    @Transactional
+    public BitacoraConstruccionEntity agregarEntradaBitacora(Long tenantId, Long proyectoId, BitacoraConstruccionEntity entrada, String idempotencyKey) {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
+
+        // Idempotencia: si ya fue procesada, retornar la entrada previa sin duplicar
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            Optional<IdempotenciaConstruccionEntity> idempOpt = idempotenciaRepository.findByTenantIdAndIdempotencyKey(tenantId, idempotencyKey.trim());
+            if (idempOpt.isPresent() && idempOpt.get().getRecursoId() != null) {
+                Optional<BitacoraConstruccionEntity> prevBit = bitacoraRepository.findByTenantIdAndId(tenantId, idempOpt.get().getRecursoId());
+                if (prevBit.isPresent()) {
+                    return prevBit.get();
+                }
+            }
+        }
+
         // Validar que el proyecto pertenezca al tenant
         proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
@@ -330,7 +397,13 @@ public class ConstruccionService {
         entrada.setTenantId(tenantId);
         entrada.setProyectoId(proyectoId);
 
-        return bitacoraRepository.save(entrada);
+        BitacoraConstruccionEntity guardada = bitacoraRepository.save(entrada);
+
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            idempotenciaRepository.save(new IdempotenciaConstruccionEntity(tenantId, idempotencyKey.trim(), "BITACORA", guardada.getId()));
+        }
+
+        return guardada;
     }
 
     // --- CATÁLOGO COVENIN (PÚBLICO / COMPARTIDO) ---

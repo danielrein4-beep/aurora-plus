@@ -4698,16 +4698,23 @@ export function listarValuacionesConstruccionApi(proyectoId: number): Promise<Va
   return request(`/api/construccion/proyectos/${proyectoId}/valuaciones`);
 }
 
-export function crearValuacionConstruccionApi(proyectoId: number, datos: ValuacionConstruccionApi): Promise<ValuacionConstruccionApi> {
+export function crearValuacionConstruccionApi(proyectoId: number, datos: ValuacionConstruccionApi, idempotencyKey?: string): Promise<ValuacionConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
   return request(`/api/construccion/proyectos/${proyectoId}/valuaciones`, {
     method: "POST",
+    headers,
     body: JSON.stringify(datos)
   });
 }
 
 export function cambiarEstadoValuacionConstruccionApi(id: number, nuevoEstado: string): Promise<ValuacionConstruccionApi> {
-  return request(`/api/construccion/valuaciones/${id}/estado?nuevoEstado=${encodeURIComponent(nuevoEstado)}`, {
-    method: "PATCH"
+  return request(`/api/construccion/valuaciones/${id}/estado`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado: nuevoEstado })
   });
 }
 
@@ -4723,9 +4730,15 @@ export function crearInsumoConstruccionApi(datos: InsumoConstruccionApi): Promis
   });
 }
 
-export function registrarConsumoInsumoConstruccionApi(id: number, cantidad: number): Promise<InsumoConstruccionApi> {
-  return request(`/api/construccion/insumos/${id}/consumo?cantidad=${encodeURIComponent(cantidad)}`, {
-    method: "POST"
+export function registrarConsumoInsumoConstruccionApi(id: number, cantidad: number, idempotencyKey?: string): Promise<InsumoConstruccionApi> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+  return request(`/api/construccion/insumos/${id}/consumo`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ cantidad })
   });
 }
 
@@ -4734,9 +4747,14 @@ export function listarBitacoraConstruccionApi(proyectoId: number): Promise<Bitac
   return request(`/api/construccion/proyectos/${proyectoId}/bitacora`);
 }
 
-export function registrarBitacoraConstruccionApi(proyectoId: number, datos: BitacoraConstruccionApi): Promise<BitacoraConstruccionApi> {
+export function registrarBitacoraConstruccionApi(proyectoId: number, datos: BitacoraConstruccionApi, idempotencyKey?: string): Promise<BitacoraConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
   return request(`/api/construccion/proyectos/${proyectoId}/bitacora`, {
     method: "POST",
+    headers,
     body: JSON.stringify(datos)
   });
 }

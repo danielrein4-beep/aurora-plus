@@ -18,6 +18,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -76,119 +78,212 @@ public class ConstruccionAislamientoTenantP0Test {
         return insumoRepository.save(ins);
     }
 
-    // 1. Falta de Tenant en TenantContext -> 401 Unauthorized
+    // 1. Sin TenantContext devuelve 401 Unauthorized en todas las operaciones
     @Test
-    void faltaDeTenant_arrojaUnauthorized() {
+    void sinTenantContext_devuelve401EnTodasLasOperaciones() {
         TenantContext.clear();
 
-        ResponseStatusException exListar = assertThrows(ResponseStatusException.class, () -> {
-            construccionController.listarProyectos();
-        });
-        assertEquals(HttpStatus.UNAUTHORIZED, exListar.getStatusCode());
+        ResponseStatusException exListarProy = assertThrows(ResponseStatusException.class, () -> construccionController.listarProyectos());
+        assertEquals(HttpStatus.UNAUTHORIZED, exListarProy.getStatusCode());
 
-        ResponseStatusException exInsumos = assertThrows(ResponseStatusException.class, () -> {
-            construccionController.listarInsumos();
-        });
-        assertEquals(HttpStatus.UNAUTHORIZED, exInsumos.getStatusCode());
+        ResponseStatusException exCrearProy = assertThrows(ResponseStatusException.class, () -> construccionController.crearProyecto(new ProyectoConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exCrearProy.getStatusCode());
+
+        ResponseStatusException exObtenerProy = assertThrows(ResponseStatusException.class, () -> construccionController.obtenerProyecto(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exObtenerProy.getStatusCode());
+
+        ResponseStatusException exListarCap = assertThrows(ResponseStatusException.class, () -> construccionController.listarCapitulos());
+        assertEquals(HttpStatus.UNAUTHORIZED, exListarCap.getStatusCode());
+
+        ResponseStatusException exCrearCap = assertThrows(ResponseStatusException.class, () -> construccionController.crearCapitulo(new CapituloConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exCrearCap.getStatusCode());
+
+        ResponseStatusException exListarPart = assertThrows(ResponseStatusException.class, () -> construccionController.listarPartidas(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exListarPart.getStatusCode());
+
+        ResponseStatusException exCrearPart = assertThrows(ResponseStatusException.class, () -> construccionController.crearPartida(1L, new PartidaConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exCrearPart.getStatusCode());
+
+        ResponseStatusException exEliminarPart = assertThrows(ResponseStatusException.class, () -> construccionController.eliminarPartida(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exEliminarPart.getStatusCode());
+
+        ResponseStatusException exListarVal = assertThrows(ResponseStatusException.class, () -> construccionController.listarValuaciones(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exListarVal.getStatusCode());
+
+        ResponseStatusException exCrearVal = assertThrows(ResponseStatusException.class, () -> construccionController.crearValuacion(1L, new ValuacionConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exCrearVal.getStatusCode());
+
+        ResponseStatusException exPatchVal = assertThrows(ResponseStatusException.class, () -> construccionController.cambiarEstadoValuacion(1L, Map.of("estado", "APROBADA")));
+        assertEquals(HttpStatus.UNAUTHORIZED, exPatchVal.getStatusCode());
+
+        ResponseStatusException exListarIns = assertThrows(ResponseStatusException.class, () -> construccionController.listarInsumos());
+        assertEquals(HttpStatus.UNAUTHORIZED, exListarIns.getStatusCode());
+
+        ResponseStatusException exCrearIns = assertThrows(ResponseStatusException.class, () -> construccionController.crearInsumo(new InsumoConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exCrearIns.getStatusCode());
+
+        ResponseStatusException exConsumo = assertThrows(ResponseStatusException.class, () -> construccionController.registrarConsumo(1L, Map.of("cantidad", BigDecimal.ONE)));
+        assertEquals(HttpStatus.UNAUTHORIZED, exConsumo.getStatusCode());
+
+        ResponseStatusException exListarBit = assertThrows(ResponseStatusException.class, () -> construccionController.listarBitacora(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exListarBit.getStatusCode());
+
+        ResponseStatusException exAgregarBit = assertThrows(ResponseStatusException.class, () -> construccionController.agregarBitacora(1L, new BitacoraConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exAgregarBit.getStatusCode());
     }
 
-    // 2. Aislamiento A/B de Proyectos entre Tenants
+    // 2. Tenant B no puede listar, leer, crear, editar ni borrar datos de Tenant A
     @Test
-    void aislamientoProyectos_tenantBNoPuedeListarNiObtenerProyectosDeA() {
-        long tenantA = 99101L;
-        long tenantB = 99102L;
+    void tenantB_noPuedeListarLeerCrearEditarNiBorrarDatosDeTenantA() {
+        long tenantA = 88101L;
+        long tenantB = 88102L;
 
-        ProyectoConstruccionEntity proyA = crearProyectoHelper(tenantA, "PROY-A-01", "Edificio Alfa");
-
-        // Tenant A lista y ve su proyecto
+        // Tenant A configura su ecosistema de obras
         TenantContext.setCurrentTenant(tenantA);
-        List<ProyectoConstruccionEntity> listaA = construccionController.listarProyectos();
-        assertTrue(listaA.stream().anyMatch(p -> p.getId().equals(proyA.getId())));
+        ProyectoConstruccionEntity proyA = crearProyectoHelper(tenantA, "PROY-A-ISO", "Torre Financiera A");
 
-        // Tenant B lista y NO ve el proyecto de A
+        CapituloConstruccionEntity cA = new CapituloConstruccionEntity();
+        cA.setTenantId(tenantA);
+        cA.setProyectoId(proyA.getId());
+        cA.setCodigo("1.0");
+        cA.setNombre("Obras Preliminares A");
+        cA.setOrden(1);
+        CapituloConstruccionEntity capA = capituloRepository.save(cA);
+
+        PartidaConstruccionEntity pA = new PartidaConstruccionEntity();
+        pA.setTenantId(tenantA);
+        pA.setProyectoId(proyA.getId());
+        pA.setCapituloId(capA.getId());
+        pA.setCodigoCovenin("E-311.100");
+        pA.setDescripcion("Concreto f'c=250 kg/cm2");
+        pA.setUnidad("m3");
+        pA.setCantidadPresupuestada(new BigDecimal("25.00"));
+        pA.setPrecioUnitario(new BigDecimal("110.00"));
+        PartidaConstruccionEntity partidaA = partidaRepository.save(pA);
+
+        ValuacionConstruccionEntity vA = new ValuacionConstruccionEntity();
+        vA.setTenantId(tenantA);
+        vA.setProyectoId(proyA.getId());
+        vA.setNumeroValuacion(1);
+        vA.setPeriodoDesde(LocalDate.now());
+        vA.setPeriodoHasta(LocalDate.now().plusDays(15));
+        vA.setFechaEmision(LocalDate.now().plusDays(15));
+        vA.setMontoBruto(new BigDecimal("2750.00"));
+        vA.setEstado("BORRADOR");
+        ValuacionConstruccionEntity valA = valuacionRepository.save(vA);
+
+        InsumoConstruccionEntity insA = crearInsumoHelper(tenantA, "INS-A-01", "Cemento Blanco", new BigDecimal("50.00"));
+
+        BitacoraConstruccionEntity bA = new BitacoraConstruccionEntity();
+        bA.setTenantId(tenantA);
+        bA.setProyectoId(proyA.getId());
+        bA.setFecha(LocalDate.now());
+        bA.setClima("DESPEJADO");
+        bA.setPersonalActivo(10);
+        bA.setActividadesEjecutadas("Vaciado inicial");
+        BitacoraConstruccionEntity bitA = bitacoraRepository.save(bA);
+
+        final Long proyAId = proyA.getId();
+        final Long capAId = capA.getId();
+        final Long partidaAId = partidaA.getId();
+        final Long valAId = valA.getId();
+        final Long insAId = insA.getId();
+        final Long bitAId = bitA.getId();
+
+        // Ahora nos posicionamos como Tenant B
         TenantContext.setCurrentTenant(tenantB);
-        List<ProyectoConstruccionEntity> listaB = construccionController.listarProyectos();
-        assertFalse(listaB.stream().anyMatch(p -> p.getId().equals(proyA.getId())));
 
-        // Tenant B intenta obtener por ID directo del proyecto de A -> 404 Not Found
-        ResponseEntity<ProyectoConstruccionEntity> resp = construccionController.obtenerProyecto(proyA.getId());
-        assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
+        // 1. LISTAR: Tenant B no ve ningún recurso de Tenant A
+        List<ProyectoConstruccionEntity> proyectosB = construccionController.listarProyectos();
+        assertFalse(proyectosB.stream().anyMatch(p -> p.getId().equals(proyAId)), "Tenant B no debe ver proyectos de Tenant A");
+
+        List<InsumoConstruccionEntity> insumosB = construccionController.listarInsumos();
+        assertFalse(insumosB.stream().anyMatch(i -> i.getId().equals(insAId)), "Tenant B no debe ver insumos de Tenant A");
+
+        List<CapituloConstruccionEntity> capitulosB = construccionController.listarCapitulos();
+        assertFalse(capitulosB.stream().anyMatch(c -> c.getId().equals(capAId)), "Tenant B no debe ver capítulos de Tenant A");
+
+        // Intentar listar subrecursos del proyecto de A -> 404 NOT_FOUND
+        ResponseStatusException exListPart = assertThrows(ResponseStatusException.class, () -> construccionController.listarPartidas(proyAId));
+        assertEquals(HttpStatus.NOT_FOUND, exListPart.getStatusCode());
+
+        ResponseStatusException exListVal = assertThrows(ResponseStatusException.class, () -> construccionController.listarValuaciones(proyAId));
+        assertEquals(HttpStatus.NOT_FOUND, exListVal.getStatusCode());
+
+        ResponseStatusException exListBit = assertThrows(ResponseStatusException.class, () -> construccionController.listarBitacora(proyAId));
+        assertEquals(HttpStatus.NOT_FOUND, exListBit.getStatusCode());
+
+        // 2. LEER: Tenant B no puede leer directamente el proyecto de Tenant A
+        ResponseEntity<ProyectoConstruccionEntity> respLectura = construccionController.obtenerProyecto(proyAId);
+        assertEquals(HttpStatus.NOT_FOUND, respLectura.getStatusCode());
+
+        // 3. CREAR: Tenant B no puede crear partidas, valuaciones ni bitácoras en el proyecto de Tenant A
+        PartidaConstruccionEntity nuevaPartida = new PartidaConstruccionEntity();
+        nuevaPartida.setCodigoCovenin("E-999.999");
+        nuevaPartida.setDescripcion("Inyección ilícita");
+        nuevaPartida.setUnidad("m");
+        nuevaPartida.setCantidadPresupuestada(BigDecimal.TEN);
+        nuevaPartida.setPrecioUnitario(BigDecimal.TEN);
+        ResponseStatusException exCrearPart = assertThrows(ResponseStatusException.class, () -> construccionController.crearPartida(proyAId, nuevaPartida));
+        assertEquals(HttpStatus.NOT_FOUND, exCrearPart.getStatusCode());
+
+        ValuacionConstruccionEntity nuevaVal = new ValuacionConstruccionEntity();
+        nuevaVal.setNumeroValuacion(2);
+        nuevaVal.setPeriodoDesde(LocalDate.now());
+        nuevaVal.setPeriodoHasta(LocalDate.now().plusDays(10));
+        nuevaVal.setFechaEmision(LocalDate.now().plusDays(10));
+        nuevaVal.setMontoBruto(BigDecimal.TEN);
+        nuevaVal.setEstado("BORRADOR");
+        ResponseStatusException exCrearVal = assertThrows(ResponseStatusException.class, () -> construccionController.crearValuacion(proyAId, nuevaVal));
+        assertEquals(HttpStatus.NOT_FOUND, exCrearVal.getStatusCode());
+
+        BitacoraConstruccionEntity nuevaBit = new BitacoraConstruccionEntity();
+        nuevaBit.setFecha(LocalDate.now());
+        nuevaBit.setClima("LLUVIA");
+        nuevaBit.setPersonalActivo(5);
+        nuevaBit.setActividadesEjecutadas("Hack intento");
+        ResponseStatusException exCrearBit = assertThrows(ResponseStatusException.class, () -> construccionController.agregarBitacora(proyAId, nuevaBit));
+        assertEquals(HttpStatus.NOT_FOUND, exCrearBit.getStatusCode());
+
+        // 4. EDITAR: Tenant B no puede cambiar estado de valuación ni descontar insumo de Tenant A
+        ResponseStatusException exEditarVal = assertThrows(ResponseStatusException.class, () -> construccionController.cambiarEstadoValuacion(valAId, Map.of("estado", "APROBADA")));
+        assertEquals(HttpStatus.NOT_FOUND, exEditarVal.getStatusCode());
+
+        ResponseStatusException exEditarIns = assertThrows(ResponseStatusException.class, () -> construccionController.registrarConsumo(insAId, Map.of("cantidad", BigDecimal.ONE)));
+        assertEquals(HttpStatus.NOT_FOUND, exEditarIns.getStatusCode());
+
+        // 5. BORRAR: Tenant B no puede eliminar partida de Tenant A
+        ResponseStatusException exBorrarPart = assertThrows(ResponseStatusException.class, () -> construccionController.eliminarPartida(partidaAId));
+        assertEquals(HttpStatus.NOT_FOUND, exBorrarPart.getStatusCode());
+
+        // Verificar que los datos de Tenant A permanecen 100% íntegros
+        TenantContext.setCurrentTenant(tenantA);
+        assertTrue(proyectoRepository.findById(proyA.getId()).isPresent());
+        assertTrue(partidaRepository.findById(partidaA.getId()).isPresent());
+        assertEquals("BORRADOR", valuacionRepository.findById(valA.getId()).orElseThrow().getEstado());
+        assertEquals(new BigDecimal("50.00"), insumoRepository.findById(insA.getId()).orElseThrow().getStockActual());
     }
 
-    // 3. Referencias Cruzadas: Tenant B no puede crear partida en proyecto de Tenant A
+    // 3. No se puede asociar capítulo de un proyecto a otro proyecto, aunque sean del mismo tenant (capitulo.proyectoId == proyectoId)
     @Test
-    void referenciasCruzadas_tenantBNoPuedeCrearPartidaEnProyectoDeA() {
-        long tenantA = 99201L;
-        long tenantB = 99202L;
-
-        ProyectoConstruccionEntity proyA = crearProyectoHelper(tenantA, "PROY-A-02", "Puente Sur");
-
-        TenantContext.setCurrentTenant(tenantB);
-        PartidaConstruccionEntity partidaHack = new PartidaConstruccionEntity();
-        partidaHack.setCodigoCovenin("E-311.110");
-        partidaHack.setDescripcion("Concreto f'c=250 kg/cm2");
-        partidaHack.setUnidad("m3");
-        partidaHack.setCantidadPresupuestada(new BigDecimal("10.00"));
-        partidaHack.setPrecioUnitario(new BigDecimal("120.00"));
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> {
-            construccionController.crearPartida(proyA.getId(), partidaHack);
-        });
-        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
-    }
-
-    // 4. Referencias Cruzadas: Partida no puede asociar capítulo de otro Tenant
-    @Test
-    void referenciasCruzadas_partidaNoPuedeUsarCapituloDeOtroTenant() {
-        long tenantA = 99301L;
-        long tenantB = 99302L;
-
-        // Tenant A crea capítulo
-        CapituloConstruccionEntity capA = new CapituloConstruccionEntity();
-        capA.setTenantId(tenantA);
-        capA.setCodigo("1.0");
-        capA.setNombre("Obras Preliminares A");
-        capA.setOrden(1);
-        capA = capituloRepository.save(capA);
-
-        // Tenant B tiene su proyecto
-        ProyectoConstruccionEntity proyB = crearProyectoHelper(tenantB, "PROY-B-01", "Galpón B");
-
-        TenantContext.setCurrentTenant(tenantB);
-        PartidaConstruccionEntity partida = new PartidaConstruccionEntity();
-        partida.setCapituloId(capA.getId()); // Intento de usar capítulo ajeno
-        partida.setCodigoCovenin("E-111.100");
-        partida.setDescripcion("Deforestación");
-        partida.setUnidad("m2");
-        partida.setCantidadPresupuestada(new BigDecimal("50.00"));
-        partida.setPrecioUnitario(new BigDecimal("2.50"));
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> {
-            construccionController.crearPartida(proyB.getId(), partida);
-        });
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
-    }
-
-    // 4B. Partida no puede asociar capítulo de otro proyecto (aunque pertenezca al mismo tenant)
-    @Test
-    void referenciasCruzadas_partidaNoPuedeUsarCapituloDeOtroProyectoDelMismoTenant() {
+    void referenciasCruzadas_noSePuedeAsociarCapituloDeOtroProyectoDelMismoTenant() {
         long tenant = 99303L;
         TenantContext.setCurrentTenant(tenant);
 
         // Proyecto 1 y su capítulo C1
         ProyectoConstruccionEntity proy1 = crearProyectoHelper(tenant, "PROY-01", "Edificio Alfa");
-        CapituloConstruccionEntity capProy1 = new CapituloConstruccionEntity();
-        capProy1.setTenantId(tenant);
-        capProy1.setProyectoId(proy1.getId());
-        capProy1.setCodigo("1.0");
-        capProy1.setNombre("Preliminares Edificio Alfa");
-        capProy1.setOrden(1);
-        capProy1 = capituloRepository.save(capProy1);
+        CapituloConstruccionEntity capProy1Entity = new CapituloConstruccionEntity();
+        capProy1Entity.setTenantId(tenant);
+        capProy1Entity.setProyectoId(proy1.getId());
+        capProy1Entity.setCodigo("1.0");
+        capProy1Entity.setNombre("Preliminares Edificio Alfa");
+        capProy1Entity.setOrden(1);
+        CapituloConstruccionEntity capProy1 = capituloRepository.save(capProy1Entity);
 
         // Proyecto 2 del MISMO tenant
         ProyectoConstruccionEntity proy2 = crearProyectoHelper(tenant, "PROY-02", "Edificio Beta");
 
-        // Intentar crear partida en Proyecto 2 vinculada al capítulo de Proyecto 1
+        // Intentar crear partida en Proyecto 2 vinculada al capítulo de Proyecto 1 -> BAD_REQUEST (400)
         PartidaConstruccionEntity partidaCruzada = new PartidaConstruccionEntity();
         partidaCruzada.setCapituloId(capProy1.getId());
         partidaCruzada.setCodigoCovenin("E-200.100");
@@ -201,9 +296,10 @@ public class ConstruccionAislamientoTenantP0Test {
             construccionController.crearPartida(proy2.getId(), partidaCruzada);
         });
         assertEquals(HttpStatus.BAD_REQUEST, exCruzado.getStatusCode());
-        assertTrue(exCruzado.getReason().contains("no coincide con el proyecto de la partida"));
+        assertTrue(exCruzado.getReason().contains("no coincide con el proyecto de la partida"),
+                "Debe rechazar vincular un capítulo cuyo proyectoId no sea igual al proyecto de la partida");
 
-        // En cambio, en su propio Proyecto 1 sí se acepta
+        // En su propio Proyecto 1 sí se acepta correctamente
         PartidaConstruccionEntity partidaValida = new PartidaConstruccionEntity();
         partidaValida.setCapituloId(capProy1.getId());
         partidaValida.setCodigoCovenin("E-200.100");
@@ -217,138 +313,334 @@ public class ConstruccionAislamientoTenantP0Test {
         assertEquals(capProy1.getId(), resp.getBody().getCapituloId());
     }
 
-    // 5. Aislamiento en Eliminación: Tenant B no puede eliminar partida de Tenant A
+    // 4. Tampoco se puede usar un capítulo de otro Tenant
     @Test
-    void aislamientoEliminacion_tenantBNoPuedeEliminarPartidaDeA() {
-        long tenantA = 99401L;
-        long tenantB = 99402L;
+    void referenciasCruzadas_partidaNoPuedeUsarCapituloDeOtroTenant() {
+        long tenantA = 99301L;
+        long tenantB = 99302L;
 
-        ProyectoConstruccionEntity proyA = crearProyectoHelper(tenantA, "PROY-A-03", "Torre Central");
+        CapituloConstruccionEntity capAEntity = new CapituloConstruccionEntity();
+        capAEntity.setTenantId(tenantA);
+        capAEntity.setCodigo("1.0");
+        capAEntity.setNombre("Obras Preliminares A");
+        capAEntity.setOrden(1);
+        CapituloConstruccionEntity capA = capituloRepository.save(capAEntity);
 
-        PartidaConstruccionEntity pA = new PartidaConstruccionEntity();
-        pA.setTenantId(tenantA);
-        pA.setProyectoId(proyA.getId());
-        pA.setCodigoCovenin("E-321.100");
-        pA.setDescripcion("Acero de refuerzo");
-        pA.setUnidad("kg");
-        pA.setCantidadPresupuestada(new BigDecimal("1000.00"));
-        pA.setPrecioUnitario(new BigDecimal("1.80"));
-        pA = partidaRepository.save(pA);
+        ProyectoConstruccionEntity proyB = crearProyectoHelper(tenantB, "PROY-B-01", "Galpón B");
 
-        // Tenant B intenta eliminar la partida de A -> 404 Not Found
         TenantContext.setCurrentTenant(tenantB);
-        Long idPartida = pA.getId();
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> {
-            construccionController.eliminarPartida(idPartida);
-        });
-        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        PartidaConstruccionEntity partida = new PartidaConstruccionEntity();
+        partida.setCapituloId(capA.getId());
+        partida.setCodigoCovenin("E-111.100");
+        partida.setDescripcion("Deforestación");
+        partida.setUnidad("m2");
+        partida.setCantidadPresupuestada(new BigDecimal("50.00"));
+        partida.setPrecioUnitario(new BigDecimal("2.50"));
 
-        // Verificar que la partida de A sigue existiendo intacta
-        assertTrue(partidaRepository.findById(idPartida).isPresent());
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.crearPartida(proyB.getId(), partida);
+        });
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
     }
 
-    // 6. Rechazo de Stock Negativo y Consumo Inválido
+    // 5. IDs enviados al crear se ignoran en todas las entidades
     @Test
-    void rechazoStockNegativoYConsumoInvalido() {
-        long tenant = 99501L;
-        InsumoConstruccionEntity insumo = crearInsumoHelper(tenant, "CEM-01", "Cemento Gris Tipo I", new BigDecimal("10.00"));
-
+    void idsEnviadosAlCrearSeIgnoranEnTodasLasEntidades() {
+        long tenant = 88201L;
         TenantContext.setCurrentTenant(tenant);
 
-        // Consumo mayor al stock disponible (15 > 10) -> BAD_REQUEST (stock negativo denegado)
-        ResponseStatusException exSobreconsumo = assertThrows(ResponseStatusException.class, () -> {
-            construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("15.00")));
-        });
-        assertEquals(HttpStatus.BAD_REQUEST, exSobreconsumo.getStatusCode());
-        assertTrue(exSobreconsumo.getReason().contains("Stock insuficiente"));
+        // Proyecto con ID forzado
+        ProyectoConstruccionEntity p = new ProyectoConstruccionEntity();
+        p.setId(99999L);
+        p.setCodigo("PROY-FORCED-01");
+        p.setNombre("Obra ID Forzado");
+        p.setCliente("Cliente Test");
+        ResponseEntity<ProyectoConstruccionEntity> respP = construccionController.crearProyecto(p);
+        assertNotEquals(99999L, respP.getBody().getId(), "El ID forzado en proyecto debe ignorarse");
+        Long proyId = respP.getBody().getId();
 
-        // Consumo negativo (-5.00) -> BAD_REQUEST
-        ResponseStatusException exNegativo = assertThrows(ResponseStatusException.class, () -> {
+        // Capítulo con ID forzado
+        CapituloConstruccionEntity c = new CapituloConstruccionEntity();
+        c.setId(88888L);
+        c.setProyectoId(proyId);
+        c.setCodigo("C-01");
+        c.setNombre("Capitulo Forzado");
+        ResponseEntity<CapituloConstruccionEntity> respC = construccionController.crearCapitulo(c);
+        assertNotEquals(88888L, respC.getBody().getId(), "El ID forzado en capítulo debe ignorarse");
+        Long capId = respC.getBody().getId();
+
+        // Partida con ID forzado
+        PartidaConstruccionEntity part = new PartidaConstruccionEntity();
+        part.setId(77777L);
+        part.setCapituloId(capId);
+        part.setCodigoCovenin("E-100");
+        part.setDescripcion("Partida Forzada");
+        part.setUnidad("m");
+        part.setCantidadPresupuestada(BigDecimal.ONE);
+        part.setPrecioUnitario(BigDecimal.ONE);
+        ResponseEntity<PartidaConstruccionEntity> respPart = construccionController.crearPartida(proyId, part);
+        assertNotEquals(77777L, respPart.getBody().getId(), "El ID forzado en partida debe ignorarse");
+
+        // Insumo con ID forzado
+        InsumoConstruccionEntity ins = new InsumoConstruccionEntity();
+        ins.setId(66666L);
+        ins.setCodigo("INS-FORCED");
+        ins.setNombre("Insumo Forzado");
+        ins.setTipo("MATERIAL");
+        ins.setUnidad("kg");
+        ins.setCostoUnitario(BigDecimal.ONE);
+        ins.setStockActual(BigDecimal.TEN);
+        ResponseEntity<InsumoConstruccionEntity> respIns = construccionController.crearInsumo(ins);
+        assertNotEquals(66666L, respIns.getBody().getId(), "El ID forzado en insumo debe ignorarse");
+
+        // Valuación con ID forzado
+        ValuacionConstruccionEntity val = new ValuacionConstruccionEntity();
+        val.setId(55555L);
+        val.setNumeroValuacion(1);
+        val.setPeriodoDesde(LocalDate.now());
+        val.setPeriodoHasta(LocalDate.now().plusDays(5));
+        val.setFechaEmision(LocalDate.now().plusDays(5));
+        val.setMontoBruto(BigDecimal.TEN);
+        val.setEstado("BORRADOR");
+        ResponseEntity<ValuacionConstruccionEntity> respVal = construccionController.crearValuacion(proyId, val);
+        assertNotEquals(55555L, respVal.getBody().getId(), "El ID forzado en valuación debe ignorarse");
+
+        // Bitácora con ID forzado
+        BitacoraConstruccionEntity bit = new BitacoraConstruccionEntity();
+        bit.setId(44444L);
+        bit.setFecha(LocalDate.now());
+        bit.setClima("NUBLADO");
+        bit.setPersonalActivo(3);
+        bit.setActividadesEjecutadas("Bitácora ID forzado");
+        ResponseEntity<BitacoraConstruccionEntity> respBit = construccionController.agregarBitacora(proyId, bit);
+        assertNotEquals(44444L, respBit.getBody().getId(), "El ID forzado en bitácora debe ignorarse");
+    }
+
+    // 6. Stock negativo, consumo cero/negativo e inventario insuficiente se rechazan
+    @Test
+    void stockNegativoConsumoCeroNegativoEInventarioInsuficienteSeRechazan() {
+        long tenant = 88301L;
+        TenantContext.setCurrentTenant(tenant);
+
+        // 1. Insumo con stock inicial negativo -> BAD_REQUEST
+        InsumoConstruccionEntity insNegativo = new InsumoConstruccionEntity();
+        insNegativo.setCodigo("INS-NEG-01");
+        insNegativo.setNombre("Insumo Negativo");
+        insNegativo.setTipo("MATERIAL");
+        insNegativo.setUnidad("kg");
+        insNegativo.setStockActual(new BigDecimal("-1.00"));
+        ResponseStatusException exStockNeg = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.crearInsumo(insNegativo);
+        });
+        assertEquals(HttpStatus.BAD_REQUEST, exStockNeg.getStatusCode());
+
+        // 2. Insumo con stock mínimo negativo -> BAD_REQUEST
+        InsumoConstruccionEntity insMinNeg = new InsumoConstruccionEntity();
+        insMinNeg.setCodigo("INS-MIN-NEG");
+        insMinNeg.setNombre("Insumo Min Negativo");
+        insMinNeg.setTipo("MATERIAL");
+        insMinNeg.setUnidad("kg");
+        insMinNeg.setStockMinimo(new BigDecimal("-10.00"));
+        ResponseStatusException exMinNeg = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.crearInsumo(insMinNeg);
+        });
+        assertEquals(HttpStatus.BAD_REQUEST, exMinNeg.getStatusCode());
+
+        // Insumo válido con stock de 15.00 unidades
+        InsumoConstruccionEntity insumo = crearInsumoHelper(tenant, "INS-VAL-01", "Arena Lavada", new BigDecimal("15.00"));
+
+        // 3. Consumo cero (0.00) -> BAD_REQUEST
+        ResponseStatusException exCero = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", BigDecimal.ZERO));
+        });
+        assertEquals(HttpStatus.BAD_REQUEST, exCero.getStatusCode());
+        assertTrue(exCero.getReason().contains("estrictamente mayor a cero"));
+
+        // 4. Consumo negativo (-5.00) -> BAD_REQUEST
+        ResponseStatusException exConsumoNeg = assertThrows(ResponseStatusException.class, () -> {
             construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("-5.00")));
         });
-        assertEquals(HttpStatus.BAD_REQUEST, exNegativo.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, exConsumoNeg.getStatusCode());
+        assertTrue(exConsumoNeg.getReason().contains("estrictamente mayor a cero"));
 
-        // Consumo válido (4.00) -> OK, stock restante 6.00
-        ResponseEntity<InsumoConstruccionEntity> respValida = construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("4.00")));
-        assertEquals(HttpStatus.OK, respValida.getStatusCode());
-        assertEquals(new BigDecimal("6.00"), respValida.getBody().getStockActual());
+        // 5. Inventario insuficiente (consumo de 20.00 > stock de 15.00) -> BAD_REQUEST
+        ResponseStatusException exInsuficiente = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("20.00")));
+        });
+        assertEquals(HttpStatus.BAD_REQUEST, exInsuficiente.getStatusCode());
+        assertTrue(exInsuficiente.getReason().contains("Stock insuficiente"));
     }
 
-    // 6B. Descuento atómico de stock y bloqueo de sobreconsumo
+    // 7. Dos consumos concurrentes no pueden descontar el mismo stock dos veces (Protección atómica con UPDATE directo)
     @Test
-    void consumoInsumo_descuentoAtomicoYProteccionConcurrente() {
-        long tenant = 99502L;
-        InsumoConstruccionEntity insumo = crearInsumoHelper(tenant, "INS-ATOM-01", "Cemento Portland", new BigDecimal("20.00"));
-
+    void dosConsumosConcurrentes_noPuedenDescontarElMismoStockDosVeces() throws InterruptedException {
+        long tenant = 99901L;
         TenantContext.setCurrentTenant(tenant);
+        // Stock inicial de 10 unidades
+        InsumoConstruccionEntity insumo = crearInsumoHelper(tenant, "INS-CONC-01", "Cemento Estructural", new BigDecimal("10.00"));
+        Long insumoId = insumo.getId();
 
-        // Consumo atómico válido de 5 sacos
-        ResponseEntity<InsumoConstruccionEntity> resp1 = construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("5.00")));
+        int numHilos = 2;
+        CountDownLatch startSignal = new CountDownLatch(1);
+        CountDownLatch doneSignal = new CountDownLatch(numHilos);
+        AtomicInteger exitos = new AtomicInteger(0);
+        AtomicInteger fallosStockInsuficiente = new AtomicInteger(0);
+
+        for (int i = 0; i < numHilos; i++) {
+            new Thread(() -> {
+                try {
+                    // Esperar la señal de inicio sincronizada para máxima concurrencia
+                    startSignal.await();
+                    TenantContext.setCurrentTenant(tenant);
+                    construccionController.registrarConsumo(insumoId, Map.of("cantidad", new BigDecimal("10.00")));
+                    exitos.incrementAndGet();
+                } catch (ResponseStatusException ex) {
+                    if (ex.getStatusCode() == HttpStatus.BAD_REQUEST && ex.getReason() != null && ex.getReason().contains("Stock insuficiente")) {
+                        fallosStockInsuficiente.incrementAndGet();
+                    }
+                } catch (Exception ignored) {
+                } finally {
+                    TenantContext.clear();
+                    doneSignal.countDown();
+                }
+            }).start();
+        }
+
+        // Disparo simultáneo de ambos hilos
+        startSignal.countDown();
+        doneSignal.await();
+
+        // Exactamente uno debe tener éxito y el otro debe fallar por stock insuficiente
+        assertEquals(1, exitos.get(), "Exactamente uno de los dos consumos concurrentes debe ejecutarse con éxito");
+        assertEquals(1, fallosStockInsuficiente.get(), "El segundo consumo concurrente debe ser rechazado por stock insuficiente");
+
+        // Verificar en base de datos que el stock final es exactamente 0.00, nunca negativo ni descontado doble
+        InsumoConstruccionEntity insumoFinal = insumoRepository.findByTenantIdAndId(tenant, insumoId).orElseThrow();
+        assertEquals(new BigDecimal("0.00"), insumoFinal.getStockActual(), "El stock final debe ser exactamente 0.00");
+    }
+
+    // 8. Estados de valuación inválidos se rechazan
+    @Test
+    void estadosDeValuacionInvalidosSeRechazan() {
+        long tenant = 88401L;
+        TenantContext.setCurrentTenant(tenant);
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PROY-VAL-ESTADOS", "Hospital Central");
+
+        // 1. Estado inventado al crear -> BAD_REQUEST
+        ValuacionConstruccionEntity valInvalida1 = new ValuacionConstruccionEntity();
+        valInvalida1.setNumeroValuacion(1);
+        valInvalida1.setPeriodoDesde(LocalDate.now());
+        valInvalida1.setPeriodoHasta(LocalDate.now().plusDays(15));
+        valInvalida1.setFechaEmision(LocalDate.now().plusDays(15));
+        valInvalida1.setMontoBruto(new BigDecimal("1000.00"));
+        valInvalida1.setEstado("ESTADO_FANTASMA");
+        assertThrows(ResponseStatusException.class, () -> construccionController.crearValuacion(proy.getId(), valInvalida1));
+
+        // 2. Estado vacío al crear -> BAD_REQUEST
+        valInvalida1.setEstado("   ");
+        assertThrows(ResponseStatusException.class, () -> construccionController.crearValuacion(proy.getId(), valInvalida1));
+
+        // 3. Crear con estado válido BORRADOR -> OK
+        valInvalida1.setEstado("BORRADOR");
+        ResponseEntity<ValuacionConstruccionEntity> respOk = construccionController.crearValuacion(proy.getId(), valInvalida1);
+        assertEquals(HttpStatus.OK, respOk.getStatusCode());
+        Long valId = respOk.getBody().getId();
+
+        // 4. Actualizar a estado inválido -> BAD_REQUEST
+        assertThrows(ResponseStatusException.class, () -> {
+            construccionController.cambiarEstadoValuacion(valId, Map.of("estado", "SUPERVISADA_PIRATA"));
+        });
+
+        // 5. Actualizar a estados legítimos en ciclo de vida de valuación
+        ResponseEntity<ValuacionConstruccionEntity> r1 = construccionController.cambiarEstadoValuacion(valId, Map.of("estado", "PRESENTADA"));
+        assertEquals("PRESENTADA", r1.getBody().getEstado());
+
+        ResponseEntity<ValuacionConstruccionEntity> r2 = construccionController.cambiarEstadoValuacion(valId, Map.of("estado", "APROBADA"));
+        assertEquals("APROBADA", r2.getBody().getEstado());
+
+        ResponseEntity<ValuacionConstruccionEntity> r3 = construccionController.cambiarEstadoValuacion(valId, Map.of("estado", "COBRADA"));
+        assertEquals("COBRADA", r3.getBody().getEstado());
+    }
+
+    // 9. Idempotencia en Valuaciones: reintento de red con misma Idempotency-Key no duplica registros
+    @Test
+    void idempotenciaValuaciones_reintentoNoDuplicaRegistro() {
+        long tenant = 99801L;
+        TenantContext.setCurrentTenant(tenant);
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PROY-IDEMP-01", "Hospital Regional");
+
+        ValuacionConstruccionEntity val = new ValuacionConstruccionEntity();
+        val.setNumeroValuacion(1);
+        val.setPeriodoDesde(LocalDate.now());
+        val.setPeriodoHasta(LocalDate.now().plusDays(15));
+        val.setFechaEmision(LocalDate.now().plusDays(15));
+        val.setMontoBruto(new BigDecimal("10000.00"));
+        val.setEstado("BORRADOR");
+
+        String ik = "IK-VAL-TEST-99801";
+
+        // Primer envío
+        ResponseEntity<ValuacionConstruccionEntity> resp1 = construccionController.crearValuacion(proy.getId(), val, ik);
         assertEquals(HttpStatus.OK, resp1.getStatusCode());
-        assertEquals(new BigDecimal("15.00"), resp1.getBody().getStockActual());
+        Long id1 = resp1.getBody().getId();
 
-        // Consumo atómico válido de 15 sacos (deja stock en 0)
-        ResponseEntity<InsumoConstruccionEntity> resp2 = construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("15.00")));
+        // Segundo envío idéntico (simulando reintento por timeout / reconexión)
+        ResponseEntity<ValuacionConstruccionEntity> resp2 = construccionController.crearValuacion(proy.getId(), val, ik);
         assertEquals(HttpStatus.OK, resp2.getStatusCode());
-        assertEquals(new BigDecimal("0.00"), resp2.getBody().getStockActual());
+        Long id2 = resp2.getBody().getId();
 
-        // Consumo adicional cuando ya está en 0 -> Rechazado con 400 Bad Request
-        ResponseStatusException exSinStock = assertThrows(ResponseStatusException.class, () -> {
-            construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("1.00")));
-        });
-        assertEquals(HttpStatus.BAD_REQUEST, exSinStock.getStatusCode());
+        assertEquals(id1, id2, "El reintento con misma Idempotency-Key debe retornar el mismo registro sin duplicar");
+        assertEquals(1, valuacionRepository.findByTenantIdAndProyectoIdOrderByNumeroValuacionDesc(tenant, proy.getId()).size());
     }
 
-    // 7. Rechazo de Estados de Valuación Arbitrarios
+    // 10. Idempotencia en Consumo de Insumos: reintento no descuenta stock dos veces
     @Test
-    void rechazoEstadosValuacionArbitrarios() {
-        long tenant = 99601L;
-        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PROY-VAL-01", "Hospital Municipal");
-
+    void idempotenciaConsumoInsumo_reintentoNoRestaDoble() {
+        long tenant = 99802L;
         TenantContext.setCurrentTenant(tenant);
+        InsumoConstruccionEntity insumo = crearInsumoHelper(tenant, "INS-IDEMP-01", "Acero Cabilla 1/2", new BigDecimal("50.00"));
 
-        // Creación con estado arbitrario
-        ValuacionConstruccionEntity valInvalida = new ValuacionConstruccionEntity();
-        valInvalida.setNumeroValuacion(1);
-        valInvalida.setPeriodoDesde(LocalDate.now());
-        valInvalida.setPeriodoHasta(LocalDate.now().plusDays(15));
-        valInvalida.setFechaEmision(LocalDate.now().plusDays(15));
-        valInvalida.setMontoBruto(new BigDecimal("5000.00"));
-        valInvalida.setEstado("ESTADO_INVENTADO_ARBITRARIO");
+        String ik = "IK-CON-TEST-99802";
 
-        ResponseStatusException exCreacion = assertThrows(ResponseStatusException.class, () -> {
-            construccionController.crearValuacion(proy.getId(), valInvalida);
-        });
-        assertEquals(HttpStatus.BAD_REQUEST, exCreacion.getStatusCode());
+        // Primer consumo de 10 unidades
+        ResponseEntity<InsumoConstruccionEntity> resp1 = construccionController.registrarConsumo(
+                insumo.getId(), Map.of("cantidad", new BigDecimal("10.00")), ik);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertEquals(new BigDecimal("40.00"), resp1.getBody().getStockActual());
 
-        // Creación con estado válido
-        valInvalida.setEstado("PRESENTADA");
-        ResponseEntity<ValuacionConstruccionEntity> respValida = construccionController.crearValuacion(proy.getId(), valInvalida);
-        assertEquals(HttpStatus.OK, respValida.getStatusCode());
-        Long idVal = respValida.getBody().getId();
-
-        // Intento de actualizar a estado arbitrario
-        ResponseStatusException exPatch = assertThrows(ResponseStatusException.class, () -> {
-            construccionController.cambiarEstadoValuacion(idVal, Map.of("estado", "HACK_ESTADO"));
-        });
-        assertEquals(HttpStatus.BAD_REQUEST, exPatch.getStatusCode());
+        // Reintento idéntico con la misma llave de idempotencia
+        ResponseEntity<InsumoConstruccionEntity> resp2 = construccionController.registrarConsumo(
+                insumo.getId(), Map.of("cantidad", new BigDecimal("10.00")), ik);
+        assertEquals(HttpStatus.OK, resp2.getStatusCode());
+        assertEquals(new BigDecimal("40.00"), resp2.getBody().getStockActual(), "El stock debe mantenerse en 40 y no restar doble");
     }
 
-    // 8. Ignorar IDs en Creación
+    // 11. Idempotencia en Bitácora: reintento no duplica asientos en el diario de obra
     @Test
-    void ignorarIdsEnCreacion() {
-        long tenant = 99701L;
+    void idempotenciaBitacora_reintentoNoDuplicaEntrada() {
+        long tenant = 99803L;
         TenantContext.setCurrentTenant(tenant);
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PROY-IDEMP-02", "Carretera Troncal");
 
-        ProyectoConstruccionEntity proyConIdForzado = new ProyectoConstruccionEntity();
-        proyConIdForzado.setId(88888L); // ID forzado que debe ignorarse
-        proyConIdForzado.setCodigo("PROY-ID-01");
-        proyConIdForzado.setNombre("Obra Sin Sobrescritura");
-        proyConIdForzado.setCliente("Cliente Seguro");
+        BitacoraConstruccionEntity entrada = new BitacoraConstruccionEntity();
+        entrada.setFecha(LocalDate.now());
+        entrada.setClima("SOLEADO");
+        entrada.setPersonalActivo(25);
+        entrada.setActividadesEjecutadas("Vaciado de brocales y compactación de base");
 
-        ResponseEntity<ProyectoConstruccionEntity> resp = construccionController.crearProyecto(proyConIdForzado);
-        assertEquals(HttpStatus.OK, resp.getStatusCode());
-        assertNotNull(resp.getBody().getId());
-        assertNotEquals(88888L, resp.getBody().getId(), "El ID forzado en creación debe ser ignorado");
+        String ik = "IK-BIT-TEST-99803";
+
+        // Primer asiento
+        ResponseEntity<BitacoraConstruccionEntity> resp1 = construccionController.agregarBitacora(proy.getId(), entrada, ik);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        Long id1 = resp1.getBody().getId();
+
+        // Reintento idéntico
+        ResponseEntity<BitacoraConstruccionEntity> resp2 = construccionController.agregarBitacora(proy.getId(), entrada, ik);
+        assertEquals(HttpStatus.OK, resp2.getStatusCode());
+        Long id2 = resp2.getBody().getId();
+
+        assertEquals(id1, id2, "La bitácora no debe duplicar la entrada bajo reintento con misma Idempotency-Key");
+        assertEquals(1, bitacoraRepository.findByTenantIdAndProyectoIdOrderByFechaDesc(tenant, proy.getId()).size());
     }
 }

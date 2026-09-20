@@ -253,7 +253,7 @@ export default function MatrizRiesgosPredictivaView({ proyecto, tasaBcv, esModoT
       {modalNuevoRiesgo && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#0f172a', border: '1px solid #f59e0b', borderRadius: '1rem', padding: '1.5rem', maxWidth: '480px', width: '100%', color: '#fff' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', pb: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#fbbf24' }}>+ REGISTRAR ALERTA DE RIESGO DE OBRA</h3>
               <button onClick={() => setModalNuevoRiesgo(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
             </div>

@@ -269,19 +269,19 @@ const VERTICAL_METADATA: Record<string, {
   },
     construccion: {
     name: "Aurora Obras & Construcción",
-    badge: "EDICIÓN CONSTRUCCIÓN & OBRAS CIVILES",
-    desc: "Presupuesto por partidas (COVENIN/APU), valuaciones de avance, cómputos métricos y cotizaciones PDF.",
+    badge: "EDICIÓN CONSTRUCCIÓN & OBRAS CIVILES (PRÓXIMAMENTE)",
+    desc: "Vertical en desarrollo activo y validación de arquitectura multitenant. La ruta operativa y registro permanecen bloqueados hasta la conexión final.",
     stats: [
-      { label: "Obras Activas", val: "2", change: "En ejecución", color: "text-amber-500 dark:text-amber-400" },
-      { label: "Presupuesto Global", val: "$148,500", change: "Partidas presupuestadas", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Avance Físico", val: "42.5%", change: "Valuaciones presentadas", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Por Cobrar Valuaciones", val: "$34,200", change: "En revisión de inspección", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Módulo Operativo", val: "En Desarrollo", change: "Próximamente", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Ruta y Registro", val: "Bloqueados", change: "Auditoría en curso", color: "text-slate-400" },
+      { label: "Aislamiento Tenant", val: "Validado P0", change: "100% aislado", color: "text-emerald-500 dark:text-emerald-400" },
+      { label: "Idempotencia", val: "Activa", change: "Sin duplicados", color: "text-teal-500 dark:text-teal-400" },
     ],
     actions: [
-      { label: "Nueva Partida", desc: "Cargar partida con APU y cómputo" },
-      { label: "Generar Valuación", desc: "Registrar avance medido en campo" },
-      { label: "Cotización PDF", desc: "Exportar presupuesto formal con membrete" },
-      { label: "Bitácora de Campo", desc: "Asentar jornada, clima y cuadrillas" },
+      { label: "Partidas COVENIN", desc: "Próximamente en lanzamiento" },
+      { label: "Valuaciones", desc: "Próximamente en lanzamiento" },
+      { label: "Cotización PDF", desc: "Próximamente en lanzamiento" },
+      { label: "Bitácora de Obra", desc: "Próximamente en lanzamiento" },
     ],
     defaultPatients: [],
   },
@@ -382,8 +382,8 @@ export default function Dashboard() {
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
   const esComercioReal = (esRubroComercio || userIndustry === "farmacia") && !!user?.tenantId;
   const esGanaderiaReal = (userIndustry === "finca" || userIndustry === "ganaderia") && !!user?.tenantId;
-  const esConstruccionReal = userIndustry === "construccion" && !!user?.tenantId;
-  const esPeluqueriaReal = userIndustry === "peluqueria" && !!user?.tenantId;
+  const esConstruccionReal = false; // Bloqueado mientras se encuentre enConstruccion
+  const esPeluqueriaReal = false; // Bloqueado mientras se encuentre enConstruccion
   const rutaVertical =
     userIndustry === "construccion"
       ? "/construccion"
@@ -894,13 +894,20 @@ export default function Dashboard() {
                   </p>
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">
-                    <button
-                      onClick={() => navigate(rutaVertical)}
-                      className="btn-cyber-neon text-white text-xs sm:text-sm font-extrabold px-7 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_0_30px_rgba(255,59,128,0.5)] cursor-pointer hover:scale-105 transition-all">
-                      <IconRocket size={17} />
-                      <span>Entrar a {vertical.name} (Cloud Web)</span>
-                      <span className="text-base">→</span>
-                    </button>
+                    {userIndustry === "construccion" || userIndustry === "peluqueria" ? (
+                      <div className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs sm:text-sm font-bold">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        <span>Módulo en Auditoría (Próximamente)</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => navigate(rutaVertical)}
+                        className="btn-cyber-neon text-white text-xs sm:text-sm font-extrabold px-7 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_0_30px_rgba(255,59,128,0.5)] cursor-pointer hover:scale-105 transition-all">
+                        <IconRocket size={17} />
+                        <span>Entrar a {vertical.name} (Cloud Web)</span>
+                        <span className="text-base">→</span>
+                      </button>
+                    )}
 
                     <a
                       href="https://github.com"
@@ -952,7 +959,12 @@ export default function Dashboard() {
               <div className={`grid grid-cols-1 md:grid-cols-3 ${user?.rol === "DUENO_ADMIN" ? "lg:grid-cols-4" : ""} gap-5`}>
                 {/* 1. Módulo Operativo Principal (Vertical Activa) */}
                 <div 
-                  onClick={() => navigate(rutaVertical)}
+                  onClick={() => {
+                    if (userIndustry === "construccion" || userIndustry === "peluqueria") {
+                      return;
+                    }
+                    navigate(rutaVertical);
+                  }}
                   className="apple-glass rounded-3xl p-6 border border-slate-300/60 dark:border-white/10 hover:border-teal-400/50 transition-all duration-300 group cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden"
                 >
                   <div className="space-y-3">

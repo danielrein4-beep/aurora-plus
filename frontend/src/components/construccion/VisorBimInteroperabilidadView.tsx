@@ -180,7 +180,7 @@ export default function VisorBimInteroperabilidadView({ proyecto, partidas, onAc
       return { x: isoX, y: isoY };
     }
 
-    function drawBox(x: number, y: number, z: number, dx: number, dy: number, dz: number, colorTop: string, colorFront: string, colorSide: string, isSelected: boolean) {
+    function drawBoxInner(ctx: CanvasRenderingContext2D, x: number, y: number, z: number, dx: number, dy: number, dz: number, colorTop: string, colorFront: string, colorSide: string, isSelected: boolean) {
       const p1 = project(x, y, z);
       const p2 = project(x + dx, y, z);
       const p3 = project(x + dx, y + dy, z);
@@ -230,48 +230,48 @@ export default function VisorBimInteroperabilidadView({ proyecto, partidas, onAc
     // 1. Fundaciones
     if (capasVisibles.FUNDACIONES) {
       const isSelZap = elementoSeleccionadoId === 'BIM-001';
-      drawBox(-3, -2, -0.6, 1.2, 1.2, 0.4, '#38bdf8', '#0284c7', '#0369a1', isSelZap);
-      drawBox(2, -2, -0.6, 1.2, 1.2, 0.4, '#38bdf8', '#0284c7', '#0369a1', isSelZap);
-      drawBox(-3, 2, -0.6, 1.2, 1.2, 0.4, '#38bdf8', '#0284c7', '#0369a1', isSelZap);
-      drawBox(2, 2, -0.6, 1.2, 1.2, 0.4, '#38bdf8', '#0284c7', '#0369a1', isSelZap);
+      drawBoxInner(ctx, -3, -2, -0.6, 1.2, 1.2, 0.4, '#38bdf8', '#0284c7', '#0369a1', isSelZap);
+      drawBoxInner(ctx, 2, -2, -0.6, 1.2, 1.2, 0.4, '#38bdf8', '#0284c7', '#0369a1', isSelZap);
+      drawBoxInner(ctx, -3, 2, -0.6, 1.2, 1.2, 0.4, '#38bdf8', '#0284c7', '#0369a1', isSelZap);
+      drawBoxInner(ctx, 2, 2, -0.6, 1.2, 1.2, 0.4, '#38bdf8', '#0284c7', '#0369a1', isSelZap);
 
       const isSelPed = elementoSeleccionadoId === 'BIM-002';
-      drawBox(-2.7, -1.7, -0.2, 0.6, 0.6, 0.6, '#60a5fa', '#3b82f6', '#1d4ed8', isSelPed);
-      drawBox(2.3, -1.7, -0.2, 0.6, 0.6, 0.6, '#60a5fa', '#3b82f6', '#1d4ed8', isSelPed);
-      drawBox(-2.7, 2.3, -0.2, 0.6, 0.6, 0.6, '#60a5fa', '#3b82f6', '#1d4ed8', isSelPed);
-      drawBox(2.3, 2.3, -0.2, 0.6, 0.6, 0.6, '#60a5fa', '#3b82f6', '#1d4ed8', isSelPed);
+      drawBoxInner(ctx, -2.7, -1.7, -0.2, 0.6, 0.6, 0.6, '#60a5fa', '#3b82f6', '#1d4ed8', isSelPed);
+      drawBoxInner(ctx, 2.3, -1.7, -0.2, 0.6, 0.6, 0.6, '#60a5fa', '#3b82f6', '#1d4ed8', isSelPed);
+      drawBoxInner(ctx, -2.7, 2.3, -0.2, 0.6, 0.6, 0.6, '#60a5fa', '#3b82f6', '#1d4ed8', isSelPed);
+      drawBoxInner(ctx, 2.3, 2.3, -0.2, 0.6, 0.6, 0.6, '#60a5fa', '#3b82f6', '#1d4ed8', isSelPed);
     }
 
     // 2. Columnas
     if (capasVisibles.COLUMNAS) {
       const isSelCol = elementoSeleccionadoId === 'BIM-003';
       const colH = elemActivo.id === 'BIM-003' ? elemActivo.dimensiones.alto : 3.5;
-      drawBox(-2.6, -1.6, 0.4, 0.4, 0.4, colH, '#34d399', '#10b981', '#047857', isSelCol);
-      drawBox(2.4, -1.6, 0.4, 0.4, 0.4, colH, '#34d399', '#10b981', '#047857', isSelCol);
-      drawBox(-2.6, 2.4, 0.4, 0.4, 0.4, colH, '#34d399', '#10b981', '#047857', isSelCol);
-      drawBox(2.4, 2.4, 0.4, 0.4, 0.4, colH, '#34d399', '#10b981', '#047857', isSelCol);
+      drawBoxInner(ctx, -2.6, -1.6, 0.4, 0.4, 0.4, colH, '#34d399', '#10b981', '#047857', isSelCol);
+      drawBoxInner(ctx, 2.4, -1.6, 0.4, 0.4, 0.4, colH, '#34d399', '#10b981', '#047857', isSelCol);
+      drawBoxInner(ctx, -2.6, 2.4, 0.4, 0.4, 0.4, colH, '#34d399', '#10b981', '#047857', isSelCol);
+      drawBoxInner(ctx, 2.4, 2.4, 0.4, 0.4, 0.4, colH, '#34d399', '#10b981', '#047857', isSelCol);
     }
 
     // 3. Vigas de Carga
     if (capasVisibles.VIGAS) {
       const isSelVig = elementoSeleccionadoId === 'BIM-004';
       const vigZ = 3.9;
-      drawBox(-2.6, -1.6, vigZ, 5.4, 0.4, 0.5, '#a78bfa', '#8b5cf6', '#6d28d9', isSelVig);
-      drawBox(-2.6, 2.4, vigZ, 5.4, 0.4, 0.5, '#a78bfa', '#8b5cf6', '#6d28d9', isSelVig);
-      drawBox(-2.6, -1.6, vigZ, 0.4, 4.4, 0.5, '#a78bfa', '#8b5cf6', '#6d28d9', isSelVig);
-      drawBox(2.4, -1.6, vigZ, 0.4, 4.4, 0.5, '#a78bfa', '#8b5cf6', '#6d28d9', isSelVig);
+      drawBoxInner(ctx, -2.6, -1.6, vigZ, 5.4, 0.4, 0.5, '#a78bfa', '#8b5cf6', '#6d28d9', isSelVig);
+      drawBoxInner(ctx, -2.6, 2.4, vigZ, 5.4, 0.4, 0.5, '#a78bfa', '#8b5cf6', '#6d28d9', isSelVig);
+      drawBoxInner(ctx, -2.6, -1.6, vigZ, 0.4, 4.4, 0.5, '#a78bfa', '#8b5cf6', '#6d28d9', isSelVig);
+      drawBoxInner(ctx, 2.4, -1.6, vigZ, 0.4, 4.4, 0.5, '#a78bfa', '#8b5cf6', '#6d28d9', isSelVig);
     }
 
     // 4. Losa
     if (capasVisibles.LOSAS) {
       const isSelLos = elementoSeleccionadoId === 'BIM-005';
-      drawBox(-2.8, -1.8, 4.4, 5.8, 4.8, 0.25, '#f43f5e', '#e11d48', '#be123c', isSelLos);
+      drawBoxInner(ctx, -2.8, -1.8, 4.4, 5.8, 4.8, 0.25, '#f43f5e', '#e11d48', '#be123c', isSelLos);
     }
 
     // 5. Muros
     if (capasVisibles.MUROS) {
       const isSelMur = elementoSeleccionadoId === 'BIM-006';
-      drawBox(-2.55, -1.5, 0.4, 0.2, 3.8, 2.8, '#fbbf24', '#f59e0b', '#b45309', isSelMur);
+      drawBoxInner(ctx, -2.55, -1.5, 0.4, 0.2, 3.8, 2.8, '#fbbf24', '#f59e0b', '#b45309', isSelMur);
     }
 
     // Coordenadas

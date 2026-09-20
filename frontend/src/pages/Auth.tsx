@@ -21,6 +21,7 @@ interface RubroNegocioItem {
   modulo: string;
   ruta: string;
   nombreDefault: string;
+  enConstruccion?: boolean;
 }
 
 const RUBROS_REGISTRO: RubroNegocioItem[] = [
@@ -121,6 +122,11 @@ export default function Auth() {
     setEnviando(true);
     try {
       if (mode === "register") {
+        if (rubroActual.enConstruccion) {
+          setErrors({ nombre: `La vertical "${rubroActual.label}" se encuentra actualmente en desarrollo y no está disponible para registro.` });
+          setEnviando(false);
+          return;
+        }
         // Registra el negocio en backend / local y conecta de inmediato a la vertical correspondiente
         await completarRegistro({
           nombreEmpresa: form.empresa.trim() || rubroActual.nombreDefault,
@@ -321,7 +327,7 @@ export default function Auth() {
                           <button
                             key={r.id}
                             type="button"
-                            onClick={() => set("industry", r.id)}
+                            disabled={r.enConstruccion} onClick={() => { if (!r.enConstruccion) set("industry", r.id); }}
                             className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                               sel
                                 ? "bg-teal-500/20 border-teal-400 text-white shadow-[0_0_15px_rgba(45,212,191,0.25)] scale-[1.02]"

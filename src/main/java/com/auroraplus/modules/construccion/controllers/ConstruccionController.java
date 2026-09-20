@@ -82,11 +82,16 @@ public class ConstruccionController {
         return construccionService.listarValuaciones(requireTenant(), proyectoId);
     }
 
+    public ResponseEntity<ValuacionConstruccionEntity> crearValuacion(Long proyectoId, ValuacionConstruccionEntity valuacion) {
+        return crearValuacion(proyectoId, valuacion, null);
+    }
+
     @PostMapping("/proyectos/{proyectoId}/valuaciones")
     public ResponseEntity<ValuacionConstruccionEntity> crearValuacion(
             @PathVariable Long proyectoId,
-            @RequestBody ValuacionConstruccionEntity valuacion) {
-        return ResponseEntity.ok(construccionService.guardarValuacion(requireTenant(), proyectoId, valuacion));
+            @RequestBody ValuacionConstruccionEntity valuacion,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.guardarValuacion(requireTenant(), proyectoId, valuacion, idempotencyKey));
     }
 
     @PatchMapping("/valuaciones/{id}/estado")
@@ -113,15 +118,20 @@ public class ConstruccionController {
         return ResponseEntity.ok(construccionService.guardarInsumo(requireTenant(), insumo));
     }
 
+    public ResponseEntity<InsumoConstruccionEntity> registrarConsumo(Long id, Map<String, BigDecimal> body) {
+        return registrarConsumo(id, body, null);
+    }
+
     @PostMapping("/insumos/{id}/consumo")
     public ResponseEntity<InsumoConstruccionEntity> registrarConsumo(
             @PathVariable Long id,
-            @RequestBody Map<String, BigDecimal> body) {
+            @RequestBody Map<String, BigDecimal> body,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
         BigDecimal cantidad = body != null ? body.get("cantidad") : null;
         if (cantidad == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El campo 'cantidad' es obligatorio");
         }
-        return ResponseEntity.ok(construccionService.registrarConsumoInsumo(requireTenant(), id, cantidad));
+        return ResponseEntity.ok(construccionService.registrarConsumoInsumo(requireTenant(), id, cantidad, idempotencyKey));
     }
 
     // --- BITÁCORA ---
@@ -130,11 +140,16 @@ public class ConstruccionController {
         return construccionService.listarBitacora(requireTenant(), proyectoId);
     }
 
+    public ResponseEntity<BitacoraConstruccionEntity> agregarBitacora(Long proyectoId, BitacoraConstruccionEntity entrada) {
+        return agregarBitacora(proyectoId, entrada, null);
+    }
+
     @PostMapping("/proyectos/{proyectoId}/bitacora")
     public ResponseEntity<BitacoraConstruccionEntity> agregarBitacora(
             @PathVariable Long proyectoId,
-            @RequestBody BitacoraConstruccionEntity entrada) {
-        return ResponseEntity.ok(construccionService.agregarEntradaBitacora(requireTenant(), proyectoId, entrada));
+            @RequestBody BitacoraConstruccionEntity entrada,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.agregarEntradaBitacora(requireTenant(), proyectoId, entrada, idempotencyKey));
     }
 
     // --- CATÁLOGO COVENIN (PÚBLICO) ---

@@ -1,6 +1,6 @@
 // Motor de Cola Offline-First para Entornos Hostiles en Obras Civiles (Túneles, Vialidad, Minas)
 // Permite al Ingeniero Residente asentar mediciones, bitácoras y consumos sin señal de internet
-// y sincronizar contra los endpoints reales del backend al recuperar conectividad.
+// y sincronizar contra los endpoints reales del backend al recuperar conectividad con IdempotencyKey.
 
 import {
   crearValuacionConstruccionApi,
@@ -8,9 +8,12 @@ import {
   registrarBitacoraConstruccionApi
 } from '../../api';
 
+export type TipoAccionConstruccion = 'VALUACION' | 'BITACORA' | 'CONSUMO_INSUMO';
+
 export interface AccionOfflineConstruccion {
   id: string;
-  tipo: 'VALUACION' | 'BITACORA' | 'CONSUMO_INSUMO' | 'HOROMETRO_MAQUINARIA' | 'ASISTENCIA_CUADRILLA' | 'PARAMETRO_BIM';
+  idempotencyKey: string;
+  tipo: TipoAccionConstruccion;
   payload: any;
   fechaCreacion: string;
   reintentos: number;
@@ -19,6 +22,7 @@ export interface AccionOfflineConstruccion {
 }
 
 const STORAGE_KEY = 'aurora_construccion_offline_queue_v1';
+const TIPOS_SOPORTADOS: readonly string[] = ['VALUACION', 'BITACORA', 'CONSUMO_INSUMO'];
 
 export function obtenerColaOffline(): AccionOfflineConstruccion[] {
   try {
@@ -38,12 +42,22 @@ export function guardarColaOffline(cola: AccionOfflineConstruccion[]): void {
   }
 }
 
-export function encolarAccionOffline(tipo: AccionOfflineConstruccion['tipo'], payload: any): AccionOfflineConstruccion {
+export function encolarAccionOffline(tipo: TipoAccionConstruccion, payload: any): AccionOfflineConstruccion {
+  // Rechazo explícito de tipos desconocidos
+  if (!TIPOS_SOPORTADOS.includes(tipo)) {
+    throw new Error(`Tipo de acción offline desconocido o no soportado: ${tipo}`);
+  }
+
+  const idempotencyKey = 'IK-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9) + '-' + Math.random().toString(36).substring(2, 9);
   const cola = obtenerColaOffline();
   const nuevaAccion: AccionOfflineConstruccion = {
     id: 'OFF-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+    idempotencyKey,
     tipo,
-    payload,
+    payload: {
+      ...payload,
+      idempotencyKey
+    },
     fechaCreacion: new Date().toISOString(),
     reintentos: 0,
     estado: 'PENDIENTE'
@@ -63,8 +77,8 @@ export function limpiarCompletadosOffline(): void {
 }
 
 /**
- * Sincronización real con el backend de Construcción de Aurora Plus.
- * Procesa cada acción pendiente contra su endpoint correspondiente sin simulaciones ni timeouts artificiales.
+ * Sincronización real e idempotente con el backend de Construcción de Aurora Plus.
+ * Procesa cada acción pendiente enviando Idempotency-Key única para evitar duplicados en reintentos.
  */
 export async function sincronizarColaOfflineConServidor(): Promise<{ sincronizados: number; errores: number }> {
   if (!navigator.onLine) {
@@ -79,14 +93,23 @@ export async function sincronizarColaOfflineConServidor(): Promise<{ sincronizad
   let errores = 0;
 
   for (const accion of pendientes) {
+    // Rechazar explícitamente si por alguna razón llegó un tipo desconocido
+    if (!TIPOS_SOPORTADOS.includes(accion.tipo)) {
+      accion.estado = 'ERROR';
+      accion.errorUltimoIntento = `Tipo de acción offline no soportado: ${accion.tipo}`;
+      errores++;
+      continue;
+    }
+
     try {
       accion.estado = 'SINCRONIZANDO';
+      const ik = accion.idempotencyKey || accion.payload?.idempotencyKey;
       if (accion.tipo === 'VALUACION' && accion.payload?.proyectoId) {
-        await crearValuacionConstruccionApi(Number(accion.payload.proyectoId), accion.payload);
+        await crearValuacionConstruccionApi(Number(accion.payload.proyectoId), accion.payload, ik);
       } else if (accion.tipo === 'CONSUMO_INSUMO' && accion.payload?.insumoId) {
-        await registrarConsumoInsumoConstruccionApi(Number(accion.payload.insumoId), Number(accion.payload.cantidad));
+        await registrarConsumoInsumoConstruccionApi(Number(accion.payload.insumoId), Number(accion.payload.cantidad), ik);
       } else if (accion.tipo === 'BITACORA' && accion.payload?.proyectoId) {
-        await registrarBitacoraConstruccionApi(Number(accion.payload.proyectoId), accion.payload);
+        await registrarBitacoraConstruccionApi(Number(accion.payload.proyectoId), accion.payload, ik);
       }
       sincronizados++;
       const index = cola.findIndex(c => c.id === accion.id);

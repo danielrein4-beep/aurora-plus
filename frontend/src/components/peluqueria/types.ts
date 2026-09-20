@@ -15,7 +15,12 @@ export type CategoriaServicio =
   | "Barbería & Afeitado" 
   | "Manicura & Pedicura" 
   | "Cejas & Pestañas" 
-  | "Spa & Masajes";
+  | "Spa & Masajes"
+  | "color"
+  | "corte"
+  | "barberia"
+  | "tratamiento"
+  | "unas";
 
 export interface Especialista {
   id: string;
@@ -124,6 +129,8 @@ export interface TransaccionCobroPeluqueria {
   porcentajeComision: number;
   montoComisionUSD: number;
   estado: "COBRADO" | "ANULADO";
+  fechaHora?: string;
+  comisionEspecialistaUSD?: number;
 }
 
 export interface PresupuestoItem {

@@ -282,7 +282,7 @@ export default function NominaCuadrillasView({ proyecto, tasaBcv, esModoTerreno 
       {cuadrillaSeleccionada && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#0f172a', border: '1px solid #38bdf8', borderRadius: '1rem', padding: '1.5rem', maxWidth: '520px', width: '100%', color: '#fff', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', pb: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '0.75rem' }}>
               <div>
                 <span style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 800 }}>FICHA TÉCNICA DE CUADRILLA</span>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900 }}>{cuadrillaSeleccionada.nombre}</h3>
@@ -359,7 +359,7 @@ export default function NominaCuadrillasView({ proyecto, tasaBcv, esModoTerreno 
       {modalNuevaCuadrilla && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#0f172a', border: '1px solid #0284c7', borderRadius: '1rem', padding: '1.5rem', maxWidth: '480px', width: '100%', color: '#fff' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', pb: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900 }}>+ Registrar Nueva Cuadrilla</h3>
               <button onClick={() => setModalNuevaCuadrilla(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
             </div>

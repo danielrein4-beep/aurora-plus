@@ -1,7 +1,7 @@
 ﻿export type UnidadMedidaPartida = "m³" | "m²" | "ml" | "kg" | "ton" | "pza" | "pto" | "gl" | "día" | "hora";
 
 export type EstadoProyecto = "LICITACION" | "EN_EJECUCION" | "PARALIZADA" | "FINALIZADA";
-export type EstadoValuacion = "BORRADOR" | "PRESENTADA" | "APROBADA" | "COBRADA";
+export type EstadoValuacion = "BORRADOR" | "PRESENTADA" | "EN_REVISION" | "APROBADA" | "COBRADA" | "RECHAZADA" | "ANULADA";
 export type ClimaJornada = "SOLEADO" | "NUBLADO" | "LLUVIOSO" | "VARIABLE";
 
 export interface PartidaObra {
