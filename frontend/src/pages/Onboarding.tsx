@@ -4,7 +4,7 @@ import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconRestaurant, IconFarm,
   IconEducation, IconConstruction, IconCustomize, IconWarning, IconClose, IconCheck, IconLock,
-  IconCard, IconBank, IconPrescription,
+  IconCard, IconBank, IconPrescription, IconScissors,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 
@@ -40,9 +40,8 @@ const INDUSTRIES: IndustryItem[] = [
     label: "Farmacia & Droguería",
     Icon: IconPrescription,
     desc: "Dispensación de medicamentos, control de lotes, alertas de vencimiento y POS mostrador",
-    badge: "100% DISPONIBLE (Listo)",
-    isReady: true,
-    tagline: "Vertical Insignia: Farmacia & Insumos",
+    badge: "En Construcción (Próximamente)",
+    isReady: false,
   },
   {
     id: "comercio",
@@ -67,9 +66,8 @@ const INDUSTRIES: IndustryItem[] = [
     label: "Veterinaria & Mascotas",
     Icon: IconVet,
     desc: "Consultas, vacunas, hospitalización y control de peso",
-    badge: "100% DISPONIBLE (Listo)",
-    isReady: true,
-    tagline: "Vertical: Mediclinic Vet",
+    badge: "En Construcción (Próximamente)",
+    isReady: false,
   },
   {
     id: "odontologia",
@@ -90,6 +88,14 @@ const INDUSTRIES: IndustryItem[] = [
     tagline: "Vertical Insignia: Aurora Ganadería",
   },
   {
+    id: "peluqueria",
+    label: "Peluquería & Salón de Belleza",
+    Icon: IconScissors,
+    desc: "Agenda de citas, turnos walk-in, fichas de colorimetría y retención a 21 días",
+    badge: "En Construcción (Próximamente)",
+    isReady: false,
+  },
+  {
     id: "educacion",
     label: "Educación & Colegios",
     Icon: IconEducation,
@@ -101,9 +107,10 @@ const INDUSTRIES: IndustryItem[] = [
     id: "construccion",
     label: "Construcción & Obras",
     Icon: IconConstruction,
-    desc: "Avance de obra, presupuestos y compras de insumos",
-    badge: "Próximamente (Fase 2)",
-    isReady: false,
+    desc: "Presupuestos por partidas (COVENIN/APU), valuaciones de avance, cómputos métricos y cotizaciones en PDF",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical: Aurora Obras & Construcción Civil Pro",
   },
   {
     id: "otro",
@@ -165,6 +172,23 @@ const RETAIL_MODULES = [
   { id: "caja", label: "Caja & Moneda Base", desc: "Ingresos, gastos y tasas de cambio del negocio", defaultOn: true },
 ];
 
+const BEAUTY_MODULES = [
+  { id: "agenda", label: "Agenda & Citas Interactivas", desc: "Turnos por especialista y confirmación por WhatsApp", defaultOn: true },
+  { id: "walkin", label: "Fila Rápida Walk-In (Sin Cita)", desc: "Gestión de turnos espontáneos y sala de espera", defaultOn: true },
+  { id: "colorimetria", label: "Fichas de Colorimetría & Fórmulas", desc: "Historial químico, recetas de tintes y preferencias", defaultOn: true },
+  { id: "retencion21", label: "Retención Inteligente a 21 Días", desc: "Recordatorios automáticos de retoque por WhatsApp", defaultOn: true },
+  { id: "caja", label: "Caja Multi-Moneda & Comisiones", desc: "Cobros en USD/Bs con cálculo de comisiones", defaultOn: true },
+];
+
+
+const CONSTRUCTION_MODULES = [
+  { id: "partidas", label: "Presupuestos por Partidas (COVENIN / APU)", desc: "Capítulos, partidas normalizadas, cómputos métricos y análisis de costos", defaultOn: true },
+  { id: "valuaciones", label: "Valuaciones de Obra & Avance Físico", desc: "Medición en campo, amortización de anticipos y retenciones de ley", defaultOn: true },
+  { id: "cotizaciones_pdf", label: "Generador de Cotizaciones en PDF", desc: "Presupuestos formales de ingeniería con membrete, indirectos, utilidad y firmas", defaultOn: true },
+  { id: "insumos_cuadrillas", label: "Insumos, Maquinaria & Cuadrillas", desc: "Control de compras de materiales, equipos pesados y personal obrero", defaultOn: true },
+  { id: "bitacora", label: "Bitácora & Libro Diario de Obra", desc: "Registro diario de campo, condiciones climáticas y reporte de novedades", defaultOn: true },
+];
+
 const GANADERIA_MODULES = [
   { id: "hato", label: "Registro de Hato & Aretes", desc: "Ficha por animal: raza, peso, categoría y trazabilidad", defaultOn: true },
   { id: "potreros", label: "Potreros & Rotación de Pastoreo", desc: "Mapa satelital de potreros, capacidad y descanso mínimo", defaultOn: true },
@@ -195,6 +219,8 @@ const INDUSTRIA_A_MODULO: Record<string, string> = {
   veterinaria: "salud",
   odontologia: "odontologia",
   finca: "ganaderia",
+  peluqueria: "peluqueria",
+  construccion: "construccion",
   otro: "horeca",
 };
 
@@ -209,6 +235,8 @@ const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
   veterinaria: CLINIC_MODULES,
   odontologia: CLINIC_MODULES,
   finca: GANADERIA_MODULES,
+  peluqueria: BEAUTY_MODULES,
+  construccion: CONSTRUCTION_MODULES,
   otro: RESTAURANT_MODULES,
 };
 
@@ -223,6 +251,8 @@ const NOMBRE_POR_DEFECTO: Record<string, string> = {
   veterinaria: "Mi Veterinaria",
   odontologia: "Mi Consultorio Dental",
   finca: "Mi Finca",
+  peluqueria: "Mi Salón de Belleza",
+  construccion: "Constructora & Proyectos Civiles",
   otro: "Mi Negocio",
 };
 
@@ -237,6 +267,7 @@ const VERTICAL_LABEL: Record<string, string> = {
   veterinaria: "Mediclinic Vet",
   odontologia: "Mediclinic Odonto",
   finca: "Aurora Ganadería (Control de Fincas & Ganado)",
+  peluqueria: "Aurora Beauty Suite (Peluquería & Salón de Belleza)",
   otro: "Aurora Suite Comercial",
 };
 
@@ -297,6 +328,10 @@ export default function Onboarding() {
     const rutaDestino =
       selectedIndustry === "restaurante"
         ? "/restaurante"
+        : selectedIndustry === "construccion"
+        ? "/construccion"
+        : selectedIndustry === "peluqueria"
+        ? "/peluqueria"
         : selectedIndustry === "veterinaria"
         ? "/veterinaria"
         : selectedIndustry === "clinica" || selectedIndustry === "farmacia" || selectedIndustry === "odontologia"
@@ -357,13 +392,13 @@ export default function Onboarding() {
       <div className="relative z-10 w-full max-w-3xl">
         {/* Cabecera superior con Logo */}
         <div className="flex flex-col items-center mb-6">
-          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 shadow-inner mb-3">
+          <div className="p-2.5 rounded-2xl bg-teal-50 border border-teal-200 shadow-sm mb-3">
             <AuroraLogo size={42} animated />
           </div>
-          <h1 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white tracking-tight">
+          <h1 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-slate-900 tracking-tight">
             Configuración del Ecosistema Aurora Plus
           </h1>
-          <p className="text-white/40 text-xs mt-1 tracking-widest uppercase font-mono">
+          <p className="text-slate-400 text-xs mt-1 tracking-widest uppercase font-mono">
             Paso {step} de 4 · Selección de Rubro & Arquitectura
           </p>
         </div>
@@ -380,56 +415,56 @@ export default function Onboarding() {
               key={s.num}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
                 s.num === step
-                  ? "bg-white text-black font-bold shadow-[0_0_20px_rgba(255,255,255,0.4)]"
+                  ? "bg-slate-900 text-white font-bold shadow-md"
                   : s.num < step
-                  ? "bg-teal-500/20 text-teal-300 border border-teal-500/30"
-                  : "bg-white/5 text-white/40 border border-white/5"
+                  ? "bg-teal-50 text-teal-700 border border-teal-200"
+                  : "bg-slate-100 text-slate-400 border border-slate-200"
               }`}
             >
-              <span className={`w-2 h-2 rounded-full ${s.num === step ? "bg-teal-500 animate-pulse" : s.num < step ? "bg-teal-400" : "bg-white/20"}`} />
+              <span className={`w-2 h-2 rounded-full ${s.num === step ? "bg-teal-400 animate-pulse" : s.num < step ? "bg-teal-500" : "bg-slate-300"}`} />
               {s.label}
             </div>
           ))}
         </div>
 
         {/* Tarjeta Principal Liquid Glass */}
-        <div className="apple-glass rounded-[32px] p-6 sm:p-9 shadow-[0_25px_70px_rgba(0,0,0,0.7)] border border-white/15 relative overflow-hidden">
+        <div className="apple-glass rounded-[32px] p-6 sm:p-9 shadow-xl border border-slate-200 relative overflow-hidden">
           <div className="line-aurora absolute top-0 left-0 right-0" />
 
           {/* ════════════ PASO 1: SELECCIONAR RUBRO / INDUSTRIA ════════════ */}
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <div className="inline-block px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[11px] font-mono uppercase tracking-wider mb-2">
+                <div className="inline-block px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-700 text-[11px] font-mono uppercase tracking-wider mb-2">
                   Selección de Sector Comercial
                 </div>
-                <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white leading-tight">
+                <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-slate-900 leading-tight">
                   ¿A qué rubro se dedica tu negocio?
                 </h2>
-                <p className="text-white/50 text-sm mt-1">
-                  Actualmente <strong className="text-teal-400">Mediclinic Pro</strong>, <strong className="text-teal-400">Aurora Horeca</strong>, <strong className="text-teal-400">Aurora Retail</strong> (Ferretería, Farmacia y Repuestos) y <strong className="text-teal-400">Aurora Ganadería</strong> están 100% habilitadas y listas para operar. Las demás verticales se encuentran en proceso de despliegue.
+                <p className="text-slate-500 text-sm mt-1">
+                  Actualmente <strong className="text-teal-600">Mediclinic Pro</strong>, <strong className="text-teal-600">Aurora Horeca</strong>, <strong className="text-teal-600">Aurora Retail</strong> (Ferretería, Farmacia y Repuestos) y <strong className="text-teal-600">Aurora Ganadería</strong> están 100% habilitadas y listas para operar. Las demás verticales se encuentran en proceso de despliegue.
                 </p>
               </div>
 
               {/* Banner de aviso si hizo clic en un rubro con candado */}
               {lockedNotice && (
-                <div className="apple-glass rounded-2xl p-4 border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs sm:text-sm flex items-start gap-3 animate-fade-in shadow-lg">
-                  <span className="text-amber-300"><IconWarning size={20} /></span>
+                <div className="rounded-2xl p-4 border border-amber-300 bg-amber-50 text-amber-900 text-xs sm:text-sm flex items-start gap-3 animate-fade-in shadow-sm">
+                  <span className="text-amber-500"><IconWarning size={20} /></span>
                   <div className="flex-1">
-                    <p className="font-semibold text-amber-300 mb-1">Módulo en Desarrollo</p>
-                    <p className="text-white/80 leading-relaxed">{lockedNotice}</p>
+                    <p className="font-semibold text-amber-700 mb-1">Módulo en Desarrollo</p>
+                    <p className="text-amber-800/90 leading-relaxed">{lockedNotice}</p>
                     <div className="flex flex-wrap gap-2 mt-2.5">
                       <button
                         type="button"
                         onClick={() => { handleSelectIndustry(INDUSTRIES.find((i) => i.id === "clinica")!); }}
-                        className="px-3 py-1.5 rounded-lg bg-teal-500 text-black font-bold text-xs hover:bg-teal-400 transition-all flex items-center gap-1.5"
+                        className="px-3 py-1.5 rounded-lg bg-teal-600 text-white font-bold text-xs hover:bg-teal-500 transition-all flex items-center gap-1.5"
                       >
                         <IconClinic size={14} /> Seleccionar Mediclinic Pro
                       </button>
                       <button
                         type="button"
                         onClick={() => { handleSelectIndustry(INDUSTRIES.find((i) => i.id === "restaurante")!); }}
-                        className="px-3 py-1.5 rounded-lg bg-teal-500 text-black font-bold text-xs hover:bg-teal-400 transition-all flex items-center gap-1.5"
+                        className="px-3 py-1.5 rounded-lg bg-teal-600 text-white font-bold text-xs hover:bg-teal-500 transition-all flex items-center gap-1.5"
                       >
                         <IconRestaurant size={14} /> Seleccionar Aurora Horeca
                       </button>
@@ -437,86 +472,103 @@ export default function Onboarding() {
                   </div>
                   <button
                     onClick={() => setLockedNotice(null)}
-                    className="text-white/40 hover:text-white text-xs"
+                    className="text-amber-500 hover:text-amber-700 text-xs"
                   >
                     <IconClose size={14} />
                   </button>
                 </div>
               )}
 
-              {/* Grid de rubros con indicación clara de candado y disponibilidad */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[380px] overflow-y-auto pr-1">
-                {INDUSTRIES.map((ind) => {
-                  const isSelected = selectedIndustry === ind.id;
-                  return (
-                    <button
-                      key={ind.id}
-                      type="button"
-                      onClick={() => handleSelectIndustry(ind)}
-                      className={`relative flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all duration-300 ${
-                        ind.isReady
-                          ? isSelected
-                            ? "bg-gradient-to-r from-teal-500/20 via-cyan-500/15 to-purple-500/20 border-teal-400/80 shadow-[0_0_25px_rgba(0,242,254,0.3)] scale-[1.01]"
-                            : "bg-teal-950/20 border-teal-500/30 hover:border-teal-400/60 hover:bg-teal-900/30 text-white"
-                          : "bg-white/[0.02] border-white/10 opacity-60 hover:opacity-85 hover:border-white/20 cursor-pointer"
-                      }`}
-                    >
-                      {/* Icono */}
-                      <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                          ind.isReady
-                            ? "bg-teal-400/15 border border-teal-400/30 shadow-inner text-teal-300"
-                            : "bg-white/5 border border-white/10 text-white/50"
-                        }`}
-                      >
-                        <ind.Icon size={16} />
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <span className={`font-bold text-xs leading-tight block ${ind.isReady ? "text-white" : "text-white/70"}`}>
-                          {ind.label}
-                        </span>
-                        <span
-                          className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono font-semibold inline-block mt-0.5 ${
-                            ind.isReady
-                              ? "bg-teal-400/20 text-teal-300 border border-teal-400/40"
-                              : "bg-white/10 text-white/40 border border-white/10"
+              {/* Grid de rubros: primero los disponibles, luego los que vienen en camino */}
+              <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
+                <div>
+                  <p className="text-[11px] font-mono font-semibold tracking-widest uppercase text-teal-700 mb-2 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                    Disponibles ahora ({INDUSTRIES.filter((i) => i.isReady).length})
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {INDUSTRIES.filter((i) => i.isReady).map((ind) => {
+                      const isSelected = selectedIndustry === ind.id;
+                      return (
+                        <button
+                          key={ind.id}
+                          type="button"
+                          onClick={() => handleSelectIndustry(ind)}
+                          className={`relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-300 ${
+                            isSelected
+                              ? "bg-gradient-to-r from-teal-50 via-cyan-50 to-violet-50 border-teal-500 shadow-md scale-[1.01]"
+                              : "bg-teal-50/50 border-teal-200 hover:border-teal-400 hover:bg-teal-50"
                           }`}
                         >
-                          {ind.badge}
-                        </span>
-                      </div>
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-teal-100 border border-teal-200 text-teal-600">
+                            <ind.Icon size={17} />
+                          </div>
 
-                      {/* Check / Lock indicator */}
-                      <div className="flex-shrink-0 self-center">
-                        {ind.isReady ? (
+                          <div className="flex-1 min-w-0">
+                            <span className="font-bold text-xs leading-tight block text-slate-900">
+                              {ind.label}
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-mono font-semibold inline-block mt-1 bg-teal-100 text-teal-700 border border-teal-200">
+                              Listo para operar
+                            </span>
+                          </div>
+
                           <div
-                            className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                            className={`flex-shrink-0 self-center w-5 h-5 rounded-full flex items-center justify-center transition-all ${
                               isSelected
-                                ? "bg-teal-400 text-black shadow-[0_0_10px_#00f2fe]"
-                                : "border border-teal-400/40 text-transparent"
+                                ? "bg-teal-500 text-white shadow-md"
+                                : "border border-teal-300 text-transparent"
                             }`}
                           >
                             <IconCheck size={11} />
                           </div>
-                        ) : (
-                          <div className="w-5 h-5 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
-                            <IconLock size={10} />
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-mono font-semibold tracking-widest uppercase text-slate-400 mb-2 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                    En camino ({INDUSTRIES.filter((i) => !i.isReady).length})
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {INDUSTRIES.filter((i) => !i.isReady).map((ind) => (
+                      <button
+                        key={ind.id}
+                        type="button"
+                        onClick={() => handleSelectIndustry(ind)}
+                        className="relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-300 bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-slate-100"
+                      >
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-slate-100 border border-slate-200 text-slate-400">
+                          <ind.Icon size={17} />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <span className="font-bold text-xs leading-tight block text-slate-500">
+                            {ind.label}
+                          </span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-mono font-semibold inline-block mt-1 bg-slate-200/70 text-slate-500 border border-slate-200">
+                            {ind.badge}
+                          </span>
+                        </div>
+
+                        <div className="flex-shrink-0 self-center w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                          <IconLock size={10} />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Botón de continuar */}
-              <div className="pt-2 flex items-center justify-between border-t border-white/10">
+              <div className="pt-2 flex items-center justify-between border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => navigate("/auth")}
-                  className="text-white/40 hover:text-white text-xs transition-colors"
+                  className="text-slate-400 hover:text-slate-700 text-xs transition-colors"
                 >
                   ← Volver a inicio de sesión
                 </button>
@@ -787,4 +839,6 @@ export default function Onboarding() {
     </div>
   );
 }
+
+
 
