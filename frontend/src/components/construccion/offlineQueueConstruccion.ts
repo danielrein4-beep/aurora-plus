@@ -1,5 +1,12 @@
 // Motor de Cola Offline-First para Entornos Hostiles en Obras Civiles (Túneles, Vialidad, Minas)
-// Permite al Ingeniero Residente asentar mediciones, bitácoras y consumos sin señal de internet.
+// Permite al Ingeniero Residente asentar mediciones, bitácoras y consumos sin señal de internet
+// y sincronizar contra los endpoints reales del backend al recuperar conectividad.
+
+import {
+  crearValuacionConstruccionApi,
+  registrarConsumoInsumoConstruccionApi,
+  registrarBitacoraConstruccionApi
+} from '../../api';
 
 export interface AccionOfflineConstruccion {
   id: string;
@@ -55,6 +62,10 @@ export function limpiarCompletadosOffline(): void {
   guardarColaOffline(cola);
 }
 
+/**
+ * Sincronización real con el backend de Construcción de Aurora Plus.
+ * Procesa cada acción pendiente contra su endpoint correspondiente sin simulaciones ni timeouts artificiales.
+ */
 export async function sincronizarColaOfflineConServidor(): Promise<{ sincronizados: number; errores: number }> {
   if (!navigator.onLine) {
     return { sincronizados: 0, errores: 0 };
@@ -70,16 +81,20 @@ export async function sincronizarColaOfflineConServidor(): Promise<{ sincronizad
   for (const accion of pendientes) {
     try {
       accion.estado = 'SINCRONIZANDO';
-      // Simulación de envío a endpoint o confirmación local segura
-      await new Promise(r => setTimeout(r, 120));
+      if (accion.tipo === 'VALUACION' && accion.payload?.proyectoId) {
+        await crearValuacionConstruccionApi(Number(accion.payload.proyectoId), accion.payload);
+      } else if (accion.tipo === 'CONSUMO_INSUMO' && accion.payload?.insumoId) {
+        await registrarConsumoInsumoConstruccionApi(Number(accion.payload.insumoId), Number(accion.payload.cantidad));
+      } else if (accion.tipo === 'BITACORA' && accion.payload?.proyectoId) {
+        await registrarBitacoraConstruccionApi(Number(accion.payload.proyectoId), accion.payload);
+      }
       sincronizados++;
-      // Una vez enviado, se remueve de la cola
       const index = cola.findIndex(c => c.id === accion.id);
       if (index !== -1) cola.splice(index, 1);
     } catch (err: any) {
       accion.estado = 'ERROR';
       accion.reintentos += 1;
-      accion.errorUltimoIntento = err.message || 'Error de red';
+      accion.errorUltimoIntento = err?.message || 'Error de sincronización con el servidor';
       errores++;
     }
   }

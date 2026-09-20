@@ -108,9 +108,9 @@ const INDUSTRIES: IndustryItem[] = [
     label: "Construcción & Obras",
     Icon: IconConstruction,
     desc: "Presupuestos por partidas (COVENIN/APU), valuaciones de avance, cómputos métricos y cotizaciones en PDF",
-    badge: "100% DISPONIBLE (Listo)",
-    isReady: true,
-    tagline: "Vertical: Aurora Obras & Construcción Civil Pro",
+    badge: "En Construcción (Próximamente)",
+    isReady: false,
+    tagline: "Vertical en Desarrollo: Aurora Obras & Construcción Civil Pro",
   },
   {
     id: "otro",

@@ -36,7 +36,7 @@ const RUBROS_REGISTRO: RubroNegocioItem[] = [
   { id: "odontologia", label: "Odontología", sub: "Historia clínica y odontograma FDI", Icon: IconTooth, modulo: "odontologia", ruta: "/mediclinic", nombreDefault: "Mi Consultorio Dental" },
   { id: "finca", label: "Finca & Ganadería", sub: "Potreros, vacunas y animales", Icon: IconFarm, modulo: "ganaderia", ruta: "/dashboard", nombreDefault: "Mi Finca" },
   { id: "peluqueria", label: "Peluquería & Belleza", sub: "En Construcción (Próximamente)", Icon: IconScissors, modulo: "salud", ruta: "/peluqueria", nombreDefault: "Mi Salón de Belleza", enConstruccion: true },
-  { id: "construccion", label: "Construcción & Obras", sub: "Partidas COVENIN, valuaciones y cotizaciones PDF", Icon: IconConstruction, modulo: "construccion", ruta: "/construccion", nombreDefault: "Constructora & Proyectos" },
+  { id: "construccion", label: "Construcción & Obras", sub: "En Construcción (Próximamente)", Icon: IconConstruction, modulo: "construccion", ruta: "/construccion", nombreDefault: "Constructora & Proyectos", enConstruccion: true },
   { id: "otro", label: "Otro Rubro Comercial", sub: "ERP y suite administrativa", Icon: IconBank, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Empresa" },
 ];
 

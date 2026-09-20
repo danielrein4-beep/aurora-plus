@@ -4,8 +4,10 @@ import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.construccion.entities.*;
 import com.auroraplus.modules.construccion.services.ConstruccionService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -18,142 +20,124 @@ public class ConstruccionController {
     @Autowired
     private ConstruccionService construccionService;
 
-    private Long getTenant(Long paramTenant) {
-        Long t = paramTenant != null ? paramTenant : TenantContext.getCurrentTenant();
-        return t != null ? t : 1L; // Fallback demo tenant 1
+    private Long requireTenant() {
+        Long tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado en TenantContext");
+        }
+        return tenantId;
     }
 
-    // Proyectos
+    // --- PROYECTOS ---
     @GetMapping("/proyectos")
-    public List<ProyectoConstruccionEntity> listarProyectos(@RequestParam(required = false) Long tenantId) {
-        return construccionService.listarProyectos(getTenant(tenantId));
+    public List<ProyectoConstruccionEntity> listarProyectos() {
+        return construccionService.listarProyectos(requireTenant());
     }
 
     @PostMapping("/proyectos")
-    public ResponseEntity<ProyectoConstruccionEntity> crearProyecto(
-            @RequestParam(required = false) Long tenantId,
-            @RequestBody ProyectoConstruccionEntity proyecto) {
-        return ResponseEntity.ok(construccionService.guardarProyecto(getTenant(tenantId), proyecto));
+    public ResponseEntity<ProyectoConstruccionEntity> crearProyecto(@RequestBody ProyectoConstruccionEntity proyecto) {
+        return ResponseEntity.ok(construccionService.guardarProyecto(requireTenant(), proyecto));
     }
 
     @GetMapping("/proyectos/{id}")
-    public ResponseEntity<ProyectoConstruccionEntity> obtenerProyecto(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long tenantId) {
-        return construccionService.obtenerProyecto(getTenant(tenantId), id)
+    public ResponseEntity<ProyectoConstruccionEntity> obtenerProyecto(@PathVariable Long id) {
+        return construccionService.obtenerProyecto(requireTenant(), id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // Capítulos
+    // --- CAPÍTULOS ---
     @GetMapping("/capitulos")
-    public List<CapituloConstruccionEntity> listarCapitulos(@RequestParam(required = false) Long tenantId) {
-        return construccionService.listarCapitulos(getTenant(tenantId));
+    public List<CapituloConstruccionEntity> listarCapitulos() {
+        return construccionService.listarCapitulos(requireTenant());
     }
 
     @PostMapping("/capitulos")
-    public ResponseEntity<CapituloConstruccionEntity> crearCapitulo(
-            @RequestParam(required = false) Long tenantId,
-            @RequestBody CapituloConstruccionEntity capitulo) {
-        return ResponseEntity.ok(construccionService.guardarCapitulo(getTenant(tenantId), capitulo));
+    public ResponseEntity<CapituloConstruccionEntity> crearCapitulo(@RequestBody CapituloConstruccionEntity capitulo) {
+        return ResponseEntity.ok(construccionService.guardarCapitulo(requireTenant(), capitulo));
     }
 
-    // Partidas
+    // --- PARTIDAS ---
     @GetMapping("/proyectos/{proyectoId}/partidas")
-    public List<PartidaConstruccionEntity> listarPartidas(
-            @PathVariable Long proyectoId,
-            @RequestParam(required = false) Long tenantId) {
-        return construccionService.listarPartidas(getTenant(tenantId), proyectoId);
+    public List<PartidaConstruccionEntity> listarPartidas(@PathVariable Long proyectoId) {
+        return construccionService.listarPartidas(requireTenant(), proyectoId);
     }
 
     @PostMapping("/proyectos/{proyectoId}/partidas")
     public ResponseEntity<PartidaConstruccionEntity> crearPartida(
             @PathVariable Long proyectoId,
-            @RequestParam(required = false) Long tenantId,
             @RequestBody PartidaConstruccionEntity partida) {
-        partida.setProyectoId(proyectoId);
-        return ResponseEntity.ok(construccionService.guardarPartida(getTenant(tenantId), partida));
+        return ResponseEntity.ok(construccionService.guardarPartida(requireTenant(), proyectoId, partida));
     }
 
     @DeleteMapping("/partidas/{id}")
-    public ResponseEntity<Void> eliminarPartida(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long tenantId) {
-        construccionService.eliminarPartida(getTenant(tenantId), id);
+    public ResponseEntity<Void> eliminarPartida(@PathVariable Long id) {
+        construccionService.eliminarPartida(requireTenant(), id);
         return ResponseEntity.noContent().build();
     }
 
-    // Valuaciones
+    // --- VALUACIONES ---
     @GetMapping("/proyectos/{proyectoId}/valuaciones")
-    public List<ValuacionConstruccionEntity> listarValuaciones(
-            @PathVariable Long proyectoId,
-            @RequestParam(required = false) Long tenantId) {
-        return construccionService.listarValuaciones(getTenant(tenantId), proyectoId);
+    public List<ValuacionConstruccionEntity> listarValuaciones(@PathVariable Long proyectoId) {
+        return construccionService.listarValuaciones(requireTenant(), proyectoId);
     }
 
     @PostMapping("/proyectos/{proyectoId}/valuaciones")
     public ResponseEntity<ValuacionConstruccionEntity> crearValuacion(
             @PathVariable Long proyectoId,
-            @RequestParam(required = false) Long tenantId,
             @RequestBody ValuacionConstruccionEntity valuacion) {
-        valuacion.setProyectoId(proyectoId);
-        return ResponseEntity.ok(construccionService.guardarValuacion(getTenant(tenantId), valuacion));
+        return ResponseEntity.ok(construccionService.guardarValuacion(requireTenant(), proyectoId, valuacion));
     }
 
     @PatchMapping("/valuaciones/{id}/estado")
     public ResponseEntity<ValuacionConstruccionEntity> cambiarEstadoValuacion(
             @PathVariable Long id,
-            @RequestParam(required = false) Long tenantId,
             @RequestBody Map<String, String> body) {
-        String estado = body.get("estado");
-        return construccionService.actualizarEstadoValuacion(getTenant(tenantId), id, estado)
+        String estado = body != null ? body.get("estado") : null;
+        if (estado == null || estado.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El campo 'estado' es obligatorio");
+        }
+        return construccionService.actualizarEstadoValuacion(requireTenant(), id, estado)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // Insumos
+    // --- INSUMOS ---
     @GetMapping("/insumos")
-    public List<InsumoConstruccionEntity> listarInsumos(@RequestParam(required = false) Long tenantId) {
-        return construccionService.listarInsumos(getTenant(tenantId));
+    public List<InsumoConstruccionEntity> listarInsumos() {
+        return construccionService.listarInsumos(requireTenant());
     }
 
     @PostMapping("/insumos")
-    public ResponseEntity<InsumoConstruccionEntity> crearInsumo(
-            @RequestParam(required = false) Long tenantId,
-            @RequestBody InsumoConstruccionEntity insumo) {
-        return ResponseEntity.ok(construccionService.guardarInsumo(getTenant(tenantId), insumo));
+    public ResponseEntity<InsumoConstruccionEntity> crearInsumo(@RequestBody InsumoConstruccionEntity insumo) {
+        return ResponseEntity.ok(construccionService.guardarInsumo(requireTenant(), insumo));
     }
 
     @PostMapping("/insumos/{id}/consumo")
     public ResponseEntity<InsumoConstruccionEntity> registrarConsumo(
             @PathVariable Long id,
-            @RequestParam(required = false) Long tenantId,
             @RequestBody Map<String, BigDecimal> body) {
-        BigDecimal cantidad = body.get("cantidad");
+        BigDecimal cantidad = body != null ? body.get("cantidad") : null;
         if (cantidad == null) {
-            return ResponseEntity.badRequest().build();
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El campo 'cantidad' es obligatorio");
         }
-        return ResponseEntity.ok(construccionService.registrarConsumoInsumo(getTenant(tenantId), id, cantidad));
+        return ResponseEntity.ok(construccionService.registrarConsumoInsumo(requireTenant(), id, cantidad));
     }
 
-    // Bitácora
+    // --- BITÁCORA ---
     @GetMapping("/proyectos/{proyectoId}/bitacora")
-    public List<BitacoraConstruccionEntity> listarBitacora(
-            @PathVariable Long proyectoId,
-            @RequestParam(required = false) Long tenantId) {
-        return construccionService.listarBitacora(getTenant(tenantId), proyectoId);
+    public List<BitacoraConstruccionEntity> listarBitacora(@PathVariable Long proyectoId) {
+        return construccionService.listarBitacora(requireTenant(), proyectoId);
     }
 
     @PostMapping("/proyectos/{proyectoId}/bitacora")
     public ResponseEntity<BitacoraConstruccionEntity> agregarBitacora(
             @PathVariable Long proyectoId,
-            @RequestParam(required = false) Long tenantId,
             @RequestBody BitacoraConstruccionEntity entrada) {
-        entrada.setProyectoId(proyectoId);
-        return ResponseEntity.ok(construccionService.agregarEntradaBitacora(getTenant(tenantId), entrada));
+        return ResponseEntity.ok(construccionService.agregarEntradaBitacora(requireTenant(), proyectoId, entrada));
     }
 
-    // Catálogo COVENIN
+    // --- CATÁLOGO COVENIN (PÚBLICO) ---
     @GetMapping("/catalogo-covenin")
     public List<CatalogoCoveninEntity> buscarCatalogo(@RequestParam(required = false) String q) {
         return construccionService.buscarCatalogo(q);

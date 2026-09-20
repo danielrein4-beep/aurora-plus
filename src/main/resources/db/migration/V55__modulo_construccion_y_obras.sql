@@ -1,5 +1,5 @@
 -- =============================================================================
--- Migracion Flyway V54: Modulo de Ingenieria Civil, Obras y Construccion Pro
+-- Migracion Flyway V55: Modulo de Ingenieria Civil, Obras y Construccion Pro
 -- Estandarizado para presupuestos COVENIN, APU, valuaciones y libro diario
 -- =============================================================================
 

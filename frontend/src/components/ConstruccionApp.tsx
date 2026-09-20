@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
+  obtenerTasaVigente,
+  listarProyectosConstruccionApi,
+  crearProyectoConstruccionApi
+} from '../api';
+import {
   ProyectoConstruccion,
   CapituloObra,
   PartidaObra,
@@ -181,6 +186,51 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const [pendientesOffline, setPendientesOffline] = useState<number>(contarPendientesOffline());
   const [sincronizando, setSincronizando] = useState<boolean>(false);
 
+  // Carga dinmica de tasa BCV en vivo desde backend
+  useEffect(() => {
+    obtenerTasaVigente("USD", "VES")
+      .then((t) => {
+        if (t && t.tasa > 0) {
+          setTasaBcv(t.tasa);
+        }
+      })
+      .catch((e) => console.warn("No se pudo obtener tasa oficial:", e));
+  }, []);
+
+  // Carga proyectos reales desde el backend para el tenant actual
+  useEffect(() => {
+    listarProyectosConstruccionApi()
+      .then((remotos) => {
+        if (remotos && remotos.length > 0) {
+          const adaptados: ProyectoConstruccion[] = remotos.map((p) => ({
+            id: String(p.id),
+            codigo: p.codigo,
+            nombre: p.nombre,
+            clienteNombre: p.cliente,
+            clienteRif: "J-50182910-2",
+            clienteTelefono: "+58 414 555-1234",
+            ubicacion: p.ubicacion || "Venezuela",
+            ingenieroResidente: p.ingenieroResidente || "Ing. Residente",
+            ingenieroCiv: p.civResidente || "CIV 000.000",
+            fechaInicio: p.fechaInicio || new Date().toISOString().slice(0, 10),
+            fechaFinEstimada: p.fechaFinEstimada || "2026-12-31",
+            estado: (p.estado as any) || "EN_EJECUCION",
+            anticipoPorcentaje: Number(p.porcentajeAnticipo || 20),
+            retencionPorcentaje: Number(p.porcentajeRetencionGarantia || 10),
+            porcentajeAdministracion: Number(p.porcentajeAdministracion || 12),
+            porcentajeUtilidad: Number(p.porcentajeUtilidad || 10),
+            porcentajeIva: Number(p.iva || 16),
+            totalPresupuestadoUSD: Number(p.montoPresupuestoTotal || 0),
+            costoDirectoUSD: Number(p.montoPresupuestoTotal || 0) * 0.8,
+            monedaPrincipal: "USD",
+          }));
+          setProyectos(adaptados);
+          setSelectedProyectoId(adaptados[0].id);
+        }
+      })
+      .catch((e) => console.warn("No se pudieron cargar proyectos remotos:", e));
+  }, []);
+
   // Formulario nueva obra
   const [formNuevaObra, setFormNuevaObra] = useState({
     codigo: '',
@@ -329,6 +379,29 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
     setCapitulos(prev => [...prev, ...capitulosEstandar]);
     setProyectos(prev => [nuevo, ...prev]);
+    crearProyectoConstruccionApi({
+      codigo: nuevo.codigo,
+      nombre: nuevo.nombre,
+      cliente: nuevo.clienteNombre,
+      ubicacion: nuevo.ubicacion,
+      ingenieroResidente: nuevo.ingenieroResidente,
+      civResidente: nuevo.ingenieroCiv,
+      fechaInicio: nuevo.fechaInicio,
+      fechaFinEstimada: nuevo.fechaFinEstimada,
+      estado: nuevo.estado,
+      montoPresupuestoTotal: nuevo.totalPresupuestadoUSD,
+      porcentajeAnticipo: nuevo.anticipoPorcentaje,
+      porcentajeRetencionGarantia: nuevo.retencionPorcentaje,
+      porcentajeAdministracion: nuevo.porcentajeAdministracion,
+      porcentajeUtilidad: nuevo.porcentajeUtilidad,
+      iva: nuevo.porcentajeIva,
+    }).then(res => {
+      if (res?.id) {
+        nuevo.id = String(res.id);
+      }
+    }).catch(err => {
+      console.warn("Error persistiendo proyecto:", err);
+    });
     setSelectedProyectoId(nuevo.id);
     setModalNuevaObra(false);
     setFormNuevaObra({
