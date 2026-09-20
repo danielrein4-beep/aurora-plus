@@ -5,6 +5,10 @@ import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.construccion.controllers.ConstruccionController;
 import com.auroraplus.modules.construccion.entities.*;
 import com.auroraplus.modules.construccion.repositories.*;
+import com.auroraplus.modules.construccion.services.IdempotenciaConstruccionService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -694,6 +698,7 @@ public class ConstruccionAislamientoTenantP0Test {
         CountDownLatch startSignal = new CountDownLatch(1);
         CountDownLatch doneSignal = new CountDownLatch(numHilos);
         AtomicInteger exitos = new AtomicInteger(0);
+        ConcurrentLinkedQueue<Throwable> fallosInesperados = new ConcurrentLinkedQueue<>();
 
         for (int i = 0; i < numHilos; i++) {
             new Thread(() -> {
@@ -705,7 +710,8 @@ public class ConstruccionAislamientoTenantP0Test {
                     if (r.getStatusCode() == HttpStatus.OK) {
                         exitos.incrementAndGet();
                     }
-                } catch (Exception ignored) {
+                } catch (Throwable t) {
+                    fallosInesperados.add(t);
                 } finally {
                     TenantContext.clear();
                     doneSignal.countDown();
@@ -714,7 +720,9 @@ public class ConstruccionAislamientoTenantP0Test {
         }
 
         startSignal.countDown();
-        doneSignal.await();
+        boolean terminado = doneSignal.await(5, TimeUnit.SECONDS);
+        assertTrue(terminado, "Ambos hilos deben culminar dentro del límite");
+        assertTrue(fallosInesperados.isEmpty(), "No deben ocurrir excepciones no previstas: " + fallosInesperados);
 
         // Ambos hilos deben retornar exitosamente (uno ejecuta y el otro recibe el resultado idéntico)
         assertEquals(2, exitos.get(), "Ambas peticiones con misma Idempotency-Key deben terminar con 200 OK");
@@ -722,5 +730,108 @@ public class ConstruccionAislamientoTenantP0Test {
         // El stock final en base de datos debe ser exactamente 40.00 (descontado una sola vez, de 50 - 10)
         InsumoConstruccionEntity insumoFinal = insumoRepository.findByTenantIdAndId(tenant, insumoId).orElseThrow();
         assertEquals(new BigDecimal("40.00"), insumoFinal.getStockActual(), "El stock debe haberse descontado exactamente una sola vez");
+    }
+
+    // 14. Idempotencia determinista: detiene la 1ra petición tras pre-claim; la 2da petición no descuenta stock ni duplica; snapshot congelado
+    @Test
+    void idempotencia_concurrenciaDeterminista_segundaPeticionNoEjecutaEfecto() throws Exception {
+        long tenant = 99806L;
+        TenantContext.setCurrentTenant(tenant);
+        InsumoConstruccionEntity insumo = crearInsumoHelper(tenant, "INS-DET-LOCK", "Cemento Gris Tipo I", new BigDecimal("100.00"));
+        Long insumoId = insumo.getId();
+
+        String ik = "IK-DETERMINISTIC-LOCK-99806";
+        CountDownLatch hilo1PreClaimListo = new CountDownLatch(1);
+        CountDownLatch liberarHilo1 = new CountDownLatch(1);
+
+        AtomicReference<ResponseEntity<InsumoConstruccionEntity>> respHilo1 = new AtomicReference<>();
+        AtomicReference<Throwable> errorHilo1 = new AtomicReference<>();
+
+        // Activar hook determinista para detener al hilo 1 justo tras insertar el pre-claim (EN_PROCESO)
+        IdempotenciaConstruccionService.setPostPreClaimHook(() -> {
+            hilo1PreClaimListo.countDown();
+            try {
+                boolean liberado = liberarHilo1.await(5, TimeUnit.SECONDS);
+                if (!liberado) {
+                    throw new RuntimeException("Timeout esperando liberación de hilo 1");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+
+        Thread hilo1;
+        try {
+            // Iniciar Hilo 1: intentará descontar 15.00
+            hilo1 = new Thread(() -> {
+                try {
+                    TenantContext.setCurrentTenant(tenant);
+                    respHilo1.set(construccionController.registrarConsumo(
+                            insumoId, Map.of("cantidad", new BigDecimal("15.00")), ik));
+                } catch (Throwable t) {
+                    errorHilo1.set(t);
+                } finally {
+                    TenantContext.clear();
+                }
+            });
+            hilo1.start();
+
+            // Esperar con certeza absoluta a que Hilo 1 haya completado el pre-claim y esté detenido antes del descuento
+            boolean listo = hilo1PreClaimListo.await(5, TimeUnit.SECONDS);
+            assertTrue(listo, "Hilo 1 debió completar el pre-claim en menos de 5 segundos");
+
+            // Desactivar el hook para que futuras llamadas no se queden detenidas
+            IdempotenciaConstruccionService.setPostPreClaimHook(null);
+
+            // Verificar que en este momento exacto el stock sigue intacto (100.00), porque el efecto aún no ocurrió
+            InsumoConstruccionEntity insumoDurantePreClaim = insumoRepository.findByTenantIdAndId(tenant, insumoId).orElseThrow();
+            assertEquals(new BigDecimal("100.00"), insumoDurantePreClaim.getStockActual(),
+                    "El stock no debe haberse modificado durante el estado EN_PROCESO");
+
+            // Lanzar 2da petición con la MISMA clave mientras la 1ra sigue en EN_PROCESO
+            TenantContext.setCurrentTenant(tenant);
+            ResponseStatusException exHilo2 = assertThrows(ResponseStatusException.class, () -> {
+                construccionController.registrarConsumo(insumoId, Map.of("cantidad", new BigDecimal("15.00")), ik);
+            }, "Hilo 2 debe fallar al encontrar la clave en EN_PROCESO");
+
+            assertEquals(HttpStatus.CONFLICT, exHilo2.getStatusCode(),
+                    "Hilo 2 debe responder 409 Conflict ('solicitud en proceso')");
+
+            // Verificar de nuevo que la 2da petición NO descontó inventario: el stock sigue en 100.00
+            InsumoConstruccionEntity insumoTrasHilo2 = insumoRepository.findByTenantIdAndId(tenant, insumoId).orElseThrow();
+            assertEquals(new BigDecimal("100.00"), insumoTrasHilo2.getStockActual(),
+                    "Hilo 2 no debe haber descontado stock bajo ninguna circunstancia");
+
+            // Liberar al Hilo 1 para que complete su ejecución
+            liberarHilo1.countDown();
+            hilo1.join(5000);
+
+            // Verificar que Hilo 1 terminó exitosamente y sin excepciones
+            assertNull(errorHilo1.get(), "Hilo 1 no debe arrojar excepciones");
+            assertNotNull(respHilo1.get(), "Hilo 1 debió retornar respuesta");
+            assertEquals(HttpStatus.OK, respHilo1.get().getStatusCode());
+            assertEquals(new BigDecimal("85.00"), respHilo1.get().getBody().getStockActual());
+
+            // Verificar que el stock final en BD es exactamente 85.00 (descontado una sola vez)
+            InsumoConstruccionEntity insumoFinal = insumoRepository.findByTenantIdAndId(tenant, insumoId).orElseThrow();
+            assertEquals(new BigDecimal("85.00"), insumoFinal.getStockActual());
+
+            // Simular otro consumo posterior con OTRA clave (descontar 20 más -> 65.00)
+            String otraIk = "IK-OTRO-CONSUMO-99806";
+            ResponseEntity<InsumoConstruccionEntity> respOtro = construccionController.registrarConsumo(
+                    insumoId, Map.of("cantidad", new BigDecimal("20.00")), otraIk);
+            assertEquals(new BigDecimal("65.00"), respOtro.getBody().getStockActual());
+
+            // Reconsultar con la clave original 'ik': debe devolver el resultado original congelado (85.00), no el actual (65.00)
+            ResponseEntity<InsumoConstruccionEntity> respReintento1 = construccionController.registrarConsumo(
+                    insumoId, Map.of("cantidad", new BigDecimal("15.00")), ik);
+            assertEquals(new BigDecimal("85.00"), respReintento1.getBody().getStockActual(),
+                    "El reintento con la clave original debe devolver el stock snapshot de ese consumo (85.00), no el inventario actual (65.00)");
+
+        } finally {
+            IdempotenciaConstruccionService.setPostPreClaimHook(null);
+            liberarHilo1.countDown();
+            TenantContext.clear();
+        }
     }
 }

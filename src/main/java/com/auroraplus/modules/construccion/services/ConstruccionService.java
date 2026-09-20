@@ -2,6 +2,9 @@ package com.auroraplus.modules.construccion.services;
 
 import com.auroraplus.modules.construccion.entities.*;
 import com.auroraplus.modules.construccion.repositories.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -47,6 +50,10 @@ public class ConstruccionService {
 
     @Autowired
     private IdempotenciaConstruccionService idempotenciaService;
+
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     // --- UTILIDADES DE IDEMPOTENCIA Y HASHING ---
     public static String calcularSha256(String input) {
@@ -273,6 +280,11 @@ public class ConstruccionService {
             );
             if (claim.isPresent()) {
                 IdempotenciaConstruccionEntity idemp = claim.get();
+                if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
+                    try {
+                        return objectMapper.readValue(idemp.getResultadoJson(), ValuacionConstruccionEntity.class);
+                    } catch (Exception ignored) {}
+                }
                 if (idemp.getRecursoId() != null) {
                     return valuacionRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
                             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Valuación previa no encontrada"));
@@ -280,35 +292,39 @@ public class ConstruccionService {
             }
         }
 
-        // 2. Validar pertenencia del proyecto y campos de negocio
-        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
-                .orElseThrow(() -> {
-                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant");
-                });
+        try {
+            // 2. Validar pertenencia del proyecto y campos de negocio
+            proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
 
-        if (valuacion.getEstado() == null || !ESTADOS_VALUACION_VALIDOS.contains(valuacion.getEstado().toUpperCase())) {
+            if (valuacion.getEstado() == null || !ESTADOS_VALUACION_VALIDOS.contains(valuacion.getEstado().toUpperCase())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de valuación no válido: " + valuacion.getEstado());
+            }
+
+            if (valuacion.getMontoBruto() != null && valuacion.getMontoBruto().compareTo(BigDecimal.ZERO) < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El monto bruto no puede ser negativo");
+            }
+
+            valuacion.setId(null);
+            valuacion.setTenantId(tenantId);
+            valuacion.setProyectoId(proyectoId);
+            valuacion.setEstado(valuacion.getEstado().toUpperCase());
+
+            // 3. Ejecutar efecto de negocio
+            ValuacionConstruccionEntity guardada = valuacionRepository.save(valuacion);
+
+            // 4. Completar clave dentro de la misma transacción guardando el snapshot serializado
+            String json = null;
+            try {
+                json = objectMapper.writeValueAsString(guardada);
+            } catch (Exception ignored) {}
+            idempotenciaService.completarClave(tenantId, idempotencyKey, guardada.getId(), json);
+
+            return guardada;
+        } catch (Throwable t) {
             idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de valuación no válido: " + valuacion.getEstado());
+            throw t;
         }
-
-        if (valuacion.getMontoBruto() != null && valuacion.getMontoBruto().compareTo(BigDecimal.ZERO) < 0) {
-            idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El monto bruto no puede ser negativo");
-        }
-
-        valuacion.setId(null);
-        valuacion.setTenantId(tenantId);
-        valuacion.setProyectoId(proyectoId);
-        valuacion.setEstado(valuacion.getEstado().toUpperCase());
-
-        // 3. Ejecutar efecto de negocio
-        ValuacionConstruccionEntity guardada = valuacionRepository.save(valuacion);
-
-        // 4. Completar clave con ID resultante
-        idempotenciaService.completarClave(tenantId, idempotencyKey, guardada.getId());
-
-        return guardada;
     }
 
     public Optional<ValuacionConstruccionEntity> actualizarEstadoValuacion(Long tenantId, Long valuacionId, String nuevoEstado) {
@@ -378,29 +394,45 @@ public class ConstruccionService {
                     tenantId, idempotencyKey, "CONSUMO_INSUMO", payloadHash
             );
             if (claim.isPresent()) {
+                IdempotenciaConstruccionEntity idemp = claim.get();
+                if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
+                    try {
+                        return objectMapper.readValue(idemp.getResultadoJson(), InsumoConstruccionEntity.class);
+                    } catch (Exception ignored) {}
+                }
                 return insumoRepository.findByTenantIdAndId(tenantId, insumoId)
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado"));
             }
         }
 
-        // 2. Ejecutar descuento atómico (solo si stock_actual >= cantidad)
-        int filasAfectadas = insumoRepository.descontarStockAtomico(tenantId, insumoId, cantidad);
+        try {
+            // 2. Ejecutar descuento atómico (solo si stock_actual >= cantidad)
+            int filasAfectadas = insumoRepository.descontarStockAtomico(tenantId, insumoId, cantidad);
 
-        if (filasAfectadas == 0) {
+            if (filasAfectadas == 0) {
+                InsumoConstruccionEntity insumoExistente = insumoRepository.findByTenantIdAndId(tenantId, insumoId)
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado para este tenant"));
+
+                BigDecimal stockActual = insumoExistente.getStockActual() != null ? insumoExistente.getStockActual() : BigDecimal.ZERO;
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Stock insuficiente: no se permite stock negativo (stock actual: " + stockActual + ", consumo: " + cantidad + ")");
+            }
+
+            InsumoConstruccionEntity insumoPostConsumo = insumoRepository.findByTenantIdAndId(tenantId, insumoId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado tras descuento"));
+
+            // 3. Completar clave dentro de la misma transacción guardando el snapshot resultante del consumo
+            String json = null;
+            try {
+                json = objectMapper.writeValueAsString(insumoPostConsumo);
+            } catch (Exception ignored) {}
+            idempotenciaService.completarClave(tenantId, idempotencyKey, insumoId, json);
+
+            return insumoPostConsumo;
+        } catch (Throwable t) {
             idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-            InsumoConstruccionEntity insumoExistente = insumoRepository.findByTenantIdAndId(tenantId, insumoId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado para este tenant"));
-
-            BigDecimal stockActual = insumoExistente.getStockActual() != null ? insumoExistente.getStockActual() : BigDecimal.ZERO;
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Stock insuficiente: no se permite stock negativo (stock actual: " + stockActual + ", consumo: " + cantidad + ")");
+            throw t;
         }
-
-        // 3. Completar clave con ID resultante
-        idempotenciaService.completarClave(tenantId, idempotencyKey, insumoId);
-
-        return insumoRepository.findByTenantIdAndId(tenantId, insumoId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado tras descuento"));
     }
 
     // --- BITÁCORA ---
@@ -437,6 +469,11 @@ public class ConstruccionService {
             );
             if (claim.isPresent()) {
                 IdempotenciaConstruccionEntity idemp = claim.get();
+                if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
+                    try {
+                        return objectMapper.readValue(idemp.getResultadoJson(), BitacoraConstruccionEntity.class);
+                    } catch (Exception ignored) {}
+                }
                 if (idemp.getRecursoId() != null) {
                     return bitacoraRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
                             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Bitácora previa no encontrada"));
@@ -444,29 +481,34 @@ public class ConstruccionService {
             }
         }
 
-        // 2. Validar pertenencia del proyecto y campos
-        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
-                .orElseThrow(() -> {
-                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant");
-                });
+        try {
+            // 2. Validar pertenencia del proyecto y campos
+            proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
 
-        if (entrada.getFecha() == null) {
+            if (entrada.getFecha() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de la bitácora es obligatoria");
+            }
+
+            entrada.setId(null);
+            entrada.setTenantId(tenantId);
+            entrada.setProyectoId(proyectoId);
+
+            // 3. Ejecutar inserción en bitácora
+            BitacoraConstruccionEntity guardada = bitacoraRepository.save(entrada);
+
+            // 4. Completar clave dentro de la misma transacción guardando el snapshot serializado
+            String json = null;
+            try {
+                json = objectMapper.writeValueAsString(guardada);
+            } catch (Exception ignored) {}
+            idempotenciaService.completarClave(tenantId, idempotencyKey, guardada.getId(), json);
+
+            return guardada;
+        } catch (Throwable t) {
             idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de la bitácora es obligatoria");
+            throw t;
         }
-
-        entrada.setId(null);
-        entrada.setTenantId(tenantId);
-        entrada.setProyectoId(proyectoId);
-
-        // 3. Ejecutar inserción en bitácora
-        BitacoraConstruccionEntity guardada = bitacoraRepository.save(entrada);
-
-        // 4. Completar clave con ID resultante
-        idempotenciaService.completarClave(tenantId, idempotencyKey, guardada.getId());
-
-        return guardada;
     }
 
     // --- CATÁLOGO COVENIN (PÚBLICO / COMPARTIDO) ---

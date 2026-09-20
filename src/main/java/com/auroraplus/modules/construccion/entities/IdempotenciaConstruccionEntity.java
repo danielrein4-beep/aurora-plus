@@ -31,18 +31,26 @@ public class IdempotenciaConstruccionEntity {
     @Column(name = "estado", length = 20)
     private String estado;
 
+    @Column(name = "resultado_json", columnDefinition = "TEXT")
+    private String resultadoJson;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
     public IdempotenciaConstruccionEntity() {}
 
     public IdempotenciaConstruccionEntity(Long tenantId, String idempotencyKey, String recursoTipo, Long recursoId, String payloadHash, String estado) {
+        this(tenantId, idempotencyKey, recursoTipo, recursoId, payloadHash, estado, null);
+    }
+
+    public IdempotenciaConstruccionEntity(Long tenantId, String idempotencyKey, String recursoTipo, Long recursoId, String payloadHash, String estado, String resultadoJson) {
         this.tenantId = tenantId;
         this.idempotencyKey = idempotencyKey;
         this.recursoTipo = recursoTipo;
         this.recursoId = recursoId;
         this.payloadHash = payloadHash;
         this.estado = estado;
+        this.resultadoJson = resultadoJson;
     }
 
     public Long getId() { return id; }
@@ -65,6 +73,9 @@ public class IdempotenciaConstruccionEntity {
 
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
+
+    public String getResultadoJson() { return resultadoJson; }
+    public void setResultadoJson(String resultadoJson) { this.resultadoJson = resultadoJson; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

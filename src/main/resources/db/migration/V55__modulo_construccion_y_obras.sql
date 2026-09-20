@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS idempotencia_construccion (
     recurso_id BIGINT,
     payload_hash VARCHAR(64) NOT NULL,
     estado VARCHAR(20) DEFAULT 'COMPLETADO',
+    resultado_json TEXT,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_idemp_tenant_key UNIQUE (tenant_id, idempotency_key)
 );
