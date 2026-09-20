@@ -1,10 +1,10 @@
-import { useState, useRef } from "react";
+﻿import { useState, useRef } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconLock,
   IconRestaurant, IconPrescription, IconHardware, IconClinic,
-  IconVet, IconTooth, IconFarm, IconBank,
+  IconVet, IconTooth, IconFarm, IconBank, IconScissors, IconConstruction,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import { solicitarRecuperacionClave } from "../api";
@@ -25,16 +25,18 @@ interface RubroNegocioItem {
 
 const RUBROS_REGISTRO: RubroNegocioItem[] = [
   { id: "restaurante", label: "Restaurante & Cafetería", sub: "Comandas, KDS, mesas y delivery", Icon: IconRestaurant, modulo: "horeca", ruta: "/restaurante", nombreDefault: "Mi Restaurante" },
-  { id: "farmacia", label: "Farmacia & Droguería", sub: "Medicamentos, lotes y mostrador", Icon: IconPrescription, modulo: "salud", ruta: "/comercio", nombreDefault: "Mi Farmacia" },
+  { id: "farmacia", label: "Farmacia & Droguería", sub: "En Construcción (Próximamente)", Icon: IconPrescription, modulo: "salud", ruta: "/comercio", nombreDefault: "Mi Farmacia", enConstruccion: true },
   // modulo:"repuestos" (no "comercio") a propósito: el backend gatea /api/repuestos/*
   // por el segmento de URL (ver LicenciaInterceptor), así que el módulo contratado
   // real DEBE ser "repuestos" para que el tenant pueda usar esos endpoints. "comercio"
   // solo existe como `industria`/user.industry, para la identidad unificada en la UI.
   { id: "comercio", label: "Comercio", sub: "POS mostrador, código de barras e inventario", Icon: IconHardware, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Negocio" },
   { id: "clinica", label: "Clínica & Consultorios", sub: "Historias clínicas y citas", Icon: IconClinic, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Consultorio" },
-  { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "Fichas, vacunas y petshop", Icon: IconVet, modulo: "salud", ruta: "/veterinaria", nombreDefault: "Mi Veterinaria" },
+  { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "En Construcción (Próximamente)", Icon: IconVet, modulo: "salud", ruta: "/veterinaria", nombreDefault: "Mi Veterinaria", enConstruccion: true },
   { id: "odontologia", label: "Odontología", sub: "Historia clínica y odontograma FDI", Icon: IconTooth, modulo: "odontologia", ruta: "/mediclinic", nombreDefault: "Mi Consultorio Dental" },
   { id: "finca", label: "Finca & Ganadería", sub: "Potreros, vacunas y animales", Icon: IconFarm, modulo: "ganaderia", ruta: "/dashboard", nombreDefault: "Mi Finca" },
+  { id: "peluqueria", label: "Peluquería & Belleza", sub: "En Construcción (Próximamente)", Icon: IconScissors, modulo: "salud", ruta: "/peluqueria", nombreDefault: "Mi Salón de Belleza", enConstruccion: true },
+  { id: "construccion", label: "Construcción & Obras", sub: "Partidas COVENIN, valuaciones y cotizaciones PDF", Icon: IconConstruction, modulo: "construccion", ruta: "/construccion", nombreDefault: "Constructora & Proyectos" },
   { id: "otro", label: "Otro Rubro Comercial", sub: "ERP y suite administrativa", Icon: IconBank, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Empresa" },
 ];
 
@@ -331,7 +333,14 @@ export default function Auth() {
                               {sel && <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />}
                             </div>
                             <div className="mt-1.5">
-                              <div className="text-xs font-bold leading-tight">{r.label}</div>
+                              <div className="text-xs font-bold leading-tight flex items-center justify-between gap-1">
+                                <span>{r.label}</span>
+                                {r.enConstruccion && (
+                                  <span className="text-[8px] uppercase tracking-wider px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    Próximamente
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[10px] text-white/40 leading-snug mt-0.5 line-clamp-1">{r.sub}</div>
                             </div>
                           </button>
@@ -534,3 +543,4 @@ export default function Auth() {
     </div>
   );
 }
+
