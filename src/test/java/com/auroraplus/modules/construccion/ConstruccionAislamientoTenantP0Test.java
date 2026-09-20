@@ -1099,4 +1099,90 @@ public class ConstruccionAislamientoTenantP0Test {
         );
         assertEquals(HttpStatus.BAD_REQUEST, exCrossProy.getStatusCode());
     }
+
+    @Test
+    void riesgos_aislamientoCalculoMatrizEIdempotencia() {
+        long tenant1 = 66611L;
+        TenantContext.setCurrentTenant(tenant1);
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant1, "PROY-SST-01", "Edificio Residencial Las Aves");
+        Long proyId = proy.getId();
+
+        // 1. Registro de riesgo IPERC con calculo automatico de matriz
+        RiesgoConstruccionEntity rsk = new RiesgoConstruccionEntity();
+        rsk.setCodigo("RSK-01");
+        rsk.setProcesoFrente("Vaciado de Losa Nivel +8.00");
+        rsk.setPeligro("Borde de placa sin barandillas de proteccion perimetral ni linea de vida");
+        rsk.setRiesgoConsecuencia("Caida a distinto nivel con traumatismo craneoencefalico severo");
+        rsk.setCategoria("ALTURA");
+        rsk.setProbabilidad(4); // Alta
+        rsk.setSeveridad(5);    // Catastrofica
+        rsk.setMedidasControl("Instalacion de red perimetral, barandilla rigida a 1.20m y uso obligatorio de arnes certificado con doble cabo de vida");
+        rsk.setResponsable("Ing. Inspector de Seguridad SST");
+        rsk.setFechaEvaluacion(java.time.LocalDate.now());
+
+        String ik = "IK-RSK-TEST-001";
+        ResponseEntity<RiesgoConstruccionEntity> resp1 = construccionController.registrarRiesgo(proyId, rsk, ik);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertNotNull(resp1.getBody().getId());
+        Long rskId = resp1.getBody().getId();
+        // 4 * 5 = 20 -> CRITICO
+        assertEquals("CRITICO", resp1.getBody().getNivelRiesgo());
+        assertEquals("IDENTIFICADO", resp1.getBody().getEstado());
+
+        // 2. Reintento idempotente devuelve el mismo id
+        ResponseEntity<RiesgoConstruccionEntity> respReintento = construccionController.registrarRiesgo(proyId, rsk, ik);
+        assertEquals(HttpStatus.OK, respReintento.getStatusCode());
+        assertEquals(rskId, respReintento.getBody().getId());
+
+        List<RiesgoConstruccionEntity> lista = construccionController.listarRiesgos(proyId);
+        assertEquals(1, lista.size(), "No debe haber duplicados por idempotencia");
+
+        // 3. Actualizacion de estado y agregado de mitigacion
+        ResponseEntity<RiesgoConstruccionEntity> respMitigado = construccionController.cambiarEstadoRiesgo(
+                rskId, Map.of("estado", "EN_MITIGACION", "medidasControl", "Barandillas instaladas e inspeccionadas en faena matutina")
+        );
+        assertEquals(HttpStatus.OK, respMitigado.getStatusCode());
+        assertEquals("EN_MITIGACION", respMitigado.getBody().getEstado());
+        assertTrue(respMitigado.getBody().getMedidasControl().contains("Barandillas instaladas"));
+
+        // 4. Intento de duplicar codigo en el mismo proyecto con otra clave -> 409 CONFLICT
+        RiesgoConstruccionEntity rskDuplicado = new RiesgoConstruccionEntity();
+        rskDuplicado.setCodigo("RSK-01");
+        rskDuplicado.setProcesoFrente("Otro Frente");
+        rskDuplicado.setPeligro("Peligro X");
+        rskDuplicado.setRiesgoConsecuencia("Danio X");
+        rskDuplicado.setMedidasControl("Control X");
+        rskDuplicado.setFechaEvaluacion(java.time.LocalDate.now());
+
+        ResponseStatusException exConflicto = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarRiesgo(proyId, rskDuplicado, "IK-RSK-OTRA-CLAVE")
+        );
+        assertEquals(HttpStatus.CONFLICT, exConflicto.getStatusCode());
+
+        // 5. Aislamiento Cross-Tenant
+        long tenantAjeno = 77799L;
+        TenantContext.setCurrentTenant(tenantAjeno);
+
+        // Listar riesgos de proyecto ajeno -> 404
+        ResponseStatusException exListarAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.listarRiesgos(proyId)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exListarAjeno.getStatusCode());
+
+        // Obtener riesgo ajeno -> 404
+        ResponseEntity<RiesgoConstruccionEntity> respObtenerAjeno = construccionController.obtenerRiesgo(rskId);
+        assertEquals(HttpStatus.NOT_FOUND, respObtenerAjeno.getStatusCode());
+
+        // Cambiar estado de riesgo ajeno -> 404
+        ResponseStatusException exEstadoAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoRiesgo(rskId, Map.of("estado", "RESUELTO"))
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exEstadoAjeno.getStatusCode());
+
+        // Registrar riesgo en proyecto ajeno -> 404
+        ResponseStatusException exCrearEnAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarRiesgo(proyId, rskDuplicado, "IK-RSK-CROSS")
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exCrearEnAjeno.getStatusCode());
+    }
 }

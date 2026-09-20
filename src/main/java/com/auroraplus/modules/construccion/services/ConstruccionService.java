@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +40,14 @@ public class ConstruccionService {
 
     public static final Set<String> TIPOS_MANTENIMIENTO_VALIDOS = Set.of(
             "PREVENTIVO", "CORRECTIVO", "OVERHAUL", "INSPECCION_DIARIA"
+    );
+
+    public static final Set<String> ESTADOS_RIESGO_VALIDOS = Set.of(
+            "IDENTIFICADO", "EN_MITIGACION", "CONTROLADO", "RESUELTO"
+    );
+
+    public static final Set<String> CATEGORIAS_RIESGO_VALIDAS = Set.of(
+            "ALTURA", "EXCAVACION", "ELECTRICO", "MECANICO", "QUIMICO", "LOCATIVO", "BIOMECANICO", "FISICO", "OTRO"
     );
 
     @Autowired
@@ -70,6 +79,9 @@ public class ConstruccionService {
 
     @Autowired
     private MantenimientoMaquinariaRepository mantenimientoRepository;
+
+    @Autowired
+    private RiesgoConstruccionRepository riesgoRepository;
 
     @Autowired
     private IdempotenciaConstruccionRepository idempotenciaRepository;
@@ -1020,5 +1032,158 @@ public class ConstruccionService {
         maquinariaRepository.save(maq);
 
         return mantenimientoRepository.save(req);
+    }
+
+    // --- MATRIZ DE RIESGOS Y SEGURIDAD OCUPACIONAL (SST / IPERC) ---
+
+    public List<RiesgoConstruccionEntity> listarRiesgos(Long tenantId, Long proyectoId) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+        return riesgoRepository.findByTenantIdAndProyectoIdOrderByCreatedAtDesc(tenantId, proyectoId);
+    }
+
+    public Optional<RiesgoConstruccionEntity> obtenerRiesgo(Long tenantId, Long id) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        return riesgoRepository.findByTenantIdAndId(tenantId, id);
+    }
+
+    public RiesgoConstruccionEntity registrarRiesgo(Long tenantId, Long proyectoId, RiesgoConstruccionEntity req) {
+        return registrarRiesgo(tenantId, proyectoId, req, null);
+    }
+
+    @Transactional
+    public RiesgoConstruccionEntity registrarRiesgo(Long tenantId, Long proyectoId, RiesgoConstruccionEntity req, String idempotencyKey) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+
+        if (req.getCodigo() == null || req.getCodigo().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El código del riesgo es obligatorio");
+        }
+        if (req.getProcesoFrente() == null || req.getProcesoFrente().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El proceso o frente de obra es obligatorio");
+        }
+        if (req.getPeligro() == null || req.getPeligro().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La descripción del peligro es obligatoria");
+        }
+        if (req.getRiesgoConsecuencia() == null || req.getRiesgoConsecuencia().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El riesgo o consecuencia potencial es obligatorio");
+        }
+        if (req.getMedidasControl() == null || req.getMedidasControl().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Las medidas de control preventivo son obligatorias");
+        }
+        if (req.getFechaEvaluacion() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de evaluación es obligatoria");
+        }
+
+        String codigoLimpio = req.getCodigo().trim().toUpperCase();
+
+        if (req.getCategoria() == null || req.getCategoria().trim().isEmpty()) {
+            req.setCategoria("OTRO");
+        } else {
+            req.setCategoria(req.getCategoria().trim().toUpperCase());
+        }
+
+        int prob = (req.getProbabilidad() != null && req.getProbabilidad() >= 1 && req.getProbabilidad() <= 5) ? req.getProbabilidad() : 1;
+        int sev = (req.getSeveridad() != null && req.getSeveridad() >= 1 && req.getSeveridad() <= 5) ? req.getSeveridad() : 1;
+        req.setProbabilidad(prob);
+        req.setSeveridad(sev);
+
+        int score = prob * sev;
+        if (score >= 16) req.setNivelRiesgo("CRITICO");
+        else if (score >= 10) req.setNivelRiesgo("ALTO");
+        else if (score >= 5) req.setNivelRiesgo("MEDIO");
+        else req.setNivelRiesgo("BAJO");
+
+        if (req.getEstado() == null || !ESTADOS_RIESGO_VALIDOS.contains(req.getEstado().trim().toUpperCase())) {
+            req.setEstado("IDENTIFICADO");
+        } else {
+            req.setEstado(req.getEstado().trim().toUpperCase());
+        }
+
+        // Idempotencia
+        String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
+                ? calcularSha256("RIESGO|" + proyectoId + "|" + codigoLimpio + "|" + score)
+                : null;
+
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            Optional<IdempotenciaConstruccionEntity> claim = idempotenciaService.reclamarClave(
+                    tenantId, idempotencyKey, "RIESGO_CONSTRUCCION", payloadHash
+            );
+            if (claim.isPresent()) {
+                IdempotenciaConstruccionEntity idemp = claim.get();
+                if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
+                    try {
+                        return objectMapper.readValue(idemp.getResultadoJson(), RiesgoConstruccionEntity.class);
+                    } catch (Exception ignored) {}
+                }
+                if (idemp.getRecursoId() != null) {
+                    return riesgoRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Riesgo no encontrado"));
+                }
+            }
+        }
+
+        // Unicidad dentro del proyecto para el tenant
+        if (riesgoRepository.findByTenantIdAndProyectoIdAndCodigo(tenantId, proyectoId, codigoLimpio).isPresent()) {
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe un riesgo con el código " + codigoLimpio + " en este proyecto");
+        }
+
+        try {
+            req.setId(null);
+            req.setTenantId(tenantId);
+            req.setProyectoId(proyectoId);
+            req.setCodigo(codigoLimpio);
+
+            RiesgoConstruccionEntity guardado = riesgoRepository.save(req);
+
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                String json = null;
+                try {
+                    json = objectMapper.writeValueAsString(guardado);
+                } catch (Exception ignored) {}
+                idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
+            }
+
+            return guardado;
+        } catch (Exception ex) {
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            }
+            throw ex;
+        }
+    }
+
+    @Transactional
+    public RiesgoConstruccionEntity actualizarEstadoRiesgo(Long tenantId, Long id, String nuevoEstado, String medidasAdicionales) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        RiesgoConstruccionEntity riesgo = riesgoRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Riesgo no encontrado para este tenant"));
+
+        if (nuevoEstado != null && !nuevoEstado.trim().isEmpty()) {
+            String est = nuevoEstado.trim().toUpperCase();
+            if (!ESTADOS_RIESGO_VALIDOS.contains(est)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de riesgo inválido: " + est);
+            }
+            riesgo.setEstado(est);
+        }
+
+        if (medidasAdicionales != null && !medidasAdicionales.trim().isEmpty()) {
+            riesgo.setMedidasControl(riesgo.getMedidasControl() + "\n[Mitigación " + LocalDate.now() + "]: " + medidasAdicionales.trim());
+        }
+
+        return riesgoRepository.save(riesgo);
     }
 }

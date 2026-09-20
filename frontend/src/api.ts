@@ -4923,3 +4923,51 @@ export function crearMantenimientoMaquinariaApi(maquinariaId: number, datos: Par
     body: JSON.stringify(datos)
   });
 }
+
+export interface RiesgoConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  codigo: string;
+  procesoFrente: string;
+  peligro: string;
+  riesgoConsecuencia: string;
+  categoria: string;
+  probabilidad: number; // 1-5
+  severidad: number; // 1-5
+  nivelRiesgo?: string; // BAJO, MEDIO, ALTO, CRITICO
+  medidasControl: string;
+  responsable?: string;
+  estado?: string; // IDENTIFICADO, EN_MITIGACION, CONTROLADO, RESUELTO
+  fechaEvaluacion: string;
+  observaciones?: string;
+  createdAt?: string;
+}
+
+export function listarRiesgosConstruccionApi(proyectoId: number): Promise<RiesgoConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/riesgos`);
+}
+
+export function obtenerRiesgoConstruccionApi(id: number): Promise<RiesgoConstruccionApi> {
+  return request(`/api/construccion/riesgos/${id}`);
+}
+
+export function crearRiesgoConstruccionApi(proyectoId: number, datos: Partial<RiesgoConstruccionApi>, idempotencyKey?: string): Promise<RiesgoConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+  return request(`/api/construccion/proyectos/${proyectoId}/riesgos`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function cambiarEstadoRiesgoConstruccionApi(id: number, estado: string, medidasControl?: string): Promise<RiesgoConstruccionApi> {
+  return request(`/api/construccion/riesgos/${id}/estado`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado, medidasControl })
+  });
+}

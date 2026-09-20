@@ -51,6 +51,10 @@ import {
   cambiarEstadoDespachoConstruccionApi,
   type MaquinariaConstruccionApi,
   type MantenimientoMaquinariaApi,
+  type RiesgoConstruccionApi,
+  listarRiesgosConstruccionApi,
+  crearRiesgoConstruccionApi,
+  cambiarEstadoRiesgoConstruccionApi,
   listarMaquinariasConstruccionApi,
   crearMaquinariaConstruccionApi,
   actualizarMaquinariaConstruccionApi,
@@ -71,6 +75,7 @@ type TabConstruccion =
   | 'insumos'
   | 'logistica'
   | 'maquinaria'
+  | 'riesgos'
   | 'bitacora'
   | 'avanzado';
 
@@ -130,6 +135,28 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const [cargandoMaquinarias, setCargandoMaquinarias] = useState(false);
   const [filtroTipoMaq, setFiltroTipoMaq] = useState<string>('TODOS');
   const [modalMaquinariaAbierto, setModalMaquinariaAbierto] = useState(false);
+
+  // Estados de Matriz de Riesgos y SST
+  const [riesgos, setRiesgos] = useState<RiesgoConstruccionApi[]>([]);
+  const [cargandoRiesgos, setCargandoRiesgos] = useState(false);
+  const [filtroNivelRiesgo, setFiltroNivelRiesgo] = useState<string>('TODOS');
+  const [modalRiesgoAbierto, setModalRiesgoAbierto] = useState(false);
+  const [modalMitigarTarget, setModalMitigarTarget] = useState<RiesgoConstruccionApi | null>(null);
+  const [nuevoEstadoRiesgo, setNuevoEstadoRiesgo] = useState('EN_MITIGACION');
+  const [medidasAdicionalesInput, setMedidasAdicionalesInput] = useState('');
+  const [formNuevoRiesgo, setFormNuevoRiesgo] = useState({
+    codigo: '',
+    procesoFrente: '',
+    peligro: '',
+    riesgoConsecuencia: '',
+    categoria: 'ALTURA',
+    probabilidad: 3,
+    severidad: 3,
+    medidasControl: '',
+    responsable: '',
+    fechaEvaluacion: new Date().toISOString().split('T')[0],
+    observaciones: ''
+  });
   const [modalHorometroTarget, setModalHorometroTarget] = useState<MaquinariaConstruccionApi | null>(null);
   const [nuevoHorometroInput, setNuevoHorometroInput] = useState('');
   const [nuevoOperadorInput, setNuevoOperadorInput] = useState('');
@@ -396,6 +423,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
           { id: 'insumos', label: 'Insumos & Stock', icon: IconBox, count: insumos.length },
           { id: 'logistica', label: 'Logística & Despachos', icon: IconTruck, count: despachos.length },
           { id: 'maquinaria', label: 'Maquinaria & Equipos', icon: IconWrench, count: maquinarias.length },
+          { id: 'riesgos', label: 'Matriz Riesgos & SST', icon: IconWarning, count: riesgos.length },
           { id: 'bitacora', label: 'Libro Diario / Bitácora', icon: IconCalendar, count: bitacora.length },
           { id: 'avanzado', label: 'Ingeniería Avanzada', icon: IconUsers, badge: 'Próximamente' },
         ].map((item) => {

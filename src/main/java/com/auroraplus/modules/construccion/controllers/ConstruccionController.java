@@ -274,4 +274,34 @@ public class ConstruccionController {
             @RequestBody MantenimientoMaquinariaEntity req) {
         return ResponseEntity.ok(construccionService.registrarMantenimiento(requireTenant(), id, req));
     }
+
+    // --- MATRIZ DE RIESGOS Y SEGURIDAD OCUPACIONAL (SST / IPERC) ---
+    @GetMapping("/proyectos/{proyectoId}/riesgos")
+    public List<RiesgoConstruccionEntity> listarRiesgos(@PathVariable Long proyectoId) {
+        return construccionService.listarRiesgos(requireTenant(), proyectoId);
+    }
+
+    @GetMapping("/riesgos/{id}")
+    public ResponseEntity<RiesgoConstruccionEntity> obtenerRiesgo(@PathVariable Long id) {
+        return construccionService.obtenerRiesgo(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/riesgos")
+    public ResponseEntity<RiesgoConstruccionEntity> registrarRiesgo(
+            @PathVariable Long proyectoId,
+            @RequestBody RiesgoConstruccionEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarRiesgo(requireTenant(), proyectoId, req, idempotencyKey));
+    }
+
+    @PatchMapping("/riesgos/{id}/estado")
+    public ResponseEntity<RiesgoConstruccionEntity> cambiarEstadoRiesgo(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String nuevoEstado = body != null ? body.get("estado") : null;
+        String medidas = body != null ? body.get("medidasControl") : null;
+        return ResponseEntity.ok(construccionService.actualizarEstadoRiesgo(requireTenant(), id, nuevoEstado, medidas));
+    }
 }
