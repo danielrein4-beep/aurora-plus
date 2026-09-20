@@ -69,14 +69,17 @@ export default function ValuacionesAvanceView({
       if (cantidadPeriodo <= 0) return;
 
       // Calcular cantidad acumulada anterior en valuaciones previas
-      const cantidadAnterior = valuaciones.reduce((acc, v) => {
-        const itemPrev = v.items.find((it) => it.partidaId === p.id);
-        return acc + (itemPrev ? itemPrev.cantidadPeriodo : 0);
-      }, 0);
+      const cantidadAnterior = valuaciones
+        .filter((v) => v.estado !== "RECHAZADA" && v.estado !== "ANULADA")
+        .reduce((acc, v) => {
+          const itemPrev = v.items.find((it) => it.partidaId === p.id);
+          return acc + (itemPrev ? itemPrev.cantidadPeriodo : 0);
+        }, 0);
 
       const cantidadAcumulada = cantidadAnterior + cantidadPeriodo;
       const montoPeriodo = cantidadPeriodo * p.precioUnitarioUSD;
-      const porcentajeAvance = Math.min(100, (cantidadAcumulada / (p.cantidad || 1)) * 100);
+      // Auditoría Civil: Reflejar porcentaje real sin truncar para alertar sobre-cómputos
+      const porcentajeAvance = Number(((cantidadAcumulada / (p.cantidad || 1)) * 100).toFixed(1));
 
       montoBruto += montoPeriodo;
 
@@ -311,8 +314,12 @@ export default function ValuacionesAvanceView({
                         {it.cantidadAcumulada.toFixed(1)}
                       </td>
                       <td className="py-2.5 px-2 text-center font-mono">
-                        <span className="px-1.5 py-0.5 rounded bg-white/5 text-white/80 font-bold text-[11px]">
-                          {it.porcentajeAvance.toFixed(1)}%
+                        <span className={`px-1.5 py-0.5 rounded font-bold text-[11px] ${
+                          it.porcentajeAvance > 100
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                            : "bg-white/5 text-white/80"
+                        }`} title={it.porcentajeAvance > 100 ? "Supera cómputo contractual (Aumento de obra)" : "Avance dentro del contrato"}>
+                          {it.porcentajeAvance.toFixed(1)}%{it.porcentajeAvance > 100 ? " (Aumento)" : ""}
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-white">

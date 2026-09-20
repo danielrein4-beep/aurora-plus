@@ -95,6 +95,48 @@ const CUADRILLAS_INICIALES: CuadrillaObra[] = [
 export default function NominaCuadrillasView({ proyecto, tasaBcv, esModoTerreno }: Props) {
   const [cuadrillas, setCuadrillas] = useState<CuadrillaObra[]>(CUADRILLAS_INICIALES);
   const [cuadrillaSeleccionada, setCuadrillaSeleccionada] = useState<CuadrillaObra | null>(null);
+  const [modalNuevaCuadrilla, setModalNuevaCuadrilla] = useState<boolean>(false);
+  const [formNueva, setFormNueva] = useState({
+    nombre: '',
+    especialidad: 'ACERO_REFUERZO' as CuadrillaObra['especialidad'],
+    capataz: '',
+    integrantesCantidad: 6,
+    frenteAsignado: 'Frente Principal',
+    horasHombreSemana: 240,
+    rendimientoEsperadoDia: '200 kg/día',
+    rendimientoRealMedido: '215 kg/día',
+    montoSemanalUSD: 1200
+  });
+
+  const handleCrearCuadrilla = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formNueva.nombre || !formNueva.capataz) return;
+    const nueva: CuadrillaObra = {
+      id: 'CD-' + (cuadrillas.length + 1).toString().padStart(2, '0'),
+      codigo: 'CUAD-' + formNueva.especialidad.slice(0, 3) + '-' + (cuadrillas.length + 1),
+      nombre: formNueva.nombre,
+      especialidad: formNueva.especialidad,
+      capataz: formNueva.capataz,
+      integrantesCantidad: Number(formNueva.integrantesCantidad),
+      frenteAsignado: formNueva.frenteAsignado,
+      horasHombreSemana: Number(formNueva.horasHombreSemana),
+      rendimientoEsperadoDia: formNueva.rendimientoEsperadoDia,
+      rendimientoRealMedido: formNueva.rendimientoRealMedido,
+      bonoProductividadPorc: 7.5,
+      montoSemanalUSD: Number(formNueva.montoSemanalUSD),
+      estado: 'ACTIVA_EN_CAMPO',
+      geocercaValidada: true
+    };
+    setCuadrillas(prev => [...prev, nueva]);
+    setModalNuevaCuadrilla(false);
+  };
+
+  const handleToggleGeocerca = (id: string) => {
+    setCuadrillas(prev => prev.map(c => c.id === id ? { ...c, geocercaValidada: !c.geocercaValidada } : c));
+    if (cuadrillaSeleccionada && cuadrillaSeleccionada.id === id) {
+      setCuadrillaSeleccionada(prev => prev ? { ...prev, geocercaValidada: !prev.geocercaValidada } : null);
+    }
+  };
 
   const totalObrerosActivos = cuadrillas.reduce((acc, c) => acc + c.integrantesCantidad, 0);
   const totalHorasHombre = cuadrillas.reduce((acc, c) => acc + c.horasHombreSemana, 0);
@@ -114,6 +156,14 @@ export default function NominaCuadrillasView({ proyecto, tasaBcv, esModoTerreno 
             Control biométrico y georreferenciado en frentes de obra. Liquidación de nómina estructurada por avance físico y bonificaciones de rendimiento sobre partidas.
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setModalNuevaCuadrilla(true)}
+          style={{ background: '#0284c7', border: 'none', color: '#fff', padding: '0.6rem 1.25rem', borderRadius: '0.5rem', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 14px rgba(2,132,199,0.35)' }}
+        >
+          + Nueva Cuadrilla
+        </button>
       </div>
 
       {/* TARJETAS DE CONSOLIDADO DE PERSONAL */}
@@ -177,7 +227,7 @@ export default function NominaCuadrillasView({ proyecto, tasaBcv, esModoTerreno 
             </thead>
             <tbody>
               {cuadrillas.map(c => (
-                <tr key={c.id} style={{ borderBottom: '1px solid #172033' }}>
+                <tr key={c.id} onClick={() => setCuadrillaSeleccionada(c)} style={{ borderBottom: '1px solid #172033', cursor: 'pointer' }} className="hover:bg-slate-800/50 transition-colors">
                   <td style={{ padding: '0.75rem 1rem' }}>
                     <div style={{ fontWeight: 800, color: '#f1f5f9' }}>{c.nombre}</div>
                     <span style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'monospace' }}>{c.codigo}</span>
@@ -227,6 +277,177 @@ export default function NominaCuadrillasView({ proyecto, tasaBcv, esModoTerreno 
           </table>
         </div>
       </div>
+
+      {/* MODAL DETALLE DE CUADRILLA */}
+      {cuadrillaSeleccionada && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#0f172a', border: '1px solid #38bdf8', borderRadius: '1rem', padding: '1.5rem', maxWidth: '520px', width: '100%', color: '#fff', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', pb: '0.75rem' }}>
+              <div>
+                <span style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 800 }}>FICHA TÉCNICA DE CUADRILLA</span>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900 }}>{cuadrillaSeleccionada.nombre}</h3>
+              </div>
+              <button onClick={() => setCuadrillaSeleccionada(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.8rem' }}>
+              <div style={{ background: '#1e293b', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.7rem' }}>Capataz Responsable:</span>
+                <strong style={{ color: '#f8fafc' }}>{cuadrillaSeleccionada.capataz}</strong>
+              </div>
+              <div style={{ background: '#1e293b', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.7rem' }}>Obreros Integrantes:</span>
+                <strong style={{ color: '#38bdf8' }}>{cuadrillaSeleccionada.integrantesCantidad} Especialistas</strong>
+              </div>
+              <div style={{ background: '#1e293b', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.7rem' }}>Frente de Asignación:</span>
+                <strong style={{ color: '#cbd5e1' }}>{cuadrillaSeleccionada.frenteAsignado}</strong>
+              </div>
+              <div style={{ background: '#1e293b', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.7rem' }}>Horas-Hombre Semanales:</span>
+                <strong style={{ color: '#10b981' }}>{cuadrillaSeleccionada.horasHombreSemana} HH</strong>
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.2)', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.8rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <span style={{ color: '#94a3b8' }}>Rendimiento Medido en Campo:</span>
+                <strong style={{ color: '#10b981' }}>{cuadrillaSeleccionada.rendimientoRealMedido}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <span style={{ color: '#94a3b8' }}>Rendimiento Teórico APU:</span>
+                <span style={{ color: '#cbd5e1' }}>{cuadrillaSeleccionada.rendimientoEsperadoDia}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#94a3b8' }}>Bono de Productividad (+{cuadrillaSeleccionada.bonoProductividadPorc}%):</span>
+                <strong style={{ color: '#38bdf8' }}>${(cuadrillaSeleccionada.montoSemanalUSD * (cuadrillaSeleccionada.bonoProductividadPorc / 100)).toFixed(2)} USD</strong>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px solid #1e293b' }}>
+              <button
+                type="button"
+                onClick={() => handleToggleGeocerca(cuadrillaSeleccionada.id)}
+                style={{
+                  background: cuadrillaSeleccionada.geocercaValidada ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
+                  border: '1px solid',
+                  borderColor: cuadrillaSeleccionada.geocercaValidada ? '#10b981' : '#ef4444',
+                  color: cuadrillaSeleccionada.geocercaValidada ? '#34d399' : '#f87171',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                {cuadrillaSeleccionada.geocercaValidada ? '✓ Geocerca GPS Validada en Obra' : '⚠ Fichaje Fuera de Obra'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCuadrillaSeleccionada(null)}
+                style={{ background: '#38bdf8', color: '#0f172a', border: 'none', padding: '0.5rem 1.25rem', borderRadius: '0.5rem', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer' }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CREAR NUEVA CUADRILLA */}
+      {modalNuevaCuadrilla && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#0f172a', border: '1px solid #0284c7', borderRadius: '1rem', padding: '1.5rem', maxWidth: '480px', width: '100%', color: '#fff' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', pb: '0.75rem', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900 }}>+ Registrar Nueva Cuadrilla</h3>
+              <button onClick={() => setModalNuevaCuadrilla(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleCrearCuadrilla} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.8rem' }}>
+              <div>
+                <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Nombre de la Cuadrilla</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ej: Cuadrilla de Enfierradores #2"
+                  value={formNueva.nombre}
+                  onChange={e => setFormNueva({ ...formNueva, nombre: e.target.value })}
+                  style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Especialidad</label>
+                  <select
+                    value={formNueva.especialidad}
+                    onChange={e => setFormNueva({ ...formNueva, especialidad: e.target.value as any })}
+                    style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                  >
+                    <option value="ACERO_REFUERZO">Acero y Armado</option>
+                    <option value="ENCOFRADO">Encofrado y Madera</option>
+                    <option value="VACIADO_CONCRETO">Vaciado Concreto</option>
+                    <option value="ALBANILERIA">Albañilería y Bloque</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Capataz / Maestro</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ej: Maestro Ramón"
+                    value={formNueva.capataz}
+                    onChange={e => setFormNueva({ ...formNueva, capataz: e.target.value })}
+                    style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Nº Integrantes</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formNueva.integrantesCantidad}
+                    onChange={e => setFormNueva({ ...formNueva, integrantesCantidad: Number(e.target.value) })}
+                    style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Nómina Semanal ($ USD)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formNueva.montoSemanalUSD}
+                    onChange={e => setFormNueva({ ...formNueva, montoSemanalUSD: Number(e.target.value) })}
+                    style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setModalNuevaCuadrilla(false)}
+                  style={{ background: '#334155', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.4rem', cursor: 'pointer' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '0.5rem 1.25rem', borderRadius: '0.4rem', fontWeight: 800, cursor: 'pointer' }}
+                >
+                  Guardar Cuadrilla
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

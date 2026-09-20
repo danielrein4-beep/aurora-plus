@@ -300,23 +300,44 @@ export default function VisorBimInteroperabilidadView({ proyecto, partidas, onAc
 
   // Sincronizar cómputos BIM con partidas contractuales COVENIN
   const handleSincronizarConERP = () => {
-    const nuevasPartidas = [...partidas];
+    // 1. Agrupar cubicaciones consolidadas del modelo 3D por código COVENIN
+    const computosPorPartida: Record<string, { volumenM3: number; encofradoM2: number; aceroKg: number }> = {};
 
     elementos.forEach(elem => {
-      const partidaTarget = nuevasPartidas.find(p => p.codigoPartida === elem.codigoPartidaCovenin);
-      if (partidaTarget) {
-        if (partidaTarget.unidad.toLowerCase().includes('m3') || partidaTarget.unidad.toLowerCase().includes('m³')) {
-          partidaTarget.cantidad = Number((partidaTarget.cantidad + calcularVolumenConcreto(elem)).toFixed(2));
-          partidaTarget.totalUSD = Number((partidaTarget.cantidad * partidaTarget.precioUnitarioUSD).toFixed(2));
-        } else if (partidaTarget.unidad.toLowerCase().includes('m2') || partidaTarget.unidad.toLowerCase().includes('m²')) {
-          partidaTarget.cantidad = Number((partidaTarget.cantidad + calcularAreaEncofrado(elem)).toFixed(2));
-          partidaTarget.totalUSD = Number((partidaTarget.cantidad * partidaTarget.precioUnitarioUSD).toFixed(2));
-        }
+      const cod = elem.codigoPartidaCovenin;
+      if (!computosPorPartida[cod]) {
+        computosPorPartida[cod] = { volumenM3: 0, encofradoM2: 0, aceroKg: 0 };
       }
+      computosPorPartida[cod].volumenM3 += calcularVolumenConcreto(elem);
+      computosPorPartida[cod].encofradoM2 += calcularAreaEncofrado(elem);
+      computosPorPartida[cod].aceroKg += calcularPesoAcero(elem);
+    });
+
+    let partidasActualizadas = 0;
+    const nuevasPartidas = partidas.map(p => {
+      const computoBim = computosPorPartida[p.codigoPartida];
+      if (!computoBim) return p;
+
+      partidasActualizadas++;
+      let nuevaCantidad = p.cantidad;
+
+      if (p.unidad.toLowerCase().includes('m3') || p.unidad.toLowerCase().includes('m³')) {
+        nuevaCantidad = Number(computoBim.volumenM3.toFixed(2));
+      } else if (p.unidad.toLowerCase().includes('m2') || p.unidad.toLowerCase().includes('m²')) {
+        nuevaCantidad = Number(computoBim.encofradoM2.toFixed(2));
+      } else if (p.unidad.toLowerCase().includes('kg') || p.unidad.toLowerCase().includes('ton')) {
+        nuevaCantidad = Number(computoBim.aceroKg.toFixed(1));
+      }
+
+      return {
+        ...p,
+        cantidad: nuevaCantidad,
+        totalUSD: Number((nuevaCantidad * p.precioUnitarioUSD).toFixed(2))
+      };
     });
 
     onActualizarPartidas(nuevasPartidas);
-    setMensajeSync('¡Modelo BIM sincronizado con éxito con las partidas y cómputos del ERP!');
+    setMensajeSync(`¡Cómputos métricos BIM actualizados! ${partidasActualizadas} partidas sincronizadas con el modelo 3D sin duplicación.`);
     setTimeout(() => setMensajeSync(null), 4500);
   };
 

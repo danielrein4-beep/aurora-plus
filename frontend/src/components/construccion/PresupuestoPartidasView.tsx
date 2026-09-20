@@ -453,7 +453,12 @@ export default function PresupuestoPartidasView({
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleInsertarDesdeCatalogo(item, capitulos[0]?.id || "cap-1")}
+                      onClick={() => {
+                        const targetCap = (capituloSeleccionadoId !== "TODOS" ? capitulos.find(c => c.id === capituloSeleccionadoId) : null)
+                          || capitulos.find(c => item.capituloSugerido.toLowerCase().includes(c.numero.toLowerCase()) || c.nombre.toLowerCase().includes(item.capituloSugerido.toLowerCase()))
+                          || capitulos[0];
+                        handleInsertarDesdeCatalogo(item, targetCap?.id || "cap-1");
+                      }}
                       className="mt-1 px-3 py-1 rounded-lg bg-teal-500 text-black font-bold text-xs hover:bg-teal-400 transition-colors cursor-pointer"
                     >
                       + Insertar

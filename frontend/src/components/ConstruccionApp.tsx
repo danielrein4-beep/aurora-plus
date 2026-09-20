@@ -317,16 +317,17 @@ export default function ConstruccionApp({ onSalir }: Props) {
       monedaPrincipal: 'USD'
     };
 
-    // Crear capítulo inicial básico para la obra
-    const capInicial: CapituloObra = {
-      id: `CAP-${nuevo.id}-01`,
-      proyectoId: nuevo.id,
-      numero: '1.0',
-      nombre: 'Obras Preliminares y Movimiento de Tierra',
-      orden: 1
-    };
+    // Crear capítulos estándar de ingeniería civil (COVENIN) para la obra
+    const capitulosEstandar: CapituloObra[] = [
+      { id: `CAP-${nuevo.id}-01`, proyectoId: nuevo.id, numero: '1.0', nombre: 'Obras Preliminares', orden: 1 },
+      { id: `CAP-${nuevo.id}-02`, proyectoId: nuevo.id, numero: '2.0', nombre: 'Movimiento de Tierras y Excavaciones', orden: 2 },
+      { id: `CAP-${nuevo.id}-03`, proyectoId: nuevo.id, numero: '3.0', nombre: 'Estructuras de Concreto Armado y Acero', orden: 3 },
+      { id: `CAP-${nuevo.id}-04`, proyectoId: nuevo.id, numero: '4.0', nombre: 'Albañilería y Cerramientos', orden: 4 },
+      { id: `CAP-${nuevo.id}-05`, proyectoId: nuevo.id, numero: '5.0', nombre: 'Instalaciones Hidráulicas, Sanitarias y Eléctricas', orden: 5 },
+      { id: `CAP-${nuevo.id}-06`, proyectoId: nuevo.id, numero: '6.0', nombre: 'Acabados, Pinturas y Revestimientos', orden: 6 }
+    ];
 
-    setCapitulos(prev => [...prev, capInicial]);
+    setCapitulos(prev => [...prev, ...capitulosEstandar]);
     setProyectos(prev => [nuevo, ...prev]);
     setSelectedProyectoId(nuevo.id);
     setModalNuevaObra(false);

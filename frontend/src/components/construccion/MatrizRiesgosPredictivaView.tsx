@@ -69,6 +69,34 @@ const RIESGOS_INICIALES: RiesgoObra[] = [
 
 export default function MatrizRiesgosPredictivaView({ proyecto, tasaBcv, esModoTerreno }: Props) {
   const [riesgos, setRiesgos] = useState<RiesgoObra[]>(RIESGOS_INICIALES);
+  const [modalNuevoRiesgo, setModalNuevoRiesgo] = useState<boolean>(false);
+  const [formRiesgo, setFormRiesgo] = useState({
+    categoria: 'CLIMATICO' as RiesgoObra['categoria'],
+    titulo: '',
+    descripcion: '',
+    probabilidad: 'MEDIA' as RiesgoObra['probabilidad'],
+    impactoFinancieroUSD: 1500,
+    impactoDiasRetraso: 2,
+    accionMitigacionRecomendada: ''
+  });
+
+  const handleCrearRiesgo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formRiesgo.titulo) return;
+    const nuevo: RiesgoObra = {
+      id: 'RSK-' + (riesgos.length + 1).toString().padStart(2, '0'),
+      categoria: formRiesgo.categoria,
+      titulo: formRiesgo.titulo,
+      descripcion: formRiesgo.descripcion,
+      probabilidad: formRiesgo.probabilidad,
+      impactoFinancieroUSD: Number(formRiesgo.impactoFinancieroUSD),
+      impactoDiasRetraso: Number(formRiesgo.impactoDiasRetraso),
+      estado: 'ACTIVO',
+      accionMitigacionRecomendada: formRiesgo.accionMitigacionRecomendada || 'Monitoreo preventivo y supervisión por residencia técnica.'
+    };
+    setRiesgos(prev => [nuevo, ...prev]);
+    setModalNuevoRiesgo(false);
+  };
 
   const totalImpactoFinanciero = riesgos.filter(r => r.estado === 'ACTIVO').reduce((acc, r) => acc + r.impactoFinancieroUSD, 0);
   const totalDiasRetrasoPotencial = riesgos.filter(r => r.estado === 'ACTIVO').reduce((acc, r) => acc + r.impactoDiasRetraso, 0);
@@ -91,6 +119,14 @@ export default function MatrizRiesgosPredictivaView({ proyecto, tasaBcv, esModoT
             Modelos predictivos que analizan variables externas (pronóstico hidrometeorológico, alzas siderúrgicas y cuellos de botella) para alertar antes de que ocurra el sobrecosto.
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setModalNuevoRiesgo(true)}
+          style={{ background: '#f59e0b', border: 'none', color: '#000', padding: '0.6rem 1.25rem', borderRadius: '0.5rem', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 14px rgba(245,158,11,0.35)' }}
+        >
+          + Registrar Alerta de Riesgo
+        </button>
       </div>
 
       {/* METRICAS DE EXPOSICIÓN AL RIESGO */}
@@ -213,6 +249,123 @@ export default function MatrizRiesgosPredictivaView({ proyecto, tasaBcv, esModoT
         ))}
       </div>
 
+      {/* MODAL REGISTRAR NUEVO RIESGO */}
+      {modalNuevoRiesgo && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#0f172a', border: '1px solid #f59e0b', borderRadius: '1rem', padding: '1.5rem', maxWidth: '480px', width: '100%', color: '#fff' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', pb: '0.75rem', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#fbbf24' }}>+ REGISTRAR ALERTA DE RIESGO DE OBRA</h3>
+              <button onClick={() => setModalNuevoRiesgo(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleCrearRiesgo} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.8rem' }}>
+              <div>
+                <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Título del Riesgo / Alerta</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ej: Deslizamiento de Talud en Eje 4"
+                  value={formRiesgo.titulo}
+                  onChange={e => setFormRiesgo({ ...formRiesgo, titulo: e.target.value })}
+                  style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Categoría</label>
+                  <select
+                    value={formRiesgo.categoria}
+                    onChange={e => setFormRiesgo({ ...formRiesgo, categoria: e.target.value as any })}
+                    style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                  >
+                    <option value="CLIMATICO">Climático / Lluvias</option>
+                    <option value="VOLATILIDAD_PRECIOS">Volatilidad Precios</option>
+                    <option value="CADENA_SUMINISTRO">Cadena Suministros</option>
+                    <option value="DESVIO_RENDIMIENTO">Desvío Rendimiento</option>
+                    <option value="PERMISOLOGIA">Permisología / Legal</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Probabilidad</label>
+                  <select
+                    value={formRiesgo.probabilidad}
+                    onChange={e => setFormRiesgo({ ...formRiesgo, probabilidad: e.target.value as any })}
+                    style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                  >
+                    <option value="ALTA">Alta</option>
+                    <option value="MEDIA">Media</option>
+                    <option value="BAJA">Baja</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Descripción del Evento</label>
+                <textarea
+                  rows={2}
+                  value={formRiesgo.descripcion}
+                  onChange={e => setFormRiesgo({ ...formRiesgo, descripcion: e.target.value })}
+                  placeholder="Detalles técnicos y condición observada en campo..."
+                  style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Impacto Económico ($ USD)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formRiesgo.impactoFinancieroUSD}
+                    onChange={e => setFormRiesgo({ ...formRiesgo, impactoFinancieroUSD: Number(e.target.value) })}
+                    style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Impacto en Plazo (Días)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formRiesgo.impactoDiasRetraso}
+                    onChange={e => setFormRiesgo({ ...formRiesgo, impactoDiasRetraso: Number(e.target.value) })}
+                    style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', color: '#94a3b8', marginBottom: '0.25rem' }}>Plan de Mitigación Sugerido</label>
+                <input
+                  type="text"
+                  placeholder="ej: Colocación de gaviones o apuntalamiento preventivo"
+                  value={formRiesgo.accionMitigacionRecomendada}
+                  onChange={e => setFormRiesgo({ ...formRiesgo, accionMitigacionRecomendada: e.target.value })}
+                  style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.5rem', color: '#fff' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setModalNuevoRiesgo(false)}
+                  style={{ background: '#334155', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.4rem', cursor: 'pointer' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{ background: '#f59e0b', color: '#000', border: 'none', padding: '0.5rem 1.25rem', borderRadius: '0.4rem', fontWeight: 800, cursor: 'pointer' }}
+                >
+                  Guardar Alerta
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
