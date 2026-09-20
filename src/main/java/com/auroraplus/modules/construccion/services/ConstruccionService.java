@@ -45,6 +45,45 @@ public class ConstruccionService {
     @Autowired
     private IdempotenciaConstruccionRepository idempotenciaRepository;
 
+    @Autowired
+    private IdempotenciaConstruccionService idempotenciaService;
+
+    // --- UTILIDADES DE IDEMPOTENCIA Y HASHING ---
+    public static String calcularSha256(String input) {
+        if (input == null) return "";
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("Algoritmo SHA-256 no disponible", e);
+        }
+    }
+
+    private String hashValuacion(Long proyectoId, ValuacionConstruccionEntity v) {
+        String data = "VAL|" + proyectoId + "|" + v.getNumeroValuacion() + "|" + v.getPeriodoDesde() + "|" +
+                v.getPeriodoHasta() + "|" + (v.getMontoBruto() != null ? v.getMontoBruto().stripTrailingZeros().toPlainString() : "0");
+        return calcularSha256(data);
+    }
+
+    private String hashConsumo(Long insumoId, BigDecimal cantidad) {
+        String data = "CONSUMO|" + insumoId + "|" + (cantidad != null ? cantidad.stripTrailingZeros().toPlainString() : "0");
+        return calcularSha256(data);
+    }
+
+    private String hashBitacora(Long proyectoId, BitacoraConstruccionEntity b) {
+        String data = "BITACORA|" + proyectoId + "|" + b.getFecha() + "|" + (b.getClima() != null ? b.getClima().trim().toUpperCase() : "") + "|" +
+                b.getPersonalActivo() + "|" + (b.getActividadesEjecutadas() != null ? b.getActividadesEjecutadas().trim() : "");
+        return calcularSha256(data);
+    }
+
+
     // --- PROYECTOS ---
 
     public List<ProyectoConstruccionEntity> listarProyectos(Long tenantId) {
@@ -223,42 +262,51 @@ public class ConstruccionService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
 
-        // Idempotencia: si ya fue procesada, retornar el recurso existente sin duplicar
+        // 1. Reclamar clave ANTES del efecto de negocio
+        String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
+                ? hashValuacion(proyectoId, valuacion)
+                : null;
+
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-            Optional<IdempotenciaConstruccionEntity> idempOpt = idempotenciaRepository.findByTenantIdAndIdempotencyKey(tenantId, idempotencyKey.trim());
-            if (idempOpt.isPresent() && idempOpt.get().getRecursoId() != null) {
-                Optional<ValuacionConstruccionEntity> prevVal = valuacionRepository.findByTenantIdAndId(tenantId, idempOpt.get().getRecursoId());
-                if (prevVal.isPresent()) {
-                    return prevVal.get();
+            Optional<IdempotenciaConstruccionEntity> claim = idempotenciaService.reclamarClave(
+                    tenantId, idempotencyKey, "VALUACION", payloadHash
+            );
+            if (claim.isPresent()) {
+                IdempotenciaConstruccionEntity idemp = claim.get();
+                if (idemp.getRecursoId() != null) {
+                    return valuacionRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Valuación previa no encontrada"));
                 }
             }
         }
 
-        // Validar pertenencia del proyecto
+        // 2. Validar pertenencia del proyecto y campos de negocio
         proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+                .orElseThrow(() -> {
+                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant");
+                });
 
-        // Validar estado de valuación no arbitrario
         if (valuacion.getEstado() == null || !ESTADOS_VALUACION_VALIDOS.contains(valuacion.getEstado().toUpperCase())) {
+            idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de valuación no válido: " + valuacion.getEstado());
         }
 
-        // Validar no negatividad de montos
         if (valuacion.getMontoBruto() != null && valuacion.getMontoBruto().compareTo(BigDecimal.ZERO) < 0) {
+            idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El monto bruto no puede ser negativo");
         }
 
-        // Ignorar IDs en creación
         valuacion.setId(null);
         valuacion.setTenantId(tenantId);
         valuacion.setProyectoId(proyectoId);
         valuacion.setEstado(valuacion.getEstado().toUpperCase());
 
+        // 3. Ejecutar efecto de negocio
         ValuacionConstruccionEntity guardada = valuacionRepository.save(valuacion);
 
-        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-            idempotenciaRepository.save(new IdempotenciaConstruccionEntity(tenantId, idempotencyKey.trim(), "VALUACION", guardada.getId()));
-        }
+        // 4. Completar clave con ID resultante
+        idempotenciaService.completarClave(tenantId, idempotencyKey, guardada.getId());
 
         return guardada;
     }
@@ -320,19 +368,26 @@ public class ConstruccionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad a consumir debe ser estrictamente mayor a cero");
         }
 
-        // Idempotencia: si la acción ya fue ejecutada, no volver a descontar inventario
+        // 1. Reclamar clave ANTES de descontar inventario
+        String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
+                ? hashConsumo(insumoId, cantidad)
+                : null;
+
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-            Optional<IdempotenciaConstruccionEntity> idempOpt = idempotenciaRepository.findByTenantIdAndIdempotencyKey(tenantId, idempotencyKey.trim());
-            if (idempOpt.isPresent()) {
+            Optional<IdempotenciaConstruccionEntity> claim = idempotenciaService.reclamarClave(
+                    tenantId, idempotencyKey, "CONSUMO_INSUMO", payloadHash
+            );
+            if (claim.isPresent()) {
                 return insumoRepository.findByTenantIdAndId(tenantId, insumoId)
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado"));
             }
         }
 
-        // UPDATE atómico concurrente: descuenta únicamente si stock_actual >= cantidad y pertenece al tenant
+        // 2. Ejecutar descuento atómico (solo si stock_actual >= cantidad)
         int filasAfectadas = insumoRepository.descontarStockAtomico(tenantId, insumoId, cantidad);
 
         if (filasAfectadas == 0) {
+            idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
             InsumoConstruccionEntity insumoExistente = insumoRepository.findByTenantIdAndId(tenantId, insumoId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado para este tenant"));
 
@@ -341,9 +396,8 @@ public class ConstruccionService {
                     "Stock insuficiente: no se permite stock negativo (stock actual: " + stockActual + ", consumo: " + cantidad + ")");
         }
 
-        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-            idempotenciaRepository.save(new IdempotenciaConstruccionEntity(tenantId, idempotencyKey.trim(), "CONSUMO_INSUMO", insumoId));
-        }
+        // 3. Completar clave con ID resultante
+        idempotenciaService.completarClave(tenantId, idempotencyKey, insumoId);
 
         return insumoRepository.findByTenantIdAndId(tenantId, insumoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado tras descuento"));
@@ -372,36 +426,45 @@ public class ConstruccionService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
 
-        // Idempotencia: si ya fue procesada, retornar la entrada previa sin duplicar
+        // 1. Reclamar clave ANTES de asentar en bitácora
+        String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
+                ? hashBitacora(proyectoId, entrada)
+                : null;
+
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-            Optional<IdempotenciaConstruccionEntity> idempOpt = idempotenciaRepository.findByTenantIdAndIdempotencyKey(tenantId, idempotencyKey.trim());
-            if (idempOpt.isPresent() && idempOpt.get().getRecursoId() != null) {
-                Optional<BitacoraConstruccionEntity> prevBit = bitacoraRepository.findByTenantIdAndId(tenantId, idempOpt.get().getRecursoId());
-                if (prevBit.isPresent()) {
-                    return prevBit.get();
+            Optional<IdempotenciaConstruccionEntity> claim = idempotenciaService.reclamarClave(
+                    tenantId, idempotencyKey, "BITACORA", payloadHash
+            );
+            if (claim.isPresent()) {
+                IdempotenciaConstruccionEntity idemp = claim.get();
+                if (idemp.getRecursoId() != null) {
+                    return bitacoraRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Bitácora previa no encontrada"));
                 }
             }
         }
 
-        // Validar que el proyecto pertenezca al tenant
+        // 2. Validar pertenencia del proyecto y campos
         proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+                .orElseThrow(() -> {
+                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant");
+                });
 
-        // Validar no negatividad de personal activo
-        if (entrada.getPersonalActivo() != null && entrada.getPersonalActivo() < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El personal activo no puede ser negativo");
+        if (entrada.getFecha() == null) {
+            idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de la bitácora es obligatoria");
         }
 
-        // Ignorar IDs en creación
         entrada.setId(null);
         entrada.setTenantId(tenantId);
         entrada.setProyectoId(proyectoId);
 
+        // 3. Ejecutar inserción en bitácora
         BitacoraConstruccionEntity guardada = bitacoraRepository.save(entrada);
 
-        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-            idempotenciaRepository.save(new IdempotenciaConstruccionEntity(tenantId, idempotencyKey.trim(), "BITACORA", guardada.getId()));
-        }
+        // 4. Completar clave con ID resultante
+        idempotenciaService.completarClave(tenantId, idempotencyKey, guardada.getId());
 
         return guardada;
     }

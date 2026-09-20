@@ -643,4 +643,84 @@ public class ConstruccionAislamientoTenantP0Test {
         assertEquals(id1, id2, "La bitácora no debe duplicar la entrada bajo reintento con misma Idempotency-Key");
         assertEquals(1, bitacoraRepository.findByTenantIdAndProyectoIdOrderByFechaDesc(tenant, proy.getId()).size());
     }
+
+    // 12. Idempotencia: rechazo con 409 Conflict si se reutiliza la misma clave con payload o recurso diferente
+    @Test
+    void idempotencia_rechazoPorReutilizacionDeClaveConPayloadDiferente() {
+        long tenant = 99804L;
+        TenantContext.setCurrentTenant(tenant);
+        InsumoConstruccionEntity insumo = crearInsumoHelper(tenant, "INS-IDEMP-DIFF", "Tubo PVC 4 pulg", new BigDecimal("100.00"));
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PROY-IDEMP-DIFF", "Edificio Prisma");
+
+        String ik = "IK-REUSE-TEST-99804";
+
+        // 1. Primer consumo con cantidad = 10.00 -> OK
+        ResponseEntity<InsumoConstruccionEntity> resp1 = construccionController.registrarConsumo(
+                insumo.getId(), Map.of("cantidad", new BigDecimal("10.00")), ik);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertEquals(new BigDecimal("90.00"), resp1.getBody().getStockActual());
+
+        // 2. Mismo IK pero con cantidad = 30.00 (payload diferente) -> 409 CONFLICT
+        ResponseStatusException exPayloadDiff = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("30.00")), ik);
+        });
+        assertEquals(HttpStatus.CONFLICT, exPayloadDiff.getStatusCode());
+
+        // 3. Mismo IK pero en un tipo de recurso diferente (Valuación en lugar de Consumo) -> 409 CONFLICT
+        ValuacionConstruccionEntity val = new ValuacionConstruccionEntity();
+        val.setNumeroValuacion(1);
+        val.setPeriodoDesde(LocalDate.now());
+        val.setPeriodoHasta(LocalDate.now().plusDays(10));
+        val.setFechaEmision(LocalDate.now().plusDays(10));
+        val.setMontoBruto(new BigDecimal("5000.00"));
+        val.setEstado("BORRADOR");
+
+        ResponseStatusException exTipoDiff = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.crearValuacion(proy.getId(), val, ik);
+        });
+        assertEquals(HttpStatus.CONFLICT, exTipoDiff.getStatusCode());
+    }
+
+    // 13. Idempotencia concurrente: dos peticiones con la misma clave descuentan el stock exactamente una vez
+    @Test
+    void dosConsumosConcurrentes_conMismaIdempotencyKey_descuentanUnaSolaVez() throws InterruptedException {
+        long tenant = 99805L;
+        TenantContext.setCurrentTenant(tenant);
+        InsumoConstruccionEntity insumo = crearInsumoHelper(tenant, "INS-IDEMP-CONC", "Pintura Epóxica", new BigDecimal("50.00"));
+        Long insumoId = insumo.getId();
+
+        String ikConcurrente = "IK-SAME-CONC-99805";
+        int numHilos = 2;
+        CountDownLatch startSignal = new CountDownLatch(1);
+        CountDownLatch doneSignal = new CountDownLatch(numHilos);
+        AtomicInteger exitos = new AtomicInteger(0);
+
+        for (int i = 0; i < numHilos; i++) {
+            new Thread(() -> {
+                try {
+                    startSignal.await();
+                    TenantContext.setCurrentTenant(tenant);
+                    ResponseEntity<InsumoConstruccionEntity> r = construccionController.registrarConsumo(
+                            insumoId, Map.of("cantidad", new BigDecimal("10.00")), ikConcurrente);
+                    if (r.getStatusCode() == HttpStatus.OK) {
+                        exitos.incrementAndGet();
+                    }
+                } catch (Exception ignored) {
+                } finally {
+                    TenantContext.clear();
+                    doneSignal.countDown();
+                }
+            }).start();
+        }
+
+        startSignal.countDown();
+        doneSignal.await();
+
+        // Ambos hilos deben retornar exitosamente (uno ejecuta y el otro recibe el resultado idéntico)
+        assertEquals(2, exitos.get(), "Ambas peticiones con misma Idempotency-Key deben terminar con 200 OK");
+
+        // El stock final en base de datos debe ser exactamente 40.00 (descontado una sola vez, de 50 - 10)
+        InsumoConstruccionEntity insumoFinal = insumoRepository.findByTenantIdAndId(tenant, insumoId).orElseThrow();
+        assertEquals(new BigDecimal("40.00"), insumoFinal.getStockActual(), "El stock debe haberse descontado exactamente una sola vez");
+    }
 }

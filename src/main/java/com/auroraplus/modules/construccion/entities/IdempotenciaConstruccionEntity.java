@@ -25,16 +25,24 @@ public class IdempotenciaConstruccionEntity {
     @Column(name = "recurso_id")
     private Long recursoId;
 
+    @Column(name = "payload_hash", nullable = false, length = 64)
+    private String payloadHash;
+
+    @Column(name = "estado", length = 20)
+    private String estado;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
     public IdempotenciaConstruccionEntity() {}
 
-    public IdempotenciaConstruccionEntity(Long tenantId, String idempotencyKey, String recursoTipo, Long recursoId) {
+    public IdempotenciaConstruccionEntity(Long tenantId, String idempotencyKey, String recursoTipo, Long recursoId, String payloadHash, String estado) {
         this.tenantId = tenantId;
         this.idempotencyKey = idempotencyKey;
         this.recursoTipo = recursoTipo;
         this.recursoId = recursoId;
+        this.payloadHash = payloadHash;
+        this.estado = estado;
     }
 
     public Long getId() { return id; }
@@ -51,6 +59,12 @@ public class IdempotenciaConstruccionEntity {
 
     public Long getRecursoId() { return recursoId; }
     public void setRecursoId(Long recursoId) { this.recursoId = recursoId; }
+
+    public String getPayloadHash() { return payloadHash; }
+    public void setPayloadHash(String payloadHash) { this.payloadHash = payloadHash; }
+
+    public String getEstado() { return estado; }
+    public void setEstado(String estado) { this.estado = estado; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
