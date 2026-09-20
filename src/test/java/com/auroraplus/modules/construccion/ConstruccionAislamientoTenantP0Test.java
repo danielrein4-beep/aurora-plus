@@ -55,6 +55,9 @@ public class ConstruccionAislamientoTenantP0Test {
     private PartidaConstruccionRepository partidaRepository;
 
     @Autowired
+    private DespachoConstruccionRepository despachoRepository;
+
+    @Autowired
     private ValuacionConstruccionRepository valuacionRepository;
 
     @Autowired
@@ -146,6 +149,18 @@ public class ConstruccionAislamientoTenantP0Test {
         ResponseStatusException exActPart = assertThrows(ResponseStatusException.class, () -> construccionController.actualizarPartida(1L, new PartidaConstruccionEntity()));
         assertEquals(HttpStatus.UNAUTHORIZED, exActPart.getStatusCode());
 
+        ResponseStatusException exListDesp = assertThrows(ResponseStatusException.class, () -> construccionController.listarDespachos(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exListDesp.getStatusCode());
+
+        ResponseStatusException exCrearDesp = assertThrows(ResponseStatusException.class, () -> construccionController.crearDespacho(1L, new DespachoConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exCrearDesp.getStatusCode());
+
+        ResponseStatusException exObtDesp = assertThrows(ResponseStatusException.class, () -> construccionController.obtenerDespacho(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exObtDesp.getStatusCode());
+
+        ResponseStatusException exPatchDesp = assertThrows(ResponseStatusException.class, () -> construccionController.cambiarEstadoDespacho(1L, Map.of("estado", "RECIBIDO")));
+        assertEquals(HttpStatus.UNAUTHORIZED, exPatchDesp.getStatusCode());
+
         ResponseStatusException exListarIns = assertThrows(ResponseStatusException.class, () -> construccionController.listarInsumos());
         assertEquals(HttpStatus.UNAUTHORIZED, exListarIns.getStatusCode());
 
@@ -212,6 +227,18 @@ public class ConstruccionAislamientoTenantP0Test {
         bA.setPersonalActivo(10);
         bA.setActividadesEjecutadas("Vaciado inicial");
         BitacoraConstruccionEntity bitA = bitacoraRepository.save(bA);
+
+        DespachoConstruccionEntity dA = new DespachoConstruccionEntity();
+        dA.setTenantId(tenantA);
+        dA.setProyectoId(proyA.getId());
+        dA.setGuiaNumero("GUIA-ISO-A-001");
+        dA.setTipoMaterial("CONCRETO_PREMEZCLADO");
+        dA.setOrigen("Planta A");
+        dA.setDestinoFrente("Frente 1");
+        dA.setCantidad(new BigDecimal("8.00"));
+        dA.setEstado("EN_TRANSITO");
+        DespachoConstruccionEntity despA = despachoRepository.save(dA);
+        final Long despAId = despA.getId();
 
         final Long proyAId = proyA.getId();
         final Long capAId = capA.getId();
@@ -307,6 +334,24 @@ public class ConstruccionAislamientoTenantP0Test {
 
         ResponseStatusException exBorrarPart = assertThrows(ResponseStatusException.class, () -> construccionController.eliminarPartida(partidaAId));
         assertEquals(HttpStatus.NOT_FOUND, exBorrarPart.getStatusCode());
+
+        // Tenant B no puede listar, leer, crear ni modificar despachos de A
+        ResponseStatusException exListDespB = assertThrows(ResponseStatusException.class, () -> construccionController.listarDespachos(proyAId));
+        assertEquals(HttpStatus.NOT_FOUND, exListDespB.getStatusCode());
+
+        ResponseEntity<DespachoConstruccionEntity> respDespLectura = construccionController.obtenerDespacho(despAId);
+        assertEquals(HttpStatus.NOT_FOUND, respDespLectura.getStatusCode());
+
+        DespachoConstruccionEntity despIlicito = new DespachoConstruccionEntity();
+        despIlicito.setGuiaNumero("GUIA-HACK-002");
+        despIlicito.setTipoMaterial("ACERO_CABILLAS");
+        despIlicito.setOrigen("Cantera X");
+        despIlicito.setDestinoFrente("Frente Ilicito");
+        ResponseStatusException exCrearDespB = assertThrows(ResponseStatusException.class, () -> construccionController.crearDespacho(proyAId, despIlicito));
+        assertEquals(HttpStatus.NOT_FOUND, exCrearDespB.getStatusCode());
+
+        ResponseStatusException exPatchDespB = assertThrows(ResponseStatusException.class, () -> construccionController.cambiarEstadoDespacho(despAId, Map.of("estado", "RECIBIDO")));
+        assertEquals(HttpStatus.NOT_FOUND, exPatchDespB.getStatusCode());
 
         // Verificar que los datos de Tenant A permanecen 100% íntegros
         TenantContext.setCurrentTenant(tenantA);
@@ -881,5 +926,75 @@ public class ConstruccionAislamientoTenantP0Test {
             liberarHilo1.countDown();
             TenantContext.clear();
         }
+    }
+
+    // 15. Logística y Despachos: aislamiento, validación de estados e idempotencia
+    @Test
+    void despachos_aislamientoEstadosEIdempotencia() {
+        long tenant = 99910L;
+        TenantContext.setCurrentTenant(tenant);
+
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PROY-LOG-01", "Complejo Logístico Norte");
+        Long proyId = proy.getId();
+
+        // 1. Crear despacho exitoso con Idempotency-Key
+        DespachoConstruccionEntity desp = new DespachoConstruccionEntity();
+        desp.setGuiaNumero("GUIA-LOG-001");
+        desp.setTipoMaterial("CONCRETO_PREMEZCLADO");
+        desp.setOrigen("Planta Central");
+        desp.setDestinoFrente("Losa Fundaciones");
+        desp.setUnidadTransporte("Mixer Mack #10");
+        desp.setChofer("Manuel Rodríguez");
+        desp.setCantidad(new BigDecimal("7.50"));
+        desp.setUnidadMedida("m3");
+        desp.setSlumpConoPulgadas(new BigDecimal("5.50"));
+
+        String ik = "IK-DESP-001-99910";
+        ResponseEntity<DespachoConstruccionEntity> resp1 = construccionController.crearDespacho(proyId, desp, ik);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertNotNull(resp1.getBody());
+        assertEquals("EN_TRANSITO", resp1.getBody().getEstado());
+        Long despId = resp1.getBody().getId();
+
+        // 2. Reintento idempotente: devuelve el mismo recurso sin duplicar en base de datos
+        ResponseEntity<DespachoConstruccionEntity> respReintento = construccionController.crearDespacho(proyId, desp, ik);
+        assertEquals(HttpStatus.OK, respReintento.getStatusCode());
+        assertEquals(despId, respReintento.getBody().getId());
+
+        List<DespachoConstruccionEntity> lista = construccionController.listarDespachos(proyId);
+        assertEquals(1, lista.size(), "No debe haber duplicados por reintento idempotente");
+
+        // 3. Rechazo de estado inválido
+        ResponseStatusException exEstado = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoDespacho(despId, Map.of("estado", "ESTADO_INEXISTENTE"))
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exEstado.getStatusCode());
+
+        // 4. Transición exitosa a RECIBIDO
+        ResponseEntity<DespachoConstruccionEntity> respRecibido = construccionController.cambiarEstadoDespacho(
+                despId, Map.of("estado", "RECIBIDO", "observaciones", "Concreto certificado con cono 5.5")
+        );
+        assertEquals(HttpStatus.OK, respRecibido.getStatusCode());
+        assertEquals("RECIBIDO", respRecibido.getBody().getEstado());
+        assertNotNull(respRecibido.getBody().getFechaHoraLlegada());
+
+        // 5. Rechazo al intentar asociar insumo de otro tenant
+        long tenantOtro = 99911L;
+        TenantContext.setCurrentTenant(tenantOtro);
+        InsumoConstruccionEntity insumoAjeno = crearInsumoHelper(tenantOtro, "INS-AJENO", "Acero Ajeno", new BigDecimal("100.00"));
+        Long insumoAjenoId = insumoAjeno.getId();
+
+        TenantContext.setCurrentTenant(tenant);
+        DespachoConstruccionEntity despConInsumoAjeno = new DespachoConstruccionEntity();
+        despConInsumoAjeno.setGuiaNumero("GUIA-AJENA-002");
+        despConInsumoAjeno.setTipoMaterial("ACERO_CABILLAS");
+        despConInsumoAjeno.setOrigen("Siderúrgica");
+        despConInsumoAjeno.setDestinoFrente("Patio");
+        despConInsumoAjeno.setInsumoId(insumoAjenoId);
+
+        ResponseStatusException exInsumo = assertThrows(ResponseStatusException.class, () ->
+                construccionController.crearDespacho(proyId, despConInsumoAjeno, "IK-DESP-CROSS")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exInsumo.getStatusCode());
     }
 }

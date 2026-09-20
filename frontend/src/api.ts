@@ -4645,6 +4645,30 @@ export interface BitacoraConstruccionApi {
   elaboradoPor?: string;
 }
 
+export interface DespachoConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  insumoId?: number;
+  guiaNumero: string;
+  tipoMaterial: string;
+  origen: string;
+  destinoFrente: string;
+  unidadTransporte?: string;
+  chofer?: string;
+  estado?: string;
+  cantidad: number;
+  unidadMedida: string;
+  pesoBrutoKg?: number;
+  pesoTaraKg?: number;
+  pesoNetoKg?: number;
+  slumpConoPulgadas?: number;
+  fechaHoraSalida?: string;
+  fechaHoraLlegada?: string;
+  observaciones?: string;
+  createdAt?: string;
+}
+
 export interface CatalogoCoveninApi {
   id: number;
   codigoCovenin: string;
@@ -4779,6 +4803,31 @@ export function registrarBitacoraConstruccionApi(proyectoId: number, datos: Bita
     method: "POST",
     headers,
     body: JSON.stringify(datos)
+  });
+}
+
+
+export function listarDespachosConstruccionApi(proyectoId: number): Promise<DespachoConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/despachos`);
+}
+
+export function crearDespachoConstruccionApi(proyectoId: number, datos: DespachoConstruccionApi, idempotencyKey?: string): Promise<DespachoConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+  return request(`/api/construccion/proyectos/${proyectoId}/despachos`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function cambiarEstadoDespachoConstruccionApi(id: number, estado: string, observaciones?: string): Promise<DespachoConstruccionApi> {
+  return request(`/api/construccion/despachos/${id}/estado`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado, observaciones })
   });
 }
 

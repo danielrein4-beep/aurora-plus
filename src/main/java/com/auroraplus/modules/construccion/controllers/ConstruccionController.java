@@ -189,4 +189,38 @@ public class ConstruccionController {
     public List<CatalogoCoveninEntity> buscarCatalogo(@RequestParam(required = false) String q) {
         return construccionService.buscarCatalogo(q);
     }
+
+    // --- LOGÍSTICA Y DESPACHOS ---
+    @GetMapping("/proyectos/{proyectoId}/despachos")
+    public List<DespachoConstruccionEntity> listarDespachos(@PathVariable Long proyectoId) {
+        return construccionService.listarDespachos(requireTenant(), proyectoId);
+    }
+
+    @GetMapping("/despachos/{id}")
+    public ResponseEntity<DespachoConstruccionEntity> obtenerDespacho(@PathVariable Long id) {
+        return construccionService.obtenerDespacho(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    public ResponseEntity<DespachoConstruccionEntity> crearDespacho(Long proyectoId, DespachoConstruccionEntity despacho) {
+        return crearDespacho(proyectoId, despacho, null);
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/despachos")
+    public ResponseEntity<DespachoConstruccionEntity> crearDespacho(
+            @PathVariable Long proyectoId,
+            @RequestBody DespachoConstruccionEntity despacho,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarDespacho(requireTenant(), proyectoId, despacho, idempotencyKey));
+    }
+
+    @PatchMapping("/despachos/{id}/estado")
+    public ResponseEntity<DespachoConstruccionEntity> cambiarEstadoDespacho(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String nuevoEstado = body != null ? body.get("estado") : null;
+        String observaciones = body != null ? body.get("observaciones") : null;
+        return ResponseEntity.ok(construccionService.actualizarEstadoDespacho(requireTenant(), id, nuevoEstado, observaciones));
+    }
 }

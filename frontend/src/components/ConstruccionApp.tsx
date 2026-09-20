@@ -16,6 +16,7 @@ import {
   IconCheck,
   IconCalendar,
   IconUsers,
+  IconTruck,
 } from '../Icons';
 import {
   type ProyectoConstruccionApi,
@@ -25,6 +26,7 @@ import {
   type InsumoConstruccionApi,
   type BitacoraConstruccionApi,
   type CatalogoCoveninApi,
+  type DespachoConstruccionApi,
   listarProyectosConstruccionApi,
   crearProyectoConstruccionApi,
   actualizarProyectoConstruccionApi,
@@ -44,6 +46,9 @@ import {
   listarBitacoraConstruccionApi,
   registrarBitacoraConstruccionApi,
   buscarCatalogoCoveninApi,
+  listarDespachosConstruccionApi,
+  crearDespachoConstruccionApi,
+  cambiarEstadoDespachoConstruccionApi,
 } from '../api';
 
 interface Props {
@@ -56,6 +61,7 @@ type TabConstruccion =
   | 'presupuesto'
   | 'valuaciones'
   | 'insumos'
+  | 'logistica'
   | 'bitacora'
   | 'avanzado';
 
@@ -87,6 +93,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const [partidas, setPartidas] = useState<PartidaConstruccionApi[]>([]);
   const [valuaciones, setValuaciones] = useState<ValuacionConstruccionApi[]>([]);
   const [insumos, setInsumos] = useState<InsumoConstruccionApi[]>([]);
+  const [despachos, setDespachos] = useState<DespachoConstruccionApi[]>([]);
   const [bitacora, setBitacora] = useState<BitacoraConstruccionApi[]>([]);
 
   // Estados de interfaz
@@ -107,6 +114,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const [modalConsumoAbierto, setModalConsumoAbierto] = useState(false);
   const [insumoConsumo, setInsumoConsumo] = useState<InsumoConstruccionApi | null>(null);
 
+  const [modalDespachoAbierto, setModalDespachoAbierto] = useState(false);
   const [modalBitacoraAbierto, setModalBitacoraAbierto] = useState(false);
 
   // Catálogo COVENIN
@@ -151,15 +159,17 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const recargarSubrecursosProyecto = useCallback(async (proyId: number) => {
     setErrorGlobal(null);
     try {
-      const [caps, parts, vals, bit] = await Promise.all([
+      const [caps, parts, vals, desps, bit] = await Promise.all([
         listarCapitulosConstruccionApi(proyId),
         listarPartidasConstruccionApi(proyId),
         listarValuacionesConstruccionApi(proyId),
+        listarDespachosConstruccionApi(proyId),
         listarBitacoraConstruccionApi(proyId),
       ]);
       setCapitulos(caps);
       setPartidas(parts);
       setValuaciones(vals);
+      setDespachos(desps);
       setBitacora(bit);
     } catch (err: any) {
       setErrorGlobal(err.message || 'Error cargando datos del proyecto seleccionado');
@@ -177,6 +187,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
       setCapitulos([]);
       setPartidas([]);
       setValuaciones([]);
+      setDespachos([]);
       setBitacora([]);
     }
   }, [proyectoSeleccionadoId, recargarSubrecursosProyecto]);
@@ -224,6 +235,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
       (i) => (Number(i.stockActual) || 0) <= (Number(i.stockMinimo) || 0)
     ).length;
 
+    const despachosEnTransito = despachos.filter(
+      (d) => d.estado === 'EN_TRANSITO' || d.estado === 'EN_BASCULA' || d.estado === 'DESCARGANDO'
+    ).length;
+
     return {
       totalPresupuesto,
       totalValuacionesAprobadas,
@@ -231,8 +246,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
       partidasEjecutadas,
       totalInsumos: insumos.length,
       insumosCriticos,
+      despachosTotales: despachos.length,
+      despachosEnTransito,
     };
-  }, [proyectos, valuaciones, partidas, insumos]);
+  }, [proyectos, valuaciones, partidas, insumos, despachos]);
 
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans selection:bg-amber-500/30 selection:text-amber-200">
@@ -252,7 +269,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Gestión Contractual, Partidas Presupuestarias y Valuaciones
+              Gestión Contractual, Partidas Presupuestarias, Valuaciones y Logística
             </p>
           </div>
         </div>
@@ -328,7 +345,8 @@ export default function ConstruccionApp({ onSalir }: Props) {
           { id: 'proyectos', label: 'Proyectos & Contratos', icon: IconConstruction, count: proyectos.length },
           { id: 'presupuesto', label: 'Capítulos & Partidas', icon: IconFileText, count: partidas.length },
           { id: 'valuaciones', label: 'Valuaciones de Obra', icon: IconCheckCircle, count: valuaciones.length },
-          { id: 'insumos', label: 'Insumos & Materiales', icon: IconBox, count: insumos.length },
+          { id: 'insumos', label: 'Insumos & Stock', icon: IconBox, count: insumos.length },
+          { id: 'logistica', label: 'Logística & Despachos', icon: IconTruck, count: despachos.length },
           { id: 'bitacora', label: 'Libro Diario / Bitácora', icon: IconCalendar, count: bitacora.length },
           { id: 'avanzado', label: 'Ingeniería Avanzada', icon: IconWrench, badge: 'Próximamente' },
         ].map((item) => {
@@ -409,20 +427,14 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
               <div className="bg-[#101726] border border-slate-800 p-4 rounded-2xl">
                 <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-                  <span>Insumos y Materiales</span>
-                  <IconBox size={18} className="text-amber-400" />
+                  <span>Logística en Tránsito</span>
+                  <IconTruck size={18} className="text-amber-400" />
                 </div>
                 <div className="text-xl font-bold font-mono text-white">
-                  {resumenCalculos.totalInsumos}
+                  {resumenCalculos.despachosEnTransito}
                 </div>
-                <div className="text-[11px] mt-1">
-                  {resumenCalculos.insumosCriticos > 0 ? (
-                    <span className="text-amber-400 font-semibold">
-                      {resumenCalculos.insumosCriticos} en stock crítico / mínimo
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">Nivel de stock óptimo</span>
-                  )}
+                <div className="text-[11px] text-slate-400 mt-1">
+                  De {resumenCalculos.despachosTotales} despachos registrados
                 </div>
               </div>
             </div>
@@ -1013,7 +1025,186 @@ export default function ConstruccionApp({ onSalir }: Props) {
           </div>
         )}
 
-        {/* VISTA 6: BITÁCORA / LIBRO DIARIO */}
+        {/* VISTA 6: LOGÍSTICA & DESPACHOS */}
+        {tabActiva === 'logistica' && (
+          <div className="space-y-4">
+            {!proyectoActivo ? (
+              <div className="bg-[#101726] border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs">
+                Selecciona un proyecto para gestionar sus guías de despacho y recepción en obra.
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Logística & Despachos de Suministros</h2>
+                    <p className="text-xs text-slate-400">
+                      Trazabilidad de transporte de carga pesada, control de pesaje y ensayos de cono de Abrams
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setModalDespachoAbierto(true)}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-500/10"
+                  >
+                    <span>+ Registrar Despacho / Guía</span>
+                  </button>
+                </div>
+
+                {despachos.length === 0 ? (
+                  <div className="bg-[#101726] border border-dashed border-slate-800 rounded-2xl p-8 text-center">
+                    <IconTruck size={36} className="text-slate-600 mx-auto mb-3" />
+                    <h3 className="text-sm font-semibold text-slate-300">Sin despachos registrados en esta obra</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      Registra camiones mixer de concreto premezclado, gandolas de acero o agregados de cantera.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {despachos.map((desp) => {
+                      return (
+                        <div
+                          key={desp.id}
+                          className="bg-[#101726] border border-slate-800 rounded-2xl p-4 space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                                  {desp.guiaNumero}
+                                </span>
+                                <span
+                                  className={
+                                    'text-[10px] font-bold uppercase px-2 py-0.5 rounded ' +
+                                    (desp.estado === 'RECIBIDO'
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                      : desp.estado === 'RECHAZADO'
+                                      ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                      : desp.estado === 'DESCARGANDO'
+                                      ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+                                      : 'bg-amber-500/10 text-amber-300 border border-amber-500/20')
+                                  }
+                                >
+                                  {desp.estado}
+                                </span>
+                              </div>
+                              <h3 className="text-sm font-bold text-white mt-1">
+                                {desp.tipoMaterial.replace(/_/g, ' ')}
+                              </h3>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] text-slate-500 uppercase font-semibold">Cantidad</span>
+                              <div className="font-mono text-base font-bold text-white">
+                                {formatVE(desp.cantidad)} {desp.unidadMedida}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-xs space-y-1.5 text-slate-300">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Ruta:</span>
+                              <span className="font-medium text-slate-200">
+                                {desp.origen} &rarr; {desp.destinoFrente}
+                              </span>
+                            </div>
+                            {desp.unidadTransporte && (
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Unidad de Transporte:</span>
+                                <span className="font-mono text-slate-200">{desp.unidadTransporte}</span>
+                              </div>
+                            )}
+                            {desp.chofer && (
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Conductor:</span>
+                                <span className="text-slate-200">{desp.chofer}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {(desp.pesoNetoKg != null || desp.slumpConoPulgadas != null) && (
+                            <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/60 font-mono">
+                              {desp.pesoNetoKg != null && (
+                                <div>
+                                  <span className="text-slate-500 font-sans block">Peso Neto Báscula:</span>
+                                  <span className="text-slate-200">{formatVE(desp.pesoNetoKg)} kg</span>
+                                </div>
+                              )}
+                              {desp.slumpConoPulgadas != null && (
+                                <div>
+                                  <span className="text-slate-500 font-sans block">Ensayo Asentamiento:</span>
+                                  <span className="text-amber-300">{formatVE(desp.slumpConoPulgadas)}&quot; (Pulgadas)</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {desp.observaciones && (
+                            <p className="text-xs text-slate-400 italic">
+                              &ldquo;{desp.observaciones}&rdquo;
+                            </p>
+                          )}
+
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                            {desp.estado === 'EN_TRANSITO' && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await cambiarEstadoDespachoConstruccionApi(desp.id!, 'EN_BASCULA');
+                                    notificarExito('Unidad reportada en báscula de obra');
+                                    recargarSubrecursosProyecto(proyectoActivo.id!);
+                                  } catch (e: any) {
+                                    setErrorGlobal(e.message || 'Error actualizando despacho');
+                                  }
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-xs font-semibold cursor-pointer"
+                              >
+                                Llegó a Báscula
+                              </button>
+                            )}
+
+                            {desp.estado === 'EN_BASCULA' && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await cambiarEstadoDespachoConstruccionApi(desp.id!, 'DESCARGANDO');
+                                    notificarExito('Iniciando descarga en frente de trabajo');
+                                    recargarSubrecursosProyecto(proyectoActivo.id!);
+                                  } catch (e: any) {
+                                    setErrorGlobal(e.message || 'Error actualizando despacho');
+                                  }
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold cursor-pointer"
+                              >
+                                Iniciar Descarga
+                              </button>
+                            )}
+
+                            {(desp.estado === 'DESCARGANDO' || desp.estado === 'EN_TRANSITO' || desp.estado === 'EN_BASCULA') && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await cambiarEstadoDespachoConstruccionApi(desp.id!, 'RECIBIDO');
+                                    notificarExito('Despacho recibido y certificado conforme en sitio');
+                                    recargarSubrecursosProyecto(proyectoActivo.id!);
+                                  } catch (e: any) {
+                                    setErrorGlobal(e.message || 'Error actualizando despacho');
+                                  }
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold cursor-pointer"
+                              >
+                                Certificar Recepción
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* VISTA 7: BITÁCORA / LIBRO DIARIO */}
         {tabActiva === 'bitacora' && (
           <div className="space-y-4">
             {!proyectoActivo ? (
@@ -1101,7 +1292,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
           </div>
         )}
 
-        {/* VISTA 7: INGENIERÍA AVANZADA / PRÓXIMAMENTE */}
+        {/* VISTA 8: INGENIERÍA AVANZADA / PRÓXIMAMENTE */}
         {tabActiva === 'avanzado' && (
           <div className="space-y-6">
             <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6">
@@ -1110,28 +1301,18 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   <IconWrench size={20} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-white">Módulos de Ingeniería Avanzada (Fase 2)</h3>
+                  <h3 className="font-bold text-base text-white">Módulos de Maquinaria, Riesgos y BIM (Fase 3)</h3>
                   <p className="text-xs text-slate-400">
                     Planificación técnica sin datos simulados ni mocks de papel
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-200">Logística y Despachos</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">En Desarrollo</span>
-                  </div>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">
-                    Guías de despacho con trazabilidad de transporte pesado y pesaje en báscula por proyecto.
-                  </p>
-                </div>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-200">Maquinaria & Horómetros</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">En Desarrollo</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">Siguiente Lote</span>
                   </div>
                   <p className="text-slate-400 text-[11px] leading-relaxed">
                     Control de horas máquina, combustible y mantenimiento preventivo por frente de obra.
@@ -1141,7 +1322,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-200">Matriz de Riesgos & BIM</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">En Desarrollo</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">Siguiente Lote</span>
                   </div>
                   <p className="text-slate-400 text-[11px] leading-relaxed">
                     Gestión documental de planos IFC / Revit y evaluación probabilística de severidad de contingencias.
@@ -2012,7 +2193,249 @@ export default function ConstruccionApp({ onSalir }: Props) {
         </div>
       )}
 
-      {/* MODAL 7: REGISTRAR ASIENTO EN BITÁCORA */}
+      {/* MODAL 7: REGISTRAR DESPACHO / GUÍA */}
+      {modalDespachoAbierto && proyectoActivo && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-base text-white">Registrar Guía de Despacho</h3>
+              <button
+                onClick={() => setModalDespachoAbierto(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.target as HTMLFormElement;
+                const fd = new FormData(form);
+
+                const data: DespachoConstruccionApi = {
+                  proyectoId: proyectoActivo.id!,
+                  insumoId: fd.get('insumoId') ? Number(fd.get('insumoId')) : undefined,
+                  guiaNumero: (fd.get('guiaNumero') as string).trim(),
+                  tipoMaterial: fd.get('tipoMaterial') as string,
+                  origen: (fd.get('origen') as string).trim(),
+                  destinoFrente: (fd.get('destinoFrente') as string).trim(),
+                  unidadTransporte: (fd.get('unidadTransporte') as string).trim(),
+                  chofer: (fd.get('chofer') as string).trim(),
+                  estado: (fd.get('estado') as string) || 'EN_TRANSITO',
+                  cantidad: Number(fd.get('cantidad')) || 0,
+                  unidadMedida: (fd.get('unidadMedida') as string).trim() || 'm3',
+                  pesoBrutoKg: fd.get('pesoBrutoKg') ? Number(fd.get('pesoBrutoKg')) : undefined,
+                  pesoTaraKg: fd.get('pesoTaraKg') ? Number(fd.get('pesoTaraKg')) : undefined,
+                  pesoNetoKg: fd.get('pesoNetoKg') ? Number(fd.get('pesoNetoKg')) : undefined,
+                  slumpConoPulgadas: fd.get('slumpConoPulgadas') ? Number(fd.get('slumpConoPulgadas')) : undefined,
+                  observaciones: (fd.get('observaciones') as string).trim(),
+                };
+
+                try {
+                  const ik = generarIdempotencyKey();
+                  await crearDespachoConstruccionApi(proyectoActivo.id!, data, ik);
+                  notificarExito('Guía de despacho registrada exitosamente');
+                  setModalDespachoAbierto(false);
+                  recargarSubrecursosProyecto(proyectoActivo.id!);
+                } catch (err: any) {
+                  alert(err.message || 'Error guardando guía de despacho');
+                }
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">N° Guía / Remisión *</label>
+                  <input
+                    name="guiaNumero"
+                    required
+                    placeholder="GUIA-MIX-2026-001"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Tipo de Material *</label>
+                  <select
+                    name="tipoMaterial"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  >
+                    <option value="CONCRETO_PREMEZCLADO">CONCRETO PREMEZCLADO</option>
+                    <option value="ACERO_CABILLAS">ACERO / CABILLAS</option>
+                    <option value="AGREGADOS_CANTERA">AGREGADOS DE CANTERA</option>
+                    <option value="CEMENTO_GRANEL">CEMENTO A GRANEL</option>
+                    <option value="OTROS">OTROS MATERIALES</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Origen / Proveedor *</label>
+                  <input
+                    name="origen"
+                    required
+                    placeholder="Planta Mezcladora Central"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Destino / Frente de Obra *</label>
+                  <input
+                    name="destinoFrente"
+                    required
+                    placeholder="Losa Nivel +3.50"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Unidad de Transporte</label>
+                  <input
+                    name="unidadTransporte"
+                    placeholder="Mixer Mack #12 (Placa A92BJ2K)"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Chofer</label>
+                  <input
+                    name="chofer"
+                    placeholder="Carlos Benítez"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Cantidad *</label>
+                  <input
+                    name="cantidad"
+                    type="number"
+                    step="0.01"
+                    required
+                    placeholder="8.00"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Unidad *</label>
+                  <input
+                    name="unidadMedida"
+                    required
+                    defaultValue="m3"
+                    placeholder="m3, ton, kg"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Asentamiento (Slump)</label>
+                  <input
+                    name="slumpConoPulgadas"
+                    type="number"
+                    step="0.1"
+                    placeholder="5.5 (pulgadas)"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Peso Bruto (kg)</label>
+                  <input
+                    name="pesoBrutoKg"
+                    type="number"
+                    step="0.01"
+                    placeholder="38000"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Peso Tara (kg)</label>
+                  <input
+                    name="pesoTaraKg"
+                    type="number"
+                    step="0.01"
+                    placeholder="13000"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Peso Neto (kg)</label>
+                  <input
+                    name="pesoNetoKg"
+                    type="number"
+                    step="0.01"
+                    placeholder="25000"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Asociar con Insumo (Opcional)</label>
+                  <select
+                    name="insumoId"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  >
+                    <option value="">(Ninguno)</option>
+                    {insumos.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.codigo} - {i.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Estado Inicial</label>
+                  <select
+                    name="estado"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  >
+                    <option value="EN_TRANSITO">EN TRANSITO</option>
+                    <option value="EN_BASCULA">EN BASCULA</option>
+                    <option value="DESCARGANDO">DESCARGANDO</option>
+                    <option value="RECIBIDO">RECIBIDO</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1 font-semibold">Observaciones</label>
+                <textarea
+                  name="observaciones"
+                  rows={2}
+                  placeholder="Muestra tomada para ensayo de compresión cilíndrica a 7 y 28 días..."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalDespachoAbierto(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer shadow-lg shadow-amber-500/10"
+                >
+                  Guardar Guía
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 8: REGISTRAR ASIENTO EN BITÁCORA */}
       {modalBitacoraAbierto && proyectoActivo && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">

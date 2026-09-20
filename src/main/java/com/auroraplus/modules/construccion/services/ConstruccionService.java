@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -22,6 +23,10 @@ public class ConstruccionService {
 
     public static final Set<String> ESTADOS_VALUACION_VALIDOS = Set.of(
             "BORRADOR", "PRESENTADA", "EN_REVISION", "APROBADA", "COBRADA", "RECHAZADA", "ANULADA"
+    );
+
+    public static final Set<String> ESTADOS_DESPACHO_VALIDOS = Set.of(
+            "EN_TRANSITO", "EN_BASCULA", "DESCARGANDO", "RECIBIDO", "RECHAZADO"
     );
 
     @Autowired
@@ -44,6 +49,9 @@ public class ConstruccionService {
 
     @Autowired
     private CatalogoCoveninRepository catalogoRepository;
+
+    @Autowired
+    private DespachoConstruccionRepository despachoRepository;
 
     @Autowired
     private IdempotenciaConstruccionRepository idempotenciaRepository;
@@ -633,5 +641,130 @@ public class ConstruccionService {
             return catalogoRepository.findAll();
         }
         return catalogoRepository.findByDescripcionContainingIgnoreCaseOrCodigoCoveninContainingIgnoreCase(busqueda, busqueda);
+    }
+
+    // --- LOGÍSTICA Y DESPACHOS ---
+
+    public List<DespachoConstruccionEntity> listarDespachos(Long tenantId, Long proyectoId) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+        return despachoRepository.findByTenantIdAndProyectoIdOrderByCreatedAtDesc(tenantId, proyectoId);
+    }
+
+    public Optional<DespachoConstruccionEntity> obtenerDespacho(Long tenantId, Long id) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        return despachoRepository.findByTenantIdAndId(tenantId, id);
+    }
+
+    public DespachoConstruccionEntity registrarDespacho(Long tenantId, Long proyectoId, DespachoConstruccionEntity despacho) {
+        return registrarDespacho(tenantId, proyectoId, despacho, null);
+    }
+
+    @Transactional
+    public DespachoConstruccionEntity registrarDespacho(Long tenantId, Long proyectoId, DespachoConstruccionEntity despacho, String idempotencyKey) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+
+        if (despacho.getGuiaNumero() == null || despacho.getGuiaNumero().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número de guía de despacho es obligatorio");
+        }
+        if (despacho.getTipoMaterial() == null || despacho.getTipoMaterial().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El tipo de material es obligatorio");
+        }
+        if (despacho.getOrigen() == null || despacho.getOrigen().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El origen del despacho es obligatorio");
+        }
+        if (despacho.getDestinoFrente() == null || despacho.getDestinoFrente().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destino/frente de obra es obligatorio");
+        }
+        if (despacho.getCantidad() != null && despacho.getCantidad().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad no puede ser negativa");
+        }
+
+        if (despacho.getInsumoId() != null) {
+            insumoRepository.findByTenantIdAndId(tenantId, despacho.getInsumoId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El insumo asociado no existe o pertenece a otro tenant"));
+        }
+
+        if (despacho.getEstado() == null || despacho.getEstado().trim().isEmpty()) {
+            despacho.setEstado("EN_TRANSITO");
+        } else if (!ESTADOS_DESPACHO_VALIDOS.contains(despacho.getEstado().trim().toUpperCase())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de despacho inválido: " + despacho.getEstado());
+        }
+
+        // Idempotencia
+        String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
+                ? calcularSha256(despacho.getGuiaNumero() + ":" + despacho.getCantidad() + ":" + proyectoId)
+                : null;
+
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            Optional<IdempotenciaConstruccionEntity> claim = idempotenciaService.reclamarClave(
+                    tenantId, idempotencyKey, "DESPACHO_CONSTRUCCION", payloadHash
+            );
+            if (claim.isPresent()) {
+                IdempotenciaConstruccionEntity idemp = claim.get();
+                if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
+                    try {
+                        return objectMapper.readValue(idemp.getResultadoJson(), DespachoConstruccionEntity.class);
+                    } catch (Exception ignored) {}
+                }
+                if (idemp.getRecursoId() != null) {
+                    return despachoRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Despacho no encontrado"));
+                }
+            }
+        }
+
+        try {
+            despacho.setId(null);
+            despacho.setTenantId(tenantId);
+            despacho.setProyectoId(proyectoId);
+
+            DespachoConstruccionEntity guardado = despachoRepository.save(despacho);
+
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                String json = null;
+                try {
+                    json = objectMapper.writeValueAsString(guardado);
+                } catch (Exception ignored) {}
+                idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
+            }
+
+            return guardado;
+        } catch (Exception ex) {
+            idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            throw ex;
+        }
+    }
+
+    @Transactional
+    public DespachoConstruccionEntity actualizarEstadoDespacho(Long tenantId, Long despachoId, String nuevoEstado, String observaciones) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        if (nuevoEstado == null || !ESTADOS_DESPACHO_VALIDOS.contains(nuevoEstado.trim().toUpperCase())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de despacho inválido: " + nuevoEstado);
+        }
+
+        DespachoConstruccionEntity despacho = despachoRepository.findByTenantIdAndId(tenantId, despachoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Despacho no encontrado para este tenant"));
+
+        despacho.setEstado(nuevoEstado.trim().toUpperCase());
+        if (observaciones != null && !observaciones.trim().isEmpty()) {
+            despacho.setObservaciones(observaciones.trim());
+        }
+        if ("RECIBIDO".equalsIgnoreCase(nuevoEstado) && despacho.getFechaHoraLlegada() == null) {
+            despacho.setFechaHoraLlegada(LocalDateTime.now());
+        }
+
+        return despachoRepository.save(despacho);
     }
 }
