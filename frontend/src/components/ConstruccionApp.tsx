@@ -69,6 +69,10 @@ import {
   actualizarHorometroMaquinariaApi,
   listarMantenimientosMaquinariaApi,
   crearMantenimientoMaquinariaApi,
+  type CuadrillaConstruccionApi,
+  listarCuadrillasConstruccionApi,
+  crearCuadrillaConstruccionApi,
+  cambiarEstadoCuadrillaConstruccionApi,
 } from '../api';
 
 interface Props {
@@ -86,7 +90,7 @@ type TabConstruccion =
   | 'riesgos'
   | 'bim'
   | 'bitacora'
-  | 'avanzado';
+  | 'cuadrillas';
 
 function formatVE(num: number | undefined | null): string {
   const n = Number(num) || 0;
@@ -118,6 +122,22 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const [insumos, setInsumos] = useState<InsumoConstruccionApi[]>([]);
   const [despachos, setDespachos] = useState<DespachoConstruccionApi[]>([]);
   const [bitacora, setBitacora] = useState<BitacoraConstruccionApi[]>([]);
+  const [cuadrillas, setCuadrillas] = useState<CuadrillaConstruccionApi[]>([]);
+  const [cargandoCuadrillas, setCargandoCuadrillas] = useState(false);
+  const [filtroEspecialidadCuadrilla, setFiltroEspecialidadCuadrilla] = useState('TODAS');
+  const [modalCuadrillaAbierto, setModalCuadrillaAbierto] = useState(false);
+  const [guardandoCuadrilla, setGuardandoCuadrilla] = useState(false);
+  const [formCuadrilla, setFormCuadrilla] = useState({
+    codigo: '',
+    nombre: '',
+    frenteTrabajo: '',
+    capatazLider: '',
+    cantidadOficiales: 2,
+    cantidadAyudantes: 4,
+    especialidad: 'ENCOFRADO_CONCRETO',
+    partidaId: '',
+    observaciones: ''
+  });
 
   // Estados de interfaz
   const [cargando, setCargando] = useState(false);
@@ -281,18 +301,20 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const recargarSubrecursosProyecto = useCallback(async (proyId: number) => {
     setErrorGlobal(null);
     try {
-      const [caps, parts, vals, desps, bit] = await Promise.all([
+      const [caps, parts, vals, desps, bit, cuads] = await Promise.all([
         listarCapitulosConstruccionApi(proyId),
         listarPartidasConstruccionApi(proyId),
         listarValuacionesConstruccionApi(proyId),
         listarDespachosConstruccionApi(proyId),
         listarBitacoraConstruccionApi(proyId),
+        listarCuadrillasConstruccionApi(proyId),
       ]);
       setCapitulos(caps);
       setPartidas(parts);
       setValuaciones(vals);
       setDespachos(desps);
       setBitacora(bit);
+      setCuadrillas(cuads);
     } catch (err: any) {
       setErrorGlobal(err.message || 'Error cargando datos del proyecto seleccionado');
     }
@@ -311,6 +333,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
       setValuaciones([]);
       setDespachos([]);
       setBitacora([]);
+      setCuadrillas([]);
     }
   }, [proyectoSeleccionadoId, recargarSubrecursosProyecto]);
 
@@ -473,7 +496,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
           { id: 'riesgos', label: 'Matriz Riesgos & SST', icon: IconWarning, count: riesgos.length },
           { id: 'bim', label: 'BIM & Planos (RFIs)', icon: IconFileText, count: documentosBim.length + rfis.length },
           { id: 'bitacora', label: 'Libro Diario / Bitácora', icon: IconCalendar, count: bitacora.length },
-          { id: 'avanzado', label: 'Cuadrillas & Frentes', icon: IconUsers, badge: 'Paso 6' },
+          { id: 'cuadrillas', label: 'Cuadrillas & Frentes', icon: IconUsers, count: cuadrillas.length },
         ].map((item) => {
           const Icon = item.icon;
           const activa = tabActiva === item.id;
@@ -495,9 +518,9 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   {item.count}
                 </span>
               )}
-              {item.badge && (
+              {(item as any).badge && (
                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold uppercase">
-                  {item.badge}
+                  {(item as any).badge}
                 </span>
               )}
             </button>
@@ -1418,41 +1441,235 @@ export default function ConstruccionApp({ onSalir }: Props) {
         )}
 
         {/* VISTA 8: INGENIERÍA AVANZADA / PRÓXIMAMENTE */}
-        {tabActiva === 'avanzado' && (
+        {tabActiva === 'cuadrillas' && (
           <div className="space-y-6">
+            {/* ENCABEZADO Y ACCIONES */}
             <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
-                  <IconWrench size={20} />
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shadow-lg shadow-violet-500/5">
+                    <IconUsers size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-bold text-lg text-white">Planificación de Cuadrillas & Frentes Operativos</h2>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/25">
+                        Rendimiento de Mano de Obra
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Control del personal civil distribuido por frentes de trabajo y vinculación a partidas COVENIN
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-base text-white">Módulos de Maquinaria, Riesgos y BIM (Fase 3)</h3>
-                  <p className="text-xs text-slate-400">
-                    Planificación técnica sin datos simulados ni mocks de papel
-                  </p>
-                </div>
+
+                <button
+                  onClick={() => setModalCuadrillaAbierto(true)}
+                  disabled={!proyectoActivo}
+                  className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-violet-600/20 cursor-pointer"
+                >
+                  <IconUsers size={16} />
+                  <span>+ Asignar Nueva Cuadrilla</span>
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-200">Maquinaria & Horómetros</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">Siguiente Lote</span>
+              {/* TARJETAS DE MÉTRICAS DE PERSONAL */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Cuadrillas Activas</div>
+                  <div className="text-2xl font-black text-violet-400 mt-1">
+                    {cuadrillas.filter((c) => c.estado === 'ACTIVA').length}
+                    <span className="text-xs font-normal text-slate-500 ml-1.5">/ {cuadrillas.length} tot.</span>
                   </div>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">
-                    Control de horas máquina, combustible y mantenimiento preventivo por frente de obra.
-                  </p>
                 </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Oficiales & Maestros</div>
+                  <div className="text-2xl font-black text-amber-400 mt-1">
+                    {cuadrillas.reduce((acc, c) => acc + (Number(c.cantidadOficiales) || 0), 0)}
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Ayudantes & Obreros</div>
+                  <div className="text-2xl font-black text-sky-400 mt-1">
+                    {cuadrillas.reduce((acc, c) => acc + (Number(c.cantidadAyudantes) || 0), 0)}
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Dotación Total</div>
+                  <div className="text-2xl font-black text-emerald-400 mt-1">
+                    {cuadrillas.reduce((acc, c) => acc + (Number(c.totalPersonal) || (Number(c.cantidadOficiales) || 0) + (Number(c.cantidadAyudantes) || 0)), 0)}
+                    <span className="text-xs font-normal text-slate-500 ml-1.5">obreros</span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-200">Matriz de Riesgos & BIM</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">Siguiente Lote</span>
-                  </div>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">
-                    Gestión documental de planos IFC / Revit y evaluación probabilística de severidad de contingencias.
-                  </p>
-                </div>
+            {/* BARRA DE FILTROS */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-[#101726]/70 border border-slate-800 rounded-xl p-3">
+              <div className="flex items-center gap-2 overflow-x-auto text-xs">
+                <span className="text-slate-400 font-semibold px-2">Especialidad:</span>
+                {['TODAS', 'ENCOFRADO_CONCRETO', 'ACERO_CABILLAS', 'ALBANILERIA_BLOQUE', 'INSTALACIONES_ELECTRICAS', 'INSTALACIONES_SANITARIAS', 'ACABADOS_PINTURA', 'MOVIMIENTO_TIERRA', 'SOLDADURA_ESTRUCTURAL'].map((esp) => (
+                  <button
+                    key={esp}
+                    onClick={() => setFiltroEspecialidadCuadrilla(esp)}
+                    className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
+                      filtroEspecialidadCuadrilla === esp
+                        ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                    }`}
+                  >
+                    {esp.replace(/_/g, ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* TABLA DE CUADRILLAS */}
+            <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider border-b border-slate-800 font-semibold">
+                    <tr>
+                      <th className="p-4">Código & Cuadrilla</th>
+                      <th className="p-4">Frente de Trabajo</th>
+                      <th className="p-4">Especialidad</th>
+                      <th className="p-4">Capataz / Líder</th>
+                      <th className="p-4 text-center">Oficiales</th>
+                      <th className="p-4 text-center">Ayudantes</th>
+                      <th className="p-4 text-center">Total</th>
+                      <th className="p-4">Partida Vinculada</th>
+                      <th className="p-4">Estado</th>
+                      <th className="p-4 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {cuadrillas
+                      .filter((c) => filtroEspecialidadCuadrilla === 'TODAS' || c.especialidad === filtroEspecialidadCuadrilla)
+                      .map((cuad) => {
+                        const partidaAsoc = partidas.find((p) => p.id === cuad.partidaId);
+                        return (
+                          <tr key={cuad.id} className="hover:bg-slate-800/30 transition">
+                            <td className="p-4">
+                              <div className="font-bold text-white text-sm">{cuad.codigo}</div>
+                              <div className="text-slate-400 text-[11px]">{cuad.nombre}</div>
+                            </td>
+                            <td className="p-4">
+                              <span className="font-semibold text-sky-300 bg-sky-500/10 px-2.5 py-1 rounded-md border border-sky-500/20">
+                                {cuad.frenteTrabajo}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <span className="text-slate-300 font-medium bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60">
+                                {cuad.especialidad.replace(/_/g, ' ')}
+                              </span>
+                            </td>
+                            <td className="p-4 text-slate-300 font-medium">
+                              {cuad.capatazLider}
+                            </td>
+                            <td className="p-4 text-center font-bold text-amber-400">
+                              {cuad.cantidadOficiales}
+                            </td>
+                            <td className="p-4 text-center font-bold text-sky-400">
+                              {cuad.cantidadAyudantes}
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className="font-black text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                                {cuad.totalPersonal || cuad.cantidadOficiales + cuad.cantidadAyudantes}
+                              </span>
+                            </td>
+                            <td className="p-4 max-w-[200px] truncate text-slate-400 text-[11px]">
+                              {partidaAsoc ? (
+                                <span title={partidaAsoc.descripcion} className="text-slate-300">
+                                  <strong className="text-amber-400">{partidaAsoc.codigoCovenin}</strong> - {partidaAsoc.descripcion}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 italic">General de Obra</span>
+                              )}
+                            </td>
+                            <td className="p-4">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  cuad.estado === 'ACTIVA'
+                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                    : cuad.estado === 'PAUSADA'
+                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                    : cuad.estado === 'REASIGNADA'
+                                    ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                                    : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                                }`}
+                              >
+                                {cuad.estado}
+                              </span>
+                            </td>
+                            <td className="p-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {cuad.estado !== 'ACTIVA' && (
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        await cambiarEstadoCuadrillaConstruccionApi(cuad.id!, 'ACTIVA');
+                                        notificarExito(`Cuadrilla ${cuad.codigo} activada.`);
+                                        if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                                      } catch (e: any) {
+                                        setErrorGlobal(e.message);
+                                      }
+                                    }}
+                                    title="Activar cuadrilla"
+                                    className="px-2 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold cursor-pointer"
+                                  >
+                                    Activar
+                                  </button>
+                                )}
+                                {cuad.estado === 'ACTIVA' && (
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        await cambiarEstadoCuadrillaConstruccionApi(cuad.id!, 'PAUSADA');
+                                        notificarExito(`Cuadrilla ${cuad.codigo} pausada.`);
+                                        if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                                      } catch (e: any) {
+                                        setErrorGlobal(e.message);
+                                      }
+                                    }}
+                                    title="Pausar cuadrilla"
+                                    className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 text-[11px] font-semibold cursor-pointer"
+                                  >
+                                    Pausar
+                                  </button>
+                                )}
+                                {cuad.estado !== 'DISUELTA' && (
+                                  <button
+                                    onClick={async () => {
+                                      if (window.confirm(`¿Desmovilizar y disolver cuadrilla ${cuad.codigo}?`)) {
+                                        try {
+                                          await cambiarEstadoCuadrillaConstruccionApi(cuad.id!, 'DISUELTA');
+                                          notificarExito(`Cuadrilla ${cuad.codigo} disuelta.`);
+                                          if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                                        } catch (e: any) {
+                                          setErrorGlobal(e.message);
+                                        }
+                                      }
+                                    }}
+                                    title="Disolver cuadrilla"
+                                    className="px-2 py-1 rounded bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 text-[11px] font-semibold cursor-pointer"
+                                  >
+                                    Disolver
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    {cuadrillas.length === 0 && (
+                      <tr>
+                        <td colSpan={10} className="p-8 text-center text-slate-500">
+                          No hay cuadrillas registradas para este proyecto de obra. Haga clic en "+ Asignar Nueva Cuadrilla" para comenzar la distribución de personal en campo.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -2690,6 +2907,218 @@ export default function ConstruccionApp({ onSalir }: Props) {
           </div>
         </div>
       )}
-    </div>
+    
+      {/* MODAL: ASIGNAR NUEVA CUADRILLA */}
+      {modalCuadrillaAbierto && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/20 text-violet-400 flex items-center justify-center">
+                  <IconUsers size={18} />
+                </div>
+                <h3 className="font-bold text-base text-white">Asignar Nueva Cuadrilla de Obra</h3>
+              </div>
+              <button
+                onClick={() => setModalCuadrillaAbierto(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!proyectoSeleccionadoId) return;
+                setGuardandoCuadrilla(true);
+                setErrorGlobal(null);
+                try {
+                  const idemKey = generarIdempotencyKey();
+                  await crearCuadrillaConstruccionApi(
+                    proyectoSeleccionadoId,
+                    {
+                      codigo: formCuadrilla.codigo.trim(),
+                      nombre: formCuadrilla.nombre.trim(),
+                      frenteTrabajo: formCuadrilla.frenteTrabajo.trim(),
+                      capatazLider: formCuadrilla.capatazLider.trim(),
+                      cantidadOficiales: Number(formCuadrilla.cantidadOficiales) || 0,
+                      cantidadAyudantes: Number(formCuadrilla.cantidadAyudantes) || 0,
+                      especialidad: formCuadrilla.especialidad,
+                      partidaId: formCuadrilla.partidaId ? Number(formCuadrilla.partidaId) : undefined,
+                      observaciones: formCuadrilla.observaciones.trim() || undefined
+                    },
+                    idemKey
+                  );
+                  notificarExito(`Cuadrilla ${formCuadrilla.codigo} asignada exitosamente al frente ${formCuadrilla.frenteTrabajo}.`);
+                  setModalCuadrillaAbierto(false);
+                  setFormCuadrilla({
+                    codigo: '',
+                    nombre: '',
+                    frenteTrabajo: '',
+                    capatazLider: '',
+                    cantidadOficiales: 2,
+                    cantidadAyudantes: 4,
+                    especialidad: 'ENCOFRADO_CONCRETO',
+                    partidaId: '',
+                    observaciones: ''
+                  });
+                  recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                } catch (err: any) {
+                  setErrorGlobal(err.message || 'Error registrando la cuadrilla en el servidor');
+                } finally {
+                  setGuardandoCuadrilla(false);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Código *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. CUAD-ENC-01"
+                    value={formCuadrilla.codigo}
+                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, codigo: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Especialidad *</label>
+                  <select
+                    value={formCuadrilla.especialidad}
+                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, especialidad: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none"
+                  >
+                    <option value="ENCOFRADO_CONCRETO">Encofrado & Concreto</option>
+                    <option value="ACERO_CABILLAS">Acero & Cabillas</option>
+                    <option value="ALBANILERIA_BLOQUE">Albañilería & Bloque</option>
+                    <option value="INSTALACIONES_ELECTRICAS">Instalaciones Eléctricas</option>
+                    <option value="INSTALACIONES_SANITARIAS">Instalaciones Sanitarias</option>
+                    <option value="ACABADOS_PINTURA">Acabados & Pintura</option>
+                    <option value="MOVIMIENTO_TIERRA">Movimiento de Tierra</option>
+                    <option value="SOLDADURA_ESTRUCTURAL">Soldadura Estructural</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Nombre de la Cuadrilla *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Cuadrilla Encofrado Losa Nivel 2"
+                  value={formCuadrilla.nombre}
+                  onChange={(e) => setFormCuadrilla({ ...formCuadrilla, nombre: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Frente de Trabajo *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Sector B - Losa 2"
+                    value={formCuadrilla.frenteTrabajo}
+                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, frenteTrabajo: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Capataz / Líder *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. José Castillo"
+                    value={formCuadrilla.capatazLider}
+                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, capatazLider: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Oficiales *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={formCuadrilla.cantidadOficiales}
+                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, cantidadOficiales: Number(e.target.value) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold text-amber-400 focus:border-violet-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Ayudantes *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={formCuadrilla.cantidadAyudantes}
+                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, cantidadAyudantes: Number(e.target.value) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold text-sky-400 focus:border-violet-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Total Personal</label>
+                  <div className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-emerald-400 font-black text-sm flex items-center justify-center">
+                    {(Number(formCuadrilla.cantidadOficiales) || 0) + (Number(formCuadrilla.cantidadAyudantes) || 0)}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Partida COVENIN Vinculada (Opcional)</label>
+                <select
+                  value={formCuadrilla.partidaId}
+                  onChange={(e) => setFormCuadrilla({ ...formCuadrilla, partidaId: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none text-xs"
+                >
+                  <option value="">General de Obra (Sin vinculación directa)</option>
+                  {partidas.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.codigoCovenin} - {p.descripcion.substring(0, 45)}...
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Observaciones</label>
+                <textarea
+                  rows={2}
+                  placeholder="Turno, herramientas asignadas, requerimientos de EPP..."
+                  value={formCuadrilla.observaciones}
+                  onChange={(e) => setFormCuadrilla({ ...formCuadrilla, observaciones: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalCuadrillaAbierto(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardandoCuadrilla}
+                  className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold transition shadow-lg shadow-violet-600/20 cursor-pointer"
+                >
+                  {guardandoCuadrilla ? 'Registrando...' : 'Asignar Cuadrilla'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+</div>
   );
 }

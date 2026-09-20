@@ -1303,4 +1303,103 @@ public class ConstruccionAislamientoTenantP0Test {
         );
         assertEquals(HttpStatus.BAD_REQUEST, exCrossBim.getStatusCode());
     }
+
+    @Test
+    void cuadrillas_aislamientoPersonalPartidaEIdempotencia() {
+        long tenant1 = 33311L;
+        TenantContext.setCurrentTenant(tenant1);
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant1, "PROY-CD-01", "Complejo Habitacional El Roble");
+        Long proyId = proy.getId();
+
+        CapituloConstruccionEntity c = new CapituloConstruccionEntity();
+        c.setProyectoId(proyId);
+        c.setCodigo("03");
+        c.setNombre("Estructuras de Concreto");
+        ResponseEntity<CapituloConstruccionEntity> respC = construccionController.crearCapitulo(c);
+        Long capId = respC.getBody().getId();
+
+        PartidaConstruccionEntity part = new PartidaConstruccionEntity();
+        part.setCapituloId(capId);
+        part.setCodigoCovenin("E-311.100");
+        part.setDescripcion("Encofrado de vigas y losas");
+        part.setUnidad("m2");
+        part.setCantidadPresupuestada(new BigDecimal("500.00"));
+        part.setPrecioUnitario(new BigDecimal("20.00"));
+        ResponseEntity<PartidaConstruccionEntity> respPart = construccionController.crearPartida(proyId, part);
+        Long partId = respPart.getBody().getId();
+
+        // 1. Registro de cuadrilla con calculo de personal y vinculacion a partida
+        CuadrillaConstruccionEntity cd = new CuadrillaConstruccionEntity();
+        cd.setCodigo("CD-ENC-01");
+        cd.setNombre("Cuadrilla 1 Encofrado de Losas");
+        cd.setEspecialidad("CONCRETO_Y_ENCOFRADO");
+        cd.setFrenteTrabajo("Planta Alta Ejes 1-6");
+        cd.setCapatazResponsable("Maestro Juan Barreto");
+        cd.setCantidadOficiales(2);
+        cd.setCantidadAyudantes(3);
+        cd.setPartidaId(partId);
+        cd.setRendimientoDiarioEstimado(new BigDecimal("45.00"));
+        cd.setUnidadMedidaRendimiento("m2/dia");
+        cd.setFechaInicio(java.time.LocalDate.now());
+
+        String ik = "IK-CD-TEST-001";
+        ResponseEntity<CuadrillaConstruccionEntity> resp1 = construccionController.registrarCuadrilla(proyId, cd, ik);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertNotNull(resp1.getBody().getId());
+        Long cdId = resp1.getBody().getId();
+        assertEquals(5, resp1.getBody().getCantidadTotalPersonal(), "Total personal debe ser la suma de oficiales y ayudantes");
+        assertEquals("ACTIVA", resp1.getBody().getEstado());
+
+        // 2. Reintento idempotente devuelve el mismo ID
+        ResponseEntity<CuadrillaConstruccionEntity> respReintento = construccionController.registrarCuadrilla(proyId, cd, ik);
+        assertEquals(HttpStatus.OK, respReintento.getStatusCode());
+        assertEquals(cdId, respReintento.getBody().getId());
+
+        List<CuadrillaConstruccionEntity> lista = construccionController.listarCuadrillas(proyId);
+        assertEquals(1, lista.size(), "No debe haber cuadrillas duplicadas por reintento idempotente");
+
+        // 3. Reasignacion de frente de trabajo y estado
+        ResponseEntity<CuadrillaConstruccionEntity> respUpdate = construccionController.cambiarEstadoCuadrilla(
+                cdId, Map.of("estado", "ACTIVA", "frenteTrabajo", "Sector B Nivel +6.00")
+        );
+        assertEquals(HttpStatus.OK, respUpdate.getStatusCode());
+        assertEquals("Sector B Nivel +6.00", respUpdate.getBody().getFrenteTrabajo());
+
+        // 4. Aislamiento Cross-Tenant
+        long tenantAjeno = 99988L;
+        TenantContext.setCurrentTenant(tenantAjeno);
+
+        // Listar cuadrillas de proyecto ajeno -> 404
+        ResponseStatusException exListarAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.listarCuadrillas(proyId)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exListarAjeno.getStatusCode());
+
+        // Obtener cuadrilla ajena -> 404
+        ResponseEntity<CuadrillaConstruccionEntity> respGetAjeno = construccionController.obtenerCuadrilla(cdId);
+        assertEquals(HttpStatus.NOT_FOUND, respGetAjeno.getStatusCode());
+
+        // Actualizar cuadrilla ajena -> 404
+        ResponseStatusException exUpdateAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoCuadrilla(cdId, Map.of("frenteTrabajo", "Frente Ilegal"))
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exUpdateAjeno.getStatusCode());
+
+        // Intentar registrar cuadrilla en proyecto propio pero asignandole una partida de otro tenant -> 400 BAD_REQUEST
+        ProyectoConstruccionEntity proyAjeno = crearProyectoHelper(tenantAjeno, "PROY-OTRO", "Obra Propia Tenant 2");
+        Long proyAjenoId = proyAjeno.getId();
+
+        CuadrillaConstruccionEntity cdCrossPartida = new CuadrillaConstruccionEntity();
+        cdCrossPartida.setCodigo("CD-CROSS-01");
+        cdCrossPartida.setNombre("Cuadrilla Cross");
+        cdCrossPartida.setFrenteTrabajo("Frente 1");
+        cdCrossPartida.setCapatazResponsable("Capataz");
+        cdCrossPartida.setFechaInicio(java.time.LocalDate.now());
+        cdCrossPartida.setPartidaId(partId); // Partida de tenant1
+
+        ResponseStatusException exCrossPart = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarCuadrilla(proyAjenoId, cdCrossPartida, "IK-CD-CROSS")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exCrossPart.getStatusCode());
+    }
 }

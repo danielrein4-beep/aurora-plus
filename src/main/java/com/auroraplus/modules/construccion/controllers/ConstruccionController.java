@@ -365,4 +365,34 @@ public class ConstruccionController {
         String nuevoEstado = body != null ? body.get("estado") : null;
         return ResponseEntity.ok(construccionService.responderRfi(requireTenant(), id, respuesta, resp, nuevoEstado));
     }
+
+    // --- PLANIFICACIÓN DE CUADRILLAS Y FRENTES OPERATIVOS ---
+    @GetMapping("/proyectos/{proyectoId}/cuadrillas")
+    public List<CuadrillaConstruccionEntity> listarCuadrillas(@PathVariable Long proyectoId) {
+        return construccionService.listarCuadrillas(requireTenant(), proyectoId);
+    }
+
+    @GetMapping("/cuadrillas/{id}")
+    public ResponseEntity<CuadrillaConstruccionEntity> obtenerCuadrilla(@PathVariable Long id) {
+        return construccionService.obtenerCuadrilla(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/cuadrillas")
+    public ResponseEntity<CuadrillaConstruccionEntity> registrarCuadrilla(
+            @PathVariable Long proyectoId,
+            @RequestBody CuadrillaConstruccionEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarCuadrilla(requireTenant(), proyectoId, req, idempotencyKey));
+    }
+
+    @PatchMapping("/cuadrillas/{id}/estado")
+    public ResponseEntity<CuadrillaConstruccionEntity> cambiarEstadoCuadrilla(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String nuevoEstado = body != null ? body.get("estado") : null;
+        String nuevoFrente = body != null ? body.get("frenteTrabajo") : null;
+        return ResponseEntity.ok(construccionService.actualizarEstadoCuadrilla(requireTenant(), id, nuevoEstado, nuevoFrente));
+    }
 }

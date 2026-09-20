@@ -66,6 +66,15 @@ public class ConstruccionService {
             "ABIERTO", "EN_EVALUACION", "RESPONDIDO", "CERRADO"
     );
 
+    public static final Set<String> ESTADOS_CUADRILLA_VALIDOS = Set.of(
+            "ACTIVA", "EN_STANDBY", "REASIGNADA", "FINALIZADA"
+    );
+
+    public static final Set<String> ESPECIALIDADES_CUADRILLA_VALIDAS = Set.of(
+            "CONCRETO_Y_ENCOFRADO", "ACERO_Y_CABILLAS", "ALBANILERIA", "MOVIMIENTO_TIERRAS",
+            "INSTALACIONES_ELECTRICAS", "INSTALACIONES_SANITARIAS", "ACABADOS_Y_PINTURA", "GENERAL"
+    );
+
     @Autowired
     private ProyectoConstruccionRepository proyectoRepository;
 
@@ -104,6 +113,9 @@ public class ConstruccionService {
 
     @Autowired
     private RfiConstruccionRepository rfiRepository;
+
+    @Autowired
+    private CuadrillaConstruccionRepository cuadrillaRepository;
 
     @Autowired
     private IdempotenciaConstruccionRepository idempotenciaRepository;
@@ -1488,5 +1500,158 @@ public class ConstruccionService {
         }
 
         return rfiRepository.save(rfi);
+    }
+
+    // --- PLANIFICACIÓN DE CUADRILLAS Y FRENTES OPERATIVOS ---
+
+    public List<CuadrillaConstruccionEntity> listarCuadrillas(Long tenantId, Long proyectoId) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+        return cuadrillaRepository.findByTenantIdAndProyectoIdOrderByCodigoAsc(tenantId, proyectoId);
+    }
+
+    public Optional<CuadrillaConstruccionEntity> obtenerCuadrilla(Long tenantId, Long id) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        return cuadrillaRepository.findByTenantIdAndId(tenantId, id);
+    }
+
+    public CuadrillaConstruccionEntity registrarCuadrilla(Long tenantId, Long proyectoId, CuadrillaConstruccionEntity req) {
+        return registrarCuadrilla(tenantId, proyectoId, req, null);
+    }
+
+    @Transactional
+    public CuadrillaConstruccionEntity registrarCuadrilla(Long tenantId, Long proyectoId, CuadrillaConstruccionEntity req, String idempotencyKey) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+
+        if (req.getCodigo() == null || req.getCodigo().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El código de la cuadrilla es obligatorio");
+        }
+        if (req.getNombre() == null || req.getNombre().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre de la cuadrilla es obligatorio");
+        }
+        if (req.getFrenteTrabajo() == null || req.getFrenteTrabajo().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El frente de trabajo es obligatorio");
+        }
+        if (req.getCapatazResponsable() == null || req.getCapatazResponsable().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El capataz o maestro de obra responsable es obligatorio");
+        }
+        if (req.getFechaInicio() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de inicio de la cuadrilla es obligatoria");
+        }
+
+        if (req.getPartidaId() != null) {
+            PartidaConstruccionEntity partida = partidaRepository.findByTenantIdAndId(tenantId, req.getPartidaId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La partida asignada no existe o pertenece a otro tenant"));
+            if (!partida.getProyectoId().equals(proyectoId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La partida asignada pertenece a otro proyecto");
+            }
+        }
+
+        String codigoLimpio = req.getCodigo().trim().toUpperCase();
+
+        if (req.getEspecialidad() == null || !ESPECIALIDADES_CUADRILLA_VALIDAS.contains(req.getEspecialidad().trim().toUpperCase())) {
+            req.setEspecialidad("GENERAL");
+        } else {
+            req.setEspecialidad(req.getEspecialidad().trim().toUpperCase());
+        }
+
+        if (req.getEstado() == null || !ESTADOS_CUADRILLA_VALIDOS.contains(req.getEstado().trim().toUpperCase())) {
+            req.setEstado("ACTIVA");
+        } else {
+            req.setEstado(req.getEstado().trim().toUpperCase());
+        }
+
+        int oficiales = (req.getCantidadOficiales() != null && req.getCantidadOficiales() >= 0) ? req.getCantidadOficiales() : 1;
+        int ayudantes = (req.getCantidadAyudantes() != null && req.getCantidadAyudantes() >= 0) ? req.getCantidadAyudantes() : 1;
+        req.setCantidadOficiales(oficiales);
+        req.setCantidadAyudantes(ayudantes);
+        req.setCantidadTotalPersonal(oficiales + ayudantes);
+
+        // Idempotencia
+        String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
+                ? calcularSha256("CUADRILLA|" + proyectoId + "|" + codigoLimpio)
+                : null;
+
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            Optional<IdempotenciaConstruccionEntity> claim = idempotenciaService.reclamarClave(
+                    tenantId, idempotencyKey, "CUADRILLA_CONSTRUCCION", payloadHash
+            );
+            if (claim.isPresent()) {
+                IdempotenciaConstruccionEntity idemp = claim.get();
+                if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
+                    try {
+                        return objectMapper.readValue(idemp.getResultadoJson(), CuadrillaConstruccionEntity.class);
+                    } catch (Exception ignored) {}
+                }
+                if (idemp.getRecursoId() != null) {
+                    return cuadrillaRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cuadrilla no encontrada"));
+                }
+            }
+        }
+
+        // Unicidad dentro del proyecto
+        if (cuadrillaRepository.findByTenantIdAndProyectoIdAndCodigo(tenantId, proyectoId, codigoLimpio).isPresent()) {
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe una cuadrilla con el código " + codigoLimpio + " en este proyecto");
+        }
+
+        try {
+            req.setId(null);
+            req.setTenantId(tenantId);
+            req.setProyectoId(proyectoId);
+            req.setCodigo(codigoLimpio);
+
+            CuadrillaConstruccionEntity guardado = cuadrillaRepository.save(req);
+
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                String json = null;
+                try {
+                    json = objectMapper.writeValueAsString(guardado);
+                } catch (Exception ignored) {}
+                idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
+            }
+
+            return guardado;
+        } catch (Exception ex) {
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            }
+            throw ex;
+        }
+    }
+
+    @Transactional
+    public CuadrillaConstruccionEntity actualizarEstadoCuadrilla(Long tenantId, Long id, String nuevoEstado, String nuevoFrente) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        CuadrillaConstruccionEntity cuadrilla = cuadrillaRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cuadrilla no encontrada para este tenant"));
+
+        if (nuevoEstado != null && !nuevoEstado.trim().isEmpty()) {
+            String est = nuevoEstado.trim().toUpperCase();
+            if (!ESTADOS_CUADRILLA_VALIDOS.contains(est)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de cuadrilla inválido: " + est);
+            }
+            cuadrilla.setEstado(est);
+        }
+
+        if (nuevoFrente != null && !nuevoFrente.trim().isEmpty()) {
+            cuadrilla.setFrenteTrabajo(nuevoFrente.trim());
+        }
+
+        return cuadrillaRepository.save(cuadrilla);
     }
 }

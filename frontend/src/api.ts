@@ -5052,3 +5052,44 @@ export function responderRfiConstruccionApi(id: number, respuestaOficial: string
     body: JSON.stringify({ respuestaOficial, responsableRespuesta, estado })
   });
 }
+
+export interface CuadrillaConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  partidaId?: number | null;
+  codigo: string;
+  nombre: string;
+  frenteTrabajo: string;
+  capatazLider: string;
+  cantidadOficiales: number;
+  cantidadAyudantes: number;
+  totalPersonal?: number;
+  especialidad: string; // ENCOFRADO_CONCRETO, ALBANILERIA_BLOQUE, ACERO_CABILLAS, INSTALACIONES_ELECTRICAS, INSTALACIONES_SANITARIAS, ACABADOS_PINTURA, MOVIMIENTO_TIERRA, SOLDADURA_ESTRUCTURAL
+  estado: string; // ACTIVA, PAUSADA, DISUELTA, REASIGNADA
+  observaciones?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export function listarCuadrillasConstruccionApi(proyectoId: number): Promise<CuadrillaConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/cuadrillas`);
+}
+
+export function crearCuadrillaConstruccionApi(proyectoId: number, datos: Partial<CuadrillaConstruccionApi>, idempotencyKey?: string): Promise<CuadrillaConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+  return request(`/api/construccion/proyectos/${proyectoId}/cuadrillas`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function cambiarEstadoCuadrillaConstruccionApi(id: number, estado: string): Promise<CuadrillaConstruccionApi> {
+  return request(`/api/construccion/cuadrillas/${id}/estado`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado })
+  });
+}
