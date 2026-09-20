@@ -381,6 +381,14 @@ input:focus, select:focus, textarea:focus {
   }
 }
 
+/* Sin "forwards": con "forwards" el navegador deja el `transform` del último
+   keyframe aplicado para siempre (aunque sea la identidad, translateY(0)) —
+   eso vuelve a este contenedor "containing block" de cualquier `position:
+   fixed` descendiente (ej. el fondo de un modal), así que en páginas largas
+   el modal se centraba dentro de TODO el alto de la página en vez del
+   viewport real, apareciendo invisible hasta hacer scroll. El estado final
+   (opacity:1, sin desplazamiento) es visualmente idéntico al reposo normal,
+   así que no hace falta mantenerlo fijado. */
 .animate-page-enter {
-  animation: pageEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: pageEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
