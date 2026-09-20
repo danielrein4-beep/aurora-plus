@@ -35,6 +35,9 @@ public class ConstruccionAislamientoTenantP0Test {
     private ConstruccionController construccionController;
 
     @Autowired
+    private TestIdempotenciaPreClaimObserver testPreClaimObserver;
+
+    @Autowired
     private ProyectoConstruccionRepository proyectoRepository;
 
     @Autowired
@@ -748,7 +751,7 @@ public class ConstruccionAislamientoTenantP0Test {
         AtomicReference<Throwable> errorHilo1 = new AtomicReference<>();
 
         // Activar hook determinista para detener al hilo 1 justo tras insertar el pre-claim (EN_PROCESO)
-        IdempotenciaConstruccionService.setPostPreClaimHook(() -> {
+        testPreClaimObserver.setDelegate(() -> {
             hilo1PreClaimListo.countDown();
             try {
                 boolean liberado = liberarHilo1.await(5, TimeUnit.SECONDS);
@@ -781,7 +784,7 @@ public class ConstruccionAislamientoTenantP0Test {
             assertTrue(listo, "Hilo 1 debió completar el pre-claim en menos de 5 segundos");
 
             // Desactivar el hook para que futuras llamadas no se queden detenidas
-            IdempotenciaConstruccionService.setPostPreClaimHook(null);
+            testPreClaimObserver.reset();
 
             // Verificar que en este momento exacto el stock sigue intacto (100.00), porque el efecto aún no ocurrió
             InsumoConstruccionEntity insumoDurantePreClaim = insumoRepository.findByTenantIdAndId(tenant, insumoId).orElseThrow();
@@ -829,7 +832,7 @@ public class ConstruccionAislamientoTenantP0Test {
                     "El reintento con la clave original debe devolver el stock snapshot de ese consumo (85.00), no el inventario actual (65.00)");
 
         } finally {
-            IdempotenciaConstruccionService.setPostPreClaimHook(null);
+            testPreClaimObserver.reset();
             liberarHilo1.countDown();
             TenantContext.clear();
         }

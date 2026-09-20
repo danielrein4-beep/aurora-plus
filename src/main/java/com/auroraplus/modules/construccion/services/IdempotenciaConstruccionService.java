@@ -26,32 +26,9 @@ public class IdempotenciaConstruccionService {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
-    // Hook determinista para pruebas concurrentes
-    private static volatile Runnable postPreClaimHook = null;
-
-    /**
-     * Hook exclusivo para pruebas de concurrencia deterministas.
-     * Rechaza cualquier invocación que no provenga de un contexto de pruebas unitarias o de integración.
-     */
-    public static void setPostPreClaimHook(Runnable hook) {
-        if (hook != null && !esEntornoDePruebas()) {
-            throw new SecurityException("postPreClaimHook solo puede configurarse durante la ejecución de pruebas");
-        }
-        postPreClaimHook = hook;
-    }
-
-    private static boolean esEntornoDePruebas() {
-        for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
-            String className = element.getClassName();
-            if (className.startsWith("org.junit.") ||
-                className.startsWith("org.springframework.test.") ||
-                className.endsWith("Test") ||
-                className.contains("Test$")) {
-                return true;
-            }
-        }
-        return false;
-    }
+    // Observador de pre-claim: en producción es un no-op por defecto
+    @Autowired(required = false)
+    private IdempotenciaPreClaimObserver preClaimObserver = () -> {};
 
     public Optional<IdempotenciaConstruccionEntity> buscar(Long tenantId, String idempotencyKey) {
         if (tenantId == null || idempotencyKey == null || idempotencyKey.trim().isEmpty()) {
@@ -98,8 +75,8 @@ public class IdempotenciaConstruccionService {
         });
 
         if (Boolean.TRUE.equals(insertado)) {
-            if (postPreClaimHook != null && esEntornoDePruebas()) {
-                postPreClaimHook.run();
+            if (preClaimObserver != null) {
+                preClaimObserver.onPostPreClaim();
             }
             return Optional.empty(); // Reclamada exitosamente por este hilo
         }
