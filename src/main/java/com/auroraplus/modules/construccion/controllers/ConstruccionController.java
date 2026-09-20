@@ -46,6 +46,19 @@ public class ConstruccionController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PutMapping("/proyectos/{id}")
+    public ResponseEntity<ProyectoConstruccionEntity> actualizarProyecto(
+            @PathVariable Long id,
+            @RequestBody ProyectoConstruccionEntity proyecto) {
+        return ResponseEntity.ok(construccionService.actualizarProyecto(requireTenant(), id, proyecto));
+    }
+
+    @DeleteMapping("/proyectos/{id}")
+    public ResponseEntity<Void> eliminarProyecto(@PathVariable Long id) {
+        construccionService.eliminarProyecto(requireTenant(), id);
+        return ResponseEntity.noContent().build();
+    }
+
     // --- CAPÍTULOS ---
     @GetMapping("/capitulos")
     public List<CapituloConstruccionEntity> listarCapitulos() {
@@ -55,6 +68,18 @@ public class ConstruccionController {
     @PostMapping("/capitulos")
     public ResponseEntity<CapituloConstruccionEntity> crearCapitulo(@RequestBody CapituloConstruccionEntity capitulo) {
         return ResponseEntity.ok(construccionService.guardarCapitulo(requireTenant(), capitulo));
+    }
+
+    @GetMapping("/proyectos/{proyectoId}/capitulos")
+    public List<CapituloConstruccionEntity> listarCapitulosPorProyecto(@PathVariable Long proyectoId) {
+        return construccionService.listarCapitulosPorProyecto(requireTenant(), proyectoId);
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/capitulos")
+    public ResponseEntity<CapituloConstruccionEntity> crearCapituloEnProyecto(
+            @PathVariable Long proyectoId,
+            @RequestBody CapituloConstruccionEntity capitulo) {
+        return ResponseEntity.ok(construccionService.guardarCapituloEnProyecto(requireTenant(), proyectoId, capitulo));
     }
 
     // --- PARTIDAS ---
@@ -74,6 +99,13 @@ public class ConstruccionController {
     public ResponseEntity<Void> eliminarPartida(@PathVariable Long id) {
         construccionService.eliminarPartida(requireTenant(), id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/partidas/{id}")
+    public ResponseEntity<PartidaConstruccionEntity> actualizarPartida(
+            @PathVariable Long id,
+            @RequestBody PartidaConstruccionEntity partida) {
+        return ResponseEntity.ok(construccionService.actualizarPartida(requireTenant(), id, partida));
     }
 
     // --- VALUACIONES ---

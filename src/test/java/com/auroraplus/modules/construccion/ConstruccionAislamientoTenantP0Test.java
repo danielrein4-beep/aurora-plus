@@ -37,6 +37,14 @@ public class ConstruccionAislamientoTenantP0Test {
     @Autowired
     private TestIdempotenciaPreClaimObserver testPreClaimObserver;
 
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        if (testPreClaimObserver != null) {
+            testPreClaimObserver.reset();
+        }
+        TenantContext.clear();
+    }
+
     @Autowired
     private ProyectoConstruccionRepository proyectoRepository;
 
@@ -122,6 +130,21 @@ public class ConstruccionAislamientoTenantP0Test {
 
         ResponseStatusException exPatchVal = assertThrows(ResponseStatusException.class, () -> construccionController.cambiarEstadoValuacion(1L, Map.of("estado", "APROBADA")));
         assertEquals(HttpStatus.UNAUTHORIZED, exPatchVal.getStatusCode());
+
+        ResponseStatusException exActProy = assertThrows(ResponseStatusException.class, () -> construccionController.actualizarProyecto(1L, new ProyectoConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exActProy.getStatusCode());
+
+        ResponseStatusException exElimProy = assertThrows(ResponseStatusException.class, () -> construccionController.eliminarProyecto(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exElimProy.getStatusCode());
+
+        ResponseStatusException exListCapProy = assertThrows(ResponseStatusException.class, () -> construccionController.listarCapitulosPorProyecto(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exListCapProy.getStatusCode());
+
+        ResponseStatusException exCrearCapProy = assertThrows(ResponseStatusException.class, () -> construccionController.crearCapituloEnProyecto(1L, new CapituloConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exCrearCapProy.getStatusCode());
+
+        ResponseStatusException exActPart = assertThrows(ResponseStatusException.class, () -> construccionController.actualizarPartida(1L, new PartidaConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exActPart.getStatusCode());
 
         ResponseStatusException exListarIns = assertThrows(ResponseStatusException.class, () -> construccionController.listarInsumos());
         assertEquals(HttpStatus.UNAUTHORIZED, exListarIns.getStatusCode());
@@ -259,7 +282,29 @@ public class ConstruccionAislamientoTenantP0Test {
         ResponseStatusException exEditarIns = assertThrows(ResponseStatusException.class, () -> construccionController.registrarConsumo(insAId, Map.of("cantidad", BigDecimal.ONE)));
         assertEquals(HttpStatus.NOT_FOUND, exEditarIns.getStatusCode());
 
-        // 5. BORRAR: Tenant B no puede eliminar partida de Tenant A
+        // 5. BORRAR Y EDITAR NUEVOS ENDPOINTS: Tenant B no puede tocar recursos de A
+        ResponseStatusException exListCapProy = assertThrows(ResponseStatusException.class, () -> construccionController.listarCapitulosPorProyecto(proyAId));
+        assertEquals(HttpStatus.NOT_FOUND, exListCapProy.getStatusCode());
+
+        CapituloConstruccionEntity capB = new CapituloConstruccionEntity();
+        capB.setCodigo("2.0");
+        capB.setNombre("Inyeccion capitulo ilicito");
+        ResponseStatusException exCrearCapProy = assertThrows(ResponseStatusException.class, () -> construccionController.crearCapituloEnProyecto(proyAId, capB));
+        assertEquals(HttpStatus.NOT_FOUND, exCrearCapProy.getStatusCode());
+
+        ProyectoConstruccionEntity modProy = new ProyectoConstruccionEntity();
+        modProy.setNombre("Nombre hackeado");
+        ResponseStatusException exActProy = assertThrows(ResponseStatusException.class, () -> construccionController.actualizarProyecto(proyAId, modProy));
+        assertEquals(HttpStatus.NOT_FOUND, exActProy.getStatusCode());
+
+        ResponseStatusException exElimProy = assertThrows(ResponseStatusException.class, () -> construccionController.eliminarProyecto(proyAId));
+        assertEquals(HttpStatus.NOT_FOUND, exElimProy.getStatusCode());
+
+        PartidaConstruccionEntity modPart = new PartidaConstruccionEntity();
+        modPart.setDescripcion("Descripcion alterada");
+        ResponseStatusException exActPart = assertThrows(ResponseStatusException.class, () -> construccionController.actualizarPartida(partidaAId, modPart));
+        assertEquals(HttpStatus.NOT_FOUND, exActPart.getStatusCode());
+
         ResponseStatusException exBorrarPart = assertThrows(ResponseStatusException.class, () -> construccionController.eliminarPartida(partidaAId));
         assertEquals(HttpStatus.NOT_FOUND, exBorrarPart.getStatusCode());
 

@@ -12,6 +12,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -98,17 +99,34 @@ public class IdempotenciaConstruccionService {
 
         if ("EN_PROCESO".equalsIgnoreCase(reg.getEstado())) {
             // Espera limitada (hasta 1500 ms en intervalos de 40 ms) a que la primera petición complete
-            long deadline = System.currentTimeMillis() + 1500;
+                        long deadline = System.currentTimeMillis() + 3500;
             while (System.currentTimeMillis() < deadline) {
                 try {
-                    Thread.sleep(40);
+                    Thread.sleep(25);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     break;
                 }
-                Optional<IdempotenciaConstruccionEntity> check = idempotenciaRepository.findByTenantIdAndIdempotencyKey(tenantId, key);
-                if (check.isPresent()) {
-                    IdempotenciaConstruccionEntity actual = check.get();
+                List<IdempotenciaConstruccionEntity> check = jdbcTemplate.query(
+                    "SELECT id, tenant_id, idempotency_key, recurso_tipo, recurso_id, payload_hash, resultado_json, estado " +
+                    "FROM idempotencia_construccion WHERE tenant_id = ? AND idempotency_key = ?",
+                    (rs, rowNum) -> {
+                        IdempotenciaConstruccionEntity e = new IdempotenciaConstruccionEntity();
+                        e.setId(rs.getLong("id"));
+                        e.setTenantId(rs.getLong("tenant_id"));
+                        e.setIdempotencyKey(rs.getString("idempotency_key"));
+                        e.setRecursoTipo(rs.getString("recurso_tipo"));
+                        long rId = rs.getLong("recurso_id");
+                        if (!rs.wasNull()) e.setRecursoId(rId);
+                        e.setPayloadHash(rs.getString("payload_hash"));
+                        e.setResultadoJson(rs.getString("resultado_json"));
+                        e.setEstado(rs.getString("estado"));
+                        return e;
+                    },
+                    tenantId, key
+                );
+                if (!check.isEmpty()) {
+                    IdempotenciaConstruccionEntity actual = check.get(0);
                     if ("COMPLETADO".equalsIgnoreCase(actual.getEstado())) {
                         return Optional.of(actual);
                     }

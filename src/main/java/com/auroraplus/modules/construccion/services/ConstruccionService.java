@@ -128,6 +128,73 @@ public class ConstruccionService {
         return proyectoRepository.findByTenantIdAndId(tenantId, id);
     }
 
+    public ProyectoConstruccionEntity actualizarProyecto(Long tenantId, Long id, ProyectoConstruccionEntity datos) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        ProyectoConstruccionEntity existente = proyectoRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+
+        if (datos.getNombre() != null && !datos.getNombre().trim().isEmpty()) {
+            existente.setNombre(datos.getNombre().trim());
+        }
+        if (datos.getCodigo() != null && !datos.getCodigo().trim().isEmpty()) {
+            existente.setCodigo(datos.getCodigo().trim());
+        }
+        if (datos.getCliente() != null) {
+            existente.setCliente(datos.getCliente());
+        }
+        if (datos.getUbicacion() != null) {
+            existente.setUbicacion(datos.getUbicacion());
+        }
+        if (datos.getIngenieroResidente() != null) {
+            existente.setIngenieroResidente(datos.getIngenieroResidente());
+        }
+        if (datos.getCivResidente() != null) {
+            existente.setCivResidente(datos.getCivResidente());
+        }
+        if (datos.getFechaInicio() != null) {
+            existente.setFechaInicio(datos.getFechaInicio());
+        }
+        if (datos.getFechaFinEstimada() != null) {
+            existente.setFechaFinEstimada(datos.getFechaFinEstimada());
+        }
+        if (datos.getEstado() != null) {
+            existente.setEstado(datos.getEstado());
+        }
+        if (datos.getMontoPresupuestoTotal() != null) {
+            if (datos.getMontoPresupuestoTotal().compareTo(BigDecimal.ZERO) < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El monto del presupuesto no puede ser negativo");
+            }
+            existente.setMontoPresupuestoTotal(datos.getMontoPresupuestoTotal());
+        }
+        if (datos.getPorcentajeAnticipo() != null) {
+            existente.setPorcentajeAnticipo(datos.getPorcentajeAnticipo());
+        }
+        if (datos.getPorcentajeRetencionGarantia() != null) {
+            existente.setPorcentajeRetencionGarantia(datos.getPorcentajeRetencionGarantia());
+        }
+        if (datos.getPorcentajeAdministracion() != null) {
+            existente.setPorcentajeAdministracion(datos.getPorcentajeAdministracion());
+        }
+        if (datos.getPorcentajeUtilidad() != null) {
+            existente.setPorcentajeUtilidad(datos.getPorcentajeUtilidad());
+        }
+        if (datos.getIva() != null) {
+            existente.setIva(datos.getIva());
+        }
+        return proyectoRepository.save(existente);
+    }
+
+    public void eliminarProyecto(Long tenantId, Long id) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        ProyectoConstruccionEntity existente = proyectoRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+        proyectoRepository.delete(existente);
+    }
+
     // --- CAPÍTULOS ---
 
     public List<CapituloConstruccionEntity> listarCapitulos(Long tenantId) {
@@ -244,6 +311,54 @@ public class ConstruccionService {
         PartidaConstruccionEntity partida = partidaRepository.findByTenantIdAndId(tenantId, partidaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Partida no encontrada para este tenant"));
         partidaRepository.delete(partida);
+    }
+
+    public PartidaConstruccionEntity actualizarPartida(Long tenantId, Long partidaId, PartidaConstruccionEntity datos) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        PartidaConstruccionEntity existente = partidaRepository.findByTenantIdAndId(tenantId, partidaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Partida no encontrada para este tenant"));
+
+        if (datos.getCodigoCovenin() != null && !datos.getCodigoCovenin().trim().isEmpty()) {
+            existente.setCodigoCovenin(datos.getCodigoCovenin().trim());
+        }
+        if (datos.getDescripcion() != null && !datos.getDescripcion().trim().isEmpty()) {
+            existente.setDescripcion(datos.getDescripcion().trim());
+        }
+        if (datos.getUnidad() != null && !datos.getUnidad().trim().isEmpty()) {
+            existente.setUnidad(datos.getUnidad().trim());
+        }
+        if (datos.getCantidadPresupuestada() != null) {
+            if (datos.getCantidadPresupuestada().compareTo(BigDecimal.ZERO) < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad presupuestada no puede ser negativa");
+            }
+            existente.setCantidadPresupuestada(datos.getCantidadPresupuestada());
+        }
+        if (datos.getPrecioUnitario() != null) {
+            if (datos.getPrecioUnitario().compareTo(BigDecimal.ZERO) < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio unitario no puede ser negativo");
+            }
+            existente.setPrecioUnitario(datos.getPrecioUnitario());
+        }
+        if (datos.getCantidadEjecutadaAcumulada() != null) {
+            if (datos.getCantidadEjecutadaAcumulada().compareTo(BigDecimal.ZERO) < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad ejecutada no puede ser negativa");
+            }
+            existente.setCantidadEjecutadaAcumulada(datos.getCantidadEjecutadaAcumulada());
+        }
+        if (datos.getRendimientoDiario() != null) {
+            existente.setRendimientoDiario(datos.getRendimientoDiario());
+        }
+        if (datos.getCapituloId() != null) {
+            CapituloConstruccionEntity cap = capituloRepository.findByTenantIdAndId(tenantId, datos.getCapituloId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El capítulo no existe o pertenece a otro tenant"));
+            if (cap.getProyectoId() != null && !existente.getProyectoId().equals(cap.getProyectoId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El capítulo no coincide con el proyecto de la partida");
+            }
+            existente.setCapituloId(datos.getCapituloId());
+        }
+        return partidaRepository.save(existente);
     }
 
     // --- VALUACIONES ---

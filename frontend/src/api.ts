@@ -4581,11 +4581,13 @@ export interface PartidaConstruccionApi {
   tenantId?: number;
   proyectoId: number;
   capituloId?: number;
-  codigoPartida: string;
+  codigoCovenin: string;
+  codigoPartida?: string;
   descripcion: string;
   unidad: string;
   cantidadPresupuestada: number;
   precioUnitario: number;
+  cantidadEjecutadaAcumulada?: number;
   totalPartida?: number;
   rendimientoDiario?: number;
 }
@@ -4599,6 +4601,12 @@ export interface ValuacionConstruccionApi {
   periodoHasta: string;
   fechaEmision: string;
   montoBruto: number;
+  amortizacionAnticipo?: number;
+  retencionLaboral?: number;
+  retencionFielCumplimiento?: number;
+  montoSubtotal?: number;
+  montoIva?: number;
+  montoNetoACobrar?: number;
   montoAmortizacionAnticipo?: number;
   montoRetencionLaboral?: number;
   montoRetencionFielCumplimiento?: number;
@@ -4617,6 +4625,7 @@ export interface InsumoConstruccionApi {
   costoUnitario: number;
   stockActual: number;
   stockMinimo: number;
+  proveedor?: string;
 }
 
 export interface BitacoraConstruccionApi {
@@ -4624,11 +4633,25 @@ export interface BitacoraConstruccionApi {
   tenantId?: number;
   proyectoId: number;
   fecha: string;
+  clima?: string;
   condicionClimatica?: string;
   personalActivo?: number;
   cuadrillasActivas?: string;
+  maquinariaOperativa?: string;
+  actividadesEjecutadas?: string;
   actividadesRealizadas?: string;
+  observacionesEIncidentes?: string;
   incidentesRetrasos?: string;
+  elaboradoPor?: string;
+}
+
+export interface CatalogoCoveninApi {
+  id: number;
+  codigoCovenin: string;
+  descripcion: string;
+  unidad: string;
+  rendimientoPromedio?: number;
+  costoReferencialBs?: number;
 }
 
 // Proyectos
@@ -4757,4 +4780,9 @@ export function registrarBitacoraConstruccionApi(proyectoId: number, datos: Bita
     headers,
     body: JSON.stringify(datos)
   });
+}
+
+export function buscarCatalogoCoveninApi(q?: string): Promise<CatalogoCoveninApi[]> {
+  const query = q ? `?q=${encodeURIComponent(q)}` : '';
+  return request(`/api/construccion/catalogo-covenin${query}`);
 }
