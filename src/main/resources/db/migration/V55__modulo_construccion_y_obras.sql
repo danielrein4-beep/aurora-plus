@@ -31,11 +31,13 @@ CREATE INDEX IF NOT EXISTS idx_proy_const_codigo ON proyectos_construccion(tenan
 CREATE TABLE IF NOT EXISTS capitulos_construccion (
     id BIGSERIAL PRIMARY KEY,
     tenant_id BIGINT NOT NULL,
+    proyecto_id BIGINT REFERENCES proyectos_construccion(id) ON DELETE CASCADE,
     codigo VARCHAR(50) NOT NULL,
     nombre VARCHAR(255) NOT NULL,
     orden INT NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_cap_const_tenant ON capitulos_construccion(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_cap_const_proy ON capitulos_construccion(proyecto_id);
 
 -- 3. Partidas de Obra (Presupuesto contractual, cómputos y APU)
 CREATE TABLE IF NOT EXISTS partidas_construccion (
@@ -108,6 +110,7 @@ CREATE TABLE IF NOT EXISTS insumos_construccion (
     stock_actual NUMERIC(14, 2) NOT NULL DEFAULT 0,
     stock_minimo NUMERIC(14, 2) NOT NULL DEFAULT 0,
     proveedor VARCHAR(255),
+    version BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_insumo_const_tenant ON insumos_construccion(tenant_id);

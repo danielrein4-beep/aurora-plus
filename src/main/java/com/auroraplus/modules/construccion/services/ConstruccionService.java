@@ -88,6 +88,35 @@ public class ConstruccionService {
         return capituloRepository.findByTenantIdOrderByOrdenAsc(tenantId);
     }
 
+    public List<CapituloConstruccionEntity> listarCapitulosPorProyecto(Long tenantId, Long proyectoId) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+        return capituloRepository.findByTenantIdAndProyectoIdOrderByOrdenAsc(tenantId, proyectoId);
+    }
+
+    public CapituloConstruccionEntity guardarCapituloEnProyecto(Long tenantId, Long proyectoId, CapituloConstruccionEntity capitulo) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+        capitulo.setId(null);
+        capitulo.setTenantId(tenantId);
+        capitulo.setProyectoId(proyectoId);
+
+        if (capitulo.getNombre() == null || capitulo.getNombre().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre del capítulo es obligatorio");
+        }
+        if (capitulo.getCodigo() == null || capitulo.getCodigo().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El código del capítulo es obligatorio");
+        }
+
+        return capituloRepository.save(capitulo);
+    }
+
     public CapituloConstruccionEntity guardarCapitulo(Long tenantId, CapituloConstruccionEntity capitulo) {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
@@ -129,8 +158,13 @@ public class ConstruccionService {
 
         // Validar que el capítulo (si se envía) pertenezca al mismo tenant
         if (partida.getCapituloId() != null) {
-            capituloRepository.findByTenantIdAndId(tenantId, partida.getCapituloId())
+            CapituloConstruccionEntity cap = capituloRepository.findByTenantIdAndId(tenantId, partida.getCapituloId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El capítulo no existe o pertenece a otro tenant"));
+            if (cap.getProyectoId() != null && !proyectoId.equals(cap.getProyectoId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El capítulo (ID: " + cap.getId() + ") pertenece al proyecto " + cap.getProyectoId() +
+                        ", no coincide con el proyecto de la partida (" + proyectoId + ")");
+            }
         }
 
         // Rechazar cantidades y precios negativos

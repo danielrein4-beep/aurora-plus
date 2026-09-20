@@ -169,6 +169,54 @@ public class ConstruccionAislamientoTenantP0Test {
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
     }
 
+    // 4B. Partida no puede asociar capítulo de otro proyecto (aunque pertenezca al mismo tenant)
+    @Test
+    void referenciasCruzadas_partidaNoPuedeUsarCapituloDeOtroProyectoDelMismoTenant() {
+        long tenant = 99303L;
+        TenantContext.setCurrentTenant(tenant);
+
+        // Proyecto 1 y su capítulo C1
+        ProyectoConstruccionEntity proy1 = crearProyectoHelper(tenant, "PROY-01", "Edificio Alfa");
+        CapituloConstruccionEntity capProy1 = new CapituloConstruccionEntity();
+        capProy1.setTenantId(tenant);
+        capProy1.setProyectoId(proy1.getId());
+        capProy1.setCodigo("1.0");
+        capProy1.setNombre("Preliminares Edificio Alfa");
+        capProy1.setOrden(1);
+        capProy1 = capituloRepository.save(capProy1);
+
+        // Proyecto 2 del MISMO tenant
+        ProyectoConstruccionEntity proy2 = crearProyectoHelper(tenant, "PROY-02", "Edificio Beta");
+
+        // Intentar crear partida en Proyecto 2 vinculada al capítulo de Proyecto 1
+        PartidaConstruccionEntity partidaCruzada = new PartidaConstruccionEntity();
+        partidaCruzada.setCapituloId(capProy1.getId());
+        partidaCruzada.setCodigoCovenin("E-200.100");
+        partidaCruzada.setDescripcion("Replanteo");
+        partidaCruzada.setUnidad("m2");
+        partidaCruzada.setCantidadPresupuestada(new BigDecimal("100.00"));
+        partidaCruzada.setPrecioUnitario(new BigDecimal("5.00"));
+
+        ResponseStatusException exCruzado = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.crearPartida(proy2.getId(), partidaCruzada);
+        });
+        assertEquals(HttpStatus.BAD_REQUEST, exCruzado.getStatusCode());
+        assertTrue(exCruzado.getReason().contains("no coincide con el proyecto de la partida"));
+
+        // En cambio, en su propio Proyecto 1 sí se acepta
+        PartidaConstruccionEntity partidaValida = new PartidaConstruccionEntity();
+        partidaValida.setCapituloId(capProy1.getId());
+        partidaValida.setCodigoCovenin("E-200.100");
+        partidaValida.setDescripcion("Replanteo Válido");
+        partidaValida.setUnidad("m2");
+        partidaValida.setCantidadPresupuestada(new BigDecimal("100.00"));
+        partidaValida.setPrecioUnitario(new BigDecimal("5.00"));
+
+        ResponseEntity<PartidaConstruccionEntity> resp = construccionController.crearPartida(proy1.getId(), partidaValida);
+        assertEquals(HttpStatus.OK, resp.getStatusCode());
+        assertEquals(capProy1.getId(), resp.getBody().getCapituloId());
+    }
+
     // 5. Aislamiento en Eliminación: Tenant B no puede eliminar partida de Tenant A
     @Test
     void aislamientoEliminacion_tenantBNoPuedeEliminarPartidaDeA() {
@@ -224,6 +272,31 @@ public class ConstruccionAislamientoTenantP0Test {
         ResponseEntity<InsumoConstruccionEntity> respValida = construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("4.00")));
         assertEquals(HttpStatus.OK, respValida.getStatusCode());
         assertEquals(new BigDecimal("6.00"), respValida.getBody().getStockActual());
+    }
+
+    // 6B. Descuento atómico de stock y bloqueo de sobreconsumo
+    @Test
+    void consumoInsumo_descuentoAtomicoYProteccionConcurrente() {
+        long tenant = 99502L;
+        InsumoConstruccionEntity insumo = crearInsumoHelper(tenant, "INS-ATOM-01", "Cemento Portland", new BigDecimal("20.00"));
+
+        TenantContext.setCurrentTenant(tenant);
+
+        // Consumo atómico válido de 5 sacos
+        ResponseEntity<InsumoConstruccionEntity> resp1 = construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("5.00")));
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertEquals(new BigDecimal("15.00"), resp1.getBody().getStockActual());
+
+        // Consumo atómico válido de 15 sacos (deja stock en 0)
+        ResponseEntity<InsumoConstruccionEntity> resp2 = construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("15.00")));
+        assertEquals(HttpStatus.OK, resp2.getStatusCode());
+        assertEquals(new BigDecimal("0.00"), resp2.getBody().getStockActual());
+
+        // Consumo adicional cuando ya está en 0 -> Rechazado con 400 Bad Request
+        ResponseStatusException exSinStock = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.registrarConsumo(insumo.getId(), Map.of("cantidad", new BigDecimal("1.00")));
+        });
+        assertEquals(HttpStatus.BAD_REQUEST, exSinStock.getStatusCode());
     }
 
     // 7. Rechazo de Estados de Valuación Arbitrarios

@@ -10,6 +10,6 @@ import java.util.Optional;
 @Repository
 public interface CapituloConstruccionRepository extends JpaRepository<CapituloConstruccionEntity, Long> {
     List<CapituloConstruccionEntity> findByTenantIdOrderByOrdenAsc(Long tenantId);
+    List<CapituloConstruccionEntity> findByTenantIdAndProyectoIdOrderByOrdenAsc(Long tenantId, Long proyectoId);
     Optional<CapituloConstruccionEntity> findByTenantIdAndId(Long tenantId, Long id);
 }
-

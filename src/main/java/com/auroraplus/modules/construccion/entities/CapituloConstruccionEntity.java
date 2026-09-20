@@ -13,6 +13,9 @@ public class CapituloConstruccionEntity {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
+    @Column(name = "proyecto_id")
+    private Long proyectoId;
+
     @Column(name = "codigo", nullable = false, length = 50)
     private String codigo;
 
@@ -27,6 +30,9 @@ public class CapituloConstruccionEntity {
 
     public Long getTenantId() { return tenantId; }
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
+
+    public Long getProyectoId() { return proyectoId; }
+    public void setProyectoId(Long proyectoId) { this.proyectoId = proyectoId; }
 
     public String getCodigo() { return codigo; }
     public void setCodigo(String codigo) { this.codigo = codigo; }
