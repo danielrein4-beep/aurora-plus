@@ -49,6 +49,14 @@ import {
   listarDespachosConstruccionApi,
   crearDespachoConstruccionApi,
   cambiarEstadoDespachoConstruccionApi,
+  type MaquinariaConstruccionApi,
+  type MantenimientoMaquinariaApi,
+  listarMaquinariasConstruccionApi,
+  crearMaquinariaConstruccionApi,
+  actualizarMaquinariaConstruccionApi,
+  actualizarHorometroMaquinariaApi,
+  listarMantenimientosMaquinariaApi,
+  crearMantenimientoMaquinariaApi,
 } from '../api';
 
 interface Props {
@@ -62,6 +70,7 @@ type TabConstruccion =
   | 'valuaciones'
   | 'insumos'
   | 'logistica'
+  | 'maquinaria'
   | 'bitacora'
   | 'avanzado';
 
@@ -115,6 +124,45 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const [insumoConsumo, setInsumoConsumo] = useState<InsumoConstruccionApi | null>(null);
 
   const [modalDespachoAbierto, setModalDespachoAbierto] = useState(false);
+
+  // Estados de Maquinaria y Equipos
+  const [maquinarias, setMaquinarias] = useState<MaquinariaConstruccionApi[]>([]);
+  const [cargandoMaquinarias, setCargandoMaquinarias] = useState(false);
+  const [filtroTipoMaq, setFiltroTipoMaq] = useState<string>('TODOS');
+  const [modalMaquinariaAbierto, setModalMaquinariaAbierto] = useState(false);
+  const [modalHorometroTarget, setModalHorometroTarget] = useState<MaquinariaConstruccionApi | null>(null);
+  const [nuevoHorometroInput, setNuevoHorometroInput] = useState('');
+  const [nuevoOperadorInput, setNuevoOperadorInput] = useState('');
+  const [modalMantTarget, setModalMantTarget] = useState<MaquinariaConstruccionApi | null>(null);
+  const [historialMantenimientos, setHistorialMantenimientos] = useState<MantenimientoMaquinariaApi[]>([]);
+  const [cargandoMantenimientos, setCargandoMantenimientos] = useState(false);
+  const [mostrarFormMant, setMostrarFormMant] = useState(false);
+  const [formMant, setFormMant] = useState({
+    tipo: 'PREVENTIVO',
+    fechaMantenimiento: new Date().toISOString().split('T')[0],
+    horometroEnMantenimiento: '',
+    descripcionTrabajo: '',
+    mecanicoOTaller: '',
+    costoTotalUsd: '0',
+    repuestosUtilizados: ''
+  });
+  const [formNuevaMaquinaria, setFormNuevaMaquinaria] = useState({
+    codigo: '',
+    nombre: '',
+    tipo: 'PESADA',
+    marca: '',
+    modelo: '',
+    serialChasis: '',
+    placa: '',
+    horometroActual: '0',
+    intervaloMantenimientoHoras: '250',
+    estado: 'OPERATIVO',
+    operadorResponsable: '',
+    costoHoraUsd: '0',
+    combustibleTipo: 'DIESEL',
+    asignarAProyecto: true,
+    observaciones: ''
+  });
   const [modalBitacoraAbierto, setModalBitacoraAbierto] = useState(false);
 
   // Catálogo COVENIN
@@ -347,8 +395,9 @@ export default function ConstruccionApp({ onSalir }: Props) {
           { id: 'valuaciones', label: 'Valuaciones de Obra', icon: IconCheckCircle, count: valuaciones.length },
           { id: 'insumos', label: 'Insumos & Stock', icon: IconBox, count: insumos.length },
           { id: 'logistica', label: 'Logística & Despachos', icon: IconTruck, count: despachos.length },
+          { id: 'maquinaria', label: 'Maquinaria & Equipos', icon: IconWrench, count: maquinarias.length },
           { id: 'bitacora', label: 'Libro Diario / Bitácora', icon: IconCalendar, count: bitacora.length },
-          { id: 'avanzado', label: 'Ingeniería Avanzada', icon: IconWrench, badge: 'Próximamente' },
+          { id: 'avanzado', label: 'Ingeniería Avanzada', icon: IconUsers, badge: 'Próximamente' },
         ].map((item) => {
           const Icon = item.icon;
           const activa = tabActiva === item.id;

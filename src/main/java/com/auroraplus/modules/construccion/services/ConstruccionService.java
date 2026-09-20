@@ -29,6 +29,18 @@ public class ConstruccionService {
             "EN_TRANSITO", "EN_BASCULA", "DESCARGANDO", "RECIBIDO", "RECHAZADO"
     );
 
+    public static final Set<String> ESTADOS_MAQUINARIA_VALIDOS = Set.of(
+            "OPERATIVO", "EN_MANTENIMIENTO", "FUERA_DE_SERVICIO", "STANDBY"
+    );
+
+    public static final Set<String> TIPOS_MAQUINARIA_VALIDOS = Set.of(
+            "PESADA", "LIVIANA", "TRANSPORTE", "HERRAMIENTA_MENOR", "GENERADOR"
+    );
+
+    public static final Set<String> TIPOS_MANTENIMIENTO_VALIDOS = Set.of(
+            "PREVENTIVO", "CORRECTIVO", "OVERHAUL", "INSPECCION_DIARIA"
+    );
+
     @Autowired
     private ProyectoConstruccionRepository proyectoRepository;
 
@@ -52,6 +64,12 @@ public class ConstruccionService {
 
     @Autowired
     private DespachoConstruccionRepository despachoRepository;
+
+    @Autowired
+    private MaquinariaConstruccionRepository maquinariaRepository;
+
+    @Autowired
+    private MantenimientoMaquinariaRepository mantenimientoRepository;
 
     @Autowired
     private IdempotenciaConstruccionRepository idempotenciaRepository;
@@ -766,5 +784,241 @@ public class ConstruccionService {
         }
 
         return despachoRepository.save(despacho);
+    }
+
+    // --- MAQUINARIA Y EQUIPOS DE OBRA ---
+
+    public List<MaquinariaConstruccionEntity> listarMaquinarias(Long tenantId, Long proyectoId) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        if (proyectoId != null) {
+            proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+            return maquinariaRepository.findByTenantIdAndProyectoIdOrderByCodigoAsc(tenantId, proyectoId);
+        }
+        return maquinariaRepository.findByTenantIdOrderByCodigoAsc(tenantId);
+    }
+
+    public Optional<MaquinariaConstruccionEntity> obtenerMaquinaria(Long tenantId, Long id) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        return maquinariaRepository.findByTenantIdAndId(tenantId, id);
+    }
+
+    public MaquinariaConstruccionEntity registrarMaquinaria(Long tenantId, MaquinariaConstruccionEntity req) {
+        return registrarMaquinaria(tenantId, req, null);
+    }
+
+    @Transactional
+    public MaquinariaConstruccionEntity registrarMaquinaria(Long tenantId, MaquinariaConstruccionEntity req, String idempotencyKey) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        if (req.getCodigo() == null || req.getCodigo().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El código del equipo o maquinaria es obligatorio");
+        }
+        if (req.getNombre() == null || req.getNombre().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre del equipo o maquinaria es obligatorio");
+        }
+        String codigoLimpio = req.getCodigo().trim().toUpperCase();
+
+        if (req.getProyectoId() != null) {
+            proyectoRepository.findByTenantIdAndId(tenantId, req.getProyectoId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El proyecto asignado no existe o pertenece a otro tenant"));
+        }
+
+        if (req.getTipo() == null || req.getTipo().trim().isEmpty()) {
+            req.setTipo("PESADA");
+        } else if (!TIPOS_MAQUINARIA_VALIDOS.contains(req.getTipo().trim().toUpperCase())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de maquinaria inválido: " + req.getTipo());
+        } else {
+            req.setTipo(req.getTipo().trim().toUpperCase());
+        }
+
+        if (req.getEstado() == null || req.getEstado().trim().isEmpty()) {
+            req.setEstado("OPERATIVO");
+        } else if (!ESTADOS_MAQUINARIA_VALIDOS.contains(req.getEstado().trim().toUpperCase())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de maquinaria inválido: " + req.getEstado());
+        } else {
+            req.setEstado(req.getEstado().trim().toUpperCase());
+        }
+
+        if (req.getHorometroActual() != null && req.getHorometroActual().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El horómetro actual no puede ser negativo");
+        }
+
+        // 1. Idempotencia: si es reintento con la misma clave, retornar el recurso existente
+        String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
+                ? calcularSha256("MAQ|" + codigoLimpio + "|" + req.getTipo() + "|" + req.getHorometroActual())
+                : null;
+
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            Optional<IdempotenciaConstruccionEntity> claim = idempotenciaService.reclamarClave(
+                    tenantId, idempotencyKey, "MAQUINARIA_CONSTRUCCION", payloadHash
+            );
+            if (claim.isPresent()) {
+                IdempotenciaConstruccionEntity idemp = claim.get();
+                if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
+                    try {
+                        return objectMapper.readValue(idemp.getResultadoJson(), MaquinariaConstruccionEntity.class);
+                    } catch (Exception ignored) {}
+                }
+                if (idemp.getRecursoId() != null) {
+                    return maquinariaRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Maquinaria no encontrada"));
+                }
+            }
+        }
+
+        // 2. Si no es reintento idempotente, verificar unicidad de código
+        if (maquinariaRepository.findByTenantIdAndCodigo(tenantId, codigoLimpio).isPresent()) {
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe una maquinaria con el código " + codigoLimpio);
+        }
+
+        try {
+            req.setId(null);
+            req.setTenantId(tenantId);
+            req.setCodigo(codigoLimpio);
+            if (req.getHorometroActual() == null) req.setHorometroActual(BigDecimal.ZERO);
+            if (req.getHorometroUltimoMantenimiento() == null) req.setHorometroUltimoMantenimiento(req.getHorometroActual());
+            if (req.getIntervaloMantenimientoHoras() == null) req.setIntervaloMantenimientoHoras(new BigDecimal("250.00"));
+
+            MaquinariaConstruccionEntity guardado = maquinariaRepository.save(req);
+
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                String json = null;
+                try {
+                    json = objectMapper.writeValueAsString(guardado);
+                } catch (Exception ignored) {}
+                idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
+            }
+
+            return guardado;
+        } catch (Exception ex) {
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            }
+            throw ex;
+        }
+    }
+
+    @Transactional
+    public MaquinariaConstruccionEntity actualizarHorometro(Long tenantId, Long id, BigDecimal nuevoHorometro, String operador) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        if (nuevoHorometro == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nuevo horómetro es obligatorio");
+        }
+        MaquinariaConstruccionEntity maq = maquinariaRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Maquinaria no encontrada para este tenant"));
+
+        if (nuevoHorometro.compareTo(maq.getHorometroActual()) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El horómetro nuevo (" + nuevoHorometro + ") no puede ser menor que el actual (" + maq.getHorometroActual() + ")");
+        }
+
+        maq.setHorometroActual(nuevoHorometro);
+        if (operador != null && !operador.trim().isEmpty()) {
+            maq.setOperadorResponsable(operador.trim());
+        }
+        return maquinariaRepository.save(maq);
+    }
+
+    @Transactional
+    public MaquinariaConstruccionEntity actualizarMaquinaria(Long tenantId, Long id, MaquinariaConstruccionEntity req) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        MaquinariaConstruccionEntity maq = maquinariaRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Maquinaria no encontrada para este tenant"));
+
+        if (req.getNombre() != null && !req.getNombre().trim().isEmpty()) {
+            maq.setNombre(req.getNombre().trim());
+        }
+        if (req.getTipo() != null && TIPOS_MAQUINARIA_VALIDOS.contains(req.getTipo().trim().toUpperCase())) {
+            maq.setTipo(req.getTipo().trim().toUpperCase());
+        }
+        if (req.getMarca() != null) maq.setMarca(req.getMarca().trim());
+        if (req.getModelo() != null) maq.setModelo(req.getModelo().trim());
+        if (req.getSerialChasis() != null) maq.setSerialChasis(req.getSerialChasis().trim());
+        if (req.getPlaca() != null) maq.setPlaca(req.getPlaca().trim());
+        if (req.getOperadorResponsable() != null) maq.setOperadorResponsable(req.getOperadorResponsable().trim());
+        if (req.getCostoHoraUsd() != null && req.getCostoHoraUsd().compareTo(BigDecimal.ZERO) >= 0) {
+            maq.setCostoHoraUsd(req.getCostoHoraUsd());
+        }
+        if (req.getCombustibleTipo() != null) maq.setCombustibleTipo(req.getCombustibleTipo().trim());
+        if (req.getCapacidadTanqueLitros() != null) maq.setCapacidadTanqueLitros(req.getCapacidadTanqueLitros());
+        if (req.getConsumoPromedioLph() != null) maq.setConsumoPromedioLph(req.getConsumoPromedioLph());
+        if (req.getObservaciones() != null) maq.setObservaciones(req.getObservaciones().trim());
+
+        if (req.getEstado() != null && !req.getEstado().trim().isEmpty()) {
+            String est = req.getEstado().trim().toUpperCase();
+            if (!ESTADOS_MAQUINARIA_VALIDOS.contains(est)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de maquinaria inválido: " + est);
+            }
+            maq.setEstado(est);
+        }
+
+        if (req.getProyectoId() != null) {
+            proyectoRepository.findByTenantIdAndId(tenantId, req.getProyectoId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El proyecto asignado no existe o pertenece a otro tenant"));
+            maq.setProyectoId(req.getProyectoId());
+        }
+
+        return maquinariaRepository.save(maq);
+    }
+
+    public List<MantenimientoMaquinariaEntity> listarMantenimientos(Long tenantId, Long maquinariaId) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        maquinariaRepository.findByTenantIdAndId(tenantId, maquinariaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Maquinaria no encontrada para este tenant"));
+        return mantenimientoRepository.findByTenantIdAndMaquinariaIdOrderByFechaMantenimientoDesc(tenantId, maquinariaId);
+    }
+
+    @Transactional
+    public MantenimientoMaquinariaEntity registrarMantenimiento(Long tenantId, Long maquinariaId, MantenimientoMaquinariaEntity req) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        MaquinariaConstruccionEntity maq = maquinariaRepository.findByTenantIdAndId(tenantId, maquinariaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Maquinaria no encontrada para este tenant"));
+
+        if (req.getTipo() == null || !TIPOS_MANTENIMIENTO_VALIDOS.contains(req.getTipo().trim().toUpperCase())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de mantenimiento inválido");
+        }
+        req.setTipo(req.getTipo().trim().toUpperCase());
+
+        if (req.getFechaMantenimiento() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de mantenimiento es obligatoria");
+        }
+        if (req.getDescripcionTrabajo() == null || req.getDescripcionTrabajo().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La descripción del trabajo de mantenimiento es obligatoria");
+        }
+        if (req.getHorometroEnMantenimiento() == null || req.getHorometroEnMantenimiento().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El horómetro en mantenimiento es obligatorio y no negativo");
+        }
+
+        req.setId(null);
+        req.setTenantId(tenantId);
+        req.setMaquinariaId(maquinariaId);
+
+        // Actualizar datos de mantenimiento en la ficha de la máquina
+        maq.setHorometroUltimoMantenimiento(req.getHorometroEnMantenimiento());
+        if (req.getHorometroEnMantenimiento().compareTo(maq.getHorometroActual()) > 0) {
+            maq.setHorometroActual(req.getHorometroEnMantenimiento());
+        }
+        if ("EN_MANTENIMIENTO".equals(maq.getEstado())) {
+            maq.setEstado("OPERATIVO");
+        }
+        maquinariaRepository.save(maq);
+
+        return mantenimientoRepository.save(req);
     }
 }

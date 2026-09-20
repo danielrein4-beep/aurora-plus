@@ -997,4 +997,106 @@ public class ConstruccionAislamientoTenantP0Test {
         );
         assertEquals(HttpStatus.BAD_REQUEST, exInsumo.getStatusCode());
     }
+
+    @Test
+    void maquinaria_aislamientoHorometroMantenimientoEIdempotencia() {
+        long tenant1 = 77710L;
+        TenantContext.setCurrentTenant(tenant1);
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant1, "PROY-MAQ-01", "Puente Rio Neveri");
+        Long proyId = proy.getId();
+
+        // 1. Registro de maquinaria con idempotencia
+        MaquinariaConstruccionEntity maq = new MaquinariaConstruccionEntity();
+        maq.setCodigo("EXC-01");
+        maq.setNombre("Excavadora Caterpillar 320D");
+        maq.setTipo("PESADA");
+        maq.setMarca("Caterpillar");
+        maq.setModelo("320D");
+        maq.setHorometroActual(new BigDecimal("1250.50"));
+        maq.setProyectoId(proyId);
+        maq.setCostoHoraUsd(new BigDecimal("85.00"));
+        maq.setOperadorResponsable("Carlos Mendoza");
+
+        String ik = "IK-MAQ-TEST-001";
+        ResponseEntity<MaquinariaConstruccionEntity> resp1 = construccionController.registrarMaquinaria(maq, ik);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertNotNull(resp1.getBody().getId());
+        Long maqId = resp1.getBody().getId();
+        assertEquals("OPERATIVO", resp1.getBody().getEstado());
+
+        // 2. Reintento idempotente devuelve el mismo id
+        ResponseEntity<MaquinariaConstruccionEntity> respReintento = construccionController.registrarMaquinaria(maq, ik);
+        assertEquals(HttpStatus.OK, respReintento.getStatusCode());
+        assertEquals(maqId, respReintento.getBody().getId());
+
+        List<MaquinariaConstruccionEntity> lista1 = construccionController.listarMaquinarias(proyId);
+        assertEquals(1, lista1.size(), "No debe haber duplicados por idempotencia");
+
+        // 3. Validacion de horometro: no puede retroceder
+        ResponseStatusException exRetroceso = assertThrows(ResponseStatusException.class, () ->
+                construccionController.actualizarHorometro(maqId, Map.of("horometro", "1000.00"))
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exRetroceso.getStatusCode());
+
+        // Actualizacion valida de horometro
+        ResponseEntity<MaquinariaConstruccionEntity> respHorom = construccionController.actualizarHorometro(
+                maqId, Map.of("horometro", "1265.00", "operador", "Pedro Gomez")
+        );
+        assertEquals(HttpStatus.OK, respHorom.getStatusCode());
+        assertEquals(new BigDecimal("1265.00"), respHorom.getBody().getHorometroActual());
+        assertEquals("Pedro Gomez", respHorom.getBody().getOperadorResponsable());
+
+        // 4. Registro de mantenimiento preventivo
+        MantenimientoMaquinariaEntity mant = new MantenimientoMaquinariaEntity();
+        mant.setTipo("PREVENTIVO");
+        mant.setFechaMantenimiento(java.time.LocalDate.now());
+        mant.setHorometroEnMantenimiento(new BigDecimal("1265.00"));
+        mant.setDescripcionTrabajo("Cambio de aceite motor 15W40 y juego completo de filtros");
+        mant.setMecanicoOTaller("Taller Central Diesel");
+        mant.setCostoTotalUsd(new BigDecimal("350.00"));
+
+        ResponseEntity<MantenimientoMaquinariaEntity> respMant = construccionController.registrarMantenimiento(maqId, mant);
+        assertEquals(HttpStatus.OK, respMant.getStatusCode());
+        assertNotNull(respMant.getBody().getId());
+
+        List<MantenimientoMaquinariaEntity> historico = construccionController.listarMantenimientos(maqId);
+        assertEquals(1, historico.size());
+        assertEquals("PREVENTIVO", historico.get(0).getTipo());
+
+        // 5. Aislamiento Cross-Tenant
+        long tenantAjeno = 88833L;
+        TenantContext.setCurrentTenant(tenantAjeno);
+
+        // No ve maquinarias de otro tenant
+        List<MaquinariaConstruccionEntity> listaAjena = construccionController.listarMaquinarias(null);
+        assertTrue(listaAjena.isEmpty(), "Tenant ajeno no debe ver maquinarias de otro tenant");
+
+        // Obtener por ID ajeno -> 404
+        ResponseEntity<MaquinariaConstruccionEntity> respObtenerAjeno = construccionController.obtenerMaquinaria(maqId);
+        assertEquals(HttpStatus.NOT_FOUND, respObtenerAjeno.getStatusCode());
+
+        // Actualizar horometro ajeno -> 404
+        ResponseStatusException exHoromAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.actualizarHorometro(maqId, Map.of("horometro", "1300.00"))
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exHoromAjeno.getStatusCode());
+
+        // Registrar mantenimiento en maquina ajena -> 404
+        ResponseStatusException exMantAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarMantenimiento(maqId, mant)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exMantAjeno.getStatusCode());
+
+        // Asignar proyecto de otro tenant -> 400
+        MaquinariaConstruccionEntity maqCrossProy = new MaquinariaConstruccionEntity();
+        maqCrossProy.setCodigo("RET-09");
+        maqCrossProy.setNombre("Retroexcavadora");
+        maqCrossProy.setTipo("PESADA");
+        maqCrossProy.setProyectoId(proyId); // Proyecto de tenant1
+
+        ResponseStatusException exCrossProy = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarMaquinaria(maqCrossProy, "IK-MAQ-CROSS")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exCrossProy.getStatusCode());
+    }
 }

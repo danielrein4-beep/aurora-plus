@@ -223,4 +223,55 @@ public class ConstruccionController {
         String observaciones = body != null ? body.get("observaciones") : null;
         return ResponseEntity.ok(construccionService.actualizarEstadoDespacho(requireTenant(), id, nuevoEstado, observaciones));
     }
+
+    // --- MAQUINARIA Y EQUIPOS DE OBRA ---
+    @GetMapping("/maquinarias")
+    public List<MaquinariaConstruccionEntity> listarMaquinarias(@RequestParam(required = false) Long proyectoId) {
+        return construccionService.listarMaquinarias(requireTenant(), proyectoId);
+    }
+
+    @GetMapping("/maquinarias/{id}")
+    public ResponseEntity<MaquinariaConstruccionEntity> obtenerMaquinaria(@PathVariable Long id) {
+        return construccionService.obtenerMaquinaria(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/maquinarias")
+    public ResponseEntity<MaquinariaConstruccionEntity> registrarMaquinaria(
+            @RequestBody MaquinariaConstruccionEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarMaquinaria(requireTenant(), req, idempotencyKey));
+    }
+
+    @PutMapping("/maquinarias/{id}")
+    public ResponseEntity<MaquinariaConstruccionEntity> actualizarMaquinaria(
+            @PathVariable Long id,
+            @RequestBody MaquinariaConstruccionEntity req) {
+        return ResponseEntity.ok(construccionService.actualizarMaquinaria(requireTenant(), id, req));
+    }
+
+    @PatchMapping("/maquinarias/{id}/horometro")
+    public ResponseEntity<MaquinariaConstruccionEntity> actualizarHorometro(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        BigDecimal nuevoHorometro = null;
+        if (body != null && body.get("horometro") != null) {
+            nuevoHorometro = new BigDecimal(body.get("horometro").toString());
+        }
+        String operador = body != null && body.get("operador") != null ? body.get("operador").toString() : null;
+        return ResponseEntity.ok(construccionService.actualizarHorometro(requireTenant(), id, nuevoHorometro, operador));
+    }
+
+    @GetMapping("/maquinarias/{id}/mantenimientos")
+    public List<MantenimientoMaquinariaEntity> listarMantenimientos(@PathVariable Long id) {
+        return construccionService.listarMantenimientos(requireTenant(), id);
+    }
+
+    @PostMapping("/maquinarias/{id}/mantenimientos")
+    public ResponseEntity<MantenimientoMaquinariaEntity> registrarMantenimiento(
+            @PathVariable Long id,
+            @RequestBody MantenimientoMaquinariaEntity req) {
+        return ResponseEntity.ok(construccionService.registrarMantenimiento(requireTenant(), id, req));
+    }
 }

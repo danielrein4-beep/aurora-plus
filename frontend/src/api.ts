@@ -4835,3 +4835,91 @@ export function buscarCatalogoCoveninApi(q?: string): Promise<CatalogoCoveninApi
   const query = q ? `?q=${encodeURIComponent(q)}` : '';
   return request(`/api/construccion/catalogo-covenin${query}`);
 }
+
+export interface MaquinariaConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId?: number | null;
+  codigo: string;
+  nombre: string;
+  tipo: string; // PESADA, LIVIANA, TRANSPORTE, HERRAMIENTA_MENOR, GENERADOR
+  marca?: string;
+  modelo?: string;
+  serialChasis?: string;
+  placa?: string;
+  horometroActual: number;
+  horometroUltimoMantenimiento?: number;
+  intervaloMantenimientoHoras?: number;
+  estado: string; // OPERATIVO, EN_MANTENIMIENTO, FUERA_DE_SERVICIO, STANDBY
+  operadorResponsable?: string;
+  costoHoraUsd?: number;
+  combustibleTipo?: string;
+  capacidadTanqueLitros?: number;
+  consumoPromedioLph?: number;
+  observaciones?: string;
+  createdAt?: string;
+}
+
+export interface MantenimientoMaquinariaApi {
+  id?: number;
+  tenantId?: number;
+  maquinariaId: number;
+  tipo: string; // PREVENTIVO, CORRECTIVO, OVERHAUL, INSPECCION_DIARIA
+  fechaMantenimiento: string;
+  horometroEnMantenimiento: number;
+  proximoHorometroMantenimiento?: number;
+  descripcionTrabajo: string;
+  mecanicoOTaller?: string;
+  costoTotalUsd?: number;
+  repuestosUtilizados?: string;
+  createdAt?: string;
+}
+
+export function listarMaquinariasConstruccionApi(proyectoId?: number | null): Promise<MaquinariaConstruccionApi[]> {
+  const query = proyectoId ? `?proyectoId=${proyectoId}` : '';
+  return request(`/api/construccion/maquinarias${query}`);
+}
+
+export function obtenerMaquinariaConstruccionApi(id: number): Promise<MaquinariaConstruccionApi> {
+  return request(`/api/construccion/maquinarias/${id}`);
+}
+
+export function crearMaquinariaConstruccionApi(datos: Partial<MaquinariaConstruccionApi>, idempotencyKey?: string): Promise<MaquinariaConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+  return request(`/api/construccion/maquinarias`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function actualizarMaquinariaConstruccionApi(id: number, datos: Partial<MaquinariaConstruccionApi>): Promise<MaquinariaConstruccionApi> {
+  return request(`/api/construccion/maquinarias/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(datos)
+  });
+}
+
+export function actualizarHorometroMaquinariaApi(id: number, horometro: number, operador?: string): Promise<MaquinariaConstruccionApi> {
+  return request(`/api/construccion/maquinarias/${id}/horometro`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ horometro, operador })
+  });
+}
+
+export function listarMantenimientosMaquinariaApi(maquinariaId: number): Promise<MantenimientoMaquinariaApi[]> {
+  return request(`/api/construccion/maquinarias/${maquinariaId}/mantenimientos`);
+}
+
+export function crearMantenimientoMaquinariaApi(maquinariaId: number, datos: Partial<MantenimientoMaquinariaApi>): Promise<MantenimientoMaquinariaApi> {
+  return request(`/api/construccion/maquinarias/${maquinariaId}/mantenimientos`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(datos)
+  });
+}
