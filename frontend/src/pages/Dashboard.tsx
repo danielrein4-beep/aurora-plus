@@ -1,4 +1,4 @@
-﻿import { obtenerCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
+import { obtenerCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
 import TenantSoporteWidget from "../components/TenantSoporteWidget";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -7,7 +7,7 @@ import {
   AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconCard, IconUsers, IconCustomize,
   IconStethoscope, IconCalendar, IconPrescription, IconRocket, IconDownload, IconKey,
   IconHourglass, IconUser, IconClose, IconCheckCircle, IconBank, IconChat, IconFileText,
-  IconRestaurant, IconFarm, IconShield, IconScissors, IconConstruction,
+  IconRestaurant, IconFarm, IconShield,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -49,8 +49,6 @@ const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNod
   restaurante: IconRestaurant,
   finca: IconFarm,
   ganaderia: IconFarm,
-  peluqueria: IconScissors,
-  construccion: IconConstruction,
 };
 
 const ACTION_ICON: Record<string, (props: { size?: number }) => React.ReactNode> = {
@@ -267,42 +265,6 @@ const VERTICAL_METADATA: Record<string, {
     ],
     defaultPatients: [],
   },
-    construccion: {
-    name: "Aurora Obras & Construcción",
-    badge: "EDICIÓN CONSTRUCCIÓN & OBRAS CIVILES",
-    desc: "Presupuesto por partidas (COVENIN/APU), valuaciones de avance, cómputos métricos y cotizaciones PDF.",
-    stats: [
-      { label: "Obras Activas", val: "2", change: "En ejecución", color: "text-amber-500 dark:text-amber-400" },
-      { label: "Presupuesto Global", val: "$148,500", change: "Partidas presupuestadas", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Avance Físico", val: "42.5%", change: "Valuaciones presentadas", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Por Cobrar Valuaciones", val: "$34,200", change: "En revisión de inspección", color: "text-purple-500 dark:text-purple-400" },
-    ],
-    actions: [
-      { label: "Nueva Partida", desc: "Cargar partida con APU y cómputo" },
-      { label: "Generar Valuación", desc: "Registrar avance medido en campo" },
-      { label: "Cotización PDF", desc: "Exportar presupuesto formal con membrete" },
-      { label: "Bitácora de Campo", desc: "Asentar jornada, clima y cuadrillas" },
-    ],
-    defaultPatients: [],
-  },
-  peluqueria: {
-    name: "Aurora Beauty & Peluquería",
-    badge: "EDICIÓN PELUQUERÍA & BELLEZA",
-    desc: "Agenda de citas, turnos walk-in, fichas de colorimetría, comisiones a estilistas y retención a los 21 días.",
-    stats: [
-      { label: "Citas de Hoy", val: "0", change: "Sin citas pendientes", color: "text-rose-500 dark:text-rose-400" },
-      { label: "Clientas en Sillón", val: "0", change: "Tocadores libres", color: "text-amber-500 dark:text-amber-400" },
-      { label: "Ventas del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-emerald-500 dark:text-emerald-400" },
-      { label: "Retención 21 Días", val: "0", change: "Listas para WhatsApp", color: "text-teal-500 dark:text-teal-400" },
-    ],
-    actions: [
-      { label: "Nueva Cita", desc: "Agendar horario con estilista" },
-      { label: "Turno Walk-In", desc: "Atención rápida sin cita previa" },
-      { label: "Ficha Colorimetría", desc: "Fórmula de tinte y decoloración" },
-      { label: "Caja & Comisiones", desc: "Liquidación por profesional" },
-    ],
-    defaultPatients: [],
-  },
   ganaderia: {
     name: "Aurora Agro & Finca",
     badge: "EDICIÓN FINCAS & GANADERÍA",
@@ -382,14 +344,8 @@ export default function Dashboard() {
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
   const esComercioReal = (esRubroComercio || userIndustry === "farmacia") && !!user?.tenantId;
   const esGanaderiaReal = (userIndustry === "finca" || userIndustry === "ganaderia") && !!user?.tenantId;
-  const esConstruccionReal = userIndustry === "construccion" && !!user?.tenantId;
-  const esPeluqueriaReal = userIndustry === "peluqueria" && !!user?.tenantId;
   const rutaVertical =
-    userIndustry === "construccion"
-      ? "/construccion"
-      : userIndustry === "peluqueria"
-      ? "/peluqueria"
-      : userIndustry === "restaurante"
+    userIndustry === "restaurante"
       ? "/restaurante"
       : (esRubroComercio || userIndustry === "farmacia")
         ? "/comercio"
@@ -398,7 +354,7 @@ export default function Dashboard() {
           : userIndustry === "veterinaria"
             ? "/veterinaria"
             : "/mediclinic";
-  const esVerticalReal = esClinicaReal || esRestauranteReal || esComercioReal || esGanaderiaReal || esConstruccionReal || esPeluqueriaReal;
+  const esVerticalReal = esClinicaReal || esRestauranteReal || esComercioReal || esGanaderiaReal;
 
   useEffect(() => {
     if (!user?.tenantId) return;
@@ -1768,5 +1724,4 @@ export default function Dashboard() {
     </div>
   );
 }
-
 

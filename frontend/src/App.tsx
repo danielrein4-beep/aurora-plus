@@ -1,4 +1,4 @@
-﻿import CatalogoPublico from "./pages/CatalogoPublico";
+import CatalogoPublico from "./pages/CatalogoPublico";
 import NotFound from "./pages/NotFound";
 import { obtenerDatosImpersonacion, salirDeImpersonacion } from "./api";
 import React, { useState, useEffect } from "react";
@@ -23,9 +23,6 @@ import VeterinariaApp from "./components/VeterinariaApp";
 import RestauranteApp from "./components/RestauranteApp";
 import ComercioApp from "./components/ComercioApp";
 import GanaderiaApp from "./components/GanaderiaApp";
-import PeluqueriaApp from "./components/PeluqueriaApp";
-import ConstruccionApp from "./components/ConstruccionApp";
-import PortalReservasPublico from "./components/peluqueria/PortalReservasPublico";
 import CentroFinanciero from "./pages/CentroFinanciero";
 import Auditoria from "./pages/Auditoria";
 import Personal from "./pages/Personal";
@@ -62,17 +59,6 @@ function ComercioPage() {
 function GanaderiaPage() {
   const navigate = useNavigate();
   return <GanaderiaApp onSalir={() => navigate("/dashboard")} />;
-}
-
-
-function ConstruccionPage() {
-  const navigate = useNavigate();
-  return <ConstruccionApp onSalir={() => navigate("/dashboard")} />;
-}
-
-function PeluqueriaPage() {
-  const navigate = useNavigate();
-  return <PeluqueriaApp onSalir={() => navigate("/dashboard")} />;
 }
 
 // Deep link del QR impreso de cada animal: /ganaderia/animal/:animalId
@@ -166,9 +152,6 @@ export default function App() {
             {/* Catalogo digital publico para Retail / Comercio */}
             <Route path="/catalogo/:tenantId" element={<CatalogoPublico />} />
             <Route path="/tienda/:tenantId" element={<CatalogoPublico />} />
-            {/* Portal público de reservas para Peluquería / Salón */}
-            <Route path="/reservar" element={<PortalReservasPublico />} />
-            <Route path="/peluqueria/reservar" element={<PortalReservasPublico />} />
             {/* Auth + onboarding — full screen con transiciones fluidas */}
             <Route path="/auth"       element={<AnimatedRoute><Auth /></AnimatedRoute>} />
             <Route path="/resetear-clave" element={<AnimatedRoute><ResetearClave /></AnimatedRoute>} />
@@ -185,8 +168,6 @@ export default function App() {
             <Route path="/restaurante" element={<ProtectedRoute><AnimatedRoute><RestaurantePage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/comercio"   element={<ProtectedRoute><AnimatedRoute><ComercioPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/ganaderia"  element={<ProtectedRoute><AnimatedRoute><GanaderiaPage /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/construccion" element={<ProtectedRoute><AnimatedRoute><ConstruccionPage /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/peluqueria" element={<ProtectedRoute><AnimatedRoute><PeluqueriaPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/ganaderia/animal/:animalId" element={<ProtectedRoute><AnimatedRoute><GanaderiaAnimalPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
@@ -199,5 +180,3 @@ export default function App() {
     </ThemeProvider>
   );
 }
-
-
