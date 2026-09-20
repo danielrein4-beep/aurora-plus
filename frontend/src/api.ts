@@ -4971,3 +4971,84 @@ export function cambiarEstadoRiesgoConstruccionApi(id: number, estado: string, m
     body: JSON.stringify({ estado, medidasControl })
   });
 }
+
+export interface DocumentoBimApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  codigo: string;
+  titulo: string;
+  disciplina: string; // ARQUITECTURA, ESTRUCTURAS, INSTALACIONES_SANITARIAS, INSTALACIONES_ELECTRICAS, MECANICA_CLIMATIZACION, COORDINACION_GENERAL
+  formato: string; // IFC, RVT_REVIT, DWG_AUTOCAD, PDF_PLANO, NWD_NAVISWORKS, OTRO
+  version: string;
+  autorProyectista?: string;
+  archivoUrl?: string;
+  pesoMb?: number;
+  estadoRevision: string; // VIGENTE, EN_REVISION, SUPERIOR_OBSOLETO, APROBADO_PARA_CONSTRUCCION
+  observaciones?: string;
+  createdAt?: string;
+}
+
+export interface RfiConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  documentoBimId?: number | null;
+  numeroRfi: string;
+  asunto: string;
+  disciplina: string; // ESTRUCTURAS, ARQUITECTURA, MEP, GENERAL
+  preguntaConsulta: string;
+  propuestaSolucion?: string;
+  respuestaOficial?: string;
+  solicitante: string;
+  responsableRespuesta?: string;
+  estado: string; // ABIERTO, EN_EVALUACION, RESPONDIDO, CERRADO
+  fechaLimite?: string;
+  fechaRespuesta?: string;
+  createdAt?: string;
+}
+
+export function listarDocumentosBimApi(proyectoId: number, disciplina?: string): Promise<DocumentoBimApi[]> {
+  const q = disciplina ? `?disciplina=${encodeURIComponent(disciplina)}` : '';
+  return request(`/api/construccion/proyectos/${proyectoId}/bim${q}`);
+}
+
+export function crearDocumentoBimApi(proyectoId: number, datos: Partial<DocumentoBimApi>, idempotencyKey?: string): Promise<DocumentoBimApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+  return request(`/api/construccion/proyectos/${proyectoId}/bim`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function cambiarEstadoDocumentoBimApi(id: number, estado: string): Promise<DocumentoBimApi> {
+  return request(`/api/construccion/bim/${id}/estado`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado })
+  });
+}
+
+export function listarRfisConstruccionApi(proyectoId: number): Promise<RfiConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/rfis`);
+}
+
+export function crearRfiConstruccionApi(proyectoId: number, datos: Partial<RfiConstruccionApi>, idempotencyKey?: string): Promise<RfiConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+  return request(`/api/construccion/proyectos/${proyectoId}/rfis`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function responderRfiConstruccionApi(id: number, respuestaOficial: string, responsableRespuesta?: string, estado?: string): Promise<RfiConstruccionApi> {
+  return request(`/api/construccion/rfis/${id}/respuesta`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ respuestaOficial, responsableRespuesta, estado })
+  });
+}

@@ -52,6 +52,14 @@ import {
   type MaquinariaConstruccionApi,
   type MantenimientoMaquinariaApi,
   type RiesgoConstruccionApi,
+  type DocumentoBimApi,
+  type RfiConstruccionApi,
+  listarDocumentosBimApi,
+  crearDocumentoBimApi,
+  cambiarEstadoDocumentoBimApi,
+  listarRfisConstruccionApi,
+  crearRfiConstruccionApi,
+  responderRfiConstruccionApi,
   listarRiesgosConstruccionApi,
   crearRiesgoConstruccionApi,
   cambiarEstadoRiesgoConstruccionApi,
@@ -76,6 +84,7 @@ type TabConstruccion =
   | 'logistica'
   | 'maquinaria'
   | 'riesgos'
+  | 'bim'
   | 'bitacora'
   | 'avanzado';
 
@@ -141,6 +150,44 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const [cargandoRiesgos, setCargandoRiesgos] = useState(false);
   const [filtroNivelRiesgo, setFiltroNivelRiesgo] = useState<string>('TODOS');
   const [modalRiesgoAbierto, setModalRiesgoAbierto] = useState(false);
+
+  // Estados de BIM & RFIs
+  const [subtabBim, setSubtabBim] = useState<'modelos' | 'rfis'>('modelos');
+  const [documentosBim, setDocumentosBim] = useState<DocumentoBimApi[]>([]);
+  const [cargandoBim, setCargandoBim] = useState(false);
+  const [filtroDisciplinaBim, setFiltroDisciplinaBim] = useState<string>('TODAS');
+  const [modalBimAbierto, setModalBimAbierto] = useState(false);
+  const [rfis, setRfis] = useState<RfiConstruccionApi[]>([]);
+  const [cargandoRfis, setCargandoRfis] = useState(false);
+  const [modalRfiAbierto, setModalRfiAbierto] = useState(false);
+  const [modalResponderRfiTarget, setModalResponderRfiTarget] = useState<RfiConstruccionApi | null>(null);
+  const [formNuevoBim, setFormNuevoBim] = useState({
+    codigo: '',
+    titulo: '',
+    disciplina: 'ESTRUCTURAS',
+    formato: 'IFC',
+    version: 'v1.0',
+    autorProyectista: '',
+    archivoUrl: '',
+    pesoMb: '',
+    estadoRevision: 'APROBADO_PARA_CONSTRUCCION',
+    observaciones: ''
+  });
+  const [formNuevoRfi, setFormNuevoRfi] = useState({
+    numeroRfi: '',
+    asunto: '',
+    disciplina: 'ESTRUCTURAS',
+    documentoBimId: '',
+    preguntaConsulta: '',
+    propuestaSolucion: '',
+    solicitante: '',
+    fechaLimite: ''
+  });
+  const [formRespuestaRfi, setFormRespuestaRfi] = useState({
+    respuestaOficial: '',
+    responsableRespuesta: '',
+    estado: 'RESPONDIDO'
+  });
   const [modalMitigarTarget, setModalMitigarTarget] = useState<RiesgoConstruccionApi | null>(null);
   const [nuevoEstadoRiesgo, setNuevoEstadoRiesgo] = useState('EN_MITIGACION');
   const [medidasAdicionalesInput, setMedidasAdicionalesInput] = useState('');
@@ -424,8 +471,9 @@ export default function ConstruccionApp({ onSalir }: Props) {
           { id: 'logistica', label: 'Logística & Despachos', icon: IconTruck, count: despachos.length },
           { id: 'maquinaria', label: 'Maquinaria & Equipos', icon: IconWrench, count: maquinarias.length },
           { id: 'riesgos', label: 'Matriz Riesgos & SST', icon: IconWarning, count: riesgos.length },
+          { id: 'bim', label: 'BIM & Planos (RFIs)', icon: IconFileText, count: documentosBim.length + rfis.length },
           { id: 'bitacora', label: 'Libro Diario / Bitácora', icon: IconCalendar, count: bitacora.length },
-          { id: 'avanzado', label: 'Ingeniería Avanzada', icon: IconUsers, badge: 'Próximamente' },
+          { id: 'avanzado', label: 'Cuadrillas & Frentes', icon: IconUsers, badge: 'Paso 6' },
         ].map((item) => {
           const Icon = item.icon;
           const activa = tabActiva === item.id;

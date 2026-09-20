@@ -1185,4 +1185,122 @@ public class ConstruccionAislamientoTenantP0Test {
         );
         assertEquals(HttpStatus.NOT_FOUND, exCrearEnAjeno.getStatusCode());
     }
+
+    @Test
+    void bimYRfi_aislamientoControlVersionesEIdempotencia() {
+        long tenant1 = 55512L;
+        TenantContext.setCurrentTenant(tenant1);
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant1, "PROY-BIM-01", "Torre Financiera Orinoco");
+        Long proyId = proy.getId();
+
+        // 1. Registro de Modelo BIM / IFC con idempotencia
+        DocumentoBimEntity bim = new DocumentoBimEntity();
+        bim.setCodigo("BIM-EST-01");
+        bim.setTitulo("Modelo Estructural de Superestructura y Vigas Nivel +4.00");
+        bim.setDisciplina("ESTRUCTURAS");
+        bim.setFormato("IFC");
+        bim.setVersion("v1.0");
+        bim.setAutorProyectista("Ing. Calculista Soto");
+        bim.setArchivoUrl("https://storage.auroraplus.com/proyectos/bim/BIM-EST-01_v1.ifc");
+        bim.setPesoMb(new BigDecimal("145.50"));
+
+        String ikBim = "IK-BIM-TEST-001";
+        ResponseEntity<DocumentoBimEntity> respBim1 = construccionController.registrarDocumentoBim(proyId, bim, ikBim);
+        assertEquals(HttpStatus.OK, respBim1.getStatusCode());
+        assertNotNull(respBim1.getBody().getId());
+        Long bimId = respBim1.getBody().getId();
+        assertEquals("VIGENTE", respBim1.getBody().getEstadoRevision());
+
+        // 2. Reintento idempotente devuelve el mismo id
+        ResponseEntity<DocumentoBimEntity> respBimReintento = construccionController.registrarDocumentoBim(proyId, bim, ikBim);
+        assertEquals(HttpStatus.OK, respBimReintento.getStatusCode());
+        assertEquals(bimId, respBimReintento.getBody().getId());
+
+        List<DocumentoBimEntity> listaBim = construccionController.listarDocumentosBim(proyId, null);
+        assertEquals(1, listaBim.size(), "No debe haber duplicados en BIM por idempotencia");
+
+        // 3. Cambio de estado a APROBADO_PARA_CONSTRUCCION
+        ResponseEntity<DocumentoBimEntity> respEstadoBim = construccionController.cambiarEstadoDocumentoBim(
+                bimId, Map.of("estado", "APROBADO_PARA_CONSTRUCCION")
+        );
+        assertEquals(HttpStatus.OK, respEstadoBim.getStatusCode());
+        assertEquals("APROBADO_PARA_CONSTRUCCION", respEstadoBim.getBody().getEstadoRevision());
+
+        // 4. Registro de RFI asociado al modelo BIM
+        RfiConstruccionEntity rfi = new RfiConstruccionEntity();
+        rfi.setNumeroRfi("RFI-001");
+        rfi.setAsunto("Interferencia de tuberia de 6 pulgadas con viga de carga Eje 4");
+        rfi.setDisciplina("MEP");
+        rfi.setPreguntaConsulta("Se solicita autorizacion tecnica para pase de tuberia sanitaria en alma de viga V-102 segun cota +3.40m");
+        rfi.setSolicitante("Ing. Residente Carlos Mendoza");
+        rfi.setDocumentoBimId(bimId);
+        rfi.setFechaLimite(java.time.LocalDate.now().plusDays(3));
+
+        String ikRfi = "IK-RFI-TEST-001";
+        ResponseEntity<RfiConstruccionEntity> respRfi1 = construccionController.registrarRfi(proyId, rfi, ikRfi);
+        assertEquals(HttpStatus.OK, respRfi1.getStatusCode());
+        assertNotNull(respRfi1.getBody().getId());
+        Long rfiId = respRfi1.getBody().getId();
+        assertEquals("ABIERTO", respRfi1.getBody().getEstado());
+
+        // Reintento idempotente RFI
+        ResponseEntity<RfiConstruccionEntity> respRfiReintento = construccionController.registrarRfi(proyId, rfi, ikRfi);
+        assertEquals(HttpStatus.OK, respRfiReintento.getStatusCode());
+        assertEquals(rfiId, respRfiReintento.getBody().getId());
+
+        // 5. Respuesta Oficial al RFI
+        ResponseEntity<RfiConstruccionEntity> respRfiRespuesta = construccionController.responderRfi(
+                rfiId, Map.of(
+                        "respuestaOficial", "Se aprueba pase con encamisado de acero y refuerzo de 2 cabillas #5 segun detalle E-15",
+                        "responsableRespuesta", "Ing. Calculista Soto",
+                        "estado", "RESPONDIDO"
+                )
+        );
+        assertEquals(HttpStatus.OK, respRfiRespuesta.getStatusCode());
+        assertEquals("RESPONDIDO", respRfiRespuesta.getBody().getEstado());
+        assertEquals("Ing. Calculista Soto", respRfiRespuesta.getBody().getResponsableRespuesta());
+        assertNotNull(respRfiRespuesta.getBody().getFechaRespuesta());
+
+        // 6. Aislamiento Cross-Tenant
+        long tenantAjeno = 44488L;
+        TenantContext.setCurrentTenant(tenantAjeno);
+
+        // Listar BIM ajeno -> 404
+        ResponseStatusException exBimAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.listarDocumentosBim(proyId, null)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exBimAjeno.getStatusCode());
+
+        // Obtener BIM ajeno -> 404
+        ResponseEntity<DocumentoBimEntity> respGetBimAjeno = construccionController.obtenerDocumentoBim(bimId);
+        assertEquals(HttpStatus.NOT_FOUND, respGetBimAjeno.getStatusCode());
+
+        // Listar RFIs ajenos -> 404
+        ResponseStatusException exListarRfisAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.listarRfis(proyId)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exListarRfisAjeno.getStatusCode());
+
+        // Responder RFI ajeno -> 404
+        ResponseStatusException exRespRfiAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.responderRfi(rfiId, Map.of("respuestaOficial", "Hack"))
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exRespRfiAjeno.getStatusCode());
+
+        // Crear RFI en proyecto propio pero intentando linkear documento BIM de otro tenant -> 400 BAD_REQUEST
+        ProyectoConstruccionEntity proyAjeno = crearProyectoHelper(tenantAjeno, "PROY-AJENO", "Hospital Central");
+        Long proyAjenoId = proyAjeno.getId();
+
+        RfiConstruccionEntity rfiCrossBim = new RfiConstruccionEntity();
+        rfiCrossBim.setNumeroRfi("RFI-002");
+        rfiCrossBim.setAsunto("Consulta Cross");
+        rfiCrossBim.setPreguntaConsulta("Pregunta");
+        rfiCrossBim.setSolicitante("Ing. X");
+        rfiCrossBim.setDocumentoBimId(bimId); // BIM de tenant 1
+
+        ResponseStatusException exCrossBim = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarRfi(proyAjenoId, rfiCrossBim, "IK-RFI-CROSS")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exCrossBim.getStatusCode());
+    }
 }

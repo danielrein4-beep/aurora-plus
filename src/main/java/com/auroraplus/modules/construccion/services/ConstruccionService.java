@@ -50,6 +50,22 @@ public class ConstruccionService {
             "ALTURA", "EXCAVACION", "ELECTRICO", "MECANICO", "QUIMICO", "LOCATIVO", "BIOMECANICO", "FISICO", "OTRO"
     );
 
+    public static final Set<String> ESTADOS_REVISION_BIM_VALIDOS = Set.of(
+            "VIGENTE", "EN_REVISION", "SUPERIOR_OBSOLETO", "APROBADO_PARA_CONSTRUCCION"
+    );
+
+    public static final Set<String> DISCIPLINAS_BIM_VALIDAS = Set.of(
+            "ARQUITECTURA", "ESTRUCTURAS", "INSTALACIONES_SANITARIAS", "INSTALACIONES_ELECTRICAS", "MECANICA_CLIMATIZACION", "COORDINACION_GENERAL"
+    );
+
+    public static final Set<String> FORMATOS_BIM_VALIDOS = Set.of(
+            "IFC", "RVT_REVIT", "DWG_AUTOCAD", "PDF_PLANO", "NWD_NAVISWORKS", "OTRO"
+    );
+
+    public static final Set<String> ESTADOS_RFI_VALIDOS = Set.of(
+            "ABIERTO", "EN_EVALUACION", "RESPONDIDO", "CERRADO"
+    );
+
     @Autowired
     private ProyectoConstruccionRepository proyectoRepository;
 
@@ -82,6 +98,12 @@ public class ConstruccionService {
 
     @Autowired
     private RiesgoConstruccionRepository riesgoRepository;
+
+    @Autowired
+    private DocumentoBimRepository documentoBimRepository;
+
+    @Autowired
+    private RfiConstruccionRepository rfiRepository;
 
     @Autowired
     private IdempotenciaConstruccionRepository idempotenciaRepository;
@@ -1185,5 +1207,286 @@ public class ConstruccionService {
         }
 
         return riesgoRepository.save(riesgo);
+    }
+
+    // --- GESTIÓN DOCUMENTAL BIM, MODELOS IFC Y CONTROL DE RFIs ---
+
+    public List<DocumentoBimEntity> listarDocumentosBim(Long tenantId, Long proyectoId, String disciplina) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+
+        if (disciplina != null && !disciplina.trim().isEmpty()) {
+            return documentoBimRepository.findByTenantIdAndProyectoIdAndDisciplinaOrderByCodigoAsc(tenantId, proyectoId, disciplina.trim().toUpperCase());
+        }
+        return documentoBimRepository.findByTenantIdAndProyectoIdOrderByCodigoAsc(tenantId, proyectoId);
+    }
+
+    public Optional<DocumentoBimEntity> obtenerDocumentoBim(Long tenantId, Long id) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        return documentoBimRepository.findByTenantIdAndId(tenantId, id);
+    }
+
+    public DocumentoBimEntity registrarDocumentoBim(Long tenantId, Long proyectoId, DocumentoBimEntity req) {
+        return registrarDocumentoBim(tenantId, proyectoId, req, null);
+    }
+
+    @Transactional
+    public DocumentoBimEntity registrarDocumentoBim(Long tenantId, Long proyectoId, DocumentoBimEntity req, String idempotencyKey) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+
+        if (req.getCodigo() == null || req.getCodigo().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El código del modelo o plano es obligatorio");
+        }
+        if (req.getTitulo() == null || req.getTitulo().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El título del modelo o plano es obligatorio");
+        }
+        if (req.getDisciplina() == null || !DISCIPLINAS_BIM_VALIDAS.contains(req.getDisciplina().trim().toUpperCase())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Disciplina técnica inválida: " + req.getDisciplina());
+        }
+        if (req.getFormato() == null || !FORMATOS_BIM_VALIDOS.contains(req.getFormato().trim().toUpperCase())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato técnico inválido: " + req.getFormato());
+        }
+
+        String codigoLimpio = req.getCodigo().trim().toUpperCase();
+        String versionLimpia = (req.getVersion() != null && !req.getVersion().trim().isEmpty()) ? req.getVersion().trim() : "v1.0";
+
+        if (req.getEstadoRevision() == null || !ESTADOS_REVISION_BIM_VALIDOS.contains(req.getEstadoRevision().trim().toUpperCase())) {
+            req.setEstadoRevision("VIGENTE");
+        } else {
+            req.setEstadoRevision(req.getEstadoRevision().trim().toUpperCase());
+        }
+
+        // Idempotencia
+        String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
+                ? calcularSha256("BIM|" + proyectoId + "|" + codigoLimpio + "|" + versionLimpia)
+                : null;
+
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            Optional<IdempotenciaConstruccionEntity> claim = idempotenciaService.reclamarClave(
+                    tenantId, idempotencyKey, "BIM_DOCUMENTO", payloadHash
+            );
+            if (claim.isPresent()) {
+                IdempotenciaConstruccionEntity idemp = claim.get();
+                if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
+                    try {
+                        return objectMapper.readValue(idemp.getResultadoJson(), DocumentoBimEntity.class);
+                    } catch (Exception ignored) {}
+                }
+                if (idemp.getRecursoId() != null) {
+                    return documentoBimRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Documento BIM no encontrado"));
+                }
+            }
+        }
+
+        // Unicidad
+        if (documentoBimRepository.findByTenantIdAndProyectoIdAndCodigoAndVersion(tenantId, proyectoId, codigoLimpio, versionLimpia).isPresent()) {
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe el documento " + codigoLimpio + " en versión " + versionLimpia + " para este proyecto");
+        }
+
+        try {
+            req.setId(null);
+            req.setTenantId(tenantId);
+            req.setProyectoId(proyectoId);
+            req.setCodigo(codigoLimpio);
+            req.setVersion(versionLimpia);
+            req.setDisciplina(req.getDisciplina().trim().toUpperCase());
+            req.setFormato(req.getFormato().trim().toUpperCase());
+
+            DocumentoBimEntity guardado = documentoBimRepository.save(req);
+
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                String json = null;
+                try {
+                    json = objectMapper.writeValueAsString(guardado);
+                } catch (Exception ignored) {}
+                idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
+            }
+
+            return guardado;
+        } catch (Exception ex) {
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            }
+            throw ex;
+        }
+    }
+
+    @Transactional
+    public DocumentoBimEntity actualizarEstadoDocumentoBim(Long tenantId, Long id, String nuevoEstado) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        DocumentoBimEntity doc = documentoBimRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Documento BIM no encontrado para este tenant"));
+
+        if (nuevoEstado != null && !nuevoEstado.trim().isEmpty()) {
+            String est = nuevoEstado.trim().toUpperCase();
+            if (!ESTADOS_REVISION_BIM_VALIDOS.contains(est)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de revisión BIM inválido: " + est);
+            }
+            doc.setEstadoRevision(est);
+        }
+
+        return documentoBimRepository.save(doc);
+    }
+
+    // --- RFIs (CONSULTAS TÉCNICAS DE OBRA) ---
+
+    public List<RfiConstruccionEntity> listarRfis(Long tenantId, Long proyectoId) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+        return rfiRepository.findByTenantIdAndProyectoIdOrderByCreatedAtDesc(tenantId, proyectoId);
+    }
+
+    public Optional<RfiConstruccionEntity> obtenerRfi(Long tenantId, Long id) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        return rfiRepository.findByTenantIdAndId(tenantId, id);
+    }
+
+    public RfiConstruccionEntity registrarRfi(Long tenantId, Long proyectoId, RfiConstruccionEntity req) {
+        return registrarRfi(tenantId, proyectoId, req, null);
+    }
+
+    @Transactional
+    public RfiConstruccionEntity registrarRfi(Long tenantId, Long proyectoId, RfiConstruccionEntity req, String idempotencyKey) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+
+        if (req.getNumeroRfi() == null || req.getNumeroRfi().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número correlativo de RFI es obligatorio");
+        }
+        if (req.getAsunto() == null || req.getAsunto().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El asunto del RFI es obligatorio");
+        }
+        if (req.getPreguntaConsulta() == null || req.getPreguntaConsulta().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La consulta técnica es obligatoria");
+        }
+        if (req.getSolicitante() == null || req.getSolicitante().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El profesional solicitante es obligatorio");
+        }
+
+        if (req.getDocumentoBimId() != null) {
+            documentoBimRepository.findByTenantIdAndId(tenantId, req.getDocumentoBimId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El documento BIM asociado no existe o pertenece a otro tenant"));
+        }
+
+        String numLimpio = req.getNumeroRfi().trim().toUpperCase();
+
+        if (req.getDisciplina() == null || req.getDisciplina().trim().isEmpty()) {
+            req.setDisciplina("GENERAL");
+        } else {
+            req.setDisciplina(req.getDisciplina().trim().toUpperCase());
+        }
+
+        if (req.getEstado() == null || !ESTADOS_RFI_VALIDOS.contains(req.getEstado().trim().toUpperCase())) {
+            req.setEstado("ABIERTO");
+        } else {
+            req.setEstado(req.getEstado().trim().toUpperCase());
+        }
+
+        // Idempotencia
+        String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
+                ? calcularSha256("RFI|" + proyectoId + "|" + numLimpio)
+                : null;
+
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            Optional<IdempotenciaConstruccionEntity> claim = idempotenciaService.reclamarClave(
+                    tenantId, idempotencyKey, "RFI_CONSTRUCCION", payloadHash
+            );
+            if (claim.isPresent()) {
+                IdempotenciaConstruccionEntity idemp = claim.get();
+                if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
+                    try {
+                        return objectMapper.readValue(idemp.getResultadoJson(), RfiConstruccionEntity.class);
+                    } catch (Exception ignored) {}
+                }
+                if (idemp.getRecursoId() != null) {
+                    return rfiRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "RFI no encontrado"));
+                }
+            }
+        }
+
+        // Unicidad dentro del proyecto
+        if (rfiRepository.findByTenantIdAndProyectoIdAndNumeroRfi(tenantId, proyectoId, numLimpio).isPresent()) {
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe el RFI " + numLimpio + " en este proyecto");
+        }
+
+        try {
+            req.setId(null);
+            req.setTenantId(tenantId);
+            req.setProyectoId(proyectoId);
+            req.setNumeroRfi(numLimpio);
+
+            RfiConstruccionEntity guardado = rfiRepository.save(req);
+
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                String json = null;
+                try {
+                    json = objectMapper.writeValueAsString(guardado);
+                } catch (Exception ignored) {}
+                idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
+            }
+
+            return guardado;
+        } catch (Exception ex) {
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            }
+            throw ex;
+        }
+    }
+
+    @Transactional
+    public RfiConstruccionEntity responderRfi(Long tenantId, Long id, String respuestaOficial, String responsableRespuesta, String nuevoEstado) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        RfiConstruccionEntity rfi = rfiRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "RFI no encontrado para este tenant"));
+
+        if (respuestaOficial != null && !respuestaOficial.trim().isEmpty()) {
+            rfi.setRespuestaOficial(respuestaOficial.trim());
+            rfi.setFechaRespuesta(LocalDate.now());
+        }
+        if (responsableRespuesta != null && !responsableRespuesta.trim().isEmpty()) {
+            rfi.setResponsableRespuesta(responsableRespuesta.trim());
+        }
+
+        if (nuevoEstado != null && !nuevoEstado.trim().isEmpty()) {
+            String est = nuevoEstado.trim().toUpperCase();
+            if (!ESTADOS_RFI_VALIDOS.contains(est)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de RFI inválido: " + est);
+            }
+            rfi.setEstado(est);
+        } else if (rfi.getRespuestaOficial() != null && "ABIERTO".equals(rfi.getEstado())) {
+            rfi.setEstado("RESPONDIDO");
+        }
+
+        return rfiRepository.save(rfi);
     }
 }

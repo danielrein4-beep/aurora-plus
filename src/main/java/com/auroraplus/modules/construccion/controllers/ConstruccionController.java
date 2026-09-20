@@ -304,4 +304,65 @@ public class ConstruccionController {
         String medidas = body != null ? body.get("medidasControl") : null;
         return ResponseEntity.ok(construccionService.actualizarEstadoRiesgo(requireTenant(), id, nuevoEstado, medidas));
     }
+
+    // --- GESTIÓN DOCUMENTAL BIM Y CONTROL DE RFIs ---
+    @GetMapping("/proyectos/{proyectoId}/bim")
+    public List<DocumentoBimEntity> listarDocumentosBim(
+            @PathVariable Long proyectoId,
+            @RequestParam(required = false) String disciplina) {
+        return construccionService.listarDocumentosBim(requireTenant(), proyectoId, disciplina);
+    }
+
+    @GetMapping("/bim/{id}")
+    public ResponseEntity<DocumentoBimEntity> obtenerDocumentoBim(@PathVariable Long id) {
+        return construccionService.obtenerDocumentoBim(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/bim")
+    public ResponseEntity<DocumentoBimEntity> registrarDocumentoBim(
+            @PathVariable Long proyectoId,
+            @RequestBody DocumentoBimEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarDocumentoBim(requireTenant(), proyectoId, req, idempotencyKey));
+    }
+
+    @PatchMapping("/bim/{id}/estado")
+    public ResponseEntity<DocumentoBimEntity> cambiarEstadoDocumentoBim(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String nuevoEstado = body != null ? body.get("estado") : null;
+        return ResponseEntity.ok(construccionService.actualizarEstadoDocumentoBim(requireTenant(), id, nuevoEstado));
+    }
+
+    @GetMapping("/proyectos/{proyectoId}/rfis")
+    public List<RfiConstruccionEntity> listarRfis(@PathVariable Long proyectoId) {
+        return construccionService.listarRfis(requireTenant(), proyectoId);
+    }
+
+    @GetMapping("/rfis/{id}")
+    public ResponseEntity<RfiConstruccionEntity> obtenerRfi(@PathVariable Long id) {
+        return construccionService.obtenerRfi(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/rfis")
+    public ResponseEntity<RfiConstruccionEntity> registrarRfi(
+            @PathVariable Long proyectoId,
+            @RequestBody RfiConstruccionEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarRfi(requireTenant(), proyectoId, req, idempotencyKey));
+    }
+
+    @PatchMapping("/rfis/{id}/respuesta")
+    public ResponseEntity<RfiConstruccionEntity> responderRfi(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String respuesta = body != null ? body.get("respuestaOficial") : null;
+        String resp = body != null ? body.get("responsableRespuesta") : null;
+        String nuevoEstado = body != null ? body.get("estado") : null;
+        return ResponseEntity.ok(construccionService.responderRfi(requireTenant(), id, respuesta, resp, nuevoEstado));
+    }
 }
