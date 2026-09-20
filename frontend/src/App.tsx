@@ -23,6 +23,7 @@ import VeterinariaApp from "./components/VeterinariaApp";
 import RestauranteApp from "./components/RestauranteApp";
 import ComercioApp from "./components/ComercioApp";
 import GanaderiaApp from "./components/GanaderiaApp";
+import ConstruccionApp from "./components/ConstruccionApp";
 import CentroFinanciero from "./pages/CentroFinanciero";
 import Auditoria from "./pages/Auditoria";
 import Personal from "./pages/Personal";
@@ -59,6 +60,11 @@ function ComercioPage() {
 function GanaderiaPage() {
   const navigate = useNavigate();
   return <GanaderiaApp onSalir={() => navigate("/dashboard")} />;
+}
+
+function ConstruccionPage() {
+  const navigate = useNavigate();
+  return <ConstruccionApp onSalir={() => navigate("/dashboard")} />;
 }
 
 // Deep link del QR impreso de cada animal: /ganaderia/animal/:animalId
@@ -169,6 +175,7 @@ export default function App() {
             <Route path="/comercio"   element={<ProtectedRoute><AnimatedRoute><ComercioPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/ganaderia"  element={<ProtectedRoute><AnimatedRoute><GanaderiaPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="/ganaderia/animal/:animalId" element={<ProtectedRoute><AnimatedRoute><GanaderiaAnimalPage /></AnimatedRoute></ProtectedRoute>} />
+            <Route path="/construccion" element={<ProtectedRoute><AnimatedRoute><ConstruccionPage /></AnimatedRoute></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           {/* Modal Oculto de SuperAdmin (Invocado solo con Atajo Secreto Ctrl+Shift+S) */}

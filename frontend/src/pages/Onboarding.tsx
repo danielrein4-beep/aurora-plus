@@ -4,7 +4,7 @@ import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconRestaurant, IconFarm,
   IconEducation, IconConstruction, IconCustomize, IconWarning, IconClose, IconCheck, IconLock,
-  IconCard, IconBank, IconPrescription, IconScissors,
+  IconCard, IconBank, IconPrescription,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 
@@ -88,14 +88,6 @@ const INDUSTRIES: IndustryItem[] = [
     tagline: "Vertical Insignia: Aurora Ganadería",
   },
   {
-    id: "peluqueria",
-    label: "Peluquería & Salón de Belleza",
-    Icon: IconScissors,
-    desc: "Agenda de citas, turnos walk-in, fichas de colorimetría y retención a 21 días",
-    badge: "En Construcción (Próximamente)",
-    isReady: false,
-  },
-  {
     id: "educacion",
     label: "Educación & Colegios",
     Icon: IconEducation,
@@ -108,9 +100,9 @@ const INDUSTRIES: IndustryItem[] = [
     label: "Construcción & Obras",
     Icon: IconConstruction,
     desc: "Presupuestos por partidas (COVENIN/APU), valuaciones de avance, cómputos métricos y cotizaciones en PDF",
-    badge: "100% DISPONIBLE (Listo)",
-    isReady: true,
-    tagline: "Vertical: Aurora Obras & Construcción Civil Pro",
+    badge: "En Construcción (Próximamente)",
+    isReady: false,
+    tagline: "Vertical en Desarrollo: Aurora Obras & Construcción Civil Pro",
   },
   {
     id: "otro",
@@ -172,15 +164,6 @@ const RETAIL_MODULES = [
   { id: "caja", label: "Caja & Moneda Base", desc: "Ingresos, gastos y tasas de cambio del negocio", defaultOn: true },
 ];
 
-const BEAUTY_MODULES = [
-  { id: "agenda", label: "Agenda & Citas Interactivas", desc: "Turnos por especialista y confirmación por WhatsApp", defaultOn: true },
-  { id: "walkin", label: "Fila Rápida Walk-In (Sin Cita)", desc: "Gestión de turnos espontáneos y sala de espera", defaultOn: true },
-  { id: "colorimetria", label: "Fichas de Colorimetría & Fórmulas", desc: "Historial químico, recetas de tintes y preferencias", defaultOn: true },
-  { id: "retencion21", label: "Retención Inteligente a 21 Días", desc: "Recordatorios automáticos de retoque por WhatsApp", defaultOn: true },
-  { id: "caja", label: "Caja Multi-Moneda & Comisiones", desc: "Cobros en USD/Bs con cálculo de comisiones", defaultOn: true },
-];
-
-
 const CONSTRUCTION_MODULES = [
   { id: "partidas", label: "Presupuestos por Partidas (COVENIN / APU)", desc: "Capítulos, partidas normalizadas, cómputos métricos y análisis de costos", defaultOn: true },
   { id: "valuaciones", label: "Valuaciones de Obra & Avance Físico", desc: "Medición en campo, amortización de anticipos y retenciones de ley", defaultOn: true },
@@ -219,7 +202,6 @@ const INDUSTRIA_A_MODULO: Record<string, string> = {
   veterinaria: "salud",
   odontologia: "odontologia",
   finca: "ganaderia",
-  peluqueria: "peluqueria",
   construccion: "construccion",
   otro: "horeca",
 };
@@ -235,7 +217,6 @@ const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
   veterinaria: CLINIC_MODULES,
   odontologia: CLINIC_MODULES,
   finca: GANADERIA_MODULES,
-  peluqueria: BEAUTY_MODULES,
   construccion: CONSTRUCTION_MODULES,
   otro: RESTAURANT_MODULES,
 };
@@ -251,7 +232,6 @@ const NOMBRE_POR_DEFECTO: Record<string, string> = {
   veterinaria: "Mi Veterinaria",
   odontologia: "Mi Consultorio Dental",
   finca: "Mi Finca",
-  peluqueria: "Mi Salón de Belleza",
   construccion: "Constructora & Proyectos Civiles",
   otro: "Mi Negocio",
 };
@@ -267,7 +247,6 @@ const VERTICAL_LABEL: Record<string, string> = {
   veterinaria: "Mediclinic Vet",
   odontologia: "Mediclinic Odonto",
   finca: "Aurora Ganadería (Control de Fincas & Ganado)",
-  peluqueria: "Aurora Beauty Suite (Peluquería & Salón de Belleza)",
   otro: "Aurora Suite Comercial",
 };
 
@@ -330,8 +309,6 @@ export default function Onboarding() {
         ? "/restaurante"
         : selectedIndustry === "construccion"
         ? "/construccion"
-        : selectedIndustry === "peluqueria"
-        ? "/peluqueria"
         : selectedIndustry === "veterinaria"
         ? "/veterinaria"
         : selectedIndustry === "clinica" || selectedIndustry === "farmacia" || selectedIndustry === "odontologia"

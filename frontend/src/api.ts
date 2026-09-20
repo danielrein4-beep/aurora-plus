@@ -4541,3 +4541,220 @@ export function salirDeImpersonacion(): void {
   borrarSesion();
   window.location.href = "/?admin=true";
 }
+
+
+// ==========================================
+// MÓDULO CONSTRUCCIÓN & OBRAS (MULTITENANT ESTRICTO)
+// ==========================================
+
+export interface ProyectoConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  codigo: string;
+  nombre: string;
+  cliente: string;
+  ubicacion?: string;
+  ingenieroResidente?: string;
+  civResidente?: string;
+  fechaInicio?: string;
+  fechaFinEstimada?: string;
+  estado?: string;
+  montoPresupuestoTotal?: number;
+  porcentajeAnticipo?: number;
+  porcentajeRetencionGarantia?: number;
+  porcentajeAdministracion?: number;
+  porcentajeUtilidad?: number;
+  iva?: number;
+}
+
+export interface CapituloConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  codigo: string;
+  nombre: string;
+  orden?: number;
+}
+
+export interface PartidaConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  capituloId?: number;
+  codigoPartida: string;
+  descripcion: string;
+  unidad: string;
+  cantidadPresupuestada: number;
+  precioUnitario: number;
+  totalPartida?: number;
+  rendimientoDiario?: number;
+}
+
+export interface ValuacionConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  numeroValuacion: number;
+  periodoDesde: string;
+  periodoHasta: string;
+  fechaEmision: string;
+  montoBruto: number;
+  montoAmortizacionAnticipo?: number;
+  montoRetencionLaboral?: number;
+  montoRetencionFielCumplimiento?: number;
+  montoNetoAPagar?: number;
+  estado?: string;
+  observaciones?: string;
+}
+
+export interface InsumoConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  codigo: string;
+  nombre: string;
+  tipo: string;
+  unidad: string;
+  costoUnitario: number;
+  stockActual: number;
+  stockMinimo: number;
+}
+
+export interface BitacoraConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  fecha: string;
+  condicionClimatica?: string;
+  personalActivo?: number;
+  cuadrillasActivas?: string;
+  actividadesRealizadas?: string;
+  incidentesRetrasos?: string;
+}
+
+// Proyectos
+export function listarProyectosConstruccionApi(): Promise<ProyectoConstruccionApi[]> {
+  return request("/api/construccion/proyectos");
+}
+
+export function crearProyectoConstruccionApi(datos: ProyectoConstruccionApi): Promise<ProyectoConstruccionApi> {
+  return request("/api/construccion/proyectos", {
+    method: "POST",
+    body: JSON.stringify(datos)
+  });
+}
+
+export function actualizarProyectoConstruccionApi(id: number, datos: ProyectoConstruccionApi): Promise<ProyectoConstruccionApi> {
+  return request(`/api/construccion/proyectos/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(datos)
+  });
+}
+
+export function eliminarProyectoConstruccionApi(id: number): Promise<void> {
+  return request(`/api/construccion/proyectos/${id}`, {
+    method: "DELETE"
+  });
+}
+
+// Capítulos
+export function listarCapitulosConstruccionApi(proyectoId: number): Promise<CapituloConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/capitulos`);
+}
+
+export function crearCapituloConstruccionApi(proyectoId: number, datos: CapituloConstruccionApi): Promise<CapituloConstruccionApi> {
+  return request(`/api/construccion/proyectos/${proyectoId}/capitulos`, {
+    method: "POST",
+    body: JSON.stringify(datos)
+  });
+}
+
+// Partidas
+export function listarPartidasConstruccionApi(proyectoId: number): Promise<PartidaConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/partidas`);
+}
+
+export function crearPartidaConstruccionApi(proyectoId: number, datos: PartidaConstruccionApi): Promise<PartidaConstruccionApi> {
+  return request(`/api/construccion/proyectos/${proyectoId}/partidas`, {
+    method: "POST",
+    body: JSON.stringify(datos)
+  });
+}
+
+export function actualizarPartidaConstruccionApi(id: number, datos: PartidaConstruccionApi): Promise<PartidaConstruccionApi> {
+  return request(`/api/construccion/partidas/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(datos)
+  });
+}
+
+export function eliminarPartidaConstruccionApi(id: number): Promise<void> {
+  return request(`/api/construccion/partidas/${id}`, {
+    method: "DELETE"
+  });
+}
+
+// Valuaciones
+export function listarValuacionesConstruccionApi(proyectoId: number): Promise<ValuacionConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/valuaciones`);
+}
+
+export function crearValuacionConstruccionApi(proyectoId: number, datos: ValuacionConstruccionApi, idempotencyKey?: string): Promise<ValuacionConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+  return request(`/api/construccion/proyectos/${proyectoId}/valuaciones`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function cambiarEstadoValuacionConstruccionApi(id: number, nuevoEstado: string): Promise<ValuacionConstruccionApi> {
+  return request(`/api/construccion/valuaciones/${id}/estado`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado: nuevoEstado })
+  });
+}
+
+// Insumos
+export function listarInsumosConstruccionApi(): Promise<InsumoConstruccionApi[]> {
+  return request("/api/construccion/insumos");
+}
+
+export function crearInsumoConstruccionApi(datos: InsumoConstruccionApi): Promise<InsumoConstruccionApi> {
+  return request("/api/construccion/insumos", {
+    method: "POST",
+    body: JSON.stringify(datos)
+  });
+}
+
+export function registrarConsumoInsumoConstruccionApi(id: number, cantidad: number, idempotencyKey?: string): Promise<InsumoConstruccionApi> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+  return request(`/api/construccion/insumos/${id}/consumo`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ cantidad })
+  });
+}
+
+// Bitácora
+export function listarBitacoraConstruccionApi(proyectoId: number): Promise<BitacoraConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/bitacora`);
+}
+
+export function registrarBitacoraConstruccionApi(proyectoId: number, datos: BitacoraConstruccionApi, idempotencyKey?: string): Promise<BitacoraConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+  return request(`/api/construccion/proyectos/${proyectoId}/bitacora`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
