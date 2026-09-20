@@ -77,7 +77,7 @@ public class AuroraWhatsappIaService {
             return resp;
         }
 
-        BigDecimal tasaVes = BigDecimal.valueOf(50.0);
+        BigDecimal tasaVes = null;
         if (tasaCambioRepository != null) {
             Optional<TasaCambio> tc = tasaCambioRepository
                 .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, "USD", "VES");
@@ -92,8 +92,11 @@ public class AuroraWhatsappIaService {
         // 1. Deteccion de Intencion: TASA DE CAMBIO
         if (msgLower.contains("tasa") || msgLower.contains("dolar") || msgLower.contains("dólar") || msgLower.contains("bcv") || msgLower.contains("a como reciben") || msgLower.contains("a cuánto")) {
             resp.intencion = "CONSULTA_TASA";
-            resp.textoRespuesta = "Hola. En " + nombreTienda + " estamos trabajando con la tasa oficial BCV de " 
-                + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$. ¿En que articulo o producto te podemos ayudar hoy?";
+            resp.textoRespuesta = tasaVes != null
+                ? "Hola. En " + nombreTienda + " estamos trabajando con la tasa BCV registrada de "
+                    + formatearTasa(tasaVes) + " Bs/$. ¿En que articulo o producto te podemos ayudar hoy?"
+                : "La tasa BCV todavía no está registrada en " + nombreTienda
+                    + ". Un asesor puede confirmarla antes de procesar un pago en bolívares.";
             guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
             return resp;
         }
@@ -107,20 +110,8 @@ public class AuroraWhatsappIaService {
                     && licencia.getPagoMovilTelefono() != null && !licencia.getPagoMovilTelefono().isBlank();
 
             if (!tieneDatos) {
-                if (Long.valueOf(1L).equals(tenantId)) {
-                    // Datos de prueba exclusivamente para tenant 1 local
-                    resp.textoRespuesta = "Con gusto. Estos son los datos de Pago Movil para " + nombreTienda + " (Modo Pruebas):\n\n"
-                        + "Banco: 0102 - Banco de Venezuela\n"
-                        + "Telefono: 04141112233\n"
-                        + "RIF / C.I.: J-12345678-0\n"
-                        + "Titular: " + nombreTienda + "\n\n"
-                        + "Tasa BCV del dia: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$.\n"
-                        + "Por favor envianos el capture del comprobante cuando realices el pago.";
-                } else {
-                    // Cero alucinaciones para comercios reales en produccion
-                    resp.textoRespuesta = "En " + nombreTienda + " no se han registrado los datos publicos de Pago Movil en el sistema.\n\n"
-                        + "Por favor escribe 'asesor' para que un encargado te suministre las coordenadas de pago directamente.";
-                }
+                resp.textoRespuesta = "En " + nombreTienda + " no se han registrado los datos publicos de Pago Movil en el sistema.\n\n"
+                    + "Por favor escribe 'asesor' para que un encargado te suministre las coordenadas de pago directamente.";
             } else {
                 // Datos reales configurados por el dueno del negocio
                 String bco = licencia.getPagoMovilBanco();
@@ -135,7 +126,7 @@ public class AuroraWhatsappIaService {
                     + "Telefono: " + telf + "\n"
                     + "RIF / C.I.: " + doc + "\n"
                     + "Titular: " + titular + "\n\n"
-                    + "Tasa BCV del dia: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$.\n"
+                    + textoTasaPago(tasaVes)
                     + "Por favor envianos el capture del comprobante cuando realices el pago.";
             }
             guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
@@ -145,7 +136,8 @@ public class AuroraWhatsappIaService {
         // 3. Deteccion de Intencion: BINANCE PAY
         if (msgLower.contains("binance") || msgLower.contains("usdt") || msgLower.contains("cripto")) {
             resp.intencion = "CONSULTA_BINANCE";
-            resp.textoRespuesta = "Si, aceptamos Binance Pay en USDT sin comisiones. Al confirmar los articulos de tu pedido, te facilitamos el enlace directo o codigo QR para transferir.";
+            resp.textoRespuesta = "No hay una modalidad de pago con criptomonedas confirmada en el perfil de "
+                + nombreTienda + ". Escribe 'asesor' para verificarla directamente con el negocio.";
             guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
             return resp;
         }
@@ -154,13 +146,9 @@ public class AuroraWhatsappIaService {
         if (msgLower.contains("metodos de pago") || msgLower.contains("métodos de pago") || msgLower.contains("formas de pago") 
                 || msgLower.contains("como pagar") || msgLower.contains("cómo pagar") || msgLower.contains("que aceptan") || msgLower.contains("qué aceptan")) {
             resp.intencion = "CONSULTA_METODOS_PAGO";
-            resp.textoRespuesta = "En " + nombreTienda + " aceptamos:\n"
-                + "- Pago Movil (a tasa oficial BCV de " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$)\n"
-                + "- Efectivo (USD y Bolivares)\n"
-                + "- Binance Pay (USDT)\n"
-                + "- Transferencias bancarias nacionales\n"
-                + "- Punto de venta en tienda\n\n"
-                + "Indicanos que articulo deseas o solicita 'pago movil' para enviarte los datos de cancelacion.";
+            resp.textoRespuesta = tieneDatosPagoMovil(licencia)
+                ? "En " + nombreTienda + " hay datos de Pago Movil registrados. Escribe 'pago movil' para recibirlos; para confirmar otras formas de pago, escribe 'asesor'."
+                : "Las formas de pago de " + nombreTienda + " todavía no están publicadas en el sistema. Escribe 'asesor' para confirmarlas.";
             guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
             return resp;
         }
@@ -175,8 +163,8 @@ public class AuroraWhatsappIaService {
                 resp.textoRespuesta = "En " + nombreTienda + ": " + pol + (zon != null && !zon.isBlank() ? "\nZonas cubiertas: " + zon : "") 
                     + "\n\nPor favor indicanos tu direccion o sector para coordinar el envio.";
             } else {
-                resp.textoRespuesta = "Si, en " + nombreTienda + " contamos con servicio de entregas a domicilio (delivery) y envios con cobro a destino (MRW, Zoom, Tealca).\n\n"
-                    + "Indicanos que articulos requieres y tu ubicacion exacta para cotizar el despacho.";
+                resp.textoRespuesta = "La política de entregas de " + nombreTienda
+                    + " todavía no está publicada. Escribe 'asesor' para confirmar cobertura, costo y disponibilidad.";
             }
             guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
             return resp;
@@ -203,8 +191,8 @@ public class AuroraWhatsappIaService {
         // 7. Deteccion de Intencion: HORARIO DE ATENCION
         if (msgLower.contains("horario") || msgLower.contains("abren") || msgLower.contains("cierran") || msgLower.contains("abierto") || msgLower.contains("hora de trabajo")) {
             resp.intencion = "CONSULTA_HORARIO";
-            resp.textoRespuesta = "En " + nombreTienda + " laboramos habitualmente en horario comercial de Lunes a Sabado.\n\n"
-                + "Escribenos el articulo o pedido que necesitas y con gusto te asistimos.";
+            resp.textoRespuesta = "El horario de " + nombreTienda
+                + " todavía no está publicado en el sistema. Escribe 'asesor' para confirmarlo.";
             guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
             return resp;
         }
@@ -302,9 +290,8 @@ public class AuroraWhatsappIaService {
                 boolean match = keywords.stream().anyMatch(k -> desc.contains(k) || sku.contains(k));
                 if (match) {
                     BigDecimal pUsd = item.getPrecioVenta() != null ? item.getPrecioVenta() : BigDecimal.ZERO;
-                    BigDecimal pBs = pUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
                     return "Si, tenemos disponible: *" + item.getDescripcion() + "*\n"
-                        + "Precio: $" + pUsd + " USD / " + pBs + " Bs. (Tasa BCV: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$)\n"
+                        + textoPrecio(pUsd, tasaVes) + "\n"
                         + "Stock actual: " + item.getStockActual() + " " + (item.getUnidadBase() != null ? item.getUnidadBase() : "Pza") + ".\n\n"
                         + "¿Deseas que te lo reservemos o prefieres entrega con delivery?";
                 }
@@ -320,39 +307,10 @@ public class AuroraWhatsappIaService {
                 boolean match = keywords.stream().anyMatch(k -> nom.contains(k) || sku.contains(k));
                 if (match) {
                     BigDecimal pUsd = art.getPrecioVenta() != null ? art.getPrecioVenta() : BigDecimal.ZERO;
-                    BigDecimal pBs = pUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
                     return "Si, tenemos disponible: *" + art.getNombre() + "*\n"
-                        + "Precio: $" + pUsd + " USD / " + pBs + " Bs. (Tasa BCV: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$)\n"
+                        + textoPrecio(pUsd, tasaVes) + "\n"
                         + "Stock actual: " + art.getStockActual() + " " + (art.getUnidadMedida() != null ? art.getUnidadMedida() : "Unidad") + ".\n\n"
                         + "¿Deseas que te lo reservemos o prefieres entrega con delivery?";
-                }
-            }
-        }
-
-        // Catalogo modelo UNICAMENTE para el tenant 1 de pruebas local
-        // Para cualquier otro tenant comercial, NUNCA se alucinan productos de otros tenants
-        if (Long.valueOf(1L).equals(tenantId)) {
-            Object[][] demo = {
-                {"tornillo", "Tornillo Drywall 6x1 (Caja 100u)", 2.80, 45, "Caja"},
-                {"taladro", "Taladro Percutor Inalambrico 20V", 68.00, 8, "Pza"},
-                {"cable", "Cable Electrico 7 Hilos THW #12 (Metro)", 0.95, 320, "Metro"},
-                {"tubo", "Tubo PVC Aguas Negras 4 x 3 Mts", 9.50, 24, "Tubo"},
-                {"disco", "Disco de Corte para Metal 4 1/2", 1.25, 110, "Pza"},
-                {"cemento", "Cemento Gris Tipo I 42.5kg", 9.00, 65, "Saco"},
-                {"pintura", "Pintura Caucho Blanco Mate (Galon)", 14.50, 18, "Galon"},
-                {"llave", "Juego de Llaves Combinadas 8-19mm", 22.00, 12, "Set"},
-                {"bombillo", "Bombillo LED 12W Luz Blanca E27", 1.80, 85, "Pza"}
-            };
-
-            for (Object[] d : demo) {
-                String key = (String) d[0];
-                if (keywords.stream().anyMatch(k -> k.contains(key) || key.contains(k))) {
-                    BigDecimal pUsd = BigDecimal.valueOf((Double) d[2]).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal pBs = pUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
-                    return "Si, tenemos disponible: *" + d[1] + "*\n"
-                        + "Precio: $" + pUsd + " USD / " + pBs + " Bs. (Tasa BCV: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$)\n"
-                        + "Stock actual: " + d[3] + " " + d[4] + ".\n\n"
-                        + "Deseas que te lo reservemos o prefieres entrega con delivery?";
                 }
             }
         }
@@ -396,7 +354,9 @@ public class AuroraWhatsappIaService {
                     + "Tu funcion es asesorar al cliente de forma amable, precisa y profesional.\n"
                     + "Datos del negocio:\n"
                     + "- Nombre: " + nombreTienda + "\n"
-                    + "- Tasa de cambio oficial del dia: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$\n"
+                    + (tasaVes != null
+                        ? "- Tasa BCV registrada: " + formatearTasa(tasaVes) + " Bs/$\n"
+                        : "- Tasa BCV: no registrada; no calcules ni inventes conversiones a bolivares.\n")
                     + "- Catalogo online: https://auroraplus.app/catalogo/" + tenantId + "\n"
                     + "Reglas estrictas de respuesta:\n"
                     + "1. Responde de forma concisa (maximo 2 a 3 oraciones cortas).\n"
@@ -461,6 +421,30 @@ public class AuroraWhatsappIaService {
         }
 
         return null;
+    }
+
+    private String formatearTasa(BigDecimal tasaVes) {
+        return tasaVes.setScale(2, RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private boolean tieneDatosPagoMovil(LicenciaTenant licencia) {
+        return licencia.getPagoMovilBanco() != null && !licencia.getPagoMovilBanco().isBlank()
+            && licencia.getPagoMovilTelefono() != null && !licencia.getPagoMovilTelefono().isBlank();
+    }
+
+    private String textoTasaPago(BigDecimal tasaVes) {
+        return tasaVes != null
+            ? "Tasa BCV registrada: " + formatearTasa(tasaVes) + " Bs/$.\n"
+            : "Tasa BCV pendiente de registro; confirma el monto en bolivares antes de pagar.\n";
+    }
+
+    private String textoPrecio(BigDecimal precioUsd, BigDecimal tasaVes) {
+        String precio = "Precio: $" + precioUsd.setScale(2, RoundingMode.HALF_UP).toPlainString() + " USD";
+        if (tasaVes == null) {
+            return precio + ". Conversion a bolivares pendiente de tasa BCV registrada.";
+        }
+        BigDecimal precioBs = precioUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
+        return precio + " / " + precioBs.toPlainString() + " Bs. (Tasa BCV: " + formatearTasa(tasaVes) + " Bs/$)";
     }
 
     private static final int LIMITE_GEMINI_POR_HORA = 30;
