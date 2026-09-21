@@ -47,11 +47,16 @@ public class EmpleadoController {
 
     @GetMapping
     public List<Empleado> listar() {
-        return empleadoRepository.findAll();
+        Long tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null || tenantId <= 0) throw new RuntimeException("Tenant no autenticado");
+        return empleadoRepository.findByTenantId(tenantId);
     }
 
     @PostMapping
-    public ResponseEntity<Empleado> crear(@RequestParam Long tenantId, @RequestBody Empleado empleado) {
+    public ResponseEntity<Empleado> crear(@RequestBody Empleado empleado) {
+        Long tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null || tenantId <= 0) throw new RuntimeException("Tenant no autenticado");
+        empleado.setId(null);
         empleado.setTenantId(tenantId);
         validar(empleado);
         return ResponseEntity.ok(empleadoRepository.save(empleado));
@@ -60,6 +65,7 @@ public class EmpleadoController {
     @PutMapping("/{id}")
     public ResponseEntity<Empleado> actualizar(@PathVariable Long id, @RequestBody Empleado datos) {
         Long tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null || tenantId <= 0) throw new RuntimeException("Tenant no autenticado");
         Empleado empleado = empleadoRepository.findById(id)
             .filter(e -> tenantId != null && tenantId.equals(e.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));

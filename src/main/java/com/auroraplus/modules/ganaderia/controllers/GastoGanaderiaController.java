@@ -2,10 +2,10 @@ package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
-import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.GastoGanaderia;
 import com.auroraplus.modules.ganaderia.repositories.GastoGanaderiaRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaGastoService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -39,12 +39,13 @@ public class GastoGanaderiaController {
     // devolviendo los gastos de TODOS los tenants mezclados.
     @GetMapping
     public List<GastoGanaderia> listar() {
-        return gastoGanaderiaRepository.findByTenantIdOrderByFechaDesc(TenantContext.getCurrentTenant());
+        return gastoGanaderiaRepository.findByTenantIdOrderByFechaDesc(GanaderiaTenantAccess.requireTenant());
     }
 
     @PostMapping
-    public ResponseEntity<GastoGanaderia> registrar(@RequestParam Long tenantId, @RequestBody GastoRequest request) {
+    public ResponseEntity<GastoGanaderia> registrar(@RequestBody GastoRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         GastoGanaderia gasto = ganaderiaGastoService.registrarGasto(tenantId, request.categoria, request.descripcion, request.monto, request.fecha);
         auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "GastoGanaderia", gasto.getId(), "Registró un gasto — categoría: " + request.categoria);
         return ResponseEntity.ok(gasto);

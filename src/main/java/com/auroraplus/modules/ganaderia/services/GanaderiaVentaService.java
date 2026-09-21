@@ -102,9 +102,12 @@ public class GanaderiaVentaService {
         venta.setTotal(totalVenta);
         VentaAnimal guardada = ventaAnimalRepository.save(venta);
 
-        motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
+        MovimientoCaja movimiento = motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
             totalVenta, monedaPago, montoRecibido,
-            "Venta de animales ticket " + numeroTicket + (comprador != null ? " — Comprador: " + comprador : ""));
+            "Venta de animales ticket " + numeroTicket + (comprador != null ? " — Comprador: " + comprador : ""),
+            "GANADERIA", "VentaAnimal", guardada.getId());
+        guardada.setMovimientoCajaId(movimiento.getId());
+        guardada = ventaAnimalRepository.save(guardada);
 
         idempotenciaService.registrar(tenantId, claveIdempotencia, "venta_ganaderia", guardada.getId());
 

@@ -25,11 +25,8 @@ public class GanaderiaMovimientoService {
 
     @Transactional
     public MovimientoPotrero moverAnimal(Long tenantId, Long animalId, Long potreroDestinoId, String motivo) {
-        Animal animal = animalRepository.findById(animalId)
+        Animal animal = animalRepository.findForUpdateByIdAndTenantId(animalId, tenantId)
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (!animal.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
-        }
         if (!"ACTIVO".equals(animal.getEstado())) {
             throw new RuntimeException("No se puede trasladar un animal que no está activo");
         }
@@ -39,8 +36,22 @@ public class GanaderiaMovimientoService {
         if (!destino.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Potrero no pertenece a este tenant");
         }
+        if (!"ACTIVO".equals(destino.getEstado())) {
+            throw new RuntimeException("No se puede mover ganado a '" + destino.getNombre()
+                + "' porque está en descanso. Reactívelo mediante una rotación válida al cumplir su descanso mínimo");
+        }
 
         Potrero origen = animal.getPotrero();
+        if (origen != null && origen.getId().equals(destino.getId())) {
+            throw new RuntimeException("El animal ya se encuentra en el potrero destino");
+        }
+        if (destino.getCapacidadAnimales() != null) {
+            long ocupacionActual = animalRepository.findByPotreroIdAndEstadoAndTenantId(destino.getId(), "ACTIVO", tenantId).size();
+            if (ocupacionActual >= destino.getCapacidadAnimales()) {
+                throw new RuntimeException("El potrero destino '" + destino.getNombre() + "' ya alcanzó su capacidad de "
+                    + destino.getCapacidadAnimales() + " animales");
+            }
+        }
 
         MovimientoPotrero movimiento = new MovimientoPotrero();
         movimiento.setTenantId(tenantId);

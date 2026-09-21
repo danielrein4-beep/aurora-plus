@@ -2,10 +2,18 @@ package com.auroraplus.modules.ganaderia;
 
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.repositories.MovimientoCajaRepository;
+import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.config.TenantContext;
+import com.auroraplus.core.rrhh.entities.Empleado;
+import com.auroraplus.core.rrhh.entities.PagoNomina;
+import com.auroraplus.core.rrhh.repositories.EmpleadoRepository;
+import com.auroraplus.core.rrhh.services.PagoNominaService;
+import com.auroraplus.modules.ganaderia.controllers.RegistroOrdenoController;
 import com.auroraplus.modules.ganaderia.entities.*;
 import com.auroraplus.modules.ganaderia.repositories.*;
 import com.auroraplus.modules.ganaderia.services.GanaderiaAlimentacionService;
 import com.auroraplus.modules.ganaderia.services.PotreroRotacionService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaSanidadService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,6 +42,17 @@ class GanaderiaAlimentacionYPotrerosTest {
     @Autowired private PotreroRepository potreroRepository;
     @Autowired private AnimalRepository animalRepository;
     @Autowired private MovimientoCajaRepository movimientoCajaRepository;
+    @Autowired private RegistroOrdenoController registroOrdenoController;
+    @Autowired private GanaderiaSanidadService ganaderiaSanidadService;
+    @Autowired private VacunaRepository vacunaRepository;
+    @Autowired private EmpleadoRepository empleadoRepository;
+    @Autowired private PagoNominaService pagoNominaService;
+
+    @org.junit.jupiter.api.AfterEach
+    void limpiarContexto() {
+        TenantContext.clear();
+        AuthContext.clear();
+    }
 
     private InsumoAlimentacion crearInsumo(Long tenantId, String nombre, BigDecimal stockInicial) {
         InsumoAlimentacion i = new InsumoAlimentacion();
@@ -192,5 +211,53 @@ class GanaderiaAlimentacionYPotrerosTest {
 
         assertTrue(alertas.stream().anyMatch(a -> "SOBRECARGA".equals(a.get("tipo"))), "Debe alertar sobrecarga: " + alertas);
         assertTrue(alertas.stream().anyMatch(a -> "DESCANSO_COMPLETO".equals(a.get("tipo"))), "Debe alertar descanso completo: " + alertas);
+    }
+
+    /** Recorrido de una finca: mover vaca, descansar potrero, sanidad, ordeño y pago de jornal. */
+    @Test
+    void flujoDeFincaNoContaminaTanqueDuranteRetiroYPagoNominaSaleACaja() {
+        long tenantId = 99009L;
+        Potrero origen = crearPotrero(tenantId, "Lote Norte", "ACTIVO", 3, 21);
+        Potrero destino = crearPotrero(tenantId, "Lote Sur", "ACTIVO", 3, 21);
+        Animal vaca = crearAnimalEnPotrero(tenantId, "ARETE-FLUJO-99009", origen);
+        vaca.setEstadoProductivo("ORDEÑO");
+        animalRepository.save(vaca);
+
+        Map<String, Object> rotacion = potreroRotacionService.rotar(tenantId, origen.getId(), destino.getId(), List.of(vaca.getId()));
+        assertEquals(true, rotacion.get("origenEnDescanso"));
+        assertEquals("EN_DESCANSO", potreroRepository.findById(origen.getId()).orElseThrow().getEstado());
+        assertEquals(destino.getId(), animalRepository.findById(vaca.getId()).orElseThrow().getPotrero().getId());
+
+        Vacuna vacuna = new Vacuna();
+        vacuna.setTenantId(tenantId);
+        vacuna.setNombre("Mastitis control");
+        vacuna.setDiasRetiroLeche(3);
+        vacuna.setDiasRetiroCarne(7);
+        vacuna = vacunaRepository.save(vacuna);
+        ganaderiaSanidadService.aplicarVacuna(tenantId, vaca.getId(), vacuna.getId(), LocalDate.now(), "L-01", "Dra. Pérez", new BigDecimal("8.00"));
+
+        TenantContext.setCurrentTenant(tenantId);
+        AuthContext.set("encargado@finca.test", "ENCARGADO_FINCA");
+        RegistroOrdenoController.RegistroRequest aTanque = new RegistroOrdenoController.RegistroRequest();
+        aTanque.animalId = vaca.getId(); aTanque.fecha = LocalDate.now(); aTanque.turno = "MANANA";
+        aTanque.cantidadLitros = new BigDecimal("12.50"); aTanque.destino = "TANQUE";
+        assertThrows(IllegalStateException.class, () -> registroOrdenoController.registrar(aTanque),
+            "La leche en retiro no puede entrar al tanque comercial");
+
+        RegistroOrdenoController.RegistroRequest descarte = new RegistroOrdenoController.RegistroRequest();
+        descarte.animalId = vaca.getId(); descarte.fecha = LocalDate.now(); descarte.turno = "MANANA";
+        descarte.cantidadLitros = new BigDecimal("12.50"); descarte.destino = "DESCARTE";
+        RegistroOrdeno registrado = registroOrdenoController.registrar(descarte).getBody();
+        assertNotNull(registrado);
+        assertEquals("DESCARTE", registrado.getDestino());
+
+        Empleado jornalero = new Empleado();
+        jornalero.setTenantId(tenantId); jornalero.setNombre("Juan Campo"); jornalero.setCedula("V-99009");
+        jornalero.setCargo("Ordeñador"); jornalero.setTipoControl("POR_HORA");
+        jornalero.setTarifaPorHora(new BigDecimal("3.00")); jornalero.setMonedaSalario("USD");
+        jornalero = empleadoRepository.save(jornalero);
+        PagoNomina pago = pagoNominaService.registrarPago(tenantId, jornalero.getId(), LocalDate.now().minusDays(6), LocalDate.now(),
+            new BigDecimal("8"), new BigDecimal("24.00"), "USD");
+        assertNotNull(pago.getMovimientoCajaId(), "El pago de jornal debe tener su egreso de caja trazable");
     }
 }

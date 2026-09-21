@@ -8,6 +8,8 @@ import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.AplicacionMedicamentoRepository;
 import com.auroraplus.modules.ganaderia.repositories.MedicamentoRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaSanidadService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
+import com.auroraplus.core.auth.AuthContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -53,18 +55,18 @@ public class GanaderiaSanidadController {
 
     @PostMapping("/mastitis")
     @Transactional
-    public ResponseEntity<AplicacionMedicamento> registrarMastitis(@RequestParam Long tenantId, @RequestBody MastitisRequest request) {
-        Animal animal = animalRepository.findById(request.animalId)
+    public ResponseEntity<AplicacionMedicamento> registrarMastitis(@RequestBody MastitisRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        Animal animal = animalRepository.findForUpdateByIdAndTenantId(request.animalId, tenantId)
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (!animal.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
-        }
+        if (!"ACTIVO".equals(animal.getEstado()) || !"HEMBRA".equalsIgnoreCase(animal.getSexo())) throw new IllegalStateException("Mastitis solo puede registrarse en una hembra activa");
 
         LocalDate fecha = request.fecha != null ? request.fecha : LocalDate.now();
         int retiroDias = request.diasRetiroLeche != null ? request.diasRetiroLeche : 3;
 
-        Medicamento med = medicamentoRepository.findAll().stream()
-            .filter(m -> tenantId.equals(m.getTenantId()) && m.getNombre().equalsIgnoreCase(request.farmacoAplicado))
+        Medicamento med = medicamentoRepository.findByTenantId(tenantId).stream()
+            .filter(m -> m.getNombre().equalsIgnoreCase(request.farmacoAplicado))
             .findFirst()
             .orElseGet(() -> {
                 Medicamento nuevo = new Medicamento();
@@ -96,12 +98,14 @@ public class GanaderiaSanidadController {
 
     /** Refuerzos de vacuna pendientes + animales todavía en período de retiro de leche/carne — todo en un solo lugar. */
     @GetMapping("/alertas")
-    public List<GanaderiaSanidadService.AlertaSanitaria> alertas(@RequestParam Long tenantId) {
+    public List<GanaderiaSanidadService.AlertaSanitaria> alertas() {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return ganaderiaSanidadService.obtenerAlertasSanitarias(tenantId);
     }
 
     @GetMapping("/alertas/export-excel")
-    public ResponseEntity<byte[]> alertasExcel(@RequestParam Long tenantId) throws Exception {
+    public ResponseEntity<byte[]> alertasExcel() throws Exception {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         List<GanaderiaSanidadService.AlertaSanitaria> alertas = ganaderiaSanidadService.obtenerAlertasSanitarias(tenantId);
 
         List<List<Object>> filas = new ArrayList<>();

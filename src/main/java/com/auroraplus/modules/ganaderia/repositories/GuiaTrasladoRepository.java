@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface GuiaTrasladoRepository extends JpaRepository<GuiaTraslado, Long> {
     List<GuiaTraslado> findAllByOrderByFechaDesc();
+    List<GuiaTraslado> findByTenantIdOrderByFechaDesc(Long tenantId);
 }

@@ -4,6 +4,8 @@ import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.RegistroPeso;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.RegistroPesoRepository;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
+import com.auroraplus.core.auth.AuthContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,12 +38,12 @@ public class RegistroPesoController {
 
     @PostMapping
     @Transactional
-    public ResponseEntity<RegistroPeso> registrar(@RequestParam Long tenantId, @RequestBody RegistroRequest request) {
-        Animal animal = animalRepository.findById(request.animalId)
+    public ResponseEntity<RegistroPeso> registrar(@RequestBody RegistroRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        if (request.animalId == null) throw new IllegalArgumentException("Debe indicar el animal");
+        Animal animal = animalRepository.findForUpdateByIdAndTenantId(request.animalId, tenantId)
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (!animal.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
-        }
         if (request.pesoKg == null || request.pesoKg.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("El peso debe ser mayor a cero");
         }
@@ -62,12 +64,16 @@ public class RegistroPesoController {
 
     @GetMapping("/animal/{animalId}")
     public List<RegistroPeso> curvaAnimal(@PathVariable Long animalId) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        animalRepository.findById(animalId).filter(a -> tenantId.equals(a.getTenantId())).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         return registroPesoRepository.findByAnimalIdOrderByFechaAsc(animalId);
     }
 
     /** GDP (ganancia diaria de peso) entre el primer y el último pesaje registrado — clave para decidir cuándo vender. */
     @GetMapping("/animal/{animalId}/gdp")
     public Map<String, Object> gananciaDiariaPeso(@PathVariable Long animalId) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        animalRepository.findById(animalId).filter(a -> tenantId.equals(a.getTenantId())).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         List<RegistroPeso> historial = registroPesoRepository.findByAnimalIdOrderByFechaAsc(animalId);
         Map<String, Object> resultado = new LinkedHashMap<>();
 

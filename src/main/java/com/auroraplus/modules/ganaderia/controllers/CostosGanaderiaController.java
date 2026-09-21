@@ -1,19 +1,16 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
-import com.auroraplus.core.config.TenantContext;
-import com.auroraplus.core.financiero.entities.MovimientoCaja;
-import com.auroraplus.core.financiero.repositories.MovimientoCajaRepository;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.DetalleVentaAnimal;
 import com.auroraplus.modules.ganaderia.repositories.*;
+import com.auroraplus.modules.ganaderia.services.GanaderiaFinanzasService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -40,13 +37,13 @@ public class CostosGanaderiaController {
     private VentaAnimalRepository ventaAnimalRepository;
 
     @Autowired
-    private MovimientoCajaRepository movimientoCajaRepository;
+    private GanaderiaFinanzasService ganaderiaFinanzasService;
 
     @GetMapping("/costos/animal/{animalId}")
     public Map<String, Object> costoAnimal(@PathVariable Long animalId) {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         Animal animal = animalRepository.findById(animalId)
-            .filter(a -> tenantId != null && tenantId.equals(a.getTenantId()))
+            .filter(a -> tenantId.equals(a.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
 
         BigDecimal costoAdquisicion = animal.getCostoAdquisicion() != null ? animal.getCostoAdquisicion() : BigDecimal.ZERO;
@@ -72,7 +69,7 @@ public class CostosGanaderiaController {
         resultado.put("nota", "No incluye prorrateo de mano de obra ni alimentación — esos son gastos de hato, no asignados por animal.");
 
         if ("VENDIDO".equals(animal.getEstado())) {
-            for (var venta : ventaAnimalRepository.findAllByOrderByFechaDesc()) {
+            for (var venta : ventaAnimalRepository.findByTenantIdOrderByFechaDesc(tenantId)) {
                 for (DetalleVentaAnimal item : venta.getItems()) {
                     if (item.getAnimal().getId().equals(animalId)) {
                         BigDecimal precioVenta = item.getPrecioVenta();
@@ -89,34 +86,15 @@ public class CostosGanaderiaController {
     }
 
     @GetMapping("/reportes/rentabilidad")
-    public Map<String, Object> rentabilidad(@RequestParam Long tenantId, @RequestParam(required = false) LocalDateTime desde,
-                                             @RequestParam(required = false) LocalDateTime hasta) {
-        LocalDateTime d = desde != null ? desde : LocalDateTime.of(2000, 1, 1, 0, 0);
-        LocalDateTime h = hasta != null ? hasta : LocalDateTime.now();
-
-        List<MovimientoCaja> movimientos = movimientoCajaRepository
-            .findByTenantIdAndMonedaAndFechaRegistroBetweenOrderByFechaRegistroAsc(tenantId, "USD", d, h);
-
-        BigDecimal ingresos = sumaPorTipo(movimientos, MovimientoCaja.TipoMovimiento.INGRESO);
-        BigDecimal egresos = sumaPorTipo(movimientos, MovimientoCaja.TipoMovimiento.EGRESO);
-        BigDecimal cxpPendiente = sumaPorTipo(movimientos, MovimientoCaja.TipoMovimiento.CXP);
-
-        Map<String, Object> resultado = new LinkedHashMap<>();
-        resultado.put("desde", d);
-        resultado.put("hasta", h);
-        resultado.put("totalIngresos", ingresos);
-        resultado.put("totalEgresosOperativos", egresos);
-        resultado.put("totalComprasACredito", cxpPendiente);
-        resultado.put("gananciaOperativaNeta", ingresos.subtract(egresos).setScale(2, RoundingMode.HALF_UP));
-        resultado.put("cantidadMovimientos", movimientos.size());
-        return resultado;
-    }
-
-    private BigDecimal sumaPorTipo(List<MovimientoCaja> movimientos, MovimientoCaja.TipoMovimiento tipo) {
-        return movimientos.stream()
-            .filter(m -> m.getTipo() == tipo)
-            .map(MovimientoCaja::getMonto)
-            .reduce(BigDecimal.ZERO, BigDecimal::add)
-            .setScale(2, RoundingMode.HALF_UP);
+    public GanaderiaFinanzasService.ResumenFinanciero rentabilidad(
+            @RequestParam(required = false) java.time.LocalDate desde,
+            @RequestParam(required = false) java.time.LocalDate hasta) {
+        java.time.LocalDate hastaFinal = hasta != null ? hasta : java.time.LocalDate.now();
+        java.time.LocalDate desdeFinal = desde != null ? desde : hastaFinal.minusDays(30);
+        if (desdeFinal.isAfter(hastaFinal)) {
+            throw new IllegalArgumentException("La fecha inicial no puede ser posterior a la fecha final");
+        }
+        return ganaderiaFinanzasService.resumenPeriodo(
+            GanaderiaTenantAccess.requireTenant(), desdeFinal, hastaFinal);
     }
 }

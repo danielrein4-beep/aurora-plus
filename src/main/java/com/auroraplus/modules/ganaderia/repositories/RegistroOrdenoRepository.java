@@ -15,4 +15,6 @@ public interface RegistroOrdenoRepository extends JpaRepository<RegistroOrdeno, 
 
     @Query("SELECT r FROM RegistroOrdeno r JOIN FETCH r.animal WHERE r.tenantId = :tenantId AND r.fecha BETWEEN :desde AND :hasta ORDER BY r.fecha DESC")
     List<RegistroOrdeno> findByTenantIdAndFechaBetween(@Param("tenantId") Long tenantId, @Param("desde") LocalDate desde, @Param("hasta") LocalDate hasta);
+
+    boolean existsByTenantIdAndAnimalIdAndFechaAndTurno(Long tenantId, Long animalId, LocalDate fecha, String turno);
 }

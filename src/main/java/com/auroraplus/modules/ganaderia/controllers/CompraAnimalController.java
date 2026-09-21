@@ -2,10 +2,10 @@ package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
-import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.CompraAnimal;
 import com.auroraplus.modules.ganaderia.repositories.CompraAnimalRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaCompraService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,14 +35,14 @@ public class CompraAnimalController {
 
     @GetMapping
     public List<CompraAnimal> listar() {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return compraAnimalRepository.findByTenantIdOrderByFechaCompraDesc(tenantId);
     }
 
     @PostMapping
     public ResponseEntity<CompraAnimal> registrar(@RequestBody CompraRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         CompraAnimal compra = ganaderiaCompraService.registrarCompra(tenantId, request.proveedorId, request.numeroFactura, request.items);
         auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "CompraAnimal", compra.getId(), "Registró una compra — factura: " + request.numeroFactura);
         return ResponseEntity.ok(compra);

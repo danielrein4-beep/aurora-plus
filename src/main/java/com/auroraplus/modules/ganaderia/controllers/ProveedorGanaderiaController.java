@@ -1,8 +1,9 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
-import com.auroraplus.core.config.TenantContext;
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.ganaderia.entities.ProveedorGanaderia;
 import com.auroraplus.modules.ganaderia.repositories.ProveedorGanaderiaRepository;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,11 +19,14 @@ public class ProveedorGanaderiaController {
 
     @GetMapping
     public List<ProveedorGanaderia> listar() {
-        return proveedorGanaderiaRepository.findByTenantId(TenantContext.getCurrentTenant());
+        return proveedorGanaderiaRepository.findByTenantId(GanaderiaTenantAccess.requireTenant());
     }
 
     @PostMapping
-    public ResponseEntity<ProveedorGanaderia> crear(@RequestParam Long tenantId, @RequestBody ProveedorGanaderia proveedor) {
+    public ResponseEntity<ProveedorGanaderia> crear(@RequestBody ProveedorGanaderia proveedor) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        proveedor.setId(null);
         proveedor.setTenantId(tenantId);
         return ResponseEntity.ok(proveedorGanaderiaRepository.save(proveedor));
     }

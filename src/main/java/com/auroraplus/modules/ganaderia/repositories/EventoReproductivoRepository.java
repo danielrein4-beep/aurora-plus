@@ -11,4 +11,6 @@ import java.util.List;
 public interface EventoReproductivoRepository extends JpaRepository<EventoReproductivo, Long> {
     @Query("SELECT e FROM EventoReproductivo e JOIN FETCH e.hembra WHERE e.hembra.id = :hembraId ORDER BY e.fecha DESC")
     List<EventoReproductivo> findByHembraIdOrderByFechaDesc(@Param("hembraId") Long hembraId);
+
+    List<EventoReproductivo> findByTenantIdAndFechaProbablePartoBetween(Long tenantId, java.time.LocalDate desde, java.time.LocalDate hasta);
 }

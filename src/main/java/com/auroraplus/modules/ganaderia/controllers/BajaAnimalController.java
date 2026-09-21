@@ -2,11 +2,11 @@ package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
-import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.BajaAnimal;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.BajaAnimalRepository;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +40,7 @@ public class BajaAnimalController {
 
     @GetMapping
     public List<BajaAnimal> listar() {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return bajaAnimalRepository.findByTenantId(tenantId);
     }
 
@@ -48,12 +48,9 @@ public class BajaAnimalController {
     @Transactional
     public ResponseEntity<BajaAnimal> registrar(@RequestBody BajaRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
-        Long tenantId = TenantContext.getCurrentTenant();
-        Animal animal = animalRepository.findById(request.animalId)
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        Animal animal = animalRepository.findForUpdateByIdAndTenantId(request.animalId, tenantId)
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (!animal.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
-        }
         if (!"ACTIVO".equals(animal.getEstado())) {
             throw new RuntimeException("El animal ya no está activo (estado actual: " + animal.getEstado() + ")");
         }
