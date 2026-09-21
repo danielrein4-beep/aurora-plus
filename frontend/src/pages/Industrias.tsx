@@ -29,8 +29,8 @@ const INDUSTRIES = [
     name: "Comercio",
     color: "from-orange-400 to-amber-500",
     tagline: "Tu mostrador, tu inventario y tu WhatsApp, en un solo lugar",
-    desc: "Punto de venta por mostrador, inventario en tiempo real, catálogo público con pedidos por WhatsApp, y un asistente de IA que responde precios y stock sin que nadie esté pegado al teléfono.",
-    modulos: ["POS por mostrador con escáner de código de barras", "Catálogo público con pedidos por WhatsApp", "Asistente de IA (precios, stock, tasa BCV, delivery)", "Inventario con alertas de stock", "Gestión de proveedores y cuentas por cobrar", "Reportes de rotación de productos"],
+    desc: "Punto de venta por mostrador, inventario en tiempo real, catálogo público con pedidos por WhatsApp y atención automatizada de precios y stock sin que nadie esté pegado al teléfono.",
+    modulos: ["POS por mostrador con escáner de código de barras", "Catálogo público con pedidos por WhatsApp", "Atención automatizada (precios, stock, tasa BCV, delivery)", "Inventario con alertas de stock", "Gestión de proveedores y cuentas por cobrar", "Reportes de rotación de productos"],
   },
   {
     Icon: IconRestaurant,

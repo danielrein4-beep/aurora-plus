@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 @import 'tailwindcss';
 /* Sin esto, Tailwind v4 usa prefers-color-scheme (el SO del visitante) para
    activar las clases dark: en TODA la app, sin importar lo que diga
@@ -240,9 +240,25 @@ html, body, #root {
   min-height: 100%;
   background-color: #FFFFFF !important;
   color: #1D1D1F !important;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Aurora no necesita una mezcla de tipografías de landing/SaaS. Plex Sans
+   unifica interfaz, títulos y paneles con una voz institucional; Plex Mono
+   queda reservado para cifras, tasas, IDs y datos operativos. Se mantiene la
+   compatibilidad de las clases heredadas mientras se retiran gradualmente. */
+[class*="font-['Inter']"],
+[class*="font-['Outfit']"] {
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: normal;
+}
+
+.font-mono,
+[class*="IBM_Plex_Mono"] {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Force Light Surfaces & Contrast */

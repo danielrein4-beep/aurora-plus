@@ -18,7 +18,7 @@ const PERIODOS = [
 // de una a otra es el precio de Full y cuál es su herramienta más fuerte, así que eso
 // se selecciona primero y el precio de la tarjeta Full se ajusta según la elección.
 const VERTICALES = [
-  { id: "comercio", nombre: "Comercio", precioFull: 40, beneficioFull: "Catálogo público + asistente de IA por WhatsApp (precios, stock, tasa BCV y delivery al instante)", Icon: IconHardware, color: "from-orange-400 to-amber-500", ring: "ring-orange-400/50", glow: "rgba(251,146,60,0.35)" },
+  { id: "comercio", nombre: "Comercio", precioFull: 40, beneficioFull: "Catálogo público + atención automatizada por WhatsApp (precios, stock, tasa BCV y delivery al instante)", Icon: IconHardware, color: "from-orange-400 to-amber-500", ring: "ring-orange-400/50", glow: "rgba(251,146,60,0.35)" },
   { id: "mediclinic", nombre: "Mediclinic", precioFull: 50, beneficioFull: "Vademécum de 36+ fármacos, récipe médico oficial en PDF y firma electrónica", Icon: IconClinic, color: "from-sky-400 to-blue-500", ring: "ring-sky-400/50", glow: "rgba(56,189,248,0.35)" },
   { id: "odontologia", nombre: "Odontología", precioFull: 50, beneficioFull: "Odontograma FDI, periodontograma de 6 puntos y planes de tratamiento por fases", Icon: IconTooth, color: "from-cyan-400 to-teal-500", ring: "ring-cyan-400/50", glow: "rgba(34,211,238,0.35)" },
   { id: "restaurantes", nombre: "Restaurantes", precioFull: 40, beneficioFull: "Turnos de caja con arqueo real, reservas y zonas de cocina configurables", Icon: IconRestaurant, color: "from-rose-400 to-pink-500", ring: "ring-rose-400/50", glow: "rgba(251,113,133,0.35)" },
@@ -46,7 +46,7 @@ const FAQ = [
   { q: "¿Cuánto tarda la implementación?", a: "Nuestra meta es tenerte operando en menos de 2 semanas, con capacitación y acompañamiento directo incluidos." },
   { q: "¿Los datos son seguros?", a: "Toda la comunicación va cifrada (HTTPS), las contraseñas nunca se guardan en texto plano, y la base de datos tiene respaldo automático diario." },
   { q: "¿Necesito instalar algo?", a: "No. Aurora Plus funciona 100% desde el navegador. La versión móvil también es web, sin necesidad de descargar apps." },
-  { q: "¿Cuál es la diferencia entre Básico y Full?", a: "Básico trae los módulos esenciales de tu vertical (punto de venta o agenda, inventario, caja). Full agrega nuestras herramientas más fuertes: catálogo con IA por WhatsApp en Comercio, récipe médico y vademécum en Mediclinic/Odontología, y mapa satelital con básculas bluetooth en Ganadería." },
+  { q: "¿Cuál es la diferencia entre Básico y Full?", a: "Básico trae los módulos esenciales de tu vertical (punto de venta o agenda, inventario, caja). Full agrega nuestras herramientas más fuertes: catálogo con atención automatizada por WhatsApp en Comercio, récipe médico y vademécum en Mediclinic/Odontología, y mapa satelital con básculas bluetooth en Ganadería." },
   { q: "¿Ofrecen descuentos por pago semestral o anual?", a: "Sí: 10% de descuento pagando cada 6 meses, y 15% pagando anual, en cualquiera de los dos planes." },
   { q: "¿Puedo empezar en Básico y subir a Full después?", a: "Sí, puedes subir de plan cuando quieras — el cambio aplica en tu siguiente ciclo de facturación." },
 ];

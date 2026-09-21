@@ -1277,7 +1277,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           </button>
           <button
             type="button"
-            title="Atencion y ventas automatizadas en WhatsApp con IA conectada a tu inventario en tiempo real"
+            title="Atención y ventas automatizadas por WhatsApp, conectadas a tu inventario en tiempo real"
             onClick={() => { setModalIaVisible(true); setSidebarAbierto(false); }}
             className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors mt-1"
           >
@@ -1286,7 +1286,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
-            <span className="flex-1 text-left">Asistente IA WhatsApp</span>
+            <span className="flex-1 text-left">Atención por WhatsApp</span>
             <span className="text-[8px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
               24/7
             </span>

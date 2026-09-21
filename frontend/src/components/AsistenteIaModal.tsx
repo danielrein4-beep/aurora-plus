@@ -142,7 +142,7 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
         ...prev,
         {
           emisor: "ia",
-          texto: "Lo siento, ha ocurrido una interrupcion temporal en el servidor de IA.",
+          texto: "Lo siento, ha ocurrido una interrupción temporal en el servicio. Inténtalo de nuevo en unos minutos.",
           hora: horaActual
         }
       ]);
@@ -168,7 +168,7 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
         })
       });
       if (res.ok) {
-        setMsgExitoConfig("Configuracion de IA guardada exitosamente.");
+        setMsgExitoConfig("Configuración de atención guardada exitosamente.");
         setTimeout(() => setMsgExitoConfig(null), 4000);
       }
     } catch {
@@ -190,7 +190,7 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white leading-none">
-                  Asistente IA de WhatsApp & Ventas
+                  Atención por WhatsApp & Ventas
                 </h3>
                 <span
                   className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
@@ -199,7 +199,7 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
                       : "bg-slate-200 dark:bg-slate-800 text-slate-500"
                   }`}
                 >
-                  {activa ? "IA Activa" : "Pausada"}
+                  {activa ? "Activa" : "Pausada"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -285,7 +285,7 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
               {enviando && (
                 <div className="flex items-center gap-2 text-slate-400 text-xs py-1">
                   <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-                  <span>La IA está consultando el inventario...</span>
+                  <span>Consultando el inventario...</span>
                 </div>
               )}
               <div ref={chatEndRef} />
@@ -345,7 +345,7 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
             <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
               <div>
                 <span className="font-bold text-sm text-slate-900 dark:text-white block">
-                  Activar Asistente IA en WhatsApp
+                  Activar atención por WhatsApp
                 </span>
                 <span className="text-xs text-slate-500 dark:text-slate-400">
                   Responde automáticamente a los mensajes entrantes consultando precios y stock.
@@ -391,7 +391,7 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
                   className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none"
                 />
                 <span className="text-[11px] text-slate-500 mt-0.5 block">
-                  La IA respondera con esta politica cuando pregunten por envios.
+                  El asistente responderá con esta política cuando pregunten por envíos.
                 </span>
               </div>
 
