@@ -8,10 +8,13 @@ function SvgClose({ className = "w-5 h-5" }: { className?: string }) {
   );
 }
 
-function SvgBot({ className = "w-5 h-5" }: { className?: string }) {
+function SvgAutomation({ className = "w-5 h-5" }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      <rect x="3.5" y="4" width="5" height="5" rx="1" />
+      <rect x="15.5" y="9.5" width="5" height="5" rx="1" />
+      <rect x="3.5" y="15" width="5" height="5" rx="1" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.5 6.5h3a3 3 0 013 3v2.5M8.5 17.5h3a3 3 0 003-3v-2.5M12 12h2.5" />
     </svg>
   );
 }
@@ -36,14 +39,6 @@ function SvgCheck({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
-
-function SvgSparkles({ className = "w-4 h-4" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.286L13 21l-2.286-6.857L5 12l5.714-2.286L13 3z" />
     </svg>
   );
 }
@@ -184,8 +179,8 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-teal-500/20 text-teal-400 flex items-center justify-center">
-              <SvgBot className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-lg bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/25 text-teal-700 dark:text-teal-300 flex items-center justify-center">
+              <SvgAutomation className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">

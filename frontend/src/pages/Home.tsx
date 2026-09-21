@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware,
   IconRestaurant, IconFarm,
-  IconCustomize, IconLink, IconCloud, IconLock,
+  IconAutomation, IconLink, IconCloud, IconLock,
   IconCard, IconBox, IconBolt, IconShield,
   IconTooth, IconVet,
 } from "../Icons";
@@ -32,7 +32,7 @@ const SISTEMA_POR_INDUSTRIA: Record<string, { ruta: string; label: string; nombr
 const SISTEMA_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro", nombre: "Mediclinic Pro — Espacio Clínico", desc: "Historias clínicas digitales, agenda médica, sala de espera reactiva, cotizador y caja diaria.", Icon: IconClinic };
 
 const FEATURES = [
-  { Icon: IconCustomize, title: "Atención automatizada por WhatsApp", desc: "En Comercio: responde precios, stock y tasa BCV al instante. Con límites de costo por negocio." },
+  { Icon: IconAutomation, title: "Atención automatizada por WhatsApp", desc: "En Comercio: responde precios, stock y tasa BCV al instante. Con límites de costo por negocio." },
   { Icon: IconFarm,      title: "Control Sanitario Estricto", desc: "En Ganadería: si un animal sigue en período de retiro por vacuna o tratamiento, el sistema bloquea su venta." },
   { Icon: IconTooth,     title: "Récipe Médico y Vademécum", desc: "En Mediclinic y Odontología: 36+ fármacos con posología, detección de alergias y récipe oficial en PDF." },
   { Icon: IconLink,      title: "Módulos Integrados", desc: "Ventas, inventario, caja y auditoría conectados sin planillas paralelas ni datos duplicados." },
@@ -126,10 +126,8 @@ export default function Home() {
             const miSistema = SISTEMA_POR_INDUSTRIA[user?.industry || ""] || SISTEMA_POR_DEFECTO;
             return (
               <div className="w-full max-w-2xl bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-6 mb-16 text-left flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-white border border-[#E5E5EA] flex items-center justify-center text-[#177E89] shadow-sm">
-                    <miSistema.Icon size={24} />
-                  </div>
+                <div className="flex items-start gap-3 border-l-2 border-[#0F766E] pl-4">
+                  <miSistema.Icon size={20} />
                   <div>
                     <div className="text-xs font-bold uppercase tracking-wider text-[#177E89]">
                       Sistema Asignado
@@ -187,15 +185,13 @@ export default function Home() {
                 <div
                   key={ind.name}
                   onClick={() => setActiveIndustry(idx)}
-                  className={`bg-white border rounded-2xl p-7 transition-all cursor-pointer shadow-sm ${
-                    activeIndustry === idx ? "border-[#177E89] ring-1 ring-[#177E89]" : "border-[#E5E5EA] hover:border-[#D1D1D6]"
+                  className={`bg-white border border-l-2 rounded-xl p-7 transition-all cursor-pointer shadow-sm ${
+                    activeIndustry === idx ? "border-[#177E89] border-l-[#0F766E] ring-1 ring-[#177E89]" : "border-[#E5E5EA] border-l-[#B8C8CD] hover:border-[#B8C8CD] hover:border-l-[#0F766E]"
                   }`}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] flex items-center justify-center text-[#177E89] mb-5">
-                    <IconComp size={24} />
-                  </div>
-                  <h3 className="text-lg font-bold text-[#1D1D1F] tracking-tight mb-2">
-                    {ind.name}
+                  <h3 className="flex items-center gap-2.5 text-lg font-bold text-[#1D1D1F] tracking-tight mb-2">
+                    <span className="text-[#0F766E]"><IconComp size={19} /></span>
+                    <span>{ind.name}</span>
                   </h3>
                   <p className="text-sm text-[#86868B] leading-relaxed">
                     {ind.desc}
@@ -268,11 +264,11 @@ export default function Home() {
             {FEATURES.map((feat) => {
               const FeatIcon = feat.Icon;
               return (
-                <div key={feat.title} className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-7">
-                  <div className="w-10 h-10 rounded-xl bg-white border border-[#E5E5EA] flex items-center justify-center text-[#177E89] mb-5 shadow-sm">
-                    <FeatIcon size={20} />
-                  </div>
-                  <h3 className="text-base font-bold text-[#1D1D1F] mb-2">{feat.title}</h3>
+                <div key={feat.title} className="bg-[#F5F5F7] border border-[#E5E5EA] border-l-2 border-l-[#B8C8CD] rounded-xl p-7">
+                  <h3 className="flex items-center gap-2.5 text-base font-bold text-[#1D1D1F] mb-2">
+                    <span className="text-[#0F766E]"><FeatIcon size={18} /></span>
+                    <span>{feat.title}</span>
+                  </h3>
                   <p className="text-xs text-[#86868B] leading-relaxed">{feat.desc}</p>
                 </div>
               );

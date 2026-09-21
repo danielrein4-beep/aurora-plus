@@ -35,7 +35,8 @@ import {
   obtenerUtilidadRepuestos,
   type UtilidadPeriodoRepuesto,
   extraerFacturaOcr,
-  listarMovimientos, registrarMovimiento,
+  crearCliente,
+  listarMovimientos, registrarMovimiento, abonarMovimiento,
   abrirTurno,
   turnoAbierto,
   historialTurnos,
@@ -55,6 +56,7 @@ import {
   type FacturaExtraidaOcr,
   type ItemImportacionRepuesto,
   type ResultadoImportacionRepuestos,
+  obtenerMiNegocio,
 } from "../api";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -99,6 +101,7 @@ export interface LineaCarritoComercio {
   codigo: string;
   nombre: string;
   precio: number;
+  costo?: number;
   cantidad: number;
   unidadMedida?: string;
   lote?: string;
@@ -114,6 +117,23 @@ export interface LineaCarritoComercio {
   factorConversion?: number;
 }
 
+export interface CuentaComercio {
+  id: string;
+  tipo: "CXP" | "CXC";
+  entidadNombre: string;
+  entidadDocumento?: string;
+  concepto: string;
+  numeroDocumento?: string;
+  montoOriginal: number;
+  saldoPendiente: number;
+  moneda: "USD" | "VES" | "COP";
+  estado: "PENDIENTE" | "PAGADO";
+  fechaRegistro: string;
+  fechaVencimiento?: string;
+  referenciaTipo?: "VENTA" | "COMPRA" | "SERVICIO" | "MANUAL";
+  referenciaId?: string;
+}
+
 export interface ClienteComercio {
   id: string;
   nombre: string;
@@ -122,6 +142,11 @@ export interface ClienteComercio {
   direccion?: string;
   saldoPendiente: number;
   limiteCredito: number;
+  fechaRegistro?: string;
+  totalCompras?: number;
+  montoTotalComprado?: number;
+  utilidadGenerada?: number;
+  ultimaCompra?: string;
 }
 
 export interface VentaComercio {
@@ -133,12 +158,15 @@ export interface VentaComercio {
   total: number;
   totalBs: number;
   totalCop: number;
+  costoTotal?: number;
+  utilidad?: number;
   metodoPago: string;
   esCredito: boolean;
   recibido?: number;
   monedaRecibida?: string;
   vuelto?: number;
   monedaVuelto?: string;
+  desglosePagos?: Array<{ moneda: string; monto: number; label?: string }>;
 }
 
 export interface CotizacionComercio {
@@ -192,6 +220,180 @@ const CLIENTES_INICIALES: ClienteComercio[] = [
   { id: "c-3", nombre: "Constructora Andina C.A.", documento: "J-40982314-1", telefono: "0424-7128901", saldoPendiente: 380.00, limiteCredito: 1200 },
   { id: "c-4", nombre: "Dr. Marcos Peñaloza", documento: "V-14567890", telefono: "0412-6543210", saldoPendiente: 0, limiteCredito: 200 },
 ];
+
+export const VENTAS_INICIALES: VentaComercio[] = [
+  {
+    id: "v-seed-1",
+    numero: "TKT-382910",
+    cliente: { id: "c-2", nombre: "Taller Mecánico Hermanos Ramos", documento: "J-31456789-2", telefono: "0414-7581290", saldoPendiente: 145.50, limiteCredito: 500 },
+    fecha: "18/09/2026, 10:30:15 AM",
+    lineas: [
+      { productoId: "f-3", codigo: "ACEI-20W50", nombre: "Aceite Motor 20W-50 Mineral 1L", precio: 5.50, costo: 3.20, cantidad: 4, unidadMedida: "Litro" },
+      { productoId: "f-4", codigo: "FILT-PH8A", nombre: "Filtro de Aceite PH-8A Blindado", precio: 6.80, costo: 3.90, cantidad: 2, unidadMedida: "Pza" }
+    ],
+    total: 35.60,
+    totalBs: 35.60 * 36.5,
+    totalCop: 35.60 * 4000,
+    costoTotal: 20.60,
+    utilidad: 15.00,
+    metodoPago: "PUNTO_VENTA",
+    esCredito: false,
+    recibido: 35.60,
+    monedaRecibida: "USD"
+  },
+  {
+    id: "v-seed-2",
+    numero: "TKT-382945",
+    cliente: { id: "c-2", nombre: "Taller Mecánico Hermanos Ramos", documento: "J-31456789-2", telefono: "0414-7581290", saldoPendiente: 145.50, limiteCredito: 500 },
+    fecha: "19/09/2026, 03:45:00 PM",
+    lineas: [
+      { productoId: "f-1", codigo: "TORN-38", nombre: 'Tornillo Drywall 6x1" (Caja 100u)', precio: 2.80, costo: 1.50, cantidad: 5, unidadMedida: "Caja" },
+      { productoId: "f-6", codigo: "BOMB-LED9", nombre: "Bombillo LED 9W Luz Blanca E27", precio: 1.95, costo: 0.90, cantidad: 4, unidadMedida: "Pza" }
+    ],
+    total: 21.80,
+    totalBs: 21.80 * 36.5,
+    totalCop: 21.80 * 4000,
+    costoTotal: 11.10,
+    utilidad: 10.70,
+    metodoPago: "CREDITO_CUENTA",
+    esCredito: true,
+    recibido: 0,
+    monedaRecibida: "USD"
+  },
+  {
+    id: "v-seed-3",
+    numero: "TKT-383012",
+    cliente: { id: "c-3", nombre: "Constructora Andina C.A.", documento: "J-40982314-1", telefono: "0424-7128901", saldoPendiente: 380.00, limiteCredito: 1200 },
+    fecha: "20/09/2026, 09:12:30 AM",
+    lineas: [
+      { productoId: "f-2", codigo: "DISC-45", nombre: 'Disco de Corte Metal 4.5" Extra Fino', precio: 1.20, costo: 0.65, cantidad: 20, unidadMedida: "Pza" },
+      { productoId: "f-5", codigo: "TEFL-34", nombre: 'Teflón Industrial Alta Densidad 3/4"', precio: 0.85, costo: 0.35, cantidad: 10, unidadMedida: "Rollo" }
+    ],
+    total: 32.50,
+    totalBs: 32.50 * 36.5,
+    totalCop: 32.50 * 4000,
+    costoTotal: 16.50,
+    utilidad: 16.00,
+    metodoPago: "PAGO_MOVIL",
+    esCredito: false,
+    recibido: 32.50 * 36.5,
+    monedaRecibida: "VES"
+  },
+  {
+    id: "v-seed-4",
+    numero: "TKT-383150",
+    cliente: { id: "c-4", nombre: "Dr. Marcos Peñaloza", documento: "V-14567890", telefono: "0412-6543210", saldoPendiente: 0, limiteCredito: 200 },
+    fecha: "20/09/2026, 06:20:10 PM",
+    lineas: [
+      { productoId: "m-1", codigo: "ACET-500", nombre: "Acetaminofén 500mg (Caja 20 Tab)", precio: 1.50, costo: 0.70, cantidad: 2, unidadMedida: "Caja" },
+      { productoId: "m-2", codigo: "IBUP-400", nombre: "Ibuprofeno 400mg (Caja 10 Tab)", precio: 2.10, costo: 1.10, cantidad: 1, unidadMedida: "Caja" }
+    ],
+    total: 5.10,
+    totalBs: 5.10 * 36.5,
+    totalCop: 5.10 * 4000,
+    costoTotal: 2.50,
+    utilidad: 2.60,
+    metodoPago: "PUNTO_VENTA",
+    esCredito: false,
+    recibido: 5.10,
+    monedaRecibida: "USD"
+  }
+];
+export const CUENTAS_INICIALES_COMERCIO: CuentaComercio[] = [
+  // Cuentas por Pagar (CXP)
+  {
+    id: "cxp-1",
+    tipo: "CXP",
+    entidadNombre: "Distribuidora Mayorista Ferretera C.A.",
+    entidadDocumento: "J-30987654-1",
+    concepto: "Factura F-94821 - Lote de Tornillería & Discos de Corte",
+    numeroDocumento: "F-94821",
+    montoOriginal: 450.00,
+    saldoPendiente: 450.00,
+    moneda: "USD",
+    estado: "PENDIENTE",
+    fechaRegistro: "2026-09-15",
+    fechaVencimiento: "2026-09-28",
+    referenciaTipo: "COMPRA"
+  },
+  {
+    id: "cxp-2",
+    tipo: "CXP",
+    entidadNombre: "Lubricantes & Filtros Los Andes",
+    entidadDocumento: "J-40112345-8",
+    concepto: "Factura F-73104 - 10 Cajas de Aceite Motor 20W-50",
+    numeroDocumento: "F-73104",
+    montoOriginal: 320.00,
+    saldoPendiente: 120.00,
+    moneda: "USD",
+    estado: "PENDIENTE",
+    fechaRegistro: "2026-09-12",
+    fechaVencimiento: "2026-09-25",
+    referenciaTipo: "COMPRA"
+  },
+  {
+    id: "cxp-3",
+    tipo: "CXP",
+    entidadNombre: "Materiales Eléctricos del Táchira",
+    entidadDocumento: "J-29871023-4",
+    concepto: "Factura F-61209 - Bombillos LED y Cajas de Breakers",
+    numeroDocumento: "F-61209",
+    montoOriginal: 180.00,
+    saldoPendiente: 0.00,
+    moneda: "USD",
+    estado: "PAGADO",
+    fechaRegistro: "2026-09-05",
+    fechaVencimiento: "2026-09-18",
+    referenciaTipo: "COMPRA"
+  },
+  // Cuentas por Cobrar (CXC)
+  {
+    id: "cxc-1",
+    tipo: "CXC",
+    entidadNombre: "Taller Mecánico Hermanos Ramos",
+    entidadDocumento: "J-31456789-2",
+    concepto: "Ticket TKT-382945 - Venta a Crédito 5 Cajas Tornillos y Bombillos",
+    numeroDocumento: "TKT-382945",
+    montoOriginal: 145.50,
+    saldoPendiente: 145.50,
+    moneda: "USD",
+    estado: "PENDIENTE",
+    fechaRegistro: "2026-09-19",
+    fechaVencimiento: "2026-09-30",
+    referenciaTipo: "VENTA"
+  },
+  {
+    id: "cxc-2",
+    tipo: "CXC",
+    entidadNombre: "Constructora Andina C.A.",
+    entidadDocumento: "J-40982314-1",
+    concepto: "Ticket TKT-383012 - Venta a Crédito Materiales de Obra",
+    numeroDocumento: "TKT-383012",
+    montoOriginal: 380.00,
+    saldoPendiente: 380.00,
+    moneda: "USD",
+    estado: "PENDIENTE",
+    fechaRegistro: "2026-09-20",
+    fechaVencimiento: "2026-10-05",
+    referenciaTipo: "VENTA"
+  },
+  {
+    id: "cxc-3",
+    tipo: "CXC",
+    entidadNombre: "Servicios Industriales Vargas",
+    entidadDocumento: "V-18765432",
+    concepto: "Ticket TKT-381044 - Venta a Crédito Repuestos y Filtros",
+    numeroDocumento: "TKT-381044",
+    montoOriginal: 250.00,
+    saldoPendiente: 0.00,
+    moneda: "USD",
+    estado: "PAGADO",
+    fechaRegistro: "2026-09-08",
+    fechaVencimiento: "2026-09-20",
+    referenciaTipo: "VENTA"
+  }
+];
+
 
 // ══════════════════════════════════════════════════════════════════════════
 // IMPRESIÓN TÉRMICA UNIVERSAL PARA COMERCIO (80mm / 58mm)
@@ -307,9 +509,24 @@ function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaA
 // caja) — solo pide al backend la utilidad real (RepuestosReporteService),
 // que nadie más ya tiene cargada.
 // ══════════════════════════════════════════════════════════════════════════
-function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNegocio, onIrAInventario, onIrAPos, onIrAProveedores, onIrAUtilidad }: {
+function DashboardGeneralComercio({
+  productos,
+  ingresosCaja,
+  ventas,
+  tasaActivaBs,
+  tasaCop,
+  esAdmin,
+  nombreNegocio,
+  onIrAInventario,
+  onIrAPos,
+  onIrAProveedores,
+  onIrAUtilidad,
+}: {
   productos: ProductoComercio[];
   ingresosCaja: MovimientoCaja[];
+  ventas: VentaComercio[];
+  tasaActivaBs: number;
+  tasaCop: number;
   esAdmin: boolean;
   nombreNegocio: string;
   onIrAInventario: () => void;
@@ -333,6 +550,90 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
       ventasSemana: sumarPorMoneda(ingresosCaja.filter((m) => new Date(m.fechaRegistro) >= inicioSemana)),
     };
   }, [ingresosCaja]);
+
+  // Función robusta para determinar si una venta fue realizada el día de hoy
+  const esFechaDeHoy = (fechaStr?: string): boolean => {
+    if (!fechaStr) return false;
+    const hoy = new Date();
+    const dHoy = hoy.getDate();
+    const mHoy = hoy.getMonth() + 1;
+    const yHoy = hoy.getFullYear();
+
+    const parsed = new Date(fechaStr);
+    if (!isNaN(parsed.getTime())) {
+      if (parsed.getDate() === dHoy && (parsed.getMonth() + 1) === mHoy && parsed.getFullYear() === yHoy) {
+        return true;
+      }
+    }
+
+    const hoyDdmmyyyy = `${dHoy.toString().padStart(2, "0")}/${mHoy.toString().padStart(2, "0")}/${yHoy}`;
+    const hoyYyyymmdd = `${yHoy}-${mHoy.toString().padStart(2, "0")}-${dHoy.toString().padStart(2, "0")}`;
+    return fechaStr.includes(hoyDdmmyyyy) || fechaStr.includes(hoyYyyymmdd);
+  };
+
+  // Cálculo integral de ventas hoy: cantidad de tickets, desglose por moneda cobrada y consolidado
+  const {
+    cantidadVentasHoy,
+    totalConsolidadoUSD,
+    totalConsolidadoBs,
+    totalConsolidadoCop,
+    cobradoUSD,
+    cobradoBs,
+    cobradoCop,
+  } = useMemo(() => {
+    const listaHoy = (ventas || []).filter((v) => esFechaDeHoy(v.fecha));
+    const cant = listaHoy.length;
+
+    let totUSD = 0;
+    let cUSD = 0;
+    let cBs = 0;
+    let cCop = 0;
+
+    listaHoy.forEach((v) => {
+      totUSD += v.total || 0;
+      if (v.desglosePagos && v.desglosePagos.length > 0) {
+        v.desglosePagos.forEach((p) => {
+          if (p.moneda === "USD") cUSD += p.monto;
+          else if (p.moneda === "VES") cBs += p.monto;
+          else if (p.moneda === "COP") cCop += p.monto;
+        });
+      } else {
+        const mon = v.monedaRecibida || (
+          v.metodoPago === "COP_EFECTIVO" ? "COP" :
+          (v.metodoPago === "EFECTIVO_BS" || v.metodoPago === "PAGO_MOVIL" || v.metodoPago === "PUNTO_VENTA") ? "VES" : "USD"
+        );
+        if (mon === "USD") cUSD += (v.recibido || v.total || 0);
+        else if (mon === "VES") cBs += (v.recibido || v.totalBs || (v.total * tasaActivaBs));
+        else if (mon === "COP") cCop += (v.recibido || v.totalCop || (v.total * tasaCop));
+      }
+    });
+
+    // Si además hay movimientos de caja backend hoy y no había ventas locales
+    const ahora = new Date();
+    const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    const ingresosHoy = (ingresosCaja || []).filter((m) => new Date(m.fechaRegistro) >= inicioHoy);
+    if (cant === 0 && ingresosHoy.length > 0) {
+      ingresosHoy.forEach((m) => {
+        const monto = Number(m.monto) || 0;
+        if (m.moneda === "USD") { cUSD += monto; totUSD += monto; }
+        else if (m.moneda === "VES") { cBs += monto; totUSD += (tasaActivaBs > 0 ? monto / tasaActivaBs : 0); }
+        else if (m.moneda === "COP") { cCop += monto; totUSD += (tasaCop > 0 ? monto / tasaCop : 0); }
+      });
+    }
+
+    const totBs = tasaActivaBs > 0 ? totUSD * tasaActivaBs : 0;
+    const totCop = tasaCop > 0 ? totUSD * tasaCop : 0;
+
+    return {
+      cantidadVentasHoy: cant > 0 ? cant : ingresosHoy.length,
+      totalConsolidadoUSD: totUSD,
+      totalConsolidadoBs: totBs,
+      totalConsolidadoCop: totCop,
+      cobradoUSD: cUSD,
+      cobradoBs: cBs,
+      cobradoCop: cCop,
+    };
+  }, [ventas, ingresosCaja, tasaActivaBs, tasaCop]);
 
   const productosBajoStock = useMemo(
     () => productos.filter((p) => p.stock <= p.stockMinimo).sort((a, b) => a.stock / Math.max(a.stockMinimo, 1) - b.stock / Math.max(b.stockMinimo, 1)),
@@ -379,20 +680,7 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
   const mostrarChecklist = pasosCompletados < 3;
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* ── ENCABEZADO ── */}
-      <div className="rounded-3xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-teal-50 via-white to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1">
-            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider bg-teal-500/10 border border-teal-500/20 rounded-full px-2.5 py-1">
-              {fechaHoyLarga}
-            </span>
-            <h2 className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">{saludo} — {nombreNegocio}</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Así está tu negocio ahora mismo.</p>
-          </div>
-        </div>
-      </div>
-
+    <div className="space-y-5 animate-fade-in">
       {/* ── CHECKLIST DE PRIMEROS PASOS (solo mientras el negocio está empezando) ── */}
       {mostrarChecklist && (
         <section className="rounded-3xl p-6 border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-white to-white dark:from-teal-500/10 dark:via-slate-900 dark:to-slate-900 shadow-sm space-y-4">
@@ -442,24 +730,91 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
       <section className="space-y-2.5">
         <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Hoy</h3>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Tarjeta héroe: Ventas de Hoy */}
-          <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl p-5 border-2 border-teal-200 dark:border-teal-500/30 shadow-sm flex flex-col justify-between">
+          {/* Tarjeta héroe: Ventas de Hoy Multi-Moneda */}
+          <div className="lg:col-span-7 self-start bg-white dark:bg-slate-900 rounded-2xl p-5 border border-teal-200 dark:border-teal-500/30 shadow-sm space-y-3.5">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/30 px-2.5 py-0.5 rounded-full">
-                  Ventas de Hoy
-                </span>
-                <div className="mt-2.5 font-['Outfit'] font-black text-3xl text-slate-900 dark:text-white truncate">
-                  {fmtMonedas(ventasHoy)}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/30 px-2.5 py-0.5 rounded-full">
+                    Ventas de Hoy
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+                    {cantidadVentasHoy === 0
+                      ? "Sin ventas hoy"
+                      : cantidadVentasHoy === 1
+                      ? "1 venta hoy"
+                      : `${cantidadVentasHoy} ventas hoy`}
+                  </span>
+                </div>
+
+                {/* Total Consolidado */}
+                <div className="mt-2 font-['Outfit'] font-black text-3xl text-slate-900 dark:text-white tracking-tight">
+                  ${totalConsolidadoUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                  <span className="text-xs font-bold text-slate-400 font-sans uppercase">USD Consolidado</span>
+                </div>
+
+                {/* Equivalencias oficiales del total en Bolívares y Pesos */}
+                <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400 pt-0.5 flex-wrap">
+                  <span>Equivalente:</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">
+                    Bs. {totalConsolidadoBs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span>·</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">
+                    COP ${Math.round(totalConsolidadoCop).toLocaleString()}
+                  </span>
                 </div>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-teal-500/10 flex items-center justify-center flex-shrink-0"><IconChart size={17} className="text-teal-600 dark:text-teal-400" /></div>
+
+              <div className="w-9 h-9 rounded-xl bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0 border border-teal-200 dark:border-teal-500/30">
+                <IconChart size={18} />
+              </div>
             </div>
-            {Object.keys(ventasHoy).length === 0 && <p className="text-[11px] text-slate-400 mt-3">Aún no registras ventas hoy.</p>}
+
+            {/* Desglose real por tipo de moneda recibida */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                Cobrado hoy por tipo de moneda:
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {/* Dólares */}
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-semibold mb-0.5">
+                    <span>Dólares</span>
+                    <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">$ USD</span>
+                  </div>
+                  <div className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400 truncate">
+                    ${cobradoUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+
+                {/* Bolívares */}
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-semibold mb-0.5">
+                    <span>Bolívares</span>
+                    <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">Bs.</span>
+                  </div>
+                  <div className="font-mono font-black text-sm text-cyan-600 dark:text-cyan-400 truncate">
+                    Bs. {cobradoBs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+
+                {/* Pesos COP */}
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-semibold mb-0.5">
+                    <span>Pesos COP</span>
+                    <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">COP $</span>
+                  </div>
+                  <div className="font-mono font-black text-sm text-amber-600 dark:text-amber-400 truncate">
+                    COP ${Math.round(cobradoCop).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Cinta secundaria: Utilidad Real + Requiere atención */}
-          <div className="lg:col-span-5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between gap-3">
+          <div className="lg:col-span-5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col justify-between gap-3">
             {esAdmin ? (
               <button type="button" onClick={onIrAUtilidad} className="text-left flex items-center justify-between gap-3 cursor-pointer group">
                 <div className="min-w-0">
@@ -508,27 +863,27 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
       {/* ── 2. ACCESOS RÁPIDOS — lo que se usa todos los días, un clic ── */}
       <section className="space-y-2.5">
         <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Accesos rápidos</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <button type="button" onClick={onIrAPos} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 hover:shadow-md transition-all cursor-pointer">
-            <div className="w-10 h-10 rounded-xl bg-teal-500/10 flex items-center justify-center"><IconCard size={19} className="text-teal-600 dark:text-teal-400" /></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <button type="button" onClick={onIrAPos} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl py-3 px-3.5 border border-slate-200 dark:border-slate-800 hover:border-teal-500/50 transition-colors cursor-pointer text-left">
+            <div className="w-8 h-8 rounded-md bg-teal-500/10 flex items-center justify-center"><IconCard size={16} className="text-teal-600 dark:text-teal-400" /></div>
             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Nueva Venta</span>
           </button>
-          <button type="button" onClick={onIrAInventario} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-cyan-500/50 hover:shadow-md transition-all cursor-pointer">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center"><IconBox size={19} className="text-cyan-600 dark:text-cyan-400" /></div>
+          <button type="button" onClick={onIrAInventario} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl py-3 px-3.5 border border-slate-200 dark:border-slate-800 hover:border-cyan-500/50 transition-colors cursor-pointer text-left">
+            <div className="w-8 h-8 rounded-md bg-cyan-500/10 flex items-center justify-center"><IconBox size={16} className="text-cyan-600 dark:text-cyan-400" /></div>
             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Inventario</span>
           </button>
-          <button type="button" onClick={onIrAProveedores} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-400 hover:shadow-md transition-all cursor-pointer">
-            <div className="w-10 h-10 rounded-xl bg-slate-500/10 flex items-center justify-center"><IconTruck size={19} className="text-slate-600 dark:text-slate-300" /></div>
+          <button type="button" onClick={onIrAProveedores} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl py-3 px-3.5 border border-slate-200 dark:border-slate-800 hover:border-slate-400 transition-colors cursor-pointer text-left">
+            <div className="w-8 h-8 rounded-md bg-slate-500/10 flex items-center justify-center"><IconTruck size={16} className="text-slate-600 dark:text-slate-300" /></div>
             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Registrar Compra</span>
           </button>
           {esAdmin ? (
-            <button type="button" onClick={onIrAUtilidad} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-emerald-500/50 hover:shadow-md transition-all cursor-pointer">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center"><IconCoins size={19} className="text-emerald-600 dark:text-emerald-400" /></div>
+            <button type="button" onClick={onIrAUtilidad} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl py-3 px-3.5 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-colors cursor-pointer text-left">
+              <div className="w-8 h-8 rounded-md bg-emerald-500/10 flex items-center justify-center"><IconCoins size={16} className="text-emerald-600 dark:text-emerald-400" /></div>
               <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Ver Utilidad</span>
             </button>
           ) : (
-            <button type="button" onClick={onIrAInventario} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-400 hover:shadow-md transition-all cursor-pointer">
-              <div className="w-10 h-10 rounded-xl bg-slate-500/10 flex items-center justify-center"><IconBank size={19} className="text-slate-600 dark:text-slate-300" /></div>
+            <button type="button" onClick={onIrAInventario} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl py-3 px-3.5 border border-slate-200 dark:border-slate-800 hover:border-slate-400 transition-colors cursor-pointer text-left">
+              <div className="w-8 h-8 rounded-md bg-slate-500/10 flex items-center justify-center"><IconBank size={16} className="text-slate-600 dark:text-slate-300" /></div>
               <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{productos.length} Productos</span>
             </button>
           )}
@@ -613,6 +968,28 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
 // ══════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL: COMERCIO & RETAIL APP
 // ══════════════════════════════════════════════════════════════════════════
+// Componente aislado para reloj en vivo: evita re-renderizar todo el árbol de ComercioApp cada segundo
+function RelojEnVivoHeader() {
+  const [hora, setHora] = useState(() =>
+    new Date().toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })
+  );
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHora(
+        new Date().toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })
+      );
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700/60 shadow-inner">
+      {hora}
+    </span>
+  );
+}
+
 export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const { user } = useAuth();
 
@@ -629,6 +1006,24 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     "ferreteria";
 
   const tenantId = user?.tenantId;
+  const [logoNegocio, setLogoNegocio] = useState<string | null>(null);
+  const [logoNoDisponible, setLogoNoDisponible] = useState(false);
+
+  // La marca pertenece al tenant y se lee desde el servidor: nunca se guarda
+  // como una preferencia local de este navegador. Si todavía no hay logo (o
+  // el archivo no es válido), el monograma A+ conserva una identidad sobria.
+  useEffect(() => {
+    if (!tenantId) return;
+    obtenerMiNegocio()
+      .then((marca) => {
+        setLogoNegocio(marca.logoBase64 || null);
+        setLogoNoDisponible(false);
+      })
+      .catch(() => {
+        setLogoNegocio(null);
+        setLogoNoDisponible(false);
+      });
+  }, [tenantId]);
 
   // Ferretería, Repuestos, Retail y Comercio son una sola identidad visual — un
   // solo nombre, un solo ícono, un solo set de campos — desde que se unificaron
@@ -661,7 +1056,23 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const tasaCop = tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
-  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "gastos" | "cierre" | "auditoria">("general");
+  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "administracion" | "gastos" | "cierre" | "auditoria">("general");
+
+  const [cuentas, setCuentas] = useState<CuentaComercio[]>(() => {
+    try {
+      const g = localStorage.getItem("aurora_comercio_cuentas");
+      return g ? JSON.parse(g) : CUENTAS_INICIALES_COMERCIO;
+    } catch {
+      return CUENTAS_INICIALES_COMERCIO;
+    }
+  });
+
+  const guardarCuentas = (nuevas: CuentaComercio[]) => {
+    setCuentas(nuevas);
+    try {
+      localStorage.setItem("aurora_comercio_cuentas", JSON.stringify(nuevas));
+    } catch {}
+  };
   // Dentro de "Cierres & Reportes": arqueo de caja (todos) vs. utilidad real por
   // producto (solo Dueño/Administrador — mismo criterio que el backend, ver
   // ReporteRepuestoController.exigirRol).
@@ -693,7 +1104,83 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     }
   });
 
+  const [ventas, setVentas] = useState<VentaComercio[]>(() => {
+    try {
+      const g = localStorage.getItem("aurora_comercio_ventas");
+      return g ? JSON.parse(g) : VENTAS_INICIALES;
+    } catch {
+      return VENTAS_INICIALES;
+    }
+  });
+
   const [clienteSel, setClienteSel] = useState<ClienteComercio>(clientes[0]);
+
+  // Estados de Registro Rápido HORECA y CRM en Mostrador
+  const [cedulaClienteInput, setCedulaClienteInput] = useState("");
+  const [nombreClienteInput, setNombreClienteInput] = useState("");
+  const [telefonoClienteInput, setTelefonoClienteInput] = useState("");
+  const [mostrarSelectorClientes, setMostrarSelectorClientes] = useState(false);
+  const [clienteHistorialModal, setClienteHistorialModal] = useState<ClienteComercio | null>(null);
+  const [busquedaClienteTab, setBusquedaClienteTab] = useState("");
+
+  const limpiarClienteAMostrador = () => {
+    const consumFinal = clientes.find((c) => c.id === "c-1") || clientes[0];
+    setClienteSel(consumFinal);
+    setCedulaClienteInput("");
+    setNombreClienteInput("");
+    setTelefonoClienteInput("");
+    setMostrarSelectorClientes(false);
+  };
+
+  const manejarCambioCedula = (valor: string) => {
+    setCedulaClienteInput(valor);
+    const valLimpio = valor.trim().toUpperCase();
+    if (!valLimpio) {
+      const consumFinal = clientes.find((c) => c.id === "c-1") || clientes[0];
+      setClienteSel(consumFinal);
+      setNombreClienteInput("");
+      setTelefonoClienteInput("");
+      return;
+    }
+    const encontrado = clientes.find((c) => c.documento.toUpperCase() === valLimpio);
+    if (encontrado) {
+      setClienteSel(encontrado);
+      setNombreClienteInput(encontrado.nombre);
+      setTelefonoClienteInput(encontrado.telefono && encontrado.telefono !== "-" ? encontrado.telefono : "");
+    } else {
+      setClienteSel({
+        id: "c-provisional",
+        nombre: nombreClienteInput || "",
+        documento: valor,
+        telefono: telefonoClienteInput || "",
+        saldoPendiente: 0,
+        limiteCredito: 200,
+      });
+    }
+  };
+
+  const seleccionarClienteDesdeLista = (c: ClienteComercio) => {
+    setClienteSel(c);
+    if (c.id === "c-1") {
+      setCedulaClienteInput("");
+      setNombreClienteInput("");
+      setTelefonoClienteInput("");
+    } else {
+      setCedulaClienteInput(c.documento);
+      setNombreClienteInput(c.nombre);
+      setTelefonoClienteInput(c.telefono && c.telefono !== "-" ? c.telefono : "");
+    }
+    setMostrarSelectorClientes(false);
+  };
+
+  const comprasClienteSel = useMemo(() => {
+    if (!clienteSel || clienteSel.id === "c-1") return [];
+    return ventas.filter(
+      (v) =>
+        v.cliente.id === clienteSel.id ||
+        (v.cliente.documento && clienteSel.documento && v.cliente.documento.toUpperCase() === clienteSel.documento.toUpperCase())
+    );
+  }, [ventas, clienteSel]);
 
   // Carrito de Mostrador
   const [carrito, setCarrito] = useState<LineaCarritoComercio[]>([]);
@@ -965,6 +1452,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       }
 
       const esMayoreo = !presentacion && !!p.precioMayorista && !!p.cantidadMinimaMayorista && 1 >= p.cantidadMinimaMayorista;
+      const costoUnitario = presentacion
+        ? (p.costo ? p.costo * (presentacion.factorConversion || 1) : 0)
+        : (p.costo || 0);
 
       return [
         ...prev,
@@ -974,6 +1464,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           codigo: p.codigo,
           nombre: presentacion ? `${p.nombre} (${presentacion.nombrePresentacion})` : p.nombre,
           precio: esMayoreo ? (p.precioMayorista || precioUnitario) : precioUnitario,
+          costo: costoUnitario,
           precioOriginalDetal: precioUnitario,
           precioMayorista: p.precioMayorista,
           cantidadMinimaMayorista: p.cantidadMinimaMayorista,
@@ -1071,15 +1562,71 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     if (monedaVuelto === "VES") vueltoFinal = vueltoUSD * tasaActivaBs;
     if (monedaVuelto === "COP") vueltoFinal = vueltoUSD * tasaCop;
 
+    // Determinar cliente real para la venta (estilo HORECA con auto-registro)
+    let clienteParaVenta = clienteSel;
+    const cedulaLimpia = cedulaClienteInput.trim().toUpperCase();
+    const nombreLimpio = nombreClienteInput.trim();
+    const hayDatosManuales = (cedulaLimpia && cedulaLimpia !== "V-00000000") || nombreLimpio.length > 0;
+
+    if (hayDatosManuales) {
+      const doc = cedulaLimpia || `CLI-${Date.now().toString().slice(-4)}`;
+      const nom = nombreLimpio || `Cliente ${doc}`;
+      const existente = clientes.find((c) => c.documento.toUpperCase() === doc.toUpperCase());
+
+      if (existente) {
+        clienteParaVenta = existente;
+      } else {
+        // Auto-registro transparente de nuevo cliente al cobrar (saldoPendiente inicia en 0 para evitar duplicación al sumar crédito)
+        const nuevoCliente: ClienteComercio = {
+          id: `c-${Date.now()}`,
+          nombre: nom,
+          documento: doc,
+          telefono: telefonoClienteInput.trim() || "-",
+          saldoPendiente: 0,
+          limiteCredito: 200,
+          fechaRegistro: new Date().toISOString().split("T")[0],
+        };
+        clienteParaVenta = nuevoCliente;
+
+        // Sincronizar en CRM de backend si hay tenant activo
+        if (user?.tenantId) {
+          crearCliente(user.tenantId, {
+            nombre: nuevoCliente.nombre,
+            identificacionRif: nuevoCliente.documento,
+            telefono: nuevoCliente.telefono !== "-" ? nuevoCliente.telefono : undefined,
+          }).catch((err) => console.warn("Auto-registro en backend diferido:", err));
+        }
+      }
+    } else if (esCredito && clienteParaVenta.id === "c-1") {
+      // Si por alguna razón forzó crédito sin datos, crear ficha de crédito
+      const doc = `CR-${Date.now().toString().slice(-4)}`;
+      const nuevoCliente: ClienteComercio = {
+        id: `c-${Date.now()}`,
+        nombre: "Cliente a Crédito Mostrador",
+        documento: doc,
+        telefono: "-",
+        saldoPendiente: 0,
+        limiteCredito: 200,
+        fechaRegistro: new Date().toISOString().split("T")[0],
+      };
+      clienteParaVenta = nuevoCliente;
+    }
+
+    // Cálculo exacto de costos y utilidad de la venta
+    const costoTotal = carrito.reduce((acc, l) => acc + (l.costo || 0) * l.cantidad, 0);
+    const utilidad = totalUSD - costoTotal;
+
     const nuevaVenta: VentaComercio = {
       id: String(Date.now()),
       numero: numRecibo,
-      cliente: clienteSel,
+      cliente: clienteParaVenta,
       lineas: [...carrito],
       fecha: new Date().toLocaleString(),
       total: totalUSD,
       totalBs,
       totalCop: totalCopCalculado,
+      costoTotal,
+      utilidad,
       metodoPago: esCredito ? "CREDITO_CUENTA" : metodoPagoSel,
       esCredito,
       recibido: esCredito ? 0 : (ingresado || (monedaRecibida === "VES" ? totalBs : monedaRecibida === "COP" ? totalCopCalculado : totalUSD)),
@@ -1087,6 +1634,15 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       vuelto: vueltoFinal,
       monedaVuelto,
     };
+
+    // Registrar en el histórico persistente de ventas
+    setVentas((prev) => {
+      const updated = [nuevaVenta, ...prev];
+      try {
+        localStorage.setItem("aurora_comercio_ventas", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
 
     // Registrar en backend Spring Boot para Ferretería & Retail si hay tenant activo.
     // REGLA DE ORO: el inventario real vive en el backend (con bloqueo pesimista contra
@@ -1133,17 +1689,78 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       })
     );
 
-    // Si es crédito, sumar a saldo del cliente
-    if (esCredito && clienteSel.id !== "c-1") {
-      setClientes((prev) =>
-        prev.map((c) => (c.id === clienteSel.id ? { ...c, saldoPendiente: c.saldoPendiente + totalUSD } : c))
-      );
+    // Actualizar o registrar cliente en CRM e histórico de compras (contado y crédito)
+    if (clienteParaVenta && clienteParaVenta.id !== "c-1") {
+      setClientes((prev) => {
+        const index = prev.findIndex(
+          (c) => c.id === clienteParaVenta.id || (c.documento && c.documento.toUpperCase() === clienteParaVenta.documento.toUpperCase())
+        );
+        let lista = [...prev];
+        if (index >= 0) {
+          const actual = lista[index];
+          lista[index] = {
+            ...actual,
+            nombre: clienteParaVenta.nombre || actual.nombre,
+            telefono: clienteParaVenta.telefono !== "-" ? clienteParaVenta.telefono : actual.telefono,
+            saldoPendiente: esCredito ? (actual.saldoPendiente || 0) + totalUSD : (actual.saldoPendiente || 0),
+            totalCompras: (actual.totalCompras || 0) + 1,
+            montoTotalComprado: (actual.montoTotalComprado || 0) + totalUSD,
+            utilidadGenerada: (actual.utilidadGenerada || 0) + utilidad,
+            ultimaCompra: new Date().toLocaleDateString("es-VE"),
+          };
+        } else {
+          const nuevoParaGuardar: ClienteComercio = {
+            ...clienteParaVenta,
+            saldoPendiente: esCredito ? totalUSD : 0,
+            totalCompras: 1,
+            montoTotalComprado: totalUSD,
+            utilidadGenerada: utilidad,
+            ultimaCompra: new Date().toLocaleDateString("es-VE"),
+          };
+          lista = [nuevoParaGuardar, ...lista];
+        }
+        try {
+          localStorage.setItem("aurora_comercio_clientes", JSON.stringify(lista));
+        } catch {}
+        return lista;
+      });
     }
 
-    setVentaReciente(nuevaVenta);
+    // Si es crédito, registrar en Cuentas por Cobrar (CXC)
+    if (esCredito) {
+
+      // Registrar cuenta por cobrar formal en el Panel Administrativo
+      const nuevaCxc: CuentaComercio = {
+        id: `cxc-${Date.now()}`,
+        tipo: "CXC",
+        entidadNombre: clienteParaVenta.nombre,
+        entidadDocumento: clienteParaVenta.documento,
+        concepto: `Venta a crédito Ticket ${numRecibo} - ${clienteParaVenta.nombre}`,
+        numeroDocumento: numRecibo,
+        montoOriginal: totalUSD,
+        saldoPendiente: totalUSD,
+        moneda: "USD",
+        estado: "PENDIENTE",
+        fechaRegistro: new Date().toISOString().split("T")[0],
+        fechaVencimiento: new Date(Date.now() + 15 * 86400000).toISOString().split("T")[0],
+        referenciaTipo: "VENTA",
+        referenciaId: numRecibo
+      };
+
+      setCuentas((prev) => {
+        const updated = [nuevaCxc, ...prev];
+        try { localStorage.setItem("aurora_comercio_cuentas", JSON.stringify(updated)); } catch {}
+        return updated;
+      });
+
+      mostrarToast(`Venta a crédito cargada a Cuentas por Cobrar (CXC) de ${clienteParaVenta.nombre} por $${totalUSD.toFixed(2)}`, "success");
+    }
+
+        setVentaReciente(nuevaVenta);
     setCarrito([]);
     setModalCobro(false);
     setMontoRecibido("");
+    limpiarClienteAMostrador();
   };
 
   // Generar Cotización PDF / Proforma
@@ -1178,6 +1795,24 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     esFarmacia ? "Farmacia & Droguería San Cristóbal" : "Comercio El Tornillo"
   );
 
+  const saludo = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Buenos días";
+    if (h < 19) return "Buenas tardes";
+    return "Buenas noches";
+  })();
+
+
+
+  const fechaHoyCap = useMemo(() => {
+    const f = new Date().toLocaleDateString("es-VE", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+    return f.charAt(0).toUpperCase() + f.slice(1);
+  }, []);
+
   return (
     <div className="h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-['Inter'] selection:bg-teal-500 selection:text-white overflow-hidden">
       {/* Sin esto, cualquier ícono "viejo estilo" (IconCard, IconBox, IconTrash...) que
@@ -1194,33 +1829,41 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         />
       )}
       <aside
-        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-white border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#fcfdfd] border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
           sidebarAbierto ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Logo + Nombre del Negocio — Verde Abisal (#0D3B3D) de base, ícono
-            en Turquesa Corporativo (#177E89) para que resalte sin ser chillón. */}
+        {/* Identidad de la empresa: logo real si fue configurado; A+ como
+            respaldo institucional, sin íconos genéricos de rubro. */}
         <button
           onClick={onSalir}
-          className="flex items-center gap-2.5 text-left group cursor-pointer p-5 border-b border-slate-100"
+          className="flex items-center gap-3 text-left group cursor-pointer px-5 py-4 border-b border-slate-200"
           title="Volver al Hub General"
         >
-          <div className="w-9 h-9 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 flex items-center justify-center group-hover:bg-teal-100 transition-colors flex-shrink-0">
-            {esFarmacia ? <IconPrescription size={18} /> :
-             <IconHardware size={18} />}
+          <div className="w-10 h-10 rounded-md border border-slate-200 bg-white text-slate-700 flex items-center justify-center overflow-hidden group-hover:border-teal-300 transition-colors flex-shrink-0">
+            {logoNegocio && !logoNoDisponible ? (
+              <img
+                src={logoNegocio}
+                alt={`Logo de ${nombreLocal}`}
+                className="h-full w-full object-contain p-1.5"
+                onError={() => setLogoNoDisponible(true)}
+              />
+            ) : (
+              <span className="font-semibold tracking-[-0.06em] text-sm" aria-label="Aurora Plus">A+</span>
+            )}
           </div>
           <div className="min-w-0">
-            <div className="font-['IBM_Plex_Sans'] font-bold text-sm text-slate-900 leading-tight truncate">
+            <div className="font-['IBM_Plex_Sans'] font-semibold text-sm text-slate-900 leading-tight tracking-tight truncate">
               {nombreLocal}
             </div>
-            <div className="text-[9px] text-slate-400 tracking-[0.14em] uppercase truncate font-semibold mt-0.5">
-              Aurora {esFarmacia ? "Farmacia" : "Comercio"}
+            <div className="text-[10px] text-slate-400 tracking-[0.02em] truncate font-medium mt-1">
+              by <span className="font-semibold text-slate-600">A+</span>
             </div>
           </div>
         </button>
 
         {/* Navegación principal, agrupada (Operación / Gestión) — mismo patrón que Aurora Horeca */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-5">
+        <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
           {([
             {
               titulo: "Operación",
@@ -1235,27 +1878,28 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               items: [
                 ...(esComercio ? [{ id: "proveedores" as const, Icon: IconTruck, etiqueta: "Proveedores" }] : []),
                 { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
+                { id: "administracion" as const, Icon: IconWallet, etiqueta: "Cuentas por Cobrar & Pagar" },
                 { id: "gastos" as const, Icon: IconBank, etiqueta: "Ingresos & Gastos" },
                 { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
                 ...(user?.rol === "DUENO_ADMIN" ? [{ id: "auditoria" as const, Icon: IconFileText, etiqueta: "Bitácora de Auditoría" }] : []),
               ],
             },
           ]).map((grupo) => (
-            <div key={grupo.titulo} className="space-y-1">
-              <div className="px-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+            <div key={grupo.titulo} className="space-y-1.5">
+              <div className="px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                 {grupo.titulo}
               </div>
               {grupo.items.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => { setTab(item.id); setSidebarAbierto(false); }}
-                  className={`sidebar-glare w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] transition-colors cursor-pointer ${
+                  className={`sidebar-glare w-full flex items-center gap-3 border-l-2 px-3 py-2.5 rounded-md font-medium text-[13px] transition-colors cursor-pointer ${
                     tab === item.id
-                      ? "sidebar-glare--active bg-teal-50 text-teal-800 border border-teal-100"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      ? "sidebar-glare--active bg-teal-50/80 text-teal-900 border-teal-700"
+                      : "text-slate-600 border-transparent hover:bg-slate-100/70 hover:text-slate-900"
                   }`}
                 >
-                  <span className={tab === item.id ? "text-teal-700" : "text-slate-400"}><item.Icon size={16} /></span>
+                  <span className={tab === item.id ? "text-teal-700" : "text-slate-400"}><item.Icon size={15} /></span>
                   <span>{item.etiqueta}</span>
                 </button>
               ))}
@@ -1308,33 +1952,52 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       {/* ══════════════════════ COLUMNA DERECHA: TOPBAR + CONTENIDO ══════════════════════ */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
 
-        {/* ── TOPBAR LIMPIO: SOLO TASAS, TEMA Y PERFIL ── */}
-        <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-between lg:justify-end gap-2.5 shadow-sm flex-shrink-0">
-          <button
-            onClick={() => setSidebarAbierto(true)}
-            className="lg:hidden p-2 -ml-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-            aria-label="Abrir menú"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </button>
-          <div className="flex items-center gap-2.5">
-          {user?.tenantId && (
-            <TasaBadgeComercio
-              tenantId={user.tenantId}
-              origenTasaActiva={origenTasaActiva}
-              tasaVes={tasaVes}
-              tasaCop={tasaCopReal}
-              onOrigenCambiado={(o) => setOrigenTasaActiva(o)}
-              onActualizadaVes={setTasaVes}
-              onActualizadaCop={setTasaCopReal}
-            />
-          )}
+                {/* ── TOPBAR PROFESIONAL: SALUDO, FECHA & HORA EN VIVO, TASAS Y TEMA ── */}
+        <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 shadow-sm flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setSidebarAbierto(true)}
+              className="lg:hidden p-2 -ml-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer flex-shrink-0"
+              aria-label="Abrir menú"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
 
-          <ThemeToggle />
+            {/* Saludo Profesional + Nombre del Comercio + Fecha y Hora en Vivo */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-3 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" title="Sistema en línea" />
+                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+                  {saludo} <span className="text-slate-300 dark:text-slate-600 font-normal">—</span> <span className="text-teal-600 dark:text-teal-400">{nombreLocal}</span>
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                <span className="hidden sm:inline text-slate-300 dark:text-slate-700">|</span>
+                <span className="capitalize">{fechaHoyCap}</span>
+                <span className="text-slate-400 font-bold">·</span>
+                <RelojEnVivoHeader />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            {user?.tenantId && (
+              <TasaBadgeComercio
+                tenantId={user.tenantId}
+                origenTasaActiva={origenTasaActiva}
+                tasaVes={tasaVes}
+                tasaCop={tasaCopReal}
+                onOrigenCambiado={(o) => setOrigenTasaActiva(o)}
+                onActualizadaVes={setTasaVes}
+                onActualizadaCop={setTasaCopReal}
+              />
+            )}
+
+            <ThemeToggle />
           </div>
         </header>
 
@@ -1348,6 +2011,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             <DashboardGeneralComercio
               productos={productos.filter((p) => p.rubro === perfilActivo)}
               ingresosCaja={ingresosCaja}
+              ventas={ventas}
+              tasaActivaBs={tasaActivaBs}
+              tasaCop={tasaCop}
               esAdmin={user?.rol === "DUENO_ADMIN"}
               nombreNegocio={user?.empresa || "tu negocio"}
               onIrAInventario={() => setTab("inventario")}
@@ -1484,28 +2150,129 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             {/* Columna Derecha (5 cols): Carrito de Venta & Cobro */}
             <div className="lg:col-span-5 xl:col-span-4 flex flex-col h-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl overflow-hidden">
               
-              {/* Selector de Cliente */}
-              <div className="flex-shrink-0 pb-3 mb-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Cliente en Mostrador</label>
-                  <select
-                    value={clienteSel.id}
-                    onChange={(e) => setClienteSel(clientes.find((c) => c.id === e.target.value) || clientes[0])}
-                    className="bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white rounded-xl px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 focus:outline-none mt-1"
-                  >
-                    {clientes.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre} ({c.documento})
-                      </option>
-                    ))}
-                  </select>
+              {/* Cliente en Mostrador - Registro Rápido HORECA & Autocompletado */}
+              <div className="flex-shrink-0 pb-3 mb-3 border-b border-slate-200 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Cliente en Mostrador
+                    </label>
+                    {clienteSel.id !== "c-1" && clienteSel.id !== "c-provisional" && (
+                      <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30">
+                        <IconCheckCircle size={10} /> Registrado
+                      </span>
+                    )}
+                    {cedulaClienteInput.trim() && !clientes.some(c => c.documento.toUpperCase() === cedulaClienteInput.trim().toUpperCase()) && (
+                      <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-400 font-bold border border-teal-500/30">
+                        Nuevo (se guardará al cobrar)
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(clienteSel.id !== "c-1" || cedulaClienteInput || nombreClienteInput) && (
+                      <button
+                        type="button"
+                        onClick={limpiarClienteAMostrador}
+                        className="text-[10px] font-semibold text-slate-400 hover:text-red-500 cursor-pointer flex items-center gap-0.5 transition-colors"
+                        title="Restablecer a Consumidor Final"
+                      >
+                        <IconClose size={11} /> Consumidor Final
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setMostrarSelectorClientes(!mostrarSelectorClientes)}
+                      className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
+                    >
+                      {mostrarSelectorClientes ? "Cerrar Lista" : "Directorio"}
+                    </button>
+                  </div>
                 </div>
-                {clienteSel.saldoPendiente > 0 && (
-                  <div className="text-right">
-                    <span className="text-[9px] text-amber-400 font-bold block">Deuda Pendiente:</span>
-                    <span className="font-mono text-xs font-bold text-amber-300">${clienteSel.saldoPendiente.toFixed(2)}</span>
+
+                {mostrarSelectorClientes ? (
+                  <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 space-y-1.5">
+                    <div className="text-[10px] text-slate-500 font-semibold">Seleccionar cliente existente:</div>
+                    <select
+                      value={clienteSel.id}
+                      onChange={(e) => {
+                        const sel = clientes.find((c) => c.id === e.target.value) || clientes[0];
+                        seleccionarClienteDesdeLista(sel);
+                      }}
+                      className="w-full bg-white dark:bg-slate-900 text-xs font-bold text-slate-900 dark:text-white rounded-xl px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 focus:outline-none"
+                    >
+                      {clientes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre} ({c.documento})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <input
+                        value={cedulaClienteInput}
+                        onChange={(e) => manejarCambioCedula(e.target.value)}
+                        placeholder="Cédula / RIF (ej. V-12345678)"
+                        className="w-full bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white rounded-xl px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-teal-500 font-mono"
+                      />
+                      <input
+                        value={telefonoClienteInput}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setTelefonoClienteInput(val);
+                          setClienteSel((prev) => ({
+                            ...prev,
+                            telefono: val || "-"
+                          }));
+                        }}
+                        placeholder="Teléfono (opcional)"
+                        className="w-full bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white rounded-xl px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+                    <input
+                      value={nombreClienteInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNombreClienteInput(val);
+                        setClienteSel((prev) => ({
+                          ...prev,
+                          nombre: val || (prev.id === "c-1" ? "Consumidor Final" : "")
+                        }));
+                      }}
+                      placeholder="Nombre y Apellido / Razón Social"
+                      className="w-full bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white rounded-xl px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-teal-500"
+                    />
                   </div>
                 )}
+
+                {/* Sub-barra de métricas rápidas: compras previas y saldo por cobrar */}
+                <div className="flex items-center justify-between text-[10px] pt-0.5">
+                  {clienteSel.id !== "c-1" && comprasClienteSel.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setClienteHistorialModal(clienteSel)}
+                      className="text-teal-600 dark:text-teal-400 hover:text-teal-500 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Ver qué productos ha comprado anteriormente"
+                    >
+                      <IconReceipt size={12} />
+                      <span>{comprasClienteSel.length} compra{comprasClienteSel.length > 1 ? "s" : ""}</span>
+                      <span className="text-[9px] underline">· Ver qué ha comprado</span>
+                    </button>
+                  ) : (
+                    <span className="text-slate-400 text-[10px]">
+                      {clienteSel.id === "c-1" ? "Consumidor Final mostrador" : "Sin compras registradas aún"}
+                    </span>
+                  )}
+
+                  {clienteSel.saldoPendiente > 0 && (
+                    <div className="text-right">
+                      <span className="text-[9px] text-amber-500 dark:text-amber-400 font-bold">
+                        Deuda: <span className="font-mono text-xs font-black text-amber-600 dark:text-amber-300">${clienteSel.saldoPendiente.toFixed(2)}</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Lista de Ítems en Venta */}
@@ -1584,13 +2351,26 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     <span> Cotización</span>
                   </button>
 
-                  <button
-                    onClick={() => ejecutarCobro(true)}
-                    disabled={carrito.length === 0 || clienteSel.id === "c-1"}
-                    className="py-2 px-3 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 disabled:opacity-40 text-xs font-bold text-amber-300 flex items-center justify-center gap-1.5 cursor-pointer"
-                    title="Cargar a cuenta por cobrar (crédito)"
+                                    <button
+                    type="button"
+                    onClick={() => {
+                      if (carrito.length === 0) return;
+                      const cedulaLimpia = cedulaClienteInput.trim().toUpperCase();
+                      const nombreLimpio = nombreClienteInput.trim();
+                      const tieneCliente = (clienteSel && clienteSel.id !== "c-1" && clienteSel.id !== "c-provisional") || cedulaLimpia.length > 0 || nombreLimpio.length > 0;
+
+                      if (!tieneCliente) {
+                        mostrarToast("Para vender a crédito debes indicar los datos del cliente (Cédula o Nombre) en el mostrador arriba.", "info");
+                        return;
+                      }
+                      ejecutarCobro(true);
+                    }}
+                    disabled={carrito.length === 0}
+                    className="py-2.5 px-3.5 rounded-xl bg-amber-100 hover:bg-amber-200 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 border border-amber-400 dark:border-amber-500/40 text-amber-900 dark:text-amber-300 disabled:opacity-40 font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                    title="Cargar esta venta a Cuentas por Cobrar (CXC)"
                   >
-                    <span> A Crédito</span>
+                    <IconWallet size={14} className="text-amber-700 dark:text-amber-400 flex-shrink-0" />
+                    <span>A Crédito (CXC)</span>
                   </button>
                 </div>
 
@@ -1752,7 +2532,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                             title="Corregir stock tras un conteo físico"
                             disabled={!p.backendId}
                           >
-                            ⚖️ Ajustar
+                            Ajustar
                           </button>
                           <button
                             onClick={() => setEditarModalItem(p)}
@@ -1760,7 +2540,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                             title="Editar datos del producto"
                             disabled={!p.backendId}
                           >
-                            ✏️ Editar
+                            Editar
                           </button>
                           <button
                             onClick={async () => {
@@ -1920,60 +2700,189 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         {/* ══════════════════════════════════════════════════════════════════
             TAB 3: CLIENTES & CUENTAS POR COBRAR (CRÉDITOS)
             ══════════════════════════════════════════════════════════════════ */}
-        {tab === "clientes" && (
-          <div className="flex-1 bg-white/80 dark:bg-slate-900/80 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Directorio de Clientes & Créditos</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Gestión de cuentas por cobrar, límites de crédito y abonos.</p>
-              </div>
-            </div>
+                {tab === "clientes" && (() => {
+          const clientesFiltrados = clientes.filter((c) => {
+            const b = busquedaClienteTab.trim().toLowerCase();
+            if (!b) return true;
+            return (
+              c.nombre.toLowerCase().includes(b) ||
+              c.documento.toLowerCase().includes(b) ||
+              (c.telefono && c.telefono.toLowerCase().includes(b))
+            );
+          });
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {clientes.map((c) => (
-                <div key={c.id} className="p-4 rounded-2xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/70 dark:border-slate-700/60 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-slate-500 dark:text-slate-400">{c.documento}</span>
-                    {c.saldoPendiente > 0 ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300">
-                        Deuda Activa
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-500/20 text-teal-300">
-                        Al Día
-                      </span>
-                    )}
-                  </div>
-                  <div className="font-bold text-sm text-slate-900 dark:text-white">{c.nombre}</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400"> {c.telefono}</div>
-                  <div className="pt-2 border-t border-slate-300/60 dark:border-slate-700/50 flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Saldo por Cobrar:</span>
-                      <span className="font-mono font-black text-base text-amber-300">${c.saldoPendiente.toFixed(2)}</span>
-                    </div>
-                    {c.saldoPendiente > 0 && (
-                      <button
-                        onClick={() => {
-                          setClienteAbonoSel(c);
-                          setMontoAbono(String(c.saldoPendiente));
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs cursor-pointer shadow-sm"
-                      >
-                        Abonar
-                      </button>
-                    )}
+          const totalCarteraCobrar = clientes.reduce((s, c) => s + (c.saldoPendiente || 0), 0);
+          const clientesConDeuda = clientes.filter((c) => c.saldoPendiente > 0).length;
+
+          return (
+            <div className="flex-1 bg-white/80 dark:bg-slate-900/80 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Directorio de Clientes, Historial & Créditos</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Historial de compras, tickets emitidos, frecuencia de visita, cálculo de utilidad y cuentas por cobrar.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Buscar por cédula, nombre o tlf..."
+                      value={busquedaClienteTab}
+                      onChange={(e) => setBusquedaClienteTab(e.target.value)}
+                      className="bg-slate-100 dark:bg-slate-800 text-xs text-slate-900 dark:text-white rounded-xl pl-8 pr-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-teal-500 w-64"
+                    />
+                    <IconSearch size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Métricas Globales de Cartera y CRM */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Clientes Registrados</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-white">{clientes.length}</span>
+                  <span className="text-[9px] text-slate-400 block mt-0.5">En base de datos</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Ventas Registradas</span>
+                  <span className="text-lg font-black text-teal-600 dark:text-teal-400">{ventas.length} tickets</span>
+                  <span className="text-[9px] text-slate-400 block mt-0.5">Histórico general</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Cartera por Cobrar</span>
+                  <span className="text-lg font-black text-amber-500 dark:text-amber-400">${totalCarteraCobrar.toFixed(2)}</span>
+                  <span className="text-[9px] text-slate-400 block mt-0.5">Bs. {(totalCarteraCobrar * tasaActivaBs).toFixed(2)}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Clientes con Crédito</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-white">{clientesConDeuda}</span>
+                  <span className="text-[9px] text-slate-400 block mt-0.5">Con saldo pendiente</span>
+                </div>
+              </div>
+
+              {/* Grid de Clientes con Historial y Métricas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {clientesFiltrados.map((c) => {
+                  const compras = ventas.filter(
+                    (v) =>
+                      v.cliente.id === c.id ||
+                      (v.cliente.documento && c.documento && v.cliente.documento.toUpperCase() === c.documento.toUpperCase())
+                  );
+                  const totalCompradoUSD = compras.reduce((acc, v) => acc + (v.total || 0), 0);
+                  const utilidadTotal = compras.reduce((acc, v) => acc + (v.utilidad || 0), 0);
+                  const ultimaVenta = compras[0];
+
+                  return (
+                    <div
+                      key={c.id}
+                      className="p-4 rounded-2xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/70 dark:border-slate-700/60 space-y-3 flex flex-col justify-between hover:border-teal-500/40 transition-all shadow-sm"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20">
+                            {c.documento}
+                          </span>
+                          {c.saldoPendiente > 0 ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                              Deuda: ${c.saldoPendiente.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">
+                              Solvente
+                            </span>
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="font-bold text-sm text-slate-900 dark:text-white line-clamp-1">{c.nombre}</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tlf: {c.telefono || "Sin teléfono"}</div>
+                        </div>
+
+                        {/* Indicadores de Compras y Utilidad */}
+                        <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-center">
+                          <div>
+                            <span className="text-[9px] text-slate-400 block uppercase font-bold">Compras</span>
+                            <span className="text-xs font-black text-slate-900 dark:text-white font-mono">
+                              {compras.length} {compras.length === 1 ? "vez" : "veces"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-slate-400 block uppercase font-bold">Facturado</span>
+                            <span className="text-xs font-black text-teal-600 dark:text-teal-400 font-mono">
+                              ${totalCompradoUSD.toFixed(2)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-slate-400 block uppercase font-bold">Utilidad</span>
+                            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                              +${utilidadTotal.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {ultimaVenta && (
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                            <span>Última compra:</span>
+                            <span className="font-mono text-slate-700 dark:text-slate-300">{ultimaVenta.fecha.split(",")[0]}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-300/60 dark:border-slate-700/50 flex items-center gap-2">
+                        <button
+                          onClick={() => setClienteHistorialModal(c)}
+                          className="flex-1 py-2 rounded-xl bg-slate-200/80 dark:bg-slate-700/70 hover:bg-teal-500 hover:text-slate-950 text-slate-800 dark:text-white font-bold text-xs cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                          title="Ver todos los tickets y productos comprados"
+                        >
+                          <IconReceipt size={13} />
+                          <span>Ver Historial</span>
+                        </button>
+                        {c.saldoPendiente > 0 && (
+                          <button
+                            onClick={() => {
+                              setClienteAbonoSel(c);
+                              setMontoAbono(String(c.saldoPendiente));
+                            }}
+                            className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer shadow-sm"
+                          >
+                            Abonar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ══════════════════════════════════════════════════════════════════
             TAB: INGRESOS & GASTOS — gastos sueltos (alquiler, papelería,
             servicios) que no pasan por el POS; las ventas siguen entrando
             solas desde el mostrador, esto es solo para anotar lo demás.
             ══════════════════════════════════════════════════════════════════ */}
+        {tab === "administracion" && (
+          <CuentasPorCobrarPagarComercio
+            cuentas={cuentas}
+            guardarCuentas={guardarCuentas}
+            tasaActivaBs={tasaActivaBs}
+            tasaCop={tasaCop}
+            clientes={clientes}
+            setClientes={setClientes}
+            proveedores={proveedoresRepuesto}
+            ingresosCaja={ingresosCaja}
+            setIngresosCaja={setIngresosCaja}
+            gastosCaja={gastosCaja}
+            setGastosCaja={setGastosCaja}
+            mostrarToast={mostrarToast}
+            cargarIngresosCaja={cargarIngresosCaja}
+            cargarGastosCaja={cargarGastosCaja}
+            tenantId={user?.tenantId}
+          />
+        )}
+
         {tab === "gastos" && (
           <IngresosGastosComercio
             ingresosCaja={ingresosCaja}
@@ -2086,7 +2995,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   ["EFECTIVO_BS", " Bs Efectivo", "VES"],
                   ["PAGO_MOVIL", " Pago Móvil", "VES"],
                   ["PUNTO_VENTA", " Punto Débito", "VES"],
-                  ["ZELLE", "⚡ Zelle / USDT", "USD"],
+                  ["ZELLE", "Zelle / USDT", "USD"],
                   ["COP_EFECTIVO", " Pesos COP", "COP"],
                 ].map(([id, label, mon]) => (
                   <button
@@ -2165,7 +3074,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   }}
                   className="px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 font-bold text-[10px] border border-teal-500/30 cursor-pointer"
                 >
-                  ⚡ Exacto
+                  Exacto
                 </button>
                 {monedaRecibida === "USD" && [10, 20, 50, 100].map((b) => (
                   <button
@@ -2251,6 +3160,187 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         </div>
       )}
 
+      {/* ── MODAL HISTORIAL DETALLADO DE COMPRAS DEL CLIENTE ── */}
+      {clienteHistorialModal && (() => {
+        const clienteActual = clienteHistorialModal;
+        const compras = ventas.filter(
+          (v) =>
+            v.cliente.id === clienteActual.id ||
+            (v.cliente.documento && clienteActual.documento && v.cliente.documento.toUpperCase() === clienteActual.documento.toUpperCase())
+        );
+        const totalGastado = compras.reduce((acc, v) => acc + (v.total || 0), 0);
+        const utilidadTotal = compras.reduce((acc, v) => acc + (v.utilidad || 0), 0);
+
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+            onClick={() => setClienteHistorialModal(null)}
+          >
+            <div
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 cursor-default max-h-[90vh] flex flex-col shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Cabecera del Cliente */}
+              <div className="flex items-start justify-between pb-3 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
+                      Historial de Compras: {clienteActual.nombre}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="font-mono font-bold text-teal-600 dark:text-teal-400">{clienteActual.documento}</span>
+                    <span>·</span>
+                    <span>Tlf: {clienteActual.telefono || "Sin teléfono"}</span>
+                    {clienteActual.saldoPendiente > 0 && (
+                      <>
+                        <span>·</span>
+                        <span className="text-amber-500 font-bold">Deuda: ${clienteActual.saldoPendiente.toFixed(2)}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setClienteHistorialModal(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                >
+                  <IconClose size={16} />
+                </button>
+              </div>
+
+              {/* Resumen KPIs del Cliente */}
+              <div className="grid grid-cols-3 gap-3 flex-shrink-0">
+                <div className="p-3 rounded-2xl bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 text-center">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Compras Realizadas</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white font-mono">
+                    {compras.length} {compras.length === 1 ? "ticket" : "tickets"}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-center">
+                  <span className="text-[10px] text-teal-600 dark:text-teal-400 uppercase font-bold block">Total Consumido</span>
+                  <span className="text-base font-black text-teal-700 dark:text-teal-300 font-mono">
+                    ${totalGastado.toFixed(2)}
+                  </span>
+                  <span className="text-[9px] text-slate-400 block font-mono">Bs. {(totalGastado * tasaActivaBs).toFixed(2)}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-bold block">Utilidad Aportada</span>
+                  <span className="text-base font-black text-emerald-700 dark:text-emerald-300 font-mono">
+                    +${utilidadTotal.toFixed(2)}
+                  </span>
+                  <span className="text-[9px] text-slate-400 block">
+                    {totalGastado > 0 ? `Margen: ${((utilidadTotal / totalGastado) * 100).toFixed(1)}%` : "Margen 0%"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Lista Detallada de Tickets y Productos */}
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                {compras.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400">
+                    <IconReceipt size={36} className="mx-auto mb-2 opacity-40 text-slate-400" />
+                    <p className="text-sm font-bold">Este cliente aún no registra compras.</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Al realizar una venta en mostrador seleccionando o tipeando este cliente, quedará guardada aquí con todos sus productos.
+                    </p>
+                  </div>
+                ) : (
+                  compras.map((v) => (
+                    <div
+                      key={v.id}
+                      className="p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-300/70 dark:border-slate-700/60 space-y-2.5"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-700/60 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-xs text-slate-900 dark:text-white">{v.numero}</span>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{v.fecha}</span>
+                          <span className={`text-[9px] px-2 py-0.5 rounded font-bold ${
+                            v.esCredito
+                              ? "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30"
+                              : "bg-teal-500/20 text-teal-600 dark:text-teal-300 border border-teal-500/30"
+                          }`}>
+                            {v.metodoPago}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <span className="font-mono font-black text-sm text-teal-600 dark:text-teal-400">${v.total.toFixed(2)}</span>
+                            <span className="text-[10px] text-slate-400 font-mono block">Bs. {v.totalBs.toFixed(2)}</span>
+                          </div>
+                          <button
+                            onClick={() => imprimirTicketComercio(v, nombreLocal, tasaActivaBs, tasaCop)}
+                            className="px-2.5 py-1 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-[10px] font-bold text-slate-800 dark:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Re-imprimir este comprobante"
+                          >
+                            <IconReceipt size={12} />
+                            <span>Imprimir</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Desglose de Productos en este Ticket */}
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                          Productos comprados ({v.lineas.length}):
+                        </div>
+                        <div className="space-y-1">
+                          {v.lineas.map((item, idx) => {
+                            const subtotal = item.precio * item.cantidad;
+                            const costoLinea = (item.costo || 0) * item.cantidad;
+                            const utilidadLinea = subtotal - costoLinea;
+
+                            return (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between text-xs p-2 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800"
+                              >
+                                <div className="flex-1 min-w-0 pr-2">
+                                  <div className="font-bold text-slate-900 dark:text-white truncate">
+                                    <span className="text-teal-500 font-mono mr-1.5">{item.cantidad}x</span>
+                                    {item.nombre}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 font-mono">
+                                    Cod: {item.codigo} · Unit: ${item.precio.toFixed(2)} {item.costo ? `· Costo: ${item.costo.toFixed(2)}` : ""}
+                                  </div>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <div className="font-mono font-bold text-slate-900 dark:text-white">${subtotal.toFixed(2)}</div>
+                                  {utilidadLinea > 0 && (
+                                    <div className="text-[9px] text-emerald-500 font-mono">Utilidad: +${utilidadLinea.toFixed(2)}</div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Resumen Financiero del Ticket */}
+                      {v.costoTotal != null && v.utilidad != null && (
+                        <div className="pt-1.5 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                          <span>Costo mercadería: ${v.costoTotal.toFixed(2)}</span>
+                          <span className="text-emerald-500 font-bold">Utilidad neta ticket: +${v.utilidad.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Pie con botón cerrar */}
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-end flex-shrink-0">
+                <button
+                  onClick={() => setClienteHistorialModal(null)}
+                  className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer shadow-md"
+                >
+                  Cerrar Historial
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── MODAL RECIBO FINAL CON BOTÓN DE IMPRESIÓN TÉRMICA ── */}
       {ventaReciente && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setVentaReciente(null)}>
@@ -2272,8 +3362,17 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               </div>
               <div className="flex justify-between text-slate-500 dark:text-slate-400">
                 <span>Método:</span>
-                <span>{ventaReciente.metodoPago}</span>
+                <span className={ventaReciente.esCredito ? "text-amber-500 font-bold" : ""}>
+                  {ventaReciente.esCredito ? "VENTA A CRÉDITO (CXC)" : ventaReciente.metodoPago}
+                </span>
               </div>
+              {ventaReciente.esCredito && (
+                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 font-sans space-y-1">
+                  <div className="font-bold">Cargado a Cuentas por Cobrar:</div>
+                  <div>Cliente: {ventaReciente.cliente.nombre} ({ventaReciente.cliente.documento})</div>
+                  <div className="font-mono font-bold text-amber-600 dark:text-amber-400">Saldo por cobrar: ${ventaReciente.total.toFixed(2)} USD</div>
+                </div>
+              )}
               {ventaReciente.vuelto != null && ventaReciente.vuelto > 0 && (
                 <div className="flex justify-between text-teal-300 font-bold border-t border-slate-300 dark:border-slate-700 pt-1">
                   <span>Vuelto:</span>
@@ -2289,6 +3388,18 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               >
                 ️ Imprimir Ticket 80mm
               </button>
+              {ventaReciente.esCredito && (
+                <button
+                  onClick={() => {
+                    setVentaReciente(null);
+                    setTab("administracion");
+                  }}
+                  className="px-3 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs cursor-pointer shadow-md"
+                  title="Ver esta cuenta en el Panel Administrativo"
+                >
+                  Ver en CxC
+                </button>
+              )}
               <button
                 onClick={() => setVentaReciente(null)}
                 className="px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs cursor-pointer"
@@ -3141,6 +4252,712 @@ function TasaBadgeComercio({ tenantId, origenTasaActiva, tasaVes, tasaCop, onOri
 // sin filtro de fecha) — aquí solo se filtran y suman en el cliente, mismo
 // criterio que ya usa DashboardGeneralComercio para "ventas de hoy/semana".
 // ══════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PANEL ADMINISTRATIVO: CUENTAS POR COBRAR & PAGAR (IDÉNTICO AL ESTÁNDAR HORECA)
+// ══════════════════════════════════════════════════════════════════════════════
+function CuentasPorCobrarPagarComercio({
+  cuentas,
+  guardarCuentas,
+  tasaActivaBs,
+  tasaCop,
+  clientes,
+  setClientes,
+  proveedores,
+  ingresosCaja,
+  setIngresosCaja,
+  gastosCaja,
+  setGastosCaja,
+  mostrarToast,
+  cargarIngresosCaja,
+  cargarGastosCaja,
+  tenantId,
+}: {
+  cuentas: CuentaComercio[];
+  guardarCuentas: (c: CuentaComercio[]) => void;
+  tasaActivaBs: number;
+  tasaCop: number;
+  clientes: ClienteComercio[];
+  setClientes: React.Dispatch<React.SetStateAction<ClienteComercio[]>>;
+  proveedores: ProveedorRepuesto[];
+  ingresosCaja: MovimientoCaja[];
+  setIngresosCaja: React.Dispatch<React.SetStateAction<MovimientoCaja[]>>;
+  gastosCaja: MovimientoCaja[];
+  setGastosCaja: React.Dispatch<React.SetStateAction<MovimientoCaja[]>>;
+  mostrarToast: (m: string, t?: "success" | "error" | "info") => void;
+  cargarIngresosCaja: () => void;
+  cargarGastosCaja: () => void;
+  tenantId?: number;
+}) {
+  const [subTab, setSubTab] = useState<"CXP" | "CXC">("CXP");
+  const [verPagadas, setVerPagadas] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [cuentaAbonando, setCuentaAbonando] = useState<CuentaComercio | null>(null);
+  const [modalNuevaCxp, setModalNuevaCxp] = useState(false);
+
+  // Filtrado de cuentas
+  const cuentasPorTipo = useMemo(() => cuentas.filter((c) => c.tipo === subTab), [cuentas, subTab]);
+  const pendientes = useMemo(() => cuentasPorTipo.filter((c) => c.estado !== "PAGADO" && c.saldoPendiente > 0), [cuentasPorTipo]);
+  const pagadas = useMemo(() => cuentasPorTipo.filter((c) => c.estado === "PAGADO" || c.saldoPendiente <= 0), [cuentasPorTipo]);
+  const listaActiva = verPagadas ? pagadas : pendientes;
+
+  const listaFiltrada = useMemo(() => {
+    const b = busqueda.trim().toLowerCase();
+    if (!b) return listaActiva;
+    return listaActiva.filter(
+      (c) =>
+        c.concepto.toLowerCase().includes(b) ||
+        c.entidadNombre.toLowerCase().includes(b) ||
+        (c.numeroDocumento && c.numeroDocumento.toLowerCase().includes(b)) ||
+        (c.entidadDocumento && c.entidadDocumento.toLowerCase().includes(b))
+    );
+  }, [listaActiva, busqueda]);
+
+  // Totales
+  const totalPendienteUSD = useMemo(() => pendientes.reduce((s, c) => s + c.saldoPendiente, 0), [pendientes]);
+  const totalSaldadoUSD = useMemo(() => pagadas.reduce((s, c) => s + c.montoOriginal, 0), [pagadas]);
+
+  const cantCxpPendientes = useMemo(() => cuentas.filter((c) => c.tipo === "CXP" && c.estado !== "PAGADO" && c.saldoPendiente > 0).length, [cuentas]);
+  const cantCxcPendientes = useMemo(() => cuentas.filter((c) => c.tipo === "CXC" && c.estado !== "PAGADO" && c.saldoPendiente > 0).length, [cuentas]);
+
+  return (
+    <div className="flex-1 bg-white/80 dark:bg-slate-900/80 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col space-y-5 animate-fade-in">
+      {/* Encabezado Principal y Pestañas estilo HORECA */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
+              Panel Administrativo: Cuentas por Cobrar & Pagar
+            </h3>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold border border-teal-500/20">
+              Control Contable & Caja
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Gestión organizada de deudas y créditos. Cada pago o abono se registra automáticamente como egreso o ingreso en tu caja.
+          </p>
+        </div>
+
+        {/* Pestañas CXP / CXC en Píldora */}
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+          <button
+            onClick={() => { setSubTab("CXP"); setVerPagadas(false); }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              subTab === "CXP"
+                ? "bg-rose-500 text-white shadow-md"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            }`}
+          >
+            <span>Por Pagar (CXP)</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+              subTab === "CXP" ? "bg-white/20 text-white" : "bg-rose-500/15 text-rose-500"
+            }`}>
+              {cantCxpPendientes}
+            </span>
+          </button>
+          <button
+            onClick={() => { setSubTab("CXC"); setVerPagadas(false); }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              subTab === "CXC"
+                ? "bg-teal-600 text-white shadow-md"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            }`}
+          >
+            <span>Por Cobrar (CXC)</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+              subTab === "CXC" ? "bg-white/20 text-white" : "bg-teal-500/15 text-teal-600 dark:text-teal-400"
+            }`}>
+              {cantCxcPendientes}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Barra de Controles: Totales, Buscador y Botón de Nueva Cuenta */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="p-4 rounded-2xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex flex-col justify-between">
+          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+            Total {subTab === "CXP" ? "Por Pagar" : "Por Cobrar"} (USD)
+          </span>
+          <div className="mt-1">
+            <span className={`text-2xl font-black font-mono ${subTab === "CXP" ? "text-rose-500" : "text-teal-600 dark:text-teal-400"}`}>
+              ${totalPendienteUSD.toFixed(2)}
+            </span>
+            <span className="text-xs text-slate-400 font-mono block mt-0.5">
+              ~ Bs. {(totalPendienteUSD * tasaActivaBs).toFixed(2)}
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex flex-col justify-between">
+          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+            Total Saldado Histórico ({pagadas.length})
+          </span>
+          <div className="mt-1">
+            <span className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+              ${totalSaldadoUSD.toFixed(2)}
+            </span>
+            <span className="text-xs text-slate-400 font-mono block mt-0.5">
+              Cuentas liquidadas con éxito
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex flex-col justify-between gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-slate-400 uppercase font-bold">Vista Actual:</span>
+            <button
+              onClick={() => setVerPagadas(!verPagadas)}
+              className="text-xs font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
+            >
+              {verPagadas ? "← Ver Pendientes" : `Ver Saldadas (${pagadas.length}) →`}
+            </button>
+          </div>
+          {subTab === "CXP" && (
+            <button
+              onClick={() => setModalNuevaCxp(true)}
+              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-teal-500 dark:hover:bg-teal-400 text-white dark:text-slate-950 text-xs font-black cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
+            >
+              <span>+ Registrar Cuenta por Pagar</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Buscador Rápido */}
+      <div className="relative">
+        <input
+          type="text"
+          placeholder={`Buscar en ${subTab === "CXP" ? "cuentas por pagar (proveedor, factura, concepto)..." : "cuentas por cobrar (cliente, ticket, concepto)..."}`}
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="w-full bg-slate-100 dark:bg-slate-800 text-xs text-slate-900 dark:text-white rounded-xl pl-9 pr-4 py-2.5 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-teal-500"
+        />
+        <IconSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      </div>
+
+      {/* Listado de Cuentas */}
+      <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+        {listaFiltrada.length === 0 ? (
+          <div className="py-12 text-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+            <IconWallet size={36} className="mx-auto mb-2 opacity-40 text-slate-400" />
+            <p className="text-sm font-bold">
+              {verPagadas
+                ? "No hay cuentas saldadas en esta sección."
+                : subTab === "CXP"
+                ? "¡Excelente! No tienes cuentas por pagar pendientes."
+                : "No tienes cuentas por cobrar pendientes."}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              {subTab === "CXP"
+                ? "Puedes registrar compras a crédito o nuevas facturas por pagar arriba."
+                : "Las ventas a crédito en mostrador se registrarán aquí automáticamente."}
+            </p>
+          </div>
+        ) : (
+          listaFiltrada.map((cta) => {
+            const esPagada = cta.estado === "PAGADO" || cta.saldoPendiente <= 0;
+            const abonado = Math.max(0, cta.montoOriginal - cta.saldoPendiente);
+            const pctAbonado = cta.montoOriginal > 0 ? Math.min(100, Math.round((abonado / cta.montoOriginal) * 100)) : 100;
+            const esVencida = cta.fechaVencimiento && new Date(cta.fechaVencimiento) < new Date() && !esPagada;
+
+            return (
+              <div
+                key={cta.id}
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border-l-4 border bg-slate-100/70 dark:bg-slate-800/60 transition-all ${
+                  esPagada
+                    ? "border-slate-300 dark:border-slate-700 opacity-70 border-l-emerald-500"
+                    : subTab === "CXP"
+                    ? "border-slate-200 dark:border-slate-700/60 border-l-rose-500 hover:border-rose-500/40"
+                    : "border-slate-200 dark:border-slate-700/60 border-l-teal-500 hover:border-teal-500/40"
+                }`}
+              >
+                <div className="space-y-1.5 min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                      {cta.entidadNombre}
+                    </span>
+                    {cta.entidadDocumento && (
+                      <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.2 rounded">
+                        {cta.entidadDocumento}
+                      </span>
+                    )}
+                    {cta.numeroDocumento && (
+                      <span className="text-[10px] font-mono font-bold text-teal-600 dark:text-teal-400">
+                        #{cta.numeroDocumento}
+                      </span>
+                    )}
+                    {esVencida && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-500 border border-rose-500/30">
+                        VENCIDA
+                      </span>
+                    )}
+                    {esPagada && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        SALDADA
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-slate-600 dark:text-slate-300 truncate">
+                    {cta.concepto}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400 font-mono">
+                    <span>Emisión: {cta.fechaRegistro}</span>
+                    {cta.fechaVencimiento && (
+                      <span className={esVencida ? "text-rose-500 font-bold" : ""}>
+                        Vencimiento: {cta.fechaVencimiento}
+                      </span>
+                    )}
+                    {abonado > 0 && !esPagada && (
+                      <span className="text-teal-600 dark:text-teal-400 font-bold">
+                        Abonado: ${abonado.toFixed(2)} ({pctAbonado}%)
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Barra de Progreso si hubo abono parcial */}
+                  {abonado > 0 && !esPagada && (
+                    <div className="w-full sm:w-64 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden mt-1">
+                      <div className="h-full bg-teal-500 rounded-full" style={{ width: `${pctAbonado}%` }} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200 dark:border-slate-700/60">
+                  <div className="text-left sm:text-right">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                      {esPagada ? "Total Pagado" : "Saldo Pendiente"}
+                    </span>
+                    <span className={`font-mono font-black text-base ${
+                      esPagada
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : subTab === "CXP"
+                        ? "text-rose-500"
+                        : "text-teal-600 dark:text-teal-400"
+                    }`}>
+                      ${(esPagada ? cta.montoOriginal : cta.saldoPendiente).toFixed(2)}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono block">
+                      ~ Bs. {((esPagada ? cta.montoOriginal : cta.saldoPendiente) * tasaActivaBs).toFixed(2)}
+                    </span>
+                  </div>
+
+                  {!esPagada && (
+                    <button
+                      onClick={() => setCuentaAbonando(cta)}
+                      className={`px-4 py-2.5 rounded-xl font-bold text-xs cursor-pointer shadow-md transition-all ${
+                        subTab === "CXP"
+                          ? "bg-rose-500 hover:bg-rose-600 text-white"
+                          : "bg-teal-500 hover:bg-teal-400 text-slate-950 font-black"
+                      }`}
+                    >
+                      {subTab === "CXP" ? "Pagar / Abonar" : "Cobrar / Abonar"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Modal de Abono / Pago con Registro Contable Automático */}
+      {cuentaAbonando && (
+        <ModalAbonarCuentaComercio
+          cuenta={cuentaAbonando}
+          tasaActivaBs={tasaActivaBs}
+          onClose={() => setCuentaAbonando(null)}
+          onConfirmar={async (montoAbono, monedaAbono, formaPago) => {
+            const cta = cuentaAbonando;
+            const nuevoSaldo = Math.max(0, cta.saldoPendiente - montoAbono);
+            const quedaPagada = nuevoSaldo <= 0.005;
+
+            // 1. Actualizar cuenta en el listado
+            const cuentasActualizadas = cuentas.map((c) =>
+              c.id === cta.id
+                ? {
+                    ...c,
+                    saldoPendiente: nuevoSaldo,
+                    estado: quedaPagada ? ("PAGADO" as const) : c.estado,
+                  }
+                : c
+            );
+            guardarCuentas(cuentasActualizadas);
+
+            // 2. REGISTRO CONTABLE AUTOMÁTICO EN CAJA (FLUJO LIMPIO ADMINISTRATIVO)
+            if (cta.tipo === "CXP") {
+              // Pago a proveedor = EGRESO / GASTO EN CAJA
+              const nuevoEgreso: MovimientoCaja = {
+                id: Date.now(),
+                tenantId: tenantId || 0,
+                tipo: "EGRESO",
+                monto: montoAbono,
+                moneda: monedaAbono,
+                concepto: `Pago CxP a ${cta.entidadNombre} (${cta.concepto}) - ${formaPago}`,
+                fechaRegistro: new Date().toISOString(),
+                saldoPendiente: null,
+                estado: "PAGADO",
+                fechaVencimiento: null,
+                moduloOrigen: "COMERCIO",
+                referenciaTipo: "CXP",
+                referenciaId: null,
+              };
+              setGastosCaja((prev) => [nuevoEgreso, ...prev]);
+
+              if (tenantId) {
+                try {
+                  await registrarMovimiento(tenantId, {
+                    tipo: "EGRESO",
+                    monto: montoAbono,
+                    moneda: monedaAbono,
+                    concepto: nuevoEgreso.concepto,
+                  });
+                  cargarGastosCaja();
+                } catch (e) {
+                  console.warn("Sincronización en backend diferida:", e);
+                }
+              }
+
+              mostrarToast(
+                `Pago de ${monedaAbono === "USD" ? "$" : "Bs. "}${montoAbono.toFixed(2)} registrado. Se contabilizó el egreso en caja automáticamente.`,
+                "success"
+              );
+            } else {
+              // Cobro a cliente = INGRESO EN CAJA
+              const nuevoIngreso: MovimientoCaja = {
+                id: Date.now(),
+                tenantId: tenantId || 0,
+                tipo: "INGRESO",
+                monto: montoAbono,
+                moneda: monedaAbono,
+                concepto: `Cobro CxC de ${cta.entidadNombre} (${cta.concepto}) - ${formaPago}`,
+                fechaRegistro: new Date().toISOString(),
+                saldoPendiente: null,
+                estado: "PAGADO",
+                fechaVencimiento: null,
+                moduloOrigen: "COMERCIO",
+                referenciaTipo: "CXC",
+                referenciaId: null,
+              };
+              setIngresosCaja((prev) => [nuevoIngreso, ...prev]);
+
+              // Descontar saldo del cliente en clientes
+              setClientes((prev) => {
+                const updated = prev.map((cl) => {
+                  if (cl.nombre === cta.entidadNombre || (cl.documento && cl.documento === cta.entidadDocumento)) {
+                    return { ...cl, saldoPendiente: Math.max(0, cl.saldoPendiente - montoAbono) };
+                  }
+                  return cl;
+                });
+                try { localStorage.setItem("aurora_comercio_clientes", JSON.stringify(updated)); } catch {}
+                return updated;
+              });
+
+              if (tenantId) {
+                try {
+                  await registrarMovimiento(tenantId, {
+                    tipo: "INGRESO",
+                    monto: montoAbono,
+                    moneda: monedaAbono,
+                    concepto: nuevoIngreso.concepto,
+                  });
+                  cargarIngresosCaja();
+                } catch (e) {
+                  console.warn("Sincronización en backend diferida:", e);
+                }
+              }
+
+              mostrarToast(
+                `Cobro de ${monedaAbono === "USD" ? "$" : "Bs. "}${montoAbono.toFixed(2)} registrado. Se contabilizó el ingreso en caja y se actualizó el saldo del cliente.`,
+                "success"
+              );
+            }
+
+            setCuentaAbonando(null);
+          }}
+        />
+      )}
+
+      {/* Modal para Crear Nueva Cuenta por Pagar */}
+      {modalNuevaCxp && (
+        <ModalNuevaCxpComercio
+          proveedores={proveedores}
+          onClose={() => setModalNuevaCxp(false)}
+          onGuardar={(nueva) => {
+            guardarCuentas([nueva, ...cuentas]);
+            setModalNuevaCxp(false);
+            mostrarToast("Cuenta por pagar registrada en el panel administrativo.", "success");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Modal de Abono / Pago con Registro Contable
+function ModalAbonarCuentaComercio({
+  cuenta,
+  tasaActivaBs,
+  onClose,
+  onConfirmar,
+}: {
+  cuenta: CuentaComercio;
+  tasaActivaBs: number;
+  onClose: () => void;
+  onConfirmar: (monto: number, moneda: "USD" | "VES" | "COP", formaPago: string) => Promise<void>;
+}) {
+  const [monto, setMonto] = useState(String(cuenta.saldoPendiente));
+  const [moneda, setMoneda] = useState<"USD" | "VES" | "COP">(cuenta.moneda || "USD");
+  const [formaPago, setFormaPago] = useState("Efectivo Caja");
+  const [guardando, setGuardando] = useState(false);
+
+  const saldoUSD = cuenta.saldoPendiente;
+  const saldoBs = saldoUSD * tasaActivaBs;
+
+  const montoNum = parseFloat(monto) || 0;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (montoNum <= 0) return;
+    setGuardando(true);
+    try {
+      await onConfirmar(montoNum, moneda, formaPago);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl cursor-default" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+          <div>
+            <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
+              {cuenta.tipo === "CXP" ? "Registrar Pago a Proveedor" : "Registrar Cobro a Cliente"}
+            </h3>
+            <span className="text-xs text-slate-500 font-semibold">{cuenta.entidadNombre}</span>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-white"><IconClose size={18} /></button>
+        </div>
+
+        <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1">
+          <span className="text-[10px] text-slate-400 uppercase font-bold block">Concepto de la Cuenta:</span>
+          <p className="text-xs font-semibold text-slate-900 dark:text-white">{cuenta.concepto}</p>
+          <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700 text-xs">
+            <span className="text-slate-500">Saldo pendiente:</span>
+            <span className="font-mono font-black text-slate-900 dark:text-white">
+              ${saldoUSD.toFixed(2)} <span className="text-slate-400 font-normal">(Bs. {saldoBs.toFixed(2)})</span>
+            </span>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Monto a {cuenta.tipo === "CXP" ? "Pagar" : "Cobrar"}</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={cuenta.saldoPendiente}
+                value={monto}
+                onChange={(e) => setMonto(e.target.value)}
+                className="w-full bg-slate-100 dark:bg-slate-800 text-sm font-black font-mono text-slate-900 dark:text-white rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-teal-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Moneda</label>
+              <select
+                value={moneda}
+                onChange={(e) => setMoneda(e.target.value as any)}
+                className="w-full bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none"
+              >
+                <option value="USD">USD ($)</option>
+                <option value="VES">Bolívares (Bs)</option>
+                <option value="COP">Pesos (COP)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Forma de Pago / Destino en Caja</label>
+            <select
+              value={formaPago}
+              onChange={(e) => setFormaPago(e.target.value)}
+              className="w-full bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none"
+            >
+              <option value="Efectivo Caja">Efectivo en Caja</option>
+              <option value="Punto de Venta">Punto de Venta / Tarjeta</option>
+              <option value="Pago Móvil">Pago Móvil</option>
+              <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+              <option value="Zelle">Zelle / Divisa Digital</option>
+            </select>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20 text-[11px] text-teal-700 dark:text-teal-300">
+            <strong className="text-teal-600 dark:text-teal-400">Efecto administrativo:</strong> Al confirmar, se descontará la deuda y se registrará inmediatamente el <strong>{cuenta.tipo === "CXP" ? "EGRESO / GASTO" : "INGRESO"}</strong> en el flujo de caja del negocio.
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={guardando || montoNum <= 0}
+              className={`flex-1 py-2.5 rounded-xl text-white font-black text-xs cursor-pointer shadow-lg disabled:opacity-50 ${
+                cuenta.tipo === "CXP" ? "bg-rose-500 hover:bg-rose-600" : "bg-teal-500 hover:bg-teal-400 text-slate-950 font-black"
+              }`}
+            >
+              {guardando ? "Procesando..." : cuenta.tipo === "CXP" ? "Confirmar Pago" : "Confirmar Cobro"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Modal para Crear Nueva Cuenta por Pagar (CXP)
+function ModalNuevaCxpComercio({
+  proveedores,
+  onClose,
+  onGuardar,
+}: {
+  proveedores: ProveedorRepuesto[];
+  onClose: () => void;
+  onGuardar: (c: CuentaComercio) => void;
+}) {
+  const [proveedorNombre, setProveedorNombre] = useState(proveedores[0]?.nombre || "");
+  const [numeroFactura, setNumeroFactura] = useState("");
+  const [concepto, setConcepto] = useState("");
+  const [monto, setMonto] = useState("");
+  const [diasCredito, setDiasCredito] = useState("15");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const m = parseFloat(monto);
+    if (!m || m <= 0) return;
+
+    const dias = parseInt(diasCredito) || 15;
+    const fVenc = new Date(Date.now() + dias * 86400000).toISOString().split("T")[0];
+
+    const nueva: CuentaComercio = {
+      id: `cxp-${Date.now()}`,
+      tipo: "CXP",
+      entidadNombre: proveedorNombre.trim() || "Proveedor Comercial",
+      concepto: concepto.trim() || `Factura ${numeroFactura.trim() || "S/N"} - ${proveedorNombre}`,
+      numeroDocumento: numeroFactura.trim() || undefined,
+      montoOriginal: m,
+      saldoPendiente: m,
+      moneda: "USD",
+      estado: "PENDIENTE",
+      fechaRegistro: new Date().toISOString().split("T")[0],
+      fechaVencimiento: fVenc,
+      referenciaTipo: "MANUAL",
+    };
+
+    onGuardar(nueva);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl cursor-default" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+          <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Nueva Cuenta por Pagar (CXP)</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-white"><IconClose size={18} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Proveedor / Beneficiario</label>
+            <input
+              type="text"
+              placeholder="Ej. Distribuidora Central, Enelven, Alquiler..."
+              value={proveedorNombre}
+              onChange={(e) => setProveedorNombre(e.target.value)}
+              className="w-full bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-teal-500"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Nº Factura / Doc</label>
+              <input
+                type="text"
+                placeholder="Ej. F-10293"
+                value={numeroFactura}
+                onChange={(e) => setNumeroFactura(e.target.value)}
+                className="w-full bg-slate-100 dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-white rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Días de Crédito</label>
+              <input
+                type="number"
+                min="0"
+                value={diasCredito}
+                onChange={(e) => setDiasCredito(e.target.value)}
+                className="w-full bg-slate-100 dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-white rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Concepto / Descripción</label>
+            <input
+              type="text"
+              placeholder="Ej. Compra de 20 cajas de bujías a crédito"
+              value={concepto}
+              onChange={(e) => setConcepto(e.target.value)}
+              className="w-full bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-teal-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Monto Total USD ($)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              placeholder="0.00"
+              value={monto}
+              onChange={(e) => setMonto(e.target.value)}
+              className="w-full bg-slate-100 dark:bg-slate-800 text-sm font-black font-mono text-slate-900 dark:text-white rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none focus:border-teal-500"
+              required
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer shadow-md"
+            >
+              Guardar Cuenta
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGasto, registrarGasto, guardandoGasto }: {
   ingresosCaja: MovimientoCaja[];
   gastosCaja: MovimientoCaja[];
@@ -3595,7 +5412,7 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
                       onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, pagoMovil: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">⚡ Zelle / USDT ($)</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Zelle / USDT ($)</label>
                     <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.zelle}
                       onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, zelle: e.target.value }))} className={inputCls} />
                   </div>
