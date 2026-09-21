@@ -14,7 +14,7 @@ import {
 const INDUSTRIES = [
   { Icon: IconClinic,     name: "Mediclinic Pro",      desc: "Historias clínicas, agenda, sala de espera en vivo, cotizador multidivisa, vademécum de fármacos y récipe médico oficial en PDF." },
   { Icon: IconTooth,      name: "Odontología",         desc: "Odontograma FDI interactivo, periodontograma de 6 puntos, planes de tratamiento por fases y presupuesto dental dual USD/Bs." },
-  { Icon: IconHardware,   name: "Comercio",            desc: "POS mostrador, inventario en tiempo real, catálogo público con pedidos por WhatsApp y atención automatizada de precios y stock 24/7." },
+  { Icon: IconHardware,   name: "Comercio",            desc: "POS mostrador, inventario en tiempo real, catálogo público con pedidos por WhatsApp, y asistente de IA que responde precios y stock 24/7." },
   { Icon: IconRestaurant, name: "Restaurantes",        desc: "Comandas digitales, mesas, cocina en tiempo real, inventario y cierres de caja automáticos." },
   { Icon: IconFarm,       name: "Control de Fincas",   desc: "Mapa satelital de potreros, básculas bluetooth para pesaje en manga, y control sanitario que bloquea la venta de un animal en período de retiro." },
   { Icon: IconVet,        name: "Veterinaria",         desc: "Agenda, historias clínicas, sala de espera y cotizador para clínicas de mascotas — el mismo motor de Mediclinic, adaptado." },
@@ -32,7 +32,7 @@ const SISTEMA_POR_INDUSTRIA: Record<string, { ruta: string; label: string; nombr
 const SISTEMA_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro", nombre: "Mediclinic Pro — Espacio Clínico", desc: "Historias clínicas digitales, agenda médica, sala de espera reactiva, cotizador y caja diaria.", Icon: IconClinic };
 
 const FEATURES = [
-  { Icon: IconCustomize, title: "Atención automatizada por WhatsApp", desc: "En Comercio: responde precios, stock y tasa BCV al instante. Con límites de costo por negocio." },
+  { Icon: IconCustomize, title: "Asistente de IA por WhatsApp", desc: "En Comercio: responde precios, stock y tasa BCV al instante y sin costo. Con límites de costo por negocio." },
   { Icon: IconFarm,      title: "Control Sanitario Estricto", desc: "En Ganadería: si un animal sigue en período de retiro por vacuna o tratamiento, el sistema bloquea su venta." },
   { Icon: IconTooth,     title: "Récipe Médico y Vademécum", desc: "En Mediclinic y Odontología: 36+ fármacos con posología, detección de alergias y récipe oficial en PDF." },
   { Icon: IconLink,      title: "Módulos Integrados", desc: "Ventas, inventario, caja y auditoría conectados sin planillas paralelas ni datos duplicados." },
@@ -48,7 +48,7 @@ const PLANS = [
   },
   {
     name: "Aurora Full", price: "Desde $40", period: "/mes", desc: "Todo lo del Básico + nuestras herramientas avanzadas",
-    features: ["Comercio: catálogo público + atención por WhatsApp", "Mediclinic/Odontología: vademécum y récipe oficial", "Ganadería: mapa satelital y básculas bluetooth", "Reportes y BI avanzado", "Acompañamiento prioritario"],
+    features: ["Comercio: catálogo público + IA por WhatsApp", "Mediclinic/Odontología: vademécum y récipe oficial", "Ganadería: mapa satelital y básculas bluetooth", "Reportes y BI avanzado", "Acompañamiento prioritario"],
     cta: "Quiero Aurora Full", highlight: true, badge: "MÁS POPULAR",
   },
 ];
@@ -69,8 +69,23 @@ export default function Home() {
     <main className="w-full bg-white text-[#1D1D1F] antialiased">
       
       {/* ── HERO SECTION APPLE AESTHETIC ── */}
-      <section className="pt-28 pb-20 md:pt-40 md:pb-28 px-6 sm:px-8 border-b border-[#E5E5EA]">
-        <div className="max-w-5xl mx-auto text-center flex flex-col items-center">
+      <section className="relative pt-28 pb-20 md:pt-40 md:pb-28 px-6 sm:px-8 border-b border-[#E5E5EA] overflow-hidden">
+        {/* Imagen de fondo a todo el ancho de la página, difuminada en los 4 bordes para fundirse con el blanco */}
+        <div className="absolute inset-x-0 bottom-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
+          <div className="relative w-full h-[760px] sm:h-[900px] md:h-[1080px]">
+            <img
+              src="/hero-laptop.png"
+              alt="Aurora Productividad"
+              className="w-full h-full object-cover object-center opacity-35 select-none mix-blend-multiply"
+            />
+            {/* Difuminado perimetral: arriba fuerte (no pelea con el texto), abajo hacia el blanco del borde de sección, y en ambos lados para que no se vea recortada */}
+            <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white pointer-events-none" />
+            <div className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-white to-transparent pointer-events-none" />
+            <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-white to-transparent pointer-events-none" />
+          </div>
+        </div>
+
+        <div className="relative z-10 max-w-5xl mx-auto text-center flex flex-col items-center">
           
           {/* H1 Monumental */}
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#1D1D1F] max-w-4xl leading-[1.06] mb-6">
