@@ -203,6 +203,17 @@ export default function ConstruccionApp({ onSalir }: Props) {
     }
   }, []);
 
+  const recargarMaquinarias = useCallback(async () => {
+    setCargandoMaquinarias(true);
+    try {
+      setMaquinarias(await listarMaquinariasConstruccionApi());
+    } catch (err: any) {
+      setErrorGlobal(err.message || 'Error cargando la flota de maquinaria');
+    } finally {
+      setCargandoMaquinarias(false);
+    }
+  }, []);
+
   // Cargar subrecursos del proyecto activo
   const recargarSubrecursosProyecto = useCallback(async (proyId: number) => {
     setErrorGlobal(null);
@@ -227,6 +238,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
   useEffect(() => {
     recargarProyectosEInsumos();
   }, [recargarProyectosEInsumos]);
+
+  useEffect(() => {
+    recargarMaquinarias();
+  }, [recargarMaquinarias]);
 
   useEffect(() => {
     if (proyectoSeleccionadoId) {
@@ -299,6 +314,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
     };
   }, [proyectos, valuaciones, partidas, insumos, despachos]);
 
+  const maquinariasFiltradas = useMemo(
+    () => filtroTipoMaq === 'TODOS'
+      ? maquinarias
+      : maquinarias.filter((maquinaria) => maquinaria.tipo === filtroTipoMaq),
+    [filtroTipoMaq, maquinarias]
+  );
+
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans selection:bg-amber-500/30 selection:text-amber-200">
       {/* BARRA SUPERIOR INSTITUCIONAL */}
@@ -344,6 +366,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
           <button
             onClick={() => {
               recargarProyectosEInsumos();
+              recargarMaquinarias();
               if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
             }}
             title="Recargar datos desde el servidor"
@@ -1253,7 +1276,104 @@ export default function ConstruccionApp({ onSalir }: Props) {
           </div>
         )}
 
-        {/* VISTA 7: BITÁCORA / LIBRO DIARIO */}
+        {/* VISTA 7: MAQUINARIA Y EQUIPOS */}
+        {tabActiva === 'maquinaria' && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-white">Maquinaria y Equipos</h2>
+                <p className="text-xs text-slate-400">
+                  Horómetros, asignación por obra y mantenimiento registrado. Los costos se habilitarán cuando exista una moneda configurada para la operación.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={filtroTipoMaq}
+                  onChange={(event) => setFiltroTipoMaq(event.target.value)}
+                  className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200"
+                >
+                  <option value="TODOS">Todos los equipos</option>
+                  <option value="PESADA">Maquinaria pesada</option>
+                  <option value="LIVIANA">Maquinaria liviana</option>
+                  <option value="TRANSPORTE">Transporte</option>
+                  <option value="HERRAMIENTA_MENOR">Herramienta menor</option>
+                  <option value="GENERADOR">Generadores</option>
+                </select>
+                <button
+                  onClick={() => setModalMaquinariaAbierto((abierto) => !abierto)}
+                  className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-amber-400"
+                >
+                  Registrar equipo
+                </button>
+              </div>
+            </div>
+
+            {modalMaquinariaAbierto && (
+              <form
+                className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-800 bg-[#101726] p-5 md:grid-cols-3"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  try {
+                    await crearMaquinariaConstruccionApi({
+                      codigo: formNuevaMaquinaria.codigo.trim(),
+                      nombre: formNuevaMaquinaria.nombre.trim(),
+                      tipo: formNuevaMaquinaria.tipo,
+                      marca: formNuevaMaquinaria.marca.trim() || undefined,
+                      modelo: formNuevaMaquinaria.modelo.trim() || undefined,
+                      serialChasis: formNuevaMaquinaria.serialChasis.trim() || undefined,
+                      placa: formNuevaMaquinaria.placa.trim() || undefined,
+                      horometroActual: Number(formNuevaMaquinaria.horometroActual) || 0,
+                      intervaloMantenimientoHoras: Number(formNuevaMaquinaria.intervaloMantenimientoHoras) || undefined,
+                      estado: formNuevaMaquinaria.estado,
+                      operadorResponsable: formNuevaMaquinaria.operadorResponsable.trim() || undefined,
+                      combustibleTipo: formNuevaMaquinaria.combustibleTipo,
+                      proyectoId: formNuevaMaquinaria.asignarAProyecto ? proyectoActivo?.id : undefined,
+                      observaciones: formNuevaMaquinaria.observaciones.trim() || undefined,
+                    }, generarIdempotencyKey());
+                    setModalMaquinariaAbierto(false);
+                    setFormNuevaMaquinaria({
+                      codigo: '', nombre: '', tipo: 'PESADA', marca: '', modelo: '', serialChasis: '', placa: '',
+                      horometroActual: '0', intervaloMantenimientoHoras: '250', estado: 'OPERATIVO',
+                      operadorResponsable: '', costoHoraUsd: '0', combustibleTipo: 'DIESEL',
+                      asignarAProyecto: true, observaciones: '',
+                    });
+                    await recargarMaquinarias();
+                    notificarExito('Equipo registrado en la flota');
+                  } catch (err: any) {
+                    setErrorGlobal(err.message || 'No se pudo registrar el equipo');
+                  }
+                }}
+              >
+                <div><label className="mb-1 block text-xs font-semibold text-slate-400">Código *</label><input required value={formNuevaMaquinaria.codigo} onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, codigo: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" placeholder="EQ-001" /></div>
+                <div><label className="mb-1 block text-xs font-semibold text-slate-400">Nombre *</label><input required value={formNuevaMaquinaria.nombre} onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, nombre: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" placeholder="Excavadora hidráulica" /></div>
+                <div><label className="mb-1 block text-xs font-semibold text-slate-400">Tipo *</label><select value={formNuevaMaquinaria.tipo} onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, tipo: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"><option value="PESADA">Pesada</option><option value="LIVIANA">Liviana</option><option value="TRANSPORTE">Transporte</option><option value="HERRAMIENTA_MENOR">Herramienta menor</option><option value="GENERADOR">Generador</option></select></div>
+                <div><label className="mb-1 block text-xs font-semibold text-slate-400">Marca</label><input value={formNuevaMaquinaria.marca} onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, marca: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" /></div>
+                <div><label className="mb-1 block text-xs font-semibold text-slate-400">Modelo</label><input value={formNuevaMaquinaria.modelo} onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, modelo: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" /></div>
+                <div><label className="mb-1 block text-xs font-semibold text-slate-400">Horómetro actual</label><input min="0" step="0.01" type="number" value={formNuevaMaquinaria.horometroActual} onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, horometroActual: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" /></div>
+                <div className="md:col-span-3 flex items-center justify-between gap-3 border-t border-slate-800 pt-3"><label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" checked={formNuevaMaquinaria.asignarAProyecto} onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, asignarAProyecto: e.target.checked })} disabled={!proyectoActivo} />Asignar a la obra seleccionada</label><div className="flex gap-2"><button type="button" onClick={() => setModalMaquinariaAbierto(false)} className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300">Cancelar</button><button type="submit" className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950">Guardar equipo</button></div></div>
+              </form>
+            )}
+
+            {cargandoMaquinarias ? (
+              <div className="rounded-2xl border border-slate-800 bg-[#101726] p-8 text-center text-xs text-slate-400">Cargando maquinaria…</div>
+            ) : maquinariasFiltradas.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-800 bg-[#101726] p-8 text-center"><IconWrench size={34} className="mx-auto mb-3 text-slate-600" /><h3 className="text-sm font-semibold text-slate-300">No hay equipos registrados</h3><p className="mt-1 text-xs text-slate-500">Registra la maquinaria real de la empresa para controlar sus horas y mantenimientos.</p></div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {maquinariasFiltradas.map((maquinaria) => {
+                  const proyecto = proyectos.find((item) => item.id === maquinaria.proyectoId);
+                  return <article key={maquinaria.id} className="rounded-2xl border border-slate-800 bg-[#101726] p-5"><div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-3"><div><p className="font-mono text-xs font-bold text-amber-300">{maquinaria.codigo}</p><h3 className="mt-1 font-bold text-white">{maquinaria.nombre}</h3><p className="mt-1 text-xs text-slate-400">{maquinaria.marca || 'Marca no indicada'} {maquinaria.modelo || ''}</p></div><span className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-bold text-slate-300">{maquinaria.estado.replace(/_/g, ' ')}</span></div><dl className="mt-3 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-slate-500">Horómetro</dt><dd className="mt-0.5 font-mono font-bold text-slate-100">{formatVE(maquinaria.horometroActual)} h</dd></div><div><dt className="text-slate-500">Asignación</dt><dd className="mt-0.5 text-slate-200">{proyecto ? proyecto.codigo : 'Flota general'}</dd></div><div><dt className="text-slate-500">Intervalo</dt><dd className="mt-0.5 font-mono text-slate-200">{formatVE(maquinaria.intervaloMantenimientoHoras)} h</dd></div><div><dt className="text-slate-500">Operador</dt><dd className="mt-0.5 text-slate-200">{maquinaria.operadorResponsable || 'Sin asignar'}</dd></div></dl><div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-800 pt-3"><button onClick={() => { setModalHorometroTarget(maquinaria); setNuevoHorometroInput(String(maquinaria.horometroActual ?? '')); setNuevoOperadorInput(maquinaria.operadorResponsable || ''); }} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-300">Actualizar horómetro</button><button onClick={async () => { setModalMantTarget(maquinaria); setMostrarFormMant(false); setCargandoMantenimientos(true); try { setHistorialMantenimientos(await listarMantenimientosMaquinariaApi(maquinaria.id!)); } catch (err: any) { setErrorGlobal(err.message || 'No se pudo cargar el historial'); } finally { setCargandoMantenimientos(false); } }} className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300">Mantenimiento</button></div></article>;
+                })}
+              </div>
+            )}
+
+            {modalHorometroTarget && <form onSubmit={async (event) => { event.preventDefault(); try { await actualizarHorometroMaquinariaApi(modalHorometroTarget.id!, Number(nuevoHorometroInput), nuevoOperadorInput.trim() || undefined); setModalHorometroTarget(null); await recargarMaquinarias(); notificarExito('Horómetro actualizado'); } catch (err: any) { setErrorGlobal(err.message || 'No se pudo actualizar el horómetro'); } }} className="rounded-2xl border border-sky-500/25 bg-[#101726] p-5"><h3 className="font-bold text-white">Actualizar horómetro · {modalHorometroTarget.codigo}</h3><div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2"><input required min={Number(modalHorometroTarget.horometroActual) || 0} step="0.01" type="number" value={nuevoHorometroInput} onChange={(e) => setNuevoHorometroInput(e.target.value)} className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" /><input value={nuevoOperadorInput} onChange={(e) => setNuevoOperadorInput(e.target.value)} placeholder="Operador responsable" className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" /></div><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setModalHorometroTarget(null)} className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300">Cancelar</button><button type="submit" className="rounded-xl bg-sky-500 px-3 py-2 text-xs font-bold text-slate-950">Actualizar</button></div></form>}
+
+            {modalMantTarget && <section className="rounded-2xl border border-amber-500/25 bg-[#101726] p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold text-white">Mantenimiento · {modalMantTarget.codigo}</h3><p className="mt-1 text-xs text-slate-400">Historial técnico persistente de este equipo.</p></div><button onClick={() => setMostrarFormMant((visible) => !visible)} className="rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950">Registrar mantenimiento</button></div>{mostrarFormMant && <form onSubmit={async (event) => { event.preventDefault(); try { const registro = await crearMantenimientoMaquinariaApi(modalMantTarget.id!, { tipo: formMant.tipo, fechaMantenimiento: formMant.fechaMantenimiento, horometroEnMantenimiento: Number(formMant.horometroEnMantenimiento), descripcionTrabajo: formMant.descripcionTrabajo.trim(), mecanicoOTaller: formMant.mecanicoOTaller.trim() || undefined, repuestosUtilizados: formMant.repuestosUtilizados.trim() || undefined }, generarIdempotencyKey()); setHistorialMantenimientos((actual) => [registro, ...actual]); setMostrarFormMant(false); setFormMant({ tipo: 'PREVENTIVO', fechaMantenimiento: new Date().toISOString().split('T')[0], horometroEnMantenimiento: '', descripcionTrabajo: '', mecanicoOTaller: '', costoTotalUsd: '0', repuestosUtilizados: '' }); await recargarMaquinarias(); notificarExito('Mantenimiento registrado'); } catch (err: any) { setErrorGlobal(err.message || 'No se pudo registrar el mantenimiento'); } }} className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-800 pt-4 md:grid-cols-2"><select value={formMant.tipo} onChange={(e) => setFormMant({ ...formMant, tipo: e.target.value })} className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"><option value="PREVENTIVO">Preventivo</option><option value="CORRECTIVO">Correctivo</option><option value="OVERHAUL">Overhaul</option><option value="INSPECCION_DIARIA">Inspección diaria</option></select><input type="date" required value={formMant.fechaMantenimiento} onChange={(e) => setFormMant({ ...formMant, fechaMantenimiento: e.target.value })} className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" /><input type="number" min="0" step="0.01" required placeholder="Horómetro al mantenimiento" value={formMant.horometroEnMantenimiento} onChange={(e) => setFormMant({ ...formMant, horometroEnMantenimiento: e.target.value })} className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" /><input placeholder="Mecánico o taller" value={formMant.mecanicoOTaller} onChange={(e) => setFormMant({ ...formMant, mecanicoOTaller: e.target.value })} className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" /><textarea required rows={3} placeholder="Trabajo realizado" value={formMant.descripcionTrabajo} onChange={(e) => setFormMant({ ...formMant, descripcionTrabajo: e.target.value })} className="md:col-span-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" /><div className="md:col-span-2 flex justify-end"><button type="submit" className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950">Guardar mantenimiento</button></div></form>}<div className="mt-4 space-y-2 border-t border-slate-800 pt-4">{cargandoMantenimientos ? <p className="text-xs text-slate-400">Cargando historial…</p> : historialMantenimientos.length === 0 ? <p className="text-xs text-slate-500">No hay mantenimientos registrados para este equipo.</p> : historialMantenimientos.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs"><div><strong className="text-slate-100">{item.tipo.replace(/_/g, ' ')}</strong><span className="ml-2 text-slate-500">{item.fechaMantenimiento}</span><p className="mt-1 text-slate-400">{item.descripcionTrabajo}</p></div><span className="font-mono text-slate-300">{formatVE(item.horometroEnMantenimiento)} h</span></div>)}</div></section>}
+          </div>
+        )}
+
+        {/* VISTA 8: BITÁCORA / LIBRO DIARIO */}
         {tabActiva === 'bitacora' && (
           <div className="space-y-4">
             {!proyectoActivo ? (

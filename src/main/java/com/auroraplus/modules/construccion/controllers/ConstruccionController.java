@@ -268,10 +268,16 @@ public class ConstruccionController {
         return construccionService.listarMantenimientos(requireTenant(), id);
     }
 
+    public ResponseEntity<MantenimientoMaquinariaEntity> registrarMantenimiento(
+            Long id, MantenimientoMaquinariaEntity req) {
+        return registrarMantenimiento(id, req, null);
+    }
+
     @PostMapping("/maquinarias/{id}/mantenimientos")
     public ResponseEntity<MantenimientoMaquinariaEntity> registrarMantenimiento(
             @PathVariable Long id,
-            @RequestBody MantenimientoMaquinariaEntity req) {
-        return ResponseEntity.ok(construccionService.registrarMantenimiento(requireTenant(), id, req));
+            @RequestBody MantenimientoMaquinariaEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarMantenimiento(requireTenant(), id, req, idempotencyKey));
     }
 }

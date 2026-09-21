@@ -11,12 +11,16 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
 public class IdempotenciaConstruccionService {
+
+    private static final Logger log = LoggerFactory.getLogger(IdempotenciaConstruccionService.class);
 
     @Autowired
     private IdempotenciaConstruccionRepository idempotenciaRepository;
@@ -182,7 +186,8 @@ public class IdempotenciaConstruccionService {
                     tenantId, idempotencyKey.trim()
                 );
             });
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            log.error("No se pudo liberar la clave de idempotencia de Construcción; quedará protegida hasta revisión", ex);
         }
     }
 
