@@ -69,9 +69,24 @@ export default function Home() {
     <main className="w-full bg-white text-[#1D1D1F] antialiased">
       
       {/* ── HERO SECTION APPLE AESTHETIC ── */}
-      <section className="pt-28 pb-20 md:pt-40 md:pb-28 px-6 sm:px-8 border-b border-[#E5E5EA]">
-        <div className="max-w-5xl mx-auto text-center flex flex-col items-center">
-          
+      <section className="relative pt-28 pb-20 md:pt-40 md:pb-28 px-6 sm:px-8 border-b border-[#E5E5EA] overflow-hidden">
+        {/* Imagen de fondo a todo el ancho de la página, difuminada en los 4 bordes para fundirse con el blanco */}
+        <div className="absolute inset-x-0 bottom-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
+          <div className="relative w-full h-[760px] sm:h-[900px] md:h-[1080px]">
+            <img
+              src="/hero-laptop.png"
+              alt="Aurora Productividad"
+              className="w-full h-full object-cover object-center opacity-35 select-none mix-blend-multiply"
+            />
+            {/* Difuminado perimetral: arriba fuerte (no pelea con el texto), abajo hacia el blanco del borde de sección, y en ambos lados para que no se vea recortada */}
+            <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white pointer-events-none" />
+            <div className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-white to-transparent pointer-events-none" />
+            <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-white to-transparent pointer-events-none" />
+          </div>
+        </div>
+
+        <div className="relative z-10 max-w-5xl mx-auto text-center flex flex-col items-center">
+
           {/* H1 Monumental */}
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#1D1D1F] max-w-4xl leading-[1.06] mb-6">
             Automatiza, simplifica y haz crecer tu negocio.
