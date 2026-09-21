@@ -1188,13 +1188,8 @@ public class ConstruccionService {
 
         // Idempotencia
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
-                ? calcularSha256("RIESGO|" + proyectoId + "|" + codigoLimpio + "|" +
-                    (req.getProcesoFrente() != null ? req.getProcesoFrente().trim() : "") + "|" +
-                    (req.getPeligro() != null ? req.getPeligro().trim() : "") + "|" +
-                    (req.getRiesgoConsecuencia() != null ? req.getRiesgoConsecuencia().trim() : "") + "|" +
-                    (req.getCategoria() != null ? req.getCategoria().trim() : "") + "|" +
-                    req.getProbabilidad() + "|" + req.getSeveridad() + "|" +
-                    (req.getMedidasControl() != null ? req.getMedidasControl().trim() : ""))
+                ? hashPayload("RIESGO|" + proyectoId, req,
+                        "id", "tenantId", "proyectoId", "createdAt")
                 : null;
 
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
@@ -1330,10 +1325,8 @@ public class ConstruccionService {
 
         // Idempotencia
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
-                ? calcularSha256("BIM|" + proyectoId + "|" + codigoLimpio + "|" + versionLimpia + "|" +
-                    (req.getTitulo() != null ? req.getTitulo().trim() : "") + "|" +
-                    (req.getDisciplina() != null ? req.getDisciplina().trim() : "") + "|" +
-                    (req.getFormato() != null ? req.getFormato().trim() : ""))
+                ? hashPayload("BIM|" + proyectoId, req,
+                        "id", "tenantId", "proyectoId", "createdAt")
                 : null;
 
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
@@ -1474,12 +1467,8 @@ public class ConstruccionService {
 
         // Idempotencia
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
-                ? calcularSha256("RFI|" + proyectoId + "|" + numLimpio + "|" +
-                    (req.getAsunto() != null ? req.getAsunto().trim() : "") + "|" +
-                    (req.getDisciplina() != null ? req.getDisciplina().trim() : "") + "|" +
-                    (req.getPreguntaConsulta() != null ? req.getPreguntaConsulta().trim() : "") + "|" +
-                    (req.getSolicitante() != null ? req.getSolicitante().trim() : "") + "|" +
-                    (req.getDocumentoBimId() != null ? req.getDocumentoBimId() : ""))
+                ? hashPayload("RFI|" + proyectoId, req,
+                        "id", "tenantId", "proyectoId", "createdAt")
                 : null;
 
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
@@ -1640,17 +1629,10 @@ public class ConstruccionService {
         req.setCantidadAyudantes(ayudantes);
         req.setCantidadTotalPersonal(oficiales + ayudantes);
 
-        // Idempotencia: hash completo de todos los campos que definen la cuadrilla
+        // Idempotencia: serialización canónica de todos los campos de negocio.
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
-                ? calcularSha256("CUADRILLA|" + proyectoId + "|" + codigoLimpio + "|" +
-                    req.getNombre().trim() + "|" +
-                    req.getFrenteTrabajo().trim() + "|" +
-                    req.getEspecialidad() + "|" +
-                    req.getCapatazResponsable().trim() + "|" +
-                    req.getCantidadOficiales() + "|" +
-                    req.getCantidadAyudantes() + "|" +
-                    (req.getPartidaId() != null ? req.getPartidaId() : "") + "|" +
-                    req.getFechaInicio())
+                ? hashPayload("CUADRILLA|" + proyectoId, req,
+                        "id", "tenantId", "proyectoId", "createdAt", "cantidadTotalPersonal")
                 : null;
 
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
@@ -1660,11 +1642,7 @@ public class ConstruccionService {
             if (claim.isPresent()) {
                 IdempotenciaConstruccionEntity idemp = claim.get();
                 if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
-                    try {
-                        return objectMapper.readValue(idemp.getResultadoJson(), CuadrillaConstruccionEntity.class);
-                    } catch (Exception ex) {
-                        // Fallback a base de datos por recursoId
-                    }
+                    return restaurarResultadoIdempotente(idemp, CuadrillaConstruccionEntity.class, "la cuadrilla");
                 }
                 if (idemp.getRecursoId() != null) {
                     return cuadrillaRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
