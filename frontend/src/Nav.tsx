@@ -20,6 +20,7 @@ const VERTICAL_POR_INDUSTRIA: Record<string, { ruta: string; label: string; icon
   retail: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
   finca: { ruta: "/ganaderia", label: "Aurora Ganadería", icono: "🐄" },
   ganaderia: { ruta: "/ganaderia", label: "Aurora Ganadería", icono: "🐄" },
+  construccion: { ruta: "/construccion", label: "Aurora Construcción", icono: "🏗️" },
 };
 const VERTICAL_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro", icono: "🩺" };
 

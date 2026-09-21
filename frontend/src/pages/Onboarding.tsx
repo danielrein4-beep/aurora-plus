@@ -100,9 +100,9 @@ const INDUSTRIES: IndustryItem[] = [
     label: "Construcción & Obras",
     Icon: IconConstruction,
     desc: "Presupuestos por partidas (COVENIN/APU), valuaciones de avance, cómputos métricos y cotizaciones en PDF",
-    badge: "En Construcción (Próximamente)",
-    isReady: false,
-    tagline: "Vertical en Desarrollo: Aurora Obras & Construcción Civil Pro",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical Insignia: Aurora Obras & Construcción Civil Pro",
   },
   {
     id: "otro",
@@ -247,6 +247,7 @@ const VERTICAL_LABEL: Record<string, string> = {
   veterinaria: "Mediclinic Vet",
   odontologia: "Mediclinic Odonto",
   finca: "Aurora Ganadería (Control de Fincas & Ganado)",
+  construccion: "Aurora Obras & Construcción Civil Pro",
   otro: "Aurora Suite Comercial",
 };
 

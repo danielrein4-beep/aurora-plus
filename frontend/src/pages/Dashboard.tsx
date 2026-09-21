@@ -7,7 +7,7 @@ import {
   AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconCard, IconUsers, IconCustomize,
   IconStethoscope, IconCalendar, IconPrescription, IconRocket, IconDownload, IconKey,
   IconHourglass, IconUser, IconClose, IconCheckCircle, IconBank, IconChat, IconFileText,
-  IconRestaurant, IconFarm, IconShield,
+  IconRestaurant, IconFarm, IconShield, IconConstruction,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -49,6 +49,7 @@ const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNod
   restaurante: IconRestaurant,
   finca: IconFarm,
   ganaderia: IconFarm,
+  construccion: IconConstruction,
 };
 
 const ACTION_ICON: Record<string, (props: { size?: number }) => React.ReactNode> = {
@@ -265,6 +266,24 @@ const VERTICAL_METADATA: Record<string, {
     ],
     defaultPatients: [],
   },
+  construccion: {
+    name: "Aurora Obras & Construcción Pro",
+    badge: "EDICIÓN CONSTRUCCIÓN & OBRAS CIVILES",
+    desc: "Gestión contractual de obras, cómputos métricos COVENIN, valuaciones de avance, insumos y logística.",
+    stats: [
+      { label: "Proyectos Activos", val: "0", change: "En ejecución", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Valuaciones de Obra", val: "0", change: "Aprobadas / En trámite", color: "text-emerald-500 dark:text-emerald-400" },
+      { label: "Partidas Contratadas", val: "0", change: "Presupuesto APU", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Alertas Operativas", val: "0", change: "Control en obra", color: "text-teal-500 dark:text-teal-400" },
+    ],
+    actions: [
+      { label: "Nueva Partida / APU", desc: "Catálogo COVENIN y análisis de precios" },
+      { label: "Registrar Valuación", desc: "Avance físico y financiero" },
+      { label: "Despacho de Material", desc: "Logística y salida de almacén" },
+      { label: "Libro de Bitácora", desc: "Libro diario de obra y novedades" },
+    ],
+    defaultPatients: [],
+  },
   ganaderia: {
     name: "Aurora Agro & Finca",
     badge: "EDICIÓN FINCAS & GANADERÍA",
@@ -344,9 +363,12 @@ export default function Dashboard() {
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
   const esComercioReal = (esRubroComercio || userIndustry === "farmacia") && !!user?.tenantId;
   const esGanaderiaReal = (userIndustry === "finca" || userIndustry === "ganaderia") && !!user?.tenantId;
+  const esConstruccionReal = userIndustry === "construccion" && !!user?.tenantId;
   const rutaVertical =
     userIndustry === "restaurante"
       ? "/restaurante"
+      : userIndustry === "construccion"
+        ? "/construccion"
       : (esRubroComercio || userIndustry === "farmacia")
         ? "/comercio"
         : (userIndustry === "finca" || userIndustry === "ganaderia")
@@ -354,7 +376,7 @@ export default function Dashboard() {
           : userIndustry === "veterinaria"
             ? "/veterinaria"
             : "/mediclinic";
-  const esVerticalReal = esClinicaReal || esRestauranteReal || esComercioReal || esGanaderiaReal;
+  const esVerticalReal = esClinicaReal || esRestauranteReal || esComercioReal || esGanaderiaReal || esConstruccionReal;
 
   useEffect(() => {
     if (!user?.tenantId) return;
