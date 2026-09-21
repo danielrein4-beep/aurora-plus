@@ -301,13 +301,17 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const recargarSubrecursosProyecto = useCallback(async (proyId: number) => {
     setErrorGlobal(null);
     try {
-      const [caps, parts, vals, desps, bit, cuads] = await Promise.all([
+      const [caps, parts, vals, desps, bit, cuads, maqs, rsg, docsBim, rfisList] = await Promise.all([
         listarCapitulosConstruccionApi(proyId),
         listarPartidasConstruccionApi(proyId),
         listarValuacionesConstruccionApi(proyId),
         listarDespachosConstruccionApi(proyId),
         listarBitacoraConstruccionApi(proyId),
         listarCuadrillasConstruccionApi(proyId),
+        listarMaquinariasConstruccionApi(proyId),
+        listarRiesgosConstruccionApi(proyId),
+        listarDocumentosBimApi(proyId),
+        listarRfisConstruccionApi(proyId),
       ]);
       setCapitulos(caps);
       setPartidas(parts);
@@ -315,6 +319,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
       setDespachos(desps);
       setBitacora(bit);
       setCuadrillas(cuads);
+      setMaquinarias(maqs);
+      setRiesgos(rsg);
+      setDocumentosBim(docsBim);
+      setRfis(rfisList);
     } catch (err: any) {
       setErrorGlobal(err.message || 'Error cargando datos del proyecto seleccionado');
     }
@@ -334,6 +342,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
       setDespachos([]);
       setBitacora([]);
       setCuadrillas([]);
+      setMaquinarias([]);
+      setRiesgos([]);
+      setDocumentosBim([]);
+      setRfis([]);
     }
   }, [proyectoSeleccionadoId, recargarSubrecursosProyecto]);
 
@@ -1353,7 +1365,665 @@ export default function ConstruccionApp({ onSalir }: Props) {
         )}
 
         {/* VISTA 7: BITÁCORA / LIBRO DIARIO */}
-        {tabActiva === 'bitacora' && (
+        
+        {/* VISTA 7: MAQUINARIA Y EQUIPOS DE OBRA */}
+        {tabActiva === 'maquinaria' && (
+          <div className="space-y-6">
+            <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/5">
+                    <IconWrench size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-bold text-lg text-white">Parque de Maquinaria & Equipos de Construcción</h2>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                        Horómetros & Mantenimiento
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Control operativo de equipos pesados, control de intervalos de servicio preventivo y costo horario
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setModalMaquinariaAbierto(true)}
+                  disabled={!proyectoActivo}
+                  className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer"
+                >
+                  <IconWrench size={16} />
+                  <span>+ Registrar Equipo / Máquina</span>
+                </button>
+              </div>
+
+              {/* TARJETAS DE RESUMEN DE MAQUINARIA */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Equipos en Obra</div>
+                  <div className="text-2xl font-black text-amber-400 mt-1">
+                    {maquinarias.length}
+                    <span className="text-xs font-normal text-slate-500 ml-1.5">unidades</span>
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Operativos</div>
+                  <div className="text-2xl font-black text-emerald-400 mt-1">
+                    {maquinarias.filter((m) => m.estado === 'OPERATIVO').length}
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">En Mantenimiento</div>
+                  <div className="text-2xl font-black text-rose-400 mt-1">
+                    {maquinarias.filter((m) => m.estado === 'EN_MANTENIMIENTO' || (Number(m.horometroActual) >= Number(m.horometroUltimoMantenimiento || 0) + Number(m.intervaloMantenimientoHoras || 250))).length}
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Horas Acumuladas</div>
+                  <div className="text-2xl font-black text-sky-400 mt-1">
+                    {formatVE(maquinarias.reduce((acc, m) => acc + (Number(m.horometroActual) || 0), 0))}
+                    <span className="text-xs font-normal text-slate-500 ml-1.5">hrs</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* FILTROS Y TABLA DE MAQUINARIA */}
+            <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <div className="p-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 overflow-x-auto text-xs">
+                  <span className="text-slate-400 font-semibold px-2">Tipo de Equipo:</span>
+                  {['TODOS', 'PESADA', 'TRANSPORTE', 'LIVIANA', 'ELEVACION', 'GENERACION'].map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setFiltroTipoMaq(t)}
+                      className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                        filtroTipoMaq === t
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider border-b border-slate-800 font-semibold">
+                    <tr>
+                      <th className="p-4">Código & Equipo</th>
+                      <th className="p-4">Tipo & Marca / Modelo</th>
+                      <th className="p-4">Placa / Serial</th>
+                      <th className="p-4 text-right">Horómetro Actual</th>
+                      <th className="p-4 text-right">Próx. Mantenimiento</th>
+                      <th className="p-4">Operador Asignado</th>
+                      <th className="p-4 text-right">Costo / Hora</th>
+                      <th className="p-4">Estado</th>
+                      <th className="p-4 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {maquinarias
+                      .filter((m) => filtroTipoMaq === 'TODOS' || m.tipo === filtroTipoMaq)
+                      .map((maq) => {
+                        const proxMant = Number(maq.horometroUltimoMantenimiento || 0) + Number(maq.intervaloMantenimientoHoras || 250);
+                        const actual = Number(maq.horometroActual || 0);
+                        const alertaMant = proxMant > 0 && actual >= proxMant - 25;
+                        return (
+                          <tr key={maq.id} className="hover:bg-slate-800/30 transition">
+                            <td className="p-4">
+                              <div className="font-bold text-white text-sm">{maq.codigo}</div>
+                              <div className="text-slate-400 text-[11px]">{maq.nombre}</div>
+                            </td>
+                            <td className="p-4">
+                              <span className="text-amber-300 font-medium bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                                {maq.tipo}
+                              </span>
+                              <div className="text-slate-400 text-[11px] mt-1">{maq.marca} {maq.modelo}</div>
+                            </td>
+                            <td className="p-4 text-slate-300 font-mono text-[11px]">
+                              {maq.placa || maq.serialChasis || 'S/N'}
+                            </td>
+                            <td className="p-4 text-right font-mono font-bold text-sky-400 text-sm">
+                              {formatVE(maq.horometroActual)} hrs
+                            </td>
+                            <td className="p-4 text-right">
+                              <span className={`font-mono font-semibold px-2 py-0.5 rounded text-[11px] ${
+                                alertaMant
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse'
+                                  : 'text-slate-300 bg-slate-800'
+                              }`}>
+                                {proxMant > 0 ? `${formatVE(proxMant)} hrs` : 'N/A'}
+                              </span>
+                            </td>
+                            <td className="p-4 text-slate-300 font-medium">
+                              {maq.operadorResponsable || <span className="text-slate-500 italic">Sin operador</span>}
+                            </td>
+                            <td className="p-4 text-right font-mono font-semibold text-emerald-400">
+                              ${formatVE(maq.costoHoraUsd)}/h
+                            </td>
+                            <td className="p-4">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  maq.estado === 'OPERATIVO'
+                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                    : maq.estado === 'EN_MANTENIMIENTO'
+                                    ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                                    : 'bg-slate-700 text-slate-300 border-slate-600'
+                                }`}
+                              >
+                                {maq.estado}
+                              </span>
+                            </td>
+                            <td className="p-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => {
+                                    setModalHorometroTarget(maq);
+                                    setNuevoHorometroInput(String(maq.horometroActual || 0));
+                                    setNuevoOperadorInput(maq.operadorResponsable || '');
+                                  }}
+                                  title="Actualizar horómetro"
+                                  className="px-2 py-1 rounded bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border border-sky-500/30 text-[11px] font-semibold cursor-pointer"
+                                >
+                                  Horómetro
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    setModalMantTarget(maq);
+                                    setMostrarFormMant(false);
+                                    setCargandoMantenimientos(true);
+                                    try {
+                                      const hist = await listarMantenimientosMaquinariaApi(maq.id!);
+                                      setHistorialMantenimientos(hist);
+                                    } catch (e: any) {
+                                      setErrorGlobal(e.message);
+                                    } finally {
+                                      setCargandoMantenimientos(false);
+                                    }
+                                  }}
+                                  title="Gestionar mantenimientos"
+                                  className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 text-[11px] font-semibold cursor-pointer"
+                                >
+                                  Mantenimientos
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    {maquinarias.length === 0 && (
+                      <tr>
+                        <td colSpan={9} className="p-8 text-center text-slate-500">
+                          No hay maquinaria ni equipos registrados en esta obra. Haga clic en "+ Registrar Equipo / Máquina".
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* VISTA 8: MATRIZ DE RIESGOS Y SST / IPERC */}
+        {tabActiva === 'riesgos' && (
+          <div className="space-y-6">
+            <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shadow-lg shadow-rose-500/5">
+                    <IconWarning size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-bold text-lg text-white">Matriz IPERC & Seguridad Laboral (SST)</h2>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/25">
+                        Norma COVENIN 2260 / 4004
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Identificación de Peligros, Evaluación de Riesgos y Medidas de Control Operativo en frentes de obra
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setModalRiesgoAbierto(true)}
+                  disabled={!proyectoActivo}
+                  className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-rose-600/20 cursor-pointer"
+                >
+                  <IconWarning size={16} />
+                  <span>+ Evaluar Nuevo Riesgo SST</span>
+                </button>
+              </div>
+
+              {/* TARJETAS DE RESUMEN DE RIESGOS */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Riesgos Identificados</div>
+                  <div className="text-2xl font-black text-white mt-1">
+                    {riesgos.length}
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Riesgos Críticos (P×S ≥ 15)</div>
+                  <div className="text-2xl font-black text-rose-400 mt-1">
+                    {riesgos.filter((r) => r.nivelRiesgo === 'CRITICO').length}
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">En Mitigación Activa</div>
+                  <div className="text-2xl font-black text-amber-400 mt-1">
+                    {riesgos.filter((r) => r.estado === 'EN_MITIGACION').length}
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Controlados / Residuales</div>
+                  <div className="text-2xl font-black text-emerald-400 mt-1">
+                    {riesgos.filter((r) => r.estado === 'CONTROLADO' || r.estado === 'RESIDUAL_ACEPTABLE').length}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* TABLA MATRIZ IPERC */}
+            <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <div className="p-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 overflow-x-auto text-xs">
+                  <span className="text-slate-400 font-semibold px-2">Severidad:</span>
+                  {['TODOS', 'CRITICO', 'ALTO', 'MEDIO', 'BAJO'].map((lvl) => (
+                    <button
+                      key={lvl}
+                      onClick={() => setFiltroNivelRiesgo(lvl)}
+                      className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                        filtroNivelRiesgo === lvl
+                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                      }`}
+                    >
+                      {lvl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider border-b border-slate-800 font-semibold">
+                    <tr>
+                      <th className="p-4">Código & Frente</th>
+                      <th className="p-4">Peligro Identificado</th>
+                      <th className="p-4">Riesgo / Consecuencia</th>
+                      <th className="p-4">Categoría</th>
+                      <th className="p-4 text-center">P (1-5)</th>
+                      <th className="p-4 text-center">S (1-5)</th>
+                      <th className="p-4 text-center">P×S</th>
+                      <th className="p-4">Nivel COVENIN</th>
+                      <th className="p-4">Medidas de Control</th>
+                      <th className="p-4">Estado</th>
+                      <th className="p-4 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {riesgos
+                      .filter((r) => filtroNivelRiesgo === 'TODOS' || r.nivelRiesgo === filtroNivelRiesgo)
+                      .map((rsg) => (
+                        <tr key={rsg.id} className="hover:bg-slate-800/30 transition">
+                          <td className="p-4">
+                            <div className="font-bold text-white text-sm">{rsg.codigo}</div>
+                            <div className="text-slate-400 text-[11px]">{rsg.procesoFrente}</div>
+                          </td>
+                          <td className="p-4 font-semibold text-slate-200 max-w-[180px]">
+                            {rsg.peligro}
+                          </td>
+                          <td className="p-4 text-slate-300 text-[11px] max-w-[200px]">
+                            {rsg.riesgoConsecuencia}
+                          </td>
+                          <td className="p-4">
+                            <span className="text-slate-300 font-medium bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                              {rsg.categoria}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center font-bold text-slate-300">{rsg.probabilidad}</td>
+                          <td className="p-4 text-center font-bold text-slate-300">{rsg.severidad}</td>
+                          <td className="p-4 text-center">
+                            <span className="font-black text-sm text-white bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono">
+                              {rsg.probabilidad * rsg.severidad}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                rsg.nivelRiesgo === 'CRITICO'
+                                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
+                                  : rsg.nivelRiesgo === 'ALTO'
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                  : rsg.nivelRiesgo === 'MEDIO'
+                                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                              }`}
+                            >
+                              {rsg.nivelRiesgo}
+                            </span>
+                          </td>
+                          <td className="p-4 text-slate-300 text-[11px] max-w-[220px]">
+                            {rsg.medidasControl}
+                          </td>
+                          <td className="p-4">
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                rsg.estado === 'CONTROLADO' || rsg.estado === 'RESIDUAL_ACEPTABLE'
+                                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                  : rsg.estado === 'EN_MITIGACION'
+                                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                  : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                              }`}
+                            >
+                              {rsg.estado}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right">
+                            <button
+                              onClick={() => {
+                                setModalMitigarTarget(rsg);
+                                setNuevoEstadoRiesgo(rsg.estado === 'IDENTIFICADO' ? 'EN_MITIGACION' : 'CONTROLADO');
+                                setMedidasAdicionalesInput('');
+                              }}
+                              className="px-2.5 py-1 rounded bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 text-[11px] font-semibold cursor-pointer"
+                            >
+                              Mitigar
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    {riesgos.length === 0 && (
+                      <tr>
+                        <td colSpan={11} className="p-8 text-center text-slate-500">
+                          No hay riesgos evaluados en la matriz IPERC. Haga clic en "+ Evaluar Nuevo Riesgo SST".
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* VISTA 9: GESTIÓN DOCUMENTAL BIM Y CONTROL DE RFIS */}
+        {tabActiva === 'bim' && (
+          <div className="space-y-6">
+            <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shadow-lg shadow-sky-500/5">
+                    <IconFileText size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-bold text-lg text-white">Modelos BIM, Planos Técnicos & RFIs</h2>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/25">
+                        Gestión Técnica de Proyecto
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Control de planos (IFC, RVT, DWG, PDF) y solicitudes formales de información de obra (RFIs)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex items-center">
+                    <button
+                      onClick={() => setSubtabBim('modelos')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                        subtabBim === 'modelos'
+                          ? 'bg-sky-500 text-slate-950 shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Planos & Modelos ({documentosBim.length})
+                    </button>
+                    <button
+                      onClick={() => setSubtabBim('rfis')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                        subtabBim === 'rfis'
+                          ? 'bg-sky-500 text-slate-950 shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Control de RFIs ({rfis.length})
+                    </button>
+                  </div>
+
+                  {subtabBim === 'modelos' ? (
+                    <button
+                      onClick={() => setModalBimAbierto(true)}
+                      disabled={!proyectoActivo}
+                      className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-sky-500/20 cursor-pointer"
+                    >
+                      <IconFileText size={16} />
+                      <span>+ Subir Modelo / Plano</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setModalRfiAbierto(true)}
+                      disabled={!proyectoActivo}
+                      className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-amber-500/20 cursor-pointer"
+                    >
+                      <IconFileText size={16} />
+                      <span>+ Emitir Nuevo RFI</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* SUBTAB: MODELOS Y PLANOS */}
+            {subtabBim === 'modelos' && (
+              <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div className="p-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 overflow-x-auto text-xs">
+                    <span className="text-slate-400 font-semibold px-2">Disciplina:</span>
+                    {['TODAS', 'ARQUITECTURA', 'ESTRUCTURAS', 'INSTALACIONES_SANITARIAS', 'INSTALACIONES_ELECTRICAS', 'COORDINACION_GENERAL'].map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => setFiltroDisciplinaBim(d)}
+                        className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                          filtroDisciplinaBim === d
+                            ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        }`}
+                      >
+                        {d.replace(/_/g, ' ')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider border-b border-slate-800 font-semibold">
+                      <tr>
+                        <th className="p-4">Código & Título</th>
+                        <th className="p-4">Disciplina</th>
+                        <th className="p-4 text-center">Formato</th>
+                        <th className="p-4 text-center">Versión</th>
+                        <th className="p-4">Proyectista</th>
+                        <th className="p-4 text-right">Peso MB</th>
+                        <th className="p-4">Estado Revisión</th>
+                        <th className="p-4 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {documentosBim
+                        .filter((d) => filtroDisciplinaBim === 'TODAS' || d.disciplina === filtroDisciplinaBim)
+                        .map((doc) => (
+                          <tr key={doc.id} className="hover:bg-slate-800/30 transition">
+                            <td className="p-4">
+                              <div className="font-bold text-white text-sm">{doc.codigo}</div>
+                              <div className="text-slate-400 text-[11px]">{doc.titulo}</div>
+                            </td>
+                            <td className="p-4">
+                              <span className="text-sky-300 font-medium bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
+                                {doc.disciplina.replace(/_/g, ' ')}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className="font-mono font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                                {doc.formato}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center font-mono text-slate-300 font-semibold">
+                              {doc.version}
+                            </td>
+                            <td className="p-4 text-slate-300 font-medium">
+                              {doc.autorProyectista || 'Ing. Proyectista'}
+                            </td>
+                            <td className="p-4 text-right font-mono text-slate-300">
+                              {doc.pesoMb ? `${formatVE(doc.pesoMb)} MB` : '-'}
+                            </td>
+                            <td className="p-4">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  doc.estadoRevision === 'APROBADO_PARA_CONSTRUCCION'
+                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                    : doc.estadoRevision === 'EN_REVISION'
+                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                    : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                                }`}
+                              >
+                                {doc.estadoRevision.replace(/_/g, ' ')}
+                              </span>
+                            </td>
+                            <td className="p-4 text-right">
+                              {doc.estadoRevision !== 'APROBADO_PARA_CONSTRUCCION' && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await cambiarEstadoDocumentoBimApi(doc.id!, 'APROBADO_PARA_CONSTRUCCION');
+                                      notificarExito(`Plano ${doc.codigo} aprobado para construcción.`);
+                                      if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                                    } catch (e: any) {
+                                      setErrorGlobal(e.message);
+                                    }
+                                  }}
+                                  className="px-2 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold cursor-pointer"
+                                >
+                                  Aprobar
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      {documentosBim.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-slate-500">
+                            No hay modelos BIM ni planos técnicos registrados en este proyecto.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* SUBTAB: CONTROL DE RFIS */}
+            {subtabBim === 'rfis' && (
+              <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider border-b border-slate-800 font-semibold">
+                      <tr>
+                        <th className="p-4">N° RFI & Asunto</th>
+                        <th className="p-4">Disciplina</th>
+                        <th className="p-4">Solicitante</th>
+                        <th className="p-4">Consulta Técnica</th>
+                        <th className="p-4">Respuesta Oficial</th>
+                        <th className="p-4">Fecha Límite</th>
+                        <th className="p-4">Estado</th>
+                        <th className="p-4 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {rfis.map((rfi) => (
+                        <tr key={rfi.id} className="hover:bg-slate-800/30 transition">
+                          <td className="p-4">
+                            <div className="font-bold text-amber-400 font-mono text-sm">{rfi.numeroRfi}</div>
+                            <div className="text-white font-semibold text-[11px]">{rfi.asunto}</div>
+                          </td>
+                          <td className="p-4">
+                            <span className="text-sky-300 font-medium bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
+                              {rfi.disciplina}
+                            </span>
+                          </td>
+                          <td className="p-4 text-slate-300 font-medium">{rfi.solicitante}</td>
+                          <td className="p-4 text-slate-300 text-[11px] max-w-[220px]">
+                            {rfi.preguntaConsulta}
+                          </td>
+                          <td className="p-4 text-[11px] max-w-[220px]">
+                            {rfi.respuestaOficial ? (
+                              <span className="text-emerald-300">{rfi.respuestaOficial}</span>
+                            ) : (
+                              <span className="text-slate-500 italic">Pendiente de respuesta</span>
+                            )}
+                          </td>
+                          <td className="p-4 font-mono text-slate-300">{rfi.fechaLimite || '-'}</td>
+                          <td className="p-4">
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                rfi.estado === 'RESPONDIDO' || rfi.estado === 'CERRADO'
+                                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                  : rfi.estado === 'EN_EVALUACION'
+                                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                  : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                              }`}
+                            >
+                              {rfi.estado}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right">
+                            {rfi.estado !== 'CERRADO' && (
+                              <button
+                                onClick={() => {
+                                  setModalResponderRfiTarget(rfi);
+                                  setFormRespuestaRfi({
+                                    respuestaOficial: rfi.respuestaOficial || '',
+                                    responsableRespuesta: rfi.responsableRespuesta || 'Ing. Proyectista',
+                                    estado: 'RESPONDIDO'
+                                  });
+                                }}
+                                className="px-2.5 py-1 rounded bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 text-[11px] font-semibold cursor-pointer"
+                              >
+                                Responder
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {rfis.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-slate-500">
+                            No hay solicitudes de información (RFIs) abiertas en esta obra.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+{tabActiva === 'bitacora' && (
           <div className="space-y-4">
             {!proyectoActivo ? (
               <div className="bg-[#101726] border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs">
@@ -3112,6 +3782,1056 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold transition shadow-lg shadow-violet-600/20 cursor-pointer"
                 >
                   {guardandoCuadrilla ? 'Registrando...' : 'Asignar Cuadrilla'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* MODAL: REGISTRAR NUEVA MAQUINARIA */}
+      {modalMaquinariaAbierto && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <IconWrench size={18} />
+                </div>
+                <h3 className="font-bold text-base text-white">Registrar Equipo / Maquinaria en Obra</h3>
+              </div>
+              <button
+                onClick={() => setModalMaquinariaAbierto(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setErrorGlobal(null);
+                try {
+                  const idemKey = generarIdempotencyKey();
+                  await crearMaquinariaConstruccionApi(
+                    {
+                      codigo: formNuevaMaquinaria.codigo.trim(),
+                      nombre: formNuevaMaquinaria.nombre.trim(),
+                      tipo: formNuevaMaquinaria.tipo,
+                      marca: formNuevaMaquinaria.marca.trim() || undefined,
+                      modelo: formNuevaMaquinaria.modelo.trim() || undefined,
+                      serialChasis: formNuevaMaquinaria.serialChasis.trim() || undefined,
+                      placa: formNuevaMaquinaria.placa.trim() || undefined,
+                      horometroActual: Number(formNuevaMaquinaria.horometroActual) || 0,
+                      intervaloMantenimientoHoras: Number(formNuevaMaquinaria.intervaloMantenimientoHoras) || 250,
+                      estado: formNuevaMaquinaria.estado,
+                      operadorResponsable: formNuevaMaquinaria.operadorResponsable.trim() || undefined,
+                      costoHoraUsd: Number(formNuevaMaquinaria.costoHoraUsd) || 0,
+                      combustibleTipo: formNuevaMaquinaria.combustibleTipo,
+                      proyectoId: formNuevaMaquinaria.asignarAProyecto && proyectoSeleccionadoId ? proyectoSeleccionadoId : undefined,
+                      observaciones: formNuevaMaquinaria.observaciones.trim() || undefined
+                    },
+                    idemKey
+                  );
+                  notificarExito(`Equipo ${formNuevaMaquinaria.codigo} registrado exitosamente.`);
+                  setModalMaquinariaAbierto(false);
+                  if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                } catch (err: any) {
+                  setErrorGlobal(err.message || 'Error registrando maquinaria');
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Código *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. RET-01"
+                    value={formNuevaMaquinaria.codigo}
+                    onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, codigo: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Tipo de Equipo *</label>
+                  <select
+                    value={formNuevaMaquinaria.tipo}
+                    onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, tipo: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  >
+                    <option value="PESADA">Pesada (Excavadora / Retro)</option>
+                    <option value="TRANSPORTE">Transporte (Volqueta / Batea)</option>
+                    <option value="LIVIANA">Liviana (Compactadora / Trompo)</option>
+                    <option value="ELEVACION">Elevación (Grúa / Montacarga)</option>
+                    <option value="GENERACION">Generación (Planta / Compresor)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Nombre / Descripción del Equipo *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Retroexcavadora sobre orugas 20T"
+                  value={formNuevaMaquinaria.nombre}
+                  onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, nombre: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Marca</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Caterpillar"
+                    value={formNuevaMaquinaria.marca}
+                    onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, marca: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Modelo</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. 320D"
+                    value={formNuevaMaquinaria.modelo}
+                    onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, modelo: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Horómetro Inicial</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={formNuevaMaquinaria.horometroActual}
+                    onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, horometroActual: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Intervalo Mant. (hrs)</label>
+                  <input
+                    type="number"
+                    value={formNuevaMaquinaria.intervaloMantenimientoHoras}
+                    onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, intervaloMantenimientoHoras: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Costo USD / Hora</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formNuevaMaquinaria.costoHoraUsd}
+                    onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, costoHoraUsd: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Operador Responsable</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Carlos Mendoza"
+                    value={formNuevaMaquinaria.operadorResponsable}
+                    onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, operadorResponsable: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Placa / Serial Chasis</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. A12BC3D"
+                    value={formNuevaMaquinaria.placa}
+                    onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, placa: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalMaquinariaAbierto(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition shadow-lg shadow-amber-500/20 cursor-pointer"
+                >
+                  Registrar Equipo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ACTUALIZAR HOROMETRO */}
+      {modalHorometroTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-base text-white">Actualizar Horómetro: {modalHorometroTarget.codigo}</h3>
+              <button onClick={() => setModalHorometroTarget(null)} className="text-slate-400 hover:text-white p-1">
+                <IconClose size={18} />
+              </button>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setErrorGlobal(null);
+                try {
+                  await actualizarHorometroMaquinariaApi(
+                    modalHorometroTarget.id!,
+                    Number(nuevoHorometroInput) || 0,
+                    nuevoOperadorInput.trim() || undefined
+                  );
+                  notificarExito(`Horómetro actualizado para ${modalHorometroTarget.codigo}.`);
+                  setModalHorometroTarget(null);
+                  if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                } catch (err: any) {
+                  setErrorGlobal(err.message);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Horómetro Actual (Horas) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  required
+                  value={nuevoHorometroInput}
+                  onChange={(e) => setNuevoHorometroInput(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-base font-bold text-sky-400 focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Operador</label>
+                <input
+                  type="text"
+                  value={nuevoOperadorInput}
+                  onChange={(e) => setNuevoOperadorInput(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalHorometroTarget(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold"
+                >
+                  Guardar Lectura
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: MANTENIMIENTOS DE MAQUINARIA */}
+      {modalMantTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="font-bold text-base text-white">Mantenimientos: {modalMantTarget.codigo} - {modalMantTarget.nombre}</h3>
+                <p className="text-xs text-slate-400">Horómetro: {formatVE(modalMantTarget.horometroActual)} hrs</p>
+              </div>
+              <button onClick={() => setModalMantTarget(null)} className="text-slate-400 hover:text-white p-1">
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <h4 className="font-semibold text-xs text-slate-300">Historial Registrado ({historialMantenimientos.length})</h4>
+              <button
+                type="button"
+                onClick={() => setMostrarFormMant(!mostrarFormMant)}
+                className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold cursor-pointer"
+              >
+                {mostrarFormMant ? 'Ver Historial' : '+ Registrar Mantenimiento'}
+              </button>
+            </div>
+
+            {mostrarFormMant ? (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setErrorGlobal(null);
+                  try {
+                    await crearMantenimientoMaquinariaApi(
+                      modalMantTarget.id!,
+                      {
+                        tipo: formMant.tipo,
+                        fechaMantenimiento: formMant.fechaMantenimiento,
+                        horometroEnMantenimiento: Number(formMant.horometroEnMantenimiento) || Number(modalMantTarget.horometroActual) || 0,
+                        descripcionTrabajo: formMant.descripcionTrabajo.trim(),
+                        mecanicoOTaller: formMant.mecanicoOTaller.trim() || undefined,
+                        costoTotalUsd: Number(formMant.costoTotalUsd) || 0,
+                        repuestosUtilizados: formMant.repuestosUtilizados.trim() || undefined
+                      }
+                    );
+                    notificarExito('Mantenimiento registrado y próximo servicio recalculado.');
+                    setMostrarFormMant(false);
+                    const hist = await listarMantenimientosMaquinariaApi(modalMantTarget.id!);
+                    setHistorialMantenimientos(hist);
+                    if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                  } catch (err: any) {
+                    setErrorGlobal(err.message);
+                  }
+                }}
+                className="space-y-3 text-xs bg-slate-900/80 p-4 rounded-xl border border-slate-800"
+              >
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Tipo de Servicio *</label>
+                    <select
+                      value={formMant.tipo}
+                      onChange={(e) => setFormMant({ ...formMant, tipo: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    >
+                      <option value="PREVENTIVO">Preventivo (Filtros / Aceites)</option>
+                      <option value="CORRECTIVO">Correctivo (Reparación)</option>
+                      <option value="OVERHAUL">Overhaul Mayor</option>
+                      <option value="INSPECCION">Inspección de Seguridad</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Fecha de Intervención *</label>
+                    <input
+                      type="date"
+                      required
+                      value={formMant.fechaMantenimiento}
+                      onChange={(e) => setFormMant({ ...formMant, fechaMantenimiento: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Horómetro al Momento</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={formMant.horometroEnMantenimiento || modalMantTarget.horometroActual}
+                      onChange={(e) => setFormMant({ ...formMant, horometroEnMantenimiento: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Costo Total USD</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formMant.costoTotalUsd}
+                      onChange={(e) => setFormMant({ ...formMant, costoTotalUsd: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1">Mecánico o Taller Especializado</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Taller Central Diesel / Mecánico Pedro Ruiz"
+                    value={formMant.mecanicoOTaller}
+                    onChange={(e) => setFormMant({ ...formMant, mecanicoOTaller: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1">Descripción del Trabajo Realizado *</label>
+                  <textarea
+                    rows={2}
+                    required
+                    placeholder="Cambio de filtro de aire, combustible, aceite 15W40, engrase general..."
+                    value={formMant.descripcionTrabajo}
+                    onChange={(e) => setFormMant({ ...formMant, descripcionTrabajo: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold"
+                  >
+                    Guardar Mantenimiento
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto text-xs">
+                {historialMantenimientos.map((h) => (
+                  <div key={h.id} className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-amber-300">{h.tipo} - {h.fechaMantenimiento}</span>
+                      <span className="font-mono text-emerald-400 font-bold">${formatVE(h.costoTotalUsd)}</span>
+                    </div>
+                    <p className="text-slate-300">{h.descripcionTrabajo}</p>
+                    <div className="text-[11px] text-slate-500 flex items-center gap-3">
+                      <span>Horómetro: {formatVE(h.horometroEnMantenimiento)} hrs</span>
+                      {h.mecanicoOTaller && <span>Taller: {h.mecanicoOTaller}</span>}
+                    </div>
+                  </div>
+                ))}
+                {historialMantenimientos.length === 0 && (
+                  <p className="text-center py-6 text-slate-500">No hay registros de mantenimiento para esta máquina.</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: REGISTRAR NUEVO RIESGO SST */}
+      {modalRiesgoAbierto && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center">
+                  <IconWarning size={18} />
+                </div>
+                <h3 className="font-bold text-base text-white">Nueva Evaluación de Riesgo IPERC (SST)</h3>
+              </div>
+              <button onClick={() => setModalRiesgoAbierto(false)} className="text-slate-400 hover:text-white p-1">
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!proyectoSeleccionadoId) return;
+                setErrorGlobal(null);
+                try {
+                  const idemKey = generarIdempotencyKey();
+                  await crearRiesgoConstruccionApi(
+                    proyectoSeleccionadoId,
+                    {
+                      codigo: formNuevoRiesgo.codigo.trim(),
+                      procesoFrente: formNuevoRiesgo.procesoFrente.trim(),
+                      peligro: formNuevoRiesgo.peligro.trim(),
+                      riesgoConsecuencia: formNuevoRiesgo.riesgoConsecuencia.trim(),
+                      categoria: formNuevoRiesgo.categoria,
+                      probabilidad: Number(formNuevoRiesgo.probabilidad) || 1,
+                      severidad: Number(formNuevoRiesgo.severidad) || 1,
+                      medidasControl: formNuevoRiesgo.medidasControl.trim(),
+                      responsable: formNuevoRiesgo.responsable.trim() || undefined,
+                      fechaEvaluacion: formNuevoRiesgo.fechaEvaluacion,
+                      observaciones: formNuevoRiesgo.observaciones.trim() || undefined
+                    },
+                    idemKey
+                  );
+                  notificarExito(`Riesgo ${formNuevoRiesgo.codigo} evaluado y registrado en la matriz.`);
+                  setModalRiesgoAbierto(false);
+                  recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                } catch (err: any) {
+                  setErrorGlobal(err.message);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Código *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. RSG-ALT-01"
+                    value={formNuevoRiesgo.codigo}
+                    onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, codigo: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Categoría *</label>
+                  <select
+                    value={formNuevoRiesgo.categoria}
+                    onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, categoria: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-rose-500 focus:outline-none"
+                  >
+                    <option value="ALTURA">Trabajo en Altura</option>
+                    <option value="ELECTRICO">Riesgo Eléctrico</option>
+                    <option value="EXCAVACION">Excavación / Zanjas</option>
+                    <option value="MAQUINARIA">Maquinaria y Atrapamiento</option>
+                    <option value="QUIMICO">Químico / Asfaltos / Solutos</option>
+                    <option value="ERGONOMICO">Ergonómico / Esfuerzo Físico</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Proceso o Frente de Obra *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Vaciado de Losas - Nivel 4"
+                  value={formNuevoRiesgo.procesoFrente}
+                  onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, procesoFrente: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Peligro Identificado *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Borde desprotegido sin barandas"
+                    value={formNuevoRiesgo.peligro}
+                    onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, peligro: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Riesgo / Consecuencia *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Caída a distinto nivel / Traumatismo"
+                    value={formNuevoRiesgo.riesgoConsecuencia}
+                    onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, riesgoConsecuencia: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Probabilidad (1-5)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={formNuevoRiesgo.probabilidad}
+                    onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, probabilidad: Number(e.target.value) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-center font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Severidad (1-5)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={formNuevoRiesgo.severidad}
+                    onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, severidad: Number(e.target.value) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-center font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Evaluación P×S</label>
+                  <div className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-center font-black text-rose-400 font-mono text-sm">
+                    {Number(formNuevoRiesgo.probabilidad) * Number(formNuevoRiesgo.severidad)}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Medidas de Control Propuestas *</label>
+                <textarea
+                  rows={2}
+                  required
+                  placeholder="Instalación de líneas de vida, uso obligatorio de arnés con doble cabo y barandillas perimetrales..."
+                  value={formNuevoRiesgo.medidasControl}
+                  onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, medidasControl: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalRiesgoAbierto(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold"
+                >
+                  Registrar en Matriz IPERC
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: MITIGAR RIESGO */}
+      {modalMitigarTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-base text-white">Gestionar Riesgo: {modalMitigarTarget.codigo}</h3>
+              <button onClick={() => setModalMitigarTarget(null)} className="text-slate-400 hover:text-white p-1">
+                <IconClose size={18} />
+              </button>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setErrorGlobal(null);
+                try {
+                  await cambiarEstadoRiesgoConstruccionApi(
+                    modalMitigarTarget.id!,
+                    nuevoEstadoRiesgo,
+                    medidasAdicionalesInput.trim() || undefined
+                  );
+                  notificarExito(`Estado de riesgo actualizado a ${nuevoEstadoRiesgo}.`);
+                  setModalMitigarTarget(null);
+                  if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                } catch (err: any) {
+                  setErrorGlobal(err.message);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Nuevo Estado *</label>
+                <select
+                  value={nuevoEstadoRiesgo}
+                  onChange={(e) => setNuevoEstadoRiesgo(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                >
+                  <option value="EN_MITIGACION">En Mitigación Activa</option>
+                  <option value="CONTROLADO">Controlado / Mitigado</option>
+                  <option value="RESIDUAL_ACEPTABLE">Riesgo Residual Aceptable</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Medidas Adicionales Aplicadas</label>
+                <textarea
+                  rows={3}
+                  placeholder="Detallar inspección de seguridad, charlas de 5 min, verificación de arneses..."
+                  value={medidasAdicionalesInput}
+                  onChange={(e) => setMedidasAdicionalesInput(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalMitigarTarget(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold"
+                >
+                  Actualizar Mitigación
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SUBIR DOCUMENTO BIM O PLANO */}
+      {modalBimAbierto && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-base text-white">Registrar Plano Técnico o Modelo BIM</h3>
+              <button onClick={() => setModalBimAbierto(false)} className="text-slate-400 hover:text-white p-1">
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!proyectoSeleccionadoId) return;
+                setErrorGlobal(null);
+                try {
+                  const idemKey = generarIdempotencyKey();
+                  await crearDocumentoBimApi(
+                    proyectoSeleccionadoId,
+                    {
+                      codigo: formNuevoBim.codigo.trim(),
+                      titulo: formNuevoBim.titulo.trim(),
+                      disciplina: formNuevoBim.disciplina,
+                      formato: formNuevoBim.formato,
+                      version: formNuevoBim.version.trim(),
+                      autorProyectista: formNuevoBim.autorProyectista.trim() || undefined,
+                      archivoUrl: formNuevoBim.archivoUrl.trim() || undefined,
+                      pesoMb: Number(formNuevoBim.pesoMb) || undefined,
+                      estadoRevision: formNuevoBim.estadoRevision,
+                      observaciones: formNuevoBim.observaciones.trim() || undefined
+                    },
+                    idemKey
+                  );
+                  notificarExito(`Documento ${formNuevoBim.codigo} registrado exitosamente.`);
+                  setModalBimAbierto(false);
+                  recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                } catch (err: any) {
+                  setErrorGlobal(err.message);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Código del Plano *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. PLN-EST-001"
+                    value={formNuevoBim.codigo}
+                    onChange={(e) => setFormNuevoBim({ ...formNuevoBim, codigo: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Formato *</label>
+                  <select
+                    value={formNuevoBim.formato}
+                    onChange={(e) => setFormNuevoBim({ ...formNuevoBim, formato: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                  >
+                    <option value="IFC">IFC (Modelo BIM Abierto)</option>
+                    <option value="RVT_REVIT">Revit (.RVT)</option>
+                    <option value="DWG_AUTOCAD">AutoCAD (.DWG)</option>
+                    <option value="PDF_PLANO">PDF Técnico</option>
+                    <option value="NWD_NAVISWORKS">Navisworks (.NWD)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Título del Documento / Plano *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Planta Estructural Vigas y Losas Nivel +3.00"
+                  value={formNuevoBim.titulo}
+                  onChange={(e) => setFormNuevoBim({ ...formNuevoBim, titulo: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Disciplina *</label>
+                  <select
+                    value={formNuevoBim.disciplina}
+                    onChange={(e) => setFormNuevoBim({ ...formNuevoBim, disciplina: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                  >
+                    <option value="ESTRUCTURAS">Estructuras</option>
+                    <option value="ARQUITECTURA">Arquitectura</option>
+                    <option value="INSTALACIONES_SANITARIAS">Instalaciones Sanitarias</option>
+                    <option value="INSTALACIONES_ELECTRICAS">Instalaciones Eléctricas</option>
+                    <option value="MECANICA_CLIMATIZACION">Mecánica / Climatización</option>
+                    <option value="COORDINACION_GENERAL">Coordinación General</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Versión *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Rev-B / v1.2"
+                    value={formNuevoBim.version}
+                    onChange={(e) => setFormNuevoBim({ ...formNuevoBim, version: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Autor Proyectista</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Ing. Calculista"
+                    value={formNuevoBim.autorProyectista}
+                    onChange={(e) => setFormNuevoBim({ ...formNuevoBim, autorProyectista: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Peso (MB)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    placeholder="Ej. 18.5"
+                    value={formNuevoBim.pesoMb}
+                    onChange={(e) => setFormNuevoBim({ ...formNuevoBim, pesoMb: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalBimAbierto(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold"
+                >
+                  Guardar Documento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EMITIR NUEVO RFI */}
+      {modalRfiAbierto && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-base text-white">Emitir Consulta Técnica (RFI)</h3>
+              <button onClick={() => setModalRfiAbierto(false)} className="text-slate-400 hover:text-white p-1">
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!proyectoSeleccionadoId) return;
+                setErrorGlobal(null);
+                try {
+                  const idemKey = generarIdempotencyKey();
+                  await crearRfiConstruccionApi(
+                    proyectoSeleccionadoId,
+                    {
+                      numeroRfi: formNuevoRfi.numeroRfi.trim(),
+                      asunto: formNuevoRfi.asunto.trim(),
+                      disciplina: formNuevoRfi.disciplina,
+                      documentoBimId: formNuevoRfi.documentoBimId ? Number(formNuevoRfi.documentoBimId) : undefined,
+                      preguntaConsulta: formNuevoRfi.preguntaConsulta.trim(),
+                      propuestaSolucion: formNuevoRfi.propuestaSolucion.trim() || undefined,
+                      solicitante: formNuevoRfi.solicitante.trim(),
+                      fechaLimite: formNuevoRfi.fechaLimite || undefined
+                    },
+                    idemKey
+                  );
+                  notificarExito(`RFI ${formNuevoRfi.numeroRfi} emitido a los proyectistas.`);
+                  setModalRfiAbierto(false);
+                  recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                } catch (err: any) {
+                  setErrorGlobal(err.message);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Número RFI *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. RFI-EST-001"
+                    value={formNuevoRfi.numeroRfi}
+                    onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, numeroRfi: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Disciplina *</label>
+                  <select
+                    value={formNuevoRfi.disciplina}
+                    onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, disciplina: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  >
+                    <option value="ESTRUCTURAS">Estructuras</option>
+                    <option value="ARQUITECTURA">Arquitectura</option>
+                    <option value="MEP">MEP (Sanitarias / Eléctricas)</option>
+                    <option value="GENERAL">General</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Asunto de la Consulta *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Interferencia de tubería sanitaria en viga de carga Eje 4"
+                  value={formNuevoRfi.asunto}
+                  onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, asunto: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Pregunta / Consulta Técnica *</label>
+                <textarea
+                  rows={2}
+                  required
+                  placeholder="Describa con precisión la discrepancia o duda de plano..."
+                  value={formNuevoRfi.preguntaConsulta}
+                  onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, preguntaConsulta: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Solicitante (Ing. Residente) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Ing. Juan Pérez"
+                    value={formNuevoRfi.solicitante}
+                    onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, solicitante: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Fecha Límite Requerida</label>
+                  <input
+                    type="date"
+                    value={formNuevoRfi.fechaLimite}
+                    onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, fechaLimite: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalRfiAbierto(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold"
+                >
+                  Emitir RFI
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: RESPONDER RFI */}
+      {modalResponderRfiTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="font-bold text-base text-white">Responder RFI: {modalResponderRfiTarget.numeroRfi}</h3>
+              <button onClick={() => setModalResponderRfiTarget(null)} className="text-slate-400 hover:text-white p-1">
+                <IconClose size={18} />
+              </button>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setErrorGlobal(null);
+                try {
+                  await responderRfiConstruccionApi(
+                    modalResponderRfiTarget.id!,
+                    formRespuestaRfi.respuestaOficial.trim(),
+                    formRespuestaRfi.responsableRespuesta.trim(),
+                    formRespuestaRfi.estado
+                  );
+                  notificarExito(`Respuesta técnica emitida para ${modalResponderRfiTarget.numeroRfi}.`);
+                  setModalResponderRfiTarget(null);
+                  if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                } catch (err: any) {
+                  setErrorGlobal(err.message);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <span className="text-slate-400 text-[11px] block font-semibold">Consulta planteada:</span>
+                <p className="text-slate-200 mt-1">{modalResponderRfiTarget.preguntaConsulta}</p>
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Respuesta Oficial del Proyectista *</label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Detallar solución estructural aprobada o remitir a plano aclaratorio..."
+                  value={formRespuestaRfi.respuestaOficial}
+                  onChange={(e) => setFormRespuestaRfi({ ...formRespuestaRfi, respuestaOficial: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Profesional Responsable *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Ing. Proyectista Estructural"
+                  value={formRespuestaRfi.responsableRespuesta}
+                  onChange={(e) => setFormRespuestaRfi({ ...formRespuestaRfi, responsableRespuesta: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Estado de la Consulta</label>
+                <select
+                  value={formRespuestaRfi.estado}
+                  onChange={(e) => setFormRespuestaRfi({ ...formRespuestaRfi, estado: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="RESPONDIDO">Respondido (Conforme para ejecutar)</option>
+                  <option value="CERRADO">Cerrado Definitivo</option>
+                  <option value="EN_EVALUACION">En Evaluación Adicional</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalResponderRfiTarget(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold"
+                >
+                  Emitir Respuesta
                 </button>
               </div>
             </form>
