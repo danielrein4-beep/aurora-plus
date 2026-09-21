@@ -31,6 +31,8 @@ import {
   listarComprasRepuesto,
   registrarCompraRepuesto,
   importarRepuestosLote,
+  obtenerUtilidadRepuestos,
+  type UtilidadPeriodoRepuesto,
   extraerFacturaOcr,
   listarMovimientos, registrarMovimiento,
   abrirTurno,
@@ -466,6 +468,10 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
   // Tabs de Navegación
   const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "gastos" | "cierre" | "auditoria">("general");
+  // Dentro de "Cierres & Reportes": arqueo de caja (todos) vs. utilidad real por
+  // producto (solo Dueño/Administrador — mismo criterio que el backend, ver
+  // ReporteRepuestoController.exigirRol).
+  const [subCierre, setSubCierre] = useState<"caja" | "utilidad">("caja");
   // El sidebar de w-64 fijo aplastaba todo el contenido en pantallas angostas
   // (celular) — no había forma de navegar sin hacer scroll horizontal. En
   // móvil ahora vive fuera de flujo (fixed) y entra/sale con un botón
@@ -1470,6 +1476,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     {esComercio && <th className="p-3 text-right">Último Costo</th>}
                     <th className="p-3 text-right">Precio USD</th>
                     <th className="p-3 text-right">Precio Bs</th>
+                    {esComercio && <th className="p-3 text-right">Margen</th>}
                     {esComercio && <th className="p-3 text-center">Gestión</th>}
                   </tr>
                 </thead>
@@ -1502,6 +1509,26 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       )}
                       <td className="p-3 text-right font-bold text-slate-900 dark:text-white">${p.precio.toFixed(2)}</td>
                       <td className="p-3 text-right text-slate-600 dark:text-slate-300">Bs. {(p.precio * tasaActivaBs).toFixed(2)}</td>
+                      {esComercio && (
+                        <td className="p-3 text-right">
+                          {p.costo > 0 ? (() => {
+                            const margenUnit = p.precio - p.costo;
+                            const margenPct = (margenUnit / p.costo) * 100;
+                            const color = margenPct < 0
+                              ? "text-rose-400"
+                              : margenPct < 15
+                                ? "text-amber-400"
+                                : "text-emerald-400";
+                            return (
+                              <span className={`font-bold ${color}`} title={`+$${margenUnit.toFixed(2)} por unidad sobre el último costo`}>
+                                {margenPct >= 0 ? "+" : ""}{margenPct.toFixed(1)}%
+                              </span>
+                            );
+                          })() : (
+                            <span className="text-slate-400 dark:text-slate-600" title="Sin costo registrado todavía — registra una compra para calcular el margen">—</span>
+                          )}
+                        </td>
+                      )}
                       {esComercio && (
                         <td className="p-3 text-center space-x-1.5 whitespace-nowrap">
                           <button
@@ -1817,7 +1844,34 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             (mismo motor /api/financiero/turnos que usa Aurora Horeca)
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "cierre" && user?.tenantId && (
-          <TurnoCajaComercio tenantId={user.tenantId} tasaUsdVes={tasaActivaBs} tasaUsdCop={tasaCop} />
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+            <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/60 w-fit">
+              <button
+                onClick={() => setSubCierre("caja")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  subCierre === "caja" ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                Arqueo de Caja
+              </button>
+              {user?.rol === "DUENO_ADMIN" && (
+                <button
+                  onClick={() => setSubCierre("utilidad")}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    subCierre === "utilidad" ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400"
+                  }`}
+                >
+                  Utilidad Real
+                </button>
+              )}
+            </div>
+
+            {subCierre === "caja" ? (
+              <TurnoCajaComercio tenantId={user.tenantId} tasaUsdVes={tasaActivaBs} tasaUsdCop={tasaCop} />
+            ) : (
+              <UtilidadComercio />
+            )}
+          </div>
         )}
 
         {tab === "pedidos_web" && user?.tenantId && (
@@ -3248,6 +3302,190 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
             </table>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMPONENTE: UTILIDAD REAL POR PRODUCTO (COMERCIO) — no es lo mismo que
+// ventas: ventas es el ingreso bruto (lo que ya muestra Arqueo de Caja),
+// utilidad es lo que queda después de restar el costo real de cada línea
+// vendida. Se calcula solo sobre ventas con costo conocido al momento de
+// venderse (ver RepuestosReporteService) — si falta cobertura, se avisa en
+// vez de inventar un número.
+// ══════════════════════════════════════════════════════════════════════════
+function UtilidadComercio() {
+  type Preset = "hoy" | "semana" | "mes" | "personalizado";
+
+  const hoyISO = () => new Date().toISOString().slice(0, 10);
+  const rangoPreset = (p: Preset): { desde: string; hasta: string } => {
+    const hoy = new Date();
+    const hasta = hoyISO();
+    if (p === "hoy") return { desde: hasta, hasta };
+    if (p === "semana") {
+      const d = new Date(hoy);
+      d.setDate(d.getDate() - 6);
+      return { desde: d.toISOString().slice(0, 10), hasta };
+    }
+    if (p === "mes") {
+      const d = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      return { desde: d.toISOString().slice(0, 10), hasta };
+    }
+    return { desde: hasta, hasta };
+  };
+
+  const [preset, setPreset] = useState<Preset>("semana");
+  const [rango, setRango] = useState(() => rangoPreset("semana"));
+  const [datos, setDatos] = useState<UtilidadPeriodoRepuesto | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const cargar = (r: { desde: string; hasta: string }) => {
+    setCargando(true);
+    setError(null);
+    obtenerUtilidadRepuestos(r.desde, r.hasta)
+      .then(setDatos)
+      .catch((err) => setError(err instanceof Error ? err.message : "No se pudo calcular la utilidad."))
+      .finally(() => setCargando(false));
+  };
+
+  useEffect(() => { cargar(rango); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const aplicarPreset = (p: Preset) => {
+    setPreset(p);
+    if (p === "personalizado") return; // espera a que el usuario ajuste las fechas y presione Aplicar
+    const r = rangoPreset(p);
+    setRango(r);
+    cargar(r);
+  };
+
+  const fmt = (n: number, moneda = datos?.moneda || "USD") =>
+    `${moneda === "USD" ? "$" : moneda + " "}${n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  return (
+    <div className="max-w-4xl mx-auto w-full space-y-5">
+      {/* Selector de período */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-slate-800 text-xs w-fit">
+          {([["hoy", "Hoy"], ["semana", "7 días"], ["mes", "Este mes"], ["personalizado", "Personalizado"]] as [Preset, string][]).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => aplicarPreset(id)}
+              className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
+                preset === id ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-300 shadow-sm" : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {preset === "personalizado" && (
+          <div className="flex items-center gap-2 text-xs">
+            <input type="date" value={rango.desde} max={rango.hasta}
+              onChange={(e) => setRango((r) => ({ ...r, desde: e.target.value }))}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white" />
+            <span className="text-slate-400">a</span>
+            <input type="date" value={rango.hasta} min={rango.desde} max={hoyISO()}
+              onChange={(e) => setRango((r) => ({ ...r, hasta: e.target.value }))}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white" />
+            <button onClick={() => cargar(rango)} className="px-3 py-1.5 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold cursor-pointer">
+              Aplicar
+            </button>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs font-semibold">
+          {error}
+        </div>
+      )}
+
+      {cargando && !error && (
+        <div className="text-center py-16 text-slate-400 text-sm">Calculando utilidad…</div>
+      )}
+
+      {!cargando && !error && datos && (
+        <>
+          {/* Tarjetas resumen */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ventas del período</div>
+              <div className="text-lg font-black text-slate-900 dark:text-white font-mono">{fmt(datos.ventasBrutas)}</div>
+            </div>
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Costo de ventas</div>
+              <div className="text-lg font-black text-slate-600 dark:text-slate-300 font-mono">{fmt(datos.costoVentas)}</div>
+            </div>
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
+              <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Utilidad real</div>
+              <div className="text-lg font-black text-emerald-600 dark:text-emerald-400 font-mono">{fmt(datos.utilidad)}</div>
+              {datos.margenPct !== null && (
+                <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/70 mt-0.5">{datos.margenPct.toFixed(1)}% de margen</div>
+              )}
+            </div>
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cobertura de costos</div>
+              <div className={`text-lg font-black font-mono ${datos.coberturaPct >= 90 ? "text-slate-900 dark:text-white" : "text-amber-500"}`}>
+                {datos.coberturaPct.toFixed(0)}%
+              </div>
+              {datos.coberturaPct < 100 && (
+                <div className="text-[10px] text-amber-600 dark:text-amber-400/80 mt-0.5">
+                  {datos.coberturaPct === 0 ? "Sin costo conocido en este período" : "Parte de las ventas no tiene costo registrado"}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Desglose por producto */}
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-white uppercase tracking-wider">Utilidad por producto</h4>
+            </div>
+            {datos.productos.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-sm">No hubo ventas en este período.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="p-3">Código</th>
+                      <th className="p-3">Producto</th>
+                      <th className="p-3 text-right">Cant. vendida</th>
+                      <th className="p-3 text-right">Ventas</th>
+                      <th className="p-3 text-right">Utilidad</th>
+                      <th className="p-3 text-right">Margen</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-mono">
+                    {datos.productos.map((p) => (
+                      <tr key={p.repuestoId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <td className="p-3 text-slate-500 dark:text-slate-400">{p.codigoSku}</td>
+                        <td className="p-3 font-sans font-semibold text-slate-900 dark:text-white">{p.descripcion}</td>
+                        <td className="p-3 text-right text-slate-600 dark:text-slate-300">{p.cantidadVendida}</td>
+                        <td className="p-3 text-right text-slate-700 dark:text-slate-200">{fmt(p.ventasBrutas, datos.moneda)}</td>
+                        <td className={`p-3 text-right font-bold ${p.margenPct === null ? "text-slate-400" : "text-emerald-500"}`}>
+                          {p.margenPct === null ? "—" : fmt(p.utilidad, datos.moneda)}
+                        </td>
+                        <td className="p-3 text-right">
+                          {p.margenPct === null ? (
+                            <span className="text-slate-400 dark:text-slate-600" title="Ninguna venta de este producto en el período tiene costo conocido">Sin costo</span>
+                          ) : (
+                            <span className={`font-bold ${p.margenPct < 0 ? "text-rose-400" : p.margenPct < 15 ? "text-amber-400" : "text-emerald-500"}`}>
+                              {p.margenPct >= 0 ? "+" : ""}{p.margenPct.toFixed(1)}%
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

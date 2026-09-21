@@ -3338,6 +3338,35 @@ export function importarRepuestosLote(tenantId: number, items: ItemImportacionRe
   return request(`/api/repuestos/items/importar-lote?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(items) });
 }
 
+// Utilidad real por producto (no ventas brutas) — solo calculada sobre líneas con costo
+// conocido al momento de la venta, ver RepuestosReporteService. Distinto del Margen Bruto
+// consolidado de Aurora Finanzas: este desglosa por producto.
+export interface ResumenUtilidadProductoRepuesto {
+  repuestoId: number;
+  codigoSku: string;
+  descripcion: string;
+  cantidadVendida: number;
+  ventasBrutas: number;
+  ventasConCostoConocido: number;
+  costoVentas: number;
+  utilidad: number;
+  margenPct: number | null;
+}
+
+export interface UtilidadPeriodoRepuesto {
+  ventasBrutas: number;
+  costoVentas: number;
+  utilidad: number;
+  margenPct: number | null;
+  coberturaPct: number;
+  moneda: string;
+  productos: ResumenUtilidadProductoRepuesto[];
+}
+
+export function obtenerUtilidadRepuestos(desde: string, hasta: string): Promise<UtilidadPeriodoRepuesto> {
+  return request(`/api/repuestos/reportes/utilidad?desde=${desde}&hasta=${hasta}`);
+}
+
 // ─────────────────────────────────────────────────────────────
 // --- Módulo Ganadería & Fincas ---
 // ─────────────────────────────────────────────────────────────

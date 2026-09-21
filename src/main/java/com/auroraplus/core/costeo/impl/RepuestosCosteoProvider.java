@@ -14,9 +14,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * Consolida las ventas reales del kardex especializado de Repuestos. El movimiento
- * todavía no congela el costo unitario histórico; por eso reporta ventas, pero deja
- * costo y cobertura en cero en vez de usar el costo actual del catálogo.
+ * Consolida las ventas reales del kardex especializado de Repuestos. Desde V56, cada
+ * venta congela el costo unitario del repuesto en ese momento (movimiento.costoUnitario);
+ * las ventas sin ese dato (históricas previas a V56, o repuestos sin ninguna compra
+ * registrada todavía) se cuentan en ventasBrutas pero quedan fuera de
+ * ventasConCostoConocido, para que la cobertura refleje qué tan confiable es el margen.
  */
 @Component
 public class RepuestosCosteoProvider implements CosteoProvider {
@@ -37,20 +39,30 @@ public class RepuestosCosteoProvider implements CosteoProvider {
         LocalDateTime desdeInicio = desde.atStartOfDay();
         LocalDateTime hastaFin = hasta.plusDays(1).atStartOfDay();
 
-        BigDecimal ventasBrutas = movimientoRepuestoRepository
+        var ventas = movimientoRepuestoRepository
             .findByTenantIdAndTipoAndFechaRegistroGreaterThanEqualAndFechaRegistroLessThan(
-                tenantId, MovimientoRepuesto.TipoMovimiento.VENTA, desdeInicio, hastaFin)
-            .stream()
-            .map(MovimientoRepuesto::getTotal)
-            .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add)
-            .setScale(2, RoundingMode.HALF_UP);
+                tenantId, MovimientoRepuesto.TipoMovimiento.VENTA, desdeInicio, hastaFin);
+
+        BigDecimal ventasBrutas = BigDecimal.ZERO;
+        BigDecimal costoVentas = BigDecimal.ZERO;
+        BigDecimal ventasConCostoConocido = BigDecimal.ZERO;
+
+        for (MovimientoRepuesto m : ventas) {
+            BigDecimal total = m.getTotal();
+            if (total == null) continue;
+            ventasBrutas = ventasBrutas.add(total);
+
+            if (m.getCostoUnitario() != null && m.getCantidad() != null) {
+                costoVentas = costoVentas.add(m.getCostoUnitario().multiply(m.getCantidad()));
+                ventasConCostoConocido = ventasConCostoConocido.add(total);
+            }
+        }
 
         return new ResumenVentasCostos(
-            ventasBrutas,
+            ventasBrutas.setScale(2, RoundingMode.HALF_UP),
+            costoVentas.setScale(2, RoundingMode.HALF_UP),
             BigDecimal.ZERO.setScale(2),
-            BigDecimal.ZERO.setScale(2),
-            BigDecimal.ZERO.setScale(2),
+            ventasConCostoConocido.setScale(2, RoundingMode.HALF_UP),
             motorFinancieroService.obtenerMonedaBase(tenantId)
         );
     }

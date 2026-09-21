@@ -20,6 +20,16 @@ public interface MovimientoRepuestoRepository extends JpaRepository<MovimientoRe
     List<MovimientoRepuesto> findByTenantIdAndTipoAndFechaRegistroGreaterThanEqualAndFechaRegistroLessThan(
         Long tenantId, MovimientoRepuesto.TipoMovimiento tipo, LocalDateTime desde, LocalDateTime hastaExclusivo);
 
+    // Igual que el anterior pero con JOIN FETCH del repuesto — lo necesita el reporte de
+    // utilidad por producto (RepuestosReporteService), que sí necesita código/descripción
+    // de cada línea; sin el FETCH, "repuesto" llega null (mismo motivo de arriba).
+    @Query("SELECT m FROM MovimientoRepuesto m JOIN FETCH m.repuesto "
+        + "WHERE m.tenantId = :tenantId AND m.tipo = :tipo "
+        + "AND m.fechaRegistro >= :desde AND m.fechaRegistro < :hastaExclusivo")
+    List<MovimientoRepuesto> findConRepuestoByTenantIdAndTipoAndFecha(
+        @Param("tenantId") Long tenantId, @Param("tipo") MovimientoRepuesto.TipoMovimiento tipo,
+        @Param("desde") LocalDateTime desde, @Param("hastaExclusivo") LocalDateTime hastaExclusivo);
+
     /** Proyección agregada por cliente para la Regla ABC (ver ClasificacionClientesJob). */
     interface ResumenComprasCliente {
         Long getTenantId();

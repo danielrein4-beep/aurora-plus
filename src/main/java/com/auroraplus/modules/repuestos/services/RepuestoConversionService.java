@@ -80,6 +80,13 @@ public class RepuestoConversionService {
         movimiento.setMotivo(motivo);
         movimiento.setClienteId(clienteId);
         movimiento.setTotal(total);
+        // costoUnitario por defecto es ZERO (nunca null) en RepuestoItem — un repuesto
+        // sin ninguna compra registrada todavía no tiene costo real conocido, así que
+        // se guarda null (no 0) para que el reporte de costos lo trate como "sin dato"
+        // en vez de inflar el margen a 100% con un costo falso de $0.
+        BigDecimal costoConocido = repuesto.getCostoUnitario();
+        movimiento.setCostoUnitario(
+            costoConocido != null && costoConocido.compareTo(BigDecimal.ZERO) > 0 ? costoConocido : null);
         return movimientoRepuestoRepository.save(movimiento);
     }
 

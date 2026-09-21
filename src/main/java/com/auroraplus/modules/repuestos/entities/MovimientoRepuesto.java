@@ -55,6 +55,14 @@ public class MovimientoRepuesto {
     @Column(precision = 18, scale = 2)
     private BigDecimal total;
 
+    // Costo unitario del repuesto congelado al momento de ESTA venta (ver V56) — no el
+    // costo actual del catálogo, que puede haber cambiado desde entonces. Null en
+    // movimientos de COMPRA/AJUSTE y en ventas históricas previas a V56; el reporte de
+    // costos (RepuestosCosteoProvider) excluye esas filas de "ventasConCostoConocido"
+    // en vez de asumir el costo de hoy — evita inventar un margen falso.
+    @Column(name = "costo_unitario", precision = 18, scale = 4)
+    private BigDecimal costoUnitario;
+
     public enum TipoMovimiento { COMPRA, VENTA, AJUSTE }
 
     public Long getId() { return id; }
@@ -79,4 +87,6 @@ public class MovimientoRepuesto {
     public void setClienteId(Long clienteId) { this.clienteId = clienteId; }
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }
+    public BigDecimal getCostoUnitario() { return costoUnitario; }
+    public void setCostoUnitario(BigDecimal costoUnitario) { this.costoUnitario = costoUnitario; }
 }
