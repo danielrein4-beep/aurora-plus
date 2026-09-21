@@ -46,6 +46,125 @@
   50% { background-position: 120% 120%; opacity: 1; }
 }
 
+/* Botones "vidrio" con reflejo especular — reemplazan los bg-sky-600 planos
+   en paneles internos (ej. Mediclinic Secretaría) por algo más sobrio, con
+   el mismo lenguaje de destello que ya usa el sidebar. */
+.btn-glass-dark,
+.btn-glass-light {
+  position: relative;
+  overflow: hidden;
+}
+.btn-glass-dark::before,
+.btn-glass-light::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  background-size: 220% 220%;
+  background-position: -120% -120%;
+  transition: background-position 650ms ease, opacity 650ms ease;
+}
+.btn-glass-dark:hover::before,
+.btn-glass-light:hover::before {
+  opacity: 1;
+  background-position: 120% 120%;
+}
+.btn-glass-dark {
+  background-color: rgba(15, 23, 42, 0.08) !important;
+  color: #1E293B !important;
+  border: 1px solid rgba(15, 23, 42, 0.14) !important;
+  transition: background-color 200ms ease, transform 150ms ease !important;
+}
+.btn-glass-dark:hover {
+  background-color: rgba(15, 23, 42, 0.14) !important;
+}
+.btn-glass-dark::before {
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.55) 50%, transparent 60%);
+}
+.btn-glass-light {
+  background-color: #F1F5F9 !important;
+  color: #334155 !important;
+  border: 1px solid #E2E8F0 !important;
+  transition: background-color 200ms ease, transform 150ms ease !important;
+}
+.btn-glass-light:hover {
+  background-color: #E2E8F0 !important;
+}
+.btn-glass-light::before {
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.8) 50%, transparent 60%);
+}
+
+/* Mismo tratamiento "poca opacidad" que btn-glass-dark/light, pero para los
+   botones sólidos azul/turquesa que ya existen regados por toda la vertical
+   de Mediclinic (bg-sky-600, bg-teal-600, btn-electric-blue) — sin tocar
+   cada botón uno por uno, se ataja por scope dentro de .mediclinic-shell. */
+.mediclinic-shell .bg-sky-600 {
+  background-color: rgba(2, 132, 199, 0.10) !important;
+  color: #0369a1 !important;
+  border: 1px solid rgba(2, 132, 199, 0.22) !important;
+  box-shadow: none !important;
+}
+.mediclinic-shell .hover\:bg-sky-500:hover {
+  background-color: rgba(2, 132, 199, 0.16) !important;
+}
+.mediclinic-shell .bg-teal-600 {
+  background-color: rgba(23, 126, 137, 0.10) !important;
+  color: #115960 !important;
+  border: 1px solid rgba(23, 126, 137, 0.24) !important;
+  box-shadow: none !important;
+}
+.mediclinic-shell .hover\:bg-teal-500:hover {
+  background-color: rgba(23, 126, 137, 0.16) !important;
+}
+.mediclinic-shell .bg-emerald-600 {
+  background-color: rgba(5, 150, 105, 0.10) !important;
+  color: #047857 !important;
+  border: 1px solid rgba(5, 150, 105, 0.22) !important;
+  box-shadow: none !important;
+}
+.mediclinic-shell .hover\:bg-emerald-500:hover {
+  background-color: rgba(5, 150, 105, 0.16) !important;
+}
+.mediclinic-shell .btn-electric-blue {
+  background-color: rgba(23, 126, 137, 0.10) !important;
+  color: #115960 !important;
+  border: 1px solid rgba(23, 126, 137, 0.24) !important;
+  box-shadow: none !important;
+}
+.mediclinic-shell .btn-electric-blue:hover {
+  background-color: rgba(23, 126, 137, 0.16) !important;
+}
+
+/* La "ficha" (form de Nueva Consulta, y cualquier tarjeta que lo pida) se
+   perdía contra el fondo blanco de la página — .apple-glass es blanco puro
+   con una sombra casi imperceptible. Esta clase, combinada con apple-glass,
+   le da un tono ligeramente gris y una sombra real para que se note el
+   desnivel respecto al fondo. */
+.mediclinic-card-deep.apple-glass {
+  background-color: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
+  box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.14), 0 2px 8px -2px rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Botón "negro profundo" — para los últimos botones sólidos azul marino
+   (#0B3D91) que quedaban regados por Nav/Home: no es un gris casi invisible
+   como btn-glass-dark, sino un negro real con apenas un toque de
+   transparencia (no 100% opaco) para que se sienta con profundidad/vidrio,
+   letras blancas siempre legibles. */
+.btn-deep-black {
+  background-color: rgba(15, 23, 42, 0.92) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18) !important;
+  transition: background-color 200ms ease, transform 150ms ease !important;
+}
+.btn-deep-black:hover {
+  background-color: rgba(15, 23, 42, 0.98) !important;
+  transform: translateY(-1px);
+}
+
 /* ==========================================================================
    AURORA PLUS — PALETA INSTITUCIONAL (arquitectura de tokens, no por archivo)
    Directiva: erradicar el turquesa/cian "neón" heredado (#00FFC2, #00C9A7,

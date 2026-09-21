@@ -287,7 +287,7 @@ function SelectorPerfilesNetflix({
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 dark:bg-[#051322] dark:text-white flex flex-col justify-between p-6 sm:p-10 relative overflow-hidden select-none transition-colors duration-300">
       {/* Luces de fondo ambient */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-teal-500/10 dark:bg-[#177E89]/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-sky-500/10 dark:bg-[#0B3D91]/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-sky-500/10 dark:bg-[#0D3B3D]/30 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header Superior */}
       <div className="flex items-center justify-between w-full max-w-6xl mx-auto z-10">
@@ -1102,7 +1102,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   }
 
   return (
-    <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "mediclinic-clasico" : ""}`}>
+    <div className={`mediclinic-shell min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex ${modoClasico ? "mediclinic-clasico" : ""}`}>
       <AuroraGradientDef />
       {modoClasico && <EstiloClasico />}
       
@@ -1206,58 +1206,58 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-y-auto">
-        <header className="py-3.5 px-6 border-b border-slate-300/60 dark:border-white/10 flex flex-wrap items-center justify-between gap-4 bg-white/40 dark:bg-black/15 backdrop-blur-md">
-          <div className="flex items-center gap-3 sm:gap-4">
+        <header className="py-2.5 px-5 border-b border-slate-300/60 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 bg-white/40 dark:bg-black/15 backdrop-blur-md">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <button
               onClick={cerrarSesionPerfil}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border border-slate-300/60 dark:border-white/10"
+              className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border border-slate-300/60 dark:border-white/10"
               title="Cambiar usuario / Cerrar turno"
             >
-              <IconLock size={13} />
+              <IconLock size={12} />
               <span>Cambiar Perfil</span>
             </button>
 
             <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                                <h1 className="font-['Outfit'] font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
+              <div className="flex items-center gap-2 flex-wrap">
+                                <h1 className="font-['Outfit'] font-bold text-sm sm:text-base text-slate-900 dark:text-white tracking-tight">
                   {rolActivo === "MEDICO" ? `¡Bienvenido ${configPerfil.doctorNombre}!` : (esOdontologia ? "¡Bienvenida Recepción / Asistente!" : "¡Bienvenida Secretaría Clínica!")}
                 </h1>
-                <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-extrabold uppercase tracking-wider ${
+                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
                   rolActivo === "MEDICO"
                     ? (esOdontologia ? "bg-emerald-100 dark:bg-emerald-950/80 border-emerald-300/50 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "bg-teal-100 dark:bg-teal-950/80 border-teal-300/50 dark:border-teal-500/30 text-teal-700 dark:text-teal-300")
-                    : "bg-sky-100 dark:bg-sky-950/80 border-sky-300/50 dark:border-sky-500/30 text-sky-700 dark:text-sky-300"
+                    : "bg-slate-100 dark:bg-white/10 border-slate-300/50 dark:border-white/15 text-slate-600 dark:text-white/70"
                 }`}>
                   {rolActivo === "MEDICO" ? (esOdontologia ? "ODONTÓLOGO TITULAR" : "MÉDICO TITULAR") : (esOdontologia ? "RECEPCIÓN DENTAL" : "SECRETARÍA CLÍNICA")}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-white/50 font-medium mt-0.5">
+              <p className="text-[11px] text-slate-500 dark:text-white/50 font-medium mt-0.5">
                 {rolActivo === "MEDICO"
                   ? `${(esOdontologia && (!configPerfil.especialidad || configPerfil.especialidad.includes("Medicina"))) ? "Odontología General / Especialista" : configPerfil.especialidad} ${configPerfil.matriculaMPPS ? `| MPPS-${configPerfil.matriculaMPPS}` : ""} ${configPerfil.colegioMedicos ? `| ${esOdontologia ? "Colegio Odontólogos" : "Col. Médicos"} ${configPerfil.colegioMedicos}` : ""}`
                   : (esOdontologia ? "Control de Sala de Espera, Presupuestos & Citas Odontológicas" : "Control de Sala de Espera, Facturación & Agendamiento")}
               </p></div>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
             {perfilActivo === "MEDICO" && (
-              <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-xs">
+              <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-[11px]">
                                   <button
                     onClick={() => intentarCambiarRol("MEDICO")}
-                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                       rolActivo === "MEDICO" ? (esOdontologia ? "bg-emerald-600 text-white shadow-xs" : "bg-teal-600 text-white shadow-xs") : "text-slate-600 dark:text-white/60"
                     }`}
                     title={esOdontologia ? "Cambiar a vista de Odontólogo Titular" : "Cambiar a vista de Médico Titular"}
                   >
-                    {esOdontologia ? <IconTooth size={13} /> : <IconStethoscope size={13} />}
+                    {esOdontologia ? <IconTooth size={12} /> : <IconStethoscope size={12} />}
                     <span>{esOdontologia ? "Odontólogo" : "Médico"}</span>
                   </button>
                   <button
                     onClick={() => intentarCambiarRol("SECRETARIA")}
-                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                       rolActivo === "SECRETARIA" ? (esOdontologia ? "bg-emerald-600 text-white shadow-xs" : "bg-teal-600 text-white shadow-xs") : "text-slate-600 dark:text-white/60"
                     }`}
                     title={esOdontologia ? "Supervisar vista de Recepción y Asistencia" : "Supervisar vista de Secretaría y Sala de Espera"}
                   >
-                    <IconFileText size={13} />
+                    <IconFileText size={12} />
                     <span>{esOdontologia ? "Recepción" : "Secretaria"}</span>
                   </button></div>
             )}
@@ -1274,25 +1274,25 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
               </button>
             )}
 
-            <div className={`flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border shadow-sm text-xs ${
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border shadow-sm text-[11px] ${
               tasaBcv ? "bg-white/70 dark:bg-white/5 border-slate-300/60 dark:border-white/15" : "bg-amber-500/10 border-amber-500/30"
             }`}>
               <span className="font-bold text-slate-700 dark:text-white/80 flex items-center gap-1.5">
-                <IconBank size={14} className="text-teal-600 dark:text-teal-400" />
+                <IconBank size={13} className="text-teal-600 dark:text-teal-400" />
                 <span>Tasas del Día:</span>
               </span>
               <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                 VES: {tasaBcv ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa"}
               </span>
               <span className="text-slate-300 dark:text-white/20">|</span>
-              <span className="font-mono font-bold text-sky-600 dark:text-sky-400">
+              <span className="font-mono font-bold text-slate-600 dark:text-white/70">
                 COP: {tasaCopReal ? `$${Number(tasaCopReal.tasa).toLocaleString()}` : "Sin tasa"}
               </span>
 
               <button
                 type="button"
                 onClick={abrirModalTasas}
-                className="ml-1 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-teal-500 hover:text-white dark:bg-white/10 dark:hover:bg-teal-500 text-slate-700 dark:text-white/80 text-[11px] font-bold border border-slate-300/60 dark:border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                className="ml-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-teal-500 hover:text-white dark:bg-white/10 dark:hover:bg-teal-500 text-slate-700 dark:text-white/80 text-[10px] font-bold border border-slate-300/60 dark:border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                 title="Cambiar tasas de cambio manualmente"
               >
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1313,8 +1313,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 <span>Inbox: {inboxLabPendientes} {inboxLabPendientes === 1 ? "examen" : "exámenes"}</span>
               </button>
             )}
-            <button onClick={recargarTodo} className="p-2 rounded-xl border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
-              <IconRefresh size={16} />
+            <button onClick={recargarTodo} className="p-1.5 rounded-lg border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
+              <IconRefresh size={14} />
             </button>
           </div>
         </header>
@@ -1929,25 +1929,25 @@ function VistaGeneral({
   return (
     <div className="space-y-6">
       {/* ── CARD: MOTOR DE BÚSQUEDA INSTANTÁNEA DE PACIENTES ── */}
-      <div className="apple-glass rounded-2xl p-5 sm:p-6 border border-slate-300/60 dark:border-white/15 shadow-sm space-y-4">
+      <div className="apple-glass rounded-2xl p-4 sm:p-5 border border-slate-300/60 dark:border-white/15 shadow-sm space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white text-base">
-            <IconSearch size={18} />
+          <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white text-sm">
+            <IconSearch size={16} />
             <span>Motor de Búsqueda Instantánea de Pacientes</span>
           </div>
-          <span className="text-[11px] text-slate-500 dark:text-white/60 font-mono bg-slate-100 dark:bg-white/5 px-2.5 py-1 rounded-full border border-slate-200 dark:border-white/10">
+          <span className="text-[10px] text-slate-500 dark:text-white/60 font-mono bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full border border-slate-200 dark:border-white/10">
             Búsqueda por Nombre, Cédula o Historia
           </span>
         </div>
 
-        <form onSubmit={handleBuscar} className="flex flex-col sm:flex-row items-center gap-3">
+        <form onSubmit={handleBuscar} className="flex flex-col sm:flex-row items-center gap-2.5">
           <div className="relative flex-1 w-full">
             <input
               type="text"
               placeholder="Buscar paciente por nombre (ej. Carlos, Niccolle), cédula (ej. 10987654) o historia..."
               value={busquedaRapida}
               onChange={(e) => setBusquedaRapida(e.target.value)}
-              className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-inner"
+              className="w-full pl-3.5 pr-10 py-2 rounded-xl border border-slate-300 dark:border-white/15 bg-white/70 dark:bg-black/20 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/15 shadow-inner"
             />
             {busquedaRapida && (
               <button
@@ -1956,21 +1956,21 @@ function VistaGeneral({
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
                 title="Limpiar"
               >
-                <IconClose size={15} />
+                <IconClose size={14} />
               </button>
             )}
           </div>
           <button
             type="submit"
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            className="btn-glass-dark w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
           >
-            <IconSearch size={15} />
+            <IconSearch size={14} />
             <span>Buscar</span>
           </button>
           <button
             type="button"
             onClick={() => onNavegar("pacientes")}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 border border-slate-300/60 dark:border-white/10 text-slate-700 dark:text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            className="btn-glass-light w-full sm:w-auto px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
           >
             <span>+ Nuevo Paciente</span>
           </button>
@@ -2048,35 +2048,35 @@ function VistaGeneral({
       </div>
 
       {/* ── 4 KPI CARDS CON BORDE LATERAL COLOREADO (EXACTO A LA IMAGEN) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Card 1: EN SALA DE ESPERA (Borde ámbar / amarillo) */}
         <div
           onClick={() => onNavegar("sala-espera")}
-          className="apple-glass rounded-2xl p-4 sm:p-5 border-l-4 border-l-amber-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
+          className="apple-glass rounded-xl p-3.5 sm:p-4 border-l-4 border-l-amber-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
         >
-          <div className="text-[11px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
+          <div className="text-[10px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
             EN SALA DE ESPERA
           </div>
-          <div className="text-3xl font-black text-amber-500 font-['Outfit'] mt-1">
+          <div className="text-2xl font-black text-amber-500 font-['Outfit'] mt-1">
             {String(enEspera)}
           </div>
-          <div className="text-[11px] text-amber-600/80 dark:text-amber-400/80 font-medium mt-1">
+          <div className="text-[10px] text-amber-600/80 dark:text-amber-400/80 font-medium mt-1">
             Turnos activos hoy
           </div>
         </div>
 
-        {/* Card 2: PACIENTES ATENDIDOS HOY (Borde azul / cyan) */}
+        {/* Card 2: PACIENTES ATENDIDOS HOY (Borde teal) */}
         <div
           onClick={() => onNavegar("sala-espera")}
-          className="apple-glass rounded-2xl p-4 sm:p-5 border-l-4 border-l-sky-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
+          className="apple-glass rounded-xl p-3.5 sm:p-4 border-l-4 border-l-teal-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
         >
-          <div className="text-[11px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
+          <div className="text-[10px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
             PACIENTES ATENDIDOS HOY
           </div>
-          <div className="text-3xl font-black text-sky-500 font-['Outfit'] mt-1">
+          <div className="text-2xl font-black text-teal-600 dark:text-teal-400 font-['Outfit'] mt-1">
             {String(atendidosHoy)}
           </div>
-          <div className="text-[11px] text-sky-600/80 dark:text-sky-400/80 font-medium mt-1">
+          <div className="text-[10px] text-teal-600/80 dark:text-teal-400/80 font-medium mt-1">
             Consultas completadas
           </div>
         </div>
@@ -2084,15 +2084,15 @@ function VistaGeneral({
         {/* Card 3: EXPEDIENTES REGISTRADOS (Borde verde / esmeralda) */}
         <div
           onClick={() => onNavegar("pacientes")}
-          className="apple-glass rounded-2xl p-4 sm:p-5 border-l-4 border-l-teal-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
+          className="apple-glass rounded-xl p-3.5 sm:p-4 border-l-4 border-l-emerald-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
         >
-          <div className="text-[11px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
+          <div className="text-[10px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
             EXPEDIENTES REGISTRADOS
           </div>
-          <div className="text-3xl font-black text-teal-600 dark:text-teal-400 font-['Outfit'] mt-1">
+          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-['Outfit'] mt-1">
             {String(totalPacientes)}
           </div>
-          <div className="text-[11px] text-teal-600/80 dark:text-teal-400/80 font-medium mt-1">
+          <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-medium mt-1">
             Pacientes en base de datos
           </div>
         </div>
@@ -2100,56 +2100,56 @@ function VistaGeneral({
         {/* Card 4: PROCEDIMIENTOS SEMANA (Borde morado / índigo) */}
         <div
           onClick={() => onNavegar("procedimientos")}
-          className="apple-glass rounded-2xl p-4 sm:p-5 border-l-4 border-l-purple-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
+          className="apple-glass rounded-xl p-3.5 sm:p-4 border-l-4 border-l-purple-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
         >
-          <div className="text-[11px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
+          <div className="text-[10px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
             PROCEDIMIENTOS SEMANA
           </div>
-          <div className="text-3xl font-black text-purple-600 dark:text-purple-400 font-['Outfit'] mt-1">
+          <div className="text-2xl font-black text-purple-600 dark:text-purple-400 font-['Outfit'] mt-1">
             {String(totalProcedimientos)}
           </div>
-          <div className="text-[11px] text-purple-600/80 dark:text-purple-400/80 font-medium mt-1">
+          <div className="text-[10px] text-purple-600/80 dark:text-purple-400/80 font-medium mt-1">
             Cotizaciones y catálogo
           </div>
         </div>
       </div>
 
       {/* ── CARD: PANEL DE CONTROL MÉDICO (ACCIONES RÁPIDAS) ── */}
-      <div className="apple-glass rounded-2xl p-5 sm:p-6 border border-slate-300/60 dark:border-white/15 shadow-sm space-y-4">
+      <div className="apple-glass rounded-2xl p-4 sm:p-5 border border-slate-300/60 dark:border-white/15 shadow-sm space-y-3">
         <div>
-          <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
+          <h3 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">
             Panel de Control Médico
           </h3>
-          <p className="text-xs text-slate-500 dark:text-white/60 mt-0.5">
+          <p className="text-[11px] text-slate-500 dark:text-white/60 mt-0.5">
             Gestiona expedientes de pacientes locales y foráneos, historias clínicas de consulta, cotizaciones multidivisa y estadísticas clínicas en tiempo real.
           </p>
         </div>
 
-        <div className="pt-3 border-t border-slate-200 dark:border-white/10 flex flex-wrap items-center gap-3">
+        <div className="pt-2.5 border-t border-slate-200 dark:border-white/10 flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             onClick={() => onNavegar("pacientes")}
-            className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer flex items-center gap-2"
+            className="btn-glass-dark px-3.5 py-2 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer flex items-center gap-2"
           >
-            <IconUsers size={16} />
+            <IconUsers size={15} />
             <span>Ver Directorio de Pacientes</span>
           </button>
 
           <button
             type="button"
             onClick={() => onNavegar("historias")}
-            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 border border-slate-300/60 dark:border-white/10 text-slate-700 dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center gap-2"
+            className="btn-glass-light px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-2"
           >
-            <IconFileText size={16} />
+            <IconFileText size={15} />
             <span>Ver Historias Clínicas</span>
           </button>
 
           <button
             type="button"
             onClick={() => onNavegar("procedimientos")}
-            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 border border-slate-300/60 dark:border-white/10 text-slate-700 dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center gap-2"
+            className="btn-glass-light px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-2"
           >
-            <IconPrescription size={16} />
+            <IconPrescription size={15} />
             <span>Cotizaciones y Procedimientos</span>
           </button>
         </div>
@@ -4181,37 +4181,37 @@ function HistoriasClinicas({
                   )}
 
                   {/* Prescripción Médica / Récipe en Estilo Recetario Integrado */}
-                  <div className="bg-slate-900/90 rounded-2xl p-4 border border-teal-500/20 relative space-y-2">
+                  <div className="bg-teal-50 dark:bg-slate-900/90 rounded-2xl p-4 border border-teal-200 dark:border-teal-500/20 relative space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-300 flex items-center gap-1.5">
-                        <span className="font-serif italic font-bold text-sm text-teal-400">Rx</span>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600 dark:text-teal-300 flex items-center gap-1.5">
+                        <span className="font-serif italic font-bold text-sm text-slate-500 dark:text-teal-400">Rx</span>
                         <span>Prescripción Farmacológica / Indicaciones</span>
                       </span>
                     </div>
-                    <pre className="font-mono text-xs text-emerald-200/90 whitespace-pre-wrap bg-black/40 p-3 rounded-xl border border-white/5 leading-relaxed">
+                    <pre className="font-mono text-xs text-slate-700 dark:text-emerald-200/90 whitespace-pre-wrap bg-white/80 dark:bg-black/40 p-3 rounded-xl border border-teal-200/60 dark:border-white/5 leading-relaxed">
                       {consultaSeleccionadaFicha.planTratamiento || "Sin récipe farmacológico especificado en esta consulta."}
                     </pre>
                   </div>
 
                   {/* ── CAMPO ROJO EXCLUSIVO: ANOTACIONES PRIVADAS Y RESERVADAS DEL MÉDICO ── */}
                   {rol === "MEDICO" && (
-                    <div className="rounded-2xl p-4 bg-gradient-to-r from-rose-950/90 via-red-950/80 to-rose-950/90 border-2 border-rose-500/60 shadow-lg space-y-2">
+                    <div className="rounded-2xl p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-500/40 shadow-xs space-y-2">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs font-black text-rose-300 uppercase tracking-wide">
-                          <svg className="w-4 h-4 text-rose-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <div className="flex items-center gap-2 text-xs font-black text-slate-600 dark:text-rose-400 uppercase tracking-wide">
+                          <svg className="w-4 h-4 text-rose-500 dark:text-rose-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                           </svg>
                           <span>ANOTACIONES PRIVADAS Y RESERVADAS DEL MÉDICO / COMENTARIOS</span>
                         </div>
-                        <span className="text-[10px] font-bold text-rose-300/80 bg-rose-900/50 px-2 py-0.5 rounded-full border border-rose-500/40">
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-rose-300/80 bg-white/70 dark:bg-rose-900/50 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-500/40">
                           Solo lectura médica
                         </span>
                       </div>
-                      <p className="text-[11px] text-rose-200/80 font-medium">
+                      <p className="text-[11px] text-slate-500 dark:text-rose-300/80 font-medium">
                         🔒 Este campo es 100% privado y confidencial. No aparece en ningún documento externo.
                       </p>
-                      <div className="p-3.5 rounded-xl bg-black/40 border border-rose-500/30 text-xs text-rose-100 whitespace-pre-wrap leading-relaxed font-sans">
+                      <div className="p-3.5 rounded-xl bg-white/80 dark:bg-black/40 border border-rose-200/60 dark:border-rose-500/30 text-xs text-slate-700 dark:text-rose-100 whitespace-pre-wrap leading-relaxed font-sans">
                         {consultaSeleccionadaFicha.anotacionesPrivadas || "Sin comentarios o anotaciones reservadas para esta consulta."}
                       </div>
                     </div>
@@ -4279,7 +4279,7 @@ function HistoriasClinicas({
             {rol !== "SECRETARIA" && (
               <form
                 onSubmit={handleGuardarSolo}
-                className="apple-glass rounded-3xl p-6 border-2 border-slate-200/90 dark:border-white/10 shadow-sm bg-white dark:bg-[#071a2e]/90 space-y-4"
+                className="apple-glass mediclinic-card-deep rounded-3xl p-6 border-2 border-slate-200/90 dark:border-white/10 shadow-sm bg-white dark:bg-[#071a2e]/90 space-y-4"
               >
                 {/* Header del Formulario de Registro */}
                 <div className="border-b border-slate-200/80 dark:border-white/10 pb-3 flex items-center justify-between">

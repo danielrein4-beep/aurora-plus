@@ -9,7 +9,7 @@ export function AuroraGradientDef() {
         <linearGradient id={GRAD} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%"   stopColor="#177E89" />
           <stop offset="50%"  stopColor="#177E89" />
-          <stop offset="100%" stopColor="#0B3D91" />
+          <stop offset="100%" stopColor="#0D3B3D" />
         </linearGradient>
       </defs>
     </svg>
