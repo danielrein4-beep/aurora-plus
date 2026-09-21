@@ -1206,114 +1206,100 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-y-auto">
-        <header className="py-2.5 px-5 border-b border-slate-300/60 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 bg-white/40 dark:bg-black/15 backdrop-blur-md">
-          <div className="flex items-center gap-2.5 sm:gap-3">
+        <header className="py-3 px-5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 bg-white/70 backdrop-blur-md">
+          <div className="flex items-center gap-3">
             <button
               onClick={cerrarSesionPerfil}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border border-slate-300/60 dark:border-white/10"
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors cursor-pointer flex-shrink-0"
               title="Cambiar usuario / Cerrar turno"
             >
-              <IconLock size={12} />
-              <span>Cambiar Perfil</span>
+              <IconLock size={13} />
             </button>
 
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                                <h1 className="font-['Outfit'] font-bold text-sm sm:text-base text-slate-900 dark:text-white tracking-tight">
+                <h1 className="font-['Outfit'] font-bold text-sm text-slate-900 tracking-tight">
                   {rolActivo === "MEDICO" ? `¡Bienvenido ${configPerfil.doctorNombre}!` : (esOdontologia ? "¡Bienvenida Recepción / Asistente!" : "¡Bienvenida Secretaría Clínica!")}
                 </h1>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
-                  rolActivo === "MEDICO"
-                    ? (esOdontologia ? "bg-emerald-100 dark:bg-emerald-950/80 border-emerald-300/50 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "bg-teal-100 dark:bg-teal-950/80 border-teal-300/50 dark:border-teal-500/30 text-teal-700 dark:text-teal-300")
-                    : "bg-slate-100 dark:bg-white/10 border-slate-300/50 dark:border-white/15 text-slate-600 dark:text-white/70"
-                }`}>
-                  {rolActivo === "MEDICO" ? (esOdontologia ? "ODONTÓLOGO TITULAR" : "MÉDICO TITULAR") : (esOdontologia ? "RECEPCIÓN DENTAL" : "SECRETARÍA CLÍNICA")}
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-teal-700 font-semibold uppercase tracking-wide">
+                  {rolActivo === "MEDICO" ? (esOdontologia ? "Odontólogo Titular" : "Médico Titular") : (esOdontologia ? "Recepción Dental" : "Secretaría Clínica")}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-white/50 font-medium mt-0.5">
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 {rolActivo === "MEDICO"
                   ? `${(esOdontologia && (!configPerfil.especialidad || configPerfil.especialidad.includes("Medicina"))) ? "Odontología General / Especialista" : configPerfil.especialidad} ${configPerfil.matriculaMPPS ? `| MPPS-${configPerfil.matriculaMPPS}` : ""} ${configPerfil.colegioMedicos ? `| ${esOdontologia ? "Colegio Odontólogos" : "Col. Médicos"} ${configPerfil.colegioMedicos}` : ""}`
                   : (esOdontologia ? "Control de Sala de Espera, Presupuestos & Citas Odontológicas" : "Control de Sala de Espera, Facturación & Agendamiento")}
-              </p></div>
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-3">
             {perfilActivo === "MEDICO" && (
-              <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-[11px]">
-                                  <button
-                    onClick={() => intentarCambiarRol("MEDICO")}
-                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      rolActivo === "MEDICO" ? (esOdontologia ? "bg-emerald-600 text-white shadow-xs" : "bg-teal-600 text-white shadow-xs") : "text-slate-600 dark:text-white/60"
-                    }`}
-                    title={esOdontologia ? "Cambiar a vista de Odontólogo Titular" : "Cambiar a vista de Médico Titular"}
-                  >
-                    {esOdontologia ? <IconTooth size={12} /> : <IconStethoscope size={12} />}
-                    <span>{esOdontologia ? "Odontólogo" : "Médico"}</span>
-                  </button>
-                  <button
-                    onClick={() => intentarCambiarRol("SECRETARIA")}
-                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      rolActivo === "SECRETARIA" ? (esOdontologia ? "bg-emerald-600 text-white shadow-xs" : "bg-teal-600 text-white shadow-xs") : "text-slate-600 dark:text-white/60"
-                    }`}
-                    title={esOdontologia ? "Supervisar vista de Recepción y Asistencia" : "Supervisar vista de Secretaría y Sala de Espera"}
-                  >
-                    <IconFileText size={12} />
-                    <span>{esOdontologia ? "Recepción" : "Secretaria"}</span>
-                  </button></div>
+              <div className="flex items-center gap-0.5 p-0.5 rounded-full bg-slate-100 text-[11px]">
+                <button
+                  onClick={() => intentarCambiarRol("MEDICO")}
+                  className={`px-2.5 py-1 rounded-full font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    rolActivo === "MEDICO" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                  title={esOdontologia ? "Cambiar a vista de Odontólogo Titular" : "Cambiar a vista de Médico Titular"}
+                >
+                  {esOdontologia ? <IconTooth size={12} /> : <IconStethoscope size={12} />}
+                  <span>{esOdontologia ? "Odontólogo" : "Médico"}</span>
+                </button>
+                <button
+                  onClick={() => intentarCambiarRol("SECRETARIA")}
+                  className={`px-2.5 py-1 rounded-full font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    rolActivo === "SECRETARIA" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                  title={esOdontologia ? "Supervisar vista de Recepción y Asistencia" : "Supervisar vista de Secretaría y Sala de Espera"}
+                >
+                  <IconFileText size={12} />
+                  <span>{esOdontologia ? "Recepción" : "Secretaria"}</span>
+                </button>
+              </div>
             )}
 
             {inboxLabPendientes > 0 && (
-              <button
-                type="button"
-                onClick={() => intentarNavegar("laboratorio")}
-                className="px-3.5 py-1.5 rounded-2xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-600 dark:text-red-400 text-xs font-black flex items-center gap-1.5 animate-pulse cursor-pointer shadow-xs transition-all"
-                title="Exámenes de laboratorio pendientes de revisión médica"
-              >
-                <span>🔬</span>
-                <span>Inbox: {inboxLabPendientes} {inboxLabPendientes === 1 ? "examen" : "exámenes"}</span>
-              </button>
+              <>
+                <div className="hidden sm:block h-6 w-px bg-slate-200" />
+                <button
+                  type="button"
+                  onClick={() => intentarNavegar("laboratorio")}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer"
+                  title="Exámenes de laboratorio pendientes de revisión médica"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  <span>{inboxLabPendientes} {inboxLabPendientes === 1 ? "examen" : "exámenes"} sin revisar</span>
+                </button>
+              </>
             )}
 
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border shadow-sm text-[11px] ${
-              tasaBcv ? "bg-white/70 dark:bg-white/5 border-slate-300/60 dark:border-white/15" : "bg-amber-500/10 border-amber-500/30"
-            }`}>
-              <span className="font-bold text-slate-700 dark:text-white/80 flex items-center gap-1.5">
-                <IconBank size={13} className="text-teal-600 dark:text-teal-400" />
-                <span>Tasas del Día:</span>
-              </span>
-              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                VES: {tasaBcv ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa"}
-              </span>
-              <span className="text-slate-300 dark:text-white/20">|</span>
-              <span className="font-mono font-bold text-slate-600 dark:text-white/70">
-                COP: {tasaCopReal ? `$${Number(tasaCopReal.tasa).toLocaleString()}` : "Sin tasa"}
-              </span>
+            <div className="hidden sm:block h-6 w-px bg-slate-200" />
 
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] ${
+              tasaBcv ? "bg-slate-50 border-slate-200" : "bg-amber-50 border-amber-200"
+            }`}>
+              <span className="font-semibold text-slate-600">Tasas:</span>
+              <span className="font-mono font-semibold text-slate-800">
+                VES {tasaBcv ? Number(tasaBcv.tasa).toFixed(2) : "—"}
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className="font-mono font-semibold text-slate-800">
+                COP {tasaCopReal ? Number(tasaCopReal.tasa).toLocaleString() : "—"}
+              </span>
               <button
                 type="button"
                 onClick={abrirModalTasas}
-                className="ml-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-teal-500 hover:text-white dark:bg-white/10 dark:hover:bg-teal-500 text-slate-700 dark:text-white/80 text-[10px] font-bold border border-slate-300/60 dark:border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                className="ml-0.5 text-slate-400 hover:text-teal-700 transition-colors cursor-pointer"
                 title="Cambiar tasas de cambio manualmente"
               >
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                 </svg>
-                <span>Actualizar Tasas</span>
               </button>
             </div>
 
-            {inboxLabPendientes > 0 && (
-              <button
-                type="button"
-                onClick={() => intentarNavegar("laboratorio")}
-                className="px-3.5 py-1.5 rounded-2xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-600 dark:text-red-400 text-xs font-black flex items-center gap-1.5 animate-pulse cursor-pointer shadow-xs transition-all"
-                title="Exámenes de laboratorio pendientes de revisión médica"
-              >
-                <span>🔬</span>
-                <span>Inbox: {inboxLabPendientes} {inboxLabPendientes === 1 ? "examen" : "exámenes"}</span>
-              </button>
-            )}
-            <button onClick={recargarTodo} className="p-1.5 rounded-lg border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
+            <button onClick={recargarTodo} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer" title="Actualizar datos">
               <IconRefresh size={14} />
             </button>
           </div>
