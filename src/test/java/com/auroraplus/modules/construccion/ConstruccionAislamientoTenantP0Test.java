@@ -1055,9 +1055,15 @@ public class ConstruccionAislamientoTenantP0Test {
         mant.setMecanicoOTaller("Taller Central Diesel");
         mant.setCostoTotalUsd(new BigDecimal("350.00"));
 
-        ResponseEntity<MantenimientoMaquinariaEntity> respMant = construccionController.registrarMantenimiento(maqId, mant);
+        String ikMantenimiento = "IK-MANT-TEST-001";
+        ResponseEntity<MantenimientoMaquinariaEntity> respMant = construccionController.registrarMantenimiento(maqId, mant, ikMantenimiento);
         assertEquals(HttpStatus.OK, respMant.getStatusCode());
         assertNotNull(respMant.getBody().getId());
+
+        ResponseEntity<MantenimientoMaquinariaEntity> reintentoMant = construccionController.registrarMantenimiento(maqId, mant, ikMantenimiento);
+        assertEquals(HttpStatus.OK, reintentoMant.getStatusCode());
+        assertEquals(respMant.getBody().getId(), reintentoMant.getBody().getId(),
+                "El reintento de mantenimiento no debe crear un segundo registro");
 
         List<MantenimientoMaquinariaEntity> historico = construccionController.listarMantenimientos(maqId);
         assertEquals(1, historico.size());

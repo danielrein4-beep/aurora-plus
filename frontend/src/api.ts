@@ -4916,10 +4916,18 @@ export function listarMantenimientosMaquinariaApi(maquinariaId: number): Promise
   return request(`/api/construccion/maquinarias/${maquinariaId}/mantenimientos`);
 }
 
-export function crearMantenimientoMaquinariaApi(maquinariaId: number, datos: Partial<MantenimientoMaquinariaApi>): Promise<MantenimientoMaquinariaApi> {
+export function crearMantenimientoMaquinariaApi(
+  maquinariaId: number,
+  datos: Partial<MantenimientoMaquinariaApi>,
+  idempotencyKey?: string
+): Promise<MantenimientoMaquinariaApi> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
   return request(`/api/construccion/maquinarias/${maquinariaId}/mantenimientos`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(datos)
   });
 }
