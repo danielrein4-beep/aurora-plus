@@ -5060,11 +5060,11 @@ export function crearRiesgoConstruccionApi(proyectoId: number, datos: Partial<Ri
   });
 }
 
-export function cambiarEstadoRiesgoConstruccionApi(id: number, estado: string, medidasControl?: string): Promise<RiesgoConstruccionApi> {
+export function cambiarEstadoRiesgoConstruccionApi(id: number, estado: string, medidasControl?: string, responsable?: string): Promise<RiesgoConstruccionApi> {
   return request(`/api/construccion/riesgos/${id}/estado`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ estado, medidasControl })
+    body: JSON.stringify({ estado, medidasControl, responsable })
   });
 }
 

@@ -12,4 +12,5 @@ public interface RfiConstruccionRepository extends JpaRepository<RfiConstruccion
     List<RfiConstruccionEntity> findByTenantIdAndProyectoIdOrderByCreatedAtDesc(Long tenantId, Long proyectoId);
     Optional<RfiConstruccionEntity> findByTenantIdAndId(Long tenantId, Long id);
     Optional<RfiConstruccionEntity> findByTenantIdAndProyectoIdAndNumeroRfi(Long tenantId, Long proyectoId, String numeroRfi);
+    long countByTenantIdAndProyectoId(Long tenantId, Long proyectoId);
 }

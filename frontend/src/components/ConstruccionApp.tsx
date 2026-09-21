@@ -252,6 +252,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const [modalMitigarTarget, setModalMitigarTarget] = useState<RiesgoConstruccionApi | null>(null);
   const [nuevoEstadoRiesgo, setNuevoEstadoRiesgo] = useState('EN_MITIGACION');
   const [medidasAdicionalesInput, setMedidasAdicionalesInput] = useState('');
+  const [responsableRiesgoInput, setResponsableRiesgoInput] = useState('');
   const [formNuevoRiesgo, setFormNuevoRiesgo] = useState({
     codigo: '',
     procesoFrente: '',
@@ -1852,6 +1853,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                 setModalMitigarTarget(rsg);
                                 setNuevoEstadoRiesgo(rsg.estado === 'IDENTIFICADO' ? 'EN_MITIGACION' : 'CONTROLADO');
                                 setMedidasAdicionalesInput('');
+                                setResponsableRiesgoInput(rsg.responsable || '');
                               }}
                               className="px-2.5 py-1 rounded bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 text-[11px] font-semibold cursor-pointer"
                             >
@@ -2022,7 +2024,18 @@ export default function ConstruccionApp({ onSalir }: Props) {
                               </span>
                             </td>
                             <td className="p-4 text-right">
-                              {doc.estadoRevision !== 'APROBADO_PARA_CONSTRUCCION' && (
+                              <div className="flex items-center justify-end gap-1.5">
+                                {doc.archivoUrl && (
+                                  <a
+                                    href={doc.archivoUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-2 py-1 rounded bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border border-sky-500/30 text-[11px] font-semibold inline-flex items-center gap-1"
+                                  >
+                                    Ver Modelo
+                                  </a>
+                                )}
+                                {doc.estadoRevision !== 'APROBADO_PARA_CONSTRUCCION' && (
                                 <button
                                   onClick={async () => {
                                     try {
@@ -2038,6 +2051,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                   Aprobar
                                 </button>
                               )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -4637,11 +4651,22 @@ export default function ConstruccionApp({ onSalir }: Props) {
               onSubmit={async (e) => {
                 e.preventDefault();
                 setErrorGlobal(null);
+                if (nuevoEstadoRiesgo === 'RESUELTO') {
+                  if (!responsableRiesgoInput.trim()) {
+                    setErrorGlobal('Para marcar un riesgo como RESUELTO es obligatorio asignar un responsable.');
+                    return;
+                  }
+                  if (!medidasAdicionalesInput.trim() && !modalMitigarTarget.medidasControl) {
+                    setErrorGlobal('Para marcar un riesgo como RESUELTO es obligatorio registrar las medidas de control o mitigación.');
+                    return;
+                  }
+                }
                 try {
                   await cambiarEstadoRiesgoConstruccionApi(
                     modalMitigarTarget.id!,
                     nuevoEstadoRiesgo,
-                    medidasAdicionalesInput.trim() || undefined
+                    medidasAdicionalesInput.trim() || undefined,
+                    responsableRiesgoInput.trim() || undefined
                   );
                   notificarExito(`Estado de riesgo actualizado a ${nuevoEstadoRiesgo}.`);
                   setModalMitigarTarget(null);
@@ -4661,13 +4686,30 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 >
                   <option value="EN_MITIGACION">En Mitigación Activa</option>
                   <option value="CONTROLADO">Controlado / Mitigado</option>
+                  <option value="RESUELTO">Resuelto</option>
                   <option value="RESIDUAL_ACEPTABLE">Riesgo Residual Aceptable</option>
                 </select>
               </div>
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Medidas Adicionales Aplicadas</label>
+                <label className="block text-slate-400 mb-1 font-semibold">
+                  Responsable de Seguridad / Mitigación {nuevoEstadoRiesgo === 'RESUELTO' && <span className="text-amber-400">*</span>}
+                </label>
+                <input
+                  type="text"
+                  required={nuevoEstadoRiesgo === 'RESUELTO'}
+                  placeholder="Ej. Ing. Residente de Seguridad"
+                  value={responsableRiesgoInput}
+                  onChange={(e) => setResponsableRiesgoInput(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">
+                  Medidas de Control / Mitigación Aplicadas {nuevoEstadoRiesgo === 'RESUELTO' && <span className="text-amber-400">*</span>}
+                </label>
                 <textarea
                   rows={3}
+                  required={nuevoEstadoRiesgo === 'RESUELTO' && !modalMitigarTarget.medidasControl}
                   placeholder="Detallar inspección de seguridad, charlas de 5 min, verificación de arneses..."
                   value={medidasAdicionalesInput}
                   onChange={(e) => setMedidasAdicionalesInput(e.target.value)}
@@ -4830,6 +4872,17 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">URL del Modelo / Repositorio Cloud (HTTPS / S3)</label>
+                <input
+                  type="url"
+                  placeholder="https://aurora.cloud/bim/modelo-est.ifc"
+                  value={formNuevoBim.archivoUrl}
+                  onChange={(e) => setFormNuevoBim({ ...formNuevoBim, archivoUrl: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
                 <button
                   type="button"
@@ -4871,7 +4924,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   await crearRfiConstruccionApi(
                     proyectoSeleccionadoId,
                     {
-                      numeroRfi: formNuevoRfi.numeroRfi.trim(),
+                      numeroRfi: formNuevoRfi.numeroRfi.trim() || undefined,
                       asunto: formNuevoRfi.asunto.trim(),
                       disciplina: formNuevoRfi.disciplina,
                       documentoBimId: formNuevoRfi.documentoBimId ? Number(formNuevoRfi.documentoBimId) : undefined,
@@ -4893,11 +4946,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
             >
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Número RFI *</label>
+                  <label className="block text-slate-400 mb-1 font-semibold">Número RFI <span className="text-slate-500 font-normal">(Vacío para autogenerar)</span></label>
                   <input
                     type="text"
-                    required
-                    placeholder="Ej. RFI-EST-001"
+                    placeholder="Ej. RFI-EST-001 (Automático)"
                     value={formNuevoRfi.numeroRfi}
                     onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, numeroRfi: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"

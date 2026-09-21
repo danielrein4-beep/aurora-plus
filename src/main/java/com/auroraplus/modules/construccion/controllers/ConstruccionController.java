@@ -245,7 +245,7 @@ public class ConstruccionController {
     public ResponseEntity<DespachoConstruccionEntity> cambiarEstadoDespacho(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
-        String nuevoEstado = body != null ? body.get("estado") : null;
+        String nuevoEstado = body != null ? (body.get("estado") != null ? body.get("estado") : body.get("nuevoEstado")) : null;
         String observaciones = body != null ? body.get("observaciones") : null;
         return ResponseEntity.ok(construccionService.actualizarEstadoDespacho(requireTenant(), id, nuevoEstado, observaciones));
     }
@@ -333,8 +333,9 @@ public class ConstruccionController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
         String nuevoEstado = body != null ? body.get("estado") : null;
-        String medidas = body != null ? body.get("medidasControl") : null;
-        return ResponseEntity.ok(construccionService.actualizarEstadoRiesgo(requireTenant(), id, nuevoEstado, medidas));
+        String medidas = body != null ? (body.get("medidasControl") != null ? body.get("medidasControl") : body.get("medidasAdicionales")) : null;
+        String responsable = body != null ? body.get("responsable") : null;
+        return ResponseEntity.ok(construccionService.actualizarEstadoRiesgo(requireTenant(), id, nuevoEstado, medidas, responsable));
     }
 
     // --- GESTIÓN DOCUMENTAL BIM Y CONTROL DE RFIs ---

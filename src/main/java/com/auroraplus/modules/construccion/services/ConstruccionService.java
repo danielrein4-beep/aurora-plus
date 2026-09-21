@@ -511,7 +511,7 @@ public class ConstruccionService {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
-        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+        ProyectoConstruccionEntity proyecto = proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
         return capituloRepository.findByTenantIdAndProyectoIdOrderByOrdenAsc(tenantId, proyectoId);
     }
@@ -1185,6 +1185,7 @@ public class ConstruccionService {
         if (req.getNombre() == null || req.getNombre().trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre del equipo o maquinaria es obligatorio");
         }
+
         String codigoLimpio = req.getCodigo().trim().toUpperCase();
 
         if (req.getProyectoId() != null) {
@@ -1554,24 +1555,41 @@ public class ConstruccionService {
         }
     }
 
-    @Transactional
     public RiesgoConstruccionEntity actualizarEstadoRiesgo(Long tenantId, Long id, String nuevoEstado, String medidasAdicionales) {
+        return actualizarEstadoRiesgo(tenantId, id, nuevoEstado, medidasAdicionales, null);
+    }
+
+    @Transactional
+    public RiesgoConstruccionEntity actualizarEstadoRiesgo(Long tenantId, Long id, String nuevoEstado, String medidasAdicionales, String responsable) {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
         RiesgoConstruccionEntity riesgo = riesgoRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Riesgo no encontrado para este tenant"));
 
+        if (responsable != null && !responsable.trim().isEmpty()) {
+            riesgo.setResponsable(responsable.trim());
+        }
+
+        if (medidasAdicionales != null && !medidasAdicionales.trim().isEmpty()) {
+            String controlActual = riesgo.getMedidasControl() != null ? riesgo.getMedidasControl() : "";
+            riesgo.setMedidasControl((controlActual + "\n[Mitigación " + LocalDate.now() + "]: " + medidasAdicionales.trim()).trim());
+        }
+
         if (nuevoEstado != null && !nuevoEstado.trim().isEmpty()) {
             String est = nuevoEstado.trim().toUpperCase();
             if (!ESTADOS_RIESGO_VALIDOS.contains(est)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de riesgo inválido: " + est);
             }
+            if ("RESUELTO".equals(est)) {
+                if (riesgo.getResponsable() == null || riesgo.getResponsable().trim().isEmpty()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Para marcar un riesgo como RESUELTO es obligatorio contar con un responsable asignado");
+                }
+                if (riesgo.getMedidasControl() == null || riesgo.getMedidasControl().trim().isEmpty()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Para marcar un riesgo como RESUELTO es obligatorio registrar las medidas de control o mitigación implementadas");
+                }
+            }
             riesgo.setEstado(est);
-        }
-
-        if (medidasAdicionales != null && !medidasAdicionales.trim().isEmpty()) {
-            riesgo.setMedidasControl(riesgo.getMedidasControl() + "\n[Mitigación " + LocalDate.now() + "]: " + medidasAdicionales.trim());
         }
 
         return riesgoRepository.save(riesgo);
@@ -1622,6 +1640,17 @@ public class ConstruccionService {
         }
         if (req.getFormato() == null || !FORMATOS_BIM_VALIDOS.contains(req.getFormato().trim().toUpperCase())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato técnico inválido: " + req.getFormato());
+        }
+
+        if (req.getArchivoUrl() != null && !req.getArchivoUrl().trim().isEmpty()) {
+            String url = req.getArchivoUrl().trim().toLowerCase();
+            if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("s3://")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La URL del modelo BIM debe ser un enlace web o repositorio válido (http, https, s3)");
+            }
+            req.setArchivoUrl(req.getArchivoUrl().trim());
+        }
+        if (req.getPesoMb() != null && req.getPesoMb().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El tamaño del archivo no puede ser negativo");
         }
 
         String codigoLimpio = req.getCodigo().trim().toUpperCase();
@@ -1740,11 +1769,12 @@ public class ConstruccionService {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
-        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+        ProyectoConstruccionEntity proyecto = proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
 
         if (req.getNumeroRfi() == null || req.getNumeroRfi().trim().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número correlativo de RFI es obligatorio");
+            long count = rfiRepository.countByTenantIdAndProyectoId(tenantId, proyectoId);
+            req.setNumeroRfi("RFI-" + proyecto.getCodigo() + "-" + String.format("%03d", count + 1));
         }
         if (req.getAsunto() == null || req.getAsunto().trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El asunto del RFI es obligatorio");
@@ -1835,6 +1865,14 @@ public class ConstruccionService {
         RfiConstruccionEntity rfi = rfiRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "RFI no encontrado para este tenant"));
 
+        String est = (nuevoEstado != null && !nuevoEstado.trim().isEmpty())
+                ? nuevoEstado.trim().toUpperCase()
+                : "RESPONDIDO";
+
+        if (!ESTADOS_RFI_VALIDOS.contains(est)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de RFI inválido: " + est);
+        }
+
         if (respuestaOficial != null && !respuestaOficial.trim().isEmpty()) {
             rfi.setRespuestaOficial(respuestaOficial.trim());
             rfi.setFechaRespuesta(LocalDate.now());
@@ -1843,15 +1881,15 @@ public class ConstruccionService {
             rfi.setResponsableRespuesta(responsableRespuesta.trim());
         }
 
-        if (nuevoEstado != null && !nuevoEstado.trim().isEmpty()) {
-            String est = nuevoEstado.trim().toUpperCase();
-            if (!ESTADOS_RFI_VALIDOS.contains(est)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de RFI inválido: " + est);
+        if ("RESPONDIDO".equals(est) || "CERRADO".equals(est)) {
+            if (rfi.getRespuestaOficial() == null || rfi.getRespuestaOficial().trim().isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Para marcar un RFI como " + est + " es obligatoria la respuesta técnica oficial");
             }
-            rfi.setEstado(est);
-        } else if (rfi.getRespuestaOficial() != null && "ABIERTO".equals(rfi.getEstado())) {
-            rfi.setEstado("RESPONDIDO");
+            if (rfi.getResponsableRespuesta() == null || rfi.getResponsableRespuesta().trim().isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Para marcar un RFI como " + est + " es obligatorio registrar el profesional responsable de la respuesta");
+            }
         }
+        rfi.setEstado(est);
 
         return rfiRepository.save(rfi);
     }

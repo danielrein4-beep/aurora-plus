@@ -79,6 +79,15 @@ public class ConstruccionAislamientoTenantP0Test {
 
     @Autowired
     private CuadrillaConstruccionRepository cuadrillaRepository;
+    @Autowired
+    private RiesgoConstruccionRepository riesgoRepository;
+
+    @Autowired
+    private DocumentoBimRepository documentoBimRepository;
+
+    @Autowired
+    private RfiConstruccionRepository rfiRepository;
+
 
     @Autowired(required = false)
     @org.springframework.beans.factory.annotation.Qualifier("personalEmpleadoRepository")
@@ -2004,6 +2013,143 @@ public class ConstruccionAislamientoTenantP0Test {
         assertEquals(5, actualizada.getPersonalReal());
         // Rendimiento real = 150.00 / 5 = 30.00
         assertEquals(new BigDecimal("30.00"), actualizada.getRendimientoReal());
+    }
+
+
+    @Test
+    void testFase4_RiesgosMatrizProbabilisticaYValidacionResolucion() {
+        Long tenant = 7301L;
+        TenantContext.setCurrentTenant(tenant);
+
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PRY-RSG-F4", "Obra Riesgos F4");
+        proy.setEstado("ACTIVO");
+        proyectoRepository.save(proy);
+
+        RiesgoConstruccionEntity r = new RiesgoConstruccionEntity();
+        r.setCodigo("RSG-ALT-01");
+        r.setProcesoFrente("Encofrado de fuste en altura Nivel 4");
+        r.setPeligro("Trabajo en altura sobre andamios volados");
+        r.setRiesgoConsecuencia("Caída a distinto nivel con consecuencias fatales");
+        r.setCategoria("ALTURA");
+        r.setProbabilidad(4);
+        r.setSeveridad(5);
+        r.setMedidasControl("Uso de arnés certificado con doble cabo de vida");
+        r.setFechaEvaluacion(java.time.LocalDate.now());
+
+        ResponseEntity<RiesgoConstruccionEntity> respReg = construccionController.registrarRiesgo(proy.getId(), r, "IK-RSG-01");
+        assertEquals(HttpStatus.OK, respReg.getStatusCode());
+        RiesgoConstruccionEntity guardado = respReg.getBody();
+        assertNotNull(guardado.getId());
+        assertEquals("CRITICO", guardado.getNivelRiesgo()); // 4 * 5 = 20 >= 16
+
+        // 1. Intento de pasar a RESUELTO sin responsable debe fallar con 400
+        java.util.Map<String, String> bodyInvalido = new java.util.HashMap<>();
+        bodyInvalido.put("estado", "RESUELTO");
+        bodyInvalido.put("medidasControl", "Verificación en campo");
+
+        ResponseStatusException exSinResp = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.cambiarEstadoRiesgo(guardado.getId(), bodyInvalido);
+        });
+        assertEquals(HttpStatus.BAD_REQUEST, exSinResp.getStatusCode());
+        assertTrue(exSinResp.getReason().contains("responsable asignado"));
+
+        // 2. Pasar a RESUELTO con responsable y medidas de mitigación
+        java.util.Map<String, String> bodyValido = new java.util.HashMap<>();
+        bodyValido.put("estado", "RESUELTO");
+        bodyValido.put("responsable", "Ing. Residente SST");
+        bodyValido.put("medidasAdicionales", "Inspección diaria de arneses y colocación de mallas anticaídas completada");
+
+        ResponseEntity<RiesgoConstruccionEntity> respResuelto = construccionController.cambiarEstadoRiesgo(guardado.getId(), bodyValido);
+        assertEquals(HttpStatus.OK, respResuelto.getStatusCode());
+        assertEquals("RESUELTO", respResuelto.getBody().getEstado());
+        assertEquals("Ing. Residente SST", respResuelto.getBody().getResponsable());
+        assertTrue(respResuelto.getBody().getMedidasControl().contains("mallas anticaídas"));
+    }
+
+    @Test
+    void testFase4_RfisCorrelativoSecuencialYValidacionRespuestaOficial() {
+        Long tenant = 7401L;
+        TenantContext.setCurrentTenant(tenant);
+
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PRY-RFI-F4", "Obra RFIs F4");
+        proy.setEstado("ACTIVO");
+        proyectoRepository.save(proy);
+
+        // 1. RFI sin numeroRfi manual debe autogenerar correlativo secuencial
+        RfiConstruccionEntity rfi1 = new RfiConstruccionEntity();
+        rfi1.setAsunto("Discrepancia en armado de zapata Z-02");
+        rfi1.setDisciplina("ESTRUCTURAS");
+        rfi1.setPreguntaConsulta("¿El refuerzo superior lleva ganchos a 90° o a 135°?");
+        rfi1.setSolicitante("Ing. Residente de Obra");
+
+        ResponseEntity<RfiConstruccionEntity> respRfi1 = construccionController.registrarRfi(proy.getId(), rfi1, "IK-RFI-01");
+        assertEquals(HttpStatus.OK, respRfi1.getStatusCode());
+        assertNotNull(respRfi1.getBody().getNumeroRfi());
+        assertTrue(respRfi1.getBody().getNumeroRfi().startsWith("RFI-" + proy.getCodigo()));
+
+        Long rfiId = respRfi1.getBody().getId();
+
+        // 2. Intento de responder RFI sin respuesta oficial técnica debe fallar con 400
+        ResponseStatusException exSinResp = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.responderRfi(rfiId, java.util.Map.of(
+                    "respuestaOficial", "",
+                    "responsableRespuesta", "Ing. Calculista",
+                    "nuevoEstado", "RESPONDIDO"
+            ));
+        });
+        assertEquals(HttpStatus.BAD_REQUEST, exSinResp.getStatusCode());
+        assertTrue(exSinResp.getReason().contains("respuesta"));
+
+        // 3. Responder RFI con datos válidos
+        ResponseEntity<RfiConstruccionEntity> respOk = construccionController.responderRfi(rfiId, java.util.Map.of(
+                "respuestaOficial", "Colocar ganchos a 90° con longitud de anclaje de 35 cm según plano E-04 rev 2",
+                "responsableRespuesta", "Ing. Estructural Proyectista",
+                "nuevoEstado", "RESPONDIDO"
+        ));
+        assertEquals(HttpStatus.OK, respOk.getStatusCode());
+        assertEquals("RESPONDIDO", respOk.getBody().getEstado());
+        assertEquals("Ing. Estructural Proyectista", respOk.getBody().getResponsableRespuesta());
+        assertNotNull(respOk.getBody().getFechaRespuesta());
+    }
+
+    @Test
+    void testFase4_BimValidacionUrlYFormato() {
+        Long tenant = 7501L;
+        TenantContext.setCurrentTenant(tenant);
+
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PRY-BIM-F4", "Obra BIM F4");
+        proy.setEstado("ACTIVO");
+        proyectoRepository.save(proy);
+
+        // 1. Intento con URL no permitida / fake path local
+        DocumentoBimEntity bimInvalido = new DocumentoBimEntity();
+        bimInvalido.setCodigo("BIM-EST-01");
+        bimInvalido.setTitulo("Modelo Estructural Completo");
+        bimInvalido.setDisciplina("ESTRUCTURAS");
+        bimInvalido.setFormato("IFC");
+        bimInvalido.setArchivoUrl("C:\\\\fakepath\\\\modelo.ifc");
+
+        ResponseStatusException exUrl = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.registrarDocumentoBim(proy.getId(), bimInvalido, "IK-BIM-INV");
+        });
+        assertEquals(HttpStatus.BAD_REQUEST, exUrl.getStatusCode());
+        assertTrue(exUrl.getReason().contains("enlace web o repositorio válido"));
+
+        // 2. Modelo BIM válido con URL HTTPS y peso real
+        DocumentoBimEntity bimValido = new DocumentoBimEntity();
+        bimValido.setCodigo("BIM-EST-01");
+        bimValido.setTitulo("Modelo Estructural Torre A");
+        bimValido.setDisciplina("ESTRUCTURAS");
+        bimValido.setFormato("IFC");
+        bimValido.setVersion("v2.1");
+        bimValido.setArchivoUrl("https://aurora.cloud/bim/proy-7501/torreA_est_v2.ifc");
+        bimValido.setPesoMb(new BigDecimal("48.50"));
+
+        ResponseEntity<DocumentoBimEntity> respBim = construccionController.registrarDocumentoBim(proy.getId(), bimValido, "IK-BIM-VAL");
+        assertEquals(HttpStatus.OK, respBim.getStatusCode());
+        assertNotNull(respBim.getBody().getId());
+        assertEquals("VIGENTE", respBim.getBody().getEstadoRevision());
+        assertEquals(new BigDecimal("48.50"), respBim.getBody().getPesoMb());
     }
 
 }
