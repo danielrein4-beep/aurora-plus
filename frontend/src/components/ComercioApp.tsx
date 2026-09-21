@@ -366,44 +366,112 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
     return "Buenas noches";
   })();
 
+  const fechaHoyLarga = new Date().toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" });
+
+  // Checklist de primeros pasos — solo se muestra mientras falte alguno. Un
+  // negocio recién creado con todo en cero no debe sentirse "vacío" sino
+  // guiado — mismo lenguaje visual que ya usa Ganadería para su onboarding.
+  const tieneProductos = productos.length > 0;
+  const tieneCosto = productos.some((p) => p.costo > 0);
+  const tieneVentaRegistrada = ingresosCaja.length > 0;
+  const pasosCompletados = (tieneProductos ? 1 : 0) + (tieneCosto ? 1 : 0) + (tieneVentaRegistrada ? 1 : 0);
+  const mostrarChecklist = pasosCompletados < 3;
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h2 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{saludo} — {nombreNegocio}</h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400">Así está tu negocio ahora mismo.</p>
+      {/* ── ENCABEZADO ── */}
+      <div className="rounded-3xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-teal-50 via-white to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1">
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider bg-teal-500/10 border border-teal-500/20 rounded-full px-2.5 py-1">
+              {fechaHoyLarga}
+            </span>
+            <h2 className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">{saludo} — {nombreNegocio}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Así está tu negocio ahora mismo.</p>
+          </div>
+        </div>
       </div>
+
+      {/* ── CHECKLIST DE PRIMEROS PASOS (solo mientras el negocio está empezando) ── */}
+      {mostrarChecklist && (
+        <section className="rounded-3xl p-6 border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-white to-white dark:from-teal-500/10 dark:via-slate-900 dark:to-slate-900 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">Primeros pasos para tu negocio</h3>
+                <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-400 font-bold border border-teal-500/30">
+                  {pasosCompletados} de 3
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Completa esto y tu panel empezará a mostrar ventas, costos y utilidad real.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              { paso: 1, hecho: tieneProductos, titulo: "Registra tu primer producto", detalle: tieneProductos ? `${productos.length} producto${productos.length === 1 ? "" : "s"} en tu catálogo.` : "Dale de alta a lo que vendes, con su precio de venta.", accion: "+ Nuevo Producto", onClick: onIrAInventario },
+              { paso: 2, hecho: tieneCosto, titulo: "Registra tu primera compra", detalle: tieneCosto ? "Ya tienes costo real registrado — tu margen se calcula solo." : "Sin esto no podemos calcular cuánto ganas de verdad.", accion: "Registrar Compra", onClick: onIrAProveedores },
+              { paso: 3, hecho: tieneVentaRegistrada, titulo: "Haz tu primera venta", detalle: tieneVentaRegistrada ? "Ya estás vendiendo — sigue así." : "Cóbrale a tu primer cliente desde el mostrador.", accion: "Ir al POS", onClick: onIrAPos },
+            ].map((p) => (
+              <div key={p.paso} className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${p.hecho ? "bg-emerald-500/10 border-emerald-500/30" : "bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-teal-500/40"}`}>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Paso {p.paso}</span>
+                    <span className={`text-[10px] font-bold ${p.hecho ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                      {p.hecho ? "Completado" : "Pendiente"}
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">{p.titulo}</h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">{p.detalle}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={p.onClick}
+                  className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${p.hecho ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/25" : "bg-teal-600 text-white hover:bg-teal-500 shadow-sm"}`}
+                >
+                  {p.accion}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── 1. RENTABILIDAD DE HOY — lo primero que un dueño necesita ver ── */}
       <section className="space-y-2.5">
         <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Hoy</h3>
         <div className={`grid grid-cols-1 sm:grid-cols-3 gap-4`}>
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas</span>
-              <IconChart size={16} className="text-teal-500" />
+              <div className="w-9 h-9 rounded-xl bg-teal-500/10 flex items-center justify-center"><IconChart size={17} className="text-teal-600 dark:text-teal-400" /></div>
             </div>
-            <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasHoy)}</div>
+            <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasHoy)}</div>
+            {Object.keys(ventasHoy).length === 0 && <p className="text-[11px] text-slate-400">Aún no registras ventas hoy.</p>}
           </div>
 
           {esAdmin ? (
-            <button type="button" onClick={onIrAUtilidad} className="text-left bg-emerald-500/10 rounded-2xl p-5 border border-emerald-500/30 shadow-sm space-y-1.5 cursor-pointer hover:border-emerald-500/60 transition-colors">
+            <button type="button" onClick={onIrAUtilidad} className="text-left relative overflow-hidden bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 rounded-2xl p-5 border border-emerald-500/30 shadow-sm space-y-2 cursor-pointer hover:border-emerald-500/60 transition-colors">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Utilidad Real</span>
-                <IconCoins size={16} className="text-emerald-600 dark:text-emerald-400" />
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center"><IconCoins size={17} className="text-emerald-600 dark:text-emerald-400" /></div>
               </div>
               {cargandoUtilidad ? (
                 <div className="text-xs text-emerald-600/70 dark:text-emerald-400/60">Calculando…</div>
               ) : utilidadHoy && utilidadHoy.ventasBrutas > 0 ? (
                 <>
-                  <div className="font-['Outfit'] font-black text-xl text-emerald-700 dark:text-emerald-400 truncate">
+                  <div className="font-['Outfit'] font-black text-2xl text-emerald-700 dark:text-emerald-400 truncate">
                     {utilidadHoy.moneda === "USD" ? "$" : utilidadHoy.moneda + " "}{utilidadHoy.utilidad.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   {utilidadHoy.margenPct !== null && (
-                    <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/70">{utilidadHoy.margenPct.toFixed(1)}% de margen{utilidadHoy.coberturaPct < 100 ? ` · ${utilidadHoy.coberturaPct.toFixed(0)}% con costo conocido` : ""}</div>
+                    <div className="text-[11px] text-emerald-600/80 dark:text-emerald-400/70">{utilidadHoy.margenPct.toFixed(1)}% de margen{utilidadHoy.coberturaPct < 100 ? ` · ${utilidadHoy.coberturaPct.toFixed(0)}% con costo conocido` : ""}</div>
                   )}
                 </>
               ) : (
-                <div className="text-xs text-emerald-700/70 dark:text-emerald-400/60">Sin ventas todavía hoy</div>
+                <>
+                  <div className="font-['Outfit'] font-black text-2xl text-emerald-700/40 dark:text-emerald-400/30">—</div>
+                  <p className="text-[11px] text-emerald-700/70 dark:text-emerald-400/60">Se calculará con tu primera venta de hoy.</p>
+                </>
               )}
             </button>
           ) : (
@@ -413,14 +481,17 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
             </div>
           )}
 
-          <div className={`rounded-2xl p-5 border shadow-sm space-y-1.5 ${productosBajoStock.length > 0 ? "bg-amber-500/10 border-amber-500/30" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"}`}>
+          <div className={`relative overflow-hidden rounded-2xl p-5 border shadow-sm space-y-2 ${productosBajoStock.length > 0 ? "bg-amber-500/10 border-amber-500/30" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"}`}>
             <div className="flex items-center justify-between">
               <span className={`text-[11px] font-bold uppercase tracking-wider ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}>Requiere tu atención</span>
-              <IconWarning size={16} className={productosBajoStock.length > 0 ? "text-amber-500" : "text-slate-400"} />
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${productosBajoStock.length > 0 ? "bg-amber-500/15" : "bg-emerald-500/10"}`}>
+                {productosBajoStock.length > 0 ? <IconWarning size={17} className="text-amber-600 dark:text-amber-400" /> : <IconCheckCircle size={17} className="text-emerald-600 dark:text-emerald-400" />}
+              </div>
             </div>
             <div className={`font-['Outfit'] font-black text-xl ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"}`}>
               {productosBajoStock.length > 0 ? `${productosBajoStock.length} producto${productosBajoStock.length === 1 ? "" : "s"} bajo mínimo` : "Todo en orden"}
             </div>
+            {productosBajoStock.length === 0 && <p className="text-[11px] text-slate-400">Sin pendientes por ahora.</p>}
           </div>
         </div>
       </section>
@@ -429,26 +500,26 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
       <section className="space-y-2.5">
         <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Accesos rápidos</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <button type="button" onClick={onIrAPos} className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 transition-colors cursor-pointer">
-            <IconCard size={20} className="text-teal-500" />
+          <button type="button" onClick={onIrAPos} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 hover:shadow-md transition-all cursor-pointer">
+            <div className="w-10 h-10 rounded-xl bg-teal-500/10 flex items-center justify-center"><IconCard size={19} className="text-teal-600 dark:text-teal-400" /></div>
             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Nueva Venta</span>
           </button>
-          <button type="button" onClick={onIrAInventario} className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 transition-colors cursor-pointer">
-            <IconBox size={20} className="text-cyan-500" />
+          <button type="button" onClick={onIrAInventario} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-cyan-500/50 hover:shadow-md transition-all cursor-pointer">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center"><IconBox size={19} className="text-cyan-600 dark:text-cyan-400" /></div>
             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Inventario</span>
           </button>
-          <button type="button" onClick={onIrAProveedores} className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 transition-colors cursor-pointer">
-            <IconTruck size={20} className="text-slate-500" />
+          <button type="button" onClick={onIrAProveedores} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-400 hover:shadow-md transition-all cursor-pointer">
+            <div className="w-10 h-10 rounded-xl bg-slate-500/10 flex items-center justify-center"><IconTruck size={19} className="text-slate-600 dark:text-slate-300" /></div>
             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Registrar Compra</span>
           </button>
           {esAdmin ? (
-            <button type="button" onClick={onIrAUtilidad} className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-emerald-500/50 transition-colors cursor-pointer">
-              <IconCoins size={20} className="text-emerald-500" />
+            <button type="button" onClick={onIrAUtilidad} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-emerald-500/50 hover:shadow-md transition-all cursor-pointer">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center"><IconCoins size={19} className="text-emerald-600 dark:text-emerald-400" /></div>
               <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Ver Utilidad</span>
             </button>
           ) : (
-            <button type="button" onClick={onIrAInventario} className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 transition-colors cursor-pointer">
-              <IconBank size={20} className="text-slate-500" />
+            <button type="button" onClick={onIrAInventario} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-400 hover:shadow-md transition-all cursor-pointer">
+              <div className="w-10 h-10 rounded-xl bg-slate-500/10 flex items-center justify-center"><IconBank size={19} className="text-slate-600 dark:text-slate-300" /></div>
               <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{productos.length} Productos</span>
             </button>
           )}
@@ -459,29 +530,29 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
       <section className="space-y-2.5">
         <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Esta semana</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas de la Semana</span>
-              <IconChart size={16} className="text-cyan-500" />
+              <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center"><IconChart size={17} className="text-cyan-600 dark:text-cyan-400" /></div>
             </div>
-            <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasSemana)}</div>
+            <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasSemana)}</div>
           </div>
 
-          <button type="button" onClick={onIrAInventario} className="text-left bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5 cursor-pointer hover:border-teal-500/50 transition-colors">
+          <button type="button" onClick={onIrAInventario} className="text-left bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2 cursor-pointer hover:border-teal-500/50 transition-colors">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Productos en Stock</span>
-              <IconBank size={16} className="text-emerald-500" />
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center"><IconBank size={17} className="text-emerald-600 dark:text-emerald-400" /></div>
             </div>
-            <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{productos.length}</div>
+            <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">{productos.length}</div>
           </button>
 
-          <div className={`rounded-2xl p-5 border shadow-sm space-y-1.5 ${productosSinCosto > 0 ? "bg-slate-100 dark:bg-slate-800/60 border-slate-300 dark:border-slate-700" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"}`}>
+          <div className={`rounded-2xl p-5 border shadow-sm space-y-2 ${productosSinCosto > 0 ? "bg-slate-100 dark:bg-slate-800/60 border-slate-300 dark:border-slate-700" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"}`}>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Sin costo registrado</span>
-              <IconCoins size={16} className="text-slate-400" />
+              <div className="w-9 h-9 rounded-xl bg-slate-500/10 flex items-center justify-center"><IconCoins size={17} className="text-slate-500" /></div>
             </div>
-            <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{productosSinCosto}</div>
-            {productosSinCosto > 0 && <div className="text-[10px] text-slate-400">Su margen no se puede calcular todavía</div>}
+            <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">{productosSinCosto}</div>
+            <p className="text-[11px] text-slate-400">{productosSinCosto > 0 ? "Su margen no se puede calcular todavía." : "Todo tu catálogo tiene costo real."}</p>
           </div>
         </div>
       </section>
@@ -499,7 +570,7 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
         {productosBajoStock.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
             <IconCheckCircle size={14} className="text-emerald-500" />
-            Todo el inventario está por encima del mínimo configurado.
+            {tieneProductos ? "Todo el inventario está por encima del mínimo configurado." : "Registra tu primer producto para empezar a monitorear stock."}
           </div>
         ) : (
           <div className="overflow-x-auto">
