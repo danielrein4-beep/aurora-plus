@@ -1,4 +1,5 @@
-// Shared gradient ID used by all icons — defined once in <AuroraGradientDef />
+// Los íconos son lineales y heredan el color de su contexto. Esto mantiene una
+// interfaz institucional y evita degradados decorativos inconsistentes.
 export const GRAD = "aurora-icon-grad";
 
 // Render this once near the top of the app (hidden)
@@ -18,10 +19,10 @@ export function AuroraGradientDef() {
 
 interface IconProps { size?: number; className?: string; stroke?: string }
 
-const s = { stroke: `url(#${GRAD})`, strokeWidth: 1.75, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, fill: "none" };
+const s = { stroke: "currentColor", strokeWidth: 1.75, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, fill: "none" };
 
 const getStyle = (className?: string, stroke?: string) => ({
-  stroke: stroke || (className ? "currentColor" : `url(#${GRAD})`),
+  stroke: stroke || "currentColor",
   strokeWidth: 1.75,
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
@@ -181,7 +182,7 @@ export function IconMobile({ size = 24 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <rect x="5" y="2" width="14" height="20" rx="2" {...s} />
-      <line x1="12" y1="18" x2="12.01" y2="18" strokeWidth={2.5} stroke={`url(#${GRAD})`} strokeLinecap="round" />
+      <line x1="12" y1="18" x2="12.01" y2="18" strokeWidth={2.5} stroke="currentColor" strokeLinecap="round" />
     </svg>
   );
 }

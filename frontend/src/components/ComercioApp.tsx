@@ -1194,7 +1194,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         />
       )}
       <aside
-        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#0D3B3D] border-r border-white/10 shadow-lg fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-white border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
           sidebarAbierto ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -1202,27 +1202,25 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             en Turquesa Corporativo (#177E89) para que resalte sin ser chillón. */}
         <button
           onClick={onSalir}
-          className="flex items-center gap-2.5 text-left group cursor-pointer p-4 border-b border-white/10"
+          className="flex items-center gap-2.5 text-left group cursor-pointer p-5 border-b border-slate-100"
           title="Volver al Hub General"
         >
-          <div className="w-9 h-9 rounded-xl bg-[#177E89] p-0.5 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform flex-shrink-0">
-            <div className="w-full h-full bg-[#0D3B3D] rounded-[10px] flex items-center justify-center">
-              {esFarmacia ? <IconPrescription size={18} className="text-[#5BC0BE]" /> :
-               <IconHardware size={18} className="text-[#5BC0BE]" />}
-            </div>
+          <div className="w-9 h-9 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 flex items-center justify-center group-hover:bg-teal-100 transition-colors flex-shrink-0">
+            {esFarmacia ? <IconPrescription size={18} /> :
+             <IconHardware size={18} />}
           </div>
           <div className="min-w-0">
-            <div className="font-['Outfit'] font-black text-sm !text-white leading-tight truncate">
+            <div className="font-['IBM_Plex_Sans'] font-bold text-sm text-slate-900 leading-tight truncate">
               {nombreLocal}
             </div>
-            <div className="text-[9px] !text-[#8FD8D2] tracking-wider uppercase truncate font-semibold">
+            <div className="text-[9px] text-slate-400 tracking-[0.14em] uppercase truncate font-semibold mt-0.5">
               Aurora {esFarmacia ? "Farmacia" : "Comercio"}
             </div>
           </div>
         </button>
 
         {/* Navegación principal, agrupada (Operación / Gestión) — mismo patrón que Aurora Horeca */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-4">
+        <nav className="flex-1 overflow-y-auto p-4 space-y-5">
           {([
             {
               titulo: "Operación",
@@ -1244,36 +1242,36 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             },
           ]).map((grupo) => (
             <div key={grupo.titulo} className="space-y-1">
-              <div className="px-3.5 text-[10px] font-black uppercase tracking-wider !text-[#5BA8A2]">
+              <div className="px-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
                 {grupo.titulo}
               </div>
               {grupo.items.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => { setTab(item.id); setSidebarAbierto(false); }}
-                  className={`sidebar-glare w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+                  className={`sidebar-glare w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] transition-colors cursor-pointer ${
                     tab === item.id
-                      ? "sidebar-glare--active bg-white/10 !text-white"
-                      : "!text-[#B9DEDA] hover:bg-white/5 hover:!text-white"
+                      ? "sidebar-glare--active bg-teal-50 text-teal-800 border border-teal-100"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
-                  <item.Icon size={16} />
+                  <span className={tab === item.id ? "text-teal-700" : "text-slate-400"}><item.Icon size={16} /></span>
                   <span>{item.etiqueta}</span>
                 </button>
               ))}
             </div>
           ))}
 
-                  <div className="pt-2 mt-2 border-t border-white/10">
+                  <div className="pt-3 mt-3 border-t border-slate-100">
           <button
             type="button"
             title="Tu catálogo digital público con precios y código QR para que tus clientes pidan por WhatsApp"
             onClick={() => { setModalQrVisible(true); setSidebarAbierto(false); }}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer text-[#5BC0BE] bg-white/5 hover:bg-white/10 transition-colors"
+            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
           >
             <IconShoppingBag size={16} />
-            <span className="flex-1 text-left !text-white">Mi Catálogo Online & QR</span>
-            <span className="text-[8px] font-black uppercase tracking-wider bg-[#177E89]/30 !text-[#8FE8E0] px-1.5 py-0.5 rounded-full">
+            <span className="flex-1 text-left">Mi Catálogo Online & QR</span>
+            <span className="text-[8px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
               Online
             </span>
           </button>
@@ -1281,15 +1279,15 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             type="button"
             title="Atencion y ventas automatizadas en WhatsApp con IA conectada a tu inventario en tiempo real"
             onClick={() => { setModalIaVisible(true); setSidebarAbierto(false); }}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer !text-white bg-white/5 hover:bg-white/10 hover:scale-[1.01] active:scale-[0.99] transition-all mt-2 border border-white/10 shadow-sm"
+            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors mt-1"
           >
-            <div className="w-4 h-4 flex items-center justify-center text-[#5BC0BE]">
+            <div className="w-4 h-4 flex items-center justify-center text-slate-400">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
-            <span className="flex-1 text-left font-semibold">Asistente IA WhatsApp</span>
-            <span className="text-[8px] font-black uppercase tracking-wider bg-white/10 !text-[#CFEFEC] px-1.5 py-0.5 rounded-full border border-white/10">
+            <span className="flex-1 text-left">Asistente IA WhatsApp</span>
+            <span className="text-[8px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
               24/7
             </span>
           </button>
@@ -1297,10 +1295,10 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         </nav>
 
         {/* Salir al Hub */}
-        <div className="p-3 border-t border-white/10">
+        <div className="p-4 border-t border-slate-100">
           <button
             onClick={onSalir}
-            className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 !text-[#B9DEDA] hover:!text-white transition-colors cursor-pointer"
+            className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left"
           >
             ← Salir al Hub
           </button>

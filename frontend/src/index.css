@@ -11,39 +11,14 @@
    Ver: https://tailwindcss.com/docs/dark-mode */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Efecto "glare hover" (basado en react-bits GlareHover) para los ítems de
-   navegación del sidebar en las 4 verticales — un destello diagonal que
-   cruza el botón al pasar el mouse, en vez del bloque plano/duro anterior. */
+/* Navegación institucional: la selección se reconoce por jerarquía y
+   contraste, no por destellos o animaciones decorativas. */
 .sidebar-glare {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 .sidebar-glare::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0;
-  background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.32) 50%, transparent 58%);
-  background-size: 220% 220%;
-  background-position: -120% -120%;
-  transition: background-position 650ms ease, opacity 650ms ease;
-}
-.sidebar-glare:hover::before {
-  opacity: 1;
-  background-position: 120% 120%;
-}
-/* Solo el ítem seleccionado repite el destello solo — a los demás, aunque
-   tengan la clase base para reaccionar al hover, no les queda ningún resto
-   visible en reposo (por eso el opacity: 0 de arriba). */
-.sidebar-glare--active::before {
-  opacity: 1;
-  animation: sidebar-glare-sweep 2.8s ease-in-out infinite;
-}
-@keyframes sidebar-glare-sweep {
-  0%, 100% { background-position: -120% -120%; opacity: 0; }
-  50% { background-position: 120% 120%; opacity: 1; }
+  content: none;
 }
 
 /* Botones "vidrio" con reflejo especular — reemplazan los bg-sky-600 planos
