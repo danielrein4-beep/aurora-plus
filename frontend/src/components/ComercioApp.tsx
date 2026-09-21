@@ -681,6 +681,19 @@ function DashboardGeneralComercio({
 
   return (
     <div className="space-y-5 animate-fade-in">
+      {/* ── ENCABEZADO ── */}
+      <div className="rounded-3xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-teal-50 via-white to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1">
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider bg-teal-500/10 border border-teal-500/20 rounded-full px-2.5 py-1">
+              {fechaHoyLarga}
+            </span>
+            <h2 className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">{saludo} — {nombreNegocio}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Así está tu negocio ahora mismo.</p>
+          </div>
+        </div>
+      </div>
+
       {/* ── CHECKLIST DE PRIMEROS PASOS (solo mientras el negocio está empezando) ── */}
       {mostrarChecklist && (
         <section className="rounded-3xl p-6 border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-white to-white dark:from-teal-500/10 dark:via-slate-900 dark:to-slate-900 shadow-sm space-y-4">
