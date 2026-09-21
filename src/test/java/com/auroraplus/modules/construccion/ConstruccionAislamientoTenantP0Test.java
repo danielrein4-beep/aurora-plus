@@ -1350,10 +1350,27 @@ public class ConstruccionAislamientoTenantP0Test {
         assertEquals(5, resp1.getBody().getCantidadTotalPersonal(), "Total personal debe ser la suma de oficiales y ayudantes");
         assertEquals("ACTIVA", resp1.getBody().getEstado());
 
-        // 2. Reintento idempotente devuelve el mismo ID
+        // 2. Reintento idempotente devuelve el mismo ID con el payload idéntico
         ResponseEntity<CuadrillaConstruccionEntity> respReintento = construccionController.registrarCuadrilla(proyId, cd, ik);
         assertEquals(HttpStatus.OK, respReintento.getStatusCode());
         assertEquals(cdId, respReintento.getBody().getId());
+
+        // 2.1 Reintento con la misma clave pero payload alterado (ej. cambio en oficiales) es rechazado con 409
+        CuadrillaConstruccionEntity cdPayloadAlterado = new CuadrillaConstruccionEntity();
+        cdPayloadAlterado.setCodigo(cd.getCodigo());
+        cdPayloadAlterado.setNombre(cd.getNombre());
+        cdPayloadAlterado.setEspecialidad(cd.getEspecialidad());
+        cdPayloadAlterado.setFrenteTrabajo(cd.getFrenteTrabajo());
+        cdPayloadAlterado.setCapatazResponsable(cd.getCapatazResponsable());
+        cdPayloadAlterado.setCantidadOficiales(10); // Alterado de 2 a 10
+        cdPayloadAlterado.setCantidadAyudantes(3);
+        cdPayloadAlterado.setPartidaId(partId);
+        cdPayloadAlterado.setFechaInicio(cd.getFechaInicio());
+
+        ResponseStatusException exPayloadMismatch = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarCuadrilla(proyId, cdPayloadAlterado, ik)
+        );
+        assertEquals(HttpStatus.CONFLICT, exPayloadMismatch.getStatusCode(), "Debe rechazar reintento con payload distinto bajo la misma clave");
 
         List<CuadrillaConstruccionEntity> lista = construccionController.listarCuadrillas(proyId);
         assertEquals(1, lista.size(), "No debe haber cuadrillas duplicadas por reintento idempotente");

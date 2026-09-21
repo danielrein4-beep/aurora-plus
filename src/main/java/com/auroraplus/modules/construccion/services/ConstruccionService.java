@@ -72,7 +72,7 @@ public class ConstruccionService {
 
     public static final Set<String> ESPECIALIDADES_CUADRILLA_VALIDAS = Set.of(
             "CONCRETO_Y_ENCOFRADO", "ACERO_Y_CABILLAS", "ALBANILERIA", "MOVIMIENTO_TIERRAS",
-            "INSTALACIONES_ELECTRICAS", "INSTALACIONES_SANITARIAS", "ACABADOS_Y_PINTURA", "GENERAL"
+            "INSTALACIONES_ELECTRICAS", "INSTALACIONES_SANITARIAS", "ACABADOS_Y_PINTURA", "SOLDADURA_ESTRUCTURAL", "GENERAL"
     );
 
     @Autowired
@@ -937,10 +937,13 @@ public class ConstruccionService {
             MaquinariaConstruccionEntity guardado = maquinariaRepository.save(req);
 
             if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                String json = null;
+                String json;
                 try {
                     json = objectMapper.writeValueAsString(guardado);
-                } catch (Exception ignored) {}
+                } catch (Exception ex) {
+                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error serializando resultado de riesgo: " + ex.getMessage(), ex);
+                }
                 idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
             }
 
@@ -1144,7 +1147,13 @@ public class ConstruccionService {
 
         // Idempotencia
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
-                ? calcularSha256("RIESGO|" + proyectoId + "|" + codigoLimpio + "|" + score)
+                ? calcularSha256("RIESGO|" + proyectoId + "|" + codigoLimpio + "|" +
+                    (req.getProcesoFrente() != null ? req.getProcesoFrente().trim() : "") + "|" +
+                    (req.getPeligro() != null ? req.getPeligro().trim() : "") + "|" +
+                    (req.getRiesgoConsecuencia() != null ? req.getRiesgoConsecuencia().trim() : "") + "|" +
+                    (req.getCategoria() != null ? req.getCategoria().trim() : "") + "|" +
+                    req.getProbabilidad() + "|" + req.getSeveridad() + "|" +
+                    (req.getMedidasControl() != null ? req.getMedidasControl().trim() : ""))
                 : null;
 
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
@@ -1182,10 +1191,13 @@ public class ConstruccionService {
             RiesgoConstruccionEntity guardado = riesgoRepository.save(req);
 
             if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                String json = null;
+                String json;
                 try {
                     json = objectMapper.writeValueAsString(guardado);
-                } catch (Exception ignored) {}
+                } catch (Exception ex) {
+                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error serializando resultado de documento BIM: " + ex.getMessage(), ex);
+                }
                 idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
             }
 
@@ -1279,7 +1291,10 @@ public class ConstruccionService {
 
         // Idempotencia
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
-                ? calcularSha256("BIM|" + proyectoId + "|" + codigoLimpio + "|" + versionLimpia)
+                ? calcularSha256("BIM|" + proyectoId + "|" + codigoLimpio + "|" + versionLimpia + "|" +
+                    (req.getTitulo() != null ? req.getTitulo().trim() : "") + "|" +
+                    (req.getDisciplina() != null ? req.getDisciplina().trim() : "") + "|" +
+                    (req.getFormato() != null ? req.getFormato().trim() : ""))
                 : null;
 
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
@@ -1320,10 +1335,13 @@ public class ConstruccionService {
             DocumentoBimEntity guardado = documentoBimRepository.save(req);
 
             if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                String json = null;
+                String json;
                 try {
                     json = objectMapper.writeValueAsString(guardado);
-                } catch (Exception ignored) {}
+                } catch (Exception ex) {
+                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error serializando resultado de RFI: " + ex.getMessage(), ex);
+                }
                 idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
             }
 
@@ -1419,7 +1437,12 @@ public class ConstruccionService {
 
         // Idempotencia
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
-                ? calcularSha256("RFI|" + proyectoId + "|" + numLimpio)
+                ? calcularSha256("RFI|" + proyectoId + "|" + numLimpio + "|" +
+                    (req.getAsunto() != null ? req.getAsunto().trim() : "") + "|" +
+                    (req.getDisciplina() != null ? req.getDisciplina().trim() : "") + "|" +
+                    (req.getPreguntaConsulta() != null ? req.getPreguntaConsulta().trim() : "") + "|" +
+                    (req.getSolicitante() != null ? req.getSolicitante().trim() : "") + "|" +
+                    (req.getDocumentoBimId() != null ? req.getDocumentoBimId() : ""))
                 : null;
 
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
@@ -1529,6 +1552,9 @@ public class ConstruccionService {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
+        if (proyectoId == null || req == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Proyecto y datos de cuadrilla requeridos");
+        }
         proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
 
@@ -1541,11 +1567,19 @@ public class ConstruccionService {
         if (req.getFrenteTrabajo() == null || req.getFrenteTrabajo().trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El frente de trabajo es obligatorio");
         }
-        if (req.getCapatazResponsable() == null || req.getCapatazResponsable().trim().isEmpty()) {
+        
+        // Soporte robusto tanto para capatazResponsable como para capatazLider
+        String capataz = req.getCapatazResponsable();
+        if (capataz == null || capataz.trim().isEmpty()) {
+            capataz = req.getCapatazLider();
+        }
+        if (capataz == null || capataz.trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El capataz o maestro de obra responsable es obligatorio");
         }
+        req.setCapatazResponsable(capataz.trim());
+
         if (req.getFechaInicio() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de inicio de la cuadrilla es obligatoria");
+            req.setFechaInicio(java.time.LocalDate.now());
         }
 
         if (req.getPartidaId() != null) {
@@ -1559,16 +1593,14 @@ public class ConstruccionService {
         String codigoLimpio = req.getCodigo().trim().toUpperCase();
 
         if (req.getEspecialidad() == null || !ESPECIALIDADES_CUADRILLA_VALIDAS.contains(req.getEspecialidad().trim().toUpperCase())) {
-            req.setEspecialidad("GENERAL");
-        } else {
-            req.setEspecialidad(req.getEspecialidad().trim().toUpperCase());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Especialidad de cuadrilla no válida: '" + req.getEspecialidad() + "'. Valores permitidos: " + ESPECIALIDADES_CUADRILLA_VALIDAS);
         }
+        req.setEspecialidad(req.getEspecialidad().trim().toUpperCase());
 
         if (req.getEstado() == null || !ESTADOS_CUADRILLA_VALIDOS.contains(req.getEstado().trim().toUpperCase())) {
-            req.setEstado("ACTIVA");
-        } else {
-            req.setEstado(req.getEstado().trim().toUpperCase());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de cuadrilla no válido: '" + req.getEstado() + "'. Valores permitidos: " + ESTADOS_CUADRILLA_VALIDOS);
         }
+        req.setEstado(req.getEstado().trim().toUpperCase());
 
         int oficiales = (req.getCantidadOficiales() != null && req.getCantidadOficiales() >= 0) ? req.getCantidadOficiales() : 1;
         int ayudantes = (req.getCantidadAyudantes() != null && req.getCantidadAyudantes() >= 0) ? req.getCantidadAyudantes() : 1;
@@ -1576,9 +1608,17 @@ public class ConstruccionService {
         req.setCantidadAyudantes(ayudantes);
         req.setCantidadTotalPersonal(oficiales + ayudantes);
 
-        // Idempotencia
+        // Idempotencia: hash completo de todos los campos que definen la cuadrilla
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
-                ? calcularSha256("CUADRILLA|" + proyectoId + "|" + codigoLimpio)
+                ? calcularSha256("CUADRILLA|" + proyectoId + "|" + codigoLimpio + "|" +
+                    req.getNombre().trim() + "|" +
+                    req.getFrenteTrabajo().trim() + "|" +
+                    req.getEspecialidad() + "|" +
+                    req.getCapatazResponsable().trim() + "|" +
+                    req.getCantidadOficiales() + "|" +
+                    req.getCantidadAyudantes() + "|" +
+                    (req.getPartidaId() != null ? req.getPartidaId() : "") + "|" +
+                    req.getFechaInicio())
                 : null;
 
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
@@ -1590,7 +1630,9 @@ public class ConstruccionService {
                 if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
                     try {
                         return objectMapper.readValue(idemp.getResultadoJson(), CuadrillaConstruccionEntity.class);
-                    } catch (Exception ignored) {}
+                    } catch (Exception ex) {
+                        // Fallback a base de datos por recursoId
+                    }
                 }
                 if (idemp.getRecursoId() != null) {
                     return cuadrillaRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
@@ -1599,15 +1641,12 @@ public class ConstruccionService {
             }
         }
 
-        // Unicidad dentro del proyecto
-        if (cuadrillaRepository.findByTenantIdAndProyectoIdAndCodigo(tenantId, proyectoId, codigoLimpio).isPresent()) {
-            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-            }
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe una cuadrilla con el código " + codigoLimpio + " en este proyecto");
-        }
-
         try {
+            // Unicidad dentro del proyecto
+            if (cuadrillaRepository.findByTenantIdAndProyectoIdAndCodigo(tenantId, proyectoId, codigoLimpio).isPresent()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe una cuadrilla con el código " + codigoLimpio + " en este proyecto");
+            }
+
             req.setId(null);
             req.setTenantId(tenantId);
             req.setProyectoId(proyectoId);
@@ -1616,10 +1655,13 @@ public class ConstruccionService {
             CuadrillaConstruccionEntity guardado = cuadrillaRepository.save(req);
 
             if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                String json = null;
+                String json;
                 try {
                     json = objectMapper.writeValueAsString(guardado);
-                } catch (Exception ignored) {}
+                } catch (Exception ex) {
+                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error serializando resultado de idempotencia: " + ex.getMessage(), ex);
+                }
                 idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
             }
 
@@ -1637,13 +1679,14 @@ public class ConstruccionService {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
+
         CuadrillaConstruccionEntity cuadrilla = cuadrillaRepository.findByTenantIdAndId(tenantId, id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cuadrilla no encontrada para este tenant"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cuadrilla no encontrada"));
 
         if (nuevoEstado != null && !nuevoEstado.trim().isEmpty()) {
             String est = nuevoEstado.trim().toUpperCase();
             if (!ESTADOS_CUADRILLA_VALIDOS.contains(est)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de cuadrilla inválido: " + est);
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado no válido para cuadrilla: '" + nuevoEstado + "'. Valores permitidos: " + ESTADOS_CUADRILLA_VALIDOS);
             }
             cuadrilla.setEstado(est);
         }

@@ -75,6 +75,14 @@ import {
   cambiarEstadoCuadrillaConstruccionApi,
 } from '../api';
 
+interface NavItemConstruccion {
+  id: TabConstruccion;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string; stroke?: number }>;
+  count?: number;
+  badge?: string;
+}
+
 interface Props {
   onSalir?: () => void;
 }
@@ -131,11 +139,12 @@ export default function ConstruccionApp({ onSalir }: Props) {
     codigo: '',
     nombre: '',
     frenteTrabajo: '',
-    capatazLider: '',
+    capatazResponsable: '',
     cantidadOficiales: 2,
     cantidadAyudantes: 4,
-    especialidad: 'ENCOFRADO_CONCRETO',
+    especialidad: 'CONCRETO_Y_ENCOFRADO',
     partidaId: '',
+    fechaInicio: new Date().toISOString().split('T')[0],
     observaciones: ''
   });
 
@@ -495,9 +504,9 @@ export default function ConstruccionApp({ onSalir }: Props) {
         </div>
       )}
 
-      {/* NAVEGACIÓN PRINCIPAL */}
+      {/* NAVEGACIÓN PRINCIPAL INSTITUCIONAL */}
       <nav className="border-b border-slate-800/80 bg-[#0d1322]/50 px-4 flex items-center gap-1 overflow-x-auto">
-        {[
+        {([
           { id: 'resumen', label: 'Resumen Ejecutivo', icon: IconChart },
           { id: 'proyectos', label: 'Proyectos & Contratos', icon: IconConstruction, count: proyectos.length },
           { id: 'presupuesto', label: 'Capítulos & Partidas', icon: IconFileText, count: partidas.length },
@@ -509,13 +518,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
           { id: 'bim', label: 'BIM & Planos (RFIs)', icon: IconFileText, count: documentosBim.length + rfis.length },
           { id: 'bitacora', label: 'Libro Diario / Bitácora', icon: IconCalendar, count: bitacora.length },
           { id: 'cuadrillas', label: 'Cuadrillas & Frentes', icon: IconUsers, count: cuadrillas.length },
-        ].map((item) => {
+        ] as NavItemConstruccion[]).map((item) => {
           const Icon = item.icon;
           const activa = tabActiva === item.id;
           return (
             <button
               key={item.id}
-              onClick={() => setTabActiva(item.id as TabConstruccion)}
+              onClick={() => setTabActiva(item.id)}
               className={
                 'flex items-center gap-2 px-3.5 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap cursor-pointer ' +
                 (activa
@@ -530,9 +539,9 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   {item.count}
                 </span>
               )}
-              {(item as any).badge && (
+              {item.badge && (
                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold uppercase">
-                  {(item as any).badge}
+                  {item.badge}
                 </span>
               )}
             </button>
@@ -2117,13 +2126,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
             <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shadow-lg shadow-violet-500/5">
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/5">
                     <IconUsers size={24} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="font-bold text-lg text-white">Planificación de Cuadrillas & Frentes Operativos</h2>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/25">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25">
                         Rendimiento de Mano de Obra
                       </span>
                     </div>
@@ -2136,7 +2145,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 <button
                   onClick={() => setModalCuadrillaAbierto(true)}
                   disabled={!proyectoActivo}
-                  className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-violet-600/20 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer"
                 >
                   <IconUsers size={16} />
                   <span>+ Asignar Nueva Cuadrilla</span>
@@ -2147,27 +2156,27 @@ export default function ConstruccionApp({ onSalir }: Props) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
                 <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
                   <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Cuadrillas Activas</div>
-                  <div className="text-2xl font-black text-violet-400 mt-1">
+                  <div className="text-2xl font-black text-amber-400 mt-1">
                     {cuadrillas.filter((c) => c.estado === 'ACTIVA').length}
                     <span className="text-xs font-normal text-slate-500 ml-1.5">/ {cuadrillas.length} tot.</span>
                   </div>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
                   <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Oficiales & Maestros</div>
-                  <div className="text-2xl font-black text-amber-400 mt-1">
+                  <div className="text-2xl font-black text-sky-400 mt-1">
                     {cuadrillas.reduce((acc, c) => acc + (Number(c.cantidadOficiales) || 0), 0)}
                   </div>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
                   <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Ayudantes & Obreros</div>
-                  <div className="text-2xl font-black text-sky-400 mt-1">
+                  <div className="text-2xl font-black text-slate-200 mt-1">
                     {cuadrillas.reduce((acc, c) => acc + (Number(c.cantidadAyudantes) || 0), 0)}
                   </div>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
                   <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Dotación Total</div>
                   <div className="text-2xl font-black text-emerald-400 mt-1">
-                    {cuadrillas.reduce((acc, c) => acc + (Number(c.totalPersonal) || (Number(c.cantidadOficiales) || 0) + (Number(c.cantidadAyudantes) || 0)), 0)}
+                    {cuadrillas.reduce((acc, c) => acc + (Number(c.cantidadTotalPersonal) || (Number(c.cantidadOficiales) || 0) + (Number(c.cantidadAyudantes) || 0)), 0)}
                     <span className="text-xs font-normal text-slate-500 ml-1.5">obreros</span>
                   </div>
                 </div>
@@ -2178,13 +2187,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
             <div className="flex flex-wrap items-center justify-between gap-3 bg-[#101726]/70 border border-slate-800 rounded-xl p-3">
               <div className="flex items-center gap-2 overflow-x-auto text-xs">
                 <span className="text-slate-400 font-semibold px-2">Especialidad:</span>
-                {['TODAS', 'ENCOFRADO_CONCRETO', 'ACERO_CABILLAS', 'ALBANILERIA_BLOQUE', 'INSTALACIONES_ELECTRICAS', 'INSTALACIONES_SANITARIAS', 'ACABADOS_PINTURA', 'MOVIMIENTO_TIERRA', 'SOLDADURA_ESTRUCTURAL'].map((esp) => (
+                {['TODAS', 'CONCRETO_Y_ENCOFRADO', 'ACERO_Y_CABILLAS', 'ALBANILERIA', 'MOVIMIENTO_TIERRAS', 'INSTALACIONES_ELECTRICAS', 'INSTALACIONES_SANITARIAS', 'ACABADOS_Y_PINTURA', 'SOLDADURA_ESTRUCTURAL', 'GENERAL'].map((esp) => (
                   <button
                     key={esp}
                     onClick={() => setFiltroEspecialidadCuadrilla(esp)}
                     className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
                       filtroEspecialidadCuadrilla === esp
-                        ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                     }`}
                   >
@@ -2203,7 +2212,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       <th className="p-4">Código & Cuadrilla</th>
                       <th className="p-4">Frente de Trabajo</th>
                       <th className="p-4">Especialidad</th>
-                      <th className="p-4">Capataz / Líder</th>
+                      <th className="p-4">Capataz / Maestro</th>
                       <th className="p-4 text-center">Oficiales</th>
                       <th className="p-4 text-center">Ayudantes</th>
                       <th className="p-4 text-center">Total</th>
@@ -2234,17 +2243,17 @@ export default function ConstruccionApp({ onSalir }: Props) {
                               </span>
                             </td>
                             <td className="p-4 text-slate-300 font-medium">
-                              {cuad.capatazLider}
-                            </td>
-                            <td className="p-4 text-center font-bold text-amber-400">
-                              {cuad.cantidadOficiales}
+                              {cuad.capatazResponsable || cuad.capatazLider}
                             </td>
                             <td className="p-4 text-center font-bold text-sky-400">
+                              {cuad.cantidadOficiales}
+                            </td>
+                            <td className="p-4 text-center font-bold text-slate-300">
                               {cuad.cantidadAyudantes}
                             </td>
                             <td className="p-4 text-center">
                               <span className="font-black text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                                {cuad.totalPersonal || cuad.cantidadOficiales + cuad.cantidadAyudantes}
+                                {cuad.cantidadTotalPersonal || cuad.cantidadOficiales + cuad.cantidadAyudantes}
                               </span>
                             </td>
                             <td className="p-4 max-w-[200px] truncate text-slate-400 text-[11px]">
@@ -2261,11 +2270,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                   cuad.estado === 'ACTIVA'
                                     ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                                    : cuad.estado === 'PAUSADA'
+                                    : cuad.estado === 'EN_STANDBY'
                                     ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                                     : cuad.estado === 'REASIGNADA'
                                     ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
-                                    : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                                    : 'bg-slate-700 text-slate-300 border-slate-600'
                                 }`}
                               >
                                 {cuad.estado}
@@ -2294,36 +2303,36 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                   <button
                                     onClick={async () => {
                                       try {
-                                        await cambiarEstadoCuadrillaConstruccionApi(cuad.id!, 'PAUSADA');
-                                        notificarExito(`Cuadrilla ${cuad.codigo} pausada.`);
+                                        await cambiarEstadoCuadrillaConstruccionApi(cuad.id!, 'EN_STANDBY');
+                                        notificarExito(`Cuadrilla ${cuad.codigo} puesta en standby.`);
                                         if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
                                       } catch (e: any) {
                                         setErrorGlobal(e.message);
                                       }
                                     }}
-                                    title="Pausar cuadrilla"
+                                    title="Poner en Standby"
                                     className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 text-[11px] font-semibold cursor-pointer"
                                   >
-                                    Pausar
+                                    Standby
                                   </button>
                                 )}
-                                {cuad.estado !== 'DISUELTA' && (
+                                {cuad.estado !== 'FINALIZADA' && (
                                   <button
                                     onClick={async () => {
-                                      if (window.confirm(`¿Desmovilizar y disolver cuadrilla ${cuad.codigo}?`)) {
+                                      if (window.confirm(`¿Finalizar y desmovilizar cuadrilla ${cuad.codigo}?`)) {
                                         try {
-                                          await cambiarEstadoCuadrillaConstruccionApi(cuad.id!, 'DISUELTA');
-                                          notificarExito(`Cuadrilla ${cuad.codigo} disuelta.`);
+                                          await cambiarEstadoCuadrillaConstruccionApi(cuad.id!, 'FINALIZADA');
+                                          notificarExito(`Cuadrilla ${cuad.codigo} finalizada.`);
                                           if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
                                         } catch (e: any) {
                                           setErrorGlobal(e.message);
                                         }
                                       }
                                     }}
-                                    title="Disolver cuadrilla"
-                                    className="px-2 py-1 rounded bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 text-[11px] font-semibold cursor-pointer"
+                                    title="Finalizar cuadrilla"
+                                    className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600 text-[11px] font-semibold cursor-pointer"
                                   >
-                                    Disolver
+                                    Finalizar
                                   </button>
                                 )}
                               </div>
@@ -3584,7 +3593,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
           <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-violet-500/20 text-violet-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
                   <IconUsers size={18} />
                 </div>
                 <h3 className="font-bold text-base text-white">Asignar Nueva Cuadrilla de Obra</h3>
@@ -3611,10 +3620,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       codigo: formCuadrilla.codigo.trim(),
                       nombre: formCuadrilla.nombre.trim(),
                       frenteTrabajo: formCuadrilla.frenteTrabajo.trim(),
-                      capatazLider: formCuadrilla.capatazLider.trim(),
+                      capatazResponsable: formCuadrilla.capatazResponsable.trim(),
                       cantidadOficiales: Number(formCuadrilla.cantidadOficiales) || 0,
                       cantidadAyudantes: Number(formCuadrilla.cantidadAyudantes) || 0,
                       especialidad: formCuadrilla.especialidad,
+                      fechaInicio: formCuadrilla.fechaInicio,
                       partidaId: formCuadrilla.partidaId ? Number(formCuadrilla.partidaId) : undefined,
                       observaciones: formCuadrilla.observaciones.trim() || undefined
                     },
@@ -3626,11 +3636,12 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     codigo: '',
                     nombre: '',
                     frenteTrabajo: '',
-                    capatazLider: '',
+                    capatazResponsable: '',
                     cantidadOficiales: 2,
                     cantidadAyudantes: 4,
-                    especialidad: 'ENCOFRADO_CONCRETO',
+                    especialidad: 'CONCRETO_Y_ENCOFRADO',
                     partidaId: '',
+                    fechaInicio: new Date().toISOString().split('T')[0],
                     observaciones: ''
                   });
                   recargarSubrecursosProyecto(proyectoSeleccionadoId);
@@ -3648,10 +3659,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   <input
                     type="text"
                     required
-                    placeholder="Ej. CUAD-ENC-01"
+                    placeholder="Ej. CD-ENC-01"
                     value={formCuadrilla.codigo}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, codigo: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none font-mono"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none font-mono"
                   />
                 </div>
                 <div>
@@ -3659,16 +3670,17 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   <select
                     value={formCuadrilla.especialidad}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, especialidad: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                   >
-                    <option value="ENCOFRADO_CONCRETO">Encofrado & Concreto</option>
-                    <option value="ACERO_CABILLAS">Acero & Cabillas</option>
-                    <option value="ALBANILERIA_BLOQUE">Albañilería & Bloque</option>
+                    <option value="CONCRETO_Y_ENCOFRADO">Concreto & Encofrado</option>
+                    <option value="ACERO_Y_CABILLAS">Acero & Cabillas</option>
+                    <option value="ALBANILERIA">Albañilería & Bloque</option>
+                    <option value="MOVIMIENTO_TIERRAS">Movimiento de Tierras</option>
                     <option value="INSTALACIONES_ELECTRICAS">Instalaciones Eléctricas</option>
                     <option value="INSTALACIONES_SANITARIAS">Instalaciones Sanitarias</option>
-                    <option value="ACABADOS_PINTURA">Acabados & Pintura</option>
-                    <option value="MOVIMIENTO_TIERRA">Movimiento de Tierra</option>
+                    <option value="ACABADOS_Y_PINTURA">Acabados & Pintura</option>
                     <option value="SOLDADURA_ESTRUCTURAL">Soldadura Estructural</option>
+                    <option value="GENERAL">General de Obra</option>
                   </select>
                 </div>
               </div>
@@ -3681,7 +3693,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   placeholder="Ej. Cuadrilla Encofrado Losa Nivel 2"
                   value={formCuadrilla.nombre}
                   onChange={(e) => setFormCuadrilla({ ...formCuadrilla, nombre: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                 />
               </div>
 
@@ -3694,18 +3706,18 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     placeholder="Ej. Sector B - Losa 2"
                     value={formCuadrilla.frenteTrabajo}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, frenteTrabajo: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Capataz / Líder *</label>
+                  <label className="block text-slate-400 mb-1 font-semibold">Capataz / Responsable *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. José Castillo"
-                    value={formCuadrilla.capatazLider}
-                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, capatazLider: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none"
+                    value={formCuadrilla.capatazResponsable}
+                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, capatazResponsable: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -3719,7 +3731,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     required
                     value={formCuadrilla.cantidadOficiales}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, cantidadOficiales: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold text-amber-400 focus:border-violet-500 focus:outline-none"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold text-sky-400 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -3730,7 +3742,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     required
                     value={formCuadrilla.cantidadAyudantes}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, cantidadAyudantes: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold text-sky-400 focus:border-violet-500 focus:outline-none"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold text-slate-300 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -3741,20 +3753,32 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Partida COVENIN Vinculada (Opcional)</label>
-                <select
-                  value={formCuadrilla.partidaId}
-                  onChange={(e) => setFormCuadrilla({ ...formCuadrilla, partidaId: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none text-xs"
-                >
-                  <option value="">General de Obra (Sin vinculación directa)</option>
-                  {partidas.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.codigoCovenin} - {p.descripcion.substring(0, 45)}...
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Fecha de Inicio *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formCuadrilla.fechaInicio}
+                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, fechaInicio: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Partida COVENIN Vinculada</label>
+                  <select
+                    value={formCuadrilla.partidaId}
+                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, partidaId: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none text-xs"
+                  >
+                    <option value="">General de Obra (Sin vinculación directa)</option>
+                    {partidas.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.codigoCovenin} - {p.descripcion.substring(0, 30)}...
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -3764,7 +3788,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   placeholder="Turno, herramientas asignadas, requerimientos de EPP..."
                   value={formCuadrilla.observaciones}
                   onChange={(e) => setFormCuadrilla({ ...formCuadrilla, observaciones: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-violet-500 focus:outline-none"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                 />
               </div>
 
@@ -3779,7 +3803,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 <button
                   type="submit"
                   disabled={guardandoCuadrilla}
-                  className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold transition shadow-lg shadow-violet-600/20 cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold transition shadow-lg shadow-amber-500/20 cursor-pointer"
                 >
                   {guardandoCuadrilla ? 'Registrando...' : 'Asignar Cuadrilla'}
                 </button>
@@ -3788,7 +3812,6 @@ export default function ConstruccionApp({ onSalir }: Props) {
           </div>
         </div>
       )}
-
 
       {/* MODAL: REGISTRAR NUEVA MAQUINARIA */}
       {modalMaquinariaAbierto && (

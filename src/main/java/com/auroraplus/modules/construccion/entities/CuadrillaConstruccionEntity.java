@@ -91,6 +91,14 @@ public class CuadrillaConstruccionEntity {
     public String getFrenteTrabajo() { return frenteTrabajo; }
     public void setFrenteTrabajo(String frenteTrabajo) { this.frenteTrabajo = frenteTrabajo; }
 
+    
+    public String getCapatazLider() { return capatazResponsable; }
+    public void setCapatazLider(String capatazLider) {
+        if (this.capatazResponsable == null || this.capatazResponsable.trim().isEmpty()) {
+            this.capatazResponsable = capatazLider;
+        }
+    }
+
     public String getCapatazResponsable() { return capatazResponsable; }
     public void setCapatazResponsable(String capatazResponsable) { this.capatazResponsable = capatazResponsable; }
 

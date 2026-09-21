@@ -5061,12 +5061,18 @@ export interface CuadrillaConstruccionApi {
   codigo: string;
   nombre: string;
   frenteTrabajo: string;
-  capatazLider: string;
+  capatazResponsable: string;
+  capatazLider?: string;
   cantidadOficiales: number;
   cantidadAyudantes: number;
+  cantidadTotalPersonal?: number;
   totalPersonal?: number;
-  especialidad: string; // ENCOFRADO_CONCRETO, ALBANILERIA_BLOQUE, ACERO_CABILLAS, INSTALACIONES_ELECTRICAS, INSTALACIONES_SANITARIAS, ACABADOS_PINTURA, MOVIMIENTO_TIERRA, SOLDADURA_ESTRUCTURAL
-  estado: string; // ACTIVA, PAUSADA, DISUELTA, REASIGNADA
+  especialidad: string; // CONCRETO_Y_ENCOFRADO, ACERO_Y_CABILLAS, ALBANILERIA, MOVIMIENTO_TIERRAS, INSTALACIONES_ELECTRICAS, INSTALACIONES_SANITARIAS, ACABADOS_Y_PINTURA, SOLDADURA_ESTRUCTURAL, GENERAL
+  rendimientoDiarioEstimado?: number;
+  unidadMedidaRendimiento?: string;
+  estado: string; // ACTIVA, EN_STANDBY, REASIGNADA, FINALIZADA
+  fechaInicio: string;
+  fechaFin?: string;
   observaciones?: string;
   createdAt?: string;
   updatedAt?: string;
