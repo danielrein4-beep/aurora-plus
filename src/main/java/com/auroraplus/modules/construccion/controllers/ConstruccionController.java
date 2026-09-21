@@ -2,6 +2,7 @@ package com.auroraplus.modules.construccion.controllers;
 
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.construccion.entities.*;
+import com.auroraplus.modules.construccion.dtos.DashboardProyectoDTO;
 import com.auroraplus.modules.construccion.services.ConstruccionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -57,6 +58,22 @@ public class ConstruccionController {
     public ResponseEntity<Void> eliminarProyecto(@PathVariable Long id) {
         construccionService.eliminarProyecto(requireTenant(), id);
         return ResponseEntity.noContent().build();
+    }
+
+    
+    @PatchMapping("/proyectos/{id}/estado")
+    public ResponseEntity<ProyectoConstruccionEntity> cambiarEstadoProyecto(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> payload) {
+        String nuevoEstado = payload.get("nuevoEstado");
+        String motivo = payload.get("motivo");
+        String usuario = payload.get("usuario");
+        return ResponseEntity.ok(construccionService.cambiarEstadoProyecto(requireTenant(), id, nuevoEstado, motivo, usuario));
+    }
+
+    @GetMapping("/proyectos/{id}/dashboard")
+    public ResponseEntity<DashboardProyectoDTO> obtenerDashboardProyecto(@PathVariable Long id) {
+        return ResponseEntity.ok(construccionService.obtenerDashboardProyecto(requireTenant(), id));
     }
 
     // --- CAPÍTULOS ---
@@ -137,6 +154,15 @@ public class ConstruccionController {
         return construccionService.actualizarEstadoValuacion(requireTenant(), id, estado)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+        @PostMapping("/valuaciones/{id}/reverso")
+    public ResponseEntity<ValuacionConstruccionEntity> reversarValuacion(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String motivo = body != null ? body.get("motivo") : null;
+        String usuario = body != null ? body.get("usuario") : null;
+        return ResponseEntity.ok(construccionService.reversarValuacion(requireTenant(), id, motivo, usuario));
     }
 
     // --- INSUMOS ---

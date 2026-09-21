@@ -1,5 +1,7 @@
 package com.auroraplus.modules.construccion;
 
+import com.auroraplus.modules.construccion.dtos.DashboardProyectoDTO;
+
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.construccion.controllers.ConstruccionController;
@@ -1424,5 +1426,264 @@ public class ConstruccionAislamientoTenantP0Test {
                 construccionController.registrarCuadrilla(proyAjenoId, cdCrossPartida, "IK-CD-CROSS")
         );
         assertEquals(HttpStatus.BAD_REQUEST, exCrossPart.getStatusCode());
+    }
+
+    // =========================================================================
+    // FASE 1: FLUJO REAL DE OBRA, CICLO DE VIDA, VALUACIONES Y DASHBOARD VIVO
+    // =========================================================================
+
+    @Test
+    void fase1_transicionesCicloVidaProyecto_y_bloqueoOperativoEnSuspendido() {
+        long tenant = 88501L;
+        TenantContext.setCurrentTenant(tenant);
+
+        // 1. Proyecto arranca en BORRADOR
+        ProyectoConstruccionEntity proy = new ProyectoConstruccionEntity();
+        proy.setCodigo("PROY-FASE1-01");
+        proy.setNombre("Construcción Puente Metropolitano");
+        proy.setCliente("Gobernación");
+        proy.setEstado("BORRADOR");
+        proy.setMontoPresupuestoTotal(new BigDecimal("50000.00"));
+        ResponseEntity<ProyectoConstruccionEntity> respCrear = construccionController.crearProyecto(proy);
+        assertEquals(HttpStatus.OK, respCrear.getStatusCode());
+        Long proyId = respCrear.getBody().getId();
+        assertEquals("BORRADOR", respCrear.getBody().getEstado());
+
+        // 2. Salto inválido de BORRADOR a TERMINADO -> 400 BAD_REQUEST
+        ResponseStatusException exSalto = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoProyecto(proyId, Map.of(
+                        "nuevoEstado", "TERMINADO",
+                        "motivo", "Salto directo no permitido"
+                ))
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exSalto.getStatusCode());
+
+        // 3. Pasar a ACTIVO con auditoría
+        ResponseEntity<ProyectoConstruccionEntity> respActivo = construccionController.cambiarEstadoProyecto(proyId, Map.of(
+                "nuevoEstado", "ACTIVO",
+                "motivo", "Acta de inicio firmada",
+                "usuario", "Ing. Residente"
+        ));
+        assertEquals("ACTIVO", respActivo.getBody().getEstado());
+        assertEquals("Acta de inicio firmada", respActivo.getBody().getMotivoCambioEstado());
+        assertNotNull(respActivo.getBody().getFechaCambioEstado());
+
+        // 4. Pasar a SUSPENDIDO por contingencia
+        ResponseEntity<ProyectoConstruccionEntity> respSusp = construccionController.cambiarEstadoProyecto(proyId, Map.of(
+                "nuevoEstado", "SUSPENDIDO",
+                "motivo", "Paralización preventiva por temporal de lluvias",
+                "usuario", "Supervisor"
+        ));
+        assertEquals("SUSPENDIDO", respSusp.getBody().getEstado());
+
+        // 5. En proyecto SUSPENDIDO: intentar crear partida o valuacion -> 400 BAD_REQUEST
+        PartidaConstruccionEntity partidaBloqueada = new PartidaConstruccionEntity();
+        partidaBloqueada.setCodigoCovenin("E-111");
+        partidaBloqueada.setDescripcion("Replanteo");
+        partidaBloqueada.setUnidad("M2");
+        partidaBloqueada.setCantidadPresupuestada(new BigDecimal("100"));
+        partidaBloqueada.setPrecioUnitario(new BigDecimal("10"));
+
+        ResponseStatusException exPartidaBloqueada = assertThrows(ResponseStatusException.class, () ->
+                construccionController.crearPartida(proyId, partidaBloqueada)
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exPartidaBloqueada.getStatusCode());
+
+        ValuacionConstruccionEntity valBloqueada = new ValuacionConstruccionEntity();
+        valBloqueada.setNumeroValuacion(1);
+        valBloqueada.setPeriodoDesde(LocalDate.now());
+        valBloqueada.setPeriodoHasta(LocalDate.now().plusDays(15));
+        valBloqueada.setFechaEmision(LocalDate.now());
+        valBloqueada.setMontoBruto(new BigDecimal("1000.00"));
+        valBloqueada.setEstado("BORRADOR");
+
+        ResponseStatusException exValBloqueada = assertThrows(ResponseStatusException.class, () ->
+                construccionController.crearValuacion(proyId, valBloqueada)
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exValBloqueada.getStatusCode());
+
+        // 6. Reactivar proyecto a EN_EJECUCION / ACTIVO
+        ResponseEntity<ProyectoConstruccionEntity> respReanudar = construccionController.cambiarEstadoProyecto(proyId, Map.of(
+                "nuevoEstado", "EN_EJECUCION",
+                "motivo", "Cese de lluvias y condiciones óptimas",
+                "usuario", "Director de Obra"
+        ));
+        assertEquals("EN_EJECUCION", respReanudar.getBody().getEstado());
+
+        // Ahora sí permite crear partida
+        ResponseEntity<PartidaConstruccionEntity> respPartidaOk = construccionController.crearPartida(proyId, partidaBloqueada);
+        assertEquals(HttpStatus.OK, respPartidaOk.getStatusCode());
+
+        // 7. Culminación y Cierre: EN_EJECUCION -> TERMINADO -> CERRADO
+        construccionController.cambiarEstadoProyecto(proyId, Map.of(
+                "nuevoEstado", "TERMINADO",
+                "motivo", "Recepción provisoria de obra aprobada"
+        ));
+        ResponseEntity<ProyectoConstruccionEntity> respCerrado = construccionController.cambiarEstadoProyecto(proyId, Map.of(
+                "nuevoEstado", "CERRADO",
+                "motivo", "Finiquito final y recepción definitiva"
+        ));
+        assertEquals("CERRADO", respCerrado.getBody().getEstado());
+
+        // 8. Intentar modificar proyecto CERRADO -> 400 BAD_REQUEST (Inmutable)
+        ResponseStatusException exCerradoInmutable = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoProyecto(proyId, Map.of(
+                        "nuevoEstado", "ACTIVO",
+                        "motivo", "Intento de reapertura indebida"
+                ))
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exCerradoInmutable.getStatusCode());
+    }
+
+    @Test
+    void fase1_cicloVidaValuacion_inmutabilidadAprobadaCobrada_y_reversoAuditado() {
+        long tenant = 88502L;
+        TenantContext.setCurrentTenant(tenant);
+
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PROY-VAL-F1", "Edificio Residencial Sol");
+        Long proyId = proy.getId();
+
+        // 1. Crear valuación en BORRADOR
+        ValuacionConstruccionEntity val = new ValuacionConstruccionEntity();
+        val.setNumeroValuacion(1);
+        val.setPeriodoDesde(LocalDate.now().minusDays(15));
+        val.setPeriodoHasta(LocalDate.now());
+        val.setFechaEmision(LocalDate.now());
+        val.setMontoBruto(new BigDecimal("15000.00"));
+        val.setMontoNetoACobrar(new BigDecimal("12000.00"));
+        val.setEstado("BORRADOR");
+
+        ResponseEntity<ValuacionConstruccionEntity> respVal = construccionController.crearValuacion(proyId, val);
+        Long valId = respVal.getBody().getId();
+        assertEquals("BORRADOR", respVal.getBody().getEstado());
+
+        // 2. Salto inválido: BORRADOR -> COBRADA (directo rechazado)
+        ResponseStatusException exSaltoVal = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoValuacion(valId, Map.of("estado", "COBRADA"))
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exSaltoVal.getStatusCode());
+
+        // 3. BORRADOR -> PRESENTADA
+        ResponseEntity<ValuacionConstruccionEntity> rPres = construccionController.cambiarEstadoValuacion(valId, Map.of("estado", "PRESENTADA"));
+        assertEquals("PRESENTADA", rPres.getBody().getEstado());
+
+        // 4. PRESENTADA -> APROBADA
+        ResponseEntity<ValuacionConstruccionEntity> rAprob = construccionController.cambiarEstadoValuacion(valId, Map.of("estado", "APROBADA"));
+        assertEquals("APROBADA", rAprob.getBody().getEstado());
+
+        // 5. Valuación APROBADA no puede regresar a BORRADOR directamente
+        ResponseStatusException exAprobABorrador = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoValuacion(valId, Map.of("estado", "BORRADOR"))
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exAprobABorrador.getStatusCode());
+
+        // 6. APROBADA -> COBRADA
+        ResponseEntity<ValuacionConstruccionEntity> rCobr = construccionController.cambiarEstadoValuacion(valId, Map.of("estado", "COBRADA"));
+        assertEquals("COBRADA", rCobr.getBody().getEstado());
+
+        // 7. Modificación estándar rechazada en COBRADA (inmutable)
+        ResponseStatusException exEditCobrada = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoValuacion(valId, Map.of("estado", "APROBADA"))
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exEditCobrada.getStatusCode());
+
+        // 8. Reverso Auditado
+        ResponseEntity<ValuacionConstruccionEntity> rRev = construccionController.reversarValuacion(valId, Map.of(
+                "motivo", "Error de metrado en partida de concreto - deducción requerida",
+                "usuario", "Auditor General"
+        ));
+        assertEquals(HttpStatus.OK, rRev.getStatusCode());
+        assertEquals("ANULADA_REVERSADA", rRev.getBody().getEstado());
+        assertEquals("Error de metrado en partida de concreto - deducción requerida", rRev.getBody().getMotivoReverso());
+        assertNotNull(rRev.getBody().getFechaReverso());
+
+        // 9. Valuación reversada es inmutable
+        ResponseStatusException exRevInmutable = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoValuacion(valId, Map.of("estado", "BORRADOR"))
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exRevInmutable.getStatusCode());
+    }
+
+    @Test
+    void fase1_dashboardProyecto_calculoRealAvanceFisicoYFinancieroYAlertas() {
+        long tenant = 88503L;
+        TenantContext.setCurrentTenant(tenant);
+
+        // Proyecto con presupuesto total de $10,000.00
+        ProyectoConstruccionEntity proy = new ProyectoConstruccionEntity();
+        proy.setCodigo("PROY-DASH-F1");
+        proy.setNombre("Complejo Habitacional Las Villas");
+        proy.setCliente("Inmobiliaria del Este");
+        proy.setEstado("ACTIVO");
+        proy.setMontoPresupuestoTotal(new BigDecimal("10000.00"));
+        ResponseEntity<ProyectoConstruccionEntity> respProy = construccionController.crearProyecto(proy);
+        Long proyId = respProy.getBody().getId();
+
+        // Partida 1: 10 unds @ $500 = $5,000. Ejecutada: 5 unds ($2,500) -> 50%
+        PartidaConstruccionEntity p1 = new PartidaConstruccionEntity();
+        p1.setCodigoCovenin("E-311.1");
+        p1.setDescripcion("Vigas de Carga 30x40");
+        p1.setUnidad("M3");
+        p1.setCantidadPresupuestada(new BigDecimal("10.00"));
+        p1.setCantidadEjecutadaAcumulada(new BigDecimal("5.00"));
+        p1.setPrecioUnitario(new BigDecimal("500.00"));
+        construccionController.crearPartida(proyId, p1);
+
+        // Partida 2: 10 unds @ $500 = $5,000. Ejecutada: 12 unds ($6,000) -> 120% (Sobre-ejecutada!)
+        PartidaConstruccionEntity p2 = new PartidaConstruccionEntity();
+        p2.setCodigoCovenin("E-311.2");
+        p2.setDescripcion("Columnas Cuadradas 40x40");
+        p2.setUnidad("M3");
+        p2.setCantidadPresupuestada(new BigDecimal("10.00"));
+        p2.setCantidadEjecutadaAcumulada(new BigDecimal("12.00"));
+        p2.setPrecioUnitario(new BigDecimal("500.00"));
+        construccionController.crearPartida(proyId, p2);
+
+        // Valuación 1 aprobada por $4,000 netos
+        ValuacionConstruccionEntity v1 = new ValuacionConstruccionEntity();
+        v1.setNumeroValuacion(1);
+        v1.setPeriodoDesde(LocalDate.now().minusDays(10));
+        v1.setPeriodoHasta(LocalDate.now());
+        v1.setFechaEmision(LocalDate.now());
+        v1.setMontoBruto(new BigDecimal("5000.00"));
+        v1.setMontoNetoACobrar(new BigDecimal("4000.00"));
+        v1.setEstado("BORRADOR");
+        ResponseEntity<ValuacionConstruccionEntity> respV = construccionController.crearValuacion(proyId, v1);
+        construccionController.cambiarEstadoValuacion(respV.getBody().getId(), Map.of("estado", "PRESENTADA"));
+        construccionController.cambiarEstadoValuacion(respV.getBody().getId(), Map.of("estado", "APROBADA"));
+
+        // Consultar Dashboard vivo
+        ResponseEntity<DashboardProyectoDTO> respDash = construccionController.obtenerDashboardProyecto(proyId);
+        assertEquals(HttpStatus.OK, respDash.getStatusCode());
+        DashboardProyectoDTO dash = respDash.getBody();
+        assertNotNull(dash);
+
+        // Verificaciones matemáticas reales sin mocks:
+        // Ppto base = 5,000 + 5,000 = 10,000.00
+        // Ejecutado total = (5 * 500) + (12 * 500) = 2,500 + 6,000 = 8,500.00
+        // Avance físico = (8,500 / 10,000) * 100 = 85.00%
+        assertEquals(new BigDecimal("85.00"), dash.getPorcentajeAvanceFisico());
+
+        // Avance financiero = (4,000 / 10,000) * 100 = 40.00%
+        assertEquals(new BigDecimal("40.00"), dash.getPorcentajeAvanceFinanciero());
+
+        // Partidas
+        assertEquals(2, dash.getPartidasTotales());
+        assertEquals(1, dash.getPartidasSobreEjecutadas());
+        assertEquals(1, dash.getPartidasEnEjecucion());
+
+        // Alertas reales:
+        // 1. Alerta de sobre-ejecución
+        // 2. Alerta de desviación físico-financiera (85% vs 40% = 45% > 15%)
+        assertFalse(dash.getAlertas().isEmpty());
+        assertTrue(dash.getAlertas().stream().anyMatch(a -> a.contains("exceden el 100%")));
+        assertTrue(dash.getAlertas().stream().anyMatch(a -> a.contains("Desviación físico/financiera")));
+
+        // Aislamiento multitenant: otro tenant no puede ver este dashboard -> 404
+        TenantContext.setCurrentTenant(99999L);
+        ResponseStatusException exAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.obtenerDashboardProyecto(proyId)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exAjeno.getStatusCode());
     }
 }

@@ -40,6 +40,10 @@ import {
   listarValuacionesConstruccionApi,
   crearValuacionConstruccionApi,
   cambiarEstadoValuacionConstruccionApi,
+  obtenerDashboardProyectoConstruccionApi,
+  cambiarEstadoProyectoConstruccionApi,
+  reversarValuacionConstruccionApi,
+  type DashboardProyectoApi,
   listarInsumosConstruccionApi,
   crearInsumoConstruccionApi,
   registrarConsumoInsumoConstruccionApi,
@@ -120,6 +124,19 @@ function generarIdempotencyKey(): string {
 export default function ConstruccionApp({ onSalir }: Props) {
   const { user } = useAuth();
   const [tabActiva, setTabActiva] = useState<TabConstruccion>('resumen');
+  // FASE 1: Dashboard vivo, estados de proyecto y reversos auditados
+  const [dashboardProyecto, setDashboardProyecto] = useState<DashboardProyectoApi | null>(null);
+  const [modalEstadoProyAbierto, setModalEstadoProyAbierto] = useState(false);
+  const [proyectoCambioEstado, setProyectoCambioEstado] = useState<ProyectoConstruccionApi | null>(null);
+  const [nuevoEstadoProy, setNuevoEstadoProy] = useState('ACTIVO');
+  const [motivoEstadoProy, setMotivoEstadoProy] = useState('');
+  const [guardandoEstadoProy, setGuardandoEstadoProy] = useState(false);
+
+  const [modalReversoValAbierto, setModalReversoValAbierto] = useState(false);
+  const [valuacionReversar, setValuacionReversar] = useState<ValuacionConstruccionApi | null>(null);
+  const [motivoReversoVal, setMotivoReversoVal] = useState('');
+  const [guardandoReversoVal, setGuardandoReversoVal] = useState(false);
+
 
   // Datos del Backend
   const [proyectos, setProyectos] = useState<ProyectoConstruccionApi[]>([]);
@@ -310,7 +327,8 @@ export default function ConstruccionApp({ onSalir }: Props) {
   const recargarSubrecursosProyecto = useCallback(async (proyId: number) => {
     setErrorGlobal(null);
     try {
-      const [caps, parts, vals, desps, bit, cuads, maqs, rsg, docsBim, rfisList] = await Promise.all([
+      const [dash, caps, parts, vals, desps, bit, cuads, maqs, rsg, docsBim, rfisList] = await Promise.all([
+        obtenerDashboardProyectoConstruccionApi(proyId),
         listarCapitulosConstruccionApi(proyId),
         listarPartidasConstruccionApi(proyId),
         listarValuacionesConstruccionApi(proyId),
@@ -332,6 +350,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
       setRiesgos(rsg);
       setDocumentosBim(docsBim);
       setRfis(rfisList);
+      setDashboardProyecto(dash);
     } catch (err: any) {
       setErrorGlobal(err.message || 'Error cargando datos del proyecto seleccionado');
     }
@@ -554,56 +573,93 @@ export default function ConstruccionApp({ onSalir }: Props) {
         {/* VISTA 1: RESUMEN EJECUTIVO */}
         {tabActiva === 'resumen' && (
           <div className="space-y-6">
+            {/* ALERTAS VIVAS EN TIEMPO REAL DEL PROYECTO */}
+            {dashboardProyecto && dashboardProyecto.alertas && dashboardProyecto.alertas.length > 0 && (
+              <div className="bg-amber-950/20 border border-amber-500/40 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+                  <IconWarning size={16} />
+                  <span>ALERTAS OPERATIVAS Y DE CONTROL (DATOS REALES)</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {dashboardProyecto.alertas.map((alerta, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-xs text-amber-200/90 bg-amber-500/10 px-3 py-2 rounded-xl border border-amber-500/20 font-mono">
+                      <span className="text-amber-400 font-bold">&bull;</span>
+                      <span>{alerta}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TARJETAS DE INDICADORES REALES */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-[#101726] border border-slate-800 p-4 rounded-2xl">
                 <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-                  <span>Presupuesto Contratado Total</span>
+                  <span>Presupuesto Contratado</span>
                   <IconConstruction size={18} className="text-amber-400" />
                 </div>
                 <div className="text-xl font-bold font-mono text-white">
-                  Bs. {formatVE(resumenCalculos.totalPresupuesto)}
+                  Bs. {formatVE(dashboardProyecto ? dashboardProyecto.montoPresupuestoTotal : resumenCalculos.totalPresupuesto)}
                 </div>
                 <div className="text-[11px] text-slate-400 mt-1">
-                  En {proyectos.length} proyecto(s) registrados
+                  {proyectoActivo ? proyectoActivo.codigo + ' - ' + proyectoActivo.nombre : `En ${proyectos.length} proyecto(s)`}
                 </div>
               </div>
 
               <div className="bg-[#101726] border border-slate-800 p-4 rounded-2xl">
                 <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-                  <span>Valuaciones Aprobadas / Cobradas</span>
+                  <span>Avance Físico Ponderado</span>
+                  <IconChart size={18} className="text-sky-400" />
+                </div>
+                <div className="text-xl font-bold font-mono text-sky-300">
+                  {dashboardProyecto ? Number(dashboardProyecto.porcentajeAvanceFisico).toFixed(2) : '0.00'}%
+                </div>
+                <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                  <div
+                    className="bg-sky-500 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, Number(dashboardProyecto?.porcentajeAvanceFisico || 0))}%` }}
+                  />
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1">
+                  Ejecutado real: Bs. {formatVE(dashboardProyecto?.montoTotalEjecutado || 0)}
+                </div>
+              </div>
+
+              <div className="bg-[#101726] border border-slate-800 p-4 rounded-2xl">
+                <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+                  <span>Avance Financiero Aprobado</span>
                   <IconCheckCircle size={18} className="text-emerald-400" />
                 </div>
                 <div className="text-xl font-bold font-mono text-emerald-300">
-                  Bs. {formatVE(resumenCalculos.totalValuacionesAprobadas)}
+                  {dashboardProyecto ? Number(dashboardProyecto.porcentajeAvanceFinanciero).toFixed(2) : '0.00'}%
+                </div>
+                <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, Number(dashboardProyecto?.porcentajeAvanceFinanciero || 0))}%` }}
+                  />
                 </div>
                 <div className="text-[11px] text-slate-400 mt-1">
-                  Avance financiero auditado
+                  Cobrado: Bs. {formatVE(dashboardProyecto?.montoTotalCobrado || 0)}
                 </div>
               </div>
 
               <div className="bg-[#101726] border border-slate-800 p-4 rounded-2xl">
                 <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-                  <span>Partidas de Obra Activas</span>
-                  <IconFileText size={18} className="text-sky-400" />
+                  <span>Partidas e Insumos</span>
+                  <IconBox size={18} className="text-amber-400" />
                 </div>
-                <div className="text-xl font-bold font-mono text-white">
-                  {resumenCalculos.totalPartidas}
+                <div className="text-sm font-bold font-mono text-white flex items-center justify-between">
+                  <span>Partidas: {dashboardProyecto?.partidasTotales || 0}</span>
+                  {Number(dashboardProyecto?.partidasSobreEjecutadas || 0) > 0 && (
+                    <span className="text-[10px] bg-red-500/20 text-red-300 border border-red-500/30 px-1.5 py-0.5 rounded font-bold">
+                      {dashboardProyecto?.partidasSobreEjecutadas} excedidas
+                    </span>
+                  )}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-1">
-                  {resumenCalculos.partidasEjecutadas} con ejecución física reportada
-                </div>
-              </div>
-
-              <div className="bg-[#101726] border border-slate-800 p-4 rounded-2xl">
-                <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-                  <span>Logística en Tránsito</span>
-                  <IconTruck size={18} className="text-amber-400" />
-                </div>
-                <div className="text-xl font-bold font-mono text-white">
-                  {resumenCalculos.despachosEnTransito}
-                </div>
-                <div className="text-[11px] text-slate-400 mt-1">
-                  De {resumenCalculos.despachosTotales} despachos registrados
+                <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+                  <span>Críticos: {dashboardProyecto?.insumosCriticos || 0} insumo(s)</span>
+                  <span>Tránsito: {dashboardProyecto?.despachosEnTransito || 0} desp.</span>
                 </div>
               </div>
             </div>
@@ -618,7 +674,16 @@ export default function ConstruccionApp({ onSalir }: Props) {
                         {proyectoActivo.codigo}
                       </span>
                       <h2 className="text-base font-bold text-white">{proyectoActivo.nombre}</h2>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
+                      <span className={
+                        'text-xs px-2.5 py-0.5 rounded-full font-semibold border ' +
+                        (proyectoActivo.estado === 'ACTIVO' || proyectoActivo.estado === 'EN_EJECUCION'
+                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                          : proyectoActivo.estado === 'SUSPENDIDO' || proyectoActivo.estado === 'PARALIZADO'
+                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                          : proyectoActivo.estado === 'CERRADO'
+                          ? 'bg-slate-700 text-slate-300 border-slate-600'
+                          : 'bg-sky-500/10 text-sky-300 border-sky-500/20')
+                      }>
                         {proyectoActivo.estado}
                       </span>
                     </div>
@@ -626,11 +691,32 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       Cliente: <strong className="text-slate-200">{proyectoActivo.cliente}</strong> &bull; Ubicación: {proyectoActivo.ubicacion || 'No especificada'}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs text-slate-400">Presupuesto del Contrato</div>
-                    <div className="text-lg font-bold font-mono text-white">
-                      Bs. {formatVE(proyectoActivo.montoPresupuestoTotal)}
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-xs text-slate-400">Presupuesto del Contrato</div>
+                      <div className="text-lg font-bold font-mono text-white">
+                        Bs. {formatVE(proyectoActivo.montoPresupuestoTotal)}
+                      </div>
                     </div>
+                    {proyectoActivo.estado !== 'CERRADO' && (
+                      <button
+                        onClick={() => {
+                          setProyectoCambioEstado(proyectoActivo);
+                          setNuevoEstadoProy(
+                            proyectoActivo.estado === 'BORRADOR'
+                              ? 'ACTIVO'
+                              : proyectoActivo.estado === 'ACTIVO' || proyectoActivo.estado === 'EN_EJECUCION'
+                              ? 'SUSPENDIDO'
+                              : 'ACTIVO'
+                          );
+                          setMotivoEstadoProy('');
+                          setModalEstadoProyAbierto(true);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold cursor-pointer transition"
+                      >
+                        Cambiar Estado
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -693,7 +779,6 @@ export default function ConstruccionApp({ onSalir }: Props) {
           </div>
         )}
 
-        {/* VISTA 2: PROYECTOS */}
         {tabActiva === 'proyectos' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -4835,6 +4920,192 @@ export default function ConstruccionApp({ onSalir }: Props) {
         </div>
       )}
 
-</div>
+
+      {/* MODAL: CAMBIO DE ESTADO DE PROYECTO (AUDITADO) */}
+      {modalEstadoProyAbierto && proyectoCambioEstado && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <IconConstruction size={18} className="text-amber-400" />
+                <span>Transición de Estado del Proyecto</span>
+              </h3>
+              <button
+                onClick={() => setModalEstadoProyAbierto(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-300 space-y-1 bg-slate-900/60 p-3 rounded-xl border border-slate-800/60">
+              <p>Proyecto: <strong className="text-amber-400 font-mono">{proyectoCambioEstado.codigo}</strong> - {proyectoCambioEstado.nombre}</p>
+              <p>Estado actual: <span className="font-semibold text-white">{proyectoCambioEstado.estado}</span></p>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Nuevo Estado</label>
+                <select
+                  value={nuevoEstadoProy}
+                  onChange={(e) => setNuevoEstadoProy(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono"
+                >
+                  {proyectoCambioEstado.estado === 'BORRADOR' && (
+                    <>
+                      <option value="ACTIVO">ACTIVO (Iniciar operaciones)</option>
+                      <option value="EN_EJECUCION">EN_EJECUCION</option>
+                      <option value="CERRADO">CERRADO (Cancelar proyecto)</option>
+                    </>
+                  )}
+                  {(proyectoCambioEstado.estado === 'ACTIVO' || proyectoCambioEstado.estado === 'EN_EJECUCION') && (
+                    <>
+                      <option value="SUSPENDIDO">SUSPENDIDO (Paralización temporal)</option>
+                      <option value="TERMINADO">TERMINADO (Recepción provisoria)</option>
+                      <option value="CERRADO">CERRADO (Finiquito y entrega)</option>
+                    </>
+                  )}
+                  {(proyectoCambioEstado.estado === 'SUSPENDIDO' || proyectoCambioEstado.estado === 'PARALIZADO') && (
+                    <>
+                      <option value="ACTIVO">ACTIVO (Reanudar obra)</option>
+                      <option value="EN_EJECUCION">EN_EJECUCION (Reanudar obra)</option>
+                      <option value="CERRADO">CERRADO (Cancelación definitiva)</option>
+                    </>
+                  )}
+                  {proyectoCambioEstado.estado === 'TERMINADO' && (
+                    <option value="CERRADO">CERRADO (Finiquito definitivo)</option>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Motivo / Justificación de Auditoría *</label>
+                <textarea
+                  value={motivoEstadoProy}
+                  onChange={(e) => setMotivoEstadoProy(e.target.value)}
+                  placeholder="Ej: Acta de inicio de obra firmada por el inspector o paralización por condiciones climáticas..."
+                  rows={3}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setModalEstadoProyAbierto(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={guardandoEstadoProy || !motivoEstadoProy.trim()}
+                onClick={async () => {
+                  setGuardandoEstadoProy(true);
+                  try {
+                    await cambiarEstadoProyectoConstruccionApi(proyectoCambioEstado.id!, {
+                      nuevoEstado: nuevoEstadoProy,
+                      motivo: motivoEstadoProy.trim(),
+                      usuario: 'Residente / Supervisor'
+                    });
+                    notificarExito(`Estado de obra actualizado a ${nuevoEstadoProy}`);
+                    setModalEstadoProyAbierto(false);
+                    await recargarProyectosEInsumos();
+                    if (proyectoSeleccionadoId) {
+                      await recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                    }
+                  } catch (e: any) {
+                    setErrorGlobal(e.message || 'Error cambiando estado del proyecto');
+                  } finally {
+                    setGuardandoEstadoProy(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-bold cursor-pointer transition shadow-lg shadow-amber-500/10"
+              >
+                {guardandoEstadoProy ? 'Guardando...' : 'Confirmar Cambio'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: REVERSO AUDITADO DE VALUACIÓN */}
+      {modalReversoValAbierto && valuacionReversar && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-red-500/40 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <IconWarning size={18} className="text-red-400" />
+                <span>Reverso Auditado de Valuación</span>
+              </h3>
+              <button
+                onClick={() => setModalReversoValAbierto(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-300 space-y-1 bg-red-500/10 p-3 rounded-xl border border-red-500/20">
+              <p>Valuación N° <strong className="text-white font-mono">{valuacionReversar.numeroValuacion}</strong></p>
+              <p>Estado actual: <span className="font-semibold text-emerald-400">{valuacionReversar.estado}</span></p>
+              <p className="text-[11px] text-slate-400">
+                Esta acción es irreversible y anula la valuación aprobada/cobrada dejando registro estricto en bitácora de auditoría.
+              </p>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Motivo Obligatorio del Reverso *</label>
+                <textarea
+                  value={motivoReversoVal}
+                  onChange={(e) => setMotivoReversoVal(e.target.value)}
+                  placeholder="Ej: Error en metrado de acero de refuerzo detectado en auditoría de fiscalización..."
+                  rows={3}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-red-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setModalReversoValAbierto(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={guardandoReversoVal || !motivoReversoVal.trim()}
+                onClick={async () => {
+                  setGuardandoReversoVal(true);
+                  try {
+                    await reversarValuacionConstruccionApi(valuacionReversar.id!, {
+                      motivo: motivoReversoVal.trim(),
+                      usuario: 'Auditor de Obra'
+                    });
+                    notificarExito('Valuación reversada y anulada con trazabilidad auditada');
+                    setModalReversoValAbierto(false);
+                    if (proyectoSeleccionadoId) {
+                      await recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                    }
+                  } catch (e: any) {
+                    setErrorGlobal(e.message || 'Error al reversar valuación');
+                  } finally {
+                    setGuardandoReversoVal(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold cursor-pointer transition shadow-lg shadow-red-600/20"
+              >
+                {guardandoReversoVal ? 'Reversando...' : 'Confirmar Reverso Auditado'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
   );
 }

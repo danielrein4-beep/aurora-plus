@@ -1,6 +1,7 @@
 package com.auroraplus.modules.construccion.services;
 
 import com.auroraplus.modules.construccion.entities.*;
+import com.auroraplus.modules.construccion.dtos.DashboardProyectoDTO;
 import com.auroraplus.modules.construccion.repositories.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -24,6 +25,10 @@ import java.util.TreeMap;
 @Service
 @Transactional
 public class ConstruccionService {
+
+    public static final Set<String> ESTADOS_PROYECTO_VALIDOS = Set.of(
+            "BORRADOR", "ACTIVO", "EN_EJECUCION", "SUSPENDIDO", "PARALIZADO", "TERMINADO", "FINALIZADO", "CERRADO"
+    );
 
     public static final Set<String> ESTADOS_VALUACION_VALIDOS = Set.of(
             "BORRADOR", "PRESENTADA", "EN_REVISION", "APROBADA", "COBRADA", "RECHAZADA", "ANULADA"
@@ -229,6 +234,189 @@ public class ConstruccionService {
         return proyectoRepository.save(proyecto);
     }
 
+    
+    @Transactional
+    
+    public void validarProyectoOperable(ProyectoConstruccionEntity proy) {
+        if (proy == null) return;
+        String st = proy.getEstado() != null ? proy.getEstado().trim().toUpperCase() : "BORRADOR";
+        if ("SUSPENDIDO".equals(st) || "PARALIZADO".equals(st)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El proyecto se encuentra SUSPENDIDO/PARALIZADO y no admite nuevas operaciones operativas.");
+        }
+        if ("TERMINADO".equals(st) || "FINALIZADO".equals(st)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El proyecto se encuentra TERMINADO y no admite nuevas operaciones operativas.");
+        }
+        if ("CERRADO".equals(st)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El proyecto se encuentra CERRADO; sus datos son de solo lectura histórica.");
+        }
+    }
+
+    public ProyectoConstruccionEntity cambiarEstadoProyecto(Long tenantId, Long proyectoId, String nuevoEstado, String motivo, String usuario) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        ProyectoConstruccionEntity proy = proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado"));
+
+        if (nuevoEstado == null || !ESTADOS_PROYECTO_VALIDOS.contains(nuevoEstado.trim().toUpperCase())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado no válido para proyecto: " + nuevoEstado);
+        }
+
+        String actual = proy.getEstado() != null ? proy.getEstado().trim().toUpperCase() : "BORRADOR";
+        String destino = nuevoEstado.trim().toUpperCase();
+
+        if (actual.equals(destino)) {
+            return proy;
+        }
+
+        // Validación estricta de transiciones:
+        // CERRADO es inmutable
+        if ("CERRADO".equals(actual)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Un proyecto CERRADO no puede cambiar de estado");
+        }
+
+        // BORRADOR solo puede pasar a ACTIVO / EN_EJECUCION o CERRADO (cancelado)
+        if ("BORRADOR".equals(actual) && ("SUSPENDIDO".equals(destino) || "TERMINADO".equals(destino))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Un proyecto en BORRADOR no puede pasar directamente a " + destino + ". Debe activarse primero.");
+        }
+
+        // TERMINADO solo puede pasar a CERRADO
+        if (("TERMINADO".equals(actual) || "FINALIZADO".equals(actual)) && !"CERRADO".equals(destino)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Un proyecto terminado solo puede transicionar a CERRADO");
+        }
+
+        proy.setEstado(destino);
+        proy.setMotivoCambioEstado(motivo != null && !motivo.trim().isEmpty() ? motivo.trim() : "Transición a " + destino);
+        proy.setFechaCambioEstado(java.time.LocalDateTime.now());
+        proy.setUsuarioCambioEstado(usuario != null && !usuario.trim().isEmpty() ? usuario.trim() : "Usuario Sistema");
+
+        return proyectoRepository.save(proy);
+    }
+
+    public DashboardProyectoDTO obtenerDashboardProyecto(Long tenantId, Long proyectoId) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        ProyectoConstruccionEntity proy = proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado"));
+
+        List<PartidaConstruccionEntity> partidas = partidaRepository.findByTenantIdAndProyectoIdOrderByCodigoCoveninAsc(tenantId, proyectoId);
+        List<ValuacionConstruccionEntity> valuaciones = valuacionRepository.findByTenantIdAndProyectoIdOrderByNumeroValuacionDesc(tenantId, proyectoId);
+        List<InsumoConstruccionEntity> insumos = insumoRepository.findByTenantIdOrderByCodigoAsc(tenantId);
+        List<DespachoConstruccionEntity> despachos = despachoRepository.findByTenantIdAndProyectoIdOrderByCreatedAtDesc(tenantId, proyectoId);
+
+        BigDecimal montoPresupuestoTotal = proy.getMontoPresupuestoTotal() != null ? proy.getMontoPresupuestoTotal() : BigDecimal.ZERO;
+        BigDecimal sumaPptoPartidas = BigDecimal.ZERO;
+        BigDecimal sumaEjecutadoPartidas = BigDecimal.ZERO;
+
+        int totalPartidas = partidas.size();
+        int completadas = 0;
+        int enEjecucion = 0;
+        int sobreEjecutadas = 0;
+
+        for (PartidaConstruccionEntity p : partidas) {
+            BigDecimal cantPpto = p.getCantidadPresupuestada() != null ? p.getCantidadPresupuestada() : BigDecimal.ZERO;
+            BigDecimal cantEjec = p.getCantidadEjecutadaAcumulada() != null ? p.getCantidadEjecutadaAcumulada() : BigDecimal.ZERO;
+            BigDecimal pu = p.getPrecioUnitario() != null ? p.getPrecioUnitario() : BigDecimal.ZERO;
+
+            sumaPptoPartidas = sumaPptoPartidas.add(cantPpto.multiply(pu));
+            sumaEjecutadoPartidas = sumaEjecutadoPartidas.add(cantEjec.multiply(pu));
+
+            if (cantEjec.compareTo(BigDecimal.ZERO) > 0) {
+                if (cantEjec.compareTo(cantPpto) > 0) {
+                    sobreEjecutadas++;
+                } else if (cantEjec.compareTo(cantPpto) == 0) {
+                    completadas++;
+                } else {
+                    enEjecucion++;
+                }
+            }
+        }
+
+        BigDecimal basePpto = sumaPptoPartidas.compareTo(BigDecimal.ZERO) > 0 ? sumaPptoPartidas : montoPresupuestoTotal;
+        BigDecimal pctFisico = BigDecimal.ZERO;
+        if (basePpto.compareTo(BigDecimal.ZERO) > 0) {
+            pctFisico = sumaEjecutadoPartidas.multiply(new BigDecimal("100"))
+                    .divide(basePpto, 2, java.math.RoundingMode.HALF_UP);
+        }
+
+        BigDecimal montoAprobado = BigDecimal.ZERO;
+        BigDecimal montoCobrado = BigDecimal.ZERO;
+        for (ValuacionConstruccionEntity v : valuaciones) {
+            String st = v.getEstado() != null ? v.getEstado().toUpperCase() : "";
+            BigDecimal neto = v.getMontoNetoACobrar() != null ? v.getMontoNetoACobrar() : BigDecimal.ZERO;
+            if ("APROBADA".equals(st) || "COBRADA".equals(st)) {
+                montoAprobado = montoAprobado.add(neto);
+            }
+            if ("COBRADA".equals(st)) {
+                montoCobrado = montoCobrado.add(neto);
+            }
+        }
+
+        BigDecimal pctFinanciero = BigDecimal.ZERO;
+        if (montoPresupuestoTotal.compareTo(BigDecimal.ZERO) > 0) {
+            pctFinanciero = montoAprobado.multiply(new BigDecimal("100"))
+                    .divide(montoPresupuestoTotal, 2, java.math.RoundingMode.HALF_UP);
+        }
+
+        int criticos = 0;
+        for (InsumoConstruccionEntity i : insumos) {
+            BigDecimal actual = i.getStockActual() != null ? i.getStockActual() : BigDecimal.ZERO;
+            BigDecimal minimo = i.getStockMinimo() != null ? i.getStockMinimo() : BigDecimal.ZERO;
+            if (actual.compareTo(minimo) <= 0) {
+                criticos++;
+            }
+        }
+
+        int transito = 0;
+        for (DespachoConstruccionEntity d : despachos) {
+            String est = d.getEstado() != null ? d.getEstado().toUpperCase() : "";
+            if ("EN_TRANSITO".equals(est) || "EN_BASCULA".equals(est) || "DESCARGANDO".equals(est)) {
+                transito++;
+            }
+        }
+
+        List<String> alertas = new java.util.ArrayList<>();
+        if (sobreEjecutadas > 0) {
+            alertas.add(sobreEjecutadas + " partida(s) exceden el 100% de la cantidad presupuestada contratada.");
+        }
+        if (criticos > 0) {
+            alertas.add(criticos + " insumo(s) se encuentran en o por debajo del stock mínimo de seguridad.");
+        }
+        BigDecimal dif = pctFisico.subtract(pctFinanciero).abs();
+        if (dif.compareTo(new BigDecimal("15.00")) > 0) {
+            alertas.add("Desviación físico/financiera relevante del " + dif + "% entre lo ejecutado en obra y lo facturado/aprobado.");
+        }
+        if ("SUSPENDIDO".equals(proy.getEstado()) || "PARALIZADO".equals(proy.getEstado())) {
+            alertas.add("Proyecto actualmente SUSPENDIDO/PARALIZADO: " + (proy.getMotivoCambioEstado() != null ? proy.getMotivoCambioEstado() : "Sin motivo registrado"));
+        }
+
+        DashboardProyectoDTO dto = new DashboardProyectoDTO();
+        dto.setProyectoId(proy.getId());
+        dto.setCodigo(proy.getCodigo());
+        dto.setNombre(proy.getNombre());
+        dto.setEstado(proy.getEstado());
+        dto.setMontoPresupuestoTotal(montoPresupuestoTotal);
+        dto.setMontoTotalEjecutado(sumaEjecutadoPartidas);
+        dto.setMontoTotalCobrado(montoCobrado);
+        dto.setPorcentajeAvanceFisico(pctFisico);
+        dto.setPorcentajeAvanceFinanciero(pctFinanciero);
+        dto.setPartidasTotales(totalPartidas);
+        dto.setPartidasCompletadas(completadas);
+        dto.setPartidasEnEjecucion(enEjecucion);
+        dto.setPartidasSobreEjecutadas(sobreEjecutadas);
+        dto.setInsumosTotales(insumos.size());
+        dto.setInsumosCriticos(criticos);
+        dto.setDespachosEnTransito(transito);
+        dto.setAlertas(alertas);
+
+        return dto;
+    }
+
+
     public Optional<ProyectoConstruccionEntity> obtenerProyecto(Long tenantId, Long id) {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
@@ -325,8 +513,9 @@ public class ConstruccionService {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
-        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+        ProyectoConstruccionEntity proy = proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+        validarProyectoOperable(proy);
         capitulo.setId(null);
         capitulo.setTenantId(tenantId);
         capitulo.setProyectoId(proyectoId);
@@ -381,8 +570,9 @@ public class ConstruccionService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
         // Validar que el proyecto pertenezca al tenant
-        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+        ProyectoConstruccionEntity proy = proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+        validarProyectoOperable(proy);
 
         // Validar que el capítulo (si se envía) pertenezca al mismo tenant
         if (partida.getCapituloId() != null) {
@@ -515,8 +705,9 @@ public class ConstruccionService {
 
         try {
             // 2. Validar pertenencia del proyecto y campos de negocio
-            proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+            ProyectoConstruccionEntity proy = proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+            validarProyectoOperable(proy);
 
             if (valuacion.getEstado() == null || !ESTADOS_VALUACION_VALIDOS.contains(valuacion.getEstado().toUpperCase())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de valuación no válido: " + valuacion.getEstado());
@@ -545,19 +736,72 @@ public class ConstruccionService {
         }
     }
 
+    
+    @Transactional
+    public ValuacionConstruccionEntity reversarValuacion(Long tenantId, Long valuacionId, String motivo, String usuario) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        if (motivo == null || motivo.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El motivo de reverso o anulación es obligatorio");
+        }
+
+        ValuacionConstruccionEntity val = valuacionRepository.findByTenantIdAndId(tenantId, valuacionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Valuación no encontrada"));
+
+        String estadoActual = val.getEstado() != null ? val.getEstado().toUpperCase() : "";
+        if (!"APROBADA".equals(estadoActual) && !"COBRADA".equals(estadoActual)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solo se pueden reversar valuaciones en estado APROBADA o COBRADA");
+        }
+
+        val.setEstado("ANULADA_REVERSADA");
+        val.setMotivoReverso(motivo.trim());
+        val.setFechaReverso(java.time.LocalDateTime.now());
+        val.setObservaciones((val.getObservaciones() != null ? val.getObservaciones() + " | " : "") +
+                "[REVERSADO por " + (usuario != null ? usuario : "Admin") + " el " + java.time.LocalDate.now() + ": " + motivo.trim() + "]");
+
+        return valuacionRepository.save(val);
+    }
+
     public Optional<ValuacionConstruccionEntity> actualizarEstadoValuacion(Long tenantId, Long valuacionId, String nuevoEstado) {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
-        if (nuevoEstado == null || !ESTADOS_VALUACION_VALIDOS.contains(nuevoEstado.toUpperCase())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de valuación arbitrario no permitido: " + nuevoEstado);
+        if (nuevoEstado == null || !ESTADOS_VALUACION_VALIDOS.contains(nuevoEstado.trim().toUpperCase())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de valuación no permitido: " + nuevoEstado);
         }
 
         // Buscar primero por (tenantId, id)
         ValuacionConstruccionEntity val = valuacionRepository.findByTenantIdAndId(tenantId, valuacionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Valuación no encontrada para este tenant"));
 
-        val.setEstado(nuevoEstado.toUpperCase());
+        String actual = val.getEstado() != null ? val.getEstado().trim().toUpperCase() : "BORRADOR";
+        String destino = nuevoEstado.trim().toUpperCase();
+
+        if (actual.equals(destino)) {
+            return Optional.of(val);
+        }
+
+        if ("ANULADA_REVERSADA".equals(actual)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Una valuación anulada/reversada es inmutable");
+        }
+        if ("COBRADA".equals(actual)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Una valuación COBRADA no puede modificarse; use reverso auditado");
+        }
+        if ("APROBADA".equals(actual) && !"COBRADA".equals(destino)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Una valuación APROBADA solo puede pasar a COBRADA o ser reversada");
+        }
+        if ("BORRADOR".equals(actual) && !"PRESENTADA".equals(destino)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Una valuación en BORRADOR solo puede pasar a PRESENTADA");
+        }
+        if ("PRESENTADA".equals(actual) && !"APROBADA".equals(destino) && !"RECHAZADA".equals(destino)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Una valuación PRESENTADA solo puede ser APROBADA o RECHAZADA");
+        }
+        if ("RECHAZADA".equals(actual) && !"BORRADOR".equals(destino)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Una valuación RECHAZADA solo puede retornar a BORRADOR para corrección");
+        }
+
+        val.setEstado(destino);
         return Optional.of(valuacionRepository.save(val));
     }
 

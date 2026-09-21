@@ -115,6 +115,24 @@ public class ProyectoConstruccionEntity {
     public BigDecimal getIva() { return iva; }
     public void setIva(BigDecimal iva) { this.iva = iva; }
 
+        @Column(name = "motivo_cambio_estado", length = 255)
+    private String motivoCambioEstado;
+
+    @Column(name = "fecha_cambio_estado")
+    private LocalDateTime fechaCambioEstado;
+
+    @Column(name = "usuario_cambio_estado", length = 150)
+    private String usuarioCambioEstado;
+
+    public String getMotivoCambioEstado() { return motivoCambioEstado; }
+    public void setMotivoCambioEstado(String motivoCambioEstado) { this.motivoCambioEstado = motivoCambioEstado; }
+
+    public LocalDateTime getFechaCambioEstado() { return fechaCambioEstado; }
+    public void setFechaCambioEstado(LocalDateTime fechaCambioEstado) { this.fechaCambioEstado = fechaCambioEstado; }
+
+    public String getUsuarioCambioEstado() { return usuarioCambioEstado; }
+    public void setUsuarioCambioEstado(String usuarioCambioEstado) { this.usuarioCambioEstado = usuarioCambioEstado; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

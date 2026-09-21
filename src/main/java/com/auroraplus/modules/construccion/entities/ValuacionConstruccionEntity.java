@@ -109,6 +109,18 @@ public class ValuacionConstruccionEntity {
     public String getObservaciones() { return observaciones; }
     public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
 
+        @Column(name = "motivo_reverso", length = 255)
+    private String motivoReverso;
+
+    @Column(name = "fecha_reverso")
+    private LocalDateTime fechaReverso;
+
+    public String getMotivoReverso() { return motivoReverso; }
+    public void setMotivoReverso(String motivoReverso) { this.motivoReverso = motivoReverso; }
+
+    public LocalDateTime getFechaReverso() { return fechaReverso; }
+    public void setFechaReverso(LocalDateTime fechaReverso) { this.fechaReverso = fechaReverso; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

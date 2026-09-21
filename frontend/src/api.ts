@@ -4576,6 +4576,27 @@ export function salirDeImpersonacion(): void {
 // MÓDULO CONSTRUCCIÓN & OBRAS (MULTITENANT ESTRICTO)
 // ==========================================
 
+
+export interface DashboardProyectoApi {
+  proyectoId: number;
+  codigo: string;
+  nombre: string;
+  estado: string;
+  montoPresupuestoTotal: number;
+  montoTotalEjecutado: number;
+  montoTotalCobrado: number;
+  porcentajeAvanceFisico: number;
+  porcentajeAvanceFinanciero: number;
+  partidasTotales: number;
+  partidasCompletadas: number;
+  partidasEnEjecucion: number;
+  partidasSobreEjecutadas: number;
+  insumosTotales: number;
+  insumosCriticos: number;
+  despachosEnTransito: number;
+  alertas: string[];
+}
+
 export interface ProyectoConstruccionApi {
   id?: number;
   tenantId?: number;
@@ -4782,6 +4803,35 @@ export function crearValuacionConstruccionApi(proyectoId: number, datos: Valuaci
   return request(`/api/construccion/proyectos/${proyectoId}/valuaciones`, {
     method: "POST",
     headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+
+export function cambiarEstadoProyectoConstruccionApi(
+  id: number,
+  datos: { nuevoEstado: string; motivo: string; usuario?: string }
+): Promise<ProyectoConstruccionApi> {
+  return request(`/api/construccion/proyectos/${id}/estado`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(datos)
+  });
+}
+
+export function obtenerDashboardProyectoConstruccionApi(
+  proyectoId: number
+): Promise<DashboardProyectoApi> {
+  return request(`/api/construccion/proyectos/${proyectoId}/dashboard`);
+}
+
+export function reversarValuacionConstruccionApi(
+  id: number,
+  datos: { motivo: string; usuario?: string }
+): Promise<ValuacionConstruccionApi> {
+  return request(`/api/construccion/valuaciones/${id}/reverso`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(datos)
   });
 }
