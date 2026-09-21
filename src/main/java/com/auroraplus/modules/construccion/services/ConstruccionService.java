@@ -3,6 +3,7 @@ package com.auroraplus.modules.construccion.services;
 import com.auroraplus.modules.construccion.entities.*;
 import com.auroraplus.modules.construccion.repositories.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,8 +16,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 
 @Service
 @Transactional
@@ -145,10 +148,45 @@ public class ConstruccionService {
         }
     }
 
+    private String hashPayload(String tipoRecurso, Object payload, String... camposGestionadosPorServidor) {
+        try {
+            Map<String, Object> serializado = objectMapper.convertValue(payload, new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> canonico = new TreeMap<>(serializado);
+            for (String campo : camposGestionadosPorServidor) {
+                canonico.remove(campo);
+            }
+            return calcularSha256(tipoRecurso + "|" + objectMapper.writeValueAsString(canonico));
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "No se pudo validar el contenido de la solicitud para idempotencia");
+        }
+    }
+
+    private <T> T restaurarResultadoIdempotente(
+            IdempotenciaConstruccionEntity registro, Class<T> tipoResultado, String recurso) {
+        if (registro.getResultadoJson() == null || registro.getResultadoJson().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "La respuesta previa de " + recurso + " no se puede recuperar de forma segura");
+        }
+        try {
+            return objectMapper.readValue(registro.getResultadoJson(), tipoResultado);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "La respuesta previa de " + recurso + " está corrupta; no se reintentará la operación");
+        }
+    }
+
+    private String serializarResultadoIdempotente(Object resultado, String recurso) {
+        try {
+            return objectMapper.writeValueAsString(resultado);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "No se pudo confirmar de forma segura la respuesta de " + recurso);
+        }
+    }
+
     private String hashValuacion(Long proyectoId, ValuacionConstruccionEntity v) {
-        String data = "VAL|" + proyectoId + "|" + v.getNumeroValuacion() + "|" + v.getPeriodoDesde() + "|" +
-                v.getPeriodoHasta() + "|" + (v.getMontoBruto() != null ? v.getMontoBruto().stripTrailingZeros().toPlainString() : "0");
-        return calcularSha256(data);
+        return hashPayload("VALUACION|" + proyectoId, v, "id", "tenantId", "proyectoId", "createdAt");
     }
 
     private String hashConsumo(Long insumoId, BigDecimal cantidad) {
@@ -157,9 +195,7 @@ public class ConstruccionService {
     }
 
     private String hashBitacora(Long proyectoId, BitacoraConstruccionEntity b) {
-        String data = "BITACORA|" + proyectoId + "|" + b.getFecha() + "|" + (b.getClima() != null ? b.getClima().trim().toUpperCase() : "") + "|" +
-                b.getPersonalActivo() + "|" + (b.getActividadesEjecutadas() != null ? b.getActividadesEjecutadas().trim() : "");
-        return calcularSha256(data);
+        return hashPayload("BITACORA|" + proyectoId, b, "id", "tenantId", "proyectoId", "createdAt");
     }
 
 
@@ -468,9 +504,7 @@ public class ConstruccionService {
             if (claim.isPresent()) {
                 IdempotenciaConstruccionEntity idemp = claim.get();
                 if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
-                    try {
-                        return objectMapper.readValue(idemp.getResultadoJson(), ValuacionConstruccionEntity.class);
-                    } catch (Exception ignored) {}
+                    return restaurarResultadoIdempotente(idemp, ValuacionConstruccionEntity.class, "la valuación");
                 }
                 if (idemp.getRecursoId() != null) {
                     return valuacionRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
@@ -501,10 +535,7 @@ public class ConstruccionService {
             ValuacionConstruccionEntity guardada = valuacionRepository.save(valuacion);
 
             // 4. Completar clave dentro de la misma transacción guardando el snapshot serializado
-            String json = null;
-            try {
-                json = objectMapper.writeValueAsString(guardada);
-            } catch (Exception ignored) {}
+            String json = serializarResultadoIdempotente(guardada, "la valuación");
             idempotenciaService.completarClave(tenantId, idempotencyKey, guardada.getId(), json);
 
             return guardada;
@@ -583,9 +614,7 @@ public class ConstruccionService {
             if (claim.isPresent()) {
                 IdempotenciaConstruccionEntity idemp = claim.get();
                 if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
-                    try {
-                        return objectMapper.readValue(idemp.getResultadoJson(), InsumoConstruccionEntity.class);
-                    } catch (Exception ignored) {}
+                    return restaurarResultadoIdempotente(idemp, InsumoConstruccionEntity.class, "el consumo de insumo");
                 }
                 return insumoRepository.findByTenantIdAndId(tenantId, insumoId)
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado"));
@@ -609,10 +638,7 @@ public class ConstruccionService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado tras descuento"));
 
             // 3. Completar clave dentro de la misma transacción guardando el snapshot resultante del consumo
-            String json = null;
-            try {
-                json = objectMapper.writeValueAsString(insumoPostConsumo);
-            } catch (Exception ignored) {}
+            String json = serializarResultadoIdempotente(insumoPostConsumo, "el consumo de insumo");
             idempotenciaService.completarClave(tenantId, idempotencyKey, insumoId, json);
 
             return insumoPostConsumo;
@@ -657,9 +683,7 @@ public class ConstruccionService {
             if (claim.isPresent()) {
                 IdempotenciaConstruccionEntity idemp = claim.get();
                 if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
-                    try {
-                        return objectMapper.readValue(idemp.getResultadoJson(), BitacoraConstruccionEntity.class);
-                    } catch (Exception ignored) {}
+                    return restaurarResultadoIdempotente(idemp, BitacoraConstruccionEntity.class, "la bitácora");
                 }
                 if (idemp.getRecursoId() != null) {
                     return bitacoraRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
@@ -685,10 +709,7 @@ public class ConstruccionService {
             BitacoraConstruccionEntity guardada = bitacoraRepository.save(entrada);
 
             // 4. Completar clave dentro de la misma transacción guardando el snapshot serializado
-            String json = null;
-            try {
-                json = objectMapper.writeValueAsString(guardada);
-            } catch (Exception ignored) {}
+            String json = serializarResultadoIdempotente(guardada, "la bitácora");
             idempotenciaService.completarClave(tenantId, idempotencyKey, guardada.getId(), json);
 
             return guardada;
@@ -749,8 +770,11 @@ public class ConstruccionService {
         if (despacho.getDestinoFrente() == null || despacho.getDestinoFrente().trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El destino/frente de obra es obligatorio");
         }
-        if (despacho.getCantidad() != null && despacho.getCantidad().compareTo(BigDecimal.ZERO) < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad no puede ser negativa");
+        if (despacho.getCantidad() == null || despacho.getCantidad().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser estrictamente mayor a cero");
+        }
+        if (despacho.getUnidadMedida() == null || despacho.getUnidadMedida().trim().isEmpty()) {
+            despacho.setUnidadMedida("unidad");
         }
 
         if (despacho.getInsumoId() != null) {
@@ -766,7 +790,8 @@ public class ConstruccionService {
 
         // Idempotencia
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
-                ? calcularSha256(despacho.getGuiaNumero() + ":" + despacho.getCantidad() + ":" + proyectoId)
+                ? hashPayload("DESPACHO|" + proyectoId, despacho,
+                        "id", "tenantId", "proyectoId", "createdAt")
                 : null;
 
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
@@ -776,9 +801,7 @@ public class ConstruccionService {
             if (claim.isPresent()) {
                 IdempotenciaConstruccionEntity idemp = claim.get();
                 if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
-                    try {
-                        return objectMapper.readValue(idemp.getResultadoJson(), DespachoConstruccionEntity.class);
-                    } catch (Exception ignored) {}
+                    return restaurarResultadoIdempotente(idemp, DespachoConstruccionEntity.class, "el despacho");
                 }
                 if (idemp.getRecursoId() != null) {
                     return despachoRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
@@ -795,10 +818,7 @@ public class ConstruccionService {
             DespachoConstruccionEntity guardado = despachoRepository.save(despacho);
 
             if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                String json = null;
-                try {
-                    json = objectMapper.writeValueAsString(guardado);
-                } catch (Exception ignored) {}
+                String json = serializarResultadoIdempotente(guardado, "el despacho");
                 idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
             }
 
@@ -895,9 +915,13 @@ public class ConstruccionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El horómetro actual no puede ser negativo");
         }
 
+        if (req.getHorometroActual() == null) req.setHorometroActual(BigDecimal.ZERO);
+        if (req.getHorometroUltimoMantenimiento() == null) req.setHorometroUltimoMantenimiento(req.getHorometroActual());
+        if (req.getIntervaloMantenimientoHoras() == null) req.setIntervaloMantenimientoHoras(new BigDecimal("250.00"));
+
         // 1. Idempotencia: si es reintento con la misma clave, retornar el recurso existente
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
-                ? calcularSha256("MAQ|" + codigoLimpio + "|" + req.getTipo() + "|" + req.getHorometroActual())
+                ? hashPayload("MAQUINARIA", req, "id", "tenantId", "createdAt")
                 : null;
 
         if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
@@ -907,9 +931,7 @@ public class ConstruccionService {
             if (claim.isPresent()) {
                 IdempotenciaConstruccionEntity idemp = claim.get();
                 if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
-                    try {
-                        return objectMapper.readValue(idemp.getResultadoJson(), MaquinariaConstruccionEntity.class);
-                    } catch (Exception ignored) {}
+                    return restaurarResultadoIdempotente(idemp, MaquinariaConstruccionEntity.class, "la maquinaria");
                 }
                 if (idemp.getRecursoId() != null) {
                     return maquinariaRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
@@ -930,20 +952,11 @@ public class ConstruccionService {
             req.setId(null);
             req.setTenantId(tenantId);
             req.setCodigo(codigoLimpio);
-            if (req.getHorometroActual() == null) req.setHorometroActual(BigDecimal.ZERO);
-            if (req.getHorometroUltimoMantenimiento() == null) req.setHorometroUltimoMantenimiento(req.getHorometroActual());
-            if (req.getIntervaloMantenimientoHoras() == null) req.setIntervaloMantenimientoHoras(new BigDecimal("250.00"));
 
             MaquinariaConstruccionEntity guardado = maquinariaRepository.save(req);
 
             if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                String json;
-                try {
-                    json = objectMapper.writeValueAsString(guardado);
-                } catch (Exception ex) {
-                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error serializando resultado de riesgo: " + ex.getMessage(), ex);
-                }
+                String json = serializarResultadoIdempotente(guardado, "la maquinaria");
                 idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
             }
 
@@ -1033,6 +1046,12 @@ public class ConstruccionService {
 
     @Transactional
     public MantenimientoMaquinariaEntity registrarMantenimiento(Long tenantId, Long maquinariaId, MantenimientoMaquinariaEntity req) {
+        return registrarMantenimiento(tenantId, maquinariaId, req, null);
+    }
+
+    @Transactional
+    public MantenimientoMaquinariaEntity registrarMantenimiento(
+            Long tenantId, Long maquinariaId, MantenimientoMaquinariaEntity req, String idempotencyKey) {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
@@ -1054,21 +1073,43 @@ public class ConstruccionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El horómetro en mantenimiento es obligatorio y no negativo");
         }
 
-        req.setId(null);
-        req.setTenantId(tenantId);
-        req.setMaquinariaId(maquinariaId);
-
-        // Actualizar datos de mantenimiento en la ficha de la máquina
-        maq.setHorometroUltimoMantenimiento(req.getHorometroEnMantenimiento());
-        if (req.getHorometroEnMantenimiento().compareTo(maq.getHorometroActual()) > 0) {
-            maq.setHorometroActual(req.getHorometroEnMantenimiento());
+        String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
+                ? hashPayload("MANTENIMIENTO|" + maquinariaId, req,
+                        "id", "tenantId", "maquinariaId", "createdAt")
+                : null;
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            Optional<IdempotenciaConstruccionEntity> claim = idempotenciaService.reclamarClave(
+                    tenantId, idempotencyKey, "MANTENIMIENTO_MAQUINARIA", payloadHash);
+            if (claim.isPresent()) {
+                return restaurarResultadoIdempotente(
+                        claim.get(), MantenimientoMaquinariaEntity.class, "el mantenimiento de maquinaria");
+            }
         }
-        if ("EN_MANTENIMIENTO".equals(maq.getEstado())) {
-            maq.setEstado("OPERATIVO");
-        }
-        maquinariaRepository.save(maq);
 
-        return mantenimientoRepository.save(req);
+        try {
+            req.setId(null);
+            req.setTenantId(tenantId);
+            req.setMaquinariaId(maquinariaId);
+
+            maq.setHorometroUltimoMantenimiento(req.getHorometroEnMantenimiento());
+            if (req.getHorometroEnMantenimiento().compareTo(maq.getHorometroActual()) > 0) {
+                maq.setHorometroActual(req.getHorometroEnMantenimiento());
+            }
+            if ("EN_MANTENIMIENTO".equals(maq.getEstado())) {
+                maq.setEstado("OPERATIVO");
+            }
+            maquinariaRepository.save(maq);
+
+            MantenimientoMaquinariaEntity guardado = mantenimientoRepository.save(req);
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(),
+                        serializarResultadoIdempotente(guardado, "el mantenimiento de maquinaria"));
+            }
+            return guardado;
+        } catch (Exception ex) {
+            idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
+            throw ex;
+        }
     }
 
     // --- MATRIZ DE RIESGOS Y SEGURIDAD OCUPACIONAL (SST / IPERC) ---
@@ -1163,9 +1204,7 @@ public class ConstruccionService {
             if (claim.isPresent()) {
                 IdempotenciaConstruccionEntity idemp = claim.get();
                 if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
-                    try {
-                        return objectMapper.readValue(idemp.getResultadoJson(), RiesgoConstruccionEntity.class);
-                    } catch (Exception ignored) {}
+                    return restaurarResultadoIdempotente(idemp, RiesgoConstruccionEntity.class, "el riesgo");
                 }
                 if (idemp.getRecursoId() != null) {
                     return riesgoRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
@@ -1304,9 +1343,7 @@ public class ConstruccionService {
             if (claim.isPresent()) {
                 IdempotenciaConstruccionEntity idemp = claim.get();
                 if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
-                    try {
-                        return objectMapper.readValue(idemp.getResultadoJson(), DocumentoBimEntity.class);
-                    } catch (Exception ignored) {}
+                    return restaurarResultadoIdempotente(idemp, DocumentoBimEntity.class, "el documento BIM");
                 }
                 if (idemp.getRecursoId() != null) {
                     return documentoBimRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
@@ -1452,9 +1489,7 @@ public class ConstruccionService {
             if (claim.isPresent()) {
                 IdempotenciaConstruccionEntity idemp = claim.get();
                 if (idemp.getResultadoJson() != null && !idemp.getResultadoJson().trim().isEmpty()) {
-                    try {
-                        return objectMapper.readValue(idemp.getResultadoJson(), RfiConstruccionEntity.class);
-                    } catch (Exception ignored) {}
+                    return restaurarResultadoIdempotente(idemp, RfiConstruccionEntity.class, "el RFI");
                 }
                 if (idemp.getRecursoId() != null) {
                     return rfiRepository.findByTenantIdAndId(tenantId, idemp.getRecursoId())
@@ -1480,10 +1515,7 @@ public class ConstruccionService {
             RfiConstruccionEntity guardado = rfiRepository.save(req);
 
             if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                String json = null;
-                try {
-                    json = objectMapper.writeValueAsString(guardado);
-                } catch (Exception ignored) {}
+                String json = serializarResultadoIdempotente(guardado, "el RFI");
                 idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
             }
 

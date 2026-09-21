@@ -1469,7 +1469,6 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       <th className="p-4 text-right">Horómetro Actual</th>
                       <th className="p-4 text-right">Próx. Mantenimiento</th>
                       <th className="p-4">Operador Asignado</th>
-                      <th className="p-4 text-right">Costo / Hora</th>
                       <th className="p-4">Estado</th>
                       <th className="p-4 text-right">Acciones</th>
                     </tr>
@@ -1510,9 +1509,6 @@ export default function ConstruccionApp({ onSalir }: Props) {
                             </td>
                             <td className="p-4 text-slate-300 font-medium">
                               {maq.operadorResponsable || <span className="text-slate-500 italic">Sin operador</span>}
-                            </td>
-                            <td className="p-4 text-right font-mono font-semibold text-emerald-400">
-                              ${formatVE(maq.costoHoraUsd)}/h
                             </td>
                             <td className="p-4">
                               <span
@@ -1566,7 +1562,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       })}
                     {maquinarias.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="p-8 text-center text-slate-500">
+                        <td colSpan={8} className="p-8 text-center text-slate-500">
                           No hay maquinaria ni equipos registrados en esta obra. Haga clic en "+ Registrar Equipo / Máquina".
                         </td>
                       </tr>
@@ -3851,7 +3847,6 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       intervaloMantenimientoHoras: Number(formNuevaMaquinaria.intervaloMantenimientoHoras) || 250,
                       estado: formNuevaMaquinaria.estado,
                       operadorResponsable: formNuevaMaquinaria.operadorResponsable.trim() || undefined,
-                      costoHoraUsd: Number(formNuevaMaquinaria.costoHoraUsd) || 0,
                       combustibleTipo: formNuevaMaquinaria.combustibleTipo,
                       proyectoId: formNuevaMaquinaria.asignarAProyecto && proyectoSeleccionadoId ? proyectoSeleccionadoId : undefined,
                       observaciones: formNuevaMaquinaria.observaciones.trim() || undefined
@@ -3947,16 +3942,6 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     type="number"
                     value={formNuevaMaquinaria.intervaloMantenimientoHoras}
                     onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, intervaloMantenimientoHoras: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Costo USD / Hora</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formNuevaMaquinaria.costoHoraUsd}
-                    onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, costoHoraUsd: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
                   />
                 </div>
@@ -4113,7 +4098,6 @@ export default function ConstruccionApp({ onSalir }: Props) {
                         horometroEnMantenimiento: Number(formMant.horometroEnMantenimiento) || Number(modalMantTarget.horometroActual) || 0,
                         descripcionTrabajo: formMant.descripcionTrabajo.trim(),
                         mecanicoOTaller: formMant.mecanicoOTaller.trim() || undefined,
-                        costoTotalUsd: Number(formMant.costoTotalUsd) || 0,
                         repuestosUtilizados: formMant.repuestosUtilizados.trim() || undefined
                       }
                     );
@@ -4165,16 +4149,6 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
                     />
                   </div>
-                  <div>
-                    <label className="block text-slate-400 mb-1">Costo Total USD</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formMant.costoTotalUsd}
-                      onChange={(e) => setFormMant({ ...formMant, costoTotalUsd: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
-                    />
-                  </div>
                 </div>
 
                 <div>
@@ -4215,7 +4189,6 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   <div key={h.id} className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-amber-300">{h.tipo} - {h.fechaMantenimiento}</span>
-                      <span className="font-mono text-emerald-400 font-bold">${formatVE(h.costoTotalUsd)}</span>
                     </div>
                     <p className="text-slate-300">{h.descripcionTrabajo}</p>
                     <div className="text-[11px] text-slate-500 flex items-center gap-3">
