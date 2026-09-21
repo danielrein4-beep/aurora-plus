@@ -1206,114 +1206,100 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-y-auto">
-        <header className="py-2.5 px-5 border-b border-slate-300/60 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 bg-white/40 dark:bg-black/15 backdrop-blur-md">
-          <div className="flex items-center gap-2.5 sm:gap-3">
+        <header className="py-3 px-5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 bg-white/70 backdrop-blur-md">
+          <div className="flex items-center gap-3">
             <button
               onClick={cerrarSesionPerfil}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border border-slate-300/60 dark:border-white/10"
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors cursor-pointer flex-shrink-0"
               title="Cambiar usuario / Cerrar turno"
             >
-              <IconLock size={12} />
-              <span>Cambiar Perfil</span>
+              <IconLock size={13} />
             </button>
 
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                                <h1 className="font-['Outfit'] font-bold text-sm sm:text-base text-slate-900 dark:text-white tracking-tight">
+                <h1 className="font-['Outfit'] font-bold text-sm text-slate-900 tracking-tight">
                   {rolActivo === "MEDICO" ? `¡Bienvenido ${configPerfil.doctorNombre}!` : (esOdontologia ? "¡Bienvenida Recepción / Asistente!" : "¡Bienvenida Secretaría Clínica!")}
                 </h1>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
-                  rolActivo === "MEDICO"
-                    ? (esOdontologia ? "bg-emerald-100 dark:bg-emerald-950/80 border-emerald-300/50 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300" : "bg-teal-100 dark:bg-teal-950/80 border-teal-300/50 dark:border-teal-500/30 text-teal-700 dark:text-teal-300")
-                    : "bg-slate-100 dark:bg-white/10 border-slate-300/50 dark:border-white/15 text-slate-600 dark:text-white/70"
-                }`}>
-                  {rolActivo === "MEDICO" ? (esOdontologia ? "ODONTÓLOGO TITULAR" : "MÉDICO TITULAR") : (esOdontologia ? "RECEPCIÓN DENTAL" : "SECRETARÍA CLÍNICA")}
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-teal-700 font-semibold uppercase tracking-wide">
+                  {rolActivo === "MEDICO" ? (esOdontologia ? "Odontólogo Titular" : "Médico Titular") : (esOdontologia ? "Recepción Dental" : "Secretaría Clínica")}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-white/50 font-medium mt-0.5">
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 {rolActivo === "MEDICO"
                   ? `${(esOdontologia && (!configPerfil.especialidad || configPerfil.especialidad.includes("Medicina"))) ? "Odontología General / Especialista" : configPerfil.especialidad} ${configPerfil.matriculaMPPS ? `| MPPS-${configPerfil.matriculaMPPS}` : ""} ${configPerfil.colegioMedicos ? `| ${esOdontologia ? "Colegio Odontólogos" : "Col. Médicos"} ${configPerfil.colegioMedicos}` : ""}`
                   : (esOdontologia ? "Control de Sala de Espera, Presupuestos & Citas Odontológicas" : "Control de Sala de Espera, Facturación & Agendamiento")}
-              </p></div>
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-3">
             {perfilActivo === "MEDICO" && (
-              <div className="flex items-center gap-1 p-1 rounded-full bg-slate-200/60 dark:bg-white/10 text-[11px]">
-                                  <button
-                    onClick={() => intentarCambiarRol("MEDICO")}
-                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      rolActivo === "MEDICO" ? (esOdontologia ? "bg-emerald-600 text-white shadow-xs" : "bg-teal-600 text-white shadow-xs") : "text-slate-600 dark:text-white/60"
-                    }`}
-                    title={esOdontologia ? "Cambiar a vista de Odontólogo Titular" : "Cambiar a vista de Médico Titular"}
-                  >
-                    {esOdontologia ? <IconTooth size={12} /> : <IconStethoscope size={12} />}
-                    <span>{esOdontologia ? "Odontólogo" : "Médico"}</span>
-                  </button>
-                  <button
-                    onClick={() => intentarCambiarRol("SECRETARIA")}
-                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      rolActivo === "SECRETARIA" ? (esOdontologia ? "bg-emerald-600 text-white shadow-xs" : "bg-teal-600 text-white shadow-xs") : "text-slate-600 dark:text-white/60"
-                    }`}
-                    title={esOdontologia ? "Supervisar vista de Recepción y Asistencia" : "Supervisar vista de Secretaría y Sala de Espera"}
-                  >
-                    <IconFileText size={12} />
-                    <span>{esOdontologia ? "Recepción" : "Secretaria"}</span>
-                  </button></div>
+              <div className="flex items-center gap-0.5 p-0.5 rounded-full bg-slate-100 text-[11px]">
+                <button
+                  onClick={() => intentarCambiarRol("MEDICO")}
+                  className={`px-2.5 py-1 rounded-full font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    rolActivo === "MEDICO" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                  title={esOdontologia ? "Cambiar a vista de Odontólogo Titular" : "Cambiar a vista de Médico Titular"}
+                >
+                  {esOdontologia ? <IconTooth size={12} /> : <IconStethoscope size={12} />}
+                  <span>{esOdontologia ? "Odontólogo" : "Médico"}</span>
+                </button>
+                <button
+                  onClick={() => intentarCambiarRol("SECRETARIA")}
+                  className={`px-2.5 py-1 rounded-full font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    rolActivo === "SECRETARIA" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                  title={esOdontologia ? "Supervisar vista de Recepción y Asistencia" : "Supervisar vista de Secretaría y Sala de Espera"}
+                >
+                  <IconFileText size={12} />
+                  <span>{esOdontologia ? "Recepción" : "Secretaria"}</span>
+                </button>
+              </div>
             )}
 
             {inboxLabPendientes > 0 && (
-              <button
-                type="button"
-                onClick={() => intentarNavegar("laboratorio")}
-                className="px-3.5 py-1.5 rounded-2xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-600 dark:text-red-400 text-xs font-black flex items-center gap-1.5 animate-pulse cursor-pointer shadow-xs transition-all"
-                title="Exámenes de laboratorio pendientes de revisión médica"
-              >
-                <span>🔬</span>
-                <span>Inbox: {inboxLabPendientes} {inboxLabPendientes === 1 ? "examen" : "exámenes"}</span>
-              </button>
+              <>
+                <div className="hidden sm:block h-6 w-px bg-slate-200" />
+                <button
+                  type="button"
+                  onClick={() => intentarNavegar("laboratorio")}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer"
+                  title="Exámenes de laboratorio pendientes de revisión médica"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  <span>{inboxLabPendientes} {inboxLabPendientes === 1 ? "examen" : "exámenes"} sin revisar</span>
+                </button>
+              </>
             )}
 
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border shadow-sm text-[11px] ${
-              tasaBcv ? "bg-white/70 dark:bg-white/5 border-slate-300/60 dark:border-white/15" : "bg-amber-500/10 border-amber-500/30"
-            }`}>
-              <span className="font-bold text-slate-700 dark:text-white/80 flex items-center gap-1.5">
-                <IconBank size={13} className="text-teal-600 dark:text-teal-400" />
-                <span>Tasas del Día:</span>
-              </span>
-              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                VES: {tasaBcv ? `Bs. ${Number(tasaBcv.tasa).toFixed(2)}` : "Sin tasa"}
-              </span>
-              <span className="text-slate-300 dark:text-white/20">|</span>
-              <span className="font-mono font-bold text-slate-600 dark:text-white/70">
-                COP: {tasaCopReal ? `$${Number(tasaCopReal.tasa).toLocaleString()}` : "Sin tasa"}
-              </span>
+            <div className="hidden sm:block h-6 w-px bg-slate-200" />
 
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] ${
+              tasaBcv ? "bg-slate-50 border-slate-200" : "bg-amber-50 border-amber-200"
+            }`}>
+              <span className="font-semibold text-slate-600">Tasas:</span>
+              <span className="font-mono font-semibold text-slate-800">
+                VES {tasaBcv ? Number(tasaBcv.tasa).toFixed(2) : "—"}
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className="font-mono font-semibold text-slate-800">
+                COP {tasaCopReal ? Number(tasaCopReal.tasa).toLocaleString() : "—"}
+              </span>
               <button
                 type="button"
                 onClick={abrirModalTasas}
-                className="ml-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-teal-500 hover:text-white dark:bg-white/10 dark:hover:bg-teal-500 text-slate-700 dark:text-white/80 text-[10px] font-bold border border-slate-300/60 dark:border-white/10 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                className="ml-0.5 text-slate-400 hover:text-teal-700 transition-colors cursor-pointer"
                 title="Cambiar tasas de cambio manualmente"
               >
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                 </svg>
-                <span>Actualizar Tasas</span>
               </button>
             </div>
 
-            {inboxLabPendientes > 0 && (
-              <button
-                type="button"
-                onClick={() => intentarNavegar("laboratorio")}
-                className="px-3.5 py-1.5 rounded-2xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-600 dark:text-red-400 text-xs font-black flex items-center gap-1.5 animate-pulse cursor-pointer shadow-xs transition-all"
-                title="Exámenes de laboratorio pendientes de revisión médica"
-              >
-                <span>🔬</span>
-                <span>Inbox: {inboxLabPendientes} {inboxLabPendientes === 1 ? "examen" : "exámenes"}</span>
-              </button>
-            )}
-            <button onClick={recargarTodo} className="p-1.5 rounded-lg border border-slate-300/60 dark:border-white/10 hover:bg-white/10 text-slate-600 dark:text-white/60 cursor-pointer" title="Actualizar datos">
+            <button onClick={recargarTodo} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer" title="Actualizar datos">
               <IconRefresh size={14} />
             </button>
           </div>
@@ -1367,6 +1353,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 salaEspera={salaEspera}
                 procedimientos={procedimientos}
                 ingresosHoy={ingresosHoy}
+                inboxLabPendientes={inboxLabPendientes}
                 onNavegar={setPagina}
                 onSeleccionarPaciente={(id, destino) => {
                   setPacienteSeleccionadoId(id);
@@ -1841,6 +1828,7 @@ function VistaGeneral({
   salaEspera,
   procedimientos,
   ingresosHoy,
+  inboxLabPendientes,
   onNavegar,
   onSeleccionarPaciente,
 }: {
@@ -1850,6 +1838,7 @@ function VistaGeneral({
   salaEspera: SalaEsperaEntrada[] | null;
   procedimientos: ProcedimientoMedico[] | null;
   ingresosHoy: number | null;
+  inboxLabPendientes?: number;
   onNavegar: (p: Pagina) => void;
   onSeleccionarPaciente?: (id: number, destino: Pagina) => void;
 }) {
@@ -1899,10 +1888,6 @@ function VistaGeneral({
     ? turnosVivos.filter((e) => e.estado === "EN_ESPERA" || e.estado === "EN_CONSULTA").length
     : (salaEspera || []).filter((e) => e.estado !== "FINALIZADO").length;
 
-  const atendidosHoy = turnosVivos.length > 0
-    ? turnosVivos.filter((e) => e.estado === "ATENDIDO").length
-    : (citasHoy ? citasHoy.length : 0);
-
   const totalPacientes = pacientes ? pacientes.length : 0;
   const totalProcedimientos = (procedimientos ? procedimientos.length : 0) + cotizacionesVivas.length;
 
@@ -1911,6 +1896,15 @@ function VistaGeneral({
         .sort((a, b) => (a.turnoNumero || 0) - (b.turnoNumero || 0))
         .filter((t) => t.estado === "EN_ESPERA" || t.estado === "EN_CONSULTA")
     : (salaEspera || []).filter((e) => e.estado !== "FINALIZADO");
+
+  const pacientesHoy = citasHoy ? citasHoy.length : 0;
+
+  const proximaCita = useMemo(() => {
+    const pendientes = (citasHoy || [])
+      .filter((c) => !["ATENDIDA", "CANCELADA", "NO_ASISTIO"].includes(c.estado))
+      .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+    return pendientes[0] || null;
+  }, [citasHoy]);
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2047,69 +2041,72 @@ function VistaGeneral({
         )}
       </div>
 
-      {/* ── 4 KPI CARDS CON BORDE LATERAL COLOREADO (EXACTO A LA IMAGEN) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Card 1: EN SALA DE ESPERA (Borde ámbar / amarillo) */}
-        <div
-          onClick={() => onNavegar("sala-espera")}
-          className="apple-glass rounded-xl p-3.5 sm:p-4 border-l-4 border-l-amber-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
-        >
-          <div className="text-[10px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
-            EN SALA DE ESPERA
+      {/* ── CABECERA DE MÉTRICAS: 1 tarjeta héroe (foco del día) + cinta de métricas secundarias ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+        {/* Tarjeta héroe: prioridad operativa del día */}
+        <div className="lg:col-span-7 apple-glass rounded-2xl p-5 border-2 border-teal-200 shadow-sm flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 border border-teal-200 px-2.5 py-0.5 rounded-full">
+                Prioridad Operativa
+              </span>
+              <div className="mt-2.5 flex items-baseline gap-2.5">
+                <span className="text-3xl font-black text-slate-900 font-['Outfit']">
+                  {pacientesHoy}
+                </span>
+                <span className="text-xs font-medium text-slate-500">
+                  {pacientesHoy === 1 ? "paciente agendado hoy" : "pacientes agendados hoy"}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavegar("agenda")}
+              className="px-3.5 py-2 rounded-xl bg-[#177E89] hover:bg-[#115960] text-white text-xs font-bold shadow-sm transition-all cursor-pointer whitespace-nowrap"
+            >
+              Ver Agenda de Hoy →
+            </button>
           </div>
-          <div className="text-2xl font-black text-amber-500 font-['Outfit'] mt-1">
-            {String(enEspera)}
-          </div>
-          <div className="text-[10px] text-amber-600/80 dark:text-amber-400/80 font-medium mt-1">
-            Turnos activos hoy
+
+          <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-3 flex-wrap text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+              <span className="font-semibold text-slate-700 flex-shrink-0">Próxima cita:</span>
+              {proximaCita ? (
+                <span className="text-slate-500 truncate">
+                  <strong className="text-slate-800 font-medium">{proximaCita.paciente?.nombreCompleto || "Paciente"}</strong>
+                  {" "}({proximaCita.horaInicio}) — {proximaCita.motivo || "Consulta general"}
+                </span>
+              ) : (
+                <span className="text-slate-400">Sin pacientes en turno inmediato</span>
+              )}
+            </div>
+            <span className="text-[11px] font-semibold text-teal-700 flex-shrink-0">En espera: {enEspera}</span>
           </div>
         </div>
 
-        {/* Card 2: PACIENTES ATENDIDOS HOY (Borde teal) */}
-        <div
-          onClick={() => onNavegar("sala-espera")}
-          className="apple-glass rounded-xl p-3.5 sm:p-4 border-l-4 border-l-teal-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
-        >
-          <div className="text-[10px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
-            PACIENTES ATENDIDOS HOY
+        {/* Cinta de métricas secundarias */}
+        <div className="lg:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+            Resumen del Turno
           </div>
-          <div className="text-2xl font-black text-teal-600 dark:text-teal-400 font-['Outfit'] mt-1">
-            {String(atendidosHoy)}
+          <div className="grid grid-cols-3 divide-x divide-slate-200 text-center">
+            <button type="button" onClick={() => onNavegar("sala-espera")} className="px-1.5 cursor-pointer">
+              <div className="text-xl font-black text-slate-900 font-['Outfit']">{enEspera}</div>
+              <div className="text-[10px] font-medium text-slate-500 mt-0.5">En Espera</div>
+            </button>
+            <button type="button" onClick={() => onNavegar("laboratorio")} className="px-1.5 cursor-pointer">
+              <div className="text-xl font-black text-slate-900 font-['Outfit']">{inboxLabPendientes ?? 0}</div>
+              <div className="text-[10px] font-medium text-slate-500 mt-0.5">Exámenes</div>
+            </button>
+            <button type="button" onClick={() => onNavegar("financiero")} className="px-1.5 cursor-pointer">
+              <div className="text-xl font-black text-slate-900 font-['Outfit']">${(ingresosHoy ?? 0).toFixed(0)}</div>
+              <div className="text-[10px] font-medium text-slate-500 mt-0.5">Caja Hoy</div>
+            </button>
           </div>
-          <div className="text-[10px] text-teal-600/80 dark:text-teal-400/80 font-medium mt-1">
-            Consultas completadas
-          </div>
-        </div>
-
-        {/* Card 3: EXPEDIENTES REGISTRADOS (Borde verde / esmeralda) */}
-        <div
-          onClick={() => onNavegar("pacientes")}
-          className="apple-glass rounded-xl p-3.5 sm:p-4 border-l-4 border-l-emerald-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
-        >
-          <div className="text-[10px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
-            EXPEDIENTES REGISTRADOS
-          </div>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-['Outfit'] mt-1">
-            {String(totalPacientes)}
-          </div>
-          <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-medium mt-1">
-            Pacientes en base de datos
-          </div>
-        </div>
-
-        {/* Card 4: PROCEDIMIENTOS SEMANA (Borde morado / índigo) */}
-        <div
-          onClick={() => onNavegar("procedimientos")}
-          className="apple-glass rounded-xl p-3.5 sm:p-4 border-l-4 border-l-purple-500 border-slate-300/60 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
-        >
-          <div className="text-[10px] font-bold text-slate-500 dark:text-white/60 uppercase tracking-wider">
-            PROCEDIMIENTOS SEMANA
-          </div>
-          <div className="text-2xl font-black text-purple-600 dark:text-purple-400 font-['Outfit'] mt-1">
-            {String(totalProcedimientos)}
-          </div>
-          <div className="text-[10px] text-purple-600/80 dark:text-purple-400/80 font-medium mt-1">
-            Cotizaciones y catálogo
+          <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
+            <span>{totalPacientes} pacientes · {totalProcedimientos} cotizaciones</span>
+            <span className="text-emerald-700 font-semibold">Sincronizado</span>
           </div>
         </div>
       </div>
@@ -4067,30 +4064,30 @@ function HistoriasClinicas({
 
             {/* 1. FICHA CONTINUA DE RESUMEN DE CONSULTA PREVIA (EXPEDIENTE DE LECTURA) */}
             {consultaSeleccionadaFicha && (
-              <div className="rounded-3xl border border-teal-500/40 dark:border-teal-400/30 shadow-2xl bg-gradient-to-b from-slate-900 to-slate-950 text-white overflow-hidden animate-fade-in">
+              <div className="rounded-3xl border border-slate-200 shadow-lg bg-white overflow-hidden animate-fade-in">
                 {/* Banner Superior Estilo Expediente Continuo */}
-                <div className="bg-gradient-to-r from-teal-900/90 via-slate-900 to-slate-900 p-5 border-b border-white/10 flex items-start justify-between">
+                <div className="bg-teal-50 p-5 border-b border-teal-100 flex items-start justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/40 text-teal-300 font-mono font-bold text-xs flex items-center gap-1.5 shadow-xs">
-                        <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+                      <span className="px-3 py-1 rounded-full bg-teal-100 border border-teal-200 text-teal-700 font-mono font-bold text-xs flex items-center gap-1.5 shadow-xs">
+                        <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
                         <span>CONSULTA DEL {consultaSeleccionadaFicha.fechaConsulta ? consultaSeleccionadaFicha.fechaConsulta.slice(0, 10) : hoy()}</span>
                       </span>
-                      <span className="text-[11px] font-semibold text-slate-300 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/10">
+                      <span className="text-[11px] font-semibold text-slate-600 bg-white px-2.5 py-0.5 rounded-full border border-slate-200">
                         Expediente HC-2026-{String(pacienteSeleccionado?.id).padStart(4, "0")}
                       </span>
                     </div>
-                    <h3 className="font-['Outfit'] font-black text-lg text-white tracking-wide pt-1">
+                    <h3 className="font-['Outfit'] font-black text-lg text-slate-900 tracking-wide pt-1">
                       {pacienteSeleccionado?.nombreCompleto}
                     </h3>
-                    <p className="text-xs text-slate-300/80">
+                    <p className="text-xs text-slate-600">
                       C.I: {pacienteSeleccionado?.identificacion} · Tel: {pacienteSeleccionado?.telefono || "No registrado"}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setConsultaSeleccionadaFicha(null)}
-                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-bold text-slate-200 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1"
                   >
                     <span>✕ Cerrar Ficha</span>
                   </button>
@@ -4099,22 +4096,22 @@ function HistoriasClinicas({
                 {/* Cuerpo Continuo del Resumen Clínico */}
                 <div className="p-6 space-y-5 text-xs">
                   {/* Flujo Narrativo: Motivo & Diagnóstico en Tira Continua */}
-                  <div className="bg-white/5 rounded-2xl p-4 border border-white/10 space-y-3">
+                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                       <div className="space-y-0.5 max-w-md">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
                           Motivo de Consulta
                         </span>
-                        <p className="text-sm font-semibold text-slate-100">
+                        <p className="text-sm font-semibold text-slate-800">
                           {consultaSeleccionadaFicha.motivoConsulta || "Evaluación Médica General"}
                         </p>
                       </div>
 
                       <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-teal-400 block">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 block">
                           Diagnóstico Clínico (Dx)
                         </span>
-                        <span className="inline-block px-3 py-1 rounded-xl bg-teal-500/20 border border-teal-400/40 text-teal-200 font-bold text-xs">
+                        <span className="inline-block px-3 py-1 rounded-xl bg-teal-100 border border-teal-200 text-teal-800 font-bold text-xs">
                           {consultaSeleccionadaFicha.descripcionDiagnostico || "Evaluación Médica"}
                         </span>
                       </div>
@@ -4122,45 +4119,45 @@ function HistoriasClinicas({
 
                     {/* Pastillas de Datos Físicos continuos */}
                     {(consultaSeleccionadaFicha.talla || consultaSeleccionadaFicha.peso || consultaSeleccionadaFicha.observacionFisica) && (
-                      <div className="pt-2 border-t border-white/10 flex items-center gap-2 flex-wrap text-[11px] text-slate-300">
-                        <span className="text-slate-400 font-medium">Examen físico registrado:</span>
+                      <div className="pt-2 border-t border-slate-200 flex items-center gap-2 flex-wrap text-[11px] text-slate-700">
+                        <span className="text-slate-600 font-medium">Examen físico registrado:</span>
                         {consultaSeleccionadaFicha.talla && (
-                          <span className="bg-sky-500/15 border border-sky-400/30 text-sky-200 px-2 py-0.5 rounded-lg font-mono">
+                          <span className="bg-sky-50 border border-sky-200 text-sky-800 px-2 py-0.5 rounded-lg font-mono">
                             Talla: {consultaSeleccionadaFicha.talla} m
                           </span>
                         )}
                         {consultaSeleccionadaFicha.peso && (
-                          <span className="bg-sky-500/15 border border-sky-400/30 text-sky-200 px-2 py-0.5 rounded-lg font-mono">
+                          <span className="bg-sky-50 border border-sky-200 text-sky-800 px-2 py-0.5 rounded-lg font-mono">
                             Peso: {consultaSeleccionadaFicha.peso} kg
                           </span>
                         )}
                         {consultaSeleccionadaFicha.presionArterial && (
-                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                          <span className="bg-rose-50 border border-rose-200 text-rose-800 px-2 py-0.5 rounded-lg font-mono">
                             TA: {consultaSeleccionadaFicha.presionArterial}
                           </span>
                         )}
                         {consultaSeleccionadaFicha.frecuenciaCardiaca != null && (
-                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                          <span className="bg-rose-50 border border-rose-200 text-rose-800 px-2 py-0.5 rounded-lg font-mono">
                             FC: {consultaSeleccionadaFicha.frecuenciaCardiaca} bpm
                           </span>
                         )}
                         {consultaSeleccionadaFicha.frecuenciaRespiratoria != null && (
-                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                          <span className="bg-rose-50 border border-rose-200 text-rose-800 px-2 py-0.5 rounded-lg font-mono">
                             FR: {consultaSeleccionadaFicha.frecuenciaRespiratoria} rpm
                           </span>
                         )}
                         {consultaSeleccionadaFicha.temperatura != null && (
-                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                          <span className="bg-rose-50 border border-rose-200 text-rose-800 px-2 py-0.5 rounded-lg font-mono">
                             Temp: {consultaSeleccionadaFicha.temperatura}°C
                           </span>
                         )}
                         {consultaSeleccionadaFicha.saturacionOxigeno != null && (
-                          <span className="bg-rose-500/15 border border-rose-400/30 text-rose-200 px-2 py-0.5 rounded-lg font-mono">
+                          <span className="bg-rose-50 border border-rose-200 text-rose-800 px-2 py-0.5 rounded-lg font-mono">
                             SatO2: {consultaSeleccionadaFicha.saturacionOxigeno}%
                           </span>
                         )}
                         {consultaSeleccionadaFicha.observacionFisica && (
-                          <span className="bg-white/10 border border-white/15 text-slate-200 px-2.5 py-0.5 rounded-lg">
+                          <span className="bg-slate-100 border border-slate-200 text-slate-700 px-2.5 py-0.5 rounded-lg">
                             {consultaSeleccionadaFicha.observacionFisica}
                           </span>
                         )}
@@ -4170,11 +4167,11 @@ function HistoriasClinicas({
 
                   {/* Evolución y Hallazgos Clínicos Continuos */}
                   {consultaSeleccionadaFicha.evolucionClinica && (
-                    <div className="border-l-3 border-teal-400 pl-3.5 py-0.5 space-y-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-400 block">
+                    <div className="border-l-3 border-teal-500 pl-3.5 py-0.5 space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 block">
                         Evolución Clínica & Hallazgos
                       </span>
-                      <p className="text-slate-200 text-xs leading-relaxed whitespace-pre-wrap">
+                      <p className="text-slate-700 text-xs leading-relaxed whitespace-pre-wrap">
                         {consultaSeleccionadaFicha.evolucionClinica}
                       </p>
                     </div>

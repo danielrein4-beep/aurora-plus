@@ -46,6 +46,19 @@ public class ConstruccionController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PutMapping("/proyectos/{id}")
+    public ResponseEntity<ProyectoConstruccionEntity> actualizarProyecto(
+            @PathVariable Long id,
+            @RequestBody ProyectoConstruccionEntity proyecto) {
+        return ResponseEntity.ok(construccionService.actualizarProyecto(requireTenant(), id, proyecto));
+    }
+
+    @DeleteMapping("/proyectos/{id}")
+    public ResponseEntity<Void> eliminarProyecto(@PathVariable Long id) {
+        construccionService.eliminarProyecto(requireTenant(), id);
+        return ResponseEntity.noContent().build();
+    }
+
     // --- CAPÍTULOS ---
     @GetMapping("/capitulos")
     public List<CapituloConstruccionEntity> listarCapitulos() {
@@ -55,6 +68,18 @@ public class ConstruccionController {
     @PostMapping("/capitulos")
     public ResponseEntity<CapituloConstruccionEntity> crearCapitulo(@RequestBody CapituloConstruccionEntity capitulo) {
         return ResponseEntity.ok(construccionService.guardarCapitulo(requireTenant(), capitulo));
+    }
+
+    @GetMapping("/proyectos/{proyectoId}/capitulos")
+    public List<CapituloConstruccionEntity> listarCapitulosPorProyecto(@PathVariable Long proyectoId) {
+        return construccionService.listarCapitulosPorProyecto(requireTenant(), proyectoId);
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/capitulos")
+    public ResponseEntity<CapituloConstruccionEntity> crearCapituloEnProyecto(
+            @PathVariable Long proyectoId,
+            @RequestBody CapituloConstruccionEntity capitulo) {
+        return ResponseEntity.ok(construccionService.guardarCapituloEnProyecto(requireTenant(), proyectoId, capitulo));
     }
 
     // --- PARTIDAS ---
@@ -74,6 +99,13 @@ public class ConstruccionController {
     public ResponseEntity<Void> eliminarPartida(@PathVariable Long id) {
         construccionService.eliminarPartida(requireTenant(), id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/partidas/{id}")
+    public ResponseEntity<PartidaConstruccionEntity> actualizarPartida(
+            @PathVariable Long id,
+            @RequestBody PartidaConstruccionEntity partida) {
+        return ResponseEntity.ok(construccionService.actualizarPartida(requireTenant(), id, partida));
     }
 
     // --- VALUACIONES ---
@@ -156,5 +188,217 @@ public class ConstruccionController {
     @GetMapping("/catalogo-covenin")
     public List<CatalogoCoveninEntity> buscarCatalogo(@RequestParam(required = false) String q) {
         return construccionService.buscarCatalogo(q);
+    }
+
+    // --- LOGÍSTICA Y DESPACHOS ---
+    @GetMapping("/proyectos/{proyectoId}/despachos")
+    public List<DespachoConstruccionEntity> listarDespachos(@PathVariable Long proyectoId) {
+        return construccionService.listarDespachos(requireTenant(), proyectoId);
+    }
+
+    @GetMapping("/despachos/{id}")
+    public ResponseEntity<DespachoConstruccionEntity> obtenerDespacho(@PathVariable Long id) {
+        return construccionService.obtenerDespacho(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    public ResponseEntity<DespachoConstruccionEntity> crearDespacho(Long proyectoId, DespachoConstruccionEntity despacho) {
+        return crearDespacho(proyectoId, despacho, null);
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/despachos")
+    public ResponseEntity<DespachoConstruccionEntity> crearDespacho(
+            @PathVariable Long proyectoId,
+            @RequestBody DespachoConstruccionEntity despacho,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarDespacho(requireTenant(), proyectoId, despacho, idempotencyKey));
+    }
+
+    @PatchMapping("/despachos/{id}/estado")
+    public ResponseEntity<DespachoConstruccionEntity> cambiarEstadoDespacho(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String nuevoEstado = body != null ? body.get("estado") : null;
+        String observaciones = body != null ? body.get("observaciones") : null;
+        return ResponseEntity.ok(construccionService.actualizarEstadoDespacho(requireTenant(), id, nuevoEstado, observaciones));
+    }
+
+    // --- MAQUINARIA Y EQUIPOS DE OBRA ---
+    @GetMapping("/maquinarias")
+    public List<MaquinariaConstruccionEntity> listarMaquinarias(@RequestParam(required = false) Long proyectoId) {
+        return construccionService.listarMaquinarias(requireTenant(), proyectoId);
+    }
+
+    @GetMapping("/maquinarias/{id}")
+    public ResponseEntity<MaquinariaConstruccionEntity> obtenerMaquinaria(@PathVariable Long id) {
+        return construccionService.obtenerMaquinaria(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/maquinarias")
+    public ResponseEntity<MaquinariaConstruccionEntity> registrarMaquinaria(
+            @RequestBody MaquinariaConstruccionEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarMaquinaria(requireTenant(), req, idempotencyKey));
+    }
+
+    @PutMapping("/maquinarias/{id}")
+    public ResponseEntity<MaquinariaConstruccionEntity> actualizarMaquinaria(
+            @PathVariable Long id,
+            @RequestBody MaquinariaConstruccionEntity req) {
+        return ResponseEntity.ok(construccionService.actualizarMaquinaria(requireTenant(), id, req));
+    }
+
+    @PatchMapping("/maquinarias/{id}/horometro")
+    public ResponseEntity<MaquinariaConstruccionEntity> actualizarHorometro(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        BigDecimal nuevoHorometro = null;
+        if (body != null && body.get("horometro") != null) {
+            nuevoHorometro = new BigDecimal(body.get("horometro").toString());
+        }
+        String operador = body != null && body.get("operador") != null ? body.get("operador").toString() : null;
+        return ResponseEntity.ok(construccionService.actualizarHorometro(requireTenant(), id, nuevoHorometro, operador));
+    }
+
+    @GetMapping("/maquinarias/{id}/mantenimientos")
+    public List<MantenimientoMaquinariaEntity> listarMantenimientos(@PathVariable Long id) {
+        return construccionService.listarMantenimientos(requireTenant(), id);
+    }
+
+    public ResponseEntity<MantenimientoMaquinariaEntity> registrarMantenimiento(
+            Long id, MantenimientoMaquinariaEntity req) {
+        return registrarMantenimiento(id, req, null);
+    }
+
+    @PostMapping("/maquinarias/{id}/mantenimientos")
+    public ResponseEntity<MantenimientoMaquinariaEntity> registrarMantenimiento(
+            @PathVariable Long id,
+            @RequestBody MantenimientoMaquinariaEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarMantenimiento(requireTenant(), id, req, idempotencyKey));
+    }
+
+    // --- MATRIZ DE RIESGOS Y SEGURIDAD OCUPACIONAL (SST / IPERC) ---
+    @GetMapping("/proyectos/{proyectoId}/riesgos")
+    public List<RiesgoConstruccionEntity> listarRiesgos(@PathVariable Long proyectoId) {
+        return construccionService.listarRiesgos(requireTenant(), proyectoId);
+    }
+
+    @GetMapping("/riesgos/{id}")
+    public ResponseEntity<RiesgoConstruccionEntity> obtenerRiesgo(@PathVariable Long id) {
+        return construccionService.obtenerRiesgo(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/riesgos")
+    public ResponseEntity<RiesgoConstruccionEntity> registrarRiesgo(
+            @PathVariable Long proyectoId,
+            @RequestBody RiesgoConstruccionEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarRiesgo(requireTenant(), proyectoId, req, idempotencyKey));
+    }
+
+    @PatchMapping("/riesgos/{id}/estado")
+    public ResponseEntity<RiesgoConstruccionEntity> cambiarEstadoRiesgo(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String nuevoEstado = body != null ? body.get("estado") : null;
+        String medidas = body != null ? body.get("medidasControl") : null;
+        return ResponseEntity.ok(construccionService.actualizarEstadoRiesgo(requireTenant(), id, nuevoEstado, medidas));
+    }
+
+    // --- GESTIÓN DOCUMENTAL BIM Y CONTROL DE RFIs ---
+    @GetMapping("/proyectos/{proyectoId}/bim")
+    public List<DocumentoBimEntity> listarDocumentosBim(
+            @PathVariable Long proyectoId,
+            @RequestParam(required = false) String disciplina) {
+        return construccionService.listarDocumentosBim(requireTenant(), proyectoId, disciplina);
+    }
+
+    @GetMapping("/bim/{id}")
+    public ResponseEntity<DocumentoBimEntity> obtenerDocumentoBim(@PathVariable Long id) {
+        return construccionService.obtenerDocumentoBim(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/bim")
+    public ResponseEntity<DocumentoBimEntity> registrarDocumentoBim(
+            @PathVariable Long proyectoId,
+            @RequestBody DocumentoBimEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarDocumentoBim(requireTenant(), proyectoId, req, idempotencyKey));
+    }
+
+    @PatchMapping("/bim/{id}/estado")
+    public ResponseEntity<DocumentoBimEntity> cambiarEstadoDocumentoBim(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String nuevoEstado = body != null ? body.get("estado") : null;
+        return ResponseEntity.ok(construccionService.actualizarEstadoDocumentoBim(requireTenant(), id, nuevoEstado));
+    }
+
+    @GetMapping("/proyectos/{proyectoId}/rfis")
+    public List<RfiConstruccionEntity> listarRfis(@PathVariable Long proyectoId) {
+        return construccionService.listarRfis(requireTenant(), proyectoId);
+    }
+
+    @GetMapping("/rfis/{id}")
+    public ResponseEntity<RfiConstruccionEntity> obtenerRfi(@PathVariable Long id) {
+        return construccionService.obtenerRfi(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/rfis")
+    public ResponseEntity<RfiConstruccionEntity> registrarRfi(
+            @PathVariable Long proyectoId,
+            @RequestBody RfiConstruccionEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarRfi(requireTenant(), proyectoId, req, idempotencyKey));
+    }
+
+    @PatchMapping("/rfis/{id}/respuesta")
+    public ResponseEntity<RfiConstruccionEntity> responderRfi(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String respuesta = body != null ? body.get("respuestaOficial") : null;
+        String resp = body != null ? body.get("responsableRespuesta") : null;
+        String nuevoEstado = body != null ? body.get("estado") : null;
+        return ResponseEntity.ok(construccionService.responderRfi(requireTenant(), id, respuesta, resp, nuevoEstado));
+    }
+
+    // --- PLANIFICACIÓN DE CUADRILLAS Y FRENTES OPERATIVOS ---
+    @GetMapping("/proyectos/{proyectoId}/cuadrillas")
+    public List<CuadrillaConstruccionEntity> listarCuadrillas(@PathVariable Long proyectoId) {
+        return construccionService.listarCuadrillas(requireTenant(), proyectoId);
+    }
+
+    @GetMapping("/cuadrillas/{id}")
+    public ResponseEntity<CuadrillaConstruccionEntity> obtenerCuadrilla(@PathVariable Long id) {
+        return construccionService.obtenerCuadrilla(requireTenant(), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/proyectos/{proyectoId}/cuadrillas")
+    public ResponseEntity<CuadrillaConstruccionEntity> registrarCuadrilla(
+            @PathVariable Long proyectoId,
+            @RequestBody CuadrillaConstruccionEntity req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ResponseEntity.ok(construccionService.registrarCuadrilla(requireTenant(), proyectoId, req, idempotencyKey));
+    }
+
+    @PatchMapping("/cuadrillas/{id}/estado")
+    public ResponseEntity<CuadrillaConstruccionEntity> cambiarEstadoCuadrilla(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String nuevoEstado = body != null ? body.get("estado") : null;
+        String nuevoFrente = body != null ? body.get("frenteTrabajo") : null;
+        return ResponseEntity.ok(construccionService.actualizarEstadoCuadrilla(requireTenant(), id, nuevoEstado, nuevoFrente));
     }
 }

@@ -37,6 +37,14 @@ public class ConstruccionAislamientoTenantP0Test {
     @Autowired
     private TestIdempotenciaPreClaimObserver testPreClaimObserver;
 
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        if (testPreClaimObserver != null) {
+            testPreClaimObserver.reset();
+        }
+        TenantContext.clear();
+    }
+
     @Autowired
     private ProyectoConstruccionRepository proyectoRepository;
 
@@ -45,6 +53,9 @@ public class ConstruccionAislamientoTenantP0Test {
 
     @Autowired
     private PartidaConstruccionRepository partidaRepository;
+
+    @Autowired
+    private DespachoConstruccionRepository despachoRepository;
 
     @Autowired
     private ValuacionConstruccionRepository valuacionRepository;
@@ -123,6 +134,33 @@ public class ConstruccionAislamientoTenantP0Test {
         ResponseStatusException exPatchVal = assertThrows(ResponseStatusException.class, () -> construccionController.cambiarEstadoValuacion(1L, Map.of("estado", "APROBADA")));
         assertEquals(HttpStatus.UNAUTHORIZED, exPatchVal.getStatusCode());
 
+        ResponseStatusException exActProy = assertThrows(ResponseStatusException.class, () -> construccionController.actualizarProyecto(1L, new ProyectoConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exActProy.getStatusCode());
+
+        ResponseStatusException exElimProy = assertThrows(ResponseStatusException.class, () -> construccionController.eliminarProyecto(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exElimProy.getStatusCode());
+
+        ResponseStatusException exListCapProy = assertThrows(ResponseStatusException.class, () -> construccionController.listarCapitulosPorProyecto(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exListCapProy.getStatusCode());
+
+        ResponseStatusException exCrearCapProy = assertThrows(ResponseStatusException.class, () -> construccionController.crearCapituloEnProyecto(1L, new CapituloConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exCrearCapProy.getStatusCode());
+
+        ResponseStatusException exActPart = assertThrows(ResponseStatusException.class, () -> construccionController.actualizarPartida(1L, new PartidaConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exActPart.getStatusCode());
+
+        ResponseStatusException exListDesp = assertThrows(ResponseStatusException.class, () -> construccionController.listarDespachos(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exListDesp.getStatusCode());
+
+        ResponseStatusException exCrearDesp = assertThrows(ResponseStatusException.class, () -> construccionController.crearDespacho(1L, new DespachoConstruccionEntity()));
+        assertEquals(HttpStatus.UNAUTHORIZED, exCrearDesp.getStatusCode());
+
+        ResponseStatusException exObtDesp = assertThrows(ResponseStatusException.class, () -> construccionController.obtenerDespacho(1L));
+        assertEquals(HttpStatus.UNAUTHORIZED, exObtDesp.getStatusCode());
+
+        ResponseStatusException exPatchDesp = assertThrows(ResponseStatusException.class, () -> construccionController.cambiarEstadoDespacho(1L, Map.of("estado", "RECIBIDO")));
+        assertEquals(HttpStatus.UNAUTHORIZED, exPatchDesp.getStatusCode());
+
         ResponseStatusException exListarIns = assertThrows(ResponseStatusException.class, () -> construccionController.listarInsumos());
         assertEquals(HttpStatus.UNAUTHORIZED, exListarIns.getStatusCode());
 
@@ -189,6 +227,18 @@ public class ConstruccionAislamientoTenantP0Test {
         bA.setPersonalActivo(10);
         bA.setActividadesEjecutadas("Vaciado inicial");
         BitacoraConstruccionEntity bitA = bitacoraRepository.save(bA);
+
+        DespachoConstruccionEntity dA = new DespachoConstruccionEntity();
+        dA.setTenantId(tenantA);
+        dA.setProyectoId(proyA.getId());
+        dA.setGuiaNumero("GUIA-ISO-A-001");
+        dA.setTipoMaterial("CONCRETO_PREMEZCLADO");
+        dA.setOrigen("Planta A");
+        dA.setDestinoFrente("Frente 1");
+        dA.setCantidad(new BigDecimal("8.00"));
+        dA.setEstado("EN_TRANSITO");
+        DespachoConstruccionEntity despA = despachoRepository.save(dA);
+        final Long despAId = despA.getId();
 
         final Long proyAId = proyA.getId();
         final Long capAId = capA.getId();
@@ -259,9 +309,49 @@ public class ConstruccionAislamientoTenantP0Test {
         ResponseStatusException exEditarIns = assertThrows(ResponseStatusException.class, () -> construccionController.registrarConsumo(insAId, Map.of("cantidad", BigDecimal.ONE)));
         assertEquals(HttpStatus.NOT_FOUND, exEditarIns.getStatusCode());
 
-        // 5. BORRAR: Tenant B no puede eliminar partida de Tenant A
+        // 5. BORRAR Y EDITAR NUEVOS ENDPOINTS: Tenant B no puede tocar recursos de A
+        ResponseStatusException exListCapProy = assertThrows(ResponseStatusException.class, () -> construccionController.listarCapitulosPorProyecto(proyAId));
+        assertEquals(HttpStatus.NOT_FOUND, exListCapProy.getStatusCode());
+
+        CapituloConstruccionEntity capB = new CapituloConstruccionEntity();
+        capB.setCodigo("2.0");
+        capB.setNombre("Inyeccion capitulo ilicito");
+        ResponseStatusException exCrearCapProy = assertThrows(ResponseStatusException.class, () -> construccionController.crearCapituloEnProyecto(proyAId, capB));
+        assertEquals(HttpStatus.NOT_FOUND, exCrearCapProy.getStatusCode());
+
+        ProyectoConstruccionEntity modProy = new ProyectoConstruccionEntity();
+        modProy.setNombre("Nombre hackeado");
+        ResponseStatusException exActProy = assertThrows(ResponseStatusException.class, () -> construccionController.actualizarProyecto(proyAId, modProy));
+        assertEquals(HttpStatus.NOT_FOUND, exActProy.getStatusCode());
+
+        ResponseStatusException exElimProy = assertThrows(ResponseStatusException.class, () -> construccionController.eliminarProyecto(proyAId));
+        assertEquals(HttpStatus.NOT_FOUND, exElimProy.getStatusCode());
+
+        PartidaConstruccionEntity modPart = new PartidaConstruccionEntity();
+        modPart.setDescripcion("Descripcion alterada");
+        ResponseStatusException exActPart = assertThrows(ResponseStatusException.class, () -> construccionController.actualizarPartida(partidaAId, modPart));
+        assertEquals(HttpStatus.NOT_FOUND, exActPart.getStatusCode());
+
         ResponseStatusException exBorrarPart = assertThrows(ResponseStatusException.class, () -> construccionController.eliminarPartida(partidaAId));
         assertEquals(HttpStatus.NOT_FOUND, exBorrarPart.getStatusCode());
+
+        // Tenant B no puede listar, leer, crear ni modificar despachos de A
+        ResponseStatusException exListDespB = assertThrows(ResponseStatusException.class, () -> construccionController.listarDespachos(proyAId));
+        assertEquals(HttpStatus.NOT_FOUND, exListDespB.getStatusCode());
+
+        ResponseEntity<DespachoConstruccionEntity> respDespLectura = construccionController.obtenerDespacho(despAId);
+        assertEquals(HttpStatus.NOT_FOUND, respDespLectura.getStatusCode());
+
+        DespachoConstruccionEntity despIlicito = new DespachoConstruccionEntity();
+        despIlicito.setGuiaNumero("GUIA-HACK-002");
+        despIlicito.setTipoMaterial("ACERO_CABILLAS");
+        despIlicito.setOrigen("Cantera X");
+        despIlicito.setDestinoFrente("Frente Ilicito");
+        ResponseStatusException exCrearDespB = assertThrows(ResponseStatusException.class, () -> construccionController.crearDespacho(proyAId, despIlicito));
+        assertEquals(HttpStatus.NOT_FOUND, exCrearDespB.getStatusCode());
+
+        ResponseStatusException exPatchDespB = assertThrows(ResponseStatusException.class, () -> construccionController.cambiarEstadoDespacho(despAId, Map.of("estado", "RECIBIDO")));
+        assertEquals(HttpStatus.NOT_FOUND, exPatchDespB.getStatusCode());
 
         // Verificar que los datos de Tenant A permanecen 100% íntegros
         TenantContext.setCurrentTenant(tenantA);
@@ -836,5 +926,503 @@ public class ConstruccionAislamientoTenantP0Test {
             liberarHilo1.countDown();
             TenantContext.clear();
         }
+    }
+
+    // 15. Logística y Despachos: aislamiento, validación de estados e idempotencia
+    @Test
+    void despachos_aislamientoEstadosEIdempotencia() {
+        long tenant = 99910L;
+        TenantContext.setCurrentTenant(tenant);
+
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PROY-LOG-01", "Complejo Logístico Norte");
+        Long proyId = proy.getId();
+
+        // 1. Crear despacho exitoso con Idempotency-Key
+        DespachoConstruccionEntity desp = new DespachoConstruccionEntity();
+        desp.setGuiaNumero("GUIA-LOG-001");
+        desp.setTipoMaterial("CONCRETO_PREMEZCLADO");
+        desp.setOrigen("Planta Central");
+        desp.setDestinoFrente("Losa Fundaciones");
+        desp.setUnidadTransporte("Mixer Mack #10");
+        desp.setChofer("Manuel Rodríguez");
+        desp.setCantidad(new BigDecimal("7.50"));
+        desp.setUnidadMedida("m3");
+        desp.setSlumpConoPulgadas(new BigDecimal("5.50"));
+
+        String ik = "IK-DESP-001-99910";
+        ResponseEntity<DespachoConstruccionEntity> resp1 = construccionController.crearDespacho(proyId, desp, ik);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertNotNull(resp1.getBody());
+        assertEquals("EN_TRANSITO", resp1.getBody().getEstado());
+        Long despId = resp1.getBody().getId();
+
+        // 2. Reintento idempotente: devuelve el mismo recurso sin duplicar en base de datos
+        ResponseEntity<DespachoConstruccionEntity> respReintento = construccionController.crearDespacho(proyId, desp, ik);
+        assertEquals(HttpStatus.OK, respReintento.getStatusCode());
+        assertEquals(despId, respReintento.getBody().getId());
+
+        List<DespachoConstruccionEntity> lista = construccionController.listarDespachos(proyId);
+        assertEquals(1, lista.size(), "No debe haber duplicados por reintento idempotente");
+
+        // 3. Rechazo de estado inválido
+        ResponseStatusException exEstado = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoDespacho(despId, Map.of("estado", "ESTADO_INEXISTENTE"))
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exEstado.getStatusCode());
+
+        // 4. Transición exitosa a RECIBIDO
+        ResponseEntity<DespachoConstruccionEntity> respRecibido = construccionController.cambiarEstadoDespacho(
+                despId, Map.of("estado", "RECIBIDO", "observaciones", "Concreto certificado con cono 5.5")
+        );
+        assertEquals(HttpStatus.OK, respRecibido.getStatusCode());
+        assertEquals("RECIBIDO", respRecibido.getBody().getEstado());
+        assertNotNull(respRecibido.getBody().getFechaHoraLlegada());
+
+        // 5. Rechazo al intentar asociar insumo de otro tenant
+        long tenantOtro = 99911L;
+        TenantContext.setCurrentTenant(tenantOtro);
+        InsumoConstruccionEntity insumoAjeno = crearInsumoHelper(tenantOtro, "INS-AJENO", "Acero Ajeno", new BigDecimal("100.00"));
+        Long insumoAjenoId = insumoAjeno.getId();
+
+        TenantContext.setCurrentTenant(tenant);
+        DespachoConstruccionEntity despConInsumoAjeno = new DespachoConstruccionEntity();
+        despConInsumoAjeno.setGuiaNumero("GUIA-AJENA-002");
+        despConInsumoAjeno.setTipoMaterial("ACERO_CABILLAS");
+        despConInsumoAjeno.setOrigen("Siderúrgica");
+        despConInsumoAjeno.setDestinoFrente("Patio");
+        despConInsumoAjeno.setInsumoId(insumoAjenoId);
+
+        ResponseStatusException exInsumo = assertThrows(ResponseStatusException.class, () ->
+                construccionController.crearDespacho(proyId, despConInsumoAjeno, "IK-DESP-CROSS")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exInsumo.getStatusCode());
+    }
+
+    @Test
+    void maquinaria_aislamientoHorometroMantenimientoEIdempotencia() {
+        long tenant1 = 77710L;
+        TenantContext.setCurrentTenant(tenant1);
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant1, "PROY-MAQ-01", "Puente Rio Neveri");
+        Long proyId = proy.getId();
+
+        // 1. Registro de maquinaria con idempotencia
+        MaquinariaConstruccionEntity maq = new MaquinariaConstruccionEntity();
+        maq.setCodigo("EXC-01");
+        maq.setNombre("Excavadora Caterpillar 320D");
+        maq.setTipo("PESADA");
+        maq.setMarca("Caterpillar");
+        maq.setModelo("320D");
+        maq.setHorometroActual(new BigDecimal("1250.50"));
+        maq.setProyectoId(proyId);
+        maq.setCostoHoraUsd(new BigDecimal("85.00"));
+        maq.setOperadorResponsable("Carlos Mendoza");
+
+        String ik = "IK-MAQ-TEST-001";
+        ResponseEntity<MaquinariaConstruccionEntity> resp1 = construccionController.registrarMaquinaria(maq, ik);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertNotNull(resp1.getBody().getId());
+        Long maqId = resp1.getBody().getId();
+        assertEquals("OPERATIVO", resp1.getBody().getEstado());
+
+        // 2. Reintento idempotente devuelve el mismo id
+        ResponseEntity<MaquinariaConstruccionEntity> respReintento = construccionController.registrarMaquinaria(maq, ik);
+        assertEquals(HttpStatus.OK, respReintento.getStatusCode());
+        assertEquals(maqId, respReintento.getBody().getId());
+
+        List<MaquinariaConstruccionEntity> lista1 = construccionController.listarMaquinarias(proyId);
+        assertEquals(1, lista1.size(), "No debe haber duplicados por idempotencia");
+
+        // 3. Validacion de horometro: no puede retroceder
+        ResponseStatusException exRetroceso = assertThrows(ResponseStatusException.class, () ->
+                construccionController.actualizarHorometro(maqId, Map.of("horometro", "1000.00"))
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exRetroceso.getStatusCode());
+
+        // Actualizacion valida de horometro
+        ResponseEntity<MaquinariaConstruccionEntity> respHorom = construccionController.actualizarHorometro(
+                maqId, Map.of("horometro", "1265.00", "operador", "Pedro Gomez")
+        );
+        assertEquals(HttpStatus.OK, respHorom.getStatusCode());
+        assertEquals(new BigDecimal("1265.00"), respHorom.getBody().getHorometroActual());
+        assertEquals("Pedro Gomez", respHorom.getBody().getOperadorResponsable());
+
+        // 4. Registro de mantenimiento preventivo
+        MantenimientoMaquinariaEntity mant = new MantenimientoMaquinariaEntity();
+        mant.setTipo("PREVENTIVO");
+        mant.setFechaMantenimiento(java.time.LocalDate.now());
+        mant.setHorometroEnMantenimiento(new BigDecimal("1265.00"));
+        mant.setDescripcionTrabajo("Cambio de aceite motor 15W40 y juego completo de filtros");
+        mant.setMecanicoOTaller("Taller Central Diesel");
+        mant.setCostoTotalUsd(new BigDecimal("350.00"));
+
+        String ikMantenimiento = "IK-MANT-TEST-001";
+        ResponseEntity<MantenimientoMaquinariaEntity> respMant = construccionController.registrarMantenimiento(maqId, mant, ikMantenimiento);
+        assertEquals(HttpStatus.OK, respMant.getStatusCode());
+        assertNotNull(respMant.getBody().getId());
+
+        ResponseEntity<MantenimientoMaquinariaEntity> reintentoMant = construccionController.registrarMantenimiento(maqId, mant, ikMantenimiento);
+        assertEquals(HttpStatus.OK, reintentoMant.getStatusCode());
+        assertEquals(respMant.getBody().getId(), reintentoMant.getBody().getId(),
+                "El reintento de mantenimiento no debe crear un segundo registro");
+
+        List<MantenimientoMaquinariaEntity> historico = construccionController.listarMantenimientos(maqId);
+        assertEquals(1, historico.size());
+        assertEquals("PREVENTIVO", historico.get(0).getTipo());
+
+        // 5. Aislamiento Cross-Tenant
+        long tenantAjeno = 88833L;
+        TenantContext.setCurrentTenant(tenantAjeno);
+
+        // No ve maquinarias de otro tenant
+        List<MaquinariaConstruccionEntity> listaAjena = construccionController.listarMaquinarias(null);
+        assertTrue(listaAjena.isEmpty(), "Tenant ajeno no debe ver maquinarias de otro tenant");
+
+        // Obtener por ID ajeno -> 404
+        ResponseEntity<MaquinariaConstruccionEntity> respObtenerAjeno = construccionController.obtenerMaquinaria(maqId);
+        assertEquals(HttpStatus.NOT_FOUND, respObtenerAjeno.getStatusCode());
+
+        // Actualizar horometro ajeno -> 404
+        ResponseStatusException exHoromAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.actualizarHorometro(maqId, Map.of("horometro", "1300.00"))
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exHoromAjeno.getStatusCode());
+
+        // Registrar mantenimiento en maquina ajena -> 404
+        ResponseStatusException exMantAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarMantenimiento(maqId, mant)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exMantAjeno.getStatusCode());
+
+        // Asignar proyecto de otro tenant -> 400
+        MaquinariaConstruccionEntity maqCrossProy = new MaquinariaConstruccionEntity();
+        maqCrossProy.setCodigo("RET-09");
+        maqCrossProy.setNombre("Retroexcavadora");
+        maqCrossProy.setTipo("PESADA");
+        maqCrossProy.setProyectoId(proyId); // Proyecto de tenant1
+
+        ResponseStatusException exCrossProy = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarMaquinaria(maqCrossProy, "IK-MAQ-CROSS")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exCrossProy.getStatusCode());
+    }
+
+    @Test
+    void riesgos_aislamientoCalculoMatrizEIdempotencia() {
+        long tenant1 = 66611L;
+        TenantContext.setCurrentTenant(tenant1);
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant1, "PROY-SST-01", "Edificio Residencial Las Aves");
+        Long proyId = proy.getId();
+
+        // 1. Registro de riesgo IPERC con calculo automatico de matriz
+        RiesgoConstruccionEntity rsk = new RiesgoConstruccionEntity();
+        rsk.setCodigo("RSK-01");
+        rsk.setProcesoFrente("Vaciado de Losa Nivel +8.00");
+        rsk.setPeligro("Borde de placa sin barandillas de proteccion perimetral ni linea de vida");
+        rsk.setRiesgoConsecuencia("Caida a distinto nivel con traumatismo craneoencefalico severo");
+        rsk.setCategoria("ALTURA");
+        rsk.setProbabilidad(4); // Alta
+        rsk.setSeveridad(5);    // Catastrofica
+        rsk.setMedidasControl("Instalacion de red perimetral, barandilla rigida a 1.20m y uso obligatorio de arnes certificado con doble cabo de vida");
+        rsk.setResponsable("Ing. Inspector de Seguridad SST");
+        rsk.setFechaEvaluacion(java.time.LocalDate.now());
+
+        String ik = "IK-RSK-TEST-001";
+        ResponseEntity<RiesgoConstruccionEntity> resp1 = construccionController.registrarRiesgo(proyId, rsk, ik);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertNotNull(resp1.getBody().getId());
+        Long rskId = resp1.getBody().getId();
+        // 4 * 5 = 20 -> CRITICO
+        assertEquals("CRITICO", resp1.getBody().getNivelRiesgo());
+        assertEquals("IDENTIFICADO", resp1.getBody().getEstado());
+
+        // 2. Reintento idempotente devuelve el mismo id
+        ResponseEntity<RiesgoConstruccionEntity> respReintento = construccionController.registrarRiesgo(proyId, rsk, ik);
+        assertEquals(HttpStatus.OK, respReintento.getStatusCode());
+        assertEquals(rskId, respReintento.getBody().getId());
+
+        List<RiesgoConstruccionEntity> lista = construccionController.listarRiesgos(proyId);
+        assertEquals(1, lista.size(), "No debe haber duplicados por idempotencia");
+
+        // 3. Actualizacion de estado y agregado de mitigacion
+        ResponseEntity<RiesgoConstruccionEntity> respMitigado = construccionController.cambiarEstadoRiesgo(
+                rskId, Map.of("estado", "EN_MITIGACION", "medidasControl", "Barandillas instaladas e inspeccionadas en faena matutina")
+        );
+        assertEquals(HttpStatus.OK, respMitigado.getStatusCode());
+        assertEquals("EN_MITIGACION", respMitigado.getBody().getEstado());
+        assertTrue(respMitigado.getBody().getMedidasControl().contains("Barandillas instaladas"));
+
+        // 4. Intento de duplicar codigo en el mismo proyecto con otra clave -> 409 CONFLICT
+        RiesgoConstruccionEntity rskDuplicado = new RiesgoConstruccionEntity();
+        rskDuplicado.setCodigo("RSK-01");
+        rskDuplicado.setProcesoFrente("Otro Frente");
+        rskDuplicado.setPeligro("Peligro X");
+        rskDuplicado.setRiesgoConsecuencia("Danio X");
+        rskDuplicado.setMedidasControl("Control X");
+        rskDuplicado.setFechaEvaluacion(java.time.LocalDate.now());
+
+        ResponseStatusException exConflicto = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarRiesgo(proyId, rskDuplicado, "IK-RSK-OTRA-CLAVE")
+        );
+        assertEquals(HttpStatus.CONFLICT, exConflicto.getStatusCode());
+
+        // 5. Aislamiento Cross-Tenant
+        long tenantAjeno = 77799L;
+        TenantContext.setCurrentTenant(tenantAjeno);
+
+        // Listar riesgos de proyecto ajeno -> 404
+        ResponseStatusException exListarAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.listarRiesgos(proyId)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exListarAjeno.getStatusCode());
+
+        // Obtener riesgo ajeno -> 404
+        ResponseEntity<RiesgoConstruccionEntity> respObtenerAjeno = construccionController.obtenerRiesgo(rskId);
+        assertEquals(HttpStatus.NOT_FOUND, respObtenerAjeno.getStatusCode());
+
+        // Cambiar estado de riesgo ajeno -> 404
+        ResponseStatusException exEstadoAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoRiesgo(rskId, Map.of("estado", "RESUELTO"))
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exEstadoAjeno.getStatusCode());
+
+        // Registrar riesgo en proyecto ajeno -> 404
+        ResponseStatusException exCrearEnAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarRiesgo(proyId, rskDuplicado, "IK-RSK-CROSS")
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exCrearEnAjeno.getStatusCode());
+    }
+
+    @Test
+    void bimYRfi_aislamientoControlVersionesEIdempotencia() {
+        long tenant1 = 55512L;
+        TenantContext.setCurrentTenant(tenant1);
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant1, "PROY-BIM-01", "Torre Financiera Orinoco");
+        Long proyId = proy.getId();
+
+        // 1. Registro de Modelo BIM / IFC con idempotencia
+        DocumentoBimEntity bim = new DocumentoBimEntity();
+        bim.setCodigo("BIM-EST-01");
+        bim.setTitulo("Modelo Estructural de Superestructura y Vigas Nivel +4.00");
+        bim.setDisciplina("ESTRUCTURAS");
+        bim.setFormato("IFC");
+        bim.setVersion("v1.0");
+        bim.setAutorProyectista("Ing. Calculista Soto");
+        bim.setArchivoUrl("https://storage.auroraplus.com/proyectos/bim/BIM-EST-01_v1.ifc");
+        bim.setPesoMb(new BigDecimal("145.50"));
+
+        String ikBim = "IK-BIM-TEST-001";
+        ResponseEntity<DocumentoBimEntity> respBim1 = construccionController.registrarDocumentoBim(proyId, bim, ikBim);
+        assertEquals(HttpStatus.OK, respBim1.getStatusCode());
+        assertNotNull(respBim1.getBody().getId());
+        Long bimId = respBim1.getBody().getId();
+        assertEquals("VIGENTE", respBim1.getBody().getEstadoRevision());
+
+        // 2. Reintento idempotente devuelve el mismo id
+        ResponseEntity<DocumentoBimEntity> respBimReintento = construccionController.registrarDocumentoBim(proyId, bim, ikBim);
+        assertEquals(HttpStatus.OK, respBimReintento.getStatusCode());
+        assertEquals(bimId, respBimReintento.getBody().getId());
+
+        List<DocumentoBimEntity> listaBim = construccionController.listarDocumentosBim(proyId, null);
+        assertEquals(1, listaBim.size(), "No debe haber duplicados en BIM por idempotencia");
+
+        // 3. Cambio de estado a APROBADO_PARA_CONSTRUCCION
+        ResponseEntity<DocumentoBimEntity> respEstadoBim = construccionController.cambiarEstadoDocumentoBim(
+                bimId, Map.of("estado", "APROBADO_PARA_CONSTRUCCION")
+        );
+        assertEquals(HttpStatus.OK, respEstadoBim.getStatusCode());
+        assertEquals("APROBADO_PARA_CONSTRUCCION", respEstadoBim.getBody().getEstadoRevision());
+
+        // 4. Registro de RFI asociado al modelo BIM
+        RfiConstruccionEntity rfi = new RfiConstruccionEntity();
+        rfi.setNumeroRfi("RFI-001");
+        rfi.setAsunto("Interferencia de tuberia de 6 pulgadas con viga de carga Eje 4");
+        rfi.setDisciplina("MEP");
+        rfi.setPreguntaConsulta("Se solicita autorizacion tecnica para pase de tuberia sanitaria en alma de viga V-102 segun cota +3.40m");
+        rfi.setSolicitante("Ing. Residente Carlos Mendoza");
+        rfi.setDocumentoBimId(bimId);
+        rfi.setFechaLimite(java.time.LocalDate.now().plusDays(3));
+
+        String ikRfi = "IK-RFI-TEST-001";
+        ResponseEntity<RfiConstruccionEntity> respRfi1 = construccionController.registrarRfi(proyId, rfi, ikRfi);
+        assertEquals(HttpStatus.OK, respRfi1.getStatusCode());
+        assertNotNull(respRfi1.getBody().getId());
+        Long rfiId = respRfi1.getBody().getId();
+        assertEquals("ABIERTO", respRfi1.getBody().getEstado());
+
+        // Reintento idempotente RFI
+        ResponseEntity<RfiConstruccionEntity> respRfiReintento = construccionController.registrarRfi(proyId, rfi, ikRfi);
+        assertEquals(HttpStatus.OK, respRfiReintento.getStatusCode());
+        assertEquals(rfiId, respRfiReintento.getBody().getId());
+
+        // 5. Respuesta Oficial al RFI
+        ResponseEntity<RfiConstruccionEntity> respRfiRespuesta = construccionController.responderRfi(
+                rfiId, Map.of(
+                        "respuestaOficial", "Se aprueba pase con encamisado de acero y refuerzo de 2 cabillas #5 segun detalle E-15",
+                        "responsableRespuesta", "Ing. Calculista Soto",
+                        "estado", "RESPONDIDO"
+                )
+        );
+        assertEquals(HttpStatus.OK, respRfiRespuesta.getStatusCode());
+        assertEquals("RESPONDIDO", respRfiRespuesta.getBody().getEstado());
+        assertEquals("Ing. Calculista Soto", respRfiRespuesta.getBody().getResponsableRespuesta());
+        assertNotNull(respRfiRespuesta.getBody().getFechaRespuesta());
+
+        // 6. Aislamiento Cross-Tenant
+        long tenantAjeno = 44488L;
+        TenantContext.setCurrentTenant(tenantAjeno);
+
+        // Listar BIM ajeno -> 404
+        ResponseStatusException exBimAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.listarDocumentosBim(proyId, null)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exBimAjeno.getStatusCode());
+
+        // Obtener BIM ajeno -> 404
+        ResponseEntity<DocumentoBimEntity> respGetBimAjeno = construccionController.obtenerDocumentoBim(bimId);
+        assertEquals(HttpStatus.NOT_FOUND, respGetBimAjeno.getStatusCode());
+
+        // Listar RFIs ajenos -> 404
+        ResponseStatusException exListarRfisAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.listarRfis(proyId)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exListarRfisAjeno.getStatusCode());
+
+        // Responder RFI ajeno -> 404
+        ResponseStatusException exRespRfiAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.responderRfi(rfiId, Map.of("respuestaOficial", "Hack"))
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exRespRfiAjeno.getStatusCode());
+
+        // Crear RFI en proyecto propio pero intentando linkear documento BIM de otro tenant -> 400 BAD_REQUEST
+        ProyectoConstruccionEntity proyAjeno = crearProyectoHelper(tenantAjeno, "PROY-AJENO", "Hospital Central");
+        Long proyAjenoId = proyAjeno.getId();
+
+        RfiConstruccionEntity rfiCrossBim = new RfiConstruccionEntity();
+        rfiCrossBim.setNumeroRfi("RFI-002");
+        rfiCrossBim.setAsunto("Consulta Cross");
+        rfiCrossBim.setPreguntaConsulta("Pregunta");
+        rfiCrossBim.setSolicitante("Ing. X");
+        rfiCrossBim.setDocumentoBimId(bimId); // BIM de tenant 1
+
+        ResponseStatusException exCrossBim = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarRfi(proyAjenoId, rfiCrossBim, "IK-RFI-CROSS")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exCrossBim.getStatusCode());
+    }
+
+    @Test
+    void cuadrillas_aislamientoPersonalPartidaEIdempotencia() {
+        long tenant1 = 33311L;
+        TenantContext.setCurrentTenant(tenant1);
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant1, "PROY-CD-01", "Complejo Habitacional El Roble");
+        Long proyId = proy.getId();
+
+        CapituloConstruccionEntity c = new CapituloConstruccionEntity();
+        c.setProyectoId(proyId);
+        c.setCodigo("03");
+        c.setNombre("Estructuras de Concreto");
+        ResponseEntity<CapituloConstruccionEntity> respC = construccionController.crearCapitulo(c);
+        Long capId = respC.getBody().getId();
+
+        PartidaConstruccionEntity part = new PartidaConstruccionEntity();
+        part.setCapituloId(capId);
+        part.setCodigoCovenin("E-311.100");
+        part.setDescripcion("Encofrado de vigas y losas");
+        part.setUnidad("m2");
+        part.setCantidadPresupuestada(new BigDecimal("500.00"));
+        part.setPrecioUnitario(new BigDecimal("20.00"));
+        ResponseEntity<PartidaConstruccionEntity> respPart = construccionController.crearPartida(proyId, part);
+        Long partId = respPart.getBody().getId();
+
+        // 1. Registro de cuadrilla con calculo de personal y vinculacion a partida
+        CuadrillaConstruccionEntity cd = new CuadrillaConstruccionEntity();
+        cd.setCodigo("CD-ENC-01");
+        cd.setNombre("Cuadrilla 1 Encofrado de Losas");
+        cd.setEspecialidad("CONCRETO_Y_ENCOFRADO");
+        cd.setFrenteTrabajo("Planta Alta Ejes 1-6");
+        cd.setCapatazResponsable("Maestro Juan Barreto");
+        cd.setCantidadOficiales(2);
+        cd.setCantidadAyudantes(3);
+        cd.setPartidaId(partId);
+        cd.setRendimientoDiarioEstimado(new BigDecimal("45.00"));
+        cd.setUnidadMedidaRendimiento("m2/dia");
+        cd.setFechaInicio(java.time.LocalDate.now());
+
+        String ik = "IK-CD-TEST-001";
+        ResponseEntity<CuadrillaConstruccionEntity> resp1 = construccionController.registrarCuadrilla(proyId, cd, ik);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertNotNull(resp1.getBody().getId());
+        Long cdId = resp1.getBody().getId();
+        assertEquals(5, resp1.getBody().getCantidadTotalPersonal(), "Total personal debe ser la suma de oficiales y ayudantes");
+        assertEquals("ACTIVA", resp1.getBody().getEstado());
+
+        // 2. Reintento idempotente devuelve el mismo ID con el payload idéntico
+        ResponseEntity<CuadrillaConstruccionEntity> respReintento = construccionController.registrarCuadrilla(proyId, cd, ik);
+        assertEquals(HttpStatus.OK, respReintento.getStatusCode());
+        assertEquals(cdId, respReintento.getBody().getId());
+
+        // 2.1 Reintento con la misma clave pero payload alterado (ej. cambio en oficiales) es rechazado con 409
+        CuadrillaConstruccionEntity cdPayloadAlterado = new CuadrillaConstruccionEntity();
+        cdPayloadAlterado.setCodigo(cd.getCodigo());
+        cdPayloadAlterado.setNombre(cd.getNombre());
+        cdPayloadAlterado.setEspecialidad(cd.getEspecialidad());
+        cdPayloadAlterado.setFrenteTrabajo(cd.getFrenteTrabajo());
+        cdPayloadAlterado.setCapatazResponsable(cd.getCapatazResponsable());
+        cdPayloadAlterado.setCantidadOficiales(10); // Alterado de 2 a 10
+        cdPayloadAlterado.setCantidadAyudantes(3);
+        cdPayloadAlterado.setPartidaId(partId);
+        cdPayloadAlterado.setFechaInicio(cd.getFechaInicio());
+
+        ResponseStatusException exPayloadMismatch = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarCuadrilla(proyId, cdPayloadAlterado, ik)
+        );
+        assertEquals(HttpStatus.CONFLICT, exPayloadMismatch.getStatusCode(), "Debe rechazar reintento con payload distinto bajo la misma clave");
+
+        List<CuadrillaConstruccionEntity> lista = construccionController.listarCuadrillas(proyId);
+        assertEquals(1, lista.size(), "No debe haber cuadrillas duplicadas por reintento idempotente");
+
+        // 3. Reasignacion de frente de trabajo y estado
+        ResponseEntity<CuadrillaConstruccionEntity> respUpdate = construccionController.cambiarEstadoCuadrilla(
+                cdId, Map.of("estado", "ACTIVA", "frenteTrabajo", "Sector B Nivel +6.00")
+        );
+        assertEquals(HttpStatus.OK, respUpdate.getStatusCode());
+        assertEquals("Sector B Nivel +6.00", respUpdate.getBody().getFrenteTrabajo());
+
+        // 4. Aislamiento Cross-Tenant
+        long tenantAjeno = 99988L;
+        TenantContext.setCurrentTenant(tenantAjeno);
+
+        // Listar cuadrillas de proyecto ajeno -> 404
+        ResponseStatusException exListarAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.listarCuadrillas(proyId)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exListarAjeno.getStatusCode());
+
+        // Obtener cuadrilla ajena -> 404
+        ResponseEntity<CuadrillaConstruccionEntity> respGetAjeno = construccionController.obtenerCuadrilla(cdId);
+        assertEquals(HttpStatus.NOT_FOUND, respGetAjeno.getStatusCode());
+
+        // Actualizar cuadrilla ajena -> 404
+        ResponseStatusException exUpdateAjeno = assertThrows(ResponseStatusException.class, () ->
+                construccionController.cambiarEstadoCuadrilla(cdId, Map.of("frenteTrabajo", "Frente Ilegal"))
+        );
+        assertEquals(HttpStatus.NOT_FOUND, exUpdateAjeno.getStatusCode());
+
+        // Intentar registrar cuadrilla en proyecto propio pero asignandole una partida de otro tenant -> 400 BAD_REQUEST
+        ProyectoConstruccionEntity proyAjeno = crearProyectoHelper(tenantAjeno, "PROY-OTRO", "Obra Propia Tenant 2");
+        Long proyAjenoId = proyAjeno.getId();
+
+        CuadrillaConstruccionEntity cdCrossPartida = new CuadrillaConstruccionEntity();
+        cdCrossPartida.setCodigo("CD-CROSS-01");
+        cdCrossPartida.setNombre("Cuadrilla Cross");
+        cdCrossPartida.setFrenteTrabajo("Frente 1");
+        cdCrossPartida.setCapatazResponsable("Capataz");
+        cdCrossPartida.setFechaInicio(java.time.LocalDate.now());
+        cdCrossPartida.setPartidaId(partId); // Partida de tenant1
+
+        ResponseStatusException exCrossPart = assertThrows(ResponseStatusException.class, () ->
+                construccionController.registrarCuadrilla(proyAjenoId, cdCrossPartida, "IK-CD-CROSS")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exCrossPart.getStatusCode());
     }
 }

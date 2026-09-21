@@ -4610,11 +4610,13 @@ export interface PartidaConstruccionApi {
   tenantId?: number;
   proyectoId: number;
   capituloId?: number;
-  codigoPartida: string;
+  codigoCovenin: string;
+  codigoPartida?: string;
   descripcion: string;
   unidad: string;
   cantidadPresupuestada: number;
   precioUnitario: number;
+  cantidadEjecutadaAcumulada?: number;
   totalPartida?: number;
   rendimientoDiario?: number;
 }
@@ -4628,6 +4630,12 @@ export interface ValuacionConstruccionApi {
   periodoHasta: string;
   fechaEmision: string;
   montoBruto: number;
+  amortizacionAnticipo?: number;
+  retencionLaboral?: number;
+  retencionFielCumplimiento?: number;
+  montoSubtotal?: number;
+  montoIva?: number;
+  montoNetoACobrar?: number;
   montoAmortizacionAnticipo?: number;
   montoRetencionLaboral?: number;
   montoRetencionFielCumplimiento?: number;
@@ -4646,6 +4654,7 @@ export interface InsumoConstruccionApi {
   costoUnitario: number;
   stockActual: number;
   stockMinimo: number;
+  proveedor?: string;
 }
 
 export interface BitacoraConstruccionApi {
@@ -4653,11 +4662,49 @@ export interface BitacoraConstruccionApi {
   tenantId?: number;
   proyectoId: number;
   fecha: string;
+  clima?: string;
   condicionClimatica?: string;
   personalActivo?: number;
   cuadrillasActivas?: string;
+  maquinariaOperativa?: string;
+  actividadesEjecutadas?: string;
   actividadesRealizadas?: string;
+  observacionesEIncidentes?: string;
   incidentesRetrasos?: string;
+  elaboradoPor?: string;
+}
+
+export interface DespachoConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  insumoId?: number;
+  guiaNumero: string;
+  tipoMaterial: string;
+  origen: string;
+  destinoFrente: string;
+  unidadTransporte?: string;
+  chofer?: string;
+  estado?: string;
+  cantidad: number;
+  unidadMedida: string;
+  pesoBrutoKg?: number;
+  pesoTaraKg?: number;
+  pesoNetoKg?: number;
+  slumpConoPulgadas?: number;
+  fechaHoraSalida?: string;
+  fechaHoraLlegada?: string;
+  observaciones?: string;
+  createdAt?: string;
+}
+
+export interface CatalogoCoveninApi {
+  id: number;
+  codigoCovenin: string;
+  descripcion: string;
+  unidad: string;
+  rendimientoPromedio?: number;
+  costoReferencialBs?: number;
 }
 
 // Proyectos
@@ -4785,5 +4832,307 @@ export function registrarBitacoraConstruccionApi(proyectoId: number, datos: Bita
     method: "POST",
     headers,
     body: JSON.stringify(datos)
+  });
+}
+
+
+export function listarDespachosConstruccionApi(proyectoId: number): Promise<DespachoConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/despachos`);
+}
+
+export function crearDespachoConstruccionApi(proyectoId: number, datos: DespachoConstruccionApi, idempotencyKey?: string): Promise<DespachoConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+  return request(`/api/construccion/proyectos/${proyectoId}/despachos`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function cambiarEstadoDespachoConstruccionApi(id: number, estado: string, observaciones?: string): Promise<DespachoConstruccionApi> {
+  return request(`/api/construccion/despachos/${id}/estado`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado, observaciones })
+  });
+}
+
+export function buscarCatalogoCoveninApi(q?: string): Promise<CatalogoCoveninApi[]> {
+  const query = q ? `?q=${encodeURIComponent(q)}` : '';
+  return request(`/api/construccion/catalogo-covenin${query}`);
+}
+
+export interface MaquinariaConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId?: number | null;
+  codigo: string;
+  nombre: string;
+  tipo: string; // PESADA, LIVIANA, TRANSPORTE, HERRAMIENTA_MENOR, GENERADOR
+  marca?: string;
+  modelo?: string;
+  serialChasis?: string;
+  placa?: string;
+  horometroActual: number;
+  horometroUltimoMantenimiento?: number;
+  intervaloMantenimientoHoras?: number;
+  estado: string; // OPERATIVO, EN_MANTENIMIENTO, FUERA_DE_SERVICIO, STANDBY
+  operadorResponsable?: string;
+  costoHoraUsd?: number;
+  combustibleTipo?: string;
+  capacidadTanqueLitros?: number;
+  consumoPromedioLph?: number;
+  observaciones?: string;
+  createdAt?: string;
+}
+
+export interface MantenimientoMaquinariaApi {
+  id?: number;
+  tenantId?: number;
+  maquinariaId: number;
+  tipo: string; // PREVENTIVO, CORRECTIVO, OVERHAUL, INSPECCION_DIARIA
+  fechaMantenimiento: string;
+  horometroEnMantenimiento: number;
+  proximoHorometroMantenimiento?: number;
+  descripcionTrabajo: string;
+  mecanicoOTaller?: string;
+  costoTotalUsd?: number;
+  repuestosUtilizados?: string;
+  createdAt?: string;
+}
+
+export function listarMaquinariasConstruccionApi(proyectoId?: number | null): Promise<MaquinariaConstruccionApi[]> {
+  const query = proyectoId ? `?proyectoId=${proyectoId}` : '';
+  return request(`/api/construccion/maquinarias${query}`);
+}
+
+export function obtenerMaquinariaConstruccionApi(id: number): Promise<MaquinariaConstruccionApi> {
+  return request(`/api/construccion/maquinarias/${id}`);
+}
+
+export function crearMaquinariaConstruccionApi(datos: Partial<MaquinariaConstruccionApi>, idempotencyKey?: string): Promise<MaquinariaConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+  return request(`/api/construccion/maquinarias`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function actualizarMaquinariaConstruccionApi(id: number, datos: Partial<MaquinariaConstruccionApi>): Promise<MaquinariaConstruccionApi> {
+  return request(`/api/construccion/maquinarias/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(datos)
+  });
+}
+
+export function actualizarHorometroMaquinariaApi(id: number, horometro: number, operador?: string): Promise<MaquinariaConstruccionApi> {
+  return request(`/api/construccion/maquinarias/${id}/horometro`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ horometro, operador })
+  });
+}
+
+export function listarMantenimientosMaquinariaApi(maquinariaId: number): Promise<MantenimientoMaquinariaApi[]> {
+  return request(`/api/construccion/maquinarias/${maquinariaId}/mantenimientos`);
+}
+
+export function crearMantenimientoMaquinariaApi(
+  maquinariaId: number,
+  datos: Partial<MantenimientoMaquinariaApi>,
+  idempotencyKey?: string
+): Promise<MantenimientoMaquinariaApi> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+  return request(`/api/construccion/maquinarias/${maquinariaId}/mantenimientos`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export interface RiesgoConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  codigo: string;
+  procesoFrente: string;
+  peligro: string;
+  riesgoConsecuencia: string;
+  categoria: string;
+  probabilidad: number; // 1-5
+  severidad: number; // 1-5
+  nivelRiesgo?: string; // BAJO, MEDIO, ALTO, CRITICO
+  medidasControl: string;
+  responsable?: string;
+  estado?: string; // IDENTIFICADO, EN_MITIGACION, CONTROLADO, RESUELTO
+  fechaEvaluacion: string;
+  observaciones?: string;
+  createdAt?: string;
+}
+
+export function listarRiesgosConstruccionApi(proyectoId: number): Promise<RiesgoConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/riesgos`);
+}
+
+export function obtenerRiesgoConstruccionApi(id: number): Promise<RiesgoConstruccionApi> {
+  return request(`/api/construccion/riesgos/${id}`);
+}
+
+export function crearRiesgoConstruccionApi(proyectoId: number, datos: Partial<RiesgoConstruccionApi>, idempotencyKey?: string): Promise<RiesgoConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+  return request(`/api/construccion/proyectos/${proyectoId}/riesgos`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function cambiarEstadoRiesgoConstruccionApi(id: number, estado: string, medidasControl?: string): Promise<RiesgoConstruccionApi> {
+  return request(`/api/construccion/riesgos/${id}/estado`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado, medidasControl })
+  });
+}
+
+export interface DocumentoBimApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  codigo: string;
+  titulo: string;
+  disciplina: string; // ARQUITECTURA, ESTRUCTURAS, INSTALACIONES_SANITARIAS, INSTALACIONES_ELECTRICAS, MECANICA_CLIMATIZACION, COORDINACION_GENERAL
+  formato: string; // IFC, RVT_REVIT, DWG_AUTOCAD, PDF_PLANO, NWD_NAVISWORKS, OTRO
+  version: string;
+  autorProyectista?: string;
+  archivoUrl?: string;
+  pesoMb?: number;
+  estadoRevision: string; // VIGENTE, EN_REVISION, SUPERIOR_OBSOLETO, APROBADO_PARA_CONSTRUCCION
+  observaciones?: string;
+  createdAt?: string;
+}
+
+export interface RfiConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  documentoBimId?: number | null;
+  numeroRfi: string;
+  asunto: string;
+  disciplina: string; // ESTRUCTURAS, ARQUITECTURA, MEP, GENERAL
+  preguntaConsulta: string;
+  propuestaSolucion?: string;
+  respuestaOficial?: string;
+  solicitante: string;
+  responsableRespuesta?: string;
+  estado: string; // ABIERTO, EN_EVALUACION, RESPONDIDO, CERRADO
+  fechaLimite?: string;
+  fechaRespuesta?: string;
+  createdAt?: string;
+}
+
+export function listarDocumentosBimApi(proyectoId: number, disciplina?: string): Promise<DocumentoBimApi[]> {
+  const q = disciplina ? `?disciplina=${encodeURIComponent(disciplina)}` : '';
+  return request(`/api/construccion/proyectos/${proyectoId}/bim${q}`);
+}
+
+export function crearDocumentoBimApi(proyectoId: number, datos: Partial<DocumentoBimApi>, idempotencyKey?: string): Promise<DocumentoBimApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+  return request(`/api/construccion/proyectos/${proyectoId}/bim`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function cambiarEstadoDocumentoBimApi(id: number, estado: string): Promise<DocumentoBimApi> {
+  return request(`/api/construccion/bim/${id}/estado`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado })
+  });
+}
+
+export function listarRfisConstruccionApi(proyectoId: number): Promise<RfiConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/rfis`);
+}
+
+export function crearRfiConstruccionApi(proyectoId: number, datos: Partial<RfiConstruccionApi>, idempotencyKey?: string): Promise<RfiConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+  return request(`/api/construccion/proyectos/${proyectoId}/rfis`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function responderRfiConstruccionApi(id: number, respuestaOficial: string, responsableRespuesta?: string, estado?: string): Promise<RfiConstruccionApi> {
+  return request(`/api/construccion/rfis/${id}/respuesta`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ respuestaOficial, responsableRespuesta, estado })
+  });
+}
+
+export interface CuadrillaConstruccionApi {
+  id?: number;
+  tenantId?: number;
+  proyectoId: number;
+  partidaId?: number | null;
+  codigo: string;
+  nombre: string;
+  frenteTrabajo: string;
+  capatazResponsable: string;
+  capatazLider?: string;
+  cantidadOficiales: number;
+  cantidadAyudantes: number;
+  cantidadTotalPersonal?: number;
+  totalPersonal?: number;
+  especialidad: string; // CONCRETO_Y_ENCOFRADO, ACERO_Y_CABILLAS, ALBANILERIA, MOVIMIENTO_TIERRAS, INSTALACIONES_ELECTRICAS, INSTALACIONES_SANITARIAS, ACABADOS_Y_PINTURA, SOLDADURA_ESTRUCTURAL, GENERAL
+  rendimientoDiarioEstimado?: number;
+  unidadMedidaRendimiento?: string;
+  estado: string; // ACTIVA, EN_STANDBY, REASIGNADA, FINALIZADA
+  fechaInicio: string;
+  fechaFin?: string;
+  observaciones?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export function listarCuadrillasConstruccionApi(proyectoId: number): Promise<CuadrillaConstruccionApi[]> {
+  return request(`/api/construccion/proyectos/${proyectoId}/cuadrillas`);
+}
+
+export function crearCuadrillaConstruccionApi(proyectoId: number, datos: Partial<CuadrillaConstruccionApi>, idempotencyKey?: string): Promise<CuadrillaConstruccionApi> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+  return request(`/api/construccion/proyectos/${proyectoId}/cuadrillas`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(datos)
+  });
+}
+
+export function cambiarEstadoCuadrillaConstruccionApi(id: number, estado: string): Promise<CuadrillaConstruccionApi> {
+  return request(`/api/construccion/cuadrillas/${id}/estado`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado })
   });
 }
