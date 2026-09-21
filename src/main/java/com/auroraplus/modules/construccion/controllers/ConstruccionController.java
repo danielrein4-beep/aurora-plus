@@ -1,5 +1,6 @@
 package com.auroraplus.modules.construccion.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.construccion.entities.*;
 import com.auroraplus.modules.construccion.dtos.DashboardProyectoDTO;
@@ -20,6 +21,20 @@ public class ConstruccionController {
 
     @Autowired
     private ConstruccionService construccionService;
+
+    private void verificarRolObra(String... rolesPermitidos) {
+        String rol = AuthContext.getRol();
+        if (rol == null) {
+            return; // Permite llamadas internas o contextos sin autenticación explícita
+        }
+        for (String r : rolesPermitidos) {
+            if (r.equalsIgnoreCase(rol)) {
+                return;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Acceso denegado: El rol '" + rol + "' no tiene privilegios para realizar esta operación en la obra.");
+    }
 
     private Long requireTenant() {
         Long tenantId = TenantContext.getCurrentTenant();
@@ -56,6 +71,7 @@ public class ConstruccionController {
 
     @DeleteMapping("/proyectos/{id}")
     public ResponseEntity<Void> eliminarProyecto(@PathVariable Long id) {
+        verificarRolObra("DUENO_ADMIN", "SUPER_ADMIN", "ADMINISTRADOR");
         construccionService.eliminarProyecto(requireTenant(), id);
         return ResponseEntity.noContent().build();
     }
@@ -65,6 +81,7 @@ public class ConstruccionController {
     public ResponseEntity<ProyectoConstruccionEntity> cambiarEstadoProyecto(
             @PathVariable Long id,
             @RequestBody Map<String, String> payload) {
+        verificarRolObra("DUENO_ADMIN", "SUPER_ADMIN", "ADMINISTRADOR", "INGENIERO_RESIDENTE", "ADMINISTRADOR_OBRA");
         String nuevoEstado = payload.get("nuevoEstado");
         String motivo = payload.get("motivo");
         String usuario = payload.get("usuario");
@@ -114,6 +131,7 @@ public class ConstruccionController {
 
     @DeleteMapping("/partidas/{id}")
     public ResponseEntity<Void> eliminarPartida(@PathVariable Long id) {
+        verificarRolObra("DUENO_ADMIN", "SUPER_ADMIN", "ADMINISTRADOR", "INGENIERO_RESIDENTE", "ADMINISTRADOR_OBRA");
         construccionService.eliminarPartida(requireTenant(), id);
         return ResponseEntity.noContent().build();
     }
@@ -147,6 +165,7 @@ public class ConstruccionController {
     public ResponseEntity<ValuacionConstruccionEntity> cambiarEstadoValuacion(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
+        verificarRolObra("DUENO_ADMIN", "SUPER_ADMIN", "ADMINISTRADOR", "INGENIERO_RESIDENTE", "ADMINISTRADOR_OBRA", "SUPERVISOR_CALIDAD");
         String estado = body != null ? body.get("estado") : null;
         if (estado == null || estado.trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El campo 'estado' es obligatorio");
@@ -160,6 +179,7 @@ public class ConstruccionController {
     public ResponseEntity<ValuacionConstruccionEntity> reversarValuacion(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
+        verificarRolObra("DUENO_ADMIN", "SUPER_ADMIN", "ADMINISTRADOR", "INGENIERO_RESIDENTE", "ADMINISTRADOR_OBRA");
         String motivo = body != null ? body.get("motivo") : null;
         String usuario = body != null ? body.get("usuario") : null;
         return ResponseEntity.ok(construccionService.reversarValuacion(requireTenant(), id, motivo, usuario));

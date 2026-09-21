@@ -1536,13 +1536,7 @@ public class ConstruccionService {
             RiesgoConstruccionEntity guardado = riesgoRepository.save(req);
 
             if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                String json;
-                try {
-                    json = objectMapper.writeValueAsString(guardado);
-                } catch (Exception ex) {
-                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error serializando resultado de documento BIM: " + ex.getMessage(), ex);
-                }
+                String json = serializarResultadoIdempotente(guardado, "el riesgo");
                 idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
             }
 
@@ -1704,13 +1698,7 @@ public class ConstruccionService {
             DocumentoBimEntity guardado = documentoBimRepository.save(req);
 
             if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                String json;
-                try {
-                    json = objectMapper.writeValueAsString(guardado);
-                } catch (Exception ex) {
-                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error serializando resultado de RFI: " + ex.getMessage(), ex);
-                }
+                String json = serializarResultadoIdempotente(guardado, "el documento BIM");
                 idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
             }
 
@@ -2029,13 +2017,7 @@ public class ConstruccionService {
             CuadrillaConstruccionEntity guardado = cuadrillaRepository.save(req);
 
             if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                String json;
-                try {
-                    json = objectMapper.writeValueAsString(guardado);
-                } catch (Exception ex) {
-                    idempotenciaService.liberarClaveEnFallo(tenantId, idempotencyKey);
-                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error serializando resultado de idempotencia: " + ex.getMessage(), ex);
-                }
+                String json = serializarResultadoIdempotente(guardado, "la cuadrilla");
                 idempotenciaService.completarClave(tenantId, idempotencyKey, guardado.getId(), json);
             }
 

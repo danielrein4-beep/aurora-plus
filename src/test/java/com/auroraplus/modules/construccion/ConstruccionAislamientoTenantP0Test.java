@@ -2152,4 +2152,135 @@ public class ConstruccionAislamientoTenantP0Test {
         assertEquals(new BigDecimal("48.50"), respBim.getBody().getPesoMb());
     }
 
+    @Test
+    void testFase5_ControlDeRolesYPermisosEnObra() {
+        Long tenant = 7601L;
+        TenantContext.setCurrentTenant(tenant);
+
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PRY-RBAC-01", "Obra Control Roles");
+        proy.setEstado("BORRADOR");
+        proyectoRepository.save(proy);
+
+        // Crear una valuación en borrador
+        ValuacionConstruccionEntity val = new ValuacionConstruccionEntity();
+        val.setNumeroValuacion(1);
+        val.setPeriodoDesde(LocalDate.now().minusDays(15));
+        val.setPeriodoHasta(LocalDate.now());
+        val.setFechaEmision(LocalDate.now());
+        val.setMontoBruto(new BigDecimal("12000.00"));
+        val.setEstado("BORRADOR");
+        val = construccionController.crearValuacion(proy.getId(), val, "IK-RBAC-VAL").getBody();
+
+        // 1. Simular usuario con rol no autorizado (ej: CAJERO)
+        AuthContext.set("cajero_test", "CAJERO");
+
+        // Intentar cambiar estado de proyecto sin rol de obra -> 403 FORBIDDEN
+        ResponseStatusException exProy = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.cambiarEstadoProyecto(proy.getId(), java.util.Map.of(
+                    "nuevoEstado", "EN_EJECUCION",
+                    "motivo", "Inicio de obras",
+                    "usuario", "cajero_test"
+            ));
+        });
+        assertEquals(HttpStatus.FORBIDDEN, exProy.getStatusCode());
+        assertTrue(exProy.getReason().contains("no tiene privilegios"));
+
+        // Intentar cambiar estado de valuación sin rol de obra -> 403 FORBIDDEN
+        final Long valId = val.getId();
+        ResponseStatusException exVal = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.cambiarEstadoValuacion(valId, java.util.Map.of("estado", "PRESENTADA"));
+        });
+        assertEquals(HttpStatus.FORBIDDEN, exVal.getStatusCode());
+
+        // Intentar reversar valuación sin rol de obra -> 403 FORBIDDEN
+        ResponseStatusException exRev = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.reversarValuacion(valId, java.util.Map.of("motivo", "Error de metrado", "usuario", "cajero_test"));
+        });
+        assertEquals(HttpStatus.FORBIDDEN, exRev.getStatusCode());
+
+        // Intentar eliminar proyecto sin rol de admin -> 403 FORBIDDEN
+        ResponseStatusException exDel = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.eliminarProyecto(proy.getId());
+        });
+        assertEquals(HttpStatus.FORBIDDEN, exDel.getStatusCode());
+
+        // 2. Simular usuario con rol autorizado (INGENIERO_RESIDENTE)
+        AuthContext.set("ing_residente", "INGENIERO_RESIDENTE");
+
+        ResponseEntity<ProyectoConstruccionEntity> respProyOk = construccionController.cambiarEstadoProyecto(proy.getId(), java.util.Map.of(
+                "nuevoEstado", "EN_EJECUCION",
+                "motivo", "Inicio oficial de obra",
+                "usuario", "ing_residente"
+        ));
+        assertEquals(HttpStatus.OK, respProyOk.getStatusCode());
+        assertEquals("EN_EJECUCION", respProyOk.getBody().getEstado());
+
+        ResponseEntity<ValuacionConstruccionEntity> respValOk = construccionController.cambiarEstadoValuacion(valId, java.util.Map.of(
+                "estado", "PRESENTADA"
+        ));
+        assertEquals(HttpStatus.OK, respValOk.getStatusCode());
+        assertEquals("PRESENTADA", respValOk.getBody().getEstado());
+
+        AuthContext.clear();
+    }
+
+    @Test
+    void testFase5_IdempotenciaCanonicaReintentoYConflicto() {
+        Long tenant = 7602L;
+        TenantContext.setCurrentTenant(tenant);
+
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PRY-IDEM-01", "Obra Idempotencia F5");
+        proy.setEstado("ACTIVO");
+        proyectoRepository.save(proy);
+
+        String idempotencyKey = "IK-CUADRILLA-F5-001";
+
+        CuadrillaConstruccionEntity cuadrilla1 = new CuadrillaConstruccionEntity();
+        cuadrilla1.setCodigo("CD-ALB-F5");
+        cuadrilla1.setNombre("Cuadrilla Albanileria Torre 1");
+        cuadrilla1.setEspecialidad("ALBANILERIA");
+        cuadrilla1.setFrenteTrabajo("Sector A");
+        cuadrilla1.setCapatazResponsable("Pedro Perez");
+        cuadrilla1.setCantidadOficiales(3);
+        cuadrilla1.setCantidadAyudantes(3);
+        cuadrilla1.setFechaInicio(LocalDate.now());
+
+        // 1. Primera petición: creación exitosa
+        ResponseEntity<CuadrillaConstruccionEntity> resp1 = construccionController.registrarCuadrilla(proy.getId(), cuadrilla1, idempotencyKey);
+        assertEquals(HttpStatus.OK, resp1.getStatusCode());
+        assertNotNull(resp1.getBody().getId());
+        Long primerId = resp1.getBody().getId();
+
+        // 2. Reintento idéntico (misma clave, mismos datos): retorna el mismo recurso sin duplicar
+        CuadrillaConstruccionEntity reintento = new CuadrillaConstruccionEntity();
+        reintento.setCodigo("CD-ALB-F5");
+        reintento.setNombre("Cuadrilla Albanileria Torre 1");
+        reintento.setEspecialidad("ALBANILERIA");
+        reintento.setFrenteTrabajo("Sector A");
+        reintento.setCapatazResponsable("Pedro Perez");
+        reintento.setCantidadOficiales(3);
+        reintento.setCantidadAyudantes(3);
+        reintento.setFechaInicio(LocalDate.now());
+
+        ResponseEntity<CuadrillaConstruccionEntity> resp2 = construccionController.registrarCuadrilla(proy.getId(), reintento, idempotencyKey);
+        assertEquals(HttpStatus.OK, resp2.getStatusCode());
+        assertEquals(primerId, resp2.getBody().getId(), "El reintento con misma Idempotency-Key debe retornar el mismo registro");
+
+        // 3. Petición con MISMA clave pero DIFERENTE payload (ej: diferente código/especialidad)
+        CuadrillaConstruccionEntity payloadDistinto = new CuadrillaConstruccionEntity();
+        payloadDistinto.setCodigo("CD-ENC-F5");
+        payloadDistinto.setNombre("Cuadrilla Distinta de Encofrado");
+        payloadDistinto.setEspecialidad("CONCRETO_Y_ENCOFRADO");
+        payloadDistinto.setFrenteTrabajo("Sector B");
+        payloadDistinto.setCapatazResponsable("Juan Gomez");
+        payloadDistinto.setCantidadOficiales(5);
+        payloadDistinto.setCantidadAyudantes(5);
+        payloadDistinto.setFechaInicio(LocalDate.now());
+
+        ResponseStatusException exConflicto = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.registrarCuadrilla(proy.getId(), payloadDistinto, idempotencyKey);
+        });
+        assertEquals(HttpStatus.CONFLICT, exConflicto.getStatusCode());
+        assertTrue(exConflicto.getReason().contains("payload diferente"));
+    }
 }
