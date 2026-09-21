@@ -473,7 +473,7 @@ export default function Onboarding() {
                           onClick={() => handleSelectIndustry(ind)}
                           className={`relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-300 ${
                             isSelected
-                              ? "bg-gradient-to-r from-teal-50 via-cyan-50 to-violet-50 border-teal-500 shadow-md scale-[1.01]"
+                              ? "bg-teal-50 border-teal-500 shadow-md scale-[1.01]"
                               : "bg-teal-50/50 border-teal-200 hover:border-teal-400 hover:bg-teal-50"
                           }`}
                         >
@@ -679,14 +679,14 @@ export default function Onboarding() {
           {step === 3 && (
             <div className="space-y-6">
               <div>
-                <div className="inline-block px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[11px] font-mono uppercase tracking-wider mb-2">
+                <div className="inline-block px-3 py-1 rounded-full bg-slate-500/10 border border-slate-300/60 text-slate-600 text-[11px] font-mono uppercase tracking-wider mb-2">
                   Paso 3 · Método de Pago
                 </div>
-                <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white leading-tight">
+                <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-slate-900 leading-tight">
                   ¿Cómo prefieres pagar cuando termine tu prueba?
                 </h2>
-                <p className="text-white/50 text-sm mt-1">
-                  Tu prueba de <strong className="text-teal-400">30 días es 100% gratis</strong> — no se te cobra nada ahora. Esto solo queda guardado como tu método preferido para cuando decidas continuar.
+                <p className="text-slate-500 text-sm mt-1">
+                  Tu prueba de <strong className="text-slate-700">30 días es 100% gratis</strong> — no se te cobra nada ahora. Esto solo queda guardado como tu método preferido para cuando decidas continuar.
                 </p>
               </div>
 
@@ -698,11 +698,11 @@ export default function Onboarding() {
                     onClick={() => setMetodoPago(m.id)}
                     className={`flex items-center gap-3 p-4 rounded-2xl border text-left transition-all ${
                       metodoPago === m.id
-                        ? "bg-teal-500/15 border-teal-400/60 text-white shadow-[0_0_15px_rgba(0,242,254,0.15)]"
-                        : "bg-white/[0.03] border-white/10 text-white/60 hover:bg-white/[0.06]"
+                        ? "bg-slate-500/10 border-slate-400/60 text-slate-800 shadow-sm"
+                        : "bg-slate-500/[0.04] border-slate-200 text-slate-500 hover:bg-slate-500/[0.08]"
                     }`}
                   >
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${metodoPago === m.id ? "bg-teal-400/20 text-teal-300" : "bg-white/5 text-white/40"}`}>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${metodoPago === m.id ? "bg-slate-500/15 text-slate-600" : "bg-slate-500/5 text-slate-400"}`}>
                       <IconCard size={16} />
                     </div>
                     <span className="font-semibold text-sm">{m.label}</span>
@@ -711,16 +711,16 @@ export default function Onboarding() {
                 ))}
               </div>
 
-              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex items-start gap-3 text-xs text-white/50">
+              <div className="p-4 rounded-2xl bg-slate-500/[0.04] border border-slate-200 flex items-start gap-3 text-xs text-slate-500">
                 <IconBank size={16} />
                 <p>Ningún cobro se procesa ahora. Cuando termine tu prueba, te avisamos y reportas tu pago por este método directamente desde el Hub.</p>
               </div>
 
-              <div className="pt-2 flex items-center justify-between border-t border-white/10">
+              <div className="pt-2 flex items-center justify-between border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="text-white/40 hover:text-white text-xs transition-colors"
+                  className="text-slate-400 hover:text-slate-700 text-xs transition-colors"
                 >
                   ← Volver a módulos
                 </button>

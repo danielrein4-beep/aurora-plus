@@ -274,7 +274,7 @@ export default function Auth() {
                 {mode === "register" ? "Crea tu cuenta" : "Bienvenido de vuelta"}
               </h2>
               {/* Barra de acento aurora estilo futurista */}
-              <div className="h-1 w-20 bg-gradient-to-r from-[#177E89] via-[#177E89] to-[#0B3D91] rounded-full mt-2 shadow-[0_0_12px_rgba(0,255,194,0.5)]" />
+              <div className="h-1 w-20 bg-[#177E89] rounded-full mt-2" />
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">

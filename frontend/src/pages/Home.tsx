@@ -127,11 +127,11 @@ export default function Home() {
             return (
               <div className="w-full max-w-2xl bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-6 mb-16 text-left flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-white border border-[#E5E5EA] flex items-center justify-center text-[#0B3D91] shadow-sm">
+                  <div className="w-12 h-12 rounded-xl bg-white border border-[#E5E5EA] flex items-center justify-center text-[#177E89] shadow-sm">
                     <miSistema.Icon size={24} />
                   </div>
                   <div>
-                    <div className="text-xs font-bold uppercase tracking-wider text-[#0B3D91]">
+                    <div className="text-xs font-bold uppercase tracking-wider text-[#177E89]">
                       Sistema Asignado
                     </div>
                     <div className="font-bold text-base text-[#1D1D1F]">
@@ -142,7 +142,7 @@ export default function Home() {
                 </div>
                 <button
                   onClick={() => navigate(miSistema.ruta)}
-                  className="bg-[#0B3D91] text-white text-xs font-semibold px-5 py-2.5 rounded-full hover:bg-[#082D6C] transition-colors cursor-pointer whitespace-nowrap"
+                  className="btn-deep-black text-xs font-semibold px-5 py-2.5 rounded-full cursor-pointer whitespace-nowrap"
                 >
                   Abrir {miSistema.label} →
                 </button>
@@ -188,10 +188,10 @@ export default function Home() {
                   key={ind.name}
                   onClick={() => setActiveIndustry(idx)}
                   className={`bg-white border rounded-2xl p-7 transition-all cursor-pointer shadow-sm ${
-                    activeIndustry === idx ? "border-[#0B3D91] ring-1 ring-[#0B3D91]" : "border-[#E5E5EA] hover:border-[#D1D1D6]"
+                    activeIndustry === idx ? "border-[#177E89] ring-1 ring-[#177E89]" : "border-[#E5E5EA] hover:border-[#D1D1D6]"
                   }`}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] flex items-center justify-center text-[#0B3D91] mb-5">
+                  <div className="w-12 h-12 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] flex items-center justify-center text-[#177E89] mb-5">
                     <IconComp size={24} />
                   </div>
                   <h3 className="text-lg font-bold text-[#1D1D1F] tracking-tight mb-2">
@@ -238,7 +238,7 @@ export default function Home() {
                 { label: "Auditoría RBAC", val: "Trazabilidad 100%", Icon: IconShield },
               ].map((item) => (
                 <div key={item.label} className="bg-white border border-[#E5E5EA] rounded-2xl p-5 shadow-sm">
-                  <div className="text-[#0B3D91] mb-3">
+                  <div className="text-[#177E89] mb-3">
                     <item.Icon size={20} />
                   </div>
                   <div className="text-[11px] font-semibold text-[#86868B] uppercase tracking-wider mb-1">{item.label}</div>
@@ -269,7 +269,7 @@ export default function Home() {
               const FeatIcon = feat.Icon;
               return (
                 <div key={feat.title} className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-7">
-                  <div className="w-10 h-10 rounded-xl bg-white border border-[#E5E5EA] flex items-center justify-center text-[#0B3D91] mb-5 shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-[#E5E5EA] flex items-center justify-center text-[#177E89] mb-5 shadow-sm">
                     <FeatIcon size={20} />
                   </div>
                   <h3 className="text-base font-bold text-[#1D1D1F] mb-2">{feat.title}</h3>
@@ -300,11 +300,11 @@ export default function Home() {
               <div
                 key={p.name}
                 className={`bg-white border rounded-3xl p-8 sm:p-10 flex flex-col justify-between shadow-sm relative ${
-                  p.highlight ? "border-[#0B3D91] ring-2 ring-[#0B3D91]" : "border-[#E5E5EA]"
+                  p.highlight ? "border-[#177E89] ring-2 ring-[#177E89]" : "border-[#E5E5EA]"
                 }`}
               >
                 {p.badge && (
-                  <span className="absolute -top-3 right-8 bg-[#0B3D91] text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm">
+                  <span className="absolute -top-3 right-8 bg-[#177E89] text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm">
                     {p.badge}
                   </span>
                 )}
@@ -332,7 +332,7 @@ export default function Home() {
                   onClick={() => navigate("/onboarding")}
                   className={`w-full py-3.5 rounded-full text-xs font-semibold tracking-wide transition-all cursor-pointer ${
                     p.highlight
-                      ? "bg-[#0B3D91] hover:bg-[#082D6C] text-white shadow-sm"
+                      ? "btn-deep-black"
                       : "bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] border border-[#E5E5EA]"
                   }`}
                 >

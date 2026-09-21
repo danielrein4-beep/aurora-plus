@@ -71,18 +71,24 @@ export default function Nav() {
 
         {/* Desktop Links */}
         <div className="hidden md:flex items-center gap-7">
-          {LINKS.map((l) => (
-            <button
-              key={l.path}
-              onClick={() => navigate(l.path)}
-              className={`font-sans text-sm font-semibold transition-colors duration-200 cursor-pointer ${
-                pathname === l.path
-                  ? "text-[#0B3D91] font-bold"
-                  : "text-[#86868B] hover:text-[#1D1D1F]"
-              }`}>
-              {l.label}
-            </button>
-          ))}
+          {LINKS.map((l) => {
+            const isActive = pathname === l.path;
+            return (
+              <button
+                key={l.path}
+                onClick={() => navigate(l.path)}
+                className={`group font-sans text-sm font-semibold transition-colors duration-200 cursor-pointer flex items-center gap-1 ${
+                  isActive
+                    ? "text-[#1D1D1F] font-black"
+                    : "text-[#86868B] hover:text-[#1D1D1F]"
+                }`}>
+                <span className={`text-[#177E89] font-bold transition-all duration-200 ${
+                  isActive ? "opacity-100 -ml-1 mr-0.5" : "opacity-0 w-0 group-hover:opacity-100 group-hover:w-2.5 group-hover:mr-0.5"
+                }`}>+</span>
+                {l.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* CTA */}
@@ -102,7 +108,7 @@ export default function Nav() {
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F5F5F7] border border-[#E5E5EA] cursor-pointer hover:border-[#D1D1D6] transition-colors"
                 title="Ir al Hub de Empresa"
               >
-                <span className="w-6 h-6 rounded-full bg-[#0B3D91] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                <span className="w-6 h-6 rounded-full bg-[#177E89] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
                   {user?.nombre?.charAt(0).toUpperCase() ?? "U"}
                 </span>
                 <span className="text-xs font-semibold text-[#1D1D1F]">
@@ -180,7 +186,7 @@ export default function Nav() {
               key={l.path}
               onClick={() => { navigate(l.path); setMobileOpen(false); }}
               className={`block w-full text-left px-4 py-3 text-sm rounded-xl font-semibold transition-colors ${
-                pathname === l.path ? "text-[#0B3D91] bg-[#F5F5F7]" : "text-[#1D1D1F] hover:bg-[#F5F5F7]"
+                pathname === l.path ? "text-[#1D1D1F] font-black bg-[#F5F5F7]" : "text-[#1D1D1F] hover:bg-[#F5F5F7]"
               }`}>
               {l.label}
             </button>
@@ -196,7 +202,7 @@ export default function Nav() {
                 </button>
                 <button
                   onClick={() => { navigate("/dashboard"); setMobileOpen(false); }}
-                  className="w-full text-sm font-semibold py-2.5 rounded-xl bg-[#0B3D91] text-white flex items-center justify-center gap-2"
+                  className="btn-deep-black w-full text-sm font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2"
                 >
                   🏢 Panel de Empresa
                 </button>
@@ -215,7 +221,7 @@ export default function Nav() {
                 </button>
                 <button
                   onClick={() => { navigate("/precios"); setMobileOpen(false); }}
-                  className="w-full bg-[#0B3D91] text-white text-sm font-semibold py-3 rounded-xl shadow-sm"
+                  className="btn-deep-black w-full text-sm font-semibold py-3 rounded-xl"
                 >
                   Solicitar demo gratis
                 </button>

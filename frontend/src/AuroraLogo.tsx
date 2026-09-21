@@ -13,13 +13,13 @@ export default function AuroraLogo({ size = 48, animated = true }: { size?: numb
       <defs>
         <linearGradient id={`${id}-main`} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#177E89">
-            {animated && <animate attributeName="stopColor" values="#177E89;#177E89;#177E89;#0B3D91;#177E89" dur="4s" repeatCount="indefinite" />}
+            {animated && <animate attributeName="stopColor" values="#177E89;#177E89;#177E89;#0D3B3D;#177E89" dur="4s" repeatCount="indefinite" />}
           </stop>
           <stop offset="50%" stopColor="#177E89">
-            {animated && <animate attributeName="stopColor" values="#177E89;#177E89;#0B3D91;#177E89;#177E89" dur="4s" repeatCount="indefinite" />}
+            {animated && <animate attributeName="stopColor" values="#177E89;#177E89;#0D3B3D;#177E89;#177E89" dur="4s" repeatCount="indefinite" />}
           </stop>
-          <stop offset="100%" stopColor="#0B3D91">
-            {animated && <animate attributeName="stopColor" values="#0B3D91;#177E89;#177E89;#177E89;#0B3D91" dur="4s" repeatCount="indefinite" />}
+          <stop offset="100%" stopColor="#0D3B3D">
+            {animated && <animate attributeName="stopColor" values="#0D3B3D;#177E89;#177E89;#177E89;#0D3B3D" dur="4s" repeatCount="indefinite" />}
           </stop>
         </linearGradient>
 
@@ -27,7 +27,7 @@ export default function AuroraLogo({ size = 48, animated = true }: { size?: numb
           <stop offset="0%" stopColor="#177E89" stopOpacity="0.7">
             {animated && <animate attributeName="stopOpacity" values="0.7;1;0.5;0.7" dur="3s" repeatCount="indefinite" />}
           </stop>
-          <stop offset="100%" stopColor="#0B3D91" stopOpacity="0.7">
+          <stop offset="100%" stopColor="#0D3B3D" stopOpacity="0.7">
             {animated && <animate attributeName="stopOpacity" values="0.7;0.4;0.9;0.7" dur="3s" repeatCount="indefinite" />}
           </stop>
         </linearGradient>
@@ -86,12 +86,12 @@ export default function AuroraLogo({ size = 48, animated = true }: { size?: numb
           {/* Vertical bar of + */}
           <line x1="50" y1="3" x2="50" y2="9"
             strokeWidth="2" strokeLinecap="round">
-            <animate attributeName="stroke" values="#177E89;#177E89;#177E89;#0B3D91;#177E89" dur="5s" repeatCount="indefinite" />
+            <animate attributeName="stroke" values="#177E89;#177E89;#177E89;#0D3B3D;#177E89" dur="5s" repeatCount="indefinite" />
           </line>
           {/* Horizontal bar of + */}
           <line x1="47" y1="6" x2="53" y2="6"
             strokeWidth="2" strokeLinecap="round">
-            <animate attributeName="stroke" values="#177E89;#177E89;#177E89;#0B3D91;#177E89" dur="5s" repeatCount="indefinite" />
+            <animate attributeName="stroke" values="#177E89;#177E89;#177E89;#0D3B3D;#177E89" dur="5s" repeatCount="indefinite" />
           </line>
         </g>
       )}
