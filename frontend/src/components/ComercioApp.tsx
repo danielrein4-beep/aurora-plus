@@ -1213,7 +1213,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         />
       )}
       <aside
-        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-white border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#fcfdfd] border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
           sidebarAbierto ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -1221,33 +1221,33 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             respaldo institucional, sin íconos genéricos de rubro. */}
         <button
           onClick={onSalir}
-          className="flex items-center gap-2.5 text-left group cursor-pointer p-5 border-b border-slate-100"
+          className="flex items-center gap-3 text-left group cursor-pointer px-5 py-4 border-b border-slate-200"
           title="Volver al Hub General"
         >
-          <div className="w-10 h-10 rounded-lg border border-slate-200 bg-white text-teal-800 flex items-center justify-center overflow-hidden group-hover:border-teal-200 transition-colors flex-shrink-0">
+          <div className="w-10 h-10 rounded-md border border-slate-200 bg-white text-slate-700 flex items-center justify-center overflow-hidden group-hover:border-teal-300 transition-colors flex-shrink-0">
             {logoNegocio && !logoNoDisponible ? (
               <img
                 src={logoNegocio}
                 alt={`Logo de ${nombreLocal}`}
-                className="h-full w-full object-contain p-1"
+                className="h-full w-full object-contain p-1.5"
                 onError={() => setLogoNoDisponible(true)}
               />
             ) : (
-              <span className="font-bold tracking-[-0.08em] text-sm" aria-label="Aurora Plus">A+</span>
+              <span className="font-semibold tracking-[-0.06em] text-sm" aria-label="Aurora Plus">A+</span>
             )}
           </div>
           <div className="min-w-0">
-            <div className="font-['IBM_Plex_Sans'] font-bold text-sm text-slate-900 leading-tight truncate">
+            <div className="font-['IBM_Plex_Sans'] font-semibold text-sm text-slate-900 leading-tight tracking-tight truncate">
               {nombreLocal}
             </div>
-            <div className="text-[10px] text-slate-400 tracking-[0.08em] truncate font-medium mt-0.5">
-              by <span className="font-semibold text-teal-700">A+</span>
+            <div className="text-[10px] text-slate-400 tracking-[0.02em] truncate font-medium mt-1">
+              by <span className="font-semibold text-slate-600">A+</span>
             </div>
           </div>
         </button>
 
         {/* Navegación principal, agrupada (Operación / Gestión) — mismo patrón que Aurora Horeca */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-5">
+        <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
           {([
             {
               titulo: "Operación",
@@ -1268,21 +1268,21 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               ],
             },
           ]).map((grupo) => (
-            <div key={grupo.titulo} className="space-y-1">
-              <div className="px-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+            <div key={grupo.titulo} className="space-y-1.5">
+              <div className="px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                 {grupo.titulo}
               </div>
               {grupo.items.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => { setTab(item.id); setSidebarAbierto(false); }}
-                  className={`sidebar-glare w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] transition-colors cursor-pointer ${
+                  className={`sidebar-glare w-full flex items-center gap-3 border-l-2 px-3 py-2.5 rounded-md font-medium text-[13px] transition-colors cursor-pointer ${
                     tab === item.id
-                      ? "sidebar-glare--active bg-teal-50 text-teal-800 border border-teal-100"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      ? "sidebar-glare--active bg-teal-50/80 text-teal-900 border-teal-700"
+                      : "text-slate-600 border-transparent hover:bg-slate-100/70 hover:text-slate-900"
                   }`}
                 >
-                  <span className={tab === item.id ? "text-teal-700" : "text-slate-400"}><item.Icon size={16} /></span>
+                  <span className={tab === item.id ? "text-teal-700" : "text-slate-400"}><item.Icon size={15} /></span>
                   <span>{item.etiqueta}</span>
                 </button>
               ))}
