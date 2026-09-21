@@ -55,6 +55,7 @@ import {
   type FacturaExtraidaOcr,
   type ItemImportacionRepuesto,
   type ResultadoImportacionRepuestos,
+  obtenerMiNegocio,
 } from "../api";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -629,6 +630,24 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     "ferreteria";
 
   const tenantId = user?.tenantId;
+  const [logoNegocio, setLogoNegocio] = useState<string | null>(null);
+  const [logoNoDisponible, setLogoNoDisponible] = useState(false);
+
+  // La marca pertenece al tenant y se lee desde el servidor: nunca se guarda
+  // como una preferencia local de este navegador. Si todavía no hay logo (o
+  // el archivo no es válido), el monograma A+ conserva una identidad sobria.
+  useEffect(() => {
+    if (!tenantId) return;
+    obtenerMiNegocio()
+      .then((marca) => {
+        setLogoNegocio(marca.logoBase64 || null);
+        setLogoNoDisponible(false);
+      })
+      .catch(() => {
+        setLogoNegocio(null);
+        setLogoNoDisponible(false);
+      });
+  }, [tenantId]);
 
   // Ferretería, Repuestos, Retail y Comercio son una sola identidad visual — un
   // solo nombre, un solo ícono, un solo set de campos — desde que se unificaron
@@ -1198,23 +1217,31 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           sidebarAbierto ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Logo + Nombre del Negocio — Verde Abisal (#0D3B3D) de base, ícono
-            en Turquesa Corporativo (#177E89) para que resalte sin ser chillón. */}
+        {/* Identidad de la empresa: logo real si fue configurado; A+ como
+            respaldo institucional, sin íconos genéricos de rubro. */}
         <button
           onClick={onSalir}
           className="flex items-center gap-2.5 text-left group cursor-pointer p-5 border-b border-slate-100"
           title="Volver al Hub General"
         >
-          <div className="w-9 h-9 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 flex items-center justify-center group-hover:bg-teal-100 transition-colors flex-shrink-0">
-            {esFarmacia ? <IconPrescription size={18} /> :
-             <IconHardware size={18} />}
+          <div className="w-10 h-10 rounded-lg border border-slate-200 bg-white text-teal-800 flex items-center justify-center overflow-hidden group-hover:border-teal-200 transition-colors flex-shrink-0">
+            {logoNegocio && !logoNoDisponible ? (
+              <img
+                src={logoNegocio}
+                alt={`Logo de ${nombreLocal}`}
+                className="h-full w-full object-contain p-1"
+                onError={() => setLogoNoDisponible(true)}
+              />
+            ) : (
+              <span className="font-bold tracking-[-0.08em] text-sm" aria-label="Aurora Plus">A+</span>
+            )}
           </div>
           <div className="min-w-0">
             <div className="font-['IBM_Plex_Sans'] font-bold text-sm text-slate-900 leading-tight truncate">
               {nombreLocal}
             </div>
-            <div className="text-[9px] text-slate-400 tracking-[0.14em] uppercase truncate font-semibold mt-0.5">
-              Aurora {esFarmacia ? "Farmacia" : "Comercio"}
+            <div className="text-[10px] text-slate-400 tracking-[0.08em] truncate font-medium mt-0.5">
+              by <span className="font-semibold text-teal-700">A+</span>
             </div>
           </div>
         </button>
