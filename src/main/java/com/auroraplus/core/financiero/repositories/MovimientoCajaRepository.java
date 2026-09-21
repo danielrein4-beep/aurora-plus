@@ -28,6 +28,9 @@ public interface MovimientoCajaRepository extends JpaRepository<MovimientoCaja, 
 
     List<MovimientoCaja> findByTenantIdAndTipoOrderByFechaRegistroDesc(Long tenantId, MovimientoCaja.TipoMovimiento tipo);
 
+    List<MovimientoCaja> findByTenantIdAndFechaRegistroGreaterThanEqualAndFechaRegistroLessThanOrderByFechaRegistroAsc(
+        Long tenantId, LocalDateTime desde, LocalDateTime hastaExclusivo);
+
     /** Trazabilidad de la Capa 1 (docs/finance-contract.md §2.2) — total de movimientos del período, sin distinguir origen. */
     long countByTenantIdAndFechaRegistroGreaterThanEqualAndFechaRegistroLessThan(
         Long tenantId, LocalDateTime desde, LocalDateTime hastaExclusivo);

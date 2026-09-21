@@ -1,13 +1,13 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
-import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.Potrero;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.PotreroRepository;
 import com.auroraplus.modules.ganaderia.services.PotreroRotacionService;
 import com.auroraplus.modules.ganaderia.services.ReferenciaPastoreoService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,7 +35,7 @@ public class PotreroController {
 
     @GetMapping
     public List<Potrero> listar() {
-        return potreroRepository.findByTenantId(TenantContext.getCurrentTenant());
+        return potreroRepository.findByTenantId(GanaderiaTenantAccess.requireTenant());
     }
 
     public static class PosicionRequest {
@@ -53,7 +53,8 @@ public class PotreroController {
      * Mesa en Horeca (pensado para arrastrar-y-soltar en el frontend).
      */
     @PutMapping("/{id}/posicion")
-    public ResponseEntity<Potrero> actualizarPosicion(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody PosicionRequest request) {
+    public ResponseEntity<Potrero> actualizarPosicion(@PathVariable Long id, @RequestBody PosicionRequest request) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         Potrero potrero = potreroRepository.findById(id).orElseThrow(() -> new RuntimeException("Potrero no encontrado"));
         if (!potrero.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Potrero no pertenece a este tenant");
@@ -74,7 +75,8 @@ public class PotreroController {
      * de su terreno.
      */
     @PostMapping
-    public ResponseEntity<Potrero> crear(@RequestParam Long tenantId, @RequestBody Potrero potrero) {
+    public ResponseEntity<Potrero> crear(@RequestBody Potrero potrero) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         potrero.setTenantId(tenantId);
         aplicarRecomendacionSiFalta(tenantId, potrero);
         return ResponseEntity.ok(potreroRepository.save(potrero));
@@ -89,7 +91,8 @@ public class PotreroController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Potrero> actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Potrero datos) {
+    public ResponseEntity<Potrero> actualizar(@PathVariable Long id, @RequestBody Potrero datos) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         Potrero potrero = potreroRepository.findById(id).orElseThrow(() -> new RuntimeException("Potrero no encontrado"));
         if (!potrero.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Potrero no pertenece a este tenant");
@@ -108,9 +111,17 @@ public class PotreroController {
 
         // Al entrar en descanso se marca la fecha de inicio (para contar días); al
         // volver a activo se limpia, para que un descanso futuro cuente desde cero.
+        if (datos.getEstado() != null && !"ACTIVO".equals(datos.getEstado()) && !"EN_DESCANSO".equals(datos.getEstado())) {
+            throw new IllegalArgumentException("Estado de potrero no válido. Use ACTIVO o EN_DESCANSO");
+        }
         boolean entraEnDescanso = "EN_DESCANSO".equals(datos.getEstado()) && !"EN_DESCANSO".equals(potrero.getEstado());
         boolean vuelveActivo = "ACTIVO".equals(datos.getEstado()) && !"ACTIVO".equals(potrero.getEstado());
         if (entraEnDescanso) {
+            long animalesActivos = animalRepository.findByPotreroIdAndEstado(potrero.getId(), "ACTIVO").size();
+            if (animalesActivos > 0) {
+                throw new IllegalStateException("No se puede poner '" + potrero.getNombre() + "' en descanso mientras conserva "
+                    + animalesActivos + " animales activos. Rote o traslade el hato primero.");
+            }
             potrero.setFechaInicioDescanso(java.time.LocalDate.now());
             potrero.setFechaInicioUso(null);
         }
@@ -119,13 +130,16 @@ public class PotreroController {
             potrero.setFechaInicioUso(java.time.LocalDate.now());
         }
 
-        potrero.setEstado(datos.getEstado());
+        if (datos.getEstado() != null) {
+            potrero.setEstado(datos.getEstado());
+        }
         return ResponseEntity.ok(potreroRepository.save(potrero));
     }
 
     /** Forma rápida de fijar el orden de rotación de todos los potreros de una vez, sin editar uno por uno. */
     @PostMapping("/reordenar")
-    public List<Potrero> reordenar(@RequestParam Long tenantId, @RequestBody List<Long> potreroIdsEnOrden) {
+    public List<Potrero> reordenar(@RequestBody List<Long> potreroIdsEnOrden) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         return potreroRotacionService.reordenar(tenantId, potreroIdsEnOrden);
     }
@@ -137,32 +151,37 @@ public class PotreroController {
 
     /** Mueve el hato del potrero {id} al destino indicado: origen queda EN_DESCANSO, destino queda ACTIVO. */
     @PostMapping("/{id}/rotar")
-    public Map<String, Object> rotar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody RotarRequest request) {
+    public Map<String, Object> rotar(@PathVariable Long id, @RequestBody RotarRequest request) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return potreroRotacionService.rotar(tenantId, id, request.potreroDestinoId, request.animalIds);
     }
 
     /** Según el ordenRotacion configurado, cuál potrero sigue después de este en el ciclo. */
     @GetMapping("/{id}/siguiente-rotacion")
-    public Potrero siguienteRotacion(@PathVariable Long id, @RequestParam Long tenantId) {
+    public Potrero siguienteRotacion(@PathVariable Long id) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return potreroRotacionService.obtenerSiguienteEnRotacion(tenantId, id);
     }
 
     /** Sobrecarga de animales y potreros que ya cumplieron su descanso mínimo y podrían reactivarse. */
     @GetMapping("/alertas")
-    public List<Map<String, Object>> alertas(@RequestParam Long tenantId) {
+    public List<Map<String, Object>> alertas() {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return potreroRotacionService.obtenerAlertas(tenantId);
     }
 
     /** Previsualiza la recomendación de capacidad/descanso ANTES de crear el potrero (ej. para mostrarla en el formulario mientras se llena). */
     @GetMapping("/recomendacion")
     public ReferenciaPastoreoService.Recomendacion recomendacionPreliminar(
-            @RequestParam Long tenantId, @RequestParam java.math.BigDecimal areaHectareas, @RequestParam(required = false) String tipoPasto) {
+            @RequestParam java.math.BigDecimal areaHectareas, @RequestParam(required = false) String tipoPasto) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return referenciaPastoreoService.calcular(tenantId, areaHectareas, tipoPasto);
     }
 
     /** Recomendación para un potrero ya creado, según su área y tipo de pasto actuales. */
     @GetMapping("/{id}/recomendacion")
-    public ReferenciaPastoreoService.Recomendacion recomendacion(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ReferenciaPastoreoService.Recomendacion recomendacion(@PathVariable Long id) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         Potrero potrero = potreroRepository.findById(id).orElseThrow(() -> new RuntimeException("Potrero no encontrado"));
         if (!potrero.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Potrero no pertenece a este tenant");
@@ -173,11 +192,12 @@ public class PotreroController {
     /** Mapa de potreros: cada potrero con sus animales actuales y % de ocupación — base para la vista visual del frontend. */
     @GetMapping("/mapa")
     public List<Map<String, Object>> mapa() {
-        List<Potrero> potreros = potreroRepository.findAll();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        List<Potrero> potreros = potreroRepository.findByTenantId(tenantId);
         List<Map<String, Object>> resultado = new ArrayList<>();
 
         for (Potrero potrero : potreros) {
-            List<Animal> animales = animalRepository.findByPotreroIdAndEstado(potrero.getId(), "ACTIVO");
+            List<Animal> animales = animalRepository.findByPotreroIdAndEstadoAndTenantId(potrero.getId(), "ACTIVO", tenantId);
             Map<String, Object> entrada = new LinkedHashMap<>();
             entrada.put("potrero", potrero);
             entrada.put("animales", animales);

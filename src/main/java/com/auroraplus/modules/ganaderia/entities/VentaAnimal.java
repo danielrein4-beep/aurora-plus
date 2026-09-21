@@ -32,6 +32,9 @@ public class VentaAnimal {
     @Column(nullable = false)
     private LocalDateTime fecha = LocalDateTime.now();
 
+    @Column(name = "movimiento_caja_id")
+    private Long movimientoCajaId;
+
     @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference
     private List<DetalleVentaAnimal> items = new ArrayList<>();
@@ -53,6 +56,8 @@ public class VentaAnimal {
     public void setTotal(BigDecimal total) { this.total = total; }
     public LocalDateTime getFecha() { return fecha; }
     public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
+    public Long getMovimientoCajaId() { return movimientoCajaId; }
+    public void setMovimientoCajaId(Long movimientoCajaId) { this.movimientoCajaId = movimientoCajaId; }
     public List<DetalleVentaAnimal> getItems() { return items; }
     public void setItems(List<DetalleVentaAnimal> items) { this.items = items; }
 }

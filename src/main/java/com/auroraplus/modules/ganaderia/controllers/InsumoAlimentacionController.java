@@ -1,13 +1,13 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
-import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.InsumoAlimentacion;
 import com.auroraplus.modules.ganaderia.entities.MovimientoInsumo;
 import com.auroraplus.modules.ganaderia.entities.RegistroConsumo;
 import com.auroraplus.modules.ganaderia.repositories.InsumoAlimentacionRepository;
 import com.auroraplus.modules.ganaderia.repositories.MovimientoInsumoRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaAlimentacionService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,11 +31,18 @@ public class InsumoAlimentacionController {
 
     @GetMapping("/insumos")
     public List<InsumoAlimentacion> listarInsumos() {
-        return insumoAlimentacionRepository.findByTenantId(TenantContext.getCurrentTenant());
+        return insumoAlimentacionRepository.findByTenantId(GanaderiaTenantAccess.requireTenant());
     }
 
     @PostMapping("/insumos")
-    public ResponseEntity<InsumoAlimentacion> crearInsumo(@RequestParam Long tenantId, @RequestBody InsumoAlimentacion insumo) {
+    public ResponseEntity<InsumoAlimentacion> crearInsumo(@RequestBody InsumoAlimentacion insumo) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        insumo.setId(null);
+        if (insumo.getNombre() == null || insumo.getNombre().isBlank() || insumo.getTipo() == null || insumo.getUnidadMedida() == null) {
+            throw new IllegalArgumentException("Nombre, tipo y unidad de medida son obligatorios para el insumo");
+        }
+        insumo.setStockActual(java.math.BigDecimal.ZERO);
         insumo.setTenantId(tenantId);
         return ResponseEntity.ok(insumoAlimentacionRepository.save(insumo));
     }
@@ -44,13 +51,17 @@ public class InsumoAlimentacionController {
         public Long insumoId;
         public BigDecimal cantidad;
         public BigDecimal costoTotal;
+        public String monedaPago;
+        public BigDecimal montoPagado;
         public String motivo;
     }
 
     @PostMapping("/entradas")
-    public ResponseEntity<InsumoAlimentacion> registrarEntrada(@RequestParam Long tenantId, @RequestBody EntradaRequest request) {
+    public ResponseEntity<InsumoAlimentacion> registrarEntrada(@RequestBody EntradaRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
-        return ResponseEntity.ok(ganaderiaAlimentacionService.registrarEntrada(tenantId, request.insumoId, request.cantidad, request.costoTotal, request.motivo));
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        return ResponseEntity.ok(ganaderiaAlimentacionService.registrarEntrada(tenantId, request.insumoId, request.cantidad,
+            request.costoTotal, request.monedaPago, request.montoPagado, request.motivo));
     }
 
     public static class ConsumoRequest {
@@ -61,12 +72,17 @@ public class InsumoAlimentacionController {
     }
 
     @PostMapping("/consumos")
-    public ResponseEntity<RegistroConsumo> registrarConsumo(@RequestParam Long tenantId, @RequestBody ConsumoRequest request) {
+    public ResponseEntity<RegistroConsumo> registrarConsumo(@RequestBody ConsumoRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return ResponseEntity.ok(ganaderiaAlimentacionService.registrarConsumo(tenantId, request.insumoId, request.potreroId, request.fecha, request.cantidad));
     }
 
     @GetMapping("/insumos/{insumoId}/movimientos")
     public List<MovimientoInsumo> movimientosInsumo(@PathVariable Long insumoId) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        insumoAlimentacionRepository.findById(insumoId).filter(i -> tenantId.equals(i.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Insumo no encontrado"));
         return movimientoInsumoRepository.findByInsumoIdOrderByFechaRegistroDesc(insumoId);
     }
 }

@@ -4,6 +4,7 @@ import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.ganaderia.entities.TabuladorPasto;
 import com.auroraplus.modules.ganaderia.repositories.TabuladorPastoRepository;
 import com.auroraplus.modules.ganaderia.services.ReferenciaPastoreoService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +27,8 @@ public class TabuladorPastoController {
     private ReferenciaPastoreoService referenciaPastoreoService;
 
     @GetMapping
-    public List<TabuladorPasto> listar(@RequestParam Long tenantId) {
+    public List<TabuladorPasto> listar() {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         List<TabuladorPasto> tabulador = tabuladorPastoRepository.findByTenantId(tenantId);
         if (tabulador.isEmpty()) {
             tabulador = referenciaPastoreoService.sembrarValoresPorDefecto(tenantId);
@@ -36,14 +38,17 @@ public class TabuladorPastoController {
 
     /** Sembrar manualmente los valores de referencia por defecto — falla si el tenant ya tiene su tabulador (para no pisar ediciones existentes). */
     @PostMapping("/sembrar-valores-defecto")
-    public List<TabuladorPasto> sembrarValoresDefecto(@RequestParam Long tenantId) {
+    public List<TabuladorPasto> sembrarValoresDefecto() {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return referenciaPastoreoService.sembrarValoresPorDefecto(tenantId);
     }
 
     @PostMapping
-    public ResponseEntity<TabuladorPasto> crear(@RequestParam Long tenantId, @RequestBody TabuladorPasto fila) {
+    public ResponseEntity<TabuladorPasto> crear(@RequestBody TabuladorPasto fila) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        fila.setId(null);
         fila.setTenantId(tenantId);
         if (fila.isEsGenerico() && tabuladorPastoRepository.findByTenantIdAndEsGenericoTrue(tenantId).isPresent()) {
             throw new RuntimeException("Este tenant ya tiene una fila genérica — edítela en vez de crear otra");
@@ -52,8 +57,9 @@ public class TabuladorPastoController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TabuladorPasto> actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody TabuladorPasto datos) {
+    public ResponseEntity<TabuladorPasto> actualizar(@PathVariable Long id, @RequestBody TabuladorPasto datos) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         TabuladorPasto fila = tabuladorPastoRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Fila de tabulador no encontrada"));
         if (!fila.getTenantId().equals(tenantId)) {
@@ -66,8 +72,9 @@ public class TabuladorPastoController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         TabuladorPasto fila = tabuladorPastoRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Fila de tabulador no encontrada"));
         if (!fila.getTenantId().equals(tenantId)) {

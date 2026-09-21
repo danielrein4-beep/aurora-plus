@@ -9,6 +9,7 @@ import com.auroraplus.modules.ganaderia.entities.PublicacionVenta;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.OfertaCompraRepository;
 import com.auroraplus.modules.ganaderia.repositories.PublicacionVentaRepository;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,16 +55,14 @@ public class PublicacionVentaController {
 
     @GetMapping("/publicaciones")
     public List<PublicacionVenta> listarPublicaciones(@RequestParam(required = false, defaultValue = "ACTIVA") String estado) {
-        return publicacionVentaRepository.findByEstado(estado);
+        return publicacionVentaRepository.findByTenantIdAndEstado(GanaderiaTenantAccess.requireTenant(), estado);
     }
 
     @PostMapping("/publicaciones")
-    public ResponseEntity<PublicacionVenta> publicar(@RequestParam Long tenantId, @RequestBody PublicacionRequest request) {
+    public ResponseEntity<PublicacionVenta> publicar(@RequestBody PublicacionRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
-        Animal animal = animalRepository.findById(request.animalId).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (!animal.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
-        }
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        Animal animal = animalRepository.findById(request.animalId).filter(a -> tenantId.equals(a.getTenantId())).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         if (!"ACTIVO".equals(animal.getEstado())) {
             throw new RuntimeException("Solo se pueden publicar animales activos");
         }
@@ -85,7 +84,9 @@ public class PublicacionVentaController {
     }
 
     @PostMapping("/ofertas")
-    public ResponseEntity<OfertaCompra> registrarOferta(@RequestParam Long tenantId, @RequestBody OfertaRequest request) {
+    public ResponseEntity<OfertaCompra> registrarOferta(@RequestBody OfertaRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         PublicacionVenta publicacion = publicacionVentaRepository.findById(request.publicacionId)
             .orElseThrow(() -> new RuntimeException("Publicación no encontrada"));
         if (!publicacion.getTenantId().equals(tenantId)) {
@@ -107,15 +108,19 @@ public class PublicacionVentaController {
 
     @GetMapping("/publicaciones/{publicacionId}/ofertas")
     public List<OfertaCompra> listarOfertas(@PathVariable Long publicacionId) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        publicacionVentaRepository.findById(publicacionId).filter(p -> tenantId.equals(p.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Publicación no encontrada"));
         return ofertaCompraRepository.findByPublicacionIdOrderByMontoOfertadoDesc(publicacionId);
     }
 
     /** Acepta una oferta: cierra la publicación y genera la comisión de intermediación de Aurora+. */
     @PostMapping("/ofertas/{ofertaId}/aceptar")
     @Transactional
-    public ResponseEntity<OfertaCompra> aceptarOferta(@PathVariable Long ofertaId, @RequestParam Long tenantId,
+    public ResponseEntity<OfertaCompra> aceptarOferta(@PathVariable Long ofertaId,
                                                         @RequestParam(required = false) BigDecimal porcentajeComision) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         OfertaCompra oferta = ofertaCompraRepository.findById(ofertaId).orElseThrow(() -> new RuntimeException("Oferta no encontrada"));
         if (!oferta.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Oferta no pertenece a este tenant");
@@ -155,7 +160,9 @@ public class PublicacionVentaController {
     }
 
     @PostMapping("/ofertas/{ofertaId}/rechazar")
-    public ResponseEntity<OfertaCompra> rechazarOferta(@PathVariable Long ofertaId, @RequestParam Long tenantId) {
+    public ResponseEntity<OfertaCompra> rechazarOferta(@PathVariable Long ofertaId) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         OfertaCompra oferta = ofertaCompraRepository.findById(ofertaId).orElseThrow(() -> new RuntimeException("Oferta no encontrada"));
         if (!oferta.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Oferta no pertenece a este tenant");

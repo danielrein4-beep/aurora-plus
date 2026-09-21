@@ -1,6 +1,10 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.financiero.entities.MovimientoCaja;
+import com.auroraplus.core.financiero.services.MotorFinancieroService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
+import com.auroraplus.modules.ganaderia.services.GanaderiaSanidadService;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.RegistroOrdeno;
 import com.auroraplus.modules.ganaderia.entities.TanqueLeche;
@@ -11,6 +15,7 @@ import com.auroraplus.modules.ganaderia.repositories.TanqueLecheRepository;
 import com.auroraplus.modules.ganaderia.repositories.VentaLecheTanqueRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -37,6 +42,12 @@ public class RegistroOrdenoController {
     @Autowired
     private VentaLecheTanqueRepository ventaLecheTanqueRepository;
 
+    @Autowired
+    private MotorFinancieroService motorFinancieroService;
+
+    @Autowired
+    private GanaderiaSanidadService ganaderiaSanidadService;
+
     public static class RegistroRequest {
         public Long animalId;
         public LocalDate fecha;
@@ -49,19 +60,39 @@ public class RegistroOrdenoController {
     }
 
     @PostMapping
-    public ResponseEntity<RegistroOrdeno> registrar(@RequestParam Long tenantId, @RequestBody RegistroRequest request) {
-        Animal animal = animalRepository.findById(request.animalId)
-            .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (!animal.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
+    @Transactional
+    public ResponseEntity<RegistroOrdeno> registrar(@RequestBody RegistroRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        if (request.animalId == null) {
+            throw new RuntimeException("Debe indicar el animal ordeñado");
         }
+        Animal animal = animalRepository.findForUpdateByIdAndTenantId(request.animalId, tenantId)
+            .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         if (request.cantidadLitros == null || request.cantidadLitros.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("La cantidad de litros debe ser mayor a cero");
+        }
+        if (!"ACTIVO".equals(animal.getEstado()) || !"HEMBRA".equals(animal.getSexo()) || !"ORDEÑO".equals(animal.getEstadoProductivo())) {
+            throw new RuntimeException("Solo se puede registrar ordeño para una hembra activa marcada 'En Ordeño'");
+        }
+        String turno = request.turno == null ? "" : request.turno.trim().toUpperCase();
+        if (!java.util.Set.of("MANANA", "TARDE").contains(turno)) {
+            throw new RuntimeException("Turno de ordeño no válido. Use MANANA o TARDE");
+        }
+        LocalDate fecha = request.fecha != null ? request.fecha : LocalDate.now();
+        if (registroOrdenoRepository.existsByTenantIdAndAnimalIdAndFechaAndTurno(tenantId, animal.getId(), fecha, turno)) {
+            throw new RuntimeException("Ya existe un ordeño para " + animal.getArete() + " en el turno " + turno + " de " + fecha);
         }
 
         String dest = (request.destino != null && !request.destino.trim().isEmpty())
             ? request.destino.trim().toUpperCase()
             : "TANQUE";
+        if (!java.util.Set.of("TANQUE", "VENTA_DIRECTA", "DESCARTE").contains(dest)) {
+            throw new IllegalArgumentException("Destino de ordeño no válido. Use TANQUE, VENTA_DIRECTA o DESCARTE");
+        }
+        if (!"DESCARTE".equals(dest)) {
+            ganaderiaSanidadService.validarAptoParaTanqueOVentaLeche(animal.getId());
+        }
 
         RegistroOrdeno registro = new RegistroOrdeno();
         registro.setTenantId(tenantId);
@@ -69,8 +100,8 @@ public class RegistroOrdenoController {
         // Snapshot del grupo de ordeño ACTUAL del animal — si más adelante se reasigna a otro
         // grupo, este registro histórico no cambia (ver RegistroOrdeno.grupoOrdeno).
         registro.setGrupoOrdeno(animal.getGrupoOrdeno());
-        registro.setFecha(request.fecha != null ? request.fecha : LocalDate.now());
-        registro.setTurno(request.turno);
+        registro.setFecha(fecha);
+        registro.setTurno(turno);
         registro.setCantidadLitros(request.cantidadLitros);
         registro.setPrecioVentaLitro(request.precioVentaLitro);
         registro.setPorcentajeGrasa(request.porcentajeGrasa);
@@ -81,7 +112,7 @@ public class RegistroOrdenoController {
 
         // Si el destino es TANQUE, sumar litros al stock del tanque de leche de la finca
         if ("TANQUE".equalsIgnoreCase(dest)) {
-            TanqueLeche tanque = tanqueLecheRepository.findByTenantId(tenantId)
+            TanqueLeche tanque = tanqueLecheRepository.findForUpdateByTenantId(tenantId)
                 .orElseGet(() -> {
                     TanqueLeche nuevo = new TanqueLeche();
                     nuevo.setTenantId(tenantId);
@@ -90,7 +121,12 @@ public class RegistroOrdenoController {
                     nuevo.setTemperaturaCelsius(BigDecimal.valueOf(4.0));
                     return nuevo;
                 });
-            tanque.setStockActualLitros(tanque.getStockActualLitros().add(request.cantidadLitros));
+            BigDecimal nuevoStock = tanque.getStockActualLitros().add(request.cantidadLitros);
+            if (tanque.getCapacidadLitros() != null && nuevoStock.compareTo(tanque.getCapacidadLitros()) > 0) {
+                throw new RuntimeException("El tanque no tiene capacidad: " + tanque.getStockActualLitros() + " L actuales + "
+                    + request.cantidadLitros + " L supera " + tanque.getCapacidadLitros() + " L");
+            }
+            tanque.setStockActualLitros(nuevoStock);
             tanque.setUltimaActualizacion(LocalDateTime.now());
             tanqueLecheRepository.save(tanque);
         }
@@ -100,12 +136,16 @@ public class RegistroOrdenoController {
 
     @GetMapping("/animal/{animalId}")
     public List<RegistroOrdeno> historialAnimal(@PathVariable Long animalId) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        animalRepository.findById(animalId).filter(a -> tenantId.equals(a.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         return registroOrdenoRepository.findByAnimalIdOrderByFechaDesc(animalId);
     }
 
     /** Reporte de producción total del hato en un rango de fechas. */
     @GetMapping("/reporte")
-    public Map<String, Object> reporte(@RequestParam Long tenantId, @RequestParam LocalDate desde, @RequestParam LocalDate hasta) {
+    public Map<String, Object> reporte(@RequestParam LocalDate desde, @RequestParam LocalDate hasta) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         List<RegistroOrdeno> registros = registroOrdenoRepository.findByTenantIdAndFechaBetween(tenantId, desde, hasta);
         BigDecimal totalLitros = registros.stream()
             .map(RegistroOrdeno::getCantidadLitros)
@@ -134,8 +174,9 @@ public class RegistroOrdenoController {
      * registro a mano.
      */
     @GetMapping("/ingresos-periodo")
-    public List<Map<String, Object>> ingresosPeriodo(@RequestParam Long tenantId, @RequestParam LocalDate desde,
+    public List<Map<String, Object>> ingresosPeriodo(@RequestParam LocalDate desde,
                                                         @RequestParam LocalDate hasta, @RequestParam(defaultValue = "DIA") String agrupacion) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         List<RegistroOrdeno> registros = registroOrdenoRepository.findByTenantIdAndFechaBetween(tenantId, desde, hasta);
 
         Map<String, List<RegistroOrdeno>> porBucket = new java.util.TreeMap<>();
@@ -174,6 +215,8 @@ public class RegistroOrdenoController {
         public BigDecimal precioLitroUSD;
         public String compradorOPlanta;
         public String monedaPago; // opcional, default USD
+        /** Monto físico recibido cuando se cobra en una moneda distinta a la base. */
+        public BigDecimal montoRecibido;
         public String notas;
     }
 
@@ -184,7 +227,8 @@ public class RegistroOrdenoController {
     }
 
     @GetMapping("/tanque")
-    public ResponseEntity<TanqueLeche> obtenerTanque(@RequestParam Long tenantId) {
+    public ResponseEntity<TanqueLeche> obtenerTanque() {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         TanqueLeche tanque = tanqueLecheRepository.findByTenantId(tenantId)
             .orElseGet(() -> {
                 TanqueLeche nuevo = new TanqueLeche();
@@ -199,8 +243,10 @@ public class RegistroOrdenoController {
     }
 
     @PostMapping("/tanque/despacho")
-    public ResponseEntity<?> despacharTanque(@RequestParam Long tenantId, @RequestBody DespachoTanqueRequest req) {
+    @Transactional
+    public ResponseEntity<?> despacharTanque(@RequestBody DespachoTanqueRequest req) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         if (req.litrosVendidos == null || req.litrosVendidos.compareTo(BigDecimal.ZERO) <= 0) {
             return ResponseEntity.badRequest().body("Los litros a despachar deben ser mayores a cero");
         }
@@ -210,8 +256,19 @@ public class RegistroOrdenoController {
         if (req.compradorOPlanta == null || req.compradorOPlanta.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Debe indicar el comprador o planta receptora");
         }
+        String monedaPago = req.monedaPago != null && !req.monedaPago.trim().isEmpty()
+            ? req.monedaPago.trim().toUpperCase()
+            : "USD";
+        if (!java.util.Set.of("USD", "VES", "COP").contains(monedaPago)) {
+            return ResponseEntity.badRequest().body("Moneda de pago no admitida: " + monedaPago);
+        }
+        String monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
+        if (!monedaPago.equals(monedaBase) && req.montoRecibido == null && !"USD".equals(monedaPago)) {
+            return ResponseEntity.badRequest().body("Indique el monto recibido en " + monedaPago
+                + " para registrar una venta cobrada fuera de la moneda base");
+        }
 
-        TanqueLeche tanque = tanqueLecheRepository.findByTenantId(tenantId)
+        TanqueLeche tanque = tanqueLecheRepository.findForUpdateByTenantId(tenantId)
             .orElseGet(() -> {
                 TanqueLeche nuevo = new TanqueLeche();
                 nuevo.setTenantId(tenantId);
@@ -236,19 +293,36 @@ public class RegistroOrdenoController {
         venta.setPrecioLitroUSD(req.precioLitroUSD);
         venta.setTotalUSD(req.litrosVendidos.multiply(req.precioLitroUSD).setScale(2, RoundingMode.HALF_UP));
         venta.setCompradorOPlanta(req.compradorOPlanta.trim());
-        venta.setMonedaPago(req.monedaPago != null && !req.monedaPago.trim().isEmpty() ? req.monedaPago.trim().toUpperCase() : "USD");
+        venta.setMonedaPago(monedaPago);
         venta.setNotas(req.notas);
-        ventaLecheTanqueRepository.save(venta);
+        venta = ventaLecheTanqueRepository.save(venta);
+
+        // El despacho confirma una venta: debe entrar a caja en la moneda
+        // física del cobro, no quedar solo como una nota de entrega.
+        BigDecimal totalBase = "USD".equals(monedaBase)
+            ? venta.getTotalUSD()
+            : motorFinancieroService.convertirMoneda(tenantId, venta.getTotalUSD(), "USD", monedaBase);
+        BigDecimal montoRecibido = req.montoRecibido;
+        if (!venta.getMonedaPago().equals(monedaBase) && montoRecibido == null && "USD".equals(venta.getMonedaPago())) {
+            montoRecibido = venta.getTotalUSD();
+        }
+        MovimientoCaja ingreso = motorFinancieroService.registrarMovimientoMultiMoneda(
+            tenantId, MovimientoCaja.TipoMovimiento.INGRESO, totalBase, venta.getMonedaPago(), montoRecibido,
+            "Venta de leche a " + venta.getCompradorOPlanta(), "GANADERIA", "VentaLecheTanque", venta.getId());
+        venta.setMovimientoCajaId(ingreso.getId());
+        venta = ventaLecheTanqueRepository.save(venta);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("tanque", tanque);
         resp.put("venta", venta);
+        resp.put("ingresoCajaId", ingreso.getId());
         resp.put("mensaje", "Despacho de leche registrado y stock descontado exitosamente");
         return ResponseEntity.ok(resp);
     }
 
     @GetMapping("/tanque/ventas")
-    public List<VentaLecheTanque> listarVentasTanque(@RequestParam Long tenantId) {
+    public List<VentaLecheTanque> listarVentasTanque() {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return ventaLecheTanqueRepository.findByTenantIdOrderByFechaDesc(tenantId);
     }
 
@@ -260,7 +334,7 @@ public class RegistroOrdenoController {
 
     @GetMapping(value = "/tanque/ventas/{id}/pdf", produces = org.springframework.http.MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> pdfDespacho(@PathVariable Long id) throws Exception {
-        Long tenantId = com.auroraplus.core.config.TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         VentaLecheTanque despacho = ventaLecheTanqueRepository.findById(id)
             .filter(v -> tenantId != null && tenantId.equals(v.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Despacho no encontrado"));
@@ -273,8 +347,9 @@ public class RegistroOrdenoController {
     }
 
     @PutMapping("/tanque/config")
-    public ResponseEntity<TanqueLeche> configurarTanque(@RequestParam Long tenantId, @RequestBody ConfigTanqueRequest req) {
+    public ResponseEntity<TanqueLeche> configurarTanque(@RequestBody ConfigTanqueRequest req) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         TanqueLeche tanque = tanqueLecheRepository.findByTenantId(tenantId)
             .orElseGet(() -> {
                 TanqueLeche nuevo = new TanqueLeche();

@@ -1,12 +1,13 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
-import com.auroraplus.core.config.TenantContext;
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.DetalleGuiaTraslado;
 import com.auroraplus.modules.ganaderia.entities.GuiaTraslado;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.GuiaTrasladoRepository;
 import com.auroraplus.modules.ganaderia.services.GuiaTrasladoPdfService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -45,12 +46,14 @@ public class GuiaTrasladoController {
 
     @GetMapping
     public List<GuiaTraslado> listar() {
-        return guiaTrasladoRepository.findAllByOrderByFechaDesc();
+        return guiaTrasladoRepository.findByTenantIdOrderByFechaDesc(GanaderiaTenantAccess.requireTenant());
     }
 
     @PostMapping
     @Transactional
-    public ResponseEntity<GuiaTraslado> crear(@RequestParam Long tenantId, @RequestBody GuiaRequest request) {
+    public ResponseEntity<GuiaTraslado> crear(@RequestBody GuiaRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         if (request.animalIds == null || request.animalIds.isEmpty()) {
             throw new RuntimeException("La guía debe incluir al menos un animal");
         }
@@ -67,11 +70,8 @@ public class GuiaTrasladoController {
         guia.setResponsable(request.responsable);
 
         for (Long animalId : request.animalIds) {
-            Animal animal = animalRepository.findById(animalId)
+            Animal animal = animalRepository.findForUpdateByIdAndTenantId(animalId, tenantId)
                 .orElseThrow(() -> new RuntimeException("Animal no encontrado: " + animalId));
-            if (!animal.getTenantId().equals(tenantId)) {
-                throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
-            }
             DetalleGuiaTraslado detalle = new DetalleGuiaTraslado();
             detalle.setTenantId(tenantId);
             detalle.setAnimal(animal);
@@ -83,9 +83,9 @@ public class GuiaTrasladoController {
 
     @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> pdf(@PathVariable Long id) throws Exception {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         GuiaTraslado guia = guiaTrasladoRepository.findById(id)
-            .filter(g -> tenantId != null && tenantId.equals(g.getTenantId()))
+            .filter(g -> tenantId.equals(g.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Guía no encontrada"));
         byte[] pdf = guiaTrasladoPdfService.generarGuiaPdf(guia);
         return ResponseEntity.ok()

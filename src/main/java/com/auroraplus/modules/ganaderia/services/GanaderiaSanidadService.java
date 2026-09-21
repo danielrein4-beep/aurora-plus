@@ -38,14 +38,17 @@ public class GanaderiaSanidadService {
     @Transactional
     public AplicacionVacuna aplicarVacuna(Long tenantId, Long animalId, Long vacunaId, LocalDate fechaAplicacion,
                                            String lote, String veterinarioResponsable, BigDecimal costo) {
-        Animal animal = animalRepository.findById(animalId)
+        if (animalId == null || vacunaId == null) {
+            throw new IllegalArgumentException("Debe indicar animal y vacuna");
+        }
+        Animal animal = animalRepository.findForUpdateByIdAndTenantId(animalId, tenantId)
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (!animal.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
+        if (!"ACTIVO".equals(animal.getEstado())) {
+            throw new IllegalStateException("No se puede vacunar un animal que no está activo");
         }
         Vacuna vacuna = vacunaRepository.findById(vacunaId)
             .orElseThrow(() -> new RuntimeException("Vacuna no encontrada"));
-        if (!vacuna.getTenantId().equals(tenantId)) {
+        if (!tenantId.equals(vacuna.getTenantId())) {
             throw new RuntimeException("Violación de seguridad: Vacuna no pertenece a este tenant");
         }
 
@@ -53,14 +56,15 @@ public class GanaderiaSanidadService {
         aplicacion.setTenantId(tenantId);
         aplicacion.setAnimal(animal);
         aplicacion.setVacuna(vacuna);
-        aplicacion.setFechaAplicacion(fechaAplicacion);
+        LocalDate fechaEfectiva = fechaAplicacion != null ? fechaAplicacion : LocalDate.now();
+        aplicacion.setFechaAplicacion(fechaEfectiva);
         aplicacion.setLote(lote);
         aplicacion.setVeterinarioResponsable(veterinarioResponsable);
         aplicacion.setCosto(costo);
-        aplicacion.setFechaFinRetiroLeche(fechaAplicacion.plusDays(vacuna.getDiasRetiroLeche()));
-        aplicacion.setFechaFinRetiroCarne(fechaAplicacion.plusDays(vacuna.getDiasRetiroCarne()));
+        aplicacion.setFechaFinRetiroLeche(fechaEfectiva.plusDays(vacuna.getDiasRetiroLeche()));
+        aplicacion.setFechaFinRetiroCarne(fechaEfectiva.plusDays(vacuna.getDiasRetiroCarne()));
         if (vacuna.getDiasParaRefuerzo() != null && vacuna.getDiasParaRefuerzo() > 0) {
-            aplicacion.setFechaProximaDosis(fechaAplicacion.plusDays(vacuna.getDiasParaRefuerzo()));
+            aplicacion.setFechaProximaDosis(fechaEfectiva.plusDays(vacuna.getDiasParaRefuerzo()));
         }
 
         return aplicacionVacunaRepository.save(aplicacion);
@@ -69,14 +73,17 @@ public class GanaderiaSanidadService {
     @Transactional
     public AplicacionMedicamento aplicarMedicamento(Long tenantId, Long animalId, Long medicamentoId, LocalDate fechaAplicacion,
                                                       String dosis, String motivoDiagnostico, String veterinarioResponsable, BigDecimal costo) {
-        Animal animal = animalRepository.findById(animalId)
+        if (animalId == null || medicamentoId == null) {
+            throw new IllegalArgumentException("Debe indicar animal y medicamento");
+        }
+        Animal animal = animalRepository.findForUpdateByIdAndTenantId(animalId, tenantId)
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (!animal.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
+        if (!"ACTIVO".equals(animal.getEstado())) {
+            throw new IllegalStateException("No se puede medicar un animal que no está activo");
         }
         Medicamento medicamento = medicamentoRepository.findById(medicamentoId)
             .orElseThrow(() -> new RuntimeException("Medicamento no encontrado"));
-        if (!medicamento.getTenantId().equals(tenantId)) {
+        if (!tenantId.equals(medicamento.getTenantId())) {
             throw new RuntimeException("Violación de seguridad: Medicamento no pertenece a este tenant");
         }
 
@@ -84,13 +91,14 @@ public class GanaderiaSanidadService {
         aplicacion.setTenantId(tenantId);
         aplicacion.setAnimal(animal);
         aplicacion.setMedicamento(medicamento);
-        aplicacion.setFechaAplicacion(fechaAplicacion);
+        LocalDate fechaEfectiva = fechaAplicacion != null ? fechaAplicacion : LocalDate.now();
+        aplicacion.setFechaAplicacion(fechaEfectiva);
         aplicacion.setDosis(dosis);
         aplicacion.setMotivoDiagnostico(motivoDiagnostico);
         aplicacion.setVeterinarioResponsable(veterinarioResponsable);
         aplicacion.setCosto(costo);
-        aplicacion.setFechaFinRetiroLeche(fechaAplicacion.plusDays(medicamento.getDiasRetiroLeche()));
-        aplicacion.setFechaFinRetiroCarne(fechaAplicacion.plusDays(medicamento.getDiasRetiroCarne()));
+        aplicacion.setFechaFinRetiroLeche(fechaEfectiva.plusDays(medicamento.getDiasRetiroLeche()));
+        aplicacion.setFechaFinRetiroCarne(fechaEfectiva.plusDays(medicamento.getDiasRetiroCarne()));
 
         return aplicacionMedicamentoRepository.save(aplicacion);
     }
@@ -161,6 +169,30 @@ public class GanaderiaSanidadService {
             if (a.getFechaFinRetiroCarne() != null && a.getFechaFinRetiroCarne().isAfter(hoy.minusDays(1))) {
                 throw new RuntimeException("No se puede vender " + a.getAnimal().getArete()
                     + ": en período de retiro de carne por " + a.getMedicamento().getNombre() + " hasta " + a.getFechaFinRetiroCarne());
+            }
+        }
+    }
+
+    /**
+     * La leche de un animal en período de retiro puede ordeñarse para su
+     * bienestar, pero no puede entrar al tanque ni venderse. El único destino
+     * permitido para ese registro es DESCARTE, para mantener producción y
+     * trazabilidad sin contaminar el inventario comercial.
+     */
+    public void validarAptoParaTanqueOVentaLeche(Long animalId) {
+        LocalDate hoy = LocalDate.now();
+        for (AplicacionVacuna a : aplicacionVacunaRepository.findByAnimalIdOrderByFechaAplicacionDesc(animalId)) {
+            if (a.getFechaFinRetiroLeche() != null && !a.getFechaFinRetiroLeche().isBefore(hoy)) {
+                throw new IllegalStateException("La leche de " + a.getAnimal().getArete()
+                    + " está en retiro por " + a.getVacuna().getNombre() + " hasta " + a.getFechaFinRetiroLeche()
+                    + ". Registre el ordeño con destino DESCARTE.");
+            }
+        }
+        for (AplicacionMedicamento a : aplicacionMedicamentoRepository.findByAnimalIdOrderByFechaAplicacionDesc(animalId)) {
+            if (a.getFechaFinRetiroLeche() != null && !a.getFechaFinRetiroLeche().isBefore(hoy)) {
+                throw new IllegalStateException("La leche de " + a.getAnimal().getArete()
+                    + " está en retiro por " + a.getMedicamento().getNombre() + " hasta " + a.getFechaFinRetiroLeche()
+                    + ". Registre el ordeño con destino DESCARTE.");
             }
         }
     }

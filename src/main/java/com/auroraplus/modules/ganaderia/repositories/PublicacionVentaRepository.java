@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface PublicacionVentaRepository extends JpaRepository<PublicacionVenta, Long> {
     List<PublicacionVenta> findByEstado(String estado);
+    List<PublicacionVenta> findByTenantIdAndEstado(Long tenantId, String estado);
 }

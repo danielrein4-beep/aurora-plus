@@ -36,6 +36,10 @@ public class VentaLecheTanque {
     @Column(name = "moneda_pago", length = 20)
     private String monedaPago = "USD";
 
+    /** Movimiento de caja generado al confirmar el despacho; deja trazabilidad financiera. */
+    @Column(name = "movimiento_caja_id")
+    private Long movimientoCajaId;
+
     @Column(columnDefinition = "TEXT")
     private String notas;
 
@@ -58,6 +62,8 @@ public class VentaLecheTanque {
     public void setCompradorOPlanta(String compradorOPlanta) { this.compradorOPlanta = compradorOPlanta; }
     public String getMonedaPago() { return monedaPago; }
     public void setMonedaPago(String monedaPago) { this.monedaPago = monedaPago; }
+    public Long getMovimientoCajaId() { return movimientoCajaId; }
+    public void setMovimientoCajaId(Long movimientoCajaId) { this.movimientoCajaId = movimientoCajaId; }
     public String getNotas() { return notas; }
     public void setNotas(String notas) { this.notas = notas; }
     public LocalDateTime getCreatedAt() { return createdAt; }

@@ -1,12 +1,12 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
-import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.entities.AplicacionVacuna;
 import com.auroraplus.modules.ganaderia.entities.Vacuna;
 import com.auroraplus.modules.ganaderia.repositories.AplicacionVacunaRepository;
 import com.auroraplus.modules.ganaderia.repositories.VacunaRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaSanidadService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -37,11 +37,21 @@ public class VacunaController {
     // el propio cliente controla, permitiendo leer el catálogo de cualquier otro tenant.
     @GetMapping
     public List<Vacuna> listar() {
-        return vacunaRepository.findByTenantId(TenantContext.getCurrentTenant());
+        return vacunaRepository.findByTenantId(GanaderiaTenantAccess.requireTenant());
     }
 
     @PostMapping
-    public ResponseEntity<Vacuna> crear(@RequestParam Long tenantId, @RequestBody Vacuna vacuna) {
+    public ResponseEntity<Vacuna> crear(@RequestBody Vacuna vacuna) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        vacuna.setId(null);
+        if (vacuna.getNombre() == null || vacuna.getNombre().isBlank()) {
+            throw new IllegalArgumentException("La vacuna debe tener un nombre");
+        }
+        if (vacuna.getDiasRetiroLeche() == null || vacuna.getDiasRetiroLeche() < 0
+                || vacuna.getDiasRetiroCarne() == null || vacuna.getDiasRetiroCarne() < 0) {
+            throw new IllegalArgumentException("Los días de retiro no pueden ser negativos");
+        }
         vacuna.setTenantId(tenantId);
         return ResponseEntity.ok(vacunaRepository.save(vacuna));
     }
@@ -65,7 +75,9 @@ public class VacunaController {
     }
 
     @PostMapping("/aplicar")
-    public ResponseEntity<AplicacionVacuna> aplicar(@RequestParam Long tenantId, @RequestBody AplicacionRequest request) {
+    public ResponseEntity<AplicacionVacuna> aplicar(@RequestBody AplicacionRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return ResponseEntity.ok(ganaderiaSanidadService.aplicarVacuna(tenantId, request.animalId, request.vacunaId,
             request.fechaAplicacion, request.lote, request.veterinarioResponsable, request.costo));
     }
@@ -75,8 +87,9 @@ public class VacunaController {
      * VERIFICA ESTRICTAMENTE CADA ANIMALID CONTRA EL TENANTID PARA PREVENIR ACCESO CRUZADO (IDOR).
      */
     @PostMapping("/aplicar-lote")
-    public ResponseEntity<List<AplicacionVacuna>> aplicarLote(@RequestParam Long tenantId, @RequestBody AplicacionLoteRequest request) {
+    public ResponseEntity<List<AplicacionVacuna>> aplicarLote(@RequestBody AplicacionLoteRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         if (request.animalIds == null || request.animalIds.isEmpty()) {
             throw new RuntimeException("Debe seleccionar al menos un animal para aplicar el tratamiento");
         }
@@ -126,13 +139,17 @@ public class VacunaController {
 
     @GetMapping("/animal/{animalId}")
     public List<AplicacionVacuna> historialAnimal(@PathVariable Long animalId) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        animalRepository.findById(animalId).filter(a -> tenantId.equals(a.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         return aplicacionVacunaRepository.findByAnimalIdOrderByFechaAplicacionDesc(animalId);
     }
 
     @GetMapping("/refuerzos-pendientes")
-    public List<AplicacionVacuna> refuerzosPendientes(@RequestParam Long tenantId,
+    public List<AplicacionVacuna> refuerzosPendientes(
                                                         @RequestParam(required = false) LocalDate desde,
                                                         @RequestParam(required = false) LocalDate hasta) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         LocalDate d = desde != null ? desde : LocalDate.now();
         LocalDate h = hasta != null ? hasta : LocalDate.now().plusDays(30);
         return aplicacionVacunaRepository.findRefuerzosPendientes(tenantId, d, h);

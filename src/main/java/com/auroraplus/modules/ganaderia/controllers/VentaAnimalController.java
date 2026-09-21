@@ -2,12 +2,12 @@ package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
-import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.config.entities.LicenciaTenant;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.modules.ganaderia.entities.VentaAnimal;
 import com.auroraplus.modules.ganaderia.repositories.VentaAnimalRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaVentaService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import com.auroraplus.modules.ganaderia.services.VentaAnimalPdfService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -50,14 +50,14 @@ public class VentaAnimalController {
 
     @GetMapping
     public List<VentaAnimal> listar() {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return ventaAnimalRepository.findByTenantIdOrderByFechaDesc(tenantId);
     }
 
     @PostMapping
     public ResponseEntity<VentaAnimal> registrar(@RequestBody VentaRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         VentaAnimal venta = ganaderiaVentaService.registrarVenta(tenantId, request.numeroTicket, request.comprador,
             request.items, request.monedaPago, request.montoRecibido, request.claveIdempotencia);
         auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "VentaAnimal", venta.getId(), "Registró una venta — comprador: " + request.comprador);
@@ -66,9 +66,9 @@ public class VentaAnimalController {
 
     @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> pdf(@PathVariable Long id) throws Exception {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         VentaAnimal venta = ventaAnimalRepository.findById(id)
-            .filter(v -> tenantId != null && tenantId.equals(v.getTenantId()))
+            .filter(v -> tenantId.equals(v.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Venta no encontrada"));
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
         byte[] pdf = ventaAnimalPdfService.generarLiquidacionPdf(venta, licencia);

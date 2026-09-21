@@ -1,7 +1,7 @@
 package com.auroraplus.modules.ganaderia.services;
 
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
-import com.auroraplus.core.financiero.repositories.MovimientoCajaRepository;
+import com.auroraplus.core.financiero.services.MotorFinancieroService;
 import com.auroraplus.modules.ganaderia.entities.*;
 import com.auroraplus.modules.ganaderia.repositories.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,20 +28,22 @@ public class GanaderiaAlimentacionService {
     private PotreroRepository potreroRepository;
 
     @Autowired
-    private MovimientoCajaRepository movimientoCajaRepository;
-
-    private static final String MONEDA_GANADERIA = "USD";
+    private MotorFinancieroService motorFinancieroService;
 
     @Transactional
     public InsumoAlimentacion registrarEntrada(Long tenantId, Long insumoId, BigDecimal cantidad, BigDecimal costoTotal, String motivo) {
+        return registrarEntrada(tenantId, insumoId, cantidad, costoTotal, null, null, motivo);
+    }
+
+    @Transactional
+    public InsumoAlimentacion registrarEntrada(Long tenantId, Long insumoId, BigDecimal cantidad, BigDecimal costoTotal,
+                                                String monedaPago, BigDecimal montoPagado, String motivo) {
         if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("La cantidad debe ser mayor a cero");
         }
-        InsumoAlimentacion insumo = insumoAlimentacionRepository.findById(insumoId)
+        if (insumoId == null) throw new IllegalArgumentException("Debe indicar el insumo");
+        InsumoAlimentacion insumo = insumoAlimentacionRepository.findForUpdateByIdAndTenantId(insumoId, tenantId)
             .orElseThrow(() -> new RuntimeException("Insumo no encontrado"));
-        if (!insumo.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Insumo no pertenece a este tenant");
-        }
 
         BigDecimal stockAnterior = insumo.getStockActual();
         BigDecimal stockNuevo = stockAnterior.add(cantidad);
@@ -62,13 +64,15 @@ public class GanaderiaAlimentacionService {
         movimientoInsumoRepository.save(movimiento);
 
         if (costoTotal != null && costoTotal.compareTo(BigDecimal.ZERO) > 0) {
-            MovimientoCaja egreso = new MovimientoCaja();
-            egreso.setTenantId(tenantId);
-            egreso.setTipo(MovimientoCaja.TipoMovimiento.EGRESO);
-            egreso.setMonto(costoTotal);
-            egreso.setMoneda(MONEDA_GANADERIA);
-            egreso.setConcepto("Compra de insumo: " + insumo.getNombre() + " (" + cantidad + " " + insumo.getUnidadMedida() + ")");
-            movimientoCajaRepository.save(egreso);
+            String monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
+            String monedaFisica = monedaPago == null || monedaPago.isBlank() ? monedaBase : monedaPago.trim().toUpperCase();
+            if (!java.util.Set.of("USD", "VES", "COP").contains(monedaFisica)) {
+                throw new IllegalArgumentException("Moneda de pago no admitida: " + monedaFisica);
+            }
+            motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO,
+                costoTotal, monedaFisica, montoPagado,
+                "Compra de alimento: " + insumo.getNombre() + " (" + cantidad + " " + insumo.getUnidadMedida() + ")",
+                "GANADERIA", "InsumoAlimentacion", insumo.getId());
         }
 
         return insumo;
@@ -79,11 +83,11 @@ public class GanaderiaAlimentacionService {
         if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("La cantidad debe ser mayor a cero");
         }
-        InsumoAlimentacion insumo = insumoAlimentacionRepository.findById(insumoId)
-            .orElseThrow(() -> new RuntimeException("Insumo no encontrado"));
-        if (!insumo.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Insumo no pertenece a este tenant");
+        if (insumoId == null || potreroId == null) {
+            throw new IllegalArgumentException("Debe indicar insumo y potrero");
         }
+        InsumoAlimentacion insumo = insumoAlimentacionRepository.findForUpdateByIdAndTenantId(insumoId, tenantId)
+            .orElseThrow(() -> new RuntimeException("Insumo no encontrado"));
         Potrero potrero = potreroRepository.findById(potreroId)
             .orElseThrow(() -> new RuntimeException("Potrero no encontrado"));
         if (!potrero.getTenantId().equals(tenantId)) {

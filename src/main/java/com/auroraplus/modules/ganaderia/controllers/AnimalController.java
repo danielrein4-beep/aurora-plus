@@ -1,6 +1,5 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
-import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.core.reportes.ExcelExportService;
 import com.auroraplus.modules.ganaderia.entities.Animal;
@@ -12,6 +11,7 @@ import com.auroraplus.modules.ganaderia.repositories.PotreroRepository;
 import com.auroraplus.modules.ganaderia.services.AnimalQrService;
 import com.auroraplus.modules.ganaderia.services.GanaderiaMovimientoService;
 import com.auroraplus.modules.ganaderia.services.RentabilidadAnimalService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -55,7 +55,7 @@ public class AnimalController {
 
     @GetMapping
     public List<Animal> listar(@RequestParam(required = false) String estado) {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return estado != null
                 ? animalRepository.findByTenantIdAndEstado(tenantId, estado)
                 : animalRepository.findByTenantId(tenantId);
@@ -87,7 +87,7 @@ public class AnimalController {
      */
     @PostMapping
     public ResponseEntity<Animal> altaDirecta(@RequestBody AltaAnimalRequest request) {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         if (request.arete == null || request.arete.isBlank()) {
             throw new RuntimeException("El identificador del animal (arete/chip/QR) es obligatorio — es como usted lo distingue de los demás");
         }
@@ -141,7 +141,7 @@ public class AnimalController {
 
     @GetMapping("/export-excel")
     public ResponseEntity<byte[]> listarExcel(@RequestParam(required = false) String estado) throws Exception {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         List<Animal> animales = estado != null
                 ? animalRepository.findByTenantIdAndEstado(tenantId, estado)
                 : animalRepository.findByTenantId(tenantId);
@@ -164,20 +164,20 @@ public class AnimalController {
     /** Rentabilidad DIRECTA de un animal (costo de adquisición + sanidad aplicada, contra su venta). */
     @GetMapping("/{id}/rentabilidad")
     public RentabilidadAnimalService.RentabilidadAnimal rentabilidad(@PathVariable Long id) {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return rentabilidadAnimalService.calcular(tenantId, id);
     }
 
     /** Rentabilidad de todos los animales ya VENDIDOS. */
     @GetMapping("/rentabilidad-reporte")
     public List<RentabilidadAnimalService.RentabilidadAnimal> rentabilidadReporte() {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return rentabilidadAnimalService.calcularParaVendidos(tenantId);
     }
 
     @GetMapping("/rentabilidad-reporte/export-excel")
     public ResponseEntity<byte[]> rentabilidadReporteExcel() throws Exception {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         List<RentabilidadAnimalService.RentabilidadAnimal> reporte = rentabilidadAnimalService.calcularParaVendidos(tenantId);
         List<List<Object>> filas = new ArrayList<>();
         for (RentabilidadAnimalService.RentabilidadAnimal r : reporte) {
@@ -194,24 +194,24 @@ public class AnimalController {
 
     @GetMapping("/{id}")
     public Animal obtener(@PathVariable Long id) {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return animalRepository.findById(id)
-            .filter(a -> tenantId != null && tenantId.equals(a.getTenantId()))
+            .filter(a -> tenantId.equals(a.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
     }
 
     @GetMapping("/arete/{arete}")
     public Animal buscarPorArete(@PathVariable String arete) {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return animalRepository.findByAreteAndTenantId(arete, tenantId)
             .orElseThrow(() -> new RuntimeException("Animal no encontrado para el arete: " + arete));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Animal> actualizar(@PathVariable Long id, @RequestBody Animal datos) {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         Animal animal = animalRepository.findById(id)
-            .filter(a -> tenantId != null && tenantId.equals(a.getTenantId()))
+            .filter(a -> tenantId.equals(a.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         if (datos.getNombre() != null) animal.setNombre(datos.getNombre());
         if (datos.getRaza() != null) animal.setRaza(datos.getRaza());
@@ -231,16 +231,16 @@ public class AnimalController {
 
     @PostMapping("/{id}/mover")
     public ResponseEntity<MovimientoPotrero> mover(@PathVariable Long id, @RequestBody MoverRequest request) {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return ResponseEntity.ok(ganaderiaMovimientoService.moverAnimal(tenantId, id, request.potreroDestinoId, request.motivo));
     }
 
     @GetMapping("/{id}/kardex-ubicacion")
     public List<MovimientoPotrero> kardexUbicacion(@PathVariable Long id) {
         // Valida pertenencia al tenant antes de devolver el kardex
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         animalRepository.findById(id)
-            .filter(a -> tenantId != null && tenantId.equals(a.getTenantId()))
+            .filter(a -> tenantId.equals(a.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         return movimientoPotreroRepository.findByAnimalIdOrderByFechaRegistroDesc(id);
     }
@@ -248,9 +248,9 @@ public class AnimalController {
     /** Ficha con código QR del animal, para identificación rápida en el campo con el celular — estampa el hierro de la finca si está configurado. */
     @GetMapping(value = "/{id}/qr", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> fichaQr(@PathVariable Long id) throws Exception {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         Animal animal = animalRepository.findById(id)
-            .filter(a -> tenantId != null && tenantId.equals(a.getTenantId()))
+            .filter(a -> tenantId.equals(a.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         String hierroBase64 = licenciaTenantRepository.findByTenantId(tenantId).map(l -> l.getHierroBase64()).orElse(null);
         byte[] pdf = animalQrService.generarFichaQr(animal, hierroBase64);

@@ -2,6 +2,7 @@ package com.auroraplus.core.rrhh.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.rrhh.entities.PagoNomina;
 import com.auroraplus.core.rrhh.repositories.PagoNominaRepository;
 import com.auroraplus.core.rrhh.services.PagoNominaService;
@@ -48,23 +49,26 @@ public class PagoNominaController {
     }
 
     @PostMapping
-    public ResponseEntity<PagoNomina> pagar(@RequestParam Long tenantId, @RequestBody PagoRequest request) {
+    public ResponseEntity<PagoNomina> pagar(@RequestBody PagoRequest request) {
         // Pagar nómina mueve dinero real del negocio — se reserva al dueño,
         // igual que el resto de acciones financieras sensibles en Aurora+.
         AuthContext.exigirRol("DUENO_ADMIN");
+        Long tenantId = requireTenant();
         PagoNomina pago = pagoNominaService.registrarPago(tenantId, request.empleadoId, request.periodoDesde,
             request.periodoHasta, request.horasTrabajadas, request.monto, request.moneda);
         return ResponseEntity.ok(pago);
     }
 
     @GetMapping
-    public List<PagoNomina> listar(@RequestParam Long tenantId, @RequestParam(required = false) Long empleadoId) {
+    public List<PagoNomina> listar(@RequestParam(required = false) Long empleadoId) {
+        Long tenantId = requireTenant();
         if (empleadoId != null) return pagoNominaRepository.findByTenantIdAndEmpleadoIdOrderByFechaPagoDesc(tenantId, empleadoId);
         return pagoNominaRepository.findByTenantIdOrderByFechaPagoDesc(tenantId);
     }
 
     @GetMapping(value = "/{id}/recibo.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> recibo(@PathVariable Long id, @RequestParam Long tenantId) throws Exception {
+    public ResponseEntity<byte[]> recibo(@PathVariable Long id) throws Exception {
+        Long tenantId = requireTenant();
         PagoNomina pago = pagoNominaRepository.findById(id)
             .filter(p -> tenantId.equals(p.getTenantId()))
             .orElseThrow(() -> new RuntimeException("Pago no encontrado"));
@@ -74,5 +78,11 @@ public class PagoNominaController {
             .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"recibo-nomina-" + id + ".pdf\"")
             .contentType(MediaType.APPLICATION_PDF)
             .body(pdf);
+    }
+
+    private Long requireTenant() {
+        Long tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null || tenantId <= 0) throw new RuntimeException("Tenant no autenticado");
+        return tenantId;
     }
 }

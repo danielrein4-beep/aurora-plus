@@ -55,12 +55,10 @@ public class PotreroRotacionService {
         }
 
         List<Animal> aMover = (animalIds == null || animalIds.isEmpty())
-            ? animalRepository.findByPotreroIdAndEstado(origen.getId(), "ACTIVO")
+            ? animalRepository.findByPotreroIdAndEstadoAndTenantId(origen.getId(), "ACTIVO", tenantId)
             : animalIds.stream().map(id -> {
-                Animal a = animalRepository.findById(id).orElseThrow(() -> new RuntimeException("Animal no encontrado: " + id));
-                if (!a.getTenantId().equals(tenantId)) {
-                    throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
-                }
+                Animal a = animalRepository.findForUpdateByIdAndTenantId(id, tenantId)
+                    .orElseThrow(() -> new RuntimeException("Animal no encontrado: " + id));
                 if (a.getPotrero() == null || !a.getPotrero().getId().equals(origen.getId())) {
                     throw new RuntimeException("El animal " + a.getArete() + " no está actualmente en el potrero de origen");
                 }
@@ -72,12 +70,20 @@ public class PotreroRotacionService {
         }
 
         if (destino.getCapacidadAnimales() != null) {
-            long yaEnDestino = animalRepository.findByPotreroIdAndEstado(destino.getId(), "ACTIVO").size();
+            long yaEnDestino = animalRepository.findByPotreroIdAndEstadoAndTenantId(destino.getId(), "ACTIVO", tenantId).size();
             if (yaEnDestino + aMover.size() > destino.getCapacidadAnimales()) {
                 throw new RuntimeException("El potrero destino '" + destino.getNombre() + "' no tiene capacidad: "
                     + yaEnDestino + " actuales + " + aMover.size() + " a mover supera su capacidad de " + destino.getCapacidadAnimales());
             }
         }
+
+        // El destino ya superó las validaciones de descanso/capacidad. Se activa
+        // dentro de esta misma transacción antes de reutilizar el traslado
+        // individual, que correctamente rechaza mover ganado a un potrero en descanso.
+        destino.setEstado("ACTIVO");
+        destino.setFechaInicioUso(LocalDate.now());
+        destino.setFechaInicioDescanso(null);
+        potreroRepository.save(destino);
 
         // Reusa el servicio de traslado individual para que cada animal quede con su rastro en
         // el kárdex de ubicación (MovimientoPotrero) — una rotación masiva no debe ser invisible
@@ -87,20 +93,23 @@ public class PotreroRotacionService {
             ganaderiaMovimientoService.moverAnimal(tenantId, a.getId(), destino.getId(), motivo);
         }
 
-        origen.setEstado("EN_DESCANSO");
-        origen.setFechaInicioDescanso(LocalDate.now());
-        origen.setFechaInicioUso(null);
-        potreroRepository.save(origen);
-
-        destino.setEstado("ACTIVO");
-        destino.setFechaInicioUso(LocalDate.now());
-        destino.setFechaInicioDescanso(null);
-        potreroRepository.save(destino);
+        // Un movimiento parcial no deja el potrero vacío: marcarlo en descanso en
+        // ese caso sería engañoso y permitiría sobrepastoreo. Solo inicia el
+        // descanso cuando realmente salió todo el hato activo.
+        long animalesRestantesEnOrigen = animalRepository.findByPotreroIdAndEstadoAndTenantId(origen.getId(), "ACTIVO", tenantId).size();
+        if (animalesRestantesEnOrigen == 0) {
+            origen.setEstado("EN_DESCANSO");
+            origen.setFechaInicioDescanso(LocalDate.now());
+            origen.setFechaInicioUso(null);
+            potreroRepository.save(origen);
+        }
 
         Map<String, Object> resultado = new LinkedHashMap<>();
         resultado.put("potreroOrigen", origen);
         resultado.put("potreroDestino", destino);
         resultado.put("animalesMovidos", aMover.size());
+        resultado.put("origenEnDescanso", animalesRestantesEnOrigen == 0);
+        resultado.put("animalesRestantesEnOrigen", animalesRestantesEnOrigen);
         return resultado;
     }
 
@@ -116,8 +125,7 @@ public class PotreroRotacionService {
             throw new RuntimeException("El potrero '" + actual.getNombre() + "' no tiene ordenRotacion configurado");
         }
 
-        List<Potrero> candidatos = potreroRepository.findAll().stream()
-            .filter(p -> p.getTenantId().equals(tenantId))
+        List<Potrero> candidatos = potreroRepository.findByTenantId(tenantId).stream()
             .filter(p -> p.getOrdenRotacion() != null)
             .filter(p -> !p.getId().equals(actual.getId()))
             .filter(p -> "ACTIVO".equals(p.getEstado()) || p.isListoParaVolverAUso())
@@ -150,12 +158,10 @@ public class PotreroRotacionService {
     /** Sobrecarga (más animales de los que caben) y potreros en descanso que ya cumplieron su mínimo y podrían reactivarse. */
     public List<Map<String, Object>> obtenerAlertas(Long tenantId) {
         List<Map<String, Object>> alertas = new ArrayList<>();
-        List<Potrero> potreros = potreroRepository.findAll().stream()
-            .filter(p -> p.getTenantId().equals(tenantId))
-            .toList();
+        List<Potrero> potreros = potreroRepository.findByTenantId(tenantId);
 
         for (Potrero p : potreros) {
-            long cantidadActual = animalRepository.findByPotreroIdAndEstado(p.getId(), "ACTIVO").size();
+            long cantidadActual = animalRepository.findByPotreroIdAndEstadoAndTenantId(p.getId(), "ACTIVO", tenantId).size();
 
             if (p.getCapacidadAnimales() != null && cantidadActual > p.getCapacidadAnimales()) {
                 alertas.add(alerta(p, "SOBRECARGA",

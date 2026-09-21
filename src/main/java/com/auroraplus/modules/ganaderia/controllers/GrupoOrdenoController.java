@@ -1,11 +1,12 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
-import com.auroraplus.core.config.TenantContext;
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.GrupoOrdeno;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.GrupoOrdenoRepository;
 import com.auroraplus.modules.ganaderia.repositories.RegistroOrdenoRepository;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,19 +37,23 @@ public class GrupoOrdenoController {
     private RegistroOrdenoRepository registroOrdenoRepository;
 
     @GetMapping
-    public List<GrupoOrdeno> listar(@RequestParam Long tenantId) {
+    public List<GrupoOrdeno> listar() {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         return grupoOrdenoRepository.findByTenantIdOrderByOrdenRotacionAsc(tenantId);
     }
 
     @PostMapping
-    public ResponseEntity<GrupoOrdeno> crear(@RequestParam Long tenantId, @RequestBody GrupoOrdeno grupo) {
+    public ResponseEntity<GrupoOrdeno> crear(@RequestBody GrupoOrdeno grupo) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        grupo.setId(null);
         grupo.setTenantId(tenantId);
         return ResponseEntity.ok(grupoOrdenoRepository.save(grupo));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<GrupoOrdeno> actualizar(@PathVariable Long id, @RequestBody GrupoOrdeno datos) {
-        Long tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         GrupoOrdeno grupo = grupoOrdenoRepository.findById(id).orElseThrow(() -> new RuntimeException("Grupo de ordeño no encontrado"));
         if (tenantId == null || !grupo.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Grupo no pertenece a este tenant");
@@ -62,40 +67,40 @@ public class GrupoOrdenoController {
 
     /** Asigna un animal a este grupo (lo saca de cualquier otro grupo anterior). */
     @PostMapping("/{id}/asignar-animal")
-    public ResponseEntity<Animal> asignarAnimal(@PathVariable Long id, @RequestParam Long tenantId, @RequestParam Long animalId) {
+    public ResponseEntity<Animal> asignarAnimal(@PathVariable Long id, @RequestParam Long animalId) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         GrupoOrdeno grupo = grupoOrdenoRepository.findById(id).orElseThrow(() -> new RuntimeException("Grupo de ordeño no encontrado"));
         if (!grupo.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Grupo no pertenece a este tenant");
         }
-        Animal animal = animalRepository.findById(animalId).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (!animal.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
-        }
+        Animal animal = animalRepository.findById(animalId).filter(a -> tenantId.equals(a.getTenantId())).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
+        if (!"HEMBRA".equalsIgnoreCase(animal.getSexo()) || !"ORDEÑO".equals(animal.getEstadoProductivo()))
+            throw new RuntimeException("Solo se pueden asignar hembras activas en ordeño a un grupo");
         animal.setGrupoOrdeno(grupo);
         return ResponseEntity.ok(animalRepository.save(animal));
     }
 
     /** Quita al animal de cualquier grupo de ordeño (vuelve a ordeño individual sin agrupar). */
     @PostMapping("/quitar-animal")
-    public ResponseEntity<Animal> quitarAnimal(@RequestParam Long tenantId, @RequestParam Long animalId) {
-        Animal animal = animalRepository.findById(animalId).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (!animal.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
-        }
+    public ResponseEntity<Animal> quitarAnimal(@RequestParam Long animalId) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        Animal animal = animalRepository.findById(animalId).filter(a -> tenantId.equals(a.getTenantId())).orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         animal.setGrupoOrdeno(null);
         return ResponseEntity.ok(animalRepository.save(animal));
     }
 
     /** Cada grupo con sus animales y el total de litros que produjo en la fecha indicada (por defecto, hoy). */
     @GetMapping("/resumen")
-    public List<Map<String, Object>> resumen(@RequestParam Long tenantId, @RequestParam(required = false) LocalDate fecha) {
+    public List<Map<String, Object>> resumen(@RequestParam(required = false) LocalDate fecha) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         LocalDate fechaConsulta = fecha != null ? fecha : LocalDate.now();
         List<GrupoOrdeno> grupos = grupoOrdenoRepository.findByTenantIdOrderByOrdenRotacionAsc(tenantId);
         List<Map<String, Object>> resultado = new java.util.ArrayList<>();
 
         for (GrupoOrdeno grupo : grupos) {
-            List<Animal> animales = animalRepository.findByEstado("ACTIVO").stream()
-                .filter(a -> a.getTenantId().equals(tenantId))
+            List<Animal> animales = animalRepository.findByTenantIdAndEstado(tenantId, "ACTIVO").stream()
                 .filter(a -> a.getGrupoOrdeno() != null && a.getGrupoOrdeno().getId().equals(grupo.getId()))
                 .toList();
 

@@ -4,6 +4,7 @@ import com.auroraplus.modules.ganaderia.entities.AplicacionVacuna;
 import com.auroraplus.modules.ganaderia.entities.EventoReproductivo;
 import com.auroraplus.modules.ganaderia.repositories.AplicacionVacunaRepository;
 import com.auroraplus.modules.ganaderia.repositories.EventoReproductivoRepository;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.web.bind.annotation.*;
@@ -31,7 +32,9 @@ public class AlertasGanaderiaController {
     private EventoReproductivoRepository eventoReproductivoRepository;
 
     @GetMapping
-    public Map<String, Object> alertas(@RequestParam Long tenantId, @RequestParam(defaultValue = "15") int diasAdelante) {
+    public Map<String, Object> alertas(@RequestParam(defaultValue = "15") int diasAdelante) {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        if (diasAdelante < 1 || diasAdelante > 90) throw new IllegalArgumentException("El rango de alertas debe estar entre 1 y 90 días");
         LocalDate hoy = LocalDate.now();
         LocalDate limite = hoy.plusDays(diasAdelante);
 
@@ -45,12 +48,8 @@ public class AlertasGanaderiaController {
         // Partos próximos: se recorre el historial reproductivo de todas las hembras con
         // fechaProbableParto en rango — no hay una query dedicada por tenant, se filtra en memoria
         // porque el volumen de eventos reproductivos por hato es bajo (no amerita índice extra).
-        List<EventoReproductivo> todosLosEventos = eventoReproductivoRepository.findAll();
-        List<EventoReproductivo> partosProximos = todosLosEventos.stream()
-            .filter(e -> e.getTenantId().equals(tenantId))
-            .filter(e -> e.getFechaProbableParto() != null)
-            .filter(e -> !e.getFechaProbableParto().isBefore(hoy) && !e.getFechaProbableParto().isAfter(limite))
-            .collect(Collectors.toList());
+        List<EventoReproductivo> partosProximos = eventoReproductivoRepository
+            .findByTenantIdAndFechaProbablePartoBetween(tenantId, hoy, limite);
 
         Map<String, Object> resultado = new LinkedHashMap<>();
         resultado.put("fechaConsulta", hoy);

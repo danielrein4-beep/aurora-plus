@@ -4,6 +4,7 @@ import com.auroraplus.core.reportes.ExcelExportService;
 import com.auroraplus.modules.ganaderia.entities.GastoGanaderia;
 import com.auroraplus.modules.ganaderia.entities.VentaAnimal;
 import com.auroraplus.modules.ganaderia.services.GanaderiaFinanzasService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -27,13 +28,14 @@ public class GanaderiaFinanzasController {
 
     @GetMapping("/resumen-periodo")
     public GanaderiaFinanzasService.ResumenFinanciero resumenPeriodo(
-            @RequestParam Long tenantId, @RequestParam LocalDate desde, @RequestParam LocalDate hasta) {
-        return ganaderiaFinanzasService.resumenPeriodo(tenantId, desde, hasta);
+            @RequestParam LocalDate desde, @RequestParam LocalDate hasta) {
+        return ganaderiaFinanzasService.resumenPeriodo(GanaderiaTenantAccess.requireTenant(), desde, hasta);
     }
 
     @GetMapping("/resumen-periodo/export-excel")
     public ResponseEntity<byte[]> resumenPeriodoExcel(
-            @RequestParam Long tenantId, @RequestParam LocalDate desde, @RequestParam LocalDate hasta) throws Exception {
+            @RequestParam LocalDate desde, @RequestParam LocalDate hasta) throws Exception {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
         GanaderiaFinanzasService.ResumenFinanciero r = ganaderiaFinanzasService.resumenPeriodo(tenantId, desde, hasta);
 
         List<List<Object>> filasGastos = new ArrayList<>();
