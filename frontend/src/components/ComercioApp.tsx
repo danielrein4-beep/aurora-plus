@@ -380,7 +380,7 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
   const mostrarChecklist = pasosCompletados < 3;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       {/* ── ENCABEZADO ── */}
       <div className="rounded-3xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-teal-50 via-white to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -444,23 +444,23 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
         <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Hoy</h3>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Tarjeta héroe: Ventas de Hoy */}
-          <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl p-5 border-2 border-teal-200 dark:border-teal-500/30 shadow-sm flex flex-col justify-between">
+          <div className="lg:col-span-7 self-start bg-white dark:bg-slate-900 rounded-xl p-4 border border-teal-200 dark:border-teal-500/30 shadow-sm">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/30 px-2.5 py-0.5 rounded-full">
                   Ventas de Hoy
                 </span>
-                <div className="mt-2.5 font-['Outfit'] font-black text-3xl text-slate-900 dark:text-white truncate">
+                <div className="mt-2 font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white truncate">
                   {fmtMonedas(ventasHoy)}
                 </div>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-teal-500/10 flex items-center justify-center flex-shrink-0"><IconChart size={17} className="text-teal-600 dark:text-teal-400" /></div>
+              <div className="w-8 h-8 rounded-md bg-teal-500/10 flex items-center justify-center flex-shrink-0"><IconChart size={16} className="text-teal-600 dark:text-teal-400" /></div>
             </div>
             {Object.keys(ventasHoy).length === 0 && <p className="text-[11px] text-slate-400 mt-3">Aún no registras ventas hoy.</p>}
           </div>
 
           {/* Cinta secundaria: Utilidad Real + Requiere atención */}
-          <div className="lg:col-span-5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between gap-3">
+          <div className="lg:col-span-5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col justify-between gap-3">
             {esAdmin ? (
               <button type="button" onClick={onIrAUtilidad} className="text-left flex items-center justify-between gap-3 cursor-pointer group">
                 <div className="min-w-0">
@@ -509,27 +509,27 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
       {/* ── 2. ACCESOS RÁPIDOS — lo que se usa todos los días, un clic ── */}
       <section className="space-y-2.5">
         <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Accesos rápidos</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <button type="button" onClick={onIrAPos} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 hover:shadow-md transition-all cursor-pointer">
-            <div className="w-10 h-10 rounded-xl bg-teal-500/10 flex items-center justify-center"><IconCard size={19} className="text-teal-600 dark:text-teal-400" /></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <button type="button" onClick={onIrAPos} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl py-3 px-3.5 border border-slate-200 dark:border-slate-800 hover:border-teal-500/50 transition-colors cursor-pointer text-left">
+            <div className="w-8 h-8 rounded-md bg-teal-500/10 flex items-center justify-center"><IconCard size={16} className="text-teal-600 dark:text-teal-400" /></div>
             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Nueva Venta</span>
           </button>
-          <button type="button" onClick={onIrAInventario} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-cyan-500/50 hover:shadow-md transition-all cursor-pointer">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center"><IconBox size={19} className="text-cyan-600 dark:text-cyan-400" /></div>
+          <button type="button" onClick={onIrAInventario} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl py-3 px-3.5 border border-slate-200 dark:border-slate-800 hover:border-cyan-500/50 transition-colors cursor-pointer text-left">
+            <div className="w-8 h-8 rounded-md bg-cyan-500/10 flex items-center justify-center"><IconBox size={16} className="text-cyan-600 dark:text-cyan-400" /></div>
             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Inventario</span>
           </button>
-          <button type="button" onClick={onIrAProveedores} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-400 hover:shadow-md transition-all cursor-pointer">
-            <div className="w-10 h-10 rounded-xl bg-slate-500/10 flex items-center justify-center"><IconTruck size={19} className="text-slate-600 dark:text-slate-300" /></div>
+          <button type="button" onClick={onIrAProveedores} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl py-3 px-3.5 border border-slate-200 dark:border-slate-800 hover:border-slate-400 transition-colors cursor-pointer text-left">
+            <div className="w-8 h-8 rounded-md bg-slate-500/10 flex items-center justify-center"><IconTruck size={16} className="text-slate-600 dark:text-slate-300" /></div>
             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Registrar Compra</span>
           </button>
           {esAdmin ? (
-            <button type="button" onClick={onIrAUtilidad} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-emerald-500/50 hover:shadow-md transition-all cursor-pointer">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center"><IconCoins size={19} className="text-emerald-600 dark:text-emerald-400" /></div>
+            <button type="button" onClick={onIrAUtilidad} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl py-3 px-3.5 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-colors cursor-pointer text-left">
+              <div className="w-8 h-8 rounded-md bg-emerald-500/10 flex items-center justify-center"><IconCoins size={16} className="text-emerald-600 dark:text-emerald-400" /></div>
               <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Ver Utilidad</span>
             </button>
           ) : (
-            <button type="button" onClick={onIrAInventario} className="flex flex-col items-center justify-center gap-2.5 bg-white dark:bg-slate-900 rounded-2xl py-5 px-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-400 hover:shadow-md transition-all cursor-pointer">
-              <div className="w-10 h-10 rounded-xl bg-slate-500/10 flex items-center justify-center"><IconBank size={19} className="text-slate-600 dark:text-slate-300" /></div>
+            <button type="button" onClick={onIrAInventario} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl py-3 px-3.5 border border-slate-200 dark:border-slate-800 hover:border-slate-400 transition-colors cursor-pointer text-left">
+              <div className="w-8 h-8 rounded-md bg-slate-500/10 flex items-center justify-center"><IconBank size={16} className="text-slate-600 dark:text-slate-300" /></div>
               <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{productos.length} Productos</span>
             </button>
           )}
