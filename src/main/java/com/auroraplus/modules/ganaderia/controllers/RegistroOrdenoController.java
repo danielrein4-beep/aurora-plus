@@ -1,6 +1,7 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.services.MotorFinancieroService;
 import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
@@ -47,6 +48,9 @@ public class RegistroOrdenoController {
 
     @Autowired
     private GanaderiaSanidadService ganaderiaSanidadService;
+
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
 
     public static class RegistroRequest {
         public Long animalId;
@@ -130,6 +134,9 @@ public class RegistroOrdenoController {
             tanque.setUltimaActualizacion(LocalDateTime.now());
             tanqueLecheRepository.save(tanque);
         }
+
+        auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "RegistroOrdeno", guardado.getId(),
+            "Registró " + guardado.getCantidadLitros() + " L para " + animal.getArete() + " el " + fecha + " turno " + turno + "; destino: " + dest);
 
         return ResponseEntity.ok(guardado);
     }

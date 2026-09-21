@@ -3393,6 +3393,29 @@ export interface PotreroGanaderia {
   fechaInicioUso?: string;
 }
 
+/** Ubicación compartida de la finca. El tenant se resuelve exclusivamente desde JWT. */
+export interface FincaGanaderiaApi {
+  id: number;
+  nombre: string;
+  latitud: number;
+  longitud: number;
+  puntosInteresJson: string;
+  actualizadoEn: string;
+}
+
+export function obtenerFincaGanaderia(): Promise<FincaGanaderiaApi | undefined> {
+  return request("/api/ganaderia/finca");
+}
+
+export function guardarFincaGanaderia(datos: {
+  nombre: string;
+  latitud: number;
+  longitud: number;
+  puntosInteresJson: string;
+}): Promise<FincaGanaderiaApi> {
+  return request("/api/ganaderia/finca", { method: "PUT", body: JSON.stringify(datos) });
+}
+
 export interface AnimalGanaderia {
   id: number;
   tenantId: number;

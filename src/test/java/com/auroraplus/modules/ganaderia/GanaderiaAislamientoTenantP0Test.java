@@ -5,6 +5,7 @@ import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.ganaderia.controllers.AnimalController;
 import com.auroraplus.modules.ganaderia.controllers.BajaAnimalController;
 import com.auroraplus.modules.ganaderia.controllers.CompraAnimalController;
+import com.auroraplus.modules.ganaderia.controllers.FincaGanaderiaController;
 import com.auroraplus.modules.ganaderia.controllers.VentaAnimalController;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.BajaAnimal;
@@ -13,6 +14,7 @@ import com.auroraplus.modules.ganaderia.entities.VentaAnimal;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.BajaAnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.CompraAnimalRepository;
+import com.auroraplus.modules.ganaderia.repositories.FincaGanaderiaRepository;
 import com.auroraplus.modules.ganaderia.repositories.ProveedorGanaderiaRepository;
 import com.auroraplus.modules.ganaderia.repositories.VentaAnimalRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaCompraService;
@@ -56,12 +58,14 @@ class GanaderiaAislamientoTenantP0Test {
     @Autowired private BajaAnimalController bajaAnimalController;
     @Autowired private CompraAnimalController compraAnimalController;
     @Autowired private VentaAnimalController ventaAnimalController;
+    @Autowired private FincaGanaderiaController fincaGanaderiaController;
 
     @Autowired private AnimalRepository animalRepository;
     @Autowired private BajaAnimalRepository bajaAnimalRepository;
     @Autowired private CompraAnimalRepository compraAnimalRepository;
     @Autowired private VentaAnimalRepository ventaAnimalRepository;
     @Autowired private ProveedorGanaderiaRepository proveedorGanaderiaRepository;
+    @Autowired private FincaGanaderiaRepository fincaGanaderiaRepository;
 
     @AfterEach
     void limpiarContexto() {
@@ -90,6 +94,36 @@ class GanaderiaAislamientoTenantP0Test {
         p.setNombre(nombre);
         p.setActivo(true);
         return proveedorGanaderiaRepository.save(p);
+    }
+
+    @Test
+    void fincaGeorreferenciadaNuncaSeComparteEntreTenants() {
+        long tenantA = 88991L, tenantB = 88992L;
+        AuthContext.set("dueno-a", "DUENO_ADMIN");
+        TenantContext.setCurrentTenant(tenantA);
+        FincaGanaderiaController.FincaRequest fincaA = new FincaGanaderiaController.FincaRequest();
+        fincaA.nombre = "Finca La Esperanza";
+        fincaA.latitud = new BigDecimal("8.1234567");
+        fincaA.longitud = new BigDecimal("-67.1234567");
+        fincaA.puntosInteresJson = "[{\"id\":\"manga-a\",\"nombre\":\"Manga A\"}]";
+        fincaGanaderiaController.guardar(fincaA);
+
+        TenantContext.setCurrentTenant(tenantB);
+        assertEquals(204, fincaGanaderiaController.obtener().getStatusCode().value(),
+            "Un tenant vecino no debe ver siquiera el punto GPS de la finca A");
+        assertTrue(fincaGanaderiaRepository.findByTenantId(tenantB).isEmpty());
+
+        AuthContext.set("dueno-b", "DUENO_ADMIN");
+        FincaGanaderiaController.FincaRequest fincaB = new FincaGanaderiaController.FincaRequest();
+        fincaB.nombre = "Finca B";
+        fincaB.latitud = new BigDecimal("7.0000000");
+        fincaB.longitud = new BigDecimal("-66.0000000");
+        fincaB.puntosInteresJson = "[]";
+        fincaGanaderiaController.guardar(fincaB);
+
+        TenantContext.setCurrentTenant(tenantA);
+        assertEquals("Finca La Esperanza", fincaGanaderiaController.obtener().getBody().getNombre());
+        assertEquals(new BigDecimal("8.1234567"), fincaGanaderiaController.obtener().getBody().getLatitud());
     }
 
     // ─────────────────────────────────────────────────────────────────

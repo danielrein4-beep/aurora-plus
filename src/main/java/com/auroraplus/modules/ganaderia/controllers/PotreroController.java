@@ -1,6 +1,7 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.Potrero;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
@@ -33,6 +34,9 @@ public class PotreroController {
     @Autowired
     private ReferenciaPastoreoService referenciaPastoreoService;
 
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
+
     @GetMapping
     public List<Potrero> listar() {
         return potreroRepository.findByTenantId(GanaderiaTenantAccess.requireTenant());
@@ -54,6 +58,7 @@ public class PotreroController {
      */
     @PutMapping("/{id}/posicion")
     public ResponseEntity<Potrero> actualizarPosicion(@PathVariable Long id, @RequestBody PosicionRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
         Potrero potrero = potreroRepository.findById(id).orElseThrow(() -> new RuntimeException("Potrero no encontrado"));
         if (!potrero.getTenantId().equals(tenantId)) {
@@ -76,10 +81,15 @@ public class PotreroController {
      */
     @PostMapping
     public ResponseEntity<Potrero> crear(@RequestBody Potrero potrero) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
+        potrero.setId(null);
         potrero.setTenantId(tenantId);
         aplicarRecomendacionSiFalta(tenantId, potrero);
-        return ResponseEntity.ok(potreroRepository.save(potrero));
+        Potrero guardado = potreroRepository.save(potrero);
+        auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "Potrero", guardado.getId(),
+            "Creó el potrero " + guardado.getNombre() + " con capacidad " + guardado.getCapacidadAnimales() + " animales");
+        return ResponseEntity.ok(guardado);
     }
 
     private void aplicarRecomendacionSiFalta(Long tenantId, Potrero potrero) {
@@ -92,6 +102,7 @@ public class PotreroController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Potrero> actualizar(@PathVariable Long id, @RequestBody Potrero datos) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
         Potrero potrero = potreroRepository.findById(id).orElseThrow(() -> new RuntimeException("Potrero no encontrado"));
         if (!potrero.getTenantId().equals(tenantId)) {
@@ -133,7 +144,10 @@ public class PotreroController {
         if (datos.getEstado() != null) {
             potrero.setEstado(datos.getEstado());
         }
-        return ResponseEntity.ok(potreroRepository.save(potrero));
+        Potrero guardado = potreroRepository.save(potrero);
+        auditoriaService.registrar(tenantId, "GANADERIA", "EDITAR", "Potrero", guardado.getId(),
+            "Actualizó el potrero " + guardado.getNombre() + "; estado: " + guardado.getEstado());
+        return ResponseEntity.ok(guardado);
     }
 
     /** Forma rápida de fijar el orden de rotación de todos los potreros de una vez, sin editar uno por uno. */
@@ -152,8 +166,14 @@ public class PotreroController {
     /** Mueve el hato del potrero {id} al destino indicado: origen queda EN_DESCANSO, destino queda ACTIVO. */
     @PostMapping("/{id}/rotar")
     public Map<String, Object> rotar(@PathVariable Long id, @RequestBody RotarRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
-        return potreroRotacionService.rotar(tenantId, id, request.potreroDestinoId, request.animalIds);
+        Map<String, Object> resultado = potreroRotacionService.rotar(tenantId, id, request.potreroDestinoId, request.animalIds);
+        Potrero origen = (Potrero) resultado.get("potreroOrigen");
+        Potrero destino = (Potrero) resultado.get("potreroDestino");
+        auditoriaService.registrar(tenantId, "GANADERIA", "EDITAR", "RotacionPotrero", origen.getId(),
+            "Rotó " + resultado.get("animalesMovidos") + " animales de " + origen.getNombre() + " a " + destino.getNombre() + "; origen en descanso: " + resultado.get("origenEnDescanso"));
+        return resultado;
     }
 
     /** Según el ordenRotacion configurado, cuál potrero sigue después de este en el ciclo. */

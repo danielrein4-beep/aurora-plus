@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import type { PotreroGanaderia, AnimalGanaderia } from "../api";
+import {
+  guardarFincaGanaderia,
+  obtenerFincaGanaderia,
+  type PotreroGanaderia,
+  type AnimalGanaderia,
+} from "../api";
 import { useAuth } from "../context/AuthContext";
 import { IconEdit } from "../Icons";
 
@@ -79,31 +84,9 @@ export default function GanaderiaMapa({
   const [busquedaLugar, setBusquedaLugar] = useState("");
   const [busquedaError, setBusquedaError] = useState<string | null>(null);
 
-  // ── ESTADO DE CONFIGURACIÓN REAL DE LA FINCA (PERSISTIDA POR TENANT) ──
-  const [fincaConfig, setFincaConfig] = useState<FincaConfig>(() => {
-    try {
-      const raw = localStorage.getItem(`aurora_finca_config_${effectiveTenantId}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.coords && parsed.nombre) {
-          return { nombre: parsed.nombre, coords: parsed.coords, guardada: true };
-        }
-      }
-    } catch {}
-    return { nombre: "", coords: PANORAMA_INICIAL, guardada: false };
-  });
-
-  // ── PUNTOS DE REFERENCIA / INSTALACIONES (CREADOS POR EL USUARIO) ──
-  const [puntosInteres, setPuntosInteres] = useState<PuntoInteresFinca[]>(() => {
-    try {
-      const raw = localStorage.getItem(`aurora_finca_puntos_${effectiveTenantId}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
-  });
+  // ── CONFIGURACIÓN CANÓNICA: backend por tenant, nunca localStorage ──
+  const [fincaConfig, setFincaConfig] = useState<FincaConfig>({ nombre: "", coords: PANORAMA_INICIAL, guardada: false });
+  const [puntosInteres, setPuntosInteres] = useState<PuntoInteresFinca[]>([]);
 
   // Modos interactivos
   const [modoFijarFinca, setModoFijarFinca] = useState(false);
@@ -128,6 +111,24 @@ export default function GanaderiaMapa({
   const [verticesTrazado, setVerticesTrazado] = useState<[number, number][]>([]);
 
   const hectareasTrazadas = calcularHectareasPoligono(verticesTrazado);
+
+  useEffect(() => {
+    let activo = true;
+    obtenerFincaGanaderia().then((finca) => {
+      if (!activo || !finca) return;
+      let puntos: PuntoInteresFinca[] = [];
+      try {
+        const parsed = JSON.parse(finca.puntosInteresJson || "[]");
+        if (Array.isArray(parsed)) puntos = parsed;
+      } catch { /* una configuración corrupta no inutiliza el mapa */ }
+      setFincaConfig({ nombre: finca.nombre, coords: [Number(finca.latitud), Number(finca.longitud)], guardada: true });
+      setPuntosInteres(puntos);
+      setNombreFincaInput(finca.nombre);
+    }).catch(() => {
+      if (activo) setBusquedaError("No se pudo cargar la configuración compartida de la finca.");
+    });
+    return () => { activo = false; };
+  }, []);
 
   // Inicializar mapa Leaflet
   useEffect(() => {
@@ -364,16 +365,10 @@ export default function GanaderiaMapa({
 
       if (pot.poligono && pot.poligono.length >= 3) {
         coords = pot.poligono;
-      } else if (fincaConfig.guardada) {
-        const base = fincaConfig.coords;
-        coords = [
-          [base[0] + (idx * 0.002) + 0.001, base[1] + (idx * 0.002) - 0.001],
-          [base[0] + (idx * 0.002) + 0.001, base[1] + (idx * 0.002) + 0.002],
-          [base[0] + (idx * 0.002) - 0.0015, base[1] + (idx * 0.002) + 0.002],
-          [base[0] + (idx * 0.002) - 0.0015, base[1] + (idx * 0.002) - 0.001],
-        ];
       }
-
+      // Nunca dibujar áreas inventadas alrededor de la finca: si no hay
+      // polígono real, el potrero queda visible en la lista como pendiente de
+      // georreferenciar, pero no aparenta una ubicación precisa en el mapa.
       if (!coords) return;
 
       const enDescanso = pot.estado === "EN_DESCANSO";
@@ -534,7 +529,7 @@ export default function GanaderiaMapa({
   };
 
   // Guardar ubicación y nombre de la finca para este tenant
-  const handleGuardarUbicacionFinca = (e?: React.FormEvent) => {
+  const handleGuardarUbicacionFinca = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!coordsTempFinca) return;
 
@@ -545,10 +540,18 @@ export default function GanaderiaMapa({
       guardada: true,
     };
 
-    setFincaConfig(nuevaConfig);
     try {
-      localStorage.setItem(`aurora_finca_config_${effectiveTenantId}`, JSON.stringify(nuevaConfig));
-    } catch {}
+      const guardada = await guardarFincaGanaderia({
+        nombre: nuevaConfig.nombre,
+        latitud: nuevaConfig.coords[0],
+        longitud: nuevaConfig.coords[1],
+        puntosInteresJson: JSON.stringify(puntosInteres),
+      });
+      setFincaConfig({ nombre: guardada.nombre, coords: [Number(guardada.latitud), Number(guardada.longitud)], guardada: true });
+    } catch {
+      setBusquedaError("No se pudo guardar la ubicación de la finca. Verifica la conexión e inténtalo de nuevo.");
+      return;
+    }
 
     setModalGuardarFinca(false);
     setCoordsTempFinca(null);
@@ -560,7 +563,7 @@ export default function GanaderiaMapa({
   };
 
   // Guardar un nuevo punto de referencia / instalación
-  const handleGuardarNuevoPunto = (e: React.FormEvent) => {
+  const handleGuardarNuevoPunto = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevoPuntoForm.coords || !nuevoPuntoForm.nombre.trim()) return;
 
@@ -571,23 +574,32 @@ export default function GanaderiaMapa({
       coords: nuevoPuntoForm.coords,
     };
 
+    if (!fincaConfig.guardada) {
+      setBusquedaError("Primero fija y guarda la ubicación de la finca.");
+      return;
+    }
     const actualizados = [...puntosInteres, nuevo];
-    setPuntosInteres(actualizados);
     try {
-      localStorage.setItem(`aurora_finca_puntos_${effectiveTenantId}`, JSON.stringify(actualizados));
-    } catch {}
+      await guardarFincaGanaderia({ nombre: fincaConfig.nombre, latitud: fincaConfig.coords[0], longitud: fincaConfig.coords[1], puntosInteresJson: JSON.stringify(actualizados) });
+      setPuntosInteres(actualizados);
+    } catch {
+      setBusquedaError("No se pudo guardar la instalación de la finca.");
+      return;
+    }
 
     setModalNuevoPunto(false);
     setNuevoPuntoForm({ nombre: "", tipo: "ORDENO", coords: null });
   };
 
   // Eliminar un punto de referencia
-  const handleEliminarPunto = (id: string) => {
+  const handleEliminarPunto = async (id: string) => {
     const filtrados = puntosInteres.filter(p => p.id !== id);
-    setPuntosInteres(filtrados);
     try {
-      localStorage.setItem(`aurora_finca_puntos_${effectiveTenantId}`, JSON.stringify(filtrados));
-    } catch {}
+      await guardarFincaGanaderia({ nombre: fincaConfig.nombre, latitud: fincaConfig.coords[0], longitud: fincaConfig.coords[1], puntosInteresJson: JSON.stringify(filtrados) });
+      setPuntosInteres(filtrados);
+    } catch {
+      setBusquedaError("No se pudo eliminar la instalación de la finca.");
+    }
   };
 
   // Buscador funcional: analiza coordenadas o busca potreros/localidades

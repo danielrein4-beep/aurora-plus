@@ -1,6 +1,8 @@
 package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
+import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.reportes.ExcelExportService;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.MovimientoPotrero;
@@ -51,6 +53,9 @@ public class AnimalController {
     @Autowired
     private LicenciaTenantRepository licenciaTenantRepository;
 
+    @Autowired
+    private RegistroAuditoriaService auditoriaService;
+
     // ── P0: tenant NUNCA viene por query/body/header — siempre de TenantContext/JWT ──
 
     @GetMapping
@@ -87,6 +92,7 @@ public class AnimalController {
      */
     @PostMapping
     public ResponseEntity<Animal> altaDirecta(@RequestBody AltaAnimalRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
         if (request.arete == null || request.arete.isBlank()) {
             throw new RuntimeException("El identificador del animal (arete/chip/QR) es obligatorio — es como usted lo distingue de los demás");
@@ -136,7 +142,10 @@ public class AnimalController {
             animal.setPotrero(potrero);
         }
 
-        return ResponseEntity.ok(animalRepository.save(animal));
+        Animal guardado = animalRepository.save(animal);
+        auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "Animal", guardado.getId(),
+            "Dio de alta el animal " + guardado.getArete() + (guardado.getPotrero() == null ? " sin potrero asignado" : " en el potrero " + guardado.getPotrero().getNombre()));
+        return ResponseEntity.ok(guardado);
     }
 
     @GetMapping("/export-excel")
@@ -209,6 +218,7 @@ public class AnimalController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Animal> actualizar(@PathVariable Long id, @RequestBody Animal datos) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
         Animal animal = animalRepository.findById(id)
             .filter(a -> tenantId.equals(a.getTenantId()))
@@ -221,7 +231,9 @@ public class AnimalController {
         if (datos.getLote() != null) animal.setLote(datos.getLote());
         if (datos.getEstadoReproductivo() != null) animal.setEstadoReproductivo(datos.getEstadoReproductivo());
         if (datos.getEstadoProductivo() != null) animal.setEstadoProductivo(datos.getEstadoProductivo());
-        return ResponseEntity.ok(animalRepository.save(animal));
+        Animal guardado = animalRepository.save(animal);
+        auditoriaService.registrar(tenantId, "GANADERIA", "EDITAR", "Animal", guardado.getId(), "Actualizó la ficha del animal " + guardado.getArete());
+        return ResponseEntity.ok(guardado);
     }
 
     public static class MoverRequest {
@@ -231,8 +243,12 @@ public class AnimalController {
 
     @PostMapping("/{id}/mover")
     public ResponseEntity<MovimientoPotrero> mover(@PathVariable Long id, @RequestBody MoverRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
-        return ResponseEntity.ok(ganaderiaMovimientoService.moverAnimal(tenantId, id, request.potreroDestinoId, request.motivo));
+        MovimientoPotrero movimiento = ganaderiaMovimientoService.moverAnimal(tenantId, id, request.potreroDestinoId, request.motivo);
+        auditoriaService.registrar(tenantId, "GANADERIA", "EDITAR", "MovimientoPotrero", movimiento.getId(),
+            "Trasladó " + movimiento.getAnimal().getArete() + " de " + (movimiento.getPotreroOrigen() == null ? "sin potrero" : movimiento.getPotreroOrigen().getNombre()) + " a " + movimiento.getPotreroDestino().getNombre());
+        return ResponseEntity.ok(movimiento);
     }
 
     @GetMapping("/{id}/kardex-ubicacion")
