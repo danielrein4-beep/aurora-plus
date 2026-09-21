@@ -66,6 +66,18 @@ public class DespachoConstruccionEntity {
     @Column(name = "fecha_hora_llegada")
     private LocalDateTime fechaHoraLlegada;
 
+    @Column(name = "moneda", length = 10)
+    private String moneda = "USD";
+
+    @Column(name = "tasa_cambio_congelada", precision = 18, scale = 6)
+    private BigDecimal tasaCambioCongelada;
+
+    @Column(name = "costo_flete_monto", precision = 18, scale = 4)
+    private BigDecimal costoFleteMonto;
+
+    @Column(name = "costo_flete_moneda", length = 10)
+    private String costoFleteMoneda;
+
     @Column(name = "observaciones", columnDefinition = "TEXT")
     private String observaciones;
 
@@ -134,4 +146,15 @@ public class DespachoConstruccionEntity {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public String getMoneda() { return moneda; }
+    public void setMoneda(String moneda) { this.moneda = moneda; }
+
+    public BigDecimal getTasaCambioCongelada() { return tasaCambioCongelada; }
+    public void setTasaCambioCongelada(BigDecimal tasaCambioCongelada) { this.tasaCambioCongelada = tasaCambioCongelada; }
+
+    public BigDecimal getCostoFleteMonto() { return costoFleteMonto; }
+    public void setCostoFleteMonto(BigDecimal costoFleteMonto) { this.costoFleteMonto = costoFleteMonto; }
+
+    public String getCostoFleteMoneda() { return costoFleteMoneda; }
+    public void setCostoFleteMoneda(String costoFleteMoneda) { this.costoFleteMoneda = costoFleteMoneda; }
 }

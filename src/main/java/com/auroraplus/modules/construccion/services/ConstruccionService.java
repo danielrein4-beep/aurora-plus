@@ -107,6 +107,9 @@ public class ConstruccionService {
     @Autowired
     private DespachoConstruccionRepository despachoRepository;
 
+    @Autowired(required = false)
+    private com.auroraplus.core.financiero.repositories.TasaCambioRepository tasaCambioRepository;
+
     @Autowired
     private MaquinariaConstruccionRepository maquinariaRepository;
 
@@ -999,8 +1002,9 @@ public class ConstruccionService {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
         }
-        proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
+        ProyectoConstruccionEntity proy = proyectoRepository.findByTenantIdAndId(tenantId, proyectoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto no encontrado para este tenant"));
+        validarProyectoOperable(proy);
 
         if (despacho.getGuiaNumero() == null || despacho.getGuiaNumero().trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número de guía de despacho es obligatorio");
@@ -1021,9 +1025,28 @@ public class ConstruccionService {
             despacho.setUnidadMedida("unidad");
         }
 
+        // Validación de existencia y disponibilidad previa del insumo
         if (despacho.getInsumoId() != null) {
-            insumoRepository.findByTenantIdAndId(tenantId, despacho.getInsumoId())
+            InsumoConstruccionEntity insumo = insumoRepository.findByTenantIdAndId(tenantId, despacho.getInsumoId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El insumo asociado no existe o pertenece a otro tenant"));
+
+            BigDecimal stockDisp = insumo.getStockActual() != null ? insumo.getStockActual() : BigDecimal.ZERO;
+            if (stockDisp.compareTo(despacho.getCantidad()) < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Stock insuficiente para el insumo '" + insumo.getNombre() + "'. Stock disponible: " +
+                        stockDisp + " " + insumo.getUnidad() + ", solicitado en despacho: " + despacho.getCantidad());
+            }
+        }
+
+        // Moneda explícita y tasa congelada
+        if (despacho.getMoneda() == null || despacho.getMoneda().trim().isEmpty()) {
+            despacho.setMoneda("USD");
+        } else {
+            despacho.setMoneda(despacho.getMoneda().trim().toUpperCase());
+        }
+        if (despacho.getTasaCambioCongelada() == null && tasaCambioRepository != null) {
+            tasaCambioRepository.findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, "USD", "VES")
+                    .ifPresent(tc -> despacho.setTasaCambioCongelada(tc.getTasa()));
         }
 
         if (despacho.getEstado() == null || despacho.getEstado().trim().isEmpty()) {
@@ -1032,7 +1055,7 @@ public class ConstruccionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de despacho inválido: " + despacho.getEstado());
         }
 
-        // Idempotencia
+        // Idempotencia: claim ANTES de aplicar descuento de inventario
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
                 ? hashPayload("DESPACHO|" + proyectoId, despacho,
                         "id", "tenantId", "proyectoId", "createdAt")
@@ -1055,6 +1078,18 @@ public class ConstruccionService {
         }
 
         try {
+            // Descuento atómico de stock (si el despacho vincula un insumo)
+            if (despacho.getInsumoId() != null) {
+                int filasAfectadas = insumoRepository.descontarStockAtomico(tenantId, despacho.getInsumoId(), despacho.getCantidad());
+                if (filasAfectadas == 0) {
+                    InsumoConstruccionEntity insumo = insumoRepository.findByTenantIdAndId(tenantId, despacho.getInsumoId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Insumo no encontrado"));
+                    BigDecimal stockActual = insumo.getStockActual() != null ? insumo.getStockActual() : BigDecimal.ZERO;
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Stock insuficiente: no se permite stock negativo (stock actual: " + stockActual + ", solicitado: " + despacho.getCantidad() + ")");
+                }
+            }
+
             despacho.setId(null);
             despacho.setTenantId(tenantId);
             despacho.setProyectoId(proyectoId);
@@ -1084,6 +1119,20 @@ public class ConstruccionService {
 
         DespachoConstruccionEntity despacho = despachoRepository.findByTenantIdAndId(tenantId, despachoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Despacho no encontrado para este tenant"));
+
+        String estadoAnterior = despacho.getEstado() != null ? despacho.getEstado().trim().toUpperCase() : "";
+        String estadoNuevoNorm = nuevoEstado.trim().toUpperCase();
+
+        // Si el despacho se rechaza o anula, se reincorpora el stock al insumo de obra
+        if (("RECHAZADO".equals(estadoNuevoNorm) || "ANULADO".equals(estadoNuevoNorm))
+                && !"RECHAZADO".equals(estadoAnterior) && !"ANULADO".equals(estadoAnterior)
+                && despacho.getInsumoId() != null) {
+            insumoRepository.findByTenantIdAndId(tenantId, despacho.getInsumoId()).ifPresent(ins -> {
+                BigDecimal actual = ins.getStockActual() != null ? ins.getStockActual() : BigDecimal.ZERO;
+                ins.setStockActual(actual.add(despacho.getCantidad()));
+                insumoRepository.save(ins);
+            });
+        }
 
         despacho.setEstado(nuevoEstado.trim().toUpperCase());
         if (observaciones != null && !observaciones.trim().isEmpty()) {

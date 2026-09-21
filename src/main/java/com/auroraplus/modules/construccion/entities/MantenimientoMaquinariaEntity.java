@@ -40,6 +40,15 @@ public class MantenimientoMaquinariaEntity {
     @Column(name = "costo_total_usd", precision = 12, scale = 2)
     private BigDecimal costoTotalUsd = BigDecimal.ZERO;
 
+    @Column(name = "costo_monto", precision = 18, scale = 4)
+    private BigDecimal costoMonto;
+
+    @Column(name = "costo_moneda", length = 10)
+    private String costoMoneda = "USD";
+
+    @Column(name = "tasa_cambio_congelada", precision = 18, scale = 6)
+    private BigDecimal tasaCambioCongelada;
+
     @Column(name = "repuestos_utilizados", columnDefinition = "TEXT")
     private String repuestosUtilizados;
 
@@ -81,4 +90,20 @@ public class MantenimientoMaquinariaEntity {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public BigDecimal getCostoMonto() {
+        if (costoMonto != null) return costoMonto;
+        return costoTotalUsd;
+    }
+    public void setCostoMonto(BigDecimal costoMonto) {
+        this.costoMonto = costoMonto;
+        if (costoTotalUsd == null || BigDecimal.ZERO.compareTo(costoTotalUsd) == 0) {
+            this.costoTotalUsd = costoMonto;
+        }
+    }
+
+    public String getCostoMoneda() { return costoMoneda; }
+    public void setCostoMoneda(String costoMoneda) { this.costoMoneda = costoMoneda; }
+
+    public BigDecimal getTasaCambioCongelada() { return tasaCambioCongelada; }
+    public void setTasaCambioCongelada(BigDecimal tasaCambioCongelada) { this.tasaCambioCongelada = tasaCambioCongelada; }
 }

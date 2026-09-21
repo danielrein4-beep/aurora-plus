@@ -26,7 +26,7 @@ ALTER TABLE maquinarias_construccion
     ADD COLUMN IF NOT EXISTS costo_hora_moneda VARCHAR(10) DEFAULT 'USD';
 
 -- 5. Moneda explícita en mantenimientos
-ALTER TABLE mantenimientos_maquinaria
+ALTER TABLE mantenimientos_maquinaria_construccion
     ADD COLUMN IF NOT EXISTS costo_monto NUMERIC(18, 4),
     ADD COLUMN IF NOT EXISTS costo_moneda VARCHAR(10) DEFAULT 'USD',
     ADD COLUMN IF NOT EXISTS tasa_cambio_congelada NUMERIC(18, 6);

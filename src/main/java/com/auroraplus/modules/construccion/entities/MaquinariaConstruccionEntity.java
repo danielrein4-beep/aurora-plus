@@ -57,6 +57,12 @@ public class MaquinariaConstruccionEntity {
     @Column(name = "costo_hora_usd", precision = 12, scale = 2)
     private BigDecimal costoHoraUsd = BigDecimal.ZERO;
 
+    @Column(name = "costo_hora_monto", precision = 18, scale = 4)
+    private BigDecimal costoHoraMonto;
+
+    @Column(name = "costo_hora_moneda", length = 10)
+    private String costoHoraMoneda = "USD";
+
     @Column(name = "combustible_tipo", length = 50)
     private String combustibleTipo = "DIESEL";
 
@@ -134,4 +140,17 @@ public class MaquinariaConstruccionEntity {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public BigDecimal getCostoHoraMonto() {
+        if (costoHoraMonto != null) return costoHoraMonto;
+        return costoHoraUsd;
+    }
+    public void setCostoHoraMonto(BigDecimal costoHoraMonto) {
+        this.costoHoraMonto = costoHoraMonto;
+        if (costoHoraUsd == null || BigDecimal.ZERO.compareTo(costoHoraUsd) == 0) {
+            this.costoHoraUsd = costoHoraMonto;
+        }
+    }
+
+    public String getCostoHoraMoneda() { return costoHoraMoneda; }
+    public void setCostoHoraMoneda(String costoHoraMoneda) { this.costoHoraMoneda = costoHoraMoneda; }
 }

@@ -1,5 +1,8 @@
 package com.auroraplus.modules.construccion;
 
+import com.auroraplus.core.financiero.entities.TasaCambio;
+import com.auroraplus.core.financiero.repositories.TasaCambioRepository;
+
 import com.auroraplus.modules.construccion.dtos.DashboardProyectoDTO;
 
 import com.auroraplus.core.auth.AuthContext;
@@ -67,6 +70,9 @@ public class ConstruccionAislamientoTenantP0Test {
 
     @Autowired
     private BitacoraConstruccionRepository bitacoraRepository;
+
+    @Autowired(required = false)
+    private TasaCambioRepository tasaCambioRepository;
 
     @AfterEach
     void limpiarContexto() {
@@ -1686,4 +1692,160 @@ public class ConstruccionAislamientoTenantP0Test {
         );
         assertEquals(HttpStatus.NOT_FOUND, exAjeno.getStatusCode());
     }
+
+    // =========================================================================
+    // FASE 2: INVENTARIO, LOGÍSTICA DE DESPACHOS, COSTOS Y MONEDA EXPLÍCITA
+    // =========================================================================
+
+    @Test
+    void fase2_despachoInsumo_descuentoAtomico_validacionStock_y_noDobleDescuentoPorReintento() {
+        long tenant = 88601L;
+        TenantContext.setCurrentTenant(tenant);
+
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PROY-LOG-01", "Torre Financiera Caracas");
+        Long proyId = proy.getId();
+
+        // 1. Crear insumo con stock inicial 100.00
+        InsumoConstruccionEntity insumo = new InsumoConstruccionEntity();
+        insumo.setCodigo("INS-CEM-01");
+        insumo.setNombre("Cemento Tipo I a Granel");
+        insumo.setTipo("MATERIAL");
+        insumo.setUnidad("ton");
+        insumo.setStockActual(new BigDecimal("100.00"));
+        insumo.setStockMinimo(new BigDecimal("20.00"));
+        insumo.setCostoUnitario(new BigDecimal("120.00"));
+
+        ResponseEntity<InsumoConstruccionEntity> respIns = construccionController.crearInsumo(insumo);
+        assertEquals(HttpStatus.OK, respIns.getStatusCode());
+        Long insumoId = respIns.getBody().getId();
+
+        // 2. Registrar despacho por 30 ton vinculado al insumo con Idempotency-Key
+        DespachoConstruccionEntity d1 = new DespachoConstruccionEntity();
+        d1.setGuiaNumero("GUIA-DESP-001");
+        d1.setTipoMaterial("CEMENTO_GRANEL");
+        d1.setInsumoId(insumoId);
+        d1.setOrigen("Planta Guanta");
+        d1.setDestinoFrente("Silo Principal");
+        d1.setUnidadTransporte("Gandola Tolva #04");
+        d1.setChofer("Carlos Pérez");
+        d1.setCantidad(new BigDecimal("30.00"));
+        d1.setUnidadMedida("ton");
+        d1.setMoneda("USD");
+
+        String ik = "IK-DESP-FASE2-001";
+        ResponseEntity<DespachoConstruccionEntity> rDesp1 = construccionController.crearDespacho(proyId, d1, ik);
+        assertEquals(HttpStatus.OK, rDesp1.getStatusCode());
+        Long d1Id = rDesp1.getBody().getId();
+
+        // Verificar descuento de stock a 70.00
+        InsumoConstruccionEntity insPostD1 = insumoRepository.findByTenantIdAndId(tenant, insumoId).orElseThrow();
+        assertEquals(new BigDecimal("70.00"), insPostD1.getStockActual());
+
+        // 3. Reintento con misma Idempotency-Key no debe restar doble stock
+        ResponseEntity<DespachoConstruccionEntity> rReintento = construccionController.crearDespacho(proyId, d1, ik);
+        assertEquals(HttpStatus.OK, rReintento.getStatusCode());
+        assertEquals(d1Id, rReintento.getBody().getId());
+
+        InsumoConstruccionEntity insPostReintento = insumoRepository.findByTenantIdAndId(tenant, insumoId).orElseThrow();
+        assertEquals(new BigDecimal("70.00"), insPostReintento.getStockActual());
+
+        // 4. Intentar despachar cantidad 80.00 (> 70.00 disponible) -> 400 BAD_REQUEST
+        DespachoConstruccionEntity dExceso = new DespachoConstruccionEntity();
+        dExceso.setGuiaNumero("GUIA-EXCESO-002");
+        dExceso.setTipoMaterial("CEMENTO_GRANEL");
+        dExceso.setInsumoId(insumoId);
+        dExceso.setOrigen("Planta Guanta");
+        dExceso.setDestinoFrente("Silo Principal");
+        dExceso.setCantidad(new BigDecimal("80.00"));
+        dExceso.setUnidadMedida("ton");
+
+        ResponseStatusException exStock = assertThrows(ResponseStatusException.class, () ->
+                construccionController.crearDespacho(proyId, dExceso, "IK-DESP-EXCESO")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, exStock.getStatusCode());
+        assertTrue(exStock.getReason().contains("Stock insuficiente"));
+
+        // El stock sigue intacto en 70.00
+        assertEquals(new BigDecimal("70.00"), insumoRepository.findByTenantIdAndId(tenant, insumoId).orElseThrow().getStockActual());
+
+        // 5. Rechazo / Anulación de despacho reincorpora el stock al insumo
+        construccionController.cambiarEstadoDespacho(d1Id, Map.of(
+                "estado", "RECHAZADO",
+                "observaciones", "Tolva contaminada con humedad en trayecto"
+        ));
+
+        InsumoConstruccionEntity insPostRechazo = insumoRepository.findByTenantIdAndId(tenant, insumoId).orElseThrow();
+        assertEquals(new BigDecimal("100.00"), insPostRechazo.getStockActual());
+    }
+
+    @Test
+    void fase2_monedaExplicita_y_tasaCongelada() {
+        long tenant = 88602L;
+        TenantContext.setCurrentTenant(tenant);
+
+        // Si el repositorio de tasa existe, registrar una tasa oficial del tenant
+        if (tasaCambioRepository != null) {
+            TasaCambio tc = new TasaCambio();
+            tc.setTenantId(tenant);
+            tc.setMonedaOrigen("USD");
+            tc.setMonedaDestino("VES");
+            tc.setTasa(new BigDecimal("42.500000"));
+            tc.setOrigenApi("BCV");
+            tasaCambioRepository.save(tc);
+        }
+
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PROY-MON-02", "Infraestructura Vial");
+        Long proyId = proy.getId();
+
+        // Despacho con flete en moneda explícita
+        DespachoConstruccionEntity desp = new DespachoConstruccionEntity();
+        desp.setGuiaNumero("GUIA-FLETE-01");
+        desp.setTipoMaterial("AGREGADOS_CANTERA");
+        desp.setOrigen("Cantera El Paují");
+        desp.setDestinoFrente("Tramo 1");
+        desp.setCantidad(new BigDecimal("15.00"));
+        desp.setUnidadMedida("m3");
+        desp.setMoneda("VES");
+        desp.setCostoFleteMonto(new BigDecimal("1500.0000"));
+        desp.setCostoFleteMoneda("VES");
+
+        ResponseEntity<DespachoConstruccionEntity> respDesp = construccionController.crearDespacho(proyId, desp, "IK-MON-001");
+        assertEquals(HttpStatus.OK, respDesp.getStatusCode());
+        DespachoConstruccionEntity despGuardado = respDesp.getBody();
+        assertEquals("VES", despGuardado.getMoneda());
+        assertEquals("VES", despGuardado.getCostoFleteMoneda());
+        assertEquals(new BigDecimal("1500.0000"), despGuardado.getCostoFleteMonto());
+
+        if (tasaCambioRepository != null) {
+            assertEquals(new BigDecimal("42.500000"), despGuardado.getTasaCambioCongelada());
+
+            // Actualizar la tasa del tenant posterior a 55.00
+            TasaCambio tcNueva = new TasaCambio();
+            tcNueva.setTenantId(tenant);
+            tcNueva.setMonedaOrigen("USD");
+            tcNueva.setMonedaDestino("VES");
+            tcNueva.setTasa(new BigDecimal("55.000000"));
+            tcNueva.setOrigenApi("BCV");
+            tasaCambioRepository.save(tcNueva);
+
+            // El despacho histórico conserva congelada la tasa original
+            DespachoConstruccionEntity despHistorico = despachoRepository.findByTenantIdAndId(tenant, despGuardado.getId()).orElseThrow();
+            assertEquals(new BigDecimal("42.500000"), despHistorico.getTasaCambioCongelada());
+        }
+
+        // Maquinaria con modelo compatible de importe + moneda
+        MaquinariaConstruccionEntity maq = new MaquinariaConstruccionEntity();
+        maq.setCodigo("EXC-F2-01");
+        maq.setNombre("Excavadora Oruga CAT 320D");
+        maq.setTipo("PESADA");
+        maq.setCostoHoraMonto(new BigDecimal("65.5000"));
+        maq.setCostoHoraMoneda("USD");
+
+        ResponseEntity<MaquinariaConstruccionEntity> respMaq = construccionController.registrarMaquinaria(maq, "IK-MAQ-F2-01");
+        assertEquals(HttpStatus.OK, respMaq.getStatusCode());
+        assertEquals("USD", respMaq.getBody().getCostoHoraMoneda());
+        assertEquals(new BigDecimal("65.5000"), respMaq.getBody().getCostoHoraMonto());
+        assertEquals(new BigDecimal("65.5000"), respMaq.getBody().getCostoHoraUsd());
+    }
+
 }

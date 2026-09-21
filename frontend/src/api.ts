@@ -4715,6 +4715,10 @@ export interface DespachoConstruccionApi {
   slumpConoPulgadas?: number;
   fechaHoraSalida?: string;
   fechaHoraLlegada?: string;
+  moneda?: string;
+  tasaCambioCongelada?: number;
+  costoFleteMonto?: number;
+  costoFleteMoneda?: string;
   observaciones?: string;
   createdAt?: string;
 }
@@ -4932,6 +4936,8 @@ export interface MaquinariaConstruccionApi {
   estado: string; // OPERATIVO, EN_MANTENIMIENTO, FUERA_DE_SERVICIO, STANDBY
   operadorResponsable?: string;
   costoHoraUsd?: number;
+  costoHoraMonto?: number;
+  costoHoraMoneda?: string;
   combustibleTipo?: string;
   capacidadTanqueLitros?: number;
   consumoPromedioLph?: number;
@@ -4950,6 +4956,9 @@ export interface MantenimientoMaquinariaApi {
   descripcionTrabajo: string;
   mecanicoOTaller?: string;
   costoTotalUsd?: number;
+  costoMonto?: number;
+  costoMoneda?: string;
+  tasaCambioCongelada?: number;
   repuestosUtilizados?: string;
   createdAt?: string;
 }
@@ -5160,6 +5169,8 @@ export interface CuadrillaConstruccionApi {
   estado: string; // ACTIVA, EN_STANDBY, REASIGNADA, FINALIZADA
   fechaInicio: string;
   fechaFin?: string;
+  costoJornalMonto?: number;
+  costoJornalMoneda?: string;
   observaciones?: string;
   createdAt?: string;
   updatedAt?: string;

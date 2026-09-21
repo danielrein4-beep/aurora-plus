@@ -1325,6 +1325,19 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                 <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
                                   {desp.guiaNumero}
                                 </span>
+                                <span className="text-[10px] font-mono font-bold text-slate-300 bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded">
+                                  {desp.moneda || 'USD'}
+                                </span>
+                                {desp.tasaCambioCongelada && (
+                                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                                    Tasa: {Number(desp.tasaCambioCongelada).toFixed(2)} Bs/$
+                                  </span>
+                                )}
+                                {desp.insumoId && (
+                                  <span className="text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded">
+                                    Descuenta Almacén
+                                  </span>
+                                )}
                                 <span
                                   className={
                                     'text-[10px] font-bold uppercase px-2 py-0.5 rounded ' +
@@ -2800,6 +2813,46 @@ export default function ConstruccionApp({ onSalir }: Props) {
               }}
               className="space-y-3 text-xs"
             >
+              <div>
+                <label className="text-slate-400 block mb-1 font-semibold">Vincular a Insumo de Almacén (Descuento Atómico)</label>
+                <select
+                  name="insumoId"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                >
+                  <option value="">-- Sin vincular (solo trazabilidad logística) --</option>
+                  {insumos.map((ins) => (
+                    <option key={ins.id} value={ins.id}>
+                      {ins.codigo} - {ins.nombre} (Stock: {ins.stockActual} {ins.unidad})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Moneda del Despacho</label>
+                  <select
+                    name="moneda"
+                    defaultValue="USD"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="VES">VES (Bs.)</option>
+                    <option value="EUR">EUR (€)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 font-semibold">Costo Flete</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="costoFleteMonto"
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-400 block mb-1 font-semibold">Código COVENIN *</label>
@@ -3317,7 +3370,6 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
                 const data: DespachoConstruccionApi = {
                   proyectoId: proyectoActivo.id!,
-                  insumoId: fd.get('insumoId') ? Number(fd.get('insumoId')) : undefined,
                   guiaNumero: (fd.get('guiaNumero') as string).trim(),
                   tipoMaterial: fd.get('tipoMaterial') as string,
                   origen: (fd.get('origen') as string).trim(),
@@ -3327,6 +3379,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   estado: (fd.get('estado') as string) || 'EN_TRANSITO',
                   cantidad: Number(fd.get('cantidad')) || 0,
                   unidadMedida: (fd.get('unidadMedida') as string).trim() || 'm3',
+                  insumoId: fd.get('insumoId') ? Number(fd.get('insumoId')) : undefined,
+                  moneda: (fd.get('moneda') as string) || 'USD',
+                  costoFleteMonto: fd.get('costoFleteMonto') ? Number(fd.get('costoFleteMonto')) : undefined,
+                  costoFleteMoneda: (fd.get('moneda') as string) || 'USD',
                   pesoBrutoKg: fd.get('pesoBrutoKg') ? Number(fd.get('pesoBrutoKg')) : undefined,
                   pesoTaraKg: fd.get('pesoTaraKg') ? Number(fd.get('pesoTaraKg')) : undefined,
                   pesoNetoKg: fd.get('pesoNetoKg') ? Number(fd.get('pesoNetoKg')) : undefined,

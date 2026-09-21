@@ -61,6 +61,12 @@ public class CuadrillaConstruccionEntity {
     @Column(name = "fecha_fin")
     private LocalDate fechaFin;
 
+    @Column(name = "costo_jornal_monto", precision = 18, scale = 4)
+    private BigDecimal costoJornalMonto;
+
+    @Column(name = "costo_jornal_moneda", length = 10)
+    private String costoJornalMoneda = "USD";
+
     @Column(name = "observaciones", columnDefinition = "TEXT")
     private String observaciones;
 
@@ -131,4 +137,9 @@ public class CuadrillaConstruccionEntity {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public BigDecimal getCostoJornalMonto() { return costoJornalMonto; }
+    public void setCostoJornalMonto(BigDecimal costoJornalMonto) { this.costoJornalMonto = costoJornalMonto; }
+
+    public String getCostoJornalMoneda() { return costoJornalMoneda; }
+    public void setCostoJornalMoneda(String costoJornalMoneda) { this.costoJornalMoneda = costoJornalMoneda; }
 }
