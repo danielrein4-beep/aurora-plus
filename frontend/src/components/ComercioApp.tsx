@@ -295,14 +295,26 @@ function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaA
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// VISTA GENERAL (DASHBOARD): tarjetas de resumen + alertas de stock bajo —
-// lee de datos que ya viven en el componente padre (productos ya cargados,
-// ingresos de caja ya cargados), no dispara peticiones propias.
+// VISTA GENERAL (DASHBOARD): panel de control diario para el dueño — en este
+// orden, a propósito, porque es el orden en que un administrador necesita
+// decidir algo al abrir la pantalla en la mañana:
+//   1. Rentabilidad de HOY (no solo ventas — ver nota más abajo)
+//   2. Pulso de la semana
+//   3. Lo que requiere acción YA (stock bajo)
+//   4. Accesos directos a lo que se usa todos los días
+// Lee datos que ya viven en el componente padre (productos, ingresos de
+// caja) — solo pide al backend la utilidad real (RepuestosReporteService),
+// que nadie más ya tiene cargada.
 // ══════════════════════════════════════════════════════════════════════════
-function DashboardGeneralComercio({ productos, ingresosCaja, onIrAInventario }: {
+function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNegocio, onIrAInventario, onIrAPos, onIrAProveedores, onIrAUtilidad }: {
   productos: ProductoComercio[];
   ingresosCaja: MovimientoCaja[];
+  esAdmin: boolean;
+  nombreNegocio: string;
   onIrAInventario: () => void;
+  onIrAPos: () => void;
+  onIrAProveedores: () => void;
+  onIrAUtilidad: () => void;
 }) {
   const sumarPorMoneda = (movimientos: MovimientoCaja[]) => {
     const acc: Record<string, number> = {};
@@ -325,6 +337,7 @@ function DashboardGeneralComercio({ productos, ingresosCaja, onIrAInventario }: 
     () => productos.filter((p) => p.stock <= p.stockMinimo).sort((a, b) => a.stock / Math.max(a.stockMinimo, 1) - b.stock / Math.max(b.stockMinimo, 1)),
     [productos]
   );
+  const productosSinCosto = useMemo(() => productos.filter((p) => !p.costo || p.costo <= 0).length, [productos]);
 
   const fmtMonedas = (obj: Record<string, number>) => {
     const entradas = Object.entries(obj);
@@ -332,48 +345,149 @@ function DashboardGeneralComercio({ productos, ingresosCaja, onIrAInventario }: 
     return entradas.map(([m, v]) => `${m === "USD" ? "$" : m + " "}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(" · ");
   };
 
+  // Utilidad real de HOY — no es lo mismo que ventas (ver conversación con el
+  // dueño: "no veo algo que indique la utilidad"). Solo se pide si el usuario
+  // puede verla (mismo criterio que el backend, ReporteRepuestoController).
+  const [utilidadHoy, setUtilidadHoy] = useState<UtilidadPeriodoRepuesto | null>(null);
+  const [cargandoUtilidad, setCargandoUtilidad] = useState(esAdmin);
+  useEffect(() => {
+    if (!esAdmin) { setCargandoUtilidad(false); return; }
+    const hoy = new Date().toISOString().slice(0, 10);
+    obtenerUtilidadRepuestos(hoy, hoy)
+      .then(setUtilidadHoy)
+      .catch(() => setUtilidadHoy(null))
+      .finally(() => setCargandoUtilidad(false));
+  }, [esAdmin]);
+
+  const saludo = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Buenos días";
+    if (h < 19) return "Buenas tardes";
+    return "Buenas noches";
+  })();
+
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       <div>
-        <h2 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Vista General</h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400">Resumen de tu negocio en tiempo real</p>
+        <h2 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{saludo} — {nombreNegocio}</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Así está tu negocio ahora mismo.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas de Hoy</span>
-            <IconChart size={16} className="text-teal-500" />
+      {/* ── 1. RENTABILIDAD DE HOY — lo primero que un dueño necesita ver ── */}
+      <section className="space-y-2.5">
+        <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Hoy</h3>
+        <div className={`grid grid-cols-1 sm:grid-cols-3 gap-4`}>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas</span>
+              <IconChart size={16} className="text-teal-500" />
+            </div>
+            <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasHoy)}</div>
           </div>
-          <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasHoy)}</div>
+
+          {esAdmin ? (
+            <button type="button" onClick={onIrAUtilidad} className="text-left bg-emerald-500/10 rounded-2xl p-5 border border-emerald-500/30 shadow-sm space-y-1.5 cursor-pointer hover:border-emerald-500/60 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Utilidad Real</span>
+                <IconCoins size={16} className="text-emerald-600 dark:text-emerald-400" />
+              </div>
+              {cargandoUtilidad ? (
+                <div className="text-xs text-emerald-600/70 dark:text-emerald-400/60">Calculando…</div>
+              ) : utilidadHoy && utilidadHoy.ventasBrutas > 0 ? (
+                <>
+                  <div className="font-['Outfit'] font-black text-xl text-emerald-700 dark:text-emerald-400 truncate">
+                    {utilidadHoy.moneda === "USD" ? "$" : utilidadHoy.moneda + " "}{utilidadHoy.utilidad.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  {utilidadHoy.margenPct !== null && (
+                    <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/70">{utilidadHoy.margenPct.toFixed(1)}% de margen{utilidadHoy.coberturaPct < 100 ? ` · ${utilidadHoy.coberturaPct.toFixed(0)}% con costo conocido` : ""}</div>
+                  )}
+                </>
+              ) : (
+                <div className="text-xs text-emerald-700/70 dark:text-emerald-400/60">Sin ventas todavía hoy</div>
+              )}
+            </button>
+          ) : (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5 flex flex-col justify-center">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Utilidad Real</span>
+              <span className="text-[11px] text-slate-400">Solo visible para el Dueño/Administrador</span>
+            </div>
+          )}
+
+          <div className={`rounded-2xl p-5 border shadow-sm space-y-1.5 ${productosBajoStock.length > 0 ? "bg-amber-500/10 border-amber-500/30" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"}`}>
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}>Requiere tu atención</span>
+              <IconWarning size={16} className={productosBajoStock.length > 0 ? "text-amber-500" : "text-slate-400"} />
+            </div>
+            <div className={`font-['Outfit'] font-black text-xl ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"}`}>
+              {productosBajoStock.length > 0 ? `${productosBajoStock.length} producto${productosBajoStock.length === 1 ? "" : "s"} bajo mínimo` : "Todo en orden"}
+            </div>
+          </div>
         </div>
+      </section>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas de la Semana</span>
-            <IconChart size={16} className="text-cyan-500" />
-          </div>
-          <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasSemana)}</div>
+      {/* ── 2. ACCESOS RÁPIDOS — lo que se usa todos los días, un clic ── */}
+      <section className="space-y-2.5">
+        <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Accesos rápidos</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <button type="button" onClick={onIrAPos} className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 transition-colors cursor-pointer">
+            <IconCard size={20} className="text-teal-500" />
+            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Nueva Venta</span>
+          </button>
+          <button type="button" onClick={onIrAInventario} className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 transition-colors cursor-pointer">
+            <IconBox size={20} className="text-cyan-500" />
+            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Inventario</span>
+          </button>
+          <button type="button" onClick={onIrAProveedores} className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 transition-colors cursor-pointer">
+            <IconTruck size={20} className="text-slate-500" />
+            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Registrar Compra</span>
+          </button>
+          {esAdmin ? (
+            <button type="button" onClick={onIrAUtilidad} className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-emerald-500/50 transition-colors cursor-pointer">
+              <IconCoins size={20} className="text-emerald-500" />
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Ver Utilidad</span>
+            </button>
+          ) : (
+            <button type="button" onClick={onIrAInventario} className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 transition-colors cursor-pointer">
+              <IconBank size={20} className="text-slate-500" />
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{productos.length} Productos</span>
+            </button>
+          )}
         </div>
+      </section>
 
-        <button type="button" onClick={onIrAInventario} className="text-left bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5 cursor-pointer hover:border-teal-500/50 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Productos en Stock</span>
-            <IconBank size={16} className="text-emerald-500" />
+      {/* ── 3. PULSO DE LA SEMANA ── */}
+      <section className="space-y-2.5">
+        <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Esta semana</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas de la Semana</span>
+              <IconChart size={16} className="text-cyan-500" />
+            </div>
+            <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasSemana)}</div>
           </div>
-          <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{productos.length}</div>
-        </button>
 
-        <div className={`rounded-2xl p-5 border shadow-sm space-y-1.5 ${productosBajoStock.length > 0 ? "bg-amber-500/10 border-amber-500/30" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"}`}>
-          <div className="flex items-center justify-between">
-            <span className={`text-[11px] font-bold uppercase tracking-wider ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}>Alertas de Stock Bajo</span>
-            <IconWarning size={16} className={productosBajoStock.length > 0 ? "text-amber-500" : "text-slate-400"} />
+          <button type="button" onClick={onIrAInventario} className="text-left bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5 cursor-pointer hover:border-teal-500/50 transition-colors">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Productos en Stock</span>
+              <IconBank size={16} className="text-emerald-500" />
+            </div>
+            <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{productos.length}</div>
+          </button>
+
+          <div className={`rounded-2xl p-5 border shadow-sm space-y-1.5 ${productosSinCosto > 0 ? "bg-slate-100 dark:bg-slate-800/60 border-slate-300 dark:border-slate-700" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"}`}>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Sin costo registrado</span>
+              <IconCoins size={16} className="text-slate-400" />
+            </div>
+            <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{productosSinCosto}</div>
+            {productosSinCosto > 0 && <div className="text-[10px] text-slate-400">Su margen no se puede calcular todavía</div>}
           </div>
-          <div className={`font-['Outfit'] font-black text-xl ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"}`}>{productosBajoStock.length}</div>
         </div>
-      </div>
+      </section>
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      {/* ── 4. LO QUE REQUIERE ACCIÓN ── */}
+      <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h3 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
             <IconWarning size={15} className="text-amber-500" /> Alertas de Inventario Bajo
@@ -411,7 +525,7 @@ function DashboardGeneralComercio({ productos, ingresosCaja, onIrAInventario }: 
             </table>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
@@ -1152,7 +1266,12 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             <DashboardGeneralComercio
               productos={productos.filter((p) => p.rubro === perfilActivo)}
               ingresosCaja={ingresosCaja}
+              esAdmin={user?.rol === "DUENO_ADMIN"}
+              nombreNegocio={user?.empresa || "tu negocio"}
               onIrAInventario={() => setTab("inventario")}
+              onIrAPos={() => setTab("pos")}
+              onIrAProveedores={() => setTab("proveedores")}
+              onIrAUtilidad={() => { setTab("cierre"); setSubCierre("utilidad"); }}
             />
           )}
 
