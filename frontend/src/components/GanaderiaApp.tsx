@@ -1777,21 +1777,20 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
               const pasosCompletados = (fincaUbicada ? 1 : 0) + (tienePotreros ? 1 : 0) + (tieneAnimales ? 1 : 0);
 
               return (
-                <div className="apple-glass rounded-3xl p-6 border border-emerald-500/30 bg-gradient-to-r from-slate-900/90 via-emerald-950/20 to-slate-900/90 shadow-xl space-y-4 text-left">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
-                        
-                        <h3 className="font-['Outfit'] font-black text-lg text-white">
+                        <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
                           Checklist de Primeros Pasos para tu Finca
                         </h3>
-                        <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                        <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
                           {pasosCompletados} de 3 completados
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400">
-                        {pasosCompletados === 3 
-                          ? "¡Felicidades! Has completado la configuración esencial de tu predio." 
+                      <p className="text-xs text-slate-500">
+                        {pasosCompletados === 3
+                          ? "¡Felicidades! Has completado la configuración esencial de tu predio."
                           : "Configura tu predio en 3 pasos clave para desbloquear el control agronómico completo:"}
                       </p>
                     </div>
@@ -1800,25 +1799,25 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {/* Paso 1: Fijar Ubicación */}
                     <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
-                      fincaUbicada 
-                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
-                        : "bg-white/5 border-white/10 hover:border-emerald-500/40"
+                      fincaUbicada
+                        ? "bg-teal-50 border-teal-200"
+                        : "bg-slate-50 border-slate-200 hover:border-teal-300"
                     }`}>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-slate-400">Paso 1</span>
                           {fincaUbicada ? (
-                            <span className="text-[11px] font-bold text-emerald-400">Completado</span>
+                            <span className="text-[11px] font-bold text-teal-700">Completado</span>
                           ) : (
-                            <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
+                            <span className="text-[11px] font-bold text-amber-600">Pendiente</span>
                           )}
                         </div>
-                        <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
+                        <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
                           Fijar Ubicación Real
                         </h4>
-                        <p className="text-[11px] text-slate-400">
-                          {fincaUbicada 
-                            ? "Coordenadas fijadas en el satélite." 
+                        <p className="text-[11px] text-slate-500">
+                          {fincaUbicada
+                            ? "Coordenadas fijadas en el satélite."
                             : "Busca tu predio en el mapa y fija las coordenadas de tu finca."}
                         </p>
                       </div>
@@ -1826,8 +1825,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                         onClick={() => { setTab("potreros"); setSubPotreros("mapa"); }}
                         className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           fincaUbicada
-                            ? "bg-white/10 text-white hover:bg-white/20"
-                            : "btn-cyber-neon text-white shadow-md"
+                            ? "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                            : "btn-cyber-neon text-white shadow-sm"
                         }`}
                       >
                         {fincaUbicada ? "Ver en Mapa →" : "Ubicar en Mapa →"}
@@ -1836,25 +1835,25 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
                     {/* Paso 2: Crear Primer Potrero */}
                     <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
-                      tienePotreros 
-                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
-                        : "bg-white/5 border-white/10 hover:border-emerald-500/40"
+                      tienePotreros
+                        ? "bg-teal-50 border-teal-200"
+                        : "bg-slate-50 border-slate-200 hover:border-teal-300"
                     }`}>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-slate-400">Paso 2</span>
                           {tienePotreros ? (
-                            <span className="text-[11px] font-bold text-emerald-400">Completado ({potreros.length})</span>
+                            <span className="text-[11px] font-bold text-teal-700">Completado ({potreros.length})</span>
                           ) : (
-                            <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
+                            <span className="text-[11px] font-bold text-amber-600">Pendiente</span>
                           )}
                         </div>
-                        <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
+                        <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
                           Crear Primer Potrero
                         </h4>
-                        <p className="text-[11px] text-slate-400">
-                          {tienePotreros 
-                            ? `${potreros.length} potreros registrados.` 
+                        <p className="text-[11px] text-slate-500">
+                          {tienePotreros
+                            ? `${potreros.length} potreros registrados.`
                             : "Delimita un potrero para asignar pastos, área y carga animal."}
                         </p>
                       </div>
@@ -1862,8 +1861,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                         onClick={abrirNuevoPotrero}
                         className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           tienePotreros
-                            ? "bg-white/10 text-white hover:bg-white/20"
-                            : "btn-cyber-neon text-white shadow-md"
+                            ? "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                            : "btn-cyber-neon text-white shadow-sm"
                         }`}
                       >
                         {tienePotreros ? "+ Nuevo Potrero" : "+ Crear Potrero"}
@@ -1872,25 +1871,25 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
                     {/* Paso 3: Dar de Alta Primer Animal */}
                     <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
-                      tieneAnimales 
-                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
-                        : "bg-white/5 border-white/10 hover:border-emerald-500/40"
+                      tieneAnimales
+                        ? "bg-teal-50 border-teal-200"
+                        : "bg-slate-50 border-slate-200 hover:border-teal-300"
                     }`}>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-slate-400">Paso 3</span>
                           {tieneAnimales ? (
-                            <span className="text-[11px] font-bold text-emerald-400">Completado ({animales.length})</span>
+                            <span className="text-[11px] font-bold text-teal-700">Completado ({animales.length})</span>
                           ) : (
-                            <span className="text-[11px] font-bold text-amber-400">Pendiente</span>
+                            <span className="text-[11px] font-bold text-amber-600">Pendiente</span>
                           )}
                         </div>
-                        <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
+                        <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
                           Dar de Alta Primer Animal
                         </h4>
-                        <p className="text-[11px] text-slate-400">
-                          {tieneAnimales 
-                            ? `${animales.length} cabezas en el hato.` 
+                        <p className="text-[11px] text-slate-500">
+                          {tieneAnimales
+                            ? `${animales.length} cabezas en el hato.`
                             : "Registra tu primer animal por nacimiento o compra con su arete."}
                         </p>
                       </div>
@@ -1898,8 +1897,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                         onClick={() => setModalNuevoAnimal(true)}
                         className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           tieneAnimales
-                            ? "bg-white/10 text-white hover:bg-white/20"
-                            : "btn-cyber-neon text-white shadow-md"
+                            ? "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                            : "btn-cyber-neon text-white shadow-sm"
                         }`}
                       >
                         {tieneAnimales ? "+ Nuevo Animal" : "+ Dar de Alta"}
@@ -1909,90 +1908,95 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </div>
               );
             })()}
-            
-            {/* Banner Superior con KPIs Vivos */}
-            <div className="apple-glass rounded-3xl p-6 sm:p-8 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-[#0a1818]/60 to-slate-900/60 shadow-xl space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-4">
+
+            {/* ── Cabecera: tarjeta héroe (hato total) + cinta de métricas secundarias ── */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1 text-left">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-extrabold text-emerald-400 uppercase">
-                    <span>Sincronización Agronómica Activa</span>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-[10px] font-bold text-teal-700 uppercase tracking-wider">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+                    Sincronización Agronómica Activa
                   </div>
-                  <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-slate-900 dark:text-white">
+                  <h2 className="font-['Outfit'] font-black text-2xl text-slate-900">
                     Control Integral de Finca & Hato
                   </h2>
-                  <p className="text-slate-500 dark:text-white/60 text-xs sm:text-sm max-w-2xl">
-                    Monitoreo en tiempo real de rotación de potreros, ordeño diario, curvas de ganancia de peso (GDP) y alertas de retiro farmacológico.
-                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2.5">
                   <button
                     onClick={() => setModalOrdeno(true)}
-                    className="apple-glass-btn text-xs font-bold px-4 py-2.5 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer">
+                    className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer">
                     + Registrar Ordeño
                   </button>
                   <button
                     onClick={() => { setTab("potreros"); setSubPotreros("mapa"); }}
-                    className="btn-cyber-neon text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-md cursor-pointer">
+                    className="btn-cyber-neon text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm cursor-pointer">
                     Ver Mapa Satelital →
                   </button>
                 </div>
               </div>
 
-              {/* Tarjetas de Métricas en Grid 4x */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3">
-                <div className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-1">
-                  <div className="text-slate-500 dark:text-white/50 text-[11px] font-medium">Hato Total</div>
-                  <div className="font-['Outfit'] font-black text-2xl text-emerald-500 dark:text-emerald-400">
-                    {totalAnimales} <span className="text-xs font-normal text-slate-400">cabezas</span>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                {/* Tarjeta héroe: Hato Total */}
+                <div className="lg:col-span-7 bg-white border-2 border-teal-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 border border-teal-200 px-2.5 py-0.5 rounded-full">
+                        Hato Total
+                      </span>
+                      <div className="mt-2.5 flex items-baseline gap-2.5">
+                        <span className="text-3xl font-black text-slate-900 font-['Outfit']">{totalAnimales}</span>
+                        <span className="text-xs font-medium text-slate-500">cabezas · {vacasOrdeno} vacas productivas</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-400 dark:text-white/40">{vacasOrdeno} vacas productivas</div>
-                </div>
-
-                <div className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-1">
-                  <div className="text-slate-500 dark:text-white/50 text-[11px] font-medium">Ordeño Hoy</div>
-                  <div className="font-['Outfit'] font-black text-2xl text-sky-500 dark:text-sky-400">
-                    {litrosHoy.toFixed(1)} <span className="text-xs font-normal text-slate-400">Litros</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400 dark:text-white/40">
-                    ${ingresosLecheHoy.toFixed(2)} USD
-                    {monedasConfig.VES && ` • Bs. ${(ingresosLecheHoy * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                    {monedasConfig.COP && ` • COP $${Math.round(ingresosLecheHoy * tasaCOP).toLocaleString()}`}
+                  <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-3 flex-wrap text-xs text-slate-500">
+                    <span>{totalHectareas.toFixed(1)} hectáreas totales</span>
+                    <span className="font-semibold text-teal-700">{cargaAnimalHa} UG/ha de carga animal</span>
                   </div>
                 </div>
 
-                <div className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-1">
-                  <div className="text-slate-500 dark:text-white/50 text-[11px] font-medium">Carga Animal</div>
-                  <div className="font-['Outfit'] font-black text-2xl text-purple-500 dark:text-purple-400">
-                    {cargaAnimalHa} <span className="text-xs font-normal text-slate-400">UG/ha</span>
+                {/* Cinta de métricas secundarias */}
+                <div className="lg:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                    Producción & Rotación
                   </div>
-                  <div className="text-[10px] text-slate-400 dark:text-white/40">{totalHectareas.toFixed(1)} hectáreas totales</div>
-                </div>
-
-                <div className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-1">
-                  <div className="text-slate-500 dark:text-white/50 text-[11px] font-medium">Potreros en Descanso</div>
-                  <div className="font-['Outfit'] font-black text-2xl text-amber-500 dark:text-amber-400">
-                    {potreros.filter(p => p.estado === "EN_DESCANSO").length} <span className="text-xs font-normal text-slate-400">de {potreros.length}</span>
+                  <div className="grid grid-cols-2 divide-x divide-slate-200 text-center">
+                    <div className="px-1.5">
+                      <div className="text-xl font-black text-slate-900 font-['Outfit']">{litrosHoy.toFixed(1)}</div>
+                      <div className="text-[10px] font-medium text-slate-500 mt-0.5">Litros Hoy</div>
+                    </div>
+                    <div className="px-1.5">
+                      <div className="text-xl font-black text-slate-900 font-['Outfit']">
+                        {potreros.filter(p => p.estado === "EN_DESCANSO").length}/{potreros.length}
+                      </div>
+                      <div className="text-[10px] font-medium text-slate-500 mt-0.5">Potreros Descanso</div>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-400 dark:text-white/40">Recuperación forrajera activa</div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
+                    <span>
+                      ${ingresosLecheHoy.toFixed(2)} USD
+                      {monedasConfig.VES && ` · Bs. ${(ingresosLecheHoy * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    </span>
+                    <span className="text-emerald-700 font-semibold">Sincronizado</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Widget: Tanque de Leche Frío (Stock en Finca & Despacho a Cisterna) */}
-            <div className="apple-glass rounded-3xl p-6 border border-sky-500/30 bg-gradient-to-r from-sky-950/40 via-slate-900/70 to-slate-900/50 shadow-xl space-y-4 text-left">
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 text-left">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
+                      <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
                         Tanque de Leche Frío
                       </h3>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-50 text-sky-700 border border-sky-200">
                         <span>{tanqueLeche?.temperaturaCelsius ?? 4.0}°C Óptima</span>
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-white/50">
+                    <p className="text-xs text-slate-500">
                       Stock recolectado en sala de ordeño listo para despacho a planta o camión cisterna.
                     </p>
                   </div>
@@ -2002,55 +2006,55 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   <button
                     type="button"
                     onClick={() => setModalAjusteTanque(true)}
-                    className="px-3.5 py-2 rounded-xl apple-glass border border-white/15 text-slate-700 dark:text-white/80 hover:text-white text-xs font-semibold cursor-pointer transition-all">
+                    className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold cursor-pointer transition-all">
                     <span className="inline-flex items-center gap-1.5"><IconSettings size={13} /> Calibrar</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => { setUltimoDespachoLecheId(null); setModalVentaLeche(true); }}
-                    className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg hover:scale-105 transition-all flex items-center gap-1.5 cursor-pointer">
+                    className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer">
                     <span>Venta Cisterna / Planta</span>
                   </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-medium">Stock en Tanque</span>
-                    <span className="text-[11px] font-mono font-bold text-sky-400">
+                    <span className="text-[11px] text-slate-500 font-medium">Stock en Tanque</span>
+                    <span className="text-[11px] font-mono font-bold text-sky-700">
                       {Math.round(((tanqueLeche?.stockActualLitros ?? 0) / (tanqueLeche?.capacidadLitros ?? 2000)) * 100)}%
                     </span>
                   </div>
-                  <div className="font-['Outfit'] font-black text-2xl text-sky-400">
-                    {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} <span className="text-xs font-normal text-slate-400">/ {(tanqueLeche?.capacidadLitros ?? 2000).toLocaleString()} L</span>
+                  <div className="font-['Outfit'] font-black text-2xl text-slate-900">
+                    {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} <span className="text-xs font-normal text-slate-500">/ {(tanqueLeche?.capacidadLitros ?? 2000).toLocaleString()} L</span>
                   </div>
-                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-sky-500 to-cyan-400 rounded-full transition-all duration-500"
+                      className="h-full bg-sky-500 rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(100, Math.max(0, ((tanqueLeche?.stockActualLitros ?? 0) / (tanqueLeche?.capacidadLitros ?? 2000)) * 100))}%` }}
                     />
                   </div>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                  <div className="text-[11px] text-slate-400 font-medium">Valor Comercial del Stock</div>
-                  <div className="font-['Outfit'] font-black text-2xl text-emerald-400">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                  <div className="text-[11px] text-slate-500 font-medium">Valor Comercial del Stock</div>
+                  <div className="font-['Outfit'] font-black text-2xl text-emerald-700">
                     ${((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <div className="text-[10px] text-slate-400">
+                  <div className="text-[10px] text-slate-500">
                     A ${precioLecheUSD.toFixed(2)} USD/L
                     {monedasConfig.VES && ` • Bs. ${(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     {monedasConfig.COP && ` • COP $${Math.round(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaCOP).toLocaleString()}`}
                   </div>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                  <div className="text-[11px] text-slate-400 font-medium">Último Despacho Registrado</div>
-                  <div className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                  <div className="text-[11px] text-slate-500 font-medium">Último Despacho Registrado</div>
+                  <div className="font-bold text-sm text-slate-900 truncate">
                     {ventasLeche[0] ? `${ventasLeche[0].litrosVendidos} L • ${ventasLeche[0].compradorOPlanta}` : "Sin despachos recientes"}
                   </div>
-                  <div className="text-[10px] text-slate-400">
+                  <div className="text-[10px] text-slate-500">
                     {ventasLeche[0] ? `${ventasLeche[0].fecha} • $${Number(ventasLeche[0].totalUSD).toFixed(2)} USD (${ventasLeche[0].monedaPago || "USD"})` : "Tanque en fase de recolección"}
                   </div>
                 </div>

@@ -9011,86 +9011,79 @@ function ResumenGeneral({
 
   return (
     <div className="space-y-6">
-      {/* Tarjetas Superiores: Ventas divididas estrictamente por moneda */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Ventas de la Semana */}
-        <div className="apple-glass rounded-2xl p-5 space-y-3 relative overflow-hidden">
+      {/* Tarjetas Superiores: tarjeta héroe (Ventas de Hoy) + cinta secundaria (Semana) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Ventas del Día — tarjeta héroe */}
+        <div className="lg:col-span-7 bg-white border-2 border-teal-200 rounded-2xl p-5 shadow-sm space-y-3 relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 dark:text-white/50 uppercase tracking-wider">
-              Ventas de la Semana (Consolidado)
-            </span>
-            <span className="text-[10px] font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-400 px-2.5 py-0.5 rounded-full">
-              Lunes a hoy · {metricasSemana ? metricasSemana.totalTickets : 0} tickets
-            </span>
-          </div>
-
-          <div className="flex items-baseline gap-2">
-            <span className="font-['Outfit'] font-black text-3xl text-sky-600 dark:text-sky-400">
-              {metricasSemana ? `$${metricasSemana.consolidadoUsd.toFixed(2)}` : "…"}
-            </span>
-            <span className="text-xs text-slate-400 font-semibold">USD base</span>
-          </div>
-
-          {/* Desglose dividido por moneda */}
-          <div className="pt-2 border-t border-slate-200/60 dark:border-white/10 grid grid-cols-3 gap-2">
-            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
-              <div className="text-[10px] text-slate-400 font-bold uppercase">En Dólares</div>
-              <div className="font-mono font-bold text-xs text-slate-900 dark:text-white">
-                ${metricasSemana ? fmtNumero(metricasSemana.usd, "USD") : "0"} USD
-              </div>
-            </div>
-            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
-              <div className="text-[10px] text-teal-600 dark:text-teal-400 font-bold uppercase">En Pesos (COP)</div>
-              <div className="font-mono font-bold text-xs text-teal-700 dark:text-teal-300 truncate">
-                {metricasSemana ? fmtNumero(metricasSemana.cop, "COP") : "0"} COP
-              </div>
-            </div>
-            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
-              <div className="text-[10px] text-slate-400 font-bold uppercase">En Bolívares</div>
-              <div className="font-mono font-bold text-xs text-slate-900 dark:text-white truncate">
-                Bs. {metricasSemana ? fmtNumero(metricasSemana.ves, "VES") : "0.00"}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Ventas del Día */}
-        <div className="apple-glass rounded-2xl p-5 space-y-3 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 dark:text-white/50 uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-teal-700 bg-teal-50 border border-teal-200 uppercase tracking-wider px-2.5 py-0.5 rounded-full">
               Ventas del Día (Hoy)
             </span>
-            <span className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-0.5 rounded-full">
+            <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full">
               {metricasHoy ? metricasHoy.totalTickets : 0} ticket{metricasHoy?.totalTickets === 1 ? "" : "s"} hoy
             </span>
           </div>
 
           <div className="flex items-baseline gap-2">
-            <span className="font-['Outfit'] font-black text-3xl text-emerald-600 dark:text-emerald-400">
+            <span className="font-['Outfit'] font-black text-3xl text-slate-900">
               {metricasHoy ? `$${metricasHoy.consolidadoUsd.toFixed(2)}` : "…"}
             </span>
             <span className="text-xs text-slate-400 font-semibold">USD base</span>
           </div>
 
           {/* Desglose dividido por moneda */}
-          <div className="pt-2 border-t border-slate-200/60 dark:border-white/10 grid grid-cols-3 gap-2">
-            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
+          <div className="pt-2 border-t border-slate-200 grid grid-cols-3 gap-2">
+            <div className="bg-slate-50 rounded-xl p-2.5">
               <div className="text-[10px] text-slate-400 font-bold uppercase">En Dólares</div>
-              <div className="font-mono font-bold text-xs text-slate-900 dark:text-white">
+              <div className="font-mono font-bold text-xs text-slate-900">
                 ${metricasHoy ? fmtNumero(metricasHoy.usd, "USD") : "0"} USD
               </div>
             </div>
-            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
-              <div className="text-[10px] text-teal-600 dark:text-teal-400 font-bold uppercase">En Pesos (COP)</div>
-              <div className="font-mono font-bold text-xs text-teal-700 dark:text-teal-300 truncate">
+            <div className="bg-slate-50 rounded-xl p-2.5">
+              <div className="text-[10px] text-teal-700 font-bold uppercase">En Pesos (COP)</div>
+              <div className="font-mono font-bold text-xs text-teal-700 truncate">
                 {metricasHoy ? fmtNumero(metricasHoy.cop, "COP") : "0"} COP
               </div>
             </div>
-            <div className="bg-slate-100/70 dark:bg-white/5 rounded-xl p-2.5">
+            <div className="bg-slate-50 rounded-xl p-2.5">
               <div className="text-[10px] text-slate-400 font-bold uppercase">En Bolívares</div>
-              <div className="font-mono font-bold text-xs text-slate-900 dark:text-white truncate">
+              <div className="font-mono font-bold text-xs text-slate-900 truncate">
                 Bs. {metricasHoy ? fmtNumero(metricasHoy.ves, "VES") : "0.00"}
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Ventas de la Semana — cinta secundaria */}
+        <div className="lg:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3 relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Ventas de la Semana
+            </span>
+            <span className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-500 px-2.5 py-0.5 rounded-full">
+              Lunes a hoy · {metricasSemana ? metricasSemana.totalTickets : 0} tickets
+            </span>
+          </div>
+
+          <div className="flex items-baseline gap-2">
+            <span className="font-['Outfit'] font-black text-2xl text-slate-900">
+              {metricasSemana ? `$${metricasSemana.consolidadoUsd.toFixed(2)}` : "…"}
+            </span>
+            <span className="text-xs text-slate-400 font-semibold">USD base</span>
+          </div>
+
+          <div className="pt-2 border-t border-slate-200 grid grid-cols-3 gap-2 text-[10px]">
+            <div>
+              <div className="text-slate-400 font-bold uppercase">USD</div>
+              <div className="font-mono font-bold text-slate-700 truncate">${metricasSemana ? fmtNumero(metricasSemana.usd, "USD") : "0"}</div>
+            </div>
+            <div>
+              <div className="text-teal-700 font-bold uppercase">COP</div>
+              <div className="font-mono font-bold text-teal-700 truncate">{metricasSemana ? fmtNumero(metricasSemana.cop, "COP") : "0"}</div>
+            </div>
+            <div>
+              <div className="text-slate-400 font-bold uppercase">Bs</div>
+              <div className="font-mono font-bold text-slate-700 truncate">{metricasSemana ? fmtNumero(metricasSemana.ves, "VES") : "0.00"}</div>
             </div>
           </div>
         </div>
