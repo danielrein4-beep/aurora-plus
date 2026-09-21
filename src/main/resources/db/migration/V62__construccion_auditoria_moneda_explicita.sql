@@ -34,4 +34,8 @@ ALTER TABLE mantenimientos_maquinaria_construccion
 -- 6. Moneda explícita en cuadrillas y partes diarios
 ALTER TABLE cuadrillas_construccion
     ADD COLUMN IF NOT EXISTS costo_jornal_monto NUMERIC(18, 4),
-    ADD COLUMN IF NOT EXISTS costo_jornal_moneda VARCHAR(10) DEFAULT 'USD';
+    ADD COLUMN IF NOT EXISTS costo_jornal_moneda VARCHAR(10) DEFAULT 'USD',
+    ADD COLUMN IF NOT EXISTS capataz_empleado_id BIGINT,
+    ADD COLUMN IF NOT EXISTS personal_real INT,
+    ADD COLUMN IF NOT EXISTS cantidad_ejecutada_real NUMERIC(14, 4),
+    ADD COLUMN IF NOT EXISTS rendimiento_real NUMERIC(10, 2);

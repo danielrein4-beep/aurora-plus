@@ -427,4 +427,11 @@ public class ConstruccionController {
         String nuevoFrente = body != null ? body.get("frenteTrabajo") : null;
         return ResponseEntity.ok(construccionService.actualizarEstadoCuadrilla(requireTenant(), id, nuevoEstado, nuevoFrente));
     }
+
+    @PutMapping("/cuadrillas/{id}")
+    public ResponseEntity<CuadrillaConstruccionEntity> actualizarCuadrilla(
+            @PathVariable Long id,
+            @RequestBody CuadrillaConstruccionEntity req) {
+        return ResponseEntity.ok(construccionService.actualizarCuadrilla(requireTenant(), id, req));
+    }
 }

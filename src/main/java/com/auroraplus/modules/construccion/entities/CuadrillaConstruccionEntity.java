@@ -37,6 +37,18 @@ public class CuadrillaConstruccionEntity {
     @Column(name = "capataz_responsable", nullable = false, length = 150)
     private String capatazResponsable;
 
+    @Column(name = "capataz_empleado_id")
+    private Long capatazEmpleadoId;
+
+    @Column(name = "personal_real")
+    private Integer personalReal;
+
+    @Column(name = "cantidad_ejecutada_real", precision = 14, scale = 4)
+    private BigDecimal cantidadEjecutadaReal;
+
+    @Column(name = "rendimiento_real", precision = 10, scale = 2)
+    private BigDecimal rendimientoReal;
+
     @Column(name = "cantidad_oficiales", nullable = false)
     private Integer cantidadOficiales = 1;
 
@@ -142,4 +154,15 @@ public class CuadrillaConstruccionEntity {
 
     public String getCostoJornalMoneda() { return costoJornalMoneda; }
     public void setCostoJornalMoneda(String costoJornalMoneda) { this.costoJornalMoneda = costoJornalMoneda; }
+    public Long getCapatazEmpleadoId() { return capatazEmpleadoId; }
+    public void setCapatazEmpleadoId(Long capatazEmpleadoId) { this.capatazEmpleadoId = capatazEmpleadoId; }
+
+    public Integer getPersonalReal() { return personalReal; }
+    public void setPersonalReal(Integer personalReal) { this.personalReal = personalReal; }
+
+    public BigDecimal getCantidadEjecutadaReal() { return cantidadEjecutadaReal; }
+    public void setCantidadEjecutadaReal(BigDecimal cantidadEjecutadaReal) { this.cantidadEjecutadaReal = cantidadEjecutadaReal; }
+
+    public BigDecimal getRendimientoReal() { return rendimientoReal; }
+    public void setRendimientoReal(BigDecimal rendimientoReal) { this.rendimientoReal = rendimientoReal; }
 }

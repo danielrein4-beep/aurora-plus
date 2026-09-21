@@ -74,6 +74,16 @@ public class ConstruccionAislamientoTenantP0Test {
     @Autowired(required = false)
     private TasaCambioRepository tasaCambioRepository;
 
+    @Autowired
+    private MaquinariaConstruccionRepository maquinariaRepository;
+
+    @Autowired
+    private CuadrillaConstruccionRepository cuadrillaRepository;
+
+    @Autowired(required = false)
+    @org.springframework.beans.factory.annotation.Qualifier("personalEmpleadoRepository")
+    private com.auroraplus.core.personal.repositories.EmpleadoRepository personalEmpleadoRepository;
+
     @AfterEach
     void limpiarContexto() {
         TenantContext.clear();
@@ -1846,6 +1856,154 @@ public class ConstruccionAislamientoTenantP0Test {
         assertEquals("USD", respMaq.getBody().getCostoHoraMoneda());
         assertEquals(new BigDecimal("65.5000"), respMaq.getBody().getCostoHoraMonto());
         assertEquals(new BigDecimal("65.5000"), respMaq.getBody().getCostoHoraUsd());
+    }
+
+
+    @Test
+    void testFase3_MaquinariaHorometroMonotonico() {
+        Long tenant = 7101L;
+        TenantContext.setCurrentTenant(tenant);
+
+        ProyectoConstruccionEntity proy = crearProyectoHelper(tenant, "PRY-MAQ-F3", "Obra Maquinaria F3");
+        proy.setEstado("ACTIVO");
+        proyectoRepository.save(proy);
+
+        MaquinariaConstruccionEntity maq = new MaquinariaConstruccionEntity();
+        maq.setCodigo("RET-F3-01");
+        maq.setNombre("Retroexcavadora CAT 420F");
+        maq.setTipo("PESADA");
+        maq.setProyectoId(proy.getId());
+        maq.setHorometroActual(new BigDecimal("120.50"));
+        maq.setCostoHoraMonto(new BigDecimal("75.0000"));
+        maq.setCostoHoraMoneda("USD");
+
+        ResponseEntity<MaquinariaConstruccionEntity> respMaq = construccionController.registrarMaquinaria(maq, "IK-MAQ-F3-01");
+        assertEquals(HttpStatus.OK, respMaq.getStatusCode());
+        Long maqId = respMaq.getBody().getId();
+
+        // 1. Intento de retroceder horómetro debe fallar con 400 BAD_REQUEST
+        MaquinariaConstruccionEntity updateRetroceso = new MaquinariaConstruccionEntity();
+        updateRetroceso.setHorometroActual(new BigDecimal("110.00"));
+
+        ResponseStatusException exRetroceso = assertThrows(ResponseStatusException.class, () -> {
+            construccionController.actualizarMaquinaria(maqId, updateRetroceso);
+        });
+        assertEquals(HttpStatus.BAD_REQUEST, exRetroceso.getStatusCode());
+        assertTrue(exRetroceso.getReason().contains("no puede ser menor al horómetro acumulado"));
+
+        // 2. Aumento de horómetro debe tener éxito
+        MaquinariaConstruccionEntity updateValido = new MaquinariaConstruccionEntity();
+        updateValido.setHorometroActual(new BigDecimal("135.00"));
+        ResponseEntity<MaquinariaConstruccionEntity> respUpdate = construccionController.actualizarMaquinaria(maqId, updateValido);
+        assertEquals(HttpStatus.OK, respUpdate.getStatusCode());
+        assertEquals(new BigDecimal("135.00"), respUpdate.getBody().getHorometroActual());
+
+        // 3. Registro de mantenimiento preventivo con moneda explícita y horómetro al mantenimiento
+        MantenimientoMaquinariaEntity mant = new MantenimientoMaquinariaEntity();
+        mant.setTipo("PREVENTIVO");
+        mant.setDescripcionTrabajo("Cambio de filtros y aceite de motor");
+        mant.setFechaMantenimiento(java.time.LocalDate.now());
+        mant.setHorometroEnMantenimiento(new BigDecimal("140.00"));
+        mant.setCostoMonto(new BigDecimal("350.0000"));
+        mant.setCostoMoneda("USD");
+
+        ResponseEntity<MantenimientoMaquinariaEntity> respMant = construccionController.registrarMantenimiento(maqId, mant);
+        assertEquals(HttpStatus.OK, respMant.getStatusCode());
+        assertNotNull(respMant.getBody().getId());
+        assertEquals("USD", respMant.getBody().getCostoMoneda());
+        assertEquals(new BigDecimal("350.0000"), respMant.getBody().getCostoMonto());
+    }
+
+    @Test
+    void testFase3_CuadrillaVinculacionPersonalYRendimientoReal() {
+        Long tenantA = 7201L;
+        Long tenantB = 7202L;
+        TenantContext.setCurrentTenant(tenantA);
+
+        ProyectoConstruccionEntity proyA = crearProyectoHelper(tenantA, "PRY-CUAD-F3", "Obra Cuadrillas F3");
+        proyA.setEstado("ACTIVO");
+        proyectoRepository.save(proyA);
+
+        Long empTenantBId = null;
+        Long empTenantAId = null;
+
+        if (personalEmpleadoRepository != null) {
+            com.auroraplus.core.personal.entities.Empleado empB = new com.auroraplus.core.personal.entities.Empleado();
+            empB.setTenantId(tenantB);
+            empB.setNombreCompleto("Carlos Capataz Tenant B");
+            empB.setDocumentoIdentidad("V-99999999");
+            empB.setFechaIngreso(java.time.LocalDate.now());
+            empB = personalEmpleadoRepository.save(empB);
+            empTenantBId = empB.getId();
+
+            com.auroraplus.core.personal.entities.Empleado empA = new com.auroraplus.core.personal.entities.Empleado();
+            empA.setTenantId(tenantA);
+            empA.setNombreCompleto("Pedro Capataz Tenant A");
+            empA.setDocumentoIdentidad("V-88888888");
+            empA.setFechaIngreso(java.time.LocalDate.now());
+            empA = personalEmpleadoRepository.save(empA);
+            empTenantAId = empA.getId();
+
+            // Intento de asignar capataz de otro tenant debe ser rechazado
+            CuadrillaConstruccionEntity reqCrossTenant = new CuadrillaConstruccionEntity();
+            reqCrossTenant.setCodigo("CUAD-CROSS-01");
+            reqCrossTenant.setNombre("Cuadrilla Cross Tenant");
+            reqCrossTenant.setEspecialidad("CONCRETO_Y_ENCOFRADO");
+            reqCrossTenant.setFrenteTrabajo("Edificio A");
+            reqCrossTenant.setCapatazEmpleadoId(empTenantBId);
+
+            ResponseStatusException exCross = assertThrows(ResponseStatusException.class, () -> {
+                construccionController.registrarCuadrilla(proyA.getId(), reqCrossTenant, "IK-CUAD-CROSS");
+            });
+            assertEquals(HttpStatus.BAD_REQUEST, exCross.getStatusCode());
+            assertTrue(exCross.getReason().contains("no existe o pertenece a otro tenant"));
+        }
+
+        // Crear cuadrilla con empleado válido y rendimiento real calculado
+        CuadrillaConstruccionEntity reqValida = new CuadrillaConstruccionEntity();
+        reqValida.setCodigo("CUAD-REAL-01");
+        reqValida.setNombre("Cuadrilla Vaciado de Losas");
+        reqValida.setEspecialidad("CONCRETO_Y_ENCOFRADO");
+        reqValida.setFrenteTrabajo("Sector Torre 1");
+        if (empTenantAId != null) {
+            reqValida.setCapatazEmpleadoId(empTenantAId);
+        } else {
+            reqValida.setCapatazResponsable("Pedro Capataz");
+        }
+        reqValida.setCantidadOficiales(2);
+        reqValida.setCantidadAyudantes(3);
+        reqValida.setPersonalReal(4); // 4 personas reales laborando
+        reqValida.setCantidadEjecutadaReal(new BigDecimal("100.0000")); // 100 m2 ejecutados
+        reqValida.setCostoJornalMonto(new BigDecimal("250.0000"));
+        reqValida.setCostoJornalMoneda("USD");
+
+        ResponseEntity<CuadrillaConstruccionEntity> respCuad = construccionController.registrarCuadrilla(
+                proyA.getId(), reqValida, "IK-CUAD-REAL-01"
+        );
+        assertEquals(HttpStatus.OK, respCuad.getStatusCode());
+        CuadrillaConstruccionEntity creada = respCuad.getBody();
+        assertNotNull(creada.getId());
+        assertEquals(5, creada.getCantidadTotalPersonal()); // 2 + 3
+        assertEquals(4, creada.getPersonalReal());
+        // Rendimiento real = 100.00 / 4 = 25.00
+        assertEquals(new BigDecimal("25.00"), creada.getRendimientoReal());
+        if (empTenantAId != null) {
+            assertEquals("Pedro Capataz Tenant A", creada.getCapatazResponsable());
+        }
+
+        // Actualización de cuadrilla mediante endpoint PUT
+        CuadrillaConstruccionEntity reqActualizar = new CuadrillaConstruccionEntity();
+        reqActualizar.setPersonalReal(5);
+        reqActualizar.setCantidadEjecutadaReal(new BigDecimal("150.0000"));
+        reqActualizar.setEstado("EN_STANDBY");
+
+        ResponseEntity<CuadrillaConstruccionEntity> respAct = construccionController.actualizarCuadrilla(creada.getId(), reqActualizar);
+        assertEquals(HttpStatus.OK, respAct.getStatusCode());
+        CuadrillaConstruccionEntity actualizada = respAct.getBody();
+        assertEquals("EN_STANDBY", actualizada.getEstado());
+        assertEquals(5, actualizada.getPersonalReal());
+        // Rendimiento real = 150.00 / 5 = 30.00
+        assertEquals(new BigDecimal("30.00"), actualizada.getRendimientoReal());
     }
 
 }

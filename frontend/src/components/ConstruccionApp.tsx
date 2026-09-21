@@ -77,6 +77,9 @@ import {
   listarCuadrillasConstruccionApi,
   crearCuadrillaConstruccionApi,
   cambiarEstadoCuadrillaConstruccionApi,
+  actualizarCuadrillaConstruccionApi,
+  listarEmpleadosPersonal,
+  type EmpleadoPersonalApi,
 } from '../api';
 
 interface NavItemConstruccion {
@@ -157,13 +160,25 @@ export default function ConstruccionApp({ onSalir }: Props) {
     nombre: '',
     frenteTrabajo: '',
     capatazResponsable: '',
+    capatazEmpleadoId: '',
     cantidadOficiales: 2,
     cantidadAyudantes: 4,
+    personalReal: '',
+    cantidadEjecutadaReal: '',
+    costoJornalMonto: '',
+    costoJornalMoneda: 'USD',
     especialidad: 'CONCRETO_Y_ENCOFRADO',
     partidaId: '',
     fechaInicio: new Date().toISOString().split('T')[0],
     observaciones: ''
   });
+  const [modalRendimientoTarget, setModalRendimientoTarget] = useState<CuadrillaConstruccionApi | null>(null);
+  const [formRendimiento, setFormRendimiento] = useState({
+    personalReal: '',
+    cantidadEjecutadaReal: ''
+  });
+  const [guardandoRendimiento, setGuardandoRendimiento] = useState(false);
+  const [empleadosNomina, setEmpleadosNomina] = useState<EmpleadoPersonalApi[]>([]);
 
   // Estados de interfaz
   const [cargando, setCargando] = useState(false);
@@ -358,6 +373,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
   useEffect(() => {
     recargarProyectosEInsumos();
+    listarEmpleadosPersonal().then(setEmpleadosNomina).catch(() => setEmpleadosNomina([]));
   }, [recargarProyectosEInsumos]);
 
   useEffect(() => {
@@ -2337,7 +2353,19 @@ export default function ConstruccionApp({ onSalir }: Props) {
                               </span>
                             </td>
                             <td className="p-4 text-slate-300 font-medium">
-                              {cuad.capatazResponsable || cuad.capatazLider}
+                              <div className="flex items-center gap-1.5">
+                                <span>{cuad.capatazResponsable || cuad.capatazLider}</span>
+                                {cuad.capatazEmpleadoId && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                                    Nómina
+                                  </span>
+                                )}
+                              </div>
+                              {cuad.rendimientoReal != null && (
+                                <div className="text-[10px] text-emerald-400 font-mono mt-0.5">
+                                  Rend: {formatVE(cuad.rendimientoReal)} / obrero
+                                </div>
+                              )}
                             </td>
                             <td className="p-4 text-center font-bold text-sky-400">
                               {cuad.cantidadOficiales}
@@ -2376,6 +2404,19 @@ export default function ConstruccionApp({ onSalir }: Props) {
                             </td>
                             <td className="p-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => {
+                                    setModalRendimientoTarget(cuad);
+                                    setFormRendimiento({
+                                      personalReal: String(cuad.personalReal || cuad.cantidadTotalPersonal || 1),
+                                      cantidadEjecutadaReal: String(cuad.cantidadEjecutadaReal || '')
+                                    });
+                                  }}
+                                  title="Reportar avance y rendimiento real"
+                                  className="px-2 py-1 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/25 text-[11px] font-semibold cursor-pointer"
+                                >
+                                  Rendimiento
+                                </button>
                                 {cuad.estado !== 'ACTIVA' && (
                                   <button
                                     onClick={async () => {
@@ -3758,8 +3799,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       nombre: formCuadrilla.nombre.trim(),
                       frenteTrabajo: formCuadrilla.frenteTrabajo.trim(),
                       capatazResponsable: formCuadrilla.capatazResponsable.trim(),
+                      capatazEmpleadoId: formCuadrilla.capatazEmpleadoId ? Number(formCuadrilla.capatazEmpleadoId) : undefined,
                       cantidadOficiales: Number(formCuadrilla.cantidadOficiales) || 0,
                       cantidadAyudantes: Number(formCuadrilla.cantidadAyudantes) || 0,
+                      personalReal: formCuadrilla.personalReal ? Number(formCuadrilla.personalReal) : undefined,
+                      cantidadEjecutadaReal: formCuadrilla.cantidadEjecutadaReal ? Number(formCuadrilla.cantidadEjecutadaReal) : undefined,
+                      costoJornalMonto: formCuadrilla.costoJornalMonto ? Number(formCuadrilla.costoJornalMonto) : undefined,
+                      costoJornalMoneda: formCuadrilla.costoJornalMoneda || 'USD',
                       especialidad: formCuadrilla.especialidad,
                       fechaInicio: formCuadrilla.fechaInicio,
                       partidaId: formCuadrilla.partidaId ? Number(formCuadrilla.partidaId) : undefined,
@@ -3774,8 +3820,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     nombre: '',
                     frenteTrabajo: '',
                     capatazResponsable: '',
+                    capatazEmpleadoId: '',
                     cantidadOficiales: 2,
                     cantidadAyudantes: 4,
+                    personalReal: '',
+                    cantidadEjecutadaReal: '',
+                    costoJornalMonto: '',
+                    costoJornalMoneda: 'USD',
                     especialidad: 'CONCRETO_Y_ENCOFRADO',
                     partidaId: '',
                     fechaInicio: new Date().toISOString().split('T')[0],
@@ -3853,11 +3904,39 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     required
                     placeholder="Ej. José Castillo"
                     value={formCuadrilla.capatazResponsable}
-                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, capatazResponsable: e.target.value })}
+                    onChange={(e) => setFormCuadrilla({ ...formCuadrilla, capatazResponsable: e.target.value, capatazEmpleadoId: '' })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                   />
                 </div>
               </div>
+
+              {empleadosNomina.length > 0 && (
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">O vincular desde Personal / Nómina</label>
+                  <select
+                    value={formCuadrilla.capatazEmpleadoId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        const emp = empleadosNomina.find(x => String(x.id) === val);
+                        setFormCuadrilla({
+                          ...formCuadrilla,
+                          capatazEmpleadoId: val,
+                          capatazResponsable: emp ? emp.nombreCompleto : formCuadrilla.capatazResponsable
+                        });
+                      } else {
+                        setFormCuadrilla({ ...formCuadrilla, capatazEmpleadoId: '' });
+                      }
+                    }}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none text-xs"
+                  >
+                    <option value="">-- Sin vincular a nómina interna --</option>
+                    {empleadosNomina.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.nombreCompleto} ({emp.documentoIdentidad})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
                 <div>
@@ -4145,10 +4224,16 @@ export default function ConstruccionApp({ onSalir }: Props) {
               onSubmit={async (e) => {
                 e.preventDefault();
                 setErrorGlobal(null);
+                const nuevoH = Number(nuevoHorometroInput) || 0;
+                const actualH = Number(modalHorometroTarget.horometroActual) || 0;
+                if (nuevoH < actualH) {
+                  setErrorGlobal(`El nuevo horómetro (${nuevoH} hrs) no puede ser menor al acumulado (${actualH} hrs).`);
+                  return;
+                }
                 try {
                   await actualizarHorometroMaquinariaApi(
                     modalHorometroTarget.id!,
-                    Number(nuevoHorometroInput) || 0,
+                    nuevoH,
                     nuevoOperadorInput.trim() || undefined
                   );
                   notificarExito(`Horómetro actualizado para ${modalHorometroTarget.codigo}.`);
@@ -4160,11 +4245,23 @@ export default function ConstruccionApp({ onSalir }: Props) {
               }}
               className="space-y-4 text-xs"
             >
+              <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800 space-y-1">
+                <div className="text-[11px] text-slate-400">
+                  Horómetro actual acumulado: <strong className="text-sky-400 font-mono">{formatVE(modalHorometroTarget.horometroActual || 0)} hrs</strong>
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Intervalo preventivo: cada <strong className="text-slate-300 font-mono">{modalHorometroTarget.intervaloMantenimientoHoras || 250} hrs</strong>
+                </div>
+              </div>
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Horómetro Actual (Horas) *</label>
+                <label className="block text-slate-400 mb-1 font-semibold">
+                  Horómetro Actualizado (Horas) *
+                  <span className="text-slate-500 font-normal ml-1">(No decreciente)</span>
+                </label>
                 <input
                   type="number"
                   step="0.1"
+                  min={Number(modalHorometroTarget.horometroActual || 0)}
                   required
                   value={nuevoHorometroInput}
                   onChange={(e) => setNuevoHorometroInput(e.target.value)}
@@ -5158,6 +5255,118 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 {guardandoReversoVal ? 'Reversando...' : 'Confirmar Reverso Auditado'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SEGUIMIENTO DE RENDIMIENTO REAL */}
+      {modalRendimientoTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <IconUsers size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white">Rendimiento Real: {modalRendimientoTarget.codigo}</h3>
+                  <p className="text-[11px] text-slate-400">{modalRendimientoTarget.nombre}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalRendimientoTarget(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setGuardandoRendimiento(true);
+                setErrorGlobal(null);
+                try {
+                  const pReal = Number(formRendimiento.personalReal) || 0;
+                  const cReal = Number(formRendimiento.cantidadEjecutadaReal) || 0;
+                  await actualizarCuadrillaConstruccionApi(modalRendimientoTarget.id!, {
+                    personalReal: pReal > 0 ? pReal : undefined,
+                    cantidadEjecutadaReal: cReal >= 0 ? cReal : undefined
+                  });
+                  notificarExito(`Rendimiento actualizado para cuadrilla ${modalRendimientoTarget.codigo}.`);
+                  setModalRendimientoTarget(null);
+                  if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
+                } catch (err: any) {
+                  setErrorGlobal(err.message || 'Error actualizando el rendimiento');
+                } finally {
+                  setGuardandoRendimiento(false);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800 space-y-1">
+                <div className="text-[11px] text-slate-400">
+                  Dotación planificada: <strong className="text-sky-400 font-bold">{modalRendimientoTarget.cantidadTotalPersonal || (modalRendimientoTarget.cantidadOficiales + modalRendimientoTarget.cantidadAyudantes)} obreros</strong>
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Frente de trabajo: <strong className="text-slate-300">{modalRendimientoTarget.frenteTrabajo}</strong>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Personal Real en Obra (Obreros)</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={formRendimiento.personalReal}
+                  onChange={(e) => setFormRendimiento({ ...formRendimiento, personalReal: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold text-sky-400 focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Cantidad Ejecutada Acumulada</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  placeholder="Ej. 120.50"
+                  value={formRendimiento.cantidadEjecutadaReal}
+                  onChange={(e) => setFormRendimiento({ ...formRendimiento, cantidadEjecutadaReal: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold text-emerald-400 focus:border-amber-500 focus:outline-none text-base"
+                />
+              </div>
+
+              {Number(formRendimiento.personalReal) > 0 && Number(formRendimiento.cantidadEjecutadaReal) > 0 && (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                  <div className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider">Rendimiento Real Calculado</div>
+                  <div className="text-xl font-mono font-black text-emerald-300 mt-0.5">
+                    {formatVE(Number(formRendimiento.cantidadEjecutadaReal) / Number(formRendimiento.personalReal))}
+                    <span className="text-xs font-normal text-emerald-400/80 ml-1.5">por obrero</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalRendimientoTarget(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardandoRendimiento}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-500/20"
+                >
+                  <IconCheck size={14} />
+                  <span>{guardandoRendimiento ? 'Guardando...' : 'Guardar Rendimiento'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

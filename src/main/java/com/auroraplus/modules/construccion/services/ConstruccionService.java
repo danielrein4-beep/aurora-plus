@@ -110,6 +110,10 @@ public class ConstruccionService {
     @Autowired(required = false)
     private com.auroraplus.core.financiero.repositories.TasaCambioRepository tasaCambioRepository;
 
+    @Autowired(required = false)
+    @org.springframework.beans.factory.annotation.Qualifier("personalEmpleadoRepository")
+    private com.auroraplus.core.personal.repositories.EmpleadoRepository personalEmpleadoRepository;
+
     @Autowired
     private MaquinariaConstruccionRepository maquinariaRepository;
 
@@ -1292,6 +1296,19 @@ public class ConstruccionService {
         MaquinariaConstruccionEntity maq = maquinariaRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Maquinaria no encontrada para este tenant"));
 
+        if (req.getHorometroActual() != null) {
+            if (req.getHorometroActual().compareTo(maq.getHorometroActual()) < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El horómetro actual (" + req.getHorometroActual() + ") no puede ser menor al horómetro acumulado (" + maq.getHorometroActual() + ")");
+            }
+            maq.setHorometroActual(req.getHorometroActual());
+        }
+        if (req.getProyectoId() != null) {
+            ProyectoConstruccionEntity proy = proyectoRepository.findByTenantIdAndId(tenantId, req.getProyectoId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Proyecto de destino no encontrado"));
+            validarProyectoOperable(proy);
+            maq.setProyectoId(req.getProyectoId());
+        }
         if (req.getNombre() != null && !req.getNombre().trim().isEmpty()) {
             maq.setNombre(req.getNombre().trim());
         }
@@ -1882,6 +1899,13 @@ public class ConstruccionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El frente de trabajo es obligatorio");
         }
         
+        if (req.getCapatazEmpleadoId() != null && personalEmpleadoRepository != null) {
+            var emp = personalEmpleadoRepository.findByTenantIdAndId(tenantId, req.getCapatazEmpleadoId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El empleado asignado como capataz no existe o pertenece a otro tenant"));
+            if (req.getCapatazResponsable() == null || req.getCapatazResponsable().trim().isEmpty()) {
+                req.setCapatazResponsable(emp.getNombreCompleto());
+            }
+        }
         // Soporte robusto tanto para capatazResponsable como para capatazLider
         String capataz = req.getCapatazResponsable();
         if (capataz == null || capataz.trim().isEmpty()) {
@@ -1921,6 +1945,15 @@ public class ConstruccionService {
         req.setCantidadOficiales(oficiales);
         req.setCantidadAyudantes(ayudantes);
         req.setCantidadTotalPersonal(oficiales + ayudantes);
+
+        if (req.getCantidadEjecutadaReal() != null && req.getCantidadEjecutadaReal().compareTo(BigDecimal.ZERO) > 0) {
+            int divisor = (req.getPersonalReal() != null && req.getPersonalReal() > 0)
+                    ? req.getPersonalReal()
+                    : req.getCantidadTotalPersonal();
+            if (divisor > 0) {
+                req.setRendimientoReal(req.getCantidadEjecutadaReal().divide(new BigDecimal(divisor), 2, java.math.RoundingMode.HALF_UP));
+            }
+        }
 
         // Idempotencia: serialización canónica de todos los campos de negocio.
         String payloadHash = (idempotencyKey != null && !idempotencyKey.trim().isEmpty())
@@ -1998,6 +2031,87 @@ public class ConstruccionService {
             cuadrilla.setFrenteTrabajo(nuevoFrente.trim());
         }
 
+        return cuadrillaRepository.save(cuadrilla);
+    }
+
+    @Transactional
+    public CuadrillaConstruccionEntity actualizarCuadrilla(Long tenantId, Long id, CuadrillaConstruccionEntity req) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant no autenticado");
+        }
+        if (id == null || req == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Datos incompletos para actualizar cuadrilla");
+        }
+
+        CuadrillaConstruccionEntity cuadrilla = cuadrillaRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cuadrilla no encontrada"));
+
+        if (req.getCapatazEmpleadoId() != null) {
+            if (personalEmpleadoRepository != null) {
+                var emp = personalEmpleadoRepository.findByTenantIdAndId(tenantId, req.getCapatazEmpleadoId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El empleado asignado como capataz no existe o pertenece a otro tenant"));
+                cuadrilla.setCapatazEmpleadoId(req.getCapatazEmpleadoId());
+                if (req.getCapatazResponsable() == null || req.getCapatazResponsable().trim().isEmpty()) {
+                    cuadrilla.setCapatazResponsable(emp.getNombreCompleto());
+                }
+            } else {
+                cuadrilla.setCapatazEmpleadoId(req.getCapatazEmpleadoId());
+            }
+        }
+        if (req.getCapatazResponsable() != null && !req.getCapatazResponsable().trim().isEmpty()) {
+            cuadrilla.setCapatazResponsable(req.getCapatazResponsable().trim());
+        }
+        if (req.getNombre() != null && !req.getNombre().trim().isEmpty()) {
+            cuadrilla.setNombre(req.getNombre().trim());
+        }
+        if (req.getFrenteTrabajo() != null && !req.getFrenteTrabajo().trim().isEmpty()) {
+            cuadrilla.setFrenteTrabajo(req.getFrenteTrabajo().trim());
+        }
+        if (req.getEspecialidad() != null && !req.getEspecialidad().trim().isEmpty()) {
+            String esp = req.getEspecialidad().trim().toUpperCase();
+            if (!ESPECIALIDADES_CUADRILLA_VALIDAS.contains(esp)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Especialidad de cuadrilla no válida: '" + req.getEspecialidad() + "'. Valores permitidos: " + ESPECIALIDADES_CUADRILLA_VALIDAS);
+            }
+            cuadrilla.setEspecialidad(esp);
+        }
+        if (req.getEstado() != null && !req.getEstado().trim().isEmpty()) {
+            String est = req.getEstado().trim().toUpperCase();
+            if (!ESTADOS_CUADRILLA_VALIDOS.contains(est)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado no válido para cuadrilla: '" + req.getEstado() + "'. Valores permitidos: " + ESTADOS_CUADRILLA_VALIDOS);
+            }
+            cuadrilla.setEstado(est);
+        }
+        if (req.getCantidadOficiales() != null && req.getCantidadOficiales() >= 0) {
+            cuadrilla.setCantidadOficiales(req.getCantidadOficiales());
+        }
+        if (req.getCantidadAyudantes() != null && req.getCantidadAyudantes() >= 0) {
+            cuadrilla.setCantidadAyudantes(req.getCantidadAyudantes());
+        }
+        cuadrilla.setCantidadTotalPersonal(cuadrilla.getCantidadOficiales() + cuadrilla.getCantidadAyudantes());
+
+        if (req.getPersonalReal() != null && req.getPersonalReal() >= 0) {
+            cuadrilla.setPersonalReal(req.getPersonalReal());
+        }
+        if (req.getCantidadEjecutadaReal() != null) {
+            cuadrilla.setCantidadEjecutadaReal(req.getCantidadEjecutadaReal());
+        }
+        if (cuadrilla.getCantidadEjecutadaReal() != null && cuadrilla.getCantidadEjecutadaReal().compareTo(BigDecimal.ZERO) > 0) {
+            int divisor = (cuadrilla.getPersonalReal() != null && cuadrilla.getPersonalReal() > 0)
+                    ? cuadrilla.getPersonalReal()
+                    : cuadrilla.getCantidadTotalPersonal();
+            if (divisor > 0) {
+                cuadrilla.setRendimientoReal(cuadrilla.getCantidadEjecutadaReal().divide(new BigDecimal(divisor), 2, java.math.RoundingMode.HALF_UP));
+            }
+        }
+        if (req.getCostoJornalMonto() != null) {
+            cuadrilla.setCostoJornalMonto(req.getCostoJornalMonto());
+        }
+        if (req.getCostoJornalMoneda() != null && !req.getCostoJornalMoneda().trim().isEmpty()) {
+            cuadrilla.setCostoJornalMoneda(req.getCostoJornalMoneda().trim().toUpperCase());
+        }
+        if (req.getObservaciones() != null) {
+            cuadrilla.setObservaciones(req.getObservaciones());
+        }
         return cuadrillaRepository.save(cuadrilla);
     }
 }

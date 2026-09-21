@@ -5159,10 +5159,14 @@ export interface CuadrillaConstruccionApi {
   frenteTrabajo: string;
   capatazResponsable: string;
   capatazLider?: string;
+  capatazEmpleadoId?: number | null;
   cantidadOficiales: number;
   cantidadAyudantes: number;
   cantidadTotalPersonal?: number;
   totalPersonal?: number;
+  personalReal?: number | null;
+  cantidadEjecutadaReal?: number | null;
+  rendimientoReal?: number | null;
   especialidad: string; // CONCRETO_Y_ENCOFRADO, ACERO_Y_CABILLAS, ALBANILERIA, MOVIMIENTO_TIERRAS, INSTALACIONES_ELECTRICAS, INSTALACIONES_SANITARIAS, ACABADOS_Y_PINTURA, SOLDADURA_ESTRUCTURAL, GENERAL
   rendimientoDiarioEstimado?: number;
   unidadMedidaRendimiento?: string;
@@ -5190,10 +5194,18 @@ export function crearCuadrillaConstruccionApi(proyectoId: number, datos: Partial
   });
 }
 
-export function cambiarEstadoCuadrillaConstruccionApi(id: number, estado: string): Promise<CuadrillaConstruccionApi> {
+export function cambiarEstadoCuadrillaConstruccionApi(id: number, estado: string, frenteTrabajo?: string): Promise<CuadrillaConstruccionApi> {
   return request(`/api/construccion/cuadrillas/${id}/estado`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ estado })
+    body: JSON.stringify({ estado, frenteTrabajo })
+  });
+}
+
+export function actualizarCuadrillaConstruccionApi(id: number, datos: Partial<CuadrillaConstruccionApi>): Promise<CuadrillaConstruccionApi> {
+  return request(`/api/construccion/cuadrillas/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(datos)
   });
 }
