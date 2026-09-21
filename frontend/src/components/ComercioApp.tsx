@@ -8,7 +8,7 @@ import {
   IconHardware, IconPrescription, IconRetail, IconCard, IconSearch, IconTrash,
   IconCheck, IconWarning, IconClose, IconUsers, IconFileText, IconHourglass,
   IconDownload, IconRefresh, IconCheckCircle, IconBank, IconChart, IconBox, IconLock,
-  IconSettings, IconCoins, IconEdit, IconShoppingBag, IconTruck,
+  IconSettings, IconCoins, IconEdit, IconShoppingBag, IconTruck, AuroraGradientDef,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
@@ -1171,6 +1171,10 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
   return (
     <div className="h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-['Inter'] selection:bg-teal-500 selection:text-white overflow-hidden">
+      {/* Sin esto, cualquier ícono "viejo estilo" (IconCard, IconBox, IconTrash...) que
+          usa un degradado SVG compartido (ver Icons.tsx, const s = {stroke: url(#GRAD)})
+          queda invisible — el navegador no encuentra el <defs> del degradado en esta página. */}
+      <AuroraGradientDef />
 
       {/* ══════════════════════ SIDEBAR (drawer en móvil, fijo en desktop) ══════════════════════ */}
       {sidebarAbierto && (
@@ -1964,69 +1968,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             solas desde el mostrador, esto es solo para anotar lo demás.
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "gastos" && (
-          <div className="max-w-3xl mx-auto w-full space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4" style={{ borderLeftColor: "#10b981" }}>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Ingresos registrados</div>
-                <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
-                  ${ingresosCaja.filter((m) => m.moneda === "USD").reduce((s, m) => s + Number(m.monto), 0).toFixed(2)}
-                </div>
-              </div>
-              <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4" style={{ borderLeftColor: "#ef4444" }}>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Gastos registrados</div>
-                <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
-                  ${gastosCaja.filter((m) => m.moneda === "USD").reduce((s, m) => s + Number(m.monto), 0).toFixed(2)}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Registrar movimiento</h3>
-              <div className="flex items-center gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs w-fit">
-                {(["EGRESO", "INGRESO"] as const).map((t) => (
-                  <button key={t} onClick={() => setFormGasto({ ...formGasto, tipo: t })}
-                    className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer ${formGasto.tipo === t ? (t === "EGRESO" ? "bg-red-500 text-white" : "bg-teal-500 text-slate-950") : "text-slate-600 dark:text-slate-400"}`}>
-                    {t === "EGRESO" ? "Gasto" : "Ingreso"}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <input value={formGasto.monto} onChange={(e) => setFormGasto({ ...formGasto, monto: e.target.value })} type="number" step="0.01" placeholder="Monto"
-                  className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" />
-                <select value={formGasto.moneda} onChange={(e) => setFormGasto({ ...formGasto, moneda: e.target.value as "USD" | "VES" | "COP" })}
-                  className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm">
-                  <option value="USD">USD</option>
-                  <option value="VES">VES</option>
-                  <option value="COP">COP</option>
-                </select>
-                <input value={formGasto.concepto} onChange={(e) => setFormGasto({ ...formGasto, concepto: e.target.value })} placeholder="Concepto (ej. Alquiler del local)"
-                  className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm sm:col-span-2" />
-              </div>
-              <button onClick={registrarGasto} disabled={guardandoGasto}
-                className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-sm cursor-pointer disabled:opacity-60">
-                {guardandoGasto ? "Guardando…" : "Registrar"}
-              </button>
-            </div>
-
-            <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-3">Últimos gastos registrados</h3>
-              {gastosCaja.length === 0 ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400">Aún no hay gastos registrados.</p>
-              ) : (
-                <div className="space-y-2">
-                  {gastosCaja.slice(0, 15).map((m) => (
-                    <div key={m.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 text-sm">
-                      <div>
-                        <div className="font-semibold text-slate-900 dark:text-white">{m.concepto}</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">{new Date(m.fechaRegistro).toLocaleString()}</div>
-                      </div>
-                      <div className="font-mono font-bold text-red-500">-{Number(m.monto).toFixed(2)} {m.moneda}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <IngresosGastosComercio
+            ingresosCaja={ingresosCaja}
+            gastosCaja={gastosCaja}
+            formGasto={formGasto}
+            setFormGasto={setFormGasto}
+            registrarGasto={registrarGasto}
+            guardandoGasto={guardandoGasto}
+          />
         )}
 
         {/* ══════════════════════════════════════════════════════════════════
@@ -3174,6 +3123,181 @@ function TasaBadgeComercio({ tenantId, origenTasaActiva, tasaVes, tasaCop, onOri
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMPONENTE: INGRESOS & GASTOS — navegable por día/semana/mes, con utilidad
+// (ingresos - gastos) calculada automáticamente para el período visible.
+// Los movimientos ya viven completos en el componente padre (listarMovimientos
+// sin filtro de fecha) — aquí solo se filtran y suman en el cliente, mismo
+// criterio que ya usa DashboardGeneralComercio para "ventas de hoy/semana".
+// ══════════════════════════════════════════════════════════════════════════
+function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGasto, registrarGasto, guardandoGasto }: {
+  ingresosCaja: MovimientoCaja[];
+  gastosCaja: MovimientoCaja[];
+  formGasto: { tipo: "INGRESO" | "EGRESO"; monto: string; moneda: "USD" | "VES" | "COP"; concepto: string };
+  setFormGasto: (v: { tipo: "INGRESO" | "EGRESO"; monto: string; moneda: "USD" | "VES" | "COP"; concepto: string }) => void;
+  registrarGasto: () => void;
+  guardandoGasto: boolean;
+}) {
+  type Modo = "dia" | "semana" | "mes";
+  const [modo, setModo] = useState<Modo>("mes");
+  const [offset, setOffset] = useState(0); // 0 = período actual, -1 = anterior, +1 = siguiente
+
+  const rango = useMemo(() => {
+    const hoy = new Date();
+    if (modo === "dia") {
+      const d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + offset);
+      const desde = new Date(d); desde.setHours(0, 0, 0, 0);
+      const hasta = new Date(d); hasta.setHours(23, 59, 59, 999);
+      const etiqueta = offset === 0 ? "Hoy" : d.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" });
+      return { desde, hasta, etiqueta };
+    }
+    if (modo === "semana") {
+      const inicioSemanaActual = new Date(hoy); inicioSemanaActual.setDate(hoy.getDate() - hoy.getDay());
+      const desde = new Date(inicioSemanaActual); desde.setDate(desde.getDate() + offset * 7); desde.setHours(0, 0, 0, 0);
+      const hasta = new Date(desde); hasta.setDate(hasta.getDate() + 6); hasta.setHours(23, 59, 59, 999);
+      const fmt = (d: Date) => d.toLocaleDateString("es-VE", { day: "numeric", month: "short" });
+      const etiqueta = offset === 0 ? "Esta semana" : `${fmt(desde)} – ${fmt(hasta)}`;
+      return { desde, hasta, etiqueta };
+    }
+    const desde = new Date(hoy.getFullYear(), hoy.getMonth() + offset, 1);
+    const hasta = new Date(hoy.getFullYear(), hoy.getMonth() + offset + 1, 0, 23, 59, 59, 999);
+    const etiqueta = offset === 0 ? "Este mes" : desde.toLocaleDateString("es-VE", { month: "long", year: "numeric" });
+    return { desde, hasta, etiqueta };
+  }, [modo, offset]);
+
+  const enRango = (m: MovimientoCaja) => {
+    const f = new Date(m.fechaRegistro);
+    return f >= rango.desde && f <= rango.hasta;
+  };
+
+  const ingresosPeriodo = useMemo(() => ingresosCaja.filter(enRango), [ingresosCaja, rango]);
+  const gastosPeriodo = useMemo(() => gastosCaja.filter(enRango), [gastosCaja, rango]);
+
+  const sumarPorMoneda = (movs: MovimientoCaja[]) => {
+    const acc: Record<string, number> = {};
+    for (const m of movs) acc[m.moneda] = (acc[m.moneda] || 0) + Number(m.monto);
+    return acc;
+  };
+  const totalIngresos = sumarPorMoneda(ingresosPeriodo);
+  const totalGastos = sumarPorMoneda(gastosPeriodo);
+  const monedas = Array.from(new Set([...Object.keys(totalIngresos), ...Object.keys(totalGastos)]));
+  const utilidadPorMoneda: Record<string, number> = {};
+  for (const m of monedas) utilidadPorMoneda[m] = (totalIngresos[m] || 0) - (totalGastos[m] || 0);
+
+  const fmtLista = (obj: Record<string, number>) => {
+    const entradas = Object.entries(obj);
+    if (entradas.length === 0) return "$0.00";
+    return entradas.map(([m, v]) => `${m === "USD" ? "$" : m + " "}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(" · ");
+  };
+
+  const movimientosPeriodo = useMemo(
+    () => [...ingresosPeriodo.map((m) => ({ ...m, esIngreso: true })), ...gastosPeriodo.map((m) => ({ ...m, esIngreso: false }))]
+      .sort((a, b) => new Date(b.fechaRegistro).getTime() - new Date(a.fechaRegistro).getTime()),
+    [ingresosPeriodo, gastosPeriodo]
+  );
+
+  return (
+    <div className="max-w-4xl mx-auto w-full space-y-5">
+      {/* ── Navegador de período ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs w-fit">
+          {([["dia", "Día"], ["semana", "Semana"], ["mes", "Mes"]] as [Modo, string][]).map(([id, label]) => (
+            <button key={id} onClick={() => { setModo(id); setOffset(0); }}
+              className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${modo === id ? "bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-300 shadow-sm" : "text-slate-500 dark:text-slate-400"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setOffset((o) => o - 1)} className="w-8 h-8 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center hover:border-teal-500/50 cursor-pointer text-slate-600 dark:text-slate-300" title="Período anterior">
+            ←
+          </button>
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-200 capitalize min-w-[9rem] text-center">{rango.etiqueta}</span>
+          <button onClick={() => setOffset((o) => Math.min(o + 1, 0))} disabled={offset >= 0} className="w-8 h-8 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center hover:border-teal-500/50 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300" title="Período siguiente">
+            →
+          </button>
+          {offset !== 0 && (
+            <button onClick={() => setOffset(0)} className="text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer ml-1">
+              Volver a hoy
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Resumen del período: ingresos, gastos, utilidad ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4" style={{ borderLeftColor: "#10b981" }}>
+          <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Ingresos del período</div>
+          <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{fmtLista(totalIngresos)}</div>
+        </div>
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4" style={{ borderLeftColor: "#ef4444" }}>
+          <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Gastos del período</div>
+          <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">{fmtLista(totalGastos)}</div>
+        </div>
+        <div className={`p-5 rounded-2xl border-l-4 ${monedas.some((m) => utilidadPorMoneda[m] < 0) ? "bg-rose-500/10" : "bg-emerald-500/10"}`} style={{ borderLeftColor: monedas.some((m) => utilidadPorMoneda[m] < 0) ? "#f43f5e" : "#10b981" }}>
+          <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Utilidad (Ingresos − Gastos)</div>
+          <div className={`font-['Outfit'] font-black text-xl ${monedas.some((m) => utilidadPorMoneda[m] < 0) ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+            {fmtLista(utilidadPorMoneda)}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Registrar movimiento ── */}
+      <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+        <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Registrar movimiento</h3>
+        <div className="flex items-center gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs w-fit">
+          {(["EGRESO", "INGRESO"] as const).map((t) => (
+            <button key={t} onClick={() => setFormGasto({ ...formGasto, tipo: t })}
+              className={`px-4 py-1.5 rounded-full font-bold transition-all cursor-pointer ${formGasto.tipo === t ? (t === "EGRESO" ? "bg-red-500 text-white" : "bg-teal-500 text-slate-950") : "text-slate-600 dark:text-slate-400"}`}>
+              {t === "EGRESO" ? "Gasto" : "Ingreso"}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <input value={formGasto.monto} onChange={(e) => setFormGasto({ ...formGasto, monto: e.target.value })} type="number" step="0.01" placeholder="Monto"
+            className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" />
+          <select value={formGasto.moneda} onChange={(e) => setFormGasto({ ...formGasto, moneda: e.target.value as "USD" | "VES" | "COP" })}
+            className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm">
+            <option value="USD">USD</option>
+            <option value="VES">VES</option>
+            <option value="COP">COP</option>
+          </select>
+          <input value={formGasto.concepto} onChange={(e) => setFormGasto({ ...formGasto, concepto: e.target.value })} placeholder="Concepto (ej. Alquiler del local)"
+            className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm sm:col-span-2" />
+        </div>
+        <button onClick={registrarGasto} disabled={guardandoGasto}
+          className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-sm cursor-pointer disabled:opacity-60">
+          {guardandoGasto ? "Guardando…" : "Registrar"}
+        </button>
+      </div>
+
+      {/* ── Movimientos del período ── */}
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+          <h3 className="text-xs font-bold text-slate-700 dark:text-white uppercase tracking-wider">Movimientos — {rango.etiqueta}</h3>
+        </div>
+        {movimientosPeriodo.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-400">Sin movimientos registrados en este período.</div>
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {movimientosPeriodo.map((m) => (
+              <div key={`${m.esIngreso ? "i" : "g"}-${m.id}`} className="flex items-center justify-between p-3.5 bg-white dark:bg-slate-900 text-sm">
+                <div>
+                  <div className="font-semibold text-slate-900 dark:text-white">{m.concepto}</div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400">{new Date(m.fechaRegistro).toLocaleString("es-VE")}</div>
+                </div>
+                <div className={`font-mono font-bold ${m.esIngreso ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
+                  {m.esIngreso ? "+" : "-"}{Number(m.monto).toFixed(2)} {m.moneda}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
