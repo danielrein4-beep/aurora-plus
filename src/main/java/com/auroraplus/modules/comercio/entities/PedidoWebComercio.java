@@ -1,13 +1,21 @@
 package com.auroraplus.modules.comercio.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+// Sin este filtro, un pedidoWebRepository.findById(id) devuelve el pedido de
+// CUALQUIER tenant — CatalogoGestionController.actualizarEstadoPedido ya
+// validaba esto a mano comparando tenantId antes de tocar el registro, pero
+// eso dependía de que cada endpoint nuevo se acuerde de repetir ese chequeo.
+// Con el filtro activo (ver TenantFilterAspect/TenantInterceptor), findById
+// queda aislado por tenant automáticamente, igual que el resto de entidades.
 @Entity
 @Table(name = "comercio_pedidos_web", indexes = {
     @Index(name = "idx_pedidos_web_tenant", columnList = "tenant_id, fecha_creacion DESC")
 })
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class PedidoWebComercio {
 
     @Id
