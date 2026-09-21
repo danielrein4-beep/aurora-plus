@@ -438,61 +438,69 @@ function DashboardGeneralComercio({ productos, ingresosCaja, esAdmin, nombreNego
         </section>
       )}
 
-      {/* ── 1. RENTABILIDAD DE HOY — lo primero que un dueño necesita ver ── */}
+      {/* ── 1. RENTABILIDAD DE HOY — tarjeta héroe (Ventas) + cinta secundaria (Utilidad / Alertas) ── */}
       <section className="space-y-2.5">
         <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Hoy</h3>
-        <div className={`grid grid-cols-1 sm:grid-cols-3 gap-4`}>
-          <div className="relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas</span>
-              <div className="w-9 h-9 rounded-xl bg-teal-500/10 flex items-center justify-center"><IconChart size={17} className="text-teal-600 dark:text-teal-400" /></div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Tarjeta héroe: Ventas de Hoy */}
+          <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl p-5 border-2 border-teal-200 dark:border-teal-500/30 shadow-sm flex flex-col justify-between">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/30 px-2.5 py-0.5 rounded-full">
+                  Ventas de Hoy
+                </span>
+                <div className="mt-2.5 font-['Outfit'] font-black text-3xl text-slate-900 dark:text-white truncate">
+                  {fmtMonedas(ventasHoy)}
+                </div>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-teal-500/10 flex items-center justify-center flex-shrink-0"><IconChart size={17} className="text-teal-600 dark:text-teal-400" /></div>
             </div>
-            <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasHoy)}</div>
-            {Object.keys(ventasHoy).length === 0 && <p className="text-[11px] text-slate-400">Aún no registras ventas hoy.</p>}
+            {Object.keys(ventasHoy).length === 0 && <p className="text-[11px] text-slate-400 mt-3">Aún no registras ventas hoy.</p>}
           </div>
 
-          {esAdmin ? (
-            <button type="button" onClick={onIrAUtilidad} className="text-left relative overflow-hidden bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 rounded-2xl p-5 border border-emerald-500/30 shadow-sm space-y-2 cursor-pointer hover:border-emerald-500/60 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Utilidad Real</span>
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center"><IconCoins size={17} className="text-emerald-600 dark:text-emerald-400" /></div>
-              </div>
-              {cargandoUtilidad ? (
-                <div className="text-xs text-emerald-600/70 dark:text-emerald-400/60">Calculando…</div>
-              ) : utilidadHoy && utilidadHoy.ventasBrutas > 0 ? (
-                <>
-                  <div className="font-['Outfit'] font-black text-2xl text-emerald-700 dark:text-emerald-400 truncate">
-                    {utilidadHoy.moneda === "USD" ? "$" : utilidadHoy.moneda + " "}{utilidadHoy.utilidad.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  {utilidadHoy.margenPct !== null && (
-                    <div className="text-[11px] text-emerald-600/80 dark:text-emerald-400/70">{utilidadHoy.margenPct.toFixed(1)}% de margen{utilidadHoy.coberturaPct < 100 ? ` · ${utilidadHoy.coberturaPct.toFixed(0)}% con costo conocido` : ""}</div>
+          {/* Cinta secundaria: Utilidad Real + Requiere atención */}
+          <div className="lg:col-span-5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between gap-3">
+            {esAdmin ? (
+              <button type="button" onClick={onIrAUtilidad} className="text-left flex items-center justify-between gap-3 cursor-pointer group">
+                <div className="min-w-0">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Utilidad Real</span>
+                  {cargandoUtilidad ? (
+                    <div className="text-xs text-slate-400">Calculando…</div>
+                  ) : utilidadHoy && utilidadHoy.ventasBrutas > 0 ? (
+                    <>
+                      <div className="font-['Outfit'] font-black text-xl text-emerald-700 dark:text-emerald-400 truncate">
+                        {utilidadHoy.moneda === "USD" ? "$" : utilidadHoy.moneda + " "}{utilidadHoy.utilidad.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      {utilidadHoy.margenPct !== null && (
+                        <div className="text-[10px] text-slate-400 truncate">{utilidadHoy.margenPct.toFixed(1)}% de margen{utilidadHoy.coberturaPct < 100 ? ` · ${utilidadHoy.coberturaPct.toFixed(0)}% con costo conocido` : ""}</div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="font-['Outfit'] font-black text-xl text-slate-300 dark:text-slate-600">—</div>
                   )}
-                </>
-              ) : (
-                <>
-                  <div className="font-['Outfit'] font-black text-2xl text-emerald-700/40 dark:text-emerald-400/30">—</div>
-                  <p className="text-[11px] text-emerald-700/70 dark:text-emerald-400/60">Se calculará con tu primera venta de hoy.</p>
-                </>
-              )}
-            </button>
-          ) : (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5 flex flex-col justify-center">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Utilidad Real</span>
-              <span className="text-[11px] text-slate-400">Solo visible para el Dueño/Administrador</span>
-            </div>
-          )}
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-500/20 transition-colors"><IconCoins size={15} className="text-emerald-600 dark:text-emerald-400" /></div>
+              </button>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Utilidad Real</span>
+                  <div className="text-[11px] text-slate-400">Solo Dueño/Admin</div>
+                </div>
+              </div>
+            )}
 
-          <div className={`relative overflow-hidden rounded-2xl p-5 border shadow-sm space-y-2 ${productosBajoStock.length > 0 ? "bg-amber-500/10 border-amber-500/30" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"}`}>
-            <div className="flex items-center justify-between">
-              <span className={`text-[11px] font-bold uppercase tracking-wider ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}>Requiere tu atención</span>
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${productosBajoStock.length > 0 ? "bg-amber-500/15" : "bg-emerald-500/10"}`}>
-                {productosBajoStock.length > 0 ? <IconWarning size={17} className="text-amber-600 dark:text-amber-400" /> : <IconCheckCircle size={17} className="text-emerald-600 dark:text-emerald-400" />}
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}>Requiere tu atención</span>
+                <div className={`font-['Outfit'] font-black text-sm truncate ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"}`}>
+                  {productosBajoStock.length > 0 ? `${productosBajoStock.length} producto${productosBajoStock.length === 1 ? "" : "s"} bajo mínimo` : "Todo en orden"}
+                </div>
+              </div>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${productosBajoStock.length > 0 ? "bg-amber-500/15" : "bg-emerald-500/10"}`}>
+                {productosBajoStock.length > 0 ? <IconWarning size={15} className="text-amber-600 dark:text-amber-400" /> : <IconCheckCircle size={15} className="text-emerald-600 dark:text-emerald-400" />}
               </div>
             </div>
-            <div className={`font-['Outfit'] font-black text-xl ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"}`}>
-              {productosBajoStock.length > 0 ? `${productosBajoStock.length} producto${productosBajoStock.length === 1 ? "" : "s"} bajo mínimo` : "Todo en orden"}
-            </div>
-            {productosBajoStock.length === 0 && <p className="text-[11px] text-slate-400">Sin pendientes por ahora.</p>}
           </div>
         </div>
       </section>
