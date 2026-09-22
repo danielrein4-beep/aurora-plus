@@ -151,6 +151,10 @@ public class CatalogoPublicoController {
         resp.put("telefonoWhatsapp", licencia.getTelefonoContacto());
         resp.put("emailContacto", licencia.getEmailContacto());
         resp.put("logoBase64", licencia.getLogoBase64());
+        if (licencia.isPersonalizacionTiendaActiva()) {
+            resp.put("colorAcentoTienda", licencia.getColorAcentoTienda());
+            resp.put("bannerBase64", licencia.getBannerBase64());
+        }
         resp.put("tasaVes", tasaVes);
         resp.put("costoEnvioDelivery", licencia.getCostoEnvioDelivery());
         resp.put("pagoMovil", pagoMovil);

@@ -64,6 +64,16 @@ public class LicenciaTenant {
     @Column(name = "logo_base64", columnDefinition = "TEXT")
     private String logoBase64;
 
+    // Add-on administrado por Aurora: solo un super-admin puede habilitarlo.
+    @Column(name = "personalizacion_tienda_activa", nullable = false)
+    private boolean personalizacionTiendaActiva = false;
+
+    @Column(name = "color_acento_tienda", length = 7)
+    private String colorAcentoTienda;
+
+    @Column(name = "banner_base64", columnDefinition = "TEXT")
+    private String bannerBase64;
+
     // Hierro/marca de propiedad del ganado (imagen codificada en Base64) — específico de
     // Ganadería, se estampa en la ficha de identificación del animal (ver AnimalQrService).
     @Column(name = "hierro_base64", columnDefinition = "TEXT")
@@ -208,6 +218,12 @@ public class LicenciaTenant {
     public void setOrigenTasaActiva(String origenTasaActiva) { this.origenTasaActiva = origenTasaActiva; }
     public String getLogoBase64() { return logoBase64; }
     public void setLogoBase64(String logoBase64) { this.logoBase64 = logoBase64; }
+    public boolean isPersonalizacionTiendaActiva() { return personalizacionTiendaActiva; }
+    public void setPersonalizacionTiendaActiva(boolean personalizacionTiendaActiva) { this.personalizacionTiendaActiva = personalizacionTiendaActiva; }
+    public String getColorAcentoTienda() { return colorAcentoTienda; }
+    public void setColorAcentoTienda(String colorAcentoTienda) { this.colorAcentoTienda = colorAcentoTienda; }
+    public String getBannerBase64() { return bannerBase64; }
+    public void setBannerBase64(String bannerBase64) { this.bannerBase64 = bannerBase64; }
     public String getHierroBase64() { return hierroBase64; }
     public void setHierroBase64(String hierroBase64) { this.hierroBase64 = hierroBase64; }
     public String getRif() { return rif; }

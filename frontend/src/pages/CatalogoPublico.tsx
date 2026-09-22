@@ -352,6 +352,8 @@ interface DatosTienda {
   telefonoWhatsapp?: string;
   emailContacto?: string;
   logoBase64?: string;
+  colorAcentoTienda?: string | null;
+  bannerBase64?: string | null;
   tasaVes: number;
   domicilioFiscal?: string;
   costoEnvioDelivery?: number;
@@ -854,6 +856,12 @@ export default function CatalogoPublico() {
         )}
       </div>
 
+      {tienda.bannerBase64 && (
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <img src={tienda.bannerBase64} alt={`Portada de ${tienda.nombreTienda}`} className="h-32 sm:h-48 w-full rounded-2xl object-cover border border-neutral-200/70 shadow-sm" />
+        </div>
+      )}
+
       {/* 1. Header Minimalista de Alta Gama con Marca y Controles */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-neutral-200/60 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
@@ -1133,7 +1141,7 @@ export default function CatalogoPublico() {
                     <div>
                       {moneda === "USD" ? (
                         <>
-                          <div className="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">
+                          <div className="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none" style={tienda.colorAcentoTienda ? { color: tienda.colorAcentoTienda } : undefined}>
                             ${pUsd.toFixed(2)}
                           </div>
                           <div className="text-[10px] font-mono text-neutral-400 mt-1">
@@ -1142,7 +1150,7 @@ export default function CatalogoPublico() {
                         </>
                       ) : (
                         <>
-                          <div className="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">
+                          <div className="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none" style={tienda.colorAcentoTienda ? { color: tienda.colorAcentoTienda } : undefined}>
                             {pBs.toFixed(2)} Bs.
                           </div>
                           <div className="text-[10px] font-mono text-neutral-400 mt-1">
@@ -1156,6 +1164,7 @@ export default function CatalogoPublico() {
                       type="button"
                       onClick={() => agregarAlCarritoConTalla(prod, tallaDefault, 1)}
                       className="w-11 h-11 rounded-2xl bg-neutral-100 hover:bg-slate-800 hover:text-white text-slate-800 border border-neutral-200/80 flex items-center justify-center transition-all shadow-sm active:scale-90"
+                      style={tienda.colorAcentoTienda ? { backgroundColor: tienda.colorAcentoTienda, color: "#ffffff", borderColor: tienda.colorAcentoTienda } : undefined}
                       title="Añadir a la bolsa"
                     >
                       <SvgBag className="w-5 h-5" />
@@ -1211,7 +1220,7 @@ export default function CatalogoPublico() {
                     {productoDetalle.nombre}
                   </h3>
                   <div className="mt-2 flex items-baseline gap-3">
-                    <span className="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight">
+                    <span className="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight" style={tienda.colorAcentoTienda ? { color: tienda.colorAcentoTienda } : undefined}>
                       ${productoDetalle.precioUsd.toFixed(2)}
                     </span>
                     <span className="text-xs font-mono text-neutral-400">

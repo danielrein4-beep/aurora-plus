@@ -1,6 +1,7 @@
 package com.auroraplus.core.config;
 
 import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.auth.entities.Usuario;
 import com.auroraplus.core.auth.services.AuthService;
 import com.auroraplus.core.auth.services.JwtService;
@@ -479,6 +480,21 @@ public class SuperAdminController {
             });
         modulo.setActivo(request.activo);
         return ResponseEntity.ok(moduloTenantRepository.save(modulo));
+    }
+
+    public static class PersonalizacionTiendaRequest {
+        public boolean activo;
+    }
+
+    @PostMapping("/{tenantId:[0-9]+}/personalizacion-tienda")
+    public ResponseEntity<LicenciaTenant> actualizarPersonalizacionTienda(
+            @PathVariable Long tenantId,
+            @RequestBody PersonalizacionTiendaRequest request) {
+        AuthContext.exigirRol("SUPER_ADMIN");
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
+        licencia.setPersonalizacionTiendaActiva(request.activo);
+        return ResponseEntity.ok(licenciaTenantRepository.save(licencia));
     }
 
     // ══════════════════════════════════════════════════════════════════

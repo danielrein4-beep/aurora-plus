@@ -34,6 +34,8 @@ public class CatalogoGestionController {
     public static class PerfilTiendaRequest {
         public String nombreEmpresa;
         public String logoBase64;
+        public String colorAcentoTienda;
+        public String bannerBase64;
         public String telefonoWhatsapp;
         public String emailContacto;
         public String domicilioFiscal;
@@ -59,6 +61,9 @@ public class CatalogoGestionController {
         resp.put("nombreEmpresa", licencia.getNombreEmpresa());
         resp.put("slugCatalogo", licencia.getSlugCatalogo() != null ? licencia.getSlugCatalogo() : "tienda-" + tenantId);
         resp.put("logoBase64", licencia.getLogoBase64());
+        resp.put("personalizacionTiendaActiva", licencia.isPersonalizacionTiendaActiva());
+        resp.put("colorAcentoTienda", licencia.getColorAcentoTienda());
+        resp.put("bannerBase64", licencia.getBannerBase64());
         resp.put("telefonoWhatsapp", licencia.getTelefonoContacto() != null ? licencia.getTelefonoContacto() : "");
         resp.put("emailContacto", licencia.getEmailContacto() != null ? licencia.getEmailContacto() : "");
         resp.put("domicilioFiscal", licencia.getDomicilioFiscal() != null ? licencia.getDomicilioFiscal() : "");
@@ -80,6 +85,22 @@ public class CatalogoGestionController {
         }
         if (req.logoBase64 != null) {
             licencia.setLogoBase64(req.logoBase64.trim().isBlank() ? null : req.logoBase64.trim());
+        }
+        // El cliente nunca decide si tiene el add-on: el flag de licencia es la
+        // única autoridad. Campos inválidos se ignoran para no bloquear el
+        // resto del perfil que el dueño sí puede actualizar.
+        if (licencia.isPersonalizacionTiendaActiva()) {
+            if (req.colorAcentoTienda != null) {
+                String color = req.colorAcentoTienda.trim();
+                if (color.isBlank()) {
+                    licencia.setColorAcentoTienda(null);
+                } else if (color.matches("^#[0-9a-fA-F]{6}$")) {
+                    licencia.setColorAcentoTienda(color);
+                }
+            }
+            if (req.bannerBase64 != null) {
+                licencia.setBannerBase64(req.bannerBase64.trim().isBlank() ? null : req.bannerBase64.trim());
+            }
         }
         if (req.telefonoWhatsapp != null) {
             licencia.setTelefonoContacto(req.telefonoWhatsapp.trim());
@@ -129,6 +150,9 @@ public class CatalogoGestionController {
         resp.put("nombreEmpresa", licencia.getNombreEmpresa());
         resp.put("slugCatalogo", licencia.getSlugCatalogo());
         resp.put("logoBase64", licencia.getLogoBase64());
+        resp.put("personalizacionTiendaActiva", licencia.isPersonalizacionTiendaActiva());
+        resp.put("colorAcentoTienda", licencia.getColorAcentoTienda());
+        resp.put("bannerBase64", licencia.getBannerBase64());
         resp.put("telefonoWhatsapp", licencia.getTelefonoContacto());
         resp.put("emailContacto", licencia.getEmailContacto());
         resp.put("domicilioFiscal", licencia.getDomicilioFiscal());
