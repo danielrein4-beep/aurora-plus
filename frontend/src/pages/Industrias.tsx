@@ -1,57 +1,40 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SpecularButton from "../components/SpecularButton";
-import {
-  IconClinic, IconHardware,
-  IconRestaurant, IconFarm, IconCheck,
-  IconTooth, IconVet,
-} from "../Icons";
 
 const INDUSTRIES = [
   {
-    Icon: IconClinic,
     name: "Mediclinic Pro",
-    color: "from-sky-400 to-blue-500",
     tagline: "Atención al paciente sin papeles",
     desc: "Expedientes digitales, agenda médica, sala de espera reactiva y cobranza multidivisa — con vademécum de fármacos y récipe médico oficial en PDF integrados a la consulta.",
     modulos: ["Historia clínica digital", "Agenda por especialista", "Sala de espera en vivo (secretaria ↔ doctor)", "Vademécum de 36+ fármacos con alergias cruzadas", "Récipe médico oficial en PDF", "Cobranza multidivisa (USD·VES·COP)"],
   },
   {
-    Icon: IconTooth,
     name: "Odontología",
-    color: "from-cyan-400 to-teal-500",
     tagline: "El consultorio dental, sin hojas sueltas",
     desc: "Odontograma internacional FDI con figuras anatómicas por tipo de diente, periodontograma de sondaje real y planes de tratamiento presupuestados por fases.",
     modulos: ["Odontograma FDI interactivo (32 piezas)", "Periodontograma de sondaje de 6 puntos", "Planes de tratamiento por fases", "Presupuesto dental dual USD/Bs.", "Agenda por sillón/consultorio", "Historial clínico unificado con Mediclinic"],
   },
   {
-    Icon: IconHardware,
     name: "Comercio",
-    color: "from-orange-400 to-amber-500",
     tagline: "Tu mostrador, tu inventario y tu WhatsApp, en un solo lugar",
     desc: "Punto de venta por mostrador, inventario en tiempo real, catálogo público con pedidos por WhatsApp, y un asistente de IA que responde precios y stock sin que nadie esté pegado al teléfono.",
     modulos: ["POS por mostrador con escáner de código de barras", "Catálogo público con pedidos por WhatsApp", "Asistente de IA (precios, stock, tasa BCV, delivery)", "Inventario con alertas de stock", "Gestión de proveedores y cuentas por cobrar", "Reportes de rotación de productos"],
   },
   {
-    Icon: IconRestaurant,
     name: "Restaurantes",
-    color: "from-rose-400 to-pink-500",
     tagline: "Del pedido a la mesa sin errores",
     desc: "Comandas digitales, gestión de mesas, comunicación directa con cocina, control de inventario y cierres de caja automáticos.",
     modulos: ["Comandas digitales por mesa", "Pantalla en cocina en tiempo real", "Control de inventario de insumos", "Cierres de caja automáticos", "Gestión de reservas", "Reportes de platos más vendidos"],
   },
   {
-    Icon: IconFarm,
     name: "Control de Fincas",
-    color: "from-green-400 to-emerald-500",
     tagline: "Tu ganado y tus potreros, organizados",
     desc: "Mapa satelital de potreros, básculas bluetooth para pesaje en manga, y control sanitario que impide vender un animal todavía en período de retiro por vacuna o medicamento.",
     modulos: ["Mapa satelital de potreros con cálculo de hectáreas", "Pesaje en manga vía báscula bluetooth/USB", "Calendario de vacunación con refuerzos automáticos", "Bloqueo de venta en período de retiro sanitario", "Trazabilidad individual por animal desde nacimiento", "Modo offline de campo con sincronización posterior"],
   },
   {
-    Icon: IconVet,
     name: "Veterinaria",
-    color: "from-violet-400 to-purple-500",
     tagline: "El mismo motor de Mediclinic, para mascotas",
     desc: "Agenda, historias clínicas, sala de espera y cotizador para clínicas veterinarias — construido sobre el mismo motor probado de Mediclinic Pro.",
     modulos: ["Historia clínica por mascota y propietario", "Agenda de citas y cirugías", "Sala de espera en vivo", "Cotizador de procedimientos", "Cobros y caja diaria", "Cierres de caja"],
@@ -95,9 +78,6 @@ export default function Industrias() {
                     ? "g-aurora text-white shadow-lg"
                     : "bg-white/70 dark:bg-white/5 text-slate-700 dark:text-white/50 hover:bg-white dark:hover:bg-white/8 hover:text-black dark:hover:text-white border border-slate-200/80 dark:border-white/5"
                 }`}>
-                <div className="w-7 h-7 rounded-lg bg-teal-500/10 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
-                  <ind.Icon size={16} />
-                </div>
                 {ind.name}
               </button>
             ))}
@@ -110,14 +90,9 @@ export default function Industrias() {
 
               <div className="p-8 sm:p-10">
                 {/* Header */}
-                <div className="flex items-start gap-5 mb-6">
-                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${ind.color} flex items-center justify-center flex-shrink-0 text-white shadow-md`}>
-                    <ind.Icon size={30} />
-                  </div>
-                  <div>
-                    <div className="text-teal-600 dark:text-white/35 text-xs font-semibold tracking-widest uppercase mb-1">{ind.tagline}</div>
-                    <h2 className="font-['Outfit'] font-bold text-3xl text-slate-900 dark:text-white">{ind.name}</h2>
-                  </div>
+                <div className="mb-6">
+                  <div className="text-teal-600 dark:text-white/35 text-xs font-semibold tracking-widest uppercase mb-2">{ind.tagline}</div>
+                  <h2 className="font-['Outfit'] font-bold text-3xl text-slate-900 dark:text-white">{ind.name}</h2>
                 </div>
 
                 <p className="text-slate-600 dark:text-white/55 text-base leading-relaxed mb-8 max-w-2xl">{ind.desc}</p>
@@ -128,7 +103,7 @@ export default function Industrias() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {ind.modulos.map((m) => (
                       <div key={m} className="flex items-center gap-3 bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/70 dark:border-white/5 rounded-xl px-4 py-3">
-                        <span className="w-5 h-5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0"><IconCheck size={10} /></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0" aria-hidden="true" />
                         <span className="text-slate-700 dark:text-white/65 text-sm font-medium">{m}</span>
                       </div>
                     ))}
