@@ -88,6 +88,9 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
   const [nombreEmpresa, setNombreEmpresa] = useState(nombreNegocio || "");
   const [slugCatalogo, setSlugCatalogo] = useState("");
   const [logoBase64, setLogoBase64] = useState("");
+  const [personalizacionTiendaActiva, setPersonalizacionTiendaActiva] = useState(false);
+  const [colorAcentoTienda, setColorAcentoTienda] = useState("#0f766e");
+  const [bannerBase64, setBannerBase64] = useState("");
   const [telefonoWhatsapp, setTelefonoWhatsapp] = useState("");
   const [emailContacto, setEmailContacto] = useState("");
   const [slogan, setSlogan] = useState("");
@@ -96,6 +99,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
   const [mensajePerfil, setMensajePerfil] = useState<string | null>(null);
   const [errorPerfil, setErrorPerfil] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
   // Formulario Pago Movil
   const [banco, setBanco] = useState("0102 - Banco de Venezuela");
@@ -137,6 +141,9 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
         if (data.nombreEmpresa) setNombreEmpresa(data.nombreEmpresa);
         if (data.slugCatalogo) setSlugCatalogo(data.slugCatalogo);
         if (data.logoBase64) setLogoBase64(data.logoBase64);
+        setPersonalizacionTiendaActiva(Boolean(data.personalizacionTiendaActiva));
+        if (data.colorAcentoTienda) setColorAcentoTienda(data.colorAcentoTienda);
+        if (data.bannerBase64) setBannerBase64(data.bannerBase64);
         if (data.telefonoWhatsapp) setTelefonoWhatsapp(data.telefonoWhatsapp);
         if (data.emailContacto) setEmailContacto(data.emailContacto);
         if (data.domicilioFiscal) setSlogan(data.domicilioFiscal);
@@ -169,6 +176,21 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
     reader.readAsDataURL(file);
   };
 
+  const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorPerfil(true);
+      setMensajePerfil("El banner no debe superar los 2MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setBannerBase64(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleGuardarPerfil = async (e: React.FormEvent) => {
     e.preventDefault();
     setGuardandoPerfil(true);
@@ -182,6 +204,8 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
           nombreEmpresa: nombreEmpresa.trim(),
           slugCatalogo: slugCatalogo.trim(),
           logoBase64: logoBase64,
+          colorAcentoTienda,
+          bannerBase64,
           telefonoWhatsapp: telefonoWhatsapp.trim(),
           emailContacto: emailContacto.trim(),
           domicilioFiscal: slogan.trim(),
@@ -412,6 +436,32 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
                 </div>
               </div>
             </div>
+
+            {personalizacionTiendaActiva ? (
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3.5 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Color de acento del catálogo</label>
+                  <div className="flex items-center gap-3">
+                    <input type="color" value={colorAcentoTienda} onChange={(e) => setColorAcentoTienda(e.target.value)} className="h-9 w-12 cursor-pointer rounded border border-slate-200 bg-white p-1" />
+                    <span className="font-mono text-xs text-slate-500">{colorAcentoTienda}</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Banner de portada</label>
+                  {bannerBase64 && <img src={bannerBase64} alt="Vista previa del banner" className="mb-2 h-24 w-full rounded-lg object-cover" />}
+                  <input ref={bannerInputRef} type="file" accept="image/*" onChange={handleBannerChange} className="hidden" />
+                  <button type="button" onClick={() => bannerInputRef.current?.click()} className="px-3.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    {bannerBase64 ? "Cambiar banner" : "Subir banner"}
+                  </button>
+                  {bannerBase64 && <button type="button" onClick={() => setBannerBase64("")} className="ml-3 text-[11px] text-rose-500 hover:underline">Eliminar banner</button>}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                <strong className="block text-slate-800 dark:text-white mb-1">Personalización de tienda</strong>
+                Personaliza el color y el banner de tu tienda. Disponible en el plan superior; contacta a soporte para activarlo.
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
