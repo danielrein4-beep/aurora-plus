@@ -2,19 +2,15 @@ import { useRef, useEffect, useState, useCallback, type CSSProperties } from "re
 import { gsap } from "gsap";
 import "./AccordionGallery.css";
 
-// react-bits.dev — AccordionGallery (JS+CSS oficial, portado a TS). Cada
-// panel crece al recibir foco/hover, revelando la imagen a tamaño completo
-// mientras los demás se comprimen con un leve tilt en perspectiva.
-
 export interface AccordionGalleryItem {
   image: string;
   label?: string;
-  alt?: string;
   link?: string;
+  alt?: string;
 }
 
-export interface AccordionGalleryProps {
-  items?: AccordionGalleryItem[];
+interface AccordionGalleryProps {
+  items: AccordionGalleryItem[];
   defaultIndex?: number;
   accentColor?: string;
   overlayColor?: string;
@@ -35,16 +31,10 @@ export interface AccordionGalleryProps {
   className?: string;
 }
 
-const DEFAULT_ITEMS: AccordionGalleryItem[] = [
-  { image: "https://picsum.photos/id/1015/900/1200", label: "Canyon", link: "#" },
-  { image: "https://picsum.photos/id/1018/900/1200", label: "Ridgeline", link: "#" },
-  { image: "https://picsum.photos/id/1039/900/1200", label: "Falls", link: "#" },
-  { image: "https://picsum.photos/id/1043/900/1200", label: "Harbour", link: "#" },
-  { image: "https://picsum.photos/id/1044/900/1200", label: "Skyline", link: "#" },
-];
+type CustomCSSProperties = CSSProperties & Record<`--${string}`, string | number>;
 
 export default function AccordionGallery({
-  items = DEFAULT_ITEMS,
+  items,
   defaultIndex = 2,
   accentColor = "#ffffff",
   overlayColor = "#060010",
@@ -64,7 +54,7 @@ export default function AccordionGallery({
   grayscale = true,
   className = "",
 }: AccordionGalleryProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const panelRefs = useRef<(HTMLElement | null)[]>([]);
   const mediaRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const barRefs = useRef<(HTMLSpanElement | null)[]>([]);
@@ -194,57 +184,81 @@ export default function AccordionGallery({
     }
   };
 
+  const rootStyle: CustomCSSProperties = {
+    "--ag-accent": accentColor,
+    "--ag-overlay": overlayColor,
+    "--ag-text": textColor,
+    "--ag-gap": `${gap}px`,
+    "--ag-radius": `${radius}px`,
+    height: vertical ? `${Math.round(height * 1.6)}px` : `${height}px`,
+  };
+
   return (
     <div
       ref={rootRef}
       className={`accordion-gallery${vertical ? " accordion-gallery--vertical" : ""}${className ? ` ${className}` : ""}`}
-      style={
-        {
-          "--ag-accent": accentColor,
-          "--ag-overlay": overlayColor,
-          "--ag-text": textColor,
-          "--ag-gap": `${gap}px`,
-          "--ag-radius": `${radius}px`,
-          height: vertical ? `${Math.round(height * 1.6)}px` : `${height}px`,
-        } as CSSProperties
-      }
+      style={rootStyle}
       role="list"
-      aria-label="Image accordion gallery"
+      aria-label="Galería de verticales Aurora"
     >
       {items.map((item, i) => {
         const isActive = i === active;
-        const Tag = (item.link ? "a" : "div") as "a" | "div";
-        return (
-          <Tag
-            key={i}
-            ref={(el: HTMLElement | null) => { panelRefs.current[i] = el; }}
-            className={`ag-panel${isActive ? " ag-panel--active" : ""}`}
-            style={{ borderRadius: `${radius}px` }}
-            href={item.link || undefined}
-            onClick={(e: React.MouseEvent) => handleClick(i, e)}
-            onMouseEnter={() => handleEnter(i)}
-            onFocus={() => setActive(i)}
-            onKeyDown={(e: React.KeyboardEvent) => handleKeyDown(i, e)}
-            role="listitem"
-            tabIndex={0}
-            aria-current={isActive ? "true" : undefined}
-            aria-label={item.label}
-          >
+        const commonProps = {
+          ref: (el: HTMLElement | null) => {
+            panelRefs.current[i] = el;
+          },
+          className: `ag-panel${isActive ? " ag-panel--active" : ""}`,
+          style: { borderRadius: `${radius}px` },
+          onClick: (e: React.MouseEvent) => handleClick(i, e),
+          onMouseEnter: () => handleEnter(i),
+          onFocus: () => setActive(i),
+          onKeyDown: (e: React.KeyboardEvent) => handleKeyDown(i, e),
+          role: "listitem",
+          tabIndex: 0,
+          "aria-current": isActive ? ("true" as const) : undefined,
+          "aria-label": item.label,
+        };
+
+        const content = (
+          <>
             <span className="ag-panel__frame">
-              <span className="ag-panel__media" ref={(el) => { mediaRefs.current[i] = el; }}>
+              <span
+                className="ag-panel__media"
+                ref={(el) => {
+                  mediaRefs.current[i] = el;
+                }}
+              >
                 <img src={item.image} alt={item.alt || item.label || ""} draggable="false" />
               </span>
               <span className="ag-panel__overlay" aria-hidden="true" />
             </span>
             {showLabels && (
               <span className="ag-panel__label" aria-hidden="true">
-                <span className="ag-panel__bar" ref={(el) => { barRefs.current[i] = el; }} />
-                <span className="ag-panel__text" ref={(el) => { textRefs.current[i] = el; }}>
+                <span
+                  className="ag-panel__bar"
+                  ref={(el) => {
+                    barRefs.current[i] = el;
+                  }}
+                />
+                <span
+                  className="ag-panel__text"
+                  ref={(el) => {
+                    textRefs.current[i] = el;
+                  }}
+                >
                   {item.label}
                 </span>
               </span>
             )}
-          </Tag>
+          </>
+        );
+
+        return item.link ? (
+          <a key={i} {...commonProps} href={item.link}>
+            {content}
+          </a>
+        ) : (
+          <div key={i} {...commonProps}>{content}</div>
         );
       })}
     </div>

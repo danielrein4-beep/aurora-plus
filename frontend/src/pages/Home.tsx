@@ -1,21 +1,21 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import SpecularButton from "../components/SpecularButton";
 import { useAuth } from "../context/AuthContext";
+import AccordionGallery, { type AccordionGalleryItem } from "../components/AccordionGallery";
 import {
   IconClinic, IconHardware,
   IconRestaurant, IconFarm,
   IconTooth, IconVet,
 } from "../Icons";
 
-const INDUSTRIES = [
-  { name: "Mediclinic Pro",    desc: "Historias clínicas, agenda, sala de espera en vivo, cotizador multidivisa, vademécum de fármacos y récipe médico oficial en PDF." },
-  { name: "Odontología",       desc: "Odontograma FDI interactivo, periodontograma de 6 puntos, planes de tratamiento por fases y presupuesto dental dual USD/Bs." },
-  { name: "Comercio",          desc: "POS mostrador, inventario en tiempo real, catálogo público con pedidos por WhatsApp, y asistente de IA que responde precios y stock 24/7." },
-  { name: "Restaurantes",      desc: "Comandas digitales, mesas, cocina en tiempo real, inventario y cierres de caja automáticos." },
-  { name: "Control de Fincas", desc: "Mapa satelital de potreros, básculas bluetooth para pesaje en manga, y control sanitario que bloquea la venta de un animal en período de retiro." },
-  { name: "Veterinaria",       desc: "Agenda, historias clínicas, sala de espera y cotizador para clínicas de mascotas — el mismo motor de Mediclinic, adaptado." },
+const VERTICAL_GALLERY: AccordionGalleryItem[] = [
+  { image: "/verticales/mediclinic.png", label: "Mediclinic Pro" },
+  { image: "/verticales/odontologia.png", label: "Odontología" },
+  { image: "/verticales/comercio.png", label: "Comercio" },
+  { image: "/verticales/restaurante.png", label: "Restaurantes" },
+  { image: "/verticales/ganaderia.png", label: "Control de Fincas" },
+  { image: "/verticales/veterinaria.png", label: "Veterinaria" },
 ];
 
 const SISTEMA_POR_INDUSTRIA: Record<string, { ruta: string; label: string; nombre: string; desc: string; Icon: typeof IconClinic }> = {
@@ -61,7 +61,6 @@ const STATS = [
 export default function Home() {
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
-  const [activeIndustry, setActiveIndustry] = useState(0);
 
   return (
     <main className="w-full bg-white text-[#1D1D1F] antialiased">
@@ -193,27 +192,26 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {INDUSTRIES.map((ind, idx) => {
-              return (
-                <div
-                  key={ind.name}
-                  onClick={() => setActiveIndustry(idx)}
-                  className={`bg-white border rounded-2xl p-7 transition-all cursor-pointer shadow-sm ${
-                    activeIndustry === idx ? "border-[#177E89] ring-1 ring-[#177E89]" : "border-[#E5E5EA] hover:border-[#D1D1D6]"
-                  }`}
-                >
-                  <div className="text-[11px] font-bold tracking-[0.16em] text-[#177E89] mb-4">SECTOR {String(idx + 1).padStart(2, "0")}</div>
-                  <h3 className="text-lg font-bold text-[#1D1D1F] tracking-tight mb-2">
-                    {ind.name}
-                  </h3>
-                  <p className="text-sm text-[#86868B] leading-relaxed">
-                    {ind.desc}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+          <AccordionGallery
+            items={VERTICAL_GALLERY}
+            defaultIndex={0}
+            expandRatio={0.5}
+            trigger="hover"
+            accentColor="#177E89"
+            overlayColor="#0D3B3D"
+            textColor="#ffffff"
+            grayscale
+            showLabels
+            duration={0.6}
+            ease="power3.out"
+            parallax={0.4}
+            tilt={6}
+            stagger={0.06}
+            height={440}
+            gap={10}
+            radius={20}
+            orientation="horizontal"
+          />
 
         </div>
       </section>
