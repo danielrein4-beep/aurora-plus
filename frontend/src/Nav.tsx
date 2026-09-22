@@ -1,28 +1,27 @@
-import { useState, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import AuroraLogo from "./AuroraLogo";
-import SpecularButton from "./components/SpecularButton";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
-import { IconBuilding } from "./Icons";
 
 const LINKS = [
-  { label: "Inicio",      path: "/" },
-  { label: "Soluciones",  path: "/soluciones" },
-  { label: "Industrias",  path: "/industrias" },
-  { label: "Precios",     path: "/precios" },
-  { label: "Nosotros",    path: "/nosotros" },
+  { label: "Soluciones", path: "/soluciones" },
+  { label: "Industrias", path: "/industrias" },
+  { label: "Precios", path: "/precios" },
+  { label: "Nosotros", path: "/nosotros" },
 ];
 
-const VERTICAL_POR_INDUSTRIA: Record<string, { ruta: string; label: string; icono: string }> = {
-  restaurante: { ruta: "/restaurante", label: "Aurora Horeca", icono: "🍽️" },
-  ferreteria: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
-  repuestos: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
-  farmacia: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
-  retail: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
-  finca: { ruta: "/ganaderia", label: "Aurora Ganadería", icono: "🐄" },
-  ganaderia: { ruta: "/ganaderia", label: "Aurora Ganadería", icono: "🐄" },
+const VERTICAL_POR_INDUSTRIA: Record<string, { ruta: string; label: string }> = {
+  restaurante: { ruta: "/restaurante", label: "Aurora Horeca" },
+  comercio: { ruta: "/comercio", label: "Aurora Comercio" },
+  ferreteria: { ruta: "/comercio", label: "Aurora Comercio" },
+  repuestos: { ruta: "/comercio", label: "Aurora Comercio" },
+  farmacia: { ruta: "/comercio", label: "Aurora Comercio" },
+  retail: { ruta: "/comercio", label: "Aurora Comercio" },
+  finca: { ruta: "/ganaderia", label: "Aurora Ganadería" },
+  ganaderia: { ruta: "/ganaderia", label: "Aurora Ganadería" },
+  veterinaria: { ruta: "/veterinaria", label: "Aurora Veterinaria" },
+  construccion: { ruta: "/construccion", label: "Aurora Construcción" },
 };
-const VERTICAL_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro", icono: "🩺" };
+const VERTICAL_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro" };
 
 export default function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -30,207 +29,134 @@ export default function Nav() {
   const { pathname } = useLocation();
   const { isLoggedIn, user, logout } = useAuth();
   const miSistema = VERTICAL_POR_INDUSTRIA[user?.industry || ""] || VERTICAL_POR_DEFECTO;
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
+  const navClicksRef = useRef(0);
+  const navClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const navClicksRef = useRef<number>(0);
-  const navClickTimeoutRef = useRef<any>(null);
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
-  const handleNavLogoClick = (e: React.MouseEvent) => {
-    if (e.altKey || e.shiftKey) {
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileOpen(false);
+        mobileToggleRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileOpen]);
+
+  useEffect(() => () => {
+    if (navClickTimeoutRef.current) clearTimeout(navClickTimeoutRef.current);
+  }, []);
+
+  const handleNavLogoClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    setMobileOpen(false);
+    if (event.altKey || event.shiftKey) {
+      event.preventDefault();
       navigate("/superadmin");
       return;
     }
     navClicksRef.current += 1;
     if (navClickTimeoutRef.current) clearTimeout(navClickTimeoutRef.current);
-
     if (navClicksRef.current >= 5) {
+      event.preventDefault();
       navClicksRef.current = 0;
       navigate("/superadmin");
     } else {
       navClickTimeoutRef.current = setTimeout(() => {
         navClicksRef.current = 0;
       }, 3500);
-      navigate("/");
     }
   };
 
+  const handleLogout = () => {
+    logout();
+    setMobileOpen(false);
+    navigate("/");
+  };
+
+  const accountActions = (
+    <>
+      <Link className="marketing-nav__business" to={miSistema.ruta} title={miSistema.label} onClick={() => setMobileOpen(false)}>
+        Mi negocio
+      </Link>
+      <Link className="marketing-nav__button" to="/dashboard" title="Ir al Hub de Empresa" onClick={() => setMobileOpen(false)}>
+        Mi cuenta
+      </Link>
+      <button className="marketing-nav__logout" type="button" onClick={handleLogout}>
+        Cerrar sesión
+      </button>
+    </>
+  );
+
+  const visitorActions = (
+    <>
+      <Link className="marketing-nav__login" to="/auth" onClick={() => setMobileOpen(false)}>
+        Iniciar sesión
+      </Link>
+      <Link className="marketing-nav__button" to="/auth" onClick={() => setMobileOpen(false)}>
+        Comenzar
+      </Link>
+    </>
+  );
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-none border-b border-[#E5E5EA] transition-colors duration-200">
-      <div className="max-w-6xl mx-auto px-6 sm:px-8 h-18 flex items-center justify-between">
+    <header className="marketing-nav">
+      <div className="marketing-nav__inner">
+        <Link to="/" onClick={handleNavLogoClick} className="marketing-nav__brand" aria-label="Aurora Plus, inicio">
+          <span className="marketing-nav__monogram" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <path d="M6 25 16 5l10 20M10.5 17h11" stroke="currentColor" strokeWidth="2.4" strokeLinecap="square" strokeLinejoin="miter" />
+            </svg>
+          </span>
+          <span>Aurora <span className="marketing-nav__brand-plus">Plus</span></span>
+        </Link>
 
-        {/* Logo */}
-        <button onClick={handleNavLogoClick} className="flex items-center gap-3 group cursor-pointer" title="Aurora Plus">
-          <AuroraLogo size={34} animated />
-          <div className="text-left">
-            <div className="font-['Inter'] font-bold text-base leading-none tracking-tight text-[#1D1D1F]">
-              Aurora Plus
-            </div>
-            <div className="font-sans text-[#86868B] text-[10px] leading-none tracking-wider uppercase mt-1">
-              Software Administrativo
-            </div>
-          </div>
+        <nav className="marketing-nav__links" aria-label="Navegación principal">
+          {LINKS.map((link) => (
+            <Link key={link.path} to={link.path} aria-current={pathname === link.path ? "page" : undefined}>
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="marketing-nav__actions">
+          {isLoggedIn ? accountActions : visitorActions}
+        </div>
+
+        <button
+          ref={mobileToggleRef}
+          className="marketing-nav__toggle"
+          type="button"
+          onClick={() => setMobileOpen((open) => !open)}
+          aria-expanded={mobileOpen}
+          aria-controls="marketing-mobile-menu"
+          aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
+        >
+          <span>{mobileOpen ? "Cerrar" : "Menú"}</span>
+          <span className={`marketing-nav__toggle-lines${mobileOpen ? " is-open" : ""}`} aria-hidden="true">
+            <span />
+            <span />
+          </span>
         </button>
-
-        {/* Desktop Links */}
-        <div className="hidden md:flex items-center gap-7">
-          {LINKS.map((l) => {
-            const isActive = pathname === l.path;
-            return (
-              <button
-                key={l.path}
-                onClick={() => navigate(l.path)}
-                className={`group font-sans text-sm font-semibold transition-colors duration-200 cursor-pointer flex items-center gap-1 ${
-                  isActive
-                    ? "text-[#1D1D1F] font-black"
-                    : "text-[#86868B] hover:text-[#1D1D1F]"
-                }`}>
-                <span className={`text-[#177E89] font-bold transition-all duration-200 ${
-                  isActive ? "opacity-100 -ml-1 mr-0.5" : "opacity-0 w-0 group-hover:opacity-100 group-hover:w-2.5 group-hover:mr-0.5"
-                }`}>+</span>
-                {l.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* CTA */}
-        <div className="hidden md:flex items-center gap-3">
-          {isLoggedIn ? (
-            <div className="flex items-center gap-2.5">
-              <button
-                onClick={() => navigate(miSistema.ruta)}
-                className="text-xs font-semibold px-3.5 py-1.5 rounded-full bg-[#F5F5F7] border border-[#E5E5EA] text-[#1D1D1F] hover:bg-[#E5E5EA] transition-colors cursor-pointer"
-                title={`Abrir ${miSistema.label}`}
-              >
-                {miSistema.label} →
-              </button>
-
-              <div
-                onClick={() => navigate("/dashboard")}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F5F5F7] border border-[#E5E5EA] cursor-pointer hover:border-[#D1D1D6] transition-colors"
-                title="Ir al Hub de Empresa"
-              >
-                <span className="w-6 h-6 rounded-full bg-[#177E89] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                  {user?.nombre?.charAt(0).toUpperCase() ?? "U"}
-                </span>
-                <span className="text-xs font-semibold text-[#1D1D1F]">
-                  {user?.nombre || user?.email?.split("@")[0]}
-                </span>
-              </div>
-
-              <button
-                onClick={() => { logout(); navigate("/"); }}
-                className="text-xs text-[#86868B] hover:text-[#ef4444] transition-colors px-2 py-1.5 cursor-pointer font-medium"
-              >
-                Cerrar sesión
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <SpecularButton
-                size="sm"
-                radius={999}
-                tint="#F5F5F7"
-                tintOpacity={0.92}
-                blur={14}
-                textColor="#1D1D1F"
-                lineColor="#ffffff"
-                baseColor="#D1D1D6"
-                shineSize={10}
-                shineFade={40}
-                proximity={220}
-                onClick={() => navigate("/auth")}
-              >
-                Iniciar sesión
-              </SpecularButton>
-              <SpecularButton
-                size="sm"
-                radius={999}
-                tint="#177E89"
-                tintOpacity={1}
-                textColor="#f5f5f5"
-                lineColor="#5BC0BE"
-                baseColor="#177E89"
-                shineSize={10}
-                shineFade={40}
-                intensity={1}
-                thickness={1}
-                proximity={220}
-                onClick={() => navigate("/onboarding")}
-              >
-                Solicitar demo
-              </SpecularButton>
-            </div>
-          )}
-        </div>
-
-        {/* Mobile controls */}
-        <div className="flex md:hidden items-center gap-2">
-          <button
-            className="p-2 text-[#1D1D1F] hover:bg-[#F5F5F7] rounded-lg transition-colors cursor-pointer"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label="Abrir menú"
-          >
-            <div className="w-5 space-y-1.5">
-              <span className={`block h-0.5 bg-current transition-all origin-center ${mobileOpen ? "rotate-45 translate-y-2" : ""}`} />
-              <span className={`block h-0.5 bg-current transition-all ${mobileOpen ? "opacity-0 scale-x-0" : ""}`} />
-              <span className={`block h-0.5 bg-current transition-all origin-center ${mobileOpen ? "-rotate-45 -translate-y-2" : ""}`} />
-            </div>
-          </button>
-        </div>
       </div>
 
-      {/* Mobile menu */}
-      {mobileOpen && (
-        <div className="md:hidden border-t border-[#E5E5EA] bg-white px-6 py-5 space-y-1 shadow-lg">
-          {LINKS.map((l) => (
-            <button
-              key={l.path}
-              onClick={() => { navigate(l.path); setMobileOpen(false); }}
-              className={`block w-full text-left px-4 py-3 text-sm rounded-xl font-semibold transition-colors ${
-                pathname === l.path ? "text-[#1D1D1F] font-black bg-[#F5F5F7]" : "text-[#1D1D1F] hover:bg-[#F5F5F7]"
-              }`}>
-              {l.label}
-            </button>
+      <div className="marketing-nav__mobile" id="marketing-mobile-menu" hidden={!mobileOpen}>
+        <nav aria-label="Navegación móvil" className="marketing-nav__mobile-links">
+          {LINKS.map((link) => (
+            <Link key={link.path} to={link.path} aria-current={pathname === link.path ? "page" : undefined} onClick={() => setMobileOpen(false)}>
+              {link.label}
+            </Link>
           ))}
-          <div className="pt-4 space-y-2 border-t border-[#E5E5EA] mt-3">
-            {isLoggedIn ? (
-              <>
-                <button
-                  onClick={() => { navigate(miSistema.ruta); setMobileOpen(false); }}
-                  className="w-full text-sm font-semibold py-2.5 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5EA] flex items-center justify-center gap-2"
-                >
-                  Entrar a {miSistema.label} →
-                </button>
-                <button
-                  onClick={() => { navigate("/dashboard"); setMobileOpen(false); }}
-                  className="btn-deep-black w-full text-sm font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2"
-                >
-                  <IconBuilding size={14} /> Panel de Empresa
-                </button>
-                <button onClick={() => { logout(); navigate("/"); setMobileOpen(false); }}
-                  className="w-full text-sm text-[#86868B] hover:text-[#ef4444] py-2 font-medium">
-                  Cerrar sesión
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => { navigate("/auth"); setMobileOpen(false); }}
-                  className="w-full text-sm font-semibold text-[#1D1D1F] py-2.5 rounded-xl hover:bg-[#F5F5F7]"
-                >
-                  Ingresar
-                </button>
-                <button
-                  onClick={() => { navigate("/precios"); setMobileOpen(false); }}
-                  className="btn-deep-black w-full text-sm font-semibold py-3 rounded-xl"
-                >
-                  Solicitar demo gratis
-                </button>
-              </>
-            )}
-          </div>
+        </nav>
+        <div className="marketing-nav__mobile-actions">
+          {isLoggedIn ? accountActions : visitorActions}
         </div>
-      )}
-    </nav>
+      </div>
+    </header>
   );
 }

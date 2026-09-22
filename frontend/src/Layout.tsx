@@ -1,32 +1,51 @@
-import { useState, useRef, useEffect } from "react";
-import AuroraLogo from "./AuroraLogo";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import Nav from "./Nav";
 import { AuroraGradientDef } from "./Icons";
 import SuperAdminPortal from "./components/SuperAdminPortal";
+import "./marketing-shell.css";
+
+const FOOTER_GROUPS = [
+  {
+    title: "Plataforma",
+    links: [
+      { label: "Soluciones", to: "/soluciones" },
+      { label: "Industrias", to: "/industrias" },
+      { label: "Planes y precios", to: "/precios" },
+    ],
+  },
+  {
+    title: "Aurora Plus",
+    links: [
+      { label: "Nosotros", to: "/nosotros" },
+      { label: "Contacto", to: "/nosotros" },
+      { label: "Iniciar sesión", to: "/auth" },
+    ],
+  },
+  {
+    title: "Información",
+    links: [
+      { label: "Privacidad", to: "/privacidad" },
+      { label: "Términos de uso", to: "/terminos" },
+      { label: "Soporte", to: "/nosotros" },
+    ],
+  },
+];
 
 export default function Layout() {
   const location = useLocation();
-  const navigate = useNavigate();
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
-  
-  // 5-Clicks Easter Egg Trigger para CEOs de Aurora (o Alt/Shift + Clic)
-  const clicksRef = useRef<number>(0);
-  const clickTimeoutRef = useRef<any>(null);
+  const clicksRef = useRef(0);
+  const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleFooterLogoClick = (e: React.MouseEvent) => {
-    // Si presiona Alt o Shift, abre de inmediato sin esperar los 5 clics
-    if (e.altKey || e.shiftKey) {
+  // Preserve the existing private administration shortcuts.
+  const handleFooterLogoClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (event.altKey || event.shiftKey) {
       setShowSuperAdmin(true);
       return;
     }
-
     clicksRef.current += 1;
-
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current);
-    }
-
+    if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
     if (clicksRef.current >= 5) {
       clicksRef.current = 0;
       setShowSuperAdmin(true);
@@ -37,74 +56,61 @@ export default function Layout() {
     }
   };
 
-  // Atajo de teclado global Ctrl+Shift+A o Ctrl+Shift+S para acceder de inmediato
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && (e.key === "A" || e.key === "S" || e.key === "a" || e.key === "s")) {
-        e.preventDefault();
-        setShowSuperAdmin((prev) => !prev);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && ["a", "s"].includes(event.key.toLowerCase())) {
+        event.preventDefault();
+        setShowSuperAdmin((previous) => !previous);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+    };
   }, []);
 
   return (
-    <div className="min-h-full bg-white text-[#1D1D1F] overflow-x-hidden antialiased flex flex-col justify-between">
+    <div className="marketing-shell min-h-full antialiased flex flex-col">
       <AuroraGradientDef />
-
       <Nav />
       <div key={location.pathname} className="animate-page-enter flex-1">
         <Outlet />
       </div>
 
-      {/* Footer Apple Aesthetic */}
-      <footer className="bg-[#F5F5F7] border-t border-[#E5E5EA] py-12 px-6 sm:px-8 mt-16">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div
-              onClick={handleFooterLogoClick}
-              className="flex items-center gap-3 select-none cursor-pointer group p-2 -m-2 rounded-2xl hover:bg-black/5 transition-colors"
-              title="Aurora Plus - Administración"
-            >
-              <div className="p-1 rounded-xl bg-white border border-[#E5E5EA] shadow-sm">
-                <AuroraLogo size={28} animated />
-              </div>
-              <div>
-                <span className="font-['Outfit'] font-bold text-[#1D1D1F] text-sm">
-                  Aurora Plus
+      <footer className="marketing-footer">
+        <div className="marketing-footer__inner">
+          <div className="marketing-footer__main">
+            <div className="marketing-footer__intro">
+              <button type="button" onClick={handleFooterLogoClick} className="marketing-footer__brand" title="Aurora Plus - Administración">
+                <span className="marketing-footer__monogram" aria-hidden="true">
+                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <path d="M6 25 16 5l10 20M10.5 17h11" stroke="currentColor" strokeWidth="2.4" strokeLinecap="square" strokeLinejoin="miter" />
+                  </svg>
                 </span>
-                <div className="text-[#86868B] text-[10px] tracking-widest uppercase">
-                  Software Administrativo
-                </div>
-              </div>
+                <span>Aurora <span className="marketing-footer__brand-plus">Plus</span></span>
+              </button>
+              <p className="marketing-footer__claim">Más claridad.<br />Mejores decisiones.</p>
+              <p className="marketing-footer__description">Software para conectar la operación de tu empresa.</p>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-6 text-sm text-[#86868B]">
-              {[
-                { label: "Privacidad", to: "/privacidad" },
-                { label: "Términos", to: "/terminos" },
-                { label: "Soporte", to: "/nosotros" },
-                { label: "Contacto", to: "/nosotros" },
-              ].map((l) => (
-                <button
-                  key={l.label}
-                  onClick={() => navigate(l.to)}
-                  className="hover:text-[#1D1D1F] transition-colors cursor-pointer font-medium"
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[#86868B] text-xs">© 2026 Aurora Plus. Todos los derechos reservados.</p>
+            {FOOTER_GROUPS.map((group) => (
+              <nav className="marketing-footer__group" key={group.title} aria-label={group.title}>
+                <h2>{group.title}</h2>
+                {group.links.map((link) => (
+                  <Link key={link.label} to={link.to}>{link.label}</Link>
+                ))}
+              </nav>
+            ))}
+          </div>
+          <div className="marketing-footer__legal">
+            <p>© {new Date().getFullYear()} Aurora Plus. Todos los derechos reservados.</p>
+            <span>Software administrativo</span>
           </div>
         </div>
       </footer>
 
-      {/* Portal Maestro Oculto para CEOs / SuperAdmin */}
-      {showSuperAdmin && (
-        <SuperAdminPortal onClose={() => setShowSuperAdmin(false)} />
-      )}
+      {showSuperAdmin && <SuperAdminPortal onClose={() => setShowSuperAdmin(false)} />}
     </div>
   );
 }
