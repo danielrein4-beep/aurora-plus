@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { consultarPortalLaboratorioPublico, subirExamenPortalLaboratorioPublico } from "../api";
+import { IconWarning, IconFrascoLab, IconFileText, IconCheckCircle, IconPaperclip, IconUpload } from "../Icons";
 
 interface ArchivoLocal {
   file: File;
@@ -93,8 +94,8 @@ export default function PortalLaboratorioPaciente() {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-white">
         <div className="max-w-md w-full bg-slate-900/90 border border-red-500/30 rounded-3xl p-8 text-center space-y-4 shadow-2xl">
-          <div className="w-16 h-16 bg-red-500/10 text-red-400 rounded-2xl flex items-center justify-center mx-auto text-3xl">
-            ⚠️
+          <div className="w-16 h-16 bg-red-500/10 text-red-400 rounded-2xl flex items-center justify-center mx-auto">
+            <IconWarning size={28} />
           </div>
           <h1 className="text-xl font-bold text-white">Enlace no válido</h1>
           <p className="text-sm text-slate-400">{error}</p>
@@ -108,8 +109,8 @@ export default function PortalLaboratorioPaciente() {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-white">
         <div className="max-w-md w-full bg-slate-900/90 border border-emerald-500/40 rounded-3xl p-8 sm:p-10 text-center space-y-5 shadow-2xl">
-          <div className="w-20 h-20 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-3xl flex items-center justify-center mx-auto text-4xl">
-            ✅
+          <div className="w-20 h-20 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-3xl flex items-center justify-center mx-auto">
+            <IconCheckCircle size={36} />
           </div>
           <h1 className="text-2xl font-black text-white font-['Outfit']">¡Resultados Enviados!</h1>
           <p className="text-slate-300 text-sm leading-relaxed">
@@ -127,8 +128,8 @@ export default function PortalLaboratorioPaciente() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-['Manrope'] selection:bg-teal-500 selection:text-white pb-16">
       <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-400 flex items-center justify-center text-slate-950 font-black text-lg shadow-md">
-            🧪
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-400 flex items-center justify-center text-slate-950 shadow-md">
+            <IconFrascoLab size={18} />
           </div>
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-teal-400">Envío de Resultados de Laboratorio</span>
@@ -184,17 +185,17 @@ export default function PortalLaboratorioPaciente() {
           <div className="space-y-3 pt-2 border-t border-slate-800">
             <div className="flex justify-between items-center">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                <span>📎</span> Resultados (fotos o PDF)
+                <IconPaperclip size={13} /> Resultados (fotos o PDF)
               </h4>
               <label className="cursor-pointer px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md transition-all">
-                <span>➕</span> Añadir Archivos
+                <span>+</span> Añadir Archivos
                 <input type="file" multiple accept="image/*,application/pdf" onChange={handleArchivosSeleccionados} className="hidden" />
               </label>
             </div>
 
             {archivos.length === 0 ? (
               <label className="border-2 border-dashed border-slate-800 hover:border-teal-500/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-950/40">
-                <div className="text-3xl mb-2">📄</div>
+                <div className="mb-2 flex justify-center text-slate-400"><IconFileText size={28} /></div>
                 <p className="text-sm font-semibold text-slate-300">Toque para seleccionar sus fotos o PDF</p>
                 <p className="text-xs text-slate-500 mt-1">Puede subir todos los que necesite, sin límite</p>
                 <input type="file" multiple accept="image/*,application/pdf" onChange={handleArchivosSeleccionados} className="hidden" />
@@ -209,7 +210,7 @@ export default function PortalLaboratorioPaciente() {
                       </div>
                     ) : (
                       <div className="w-full h-24 rounded-xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center text-red-400 mb-2">
-                        <span className="text-2xl">📄</span>
+                        <IconFileText size={22} />
                         <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">PDF</span>
                       </div>
                     )}
@@ -236,7 +237,7 @@ export default function PortalLaboratorioPaciente() {
             disabled={enviando}
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-500 text-slate-950 font-black text-base shadow-xl hover:shadow-teal-500/25 hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60"
           >
-            {enviando ? "Enviando..." : "📤 Enviar a mi médico"}
+            {enviando ? "Enviando..." : <><IconUpload size={16} /> Enviar a mi médico</>}
           </button>
         </form>
       </main>

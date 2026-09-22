@@ -10,6 +10,7 @@ import {
   IconDownload, IconRefresh, IconCheckCircle, IconBank, IconChart, IconBox, IconLock,
   IconSettings, IconCoins, IconEdit, IconShoppingBag, IconTruck, AuroraGradientDef,
   IconChevronLeft, IconChevronRight, IconReceipt, IconChartTrend, IconWallet,
+  IconScale, IconBolt,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
@@ -1750,19 +1751,19 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                           </button>
                           <button
                             onClick={() => setAjustarStockModalItem(p)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-amber-400 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-amber-400 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm inline-flex items-center gap-1"
                             title="Corregir stock tras un conteo físico"
                             disabled={!p.backendId}
                           >
-                            ⚖️ Ajustar
+                            <IconScale size={11} /> Ajustar
                           </button>
                           <button
                             onClick={() => setEditarModalItem(p)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-slate-500 dark:text-slate-300 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-slate-500 dark:text-slate-300 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm inline-flex items-center gap-1"
                             title="Editar datos del producto"
                             disabled={!p.backendId}
                           >
-                            ✏️ Editar
+                            <IconEdit size={11} /> Editar
                           </button>
                           <button
                             onClick={async () => {
@@ -2088,7 +2089,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   ["EFECTIVO_BS", " Bs Efectivo", "VES"],
                   ["PAGO_MOVIL", " Pago Móvil", "VES"],
                   ["PUNTO_VENTA", " Punto Débito", "VES"],
-                  ["ZELLE", "⚡ Zelle / USDT", "USD"],
+                  ["ZELLE", " Zelle / USDT", "USD"],
                   ["COP_EFECTIVO", " Pesos COP", "COP"],
                 ].map(([id, label, mon]) => (
                   <button
@@ -2165,9 +2166,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     else if (monedaRecibida === "VES") setMontoRecibido(totalBs.toFixed(2));
                     else if (monedaRecibida === "COP") setMontoRecibido(Math.round(totalCopCalculado).toString());
                   }}
-                  className="px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 font-bold text-[10px] border border-teal-500/30 cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 font-bold text-[10px] border border-teal-500/30 cursor-pointer inline-flex items-center gap-1"
                 >
-                  ⚡ Exacto
+                  <IconBolt size={11} /> Exacto
                 </button>
                 {monedaRecibida === "USD" && [10, 20, 50, 100].map((b) => (
                   <button
@@ -3597,7 +3598,7 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
                       onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, pagoMovil: e.target.value }))} className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">⚡ Zelle / USDT ($)</label>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Zelle / USDT ($)</label>
                     <input type="number" step="0.01" min="0" placeholder="0.00" value={desgloseArqueo.zelle}
                       onChange={(e) => setDesgloseArqueo((prev) => ({ ...prev, zelle: e.target.value }))} className={inputCls} />
                   </div>

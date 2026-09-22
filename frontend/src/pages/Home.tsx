@@ -76,7 +76,7 @@ export default function Home() {
             <img
               src="/hero-laptop.png"
               alt="Aurora Productividad"
-              className="w-full h-full object-cover object-center opacity-35 select-none mix-blend-multiply"
+              className="w-full h-full object-cover object-center opacity-45 select-none mix-blend-multiply"
             />
             {/* Difuminado perimetral: arriba fuerte (no pelea con el texto), abajo hacia el blanco del borde de sección, y en ambos lados para que no se vea recortada */}
             <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white pointer-events-none" />
@@ -93,7 +93,7 @@ export default function Home() {
           </h1>
 
           {/* Subtítulo */}
-          <p className="text-lg sm:text-xl md:text-2xl text-[#86868B] max-w-2xl font-normal leading-relaxed mb-10 tracking-tight">
+          <p className="text-lg sm:text-xl md:text-2xl text-[#6E6E73] max-w-2xl font-normal leading-relaxed mb-10 tracking-tight">
             De la libreta y las hojas de Excel a la tranquilidad de un sistema integrado. Controla caja, inventario, agenda clínica y producción en tiempo real.
           </p>
 

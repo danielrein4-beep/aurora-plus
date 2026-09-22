@@ -466,6 +466,68 @@ export function IconClose({ size = 24, className, stroke }: IconProps) {
   );
 }
 
+export function IconBell({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6" {...st} />
+      <path d="M10 20a2 2 0 0 0 4 0" {...st} />
+    </svg>
+  );
+}
+
+export function IconDoorExit({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M13 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h7" {...st} />
+      <path d="M16 16l4-4-4-4" {...st} />
+      <path d="M20 12H9" {...st} />
+    </svg>
+  );
+}
+
+export function IconCamera({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M4 8a1 1 0 0 1 1-1h2.5l1-1.5h7l1 1.5H19a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8z" {...st} />
+      <circle cx="12" cy="13" r="3.2" {...st} />
+    </svg>
+  );
+}
+
+export function IconPaperclip({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M17.5 8.5 9.7 16.3a3 3 0 0 1-4.2-4.2l8.2-8.2a2 2 0 0 1 2.8 2.8l-8.1 8.1a1 1 0 0 1-1.4-1.4l7-7" {...st} />
+    </svg>
+  );
+}
+
+export function IconUpload({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 15V4" {...st} />
+      <path d="M7.5 8.5 12 4l4.5 4.5" {...st} />
+      <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" {...st} />
+    </svg>
+  );
+}
+
+export function IconBuilding({ size = 24, className, stroke }: IconProps) {
+  const st = getStyle(className, stroke);
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="4" y="3" width="12" height="18" rx="1" {...st} />
+      <path d="M16 8h4v13h-4" {...st} />
+      <path d="M7.5 7h1M11.5 7h1M7.5 11h1M11.5 11h1M7.5 15h1M11.5 15h1" {...st} />
+    </svg>
+  );
+}
+
 export function IconCheckCircle({ size = 24, className, stroke }: IconProps) {
   const st = getStyle(className, stroke);
   return (

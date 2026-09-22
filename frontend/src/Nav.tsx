@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import AuroraLogo from "./AuroraLogo";
 import SpecularButton from "./components/SpecularButton";
 import { useAuth } from "./context/AuthContext";
+import { IconBuilding } from "./Icons";
 
 const LINKS = [
   { label: "Inicio",      path: "/" },
@@ -204,7 +205,7 @@ export default function Nav() {
                   onClick={() => { navigate("/dashboard"); setMobileOpen(false); }}
                   className="btn-deep-black w-full text-sm font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2"
                 >
-                  🏢 Panel de Empresa
+                  <IconBuilding size={14} /> Panel de Empresa
                 </button>
                 <button onClick={() => { logout(); navigate("/"); setMobileOpen(false); }}
                   className="w-full text-sm text-[#86868B] hover:text-[#ef4444] py-2 font-medium">

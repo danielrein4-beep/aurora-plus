@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PeriodoNomina, ReciboNominaEmpleado, formatearMoneda } from './types';
 import { EstadoNominaBadge } from './EstadoNominaBadge';
 import { DetalleCalculoNomina } from './DetalleCalculoNomina';
+import { IconWarning } from '../../Icons';
 
 interface NominaPersonalProps {
   periodos: PeriodoNomina[];
@@ -193,7 +194,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
       {!nominaHabilitada && (
         <div className="p-4 bg-[#0b111e] border border-[#f59e0b]/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#fbbf24]">
           <div className="flex items-center gap-2">
-            <span>⚠️</span>
+            <IconWarning size={14} />
             <span>
               <strong>Módulo desactivado:</strong> Solicita su activación al administrador del negocio para comenzar a calcular períodos.
             </span>
@@ -479,8 +480,8 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 bg-[#f59e0b]/10 border border-[#f59e0b]/25 rounded-lg text-[#fbbf24] text-[11px]">
-                ⚠️ Recordatorio: Los cambios posteriores deberán realizarse exclusivamente mediante notas de ajuste o reverso justificado.
+              <div className="p-3 bg-[#f59e0b]/10 border border-[#f59e0b]/25 rounded-lg text-[#fbbf24] text-[11px] inline-flex items-center gap-1.5">
+                <IconWarning size={12} /> Recordatorio: Los cambios posteriores deberán realizarse exclusivamente mediante notas de ajuste o reverso justificado.
               </div>
             </div>
 

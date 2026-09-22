@@ -6,6 +6,7 @@ import {
   IconFileText,
   IconClose,
   IconTrash,
+  IconWarning,
 } from '../../Icons';
 import {
   type Propietario,
@@ -300,8 +301,8 @@ export default function GestionPropietariosMascotas({
                             {m.esterilizado ? 'Esterilizado(a)' : 'Sin esterilizar'}
                           </p>
                           {m.alergias && (
-                            <div className="mt-2 text-[11px] bg-red-500/10 border border-red-500/20 text-red-400 p-1.5 rounded-lg">
-                              ⚠️ Alertas: {m.alergias}
+                            <div className="mt-2 text-[11px] bg-red-500/10 border border-red-500/20 text-red-400 p-1.5 rounded-lg inline-flex items-center gap-1">
+                              <IconWarning size={11} /> Alertas: {m.alergias}
                             </div>
                           )}
                         </div>
@@ -334,7 +335,7 @@ export default function GestionPropietariosMascotas({
             </>
           ) : (
             <div className="text-center py-24 text-slate-500 text-sm">
-              👈 Seleccione un propietario de la lista izquierda para ver y gestionar sus mascotas.
+              Seleccione un propietario de la lista izquierda para ver y gestionar sus mascotas.
             </div>
           )}
         </div>

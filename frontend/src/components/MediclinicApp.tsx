@@ -10,6 +10,7 @@ import {
   IconWhatsApp, IconMail, IconChart, IconCoins, IconEdit, IconTooth,
   IconDashboardGrid, IconDocumentoMedico, IconFrascoLab, IconClipboardCheck, IconRelojArena,
   IconCalendarSolido, IconChartTrend, IconWallet, IconGearSolido,
+  IconBell, IconDoorExit, IconCamera,
 } from "../Icons";
 import ModuloOdontologia from "./ModuloOdontologia";
 import ThemeToggle from "./ThemeToggle";
@@ -2021,7 +2022,7 @@ function VistaGeneral({
                           className="px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-600 hover:text-white text-teal-700 dark:text-teal-300 font-bold text-[11px] transition-colors cursor-pointer"
                           title="Abrir Historia Clínica"
                         >
-                          🩺 Historia
+                          <span className="inline-flex items-center gap-1"><IconStethoscope size={11} /> Historia</span>
                         </button>
                         <button
                           type="button"
@@ -2029,7 +2030,7 @@ function VistaGeneral({
                           className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-white font-bold text-[11px] transition-colors cursor-pointer"
                           title="Ver Ficha Completa"
                         >
-                          👤 Ficha
+                          <span className="inline-flex items-center gap-1"><IconUser size={11} /> Ficha</span>
                         </button>
                       </div>
                     </div>
@@ -2576,7 +2577,7 @@ function GestionPacientes({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-3">
                 <label className="text-[10px] text-red-600 dark:text-red-400 uppercase font-mono font-bold flex items-center gap-1.5">
-                  ⚠ Alergias Conocidas
+                  <IconWarning size={11} /> Alergias Conocidas
                 </label>
                 <textarea
                   placeholder="Ej. Penicilina, sulfas, mariscos... (dejar en blanco si no tiene ninguna conocida)"
@@ -2808,7 +2809,7 @@ function GestionPacientes({
 
               {pacienteActivo.alergias && pacienteActivo.alergias.trim() && (
                 <div className="rounded-xl border border-red-400/60 bg-red-500/10 px-3.5 py-2.5 flex items-start gap-2">
-                  <span className="text-red-500 text-base leading-none mt-0.5">⚠</span>
+                  <IconWarning size={16} className="text-red-500 mt-0.5 shrink-0" />
                   <div>
                     <div className="text-[10px] font-black uppercase tracking-wider text-red-600 dark:text-red-400">Alergias Conocidas</div>
                     <div className="text-xs font-bold text-red-700 dark:text-red-300 mt-0.5">{pacienteActivo.alergias}</div>
@@ -3038,7 +3039,7 @@ function LaboratoriosRecibidosPaciente({ tenantId, pacienteId }: { tenantId: num
     <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/60 dark:bg-black/20 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h5 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
-          <span>🔬</span> Laboratorios Recibidos
+          <IconFrascoLab size={16} /> Laboratorios Recibidos
         </h5>
         <span className="text-[11px] text-slate-500 dark:text-white/50 font-mono font-bold">{examenes.length}</span>
       </div>
@@ -3065,9 +3066,9 @@ function LaboratoriosRecibidosPaciente({ tenantId, pacienteId }: { tenantId: num
                         win?.document.write(`<iframe src="${adj.contenidoBase64}" frameborder="0" style="border:0; width:100%; height:100%;" allowfullscreen></iframe>`);
                       }
                     }}
-                    className="px-2 py-1 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 font-semibold hover:bg-teal-500/20 transition-all"
+                    className="px-2 py-1 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 font-semibold hover:bg-teal-500/20 transition-all inline-flex items-center gap-1"
                   >
-                    {esImagen ? "📷" : "📄"} {adj.nombreArchivo}
+                    {esImagen ? <IconCamera size={12} /> : <IconFileText size={12} />} {adj.nombreArchivo}
                   </button>
                 );
               })}
@@ -4205,8 +4206,8 @@ function HistoriasClinicas({
                           Solo lectura médica
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-rose-300/80 font-medium">
-                        🔒 Este campo es 100% privado y confidencial. No aparece en ningún documento externo.
+                      <p className="text-[11px] text-slate-500 dark:text-rose-300/80 font-medium inline-flex items-center gap-1">
+                        <IconLock size={11} /> Este campo es 100% privado y confidencial. No aparece en ningún documento externo.
                       </p>
                       <div className="p-3.5 rounded-xl bg-white/80 dark:bg-black/40 border border-rose-200/60 dark:border-rose-500/30 text-xs text-slate-700 dark:text-rose-100 whitespace-pre-wrap leading-relaxed font-sans">
                         {consultaSeleccionadaFicha.anotacionesPrivadas || "Sin comentarios o anotaciones reservadas para esta consulta."}
@@ -4483,7 +4484,7 @@ function HistoriasClinicas({
                 <span>ANOTACIONES PRIVADAS Y RESERVADAS DEL MÉDICO / COMENTARIOS</span>
               </div>
               <p className="text-[11px] text-rose-600/90 dark:text-rose-300/80 font-semibold">
-                🔒 Confidencial: Este campo es estrictamente privado para lectura del médico. No se mostrará ni anexará en ningún informe, PDF, correo o WhatsApp.
+                Confidencial: Este campo es estrictamente privado para lectura del médico. No se mostrará ni anexará en ningún informe, PDF, correo o WhatsApp.
               </p>
               <textarea
                 rows={3}
@@ -5530,7 +5531,7 @@ function Procedimientos({
                     : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
                 }`}
               >
-                📅 Planificadas ({conteos.planificada})
+                <span className="inline-flex items-center gap-1"><IconCalendar size={12} /> Planificadas ({conteos.planificada})</span>
               </button>
 
               <button
@@ -5542,7 +5543,7 @@ function Procedimientos({
                     : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
                 }`}
               >
-                ✓ Realizadas ({conteos.realizada})
+                <span className="inline-flex items-center gap-1"><IconCheck size={12} /> Realizadas ({conteos.realizada})</span>
               </button>
             </div>
 
@@ -6376,21 +6377,21 @@ function SalaEspera({
         <div className="flex flex-wrap items-center gap-2.5">
           {/* En Espera */}
           <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-500/30 px-3.5 py-1.5 rounded-2xl text-xs font-bold shadow-xs">
-            <span className="text-sm">⏳</span>
+            <IconRelojArena size={14} />
             <span>En Espera:</span>
             <span className="font-black font-mono text-sm">{conteoEnEspera}</span>
           </div>
 
           {/* En Consulta */}
           <div className="flex items-center gap-2 bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-300 border border-sky-300/80 dark:border-sky-500/30 px-3.5 py-1.5 rounded-2xl text-xs font-bold shadow-xs">
-            <span className="text-sm">🚪</span>
+            <IconDoorExit size={14} />
             <span>En Consulta:</span>
             <span className="font-black font-mono text-sm">{conteoEnConsulta}</span>
           </div>
 
           {/* Atendidos */}
           <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-500/30 px-3.5 py-1.5 rounded-2xl text-xs font-bold shadow-xs">
-            <span className="text-sm">✓</span>
+            <IconCheck size={14} />
             <span>Atendidos:</span>
             <span className="font-black font-mono text-sm">{conteoAtendidos}</span>
           </div>
@@ -6490,7 +6491,7 @@ function SalaEspera({
                 : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
             }`}
           >
-            ⏳ En Espera ({conteoEnEspera})
+            <span className="inline-flex items-center gap-1"><IconRelojArena size={12} /> En Espera ({conteoEnEspera})</span>
           </button>
 
           <button
@@ -6502,7 +6503,7 @@ function SalaEspera({
                 : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/10"
             }`}
           >
-            🚪 En Consulta ({conteoEnConsulta})
+            <span className="inline-flex items-center gap-1"><IconDoorExit size={12} /> En Consulta ({conteoEnConsulta})</span>
           </button>
 
           <button
@@ -6662,10 +6663,10 @@ function SalaEspera({
                               setPagoEmail(pacientes?.find((p) => p.id === t.pacienteId)?.email || "");
                               setComprobanteMsg(null);
                             }}
-                            className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-400/30 font-bold text-[10px] hover:bg-amber-500/25 cursor-pointer"
+                            className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-400/30 font-bold text-[10px] hover:bg-amber-500/25 cursor-pointer inline-flex items-center gap-1"
                             title="Haz clic para registrar cobro"
                           >
-                            PENDIENTE 💳
+                            PENDIENTE <IconCard size={10} />
                           </button>
                         ) : (
                           <span className="px-2 py-0.5 rounded-md bg-slate-500/15 text-slate-600 dark:text-slate-300 border border-slate-400/30 font-bold text-[10px]">
@@ -7746,7 +7747,7 @@ function AgendaMedica({
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/30">
-                🔔
+                <IconBell size={18} />
               </div>
               <div>
                 <h3 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white">
@@ -7877,7 +7878,7 @@ function AgendaMedica({
 
                     {!estaBloq && citasEnDia.length > 0 && (
                       <div className="text-[8.5px] font-black px-1 py-0.5 rounded-md bg-sky-500 text-white dark:bg-sky-600 flex items-center justify-center gap-0.5 shadow-xs truncate">
-                        <span>📅</span>
+                        <IconCalendar size={9} />
                         <span>{citasEnDia.length}</span>
                       </div>
                     )}
@@ -8300,7 +8301,7 @@ function ResumenesFinancieros({
         </div>
         <div className="pt-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[11px] font-mono font-bold text-slate-500 dark:text-white/50">
-            🔒 Requiere autenticación del Doctor Titular
+            <IconLock size={11} /> Requiere autenticación del Doctor Titular
           </span>
         </div>
       </div>

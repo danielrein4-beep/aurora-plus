@@ -26,12 +26,12 @@ type Granularidad = "semana" | "mes" | "anio";
 
 type ZonaCanal = "exito" | "seguridad" | "alarma" | "epidemia" | "sin_historial";
 
-const ZONA_INFO: Record<ZonaCanal, { color: string; texto: string; badge: string }> = {
-  exito: { color: "#22c55e", texto: "Zona de éxito", badge: "🟢" },
-  seguridad: { color: "#3b82f6", texto: "Zona de seguridad", badge: "🔵" },
-  alarma: { color: "#f97316", texto: "Zona de alarma", badge: "🟠" },
-  epidemia: { color: "#ef4444", texto: "Zona de epidemia", badge: "🔴" },
-  sin_historial: { color: "#64748b", texto: "Sin historial suficiente para comparar", badge: "⚪" },
+const ZONA_INFO: Record<ZonaCanal, { color: string; texto: string }> = {
+  exito: { color: "#22c55e", texto: "Zona de éxito" },
+  seguridad: { color: "#3b82f6", texto: "Zona de seguridad" },
+  alarma: { color: "#f97316", texto: "Zona de alarma" },
+  epidemia: { color: "#ef4444", texto: "Zona de epidemia" },
+  sin_historial: { color: "#64748b", texto: "Sin historial suficiente para comparar" },
 };
 
 /** El mismo criterio Q1/Mediana/Q3 en un solo lugar — sin historial real, no se inventa una zona (evita el falso "epidemia" cuando el umbral es puro cero). */
@@ -384,7 +384,7 @@ export default function CanalEndemico({ modo, clinicaNombre, doctorNombre }: Pro
 
           {veredicto && (
             <div className="rounded-2xl px-5 py-4 flex items-center gap-3" style={{ backgroundColor: `${ZONA_INFO[veredicto.zona].color}18`, border: `1px solid ${ZONA_INFO[veredicto.zona].color}40` }}>
-              <span className="text-2xl leading-none">{ZONA_INFO[veredicto.zona].badge}</span>
+              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ZONA_INFO[veredicto.zona].color }} />
               <div>
                 <p className="text-sm font-bold font-['Outfit']" style={{ color: ZONA_INFO[veredicto.zona].color }}>
                   {ZONA_INFO[veredicto.zona].texto}

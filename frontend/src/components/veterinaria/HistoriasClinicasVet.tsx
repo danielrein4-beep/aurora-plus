@@ -257,7 +257,7 @@ export default function HistoriasClinicasVet({
             </>
           ) : (
             <div className="text-center py-20 text-slate-500 text-sm">
-              👈 Seleccione una mascota de la lista para ver o registrar su historial clínico.
+              Seleccione una mascota de la lista para ver o registrar su historial clínico.
             </div>
           )}
         </div>

@@ -7,6 +7,7 @@ import {
   type ExamenRecibidoPaciente,
   type Paciente,
 } from "../../api";
+import { IconFrascoLab, IconLink, IconWarning, IconCamera, IconFileText, IconWhatsApp } from "../../Icons";
 
 export default function InboxLaboratorioMedico({
   tenantId,
@@ -117,7 +118,7 @@ export default function InboxLaboratorioMedico({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🔬</span>
+            <IconFrascoLab size={26} />
             <h2 className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
               Red de Laboratorios & Inbox
             </h2>
@@ -144,9 +145,9 @@ export default function InboxLaboratorioMedico({
         <button
           onClick={copiarLinkPortal}
           disabled={!urlPortal}
-          className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all disabled:opacity-50"
+          className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all disabled:opacity-50 inline-flex items-center gap-1.5"
         >
-          {copiadoLink ? "¡Copiado!" : "🔗 Copiar enlace"}
+          {copiadoLink ? "¡Copiado!" : <><IconLink size={12} /> Copiar enlace</>}
         </button>
       </div>
 
@@ -158,7 +159,7 @@ export default function InboxLaboratorioMedico({
         </div>
       ) : examenes.length === 0 ? (
         <div className="apple-glass rounded-3xl p-12 text-center space-y-3">
-          <div className="text-4xl">🧪</div>
+          <div className="flex justify-center"><IconFrascoLab size={40} /></div>
           <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Bandeja de Entrada al Día</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
             Cuando un paciente suba resultados desde el enlace/QR de su consultorio, aparecerán aquí.
@@ -242,7 +243,7 @@ export default function InboxLaboratorioMedico({
             {!examenDetalle.pacienteId && (
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-3">
                 <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
-                  <span>⚠️</span> Esta ficha no está vinculada a ningún expediente
+                  <IconWarning size={12} /> Esta ficha no está vinculada a ningún expediente
                 </span>
                 <input
                   type="text"
@@ -292,7 +293,7 @@ export default function InboxLaboratorioMedico({
             {/* GALERÍA DE ARCHIVOS */}
             <div className="space-y-2 pt-2 border-t border-slate-800">
               <h4 className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center gap-2">
-                <span>📸</span> Archivos Recibidos ({examenDetalle.archivos.length})
+                <IconCamera size={13} /> Archivos Recibidos ({examenDetalle.archivos.length})
               </h4>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {examenDetalle.archivos.map((adj, idx) => {
@@ -314,8 +315,8 @@ export default function InboxLaboratorioMedico({
                           <img src={adj.contenidoBase64} alt={adj.nombreArchivo} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                         </div>
                       ) : (
-                        <div className="w-full h-32 rounded-xl bg-slate-900 flex flex-col items-center justify-center text-3xl mb-2 text-red-400">
-                          <span>📄</span>
+                        <div className="w-full h-32 rounded-xl bg-slate-900 flex flex-col items-center justify-center mb-2 text-red-400">
+                          <IconFileText size={28} />
                           <span className="text-[10px] text-slate-400 font-bold uppercase mt-1">Ver PDF</span>
                         </div>
                       )}
@@ -332,7 +333,7 @@ export default function InboxLaboratorioMedico({
                 onClick={() => responderWhatsApp(examenDetalle)}
                 className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2"
               >
-                <span>💬</span> Responder al Paciente por WhatsApp
+                <IconWhatsApp size={14} /> Responder al Paciente por WhatsApp
               </button>
               {examenDetalle.pacienteId && onVerHistoriaPaciente && (
                 <button
