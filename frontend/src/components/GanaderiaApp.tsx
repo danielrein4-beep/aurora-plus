@@ -10,6 +10,11 @@ import ModalVacunacion, { type VacunacionAplicada } from "./ganaderia/ModalVacun
 import ModalReproduccion from "./ganaderia/ModalReproduccion";
 import ModalCelo from "./ganaderia/ModalCelo";
 import ModalMastitis from "./ganaderia/ModalMastitis";
+import ModalOrdeno from "./ganaderia/ModalOrdeno";
+import ModalGasto from "./ganaderia/ModalGasto";
+import ModalRotarPotrero from "./ganaderia/ModalRotarPotrero";
+import ModalPotrero, { potreroVacio, type FormPotrero } from "./ganaderia/ModalPotrero";
+import { CATEGORIAS_GASTO_GANADERIA } from "./ganaderia/catalogos";
 import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
 import {
   encolarAccionGanaderia,
@@ -111,17 +116,6 @@ const DEFAULT_VACUNAS_CATALOGO: VacunaGanaderia[] = [
   { id: 4, tenantId: 1, nombre: "Ivermectina 1% Endectocida", diasParaRefuerzo: 90, diasRetiroLeche: 28, diasRetiroCarne: 35 },
 ];
 
-const CATEGORIAS_GASTO_GANADERIA = [
-  { id: "ALIMENTACION", label: "Alimentación / Suplementos / Sal", icon: IconWheat, colorBadge: "text-amber-400 bg-amber-500/10 border-amber-500/30" },
-  { id: "SANIDAD", label: "Sanidad / Vacunas / Fármacos", icon: IconSyringe, colorBadge: "text-sky-400 bg-sky-500/10 border-sky-500/30" },
-  { id: "MANO_DE_OBRA", label: "Mano de Obra / Jornales / Nómina", icon: IconUsers, colorBadge: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" },
-  { id: "MANTENIMIENTO", label: "Mantenimiento / Cercas / Potreros", icon: IconWrench, colorBadge: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30" },
-  { id: "MAQUINARIA", label: "Maquinaria / Repuestos / Combustible", icon: IconTractor, colorBadge: "text-purple-400 bg-purple-500/10 border-purple-500/30" },
-  { id: "TRANSPORTE", label: "Fletes / Transporte de Ganado", icon: IconTruck, colorBadge: "text-blue-400 bg-blue-500/10 border-blue-500/30" },
-  { id: "SERVICIOS", label: "Servicios Básicos / Electricidad / Agua", icon: IconBolt, colorBadge: "text-orange-400 bg-orange-500/10 border-orange-500/30" },
-  { id: "OTROS", label: "Otros Gastos Operativos", icon: IconBox, colorBadge: "text-slate-300 bg-slate-500/10 border-slate-500/30" },
-];
-
 export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const { user } = useAuth();
   const tenantId = user?.tenantId ? Number(user.tenantId) : 1;
@@ -182,7 +176,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   const guardarPrecioLeche = (nuevoPrecio: number) => {
     setPrecioLecheUSD(nuevoPrecio);
-    setFormOrdeno(prev => ({ ...prev, precioVentaLitro: nuevoPrecio }));
     try {
       localStorage.setItem(`aurora_ganaderia_precio_leche_usd_${tenantId}`, String(nuevoPrecio));
     } catch {}
@@ -241,13 +234,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // Gastos Operativos del Hato & Ventas de Animales
   const [gastos, setGastos] = useState<GastoGanaderia[]>([]);
   const [ventasAnimales, setVentasAnimales] = useState<VentaGanaderiaResumen[]>([]);
-  const [modalGasto, setModalGasto] = useState(false);
-  const [formGasto, setFormGasto] = useState({
-    categoria: "ALIMENTACION",
-    descripcion: "",
-    monto: "" as number | string,
-    fecha: new Date().toISOString().slice(0, 10),
-  });
+  const [gastoAbierto, setGastoAbierto] = useState(false);
 
   // Pestaña principal activa
   const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "engorde" | "sociedades" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
@@ -290,9 +277,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [prenezActual, setPrenezActual] = useState<PrenezActualGanaderia[]>([]);
   const [categoriaExpandida, setCategoriaExpandida] = useState<string | null>(null);
   const puedeImportarHato = user?.rol === "DUENO_ADMIN" || user?.rol === "ADMINISTRADOR_FINCA";
-  const [modalNuevoPotrero, setModalNuevoPotrero] = useState(false);
+  const [potreroEnModal, setPotreroEnModal] = useState<{ form: FormPotrero; editandoId: number | null } | null>(null);
   const [modalRotar, setModalRotar] = useState<PotreroGanaderia | null>(null);
-  const [modalOrdeno, setModalOrdeno] = useState(false);
+  const [ordenoAbierto, setOrdenoAbierto] = useState(false);
   const [modalPesaje, setModalPesaje] = useState<AnimalGanaderia | null>(null);
   const [modalBasculaAbierto, setModalBasculaAbierto] = useState(false);
   const [estaOnline, setEstaOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
@@ -343,37 +330,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   const [ultimoDespachoLecheId, setUltimoDespachoLecheId] = useState<number | null>(null);
 
-  // Formulario nuevo potrero con color distintivo (estilo GanSoft)
-  const [formPotrero, setFormPotrero] = useState({
-    codigo: "POT-05",
-    nombre: "",
-    areaHectareas: 15.0,
-    capacidadAnimales: 25,
-    tipoPasto: "Brachiaria brizantha",
-    color: "#10B981",
-    diasDescansoMinimo: 28,
-    observaciones: "",
-    poligono: undefined as [number, number][] | undefined,
-  });
-  // Si tiene valor, el modal de "Agregar Potrero" edita ese potrero en vez de crear uno nuevo.
-  const [potreroEditandoId, setPotreroEditandoId] = useState<number | null>(null);
 
   // Modo vaquera rápida (jornada de ordeño de todo el rebaño): ver ganaderia/ModalJornadaOrdeno
   const [vaqueraAbierta, setVaqueraAbierta] = useState(false);
-
-  // Formulario rotación
-  const [potreroDestinoId, setPotreroDestinoId] = useState<number>(0);
-
-  // Formulario ordeño rápido
-  const [formOrdeno, setFormOrdeno] = useState({
-    animalId: 0,
-    turno: "MANANA",
-    cantidadLitros: 12.5,
-    precioVentaLitro: precioLecheUSD,
-    porcentajeGrasa: 3.8,
-    porcentajeProteina: 3.2,
-    destino: "TANQUE" as "TANQUE" | "VENTA_DIRECTA",
-  });
 
   // Formulario pesaje
   const [pesoNuevo, setPesoNuevo] = useState<number>(400);
@@ -419,16 +378,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     }
   }, [potreros]);
 
-  // Mismo problema para el potrero destino al abrir "Rotar Potrero" — debe ser
-  // un potrero real distinto del origen, nunca el 0/id inventado inicial.
-  useEffect(() => {
-    if (!modalRotar) return;
-    const opciones = potreros.filter(p => p.id !== modalRotar.id);
-    if (opciones.length > 0 && !opciones.some(p => p.id === potreroDestinoId)) {
-      setPotreroDestinoId(opciones[0].id);
-    }
-  }, [modalRotar, potreros]);
-
   // Deep link desde el QR de un animal (/ganaderia/animal/:id): en cuanto
   // carga la lista real, salta directo a su ficha en Sanidad & Trazabilidad
   // en vez de dejar al usuario en el Panel General.
@@ -439,16 +388,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     setSubSanidad("individual");
     setAnimalFichaId(deepLinkAnimalId);
   }, [deepLinkAnimalId, animales]);
-
-  // Mismo saneamiento para el resto de formularios que empiezan en 0/sin
-  // selección: en cuanto la lista real de animales carga, si el animal
-  // seleccionado no existe de verdad, se corrige al primero real disponible.
-  useEffect(() => {
-    if (animalesActivos.length === 0) return;
-    if (!animalesActivos.some(a => a.id === formOrdeno.animalId)) {
-      setFormOrdeno(prev => ({ ...prev, animalId: animalesActivos[0].id }));
-    }
-  }, [animalesActivos]);
 
 
   useEffect(() => {
@@ -756,81 +695,13 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   // Abre la venta de animales; "MULTIPLE" = vender un lote seleccionando varios animales.
   const abrirVentaAnimales = (modo: ModoVenta) => setVentaAbierta(modo);
-  // Manejador: Crear nuevo potrero con color
-  const handleGuardarPotrero = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formPotrero.nombre.trim()) return;
-
-    const datos: Partial<PotreroGanaderia> = {
-      codigo: formPotrero.codigo,
-      nombre: formPotrero.nombre,
-      areaHectareas: Number(formPotrero.areaHectareas),
-      capacidadAnimales: Number(formPotrero.capacidadAnimales),
-      tipoPasto: formPotrero.tipoPasto,
-      color: formPotrero.color,
-      diasDescansoMinimo: Number(formPotrero.diasDescansoMinimo),
-      observaciones: formPotrero.observaciones,
-      poligono: formPotrero.poligono,
-    };
-
-    let guardado: PotreroGanaderia;
-    try {
-      if (potreroEditandoId) {
-        guardado = await actualizarPotreroGanaderia(potreroEditandoId, tenantId, datos);
-      } else {
-        guardado = await crearPotreroGanaderia(tenantId, {
-          ...datos,
-          estado: "ACTIVO",
-          ordenRotacion: potreros.length + 1,
-        });
-      }
-    } catch {
-      notificar(`No se pudo guardar el potrero ${formPotrero.nombre} — revisa tu conexión e inténtalo de nuevo.`);
-      return;
-    }
-
-    if (potreroEditandoId) {
-      setPotreros(prev => prev.map(p => p.id === potreroEditandoId ? guardado : p));
-    } else {
-      setPotreros(prev => [...prev, guardado]);
-    }
-    notificar(`Potrero ${guardado.nombre} (${guardado.areaHectareas} ha) guardado en el mapa satelital.`);
-    setModalNuevoPotrero(false);
-    setPotreroEditandoId(null);
-    setFormPotrero({
-      codigo: `POT-0${potreros.length + 2}`,
-      nombre: "",
-      areaHectareas: 15.0,
-      capacidadAnimales: 25,
-      tipoPasto: "Brachiaria brizantha",
-      color: "#10B981",
-      diasDescansoMinimo: 28,
-      observaciones: "",
-      poligono: undefined,
-    });
-  };
-
   // Abre el modal en modo "crear" (limpio, sin arrastrar datos de una edición previa)
-  const abrirNuevoPotrero = () => {
-    setPotreroEditandoId(null);
-    setFormPotrero({
-      codigo: `POT-0${potreros.length + 1}`,
-      nombre: "",
-      areaHectareas: 15.0,
-      capacidadAnimales: 25,
-      tipoPasto: "Brachiaria brizantha",
-      color: "#10B981",
-      diasDescansoMinimo: 28,
-      observaciones: "",
-      poligono: undefined,
-    });
-    setModalNuevoPotrero(true);
-  };
+  const abrirNuevoPotrero = () => setPotreroEnModal({ form: potreroVacio(potreros.length + 1), editandoId: null });
 
   // Abre el modal en modo "editar", precargado con los datos reales del potrero
-  const abrirEditarPotrero = (potrero: PotreroGanaderia) => {
-    setPotreroEditandoId(potrero.id);
-    setFormPotrero({
+  const abrirEditarPotrero = (potrero: PotreroGanaderia) => setPotreroEnModal({
+    editandoId: potrero.id,
+    form: {
       codigo: potrero.codigo || "",
       nombre: potrero.nombre,
       areaHectareas: Number(potrero.areaHectareas) || 0,
@@ -840,27 +711,30 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       diasDescansoMinimo: Number(potrero.diasDescansoMinimo) || 28,
       observaciones: potrero.observaciones || "",
       poligono: potrero.poligono,
-    });
-    setModalNuevoPotrero(true);
-  };
+    },
+  });
 
   // Manejador cuando el usuario traza un potrero en el mapa satelital
   const handleGuardarPotreroTrazado = (datos: { poligono: [number, number][]; hectareas: number }) => {
-    setFormPotrero({
-      codigo: `POT-${(potreros.length + 1).toString().padStart(2, "0")}`,
-      nombre: `Potrero Trazado #${potreros.length + 1}`,
-      areaHectareas: datos.hectareas,
-      capacidadAnimales: Math.max(1, Math.round(datos.hectareas * 1.8)),
-      tipoPasto: "Brachiaria brizantha",
-      color: "#10B981",
-      diasDescansoMinimo: 28,
-      observaciones: `Georreferenciado sobre imagen satelital (${datos.poligono.length} postes).`,
-      poligono: datos.poligono,
+    setPotreroEnModal({
+      editandoId: null,
+      form: {
+        codigo: `POT-${(potreros.length + 1).toString().padStart(2, "0")}`,
+        nombre: `Potrero Trazado #${potreros.length + 1}`,
+        areaHectareas: datos.hectareas,
+        capacidadAnimales: Math.max(1, Math.round(datos.hectareas * 1.8)),
+        tipoPasto: "Brachiaria brizantha",
+        color: "#10B981",
+        diasDescansoMinimo: 28,
+        observaciones: `Georreferenciado sobre imagen satelital (${datos.poligono.length} postes).`,
+        poligono: datos.poligono,
+      },
     });
-    setPotreroEditandoId(null);
-    setModalNuevoPotrero(true);
     notificar(`Potrero trazado con ${datos.hectareas} ha. Completa los datos para guardarlo.`);
   };
+
+  const alGuardarPotrero = (guardado: PotreroGanaderia, esEdicion: boolean) =>
+    setPotreros(prev => esEdicion ? prev.map(p => p.id === guardado.id ? guardado : p) : [...prev, guardado]);
 
   // Abrir Modo Vaquera Rápida (Bulk Entry de Ordeño)
   const abrirVaqueraRapida = () => {
@@ -888,88 +762,20 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     }
   };
 
-  // Manejador: Rotar potrero
-  const handleEjecutarRotacion = async () => {
-    if (!modalRotar) return;
-    try {
-      await rotarPotreroGanaderia(modalRotar.id, tenantId, potreroDestinoId);
-    } catch (err) {
-      if (esFalloDeConexion(err)) {
-        encolarAccionGanaderia(tenantId, {
-          tipo: "rotar_potrero",
-          id: generarClaveIdempotencia(),
-          claveIdempotencia: generarClaveIdempotencia(),
-          descripcion: `Rotacion de ${modalRotar.nombre} a potrero #${potreroDestinoId}`,
-          creadaEn: Date.now(),
-          payload: {
-            potreroOrigenId: modalRotar.id,
-            potreroDestinoId: potreroDestinoId,
-            nombreOrigen: modalRotar.nombre,
-          }
-        });
-        setPendientesOffline(contarPendientesGanaderia(tenantId));
-        setPotreros(prev => prev.map(p => {
-          if (p.id === modalRotar.id) return { ...p, estado: "EN_DESCANSO", fechaInicioDescanso: new Date().toISOString().slice(0, 10) };
-          if (p.id === potreroDestinoId) return { ...p, estado: "ACTIVO", fechaInicioUso: new Date().toISOString().slice(0, 10) };
-          return p;
-        }));
-        setModalRotar(null);
-        notificar(`Rotacion guardada en Modo Campo (offline). Se sincronizara al volver a tener senal.`);
-        return;
-      }
-      notificar(`No se pudo rotar el hato de ${modalRotar.nombre} — revisa tu conexión e inténtalo de nuevo.`);
-      return;
-    }
-
+  // Rotación hecha (o encolada sin señal): el origen entra en descanso y el destino en uso.
+  const alRotarPotrero = (origenId: number, destinoId: number, offline: boolean) => {
+    const hoy = fechaLocalISO();
+    if (offline) setPendientesOffline(contarPendientesGanaderia(tenantId));
     setPotreros(prev => prev.map(p => {
-      if (p.id === modalRotar.id) return { ...p, estado: "EN_DESCANSO", fechaInicioDescanso: new Date().toISOString().slice(0, 10) };
-      if (p.id === potreroDestinoId) return { ...p, estado: "ACTIVO", fechaInicioUso: new Date().toISOString().slice(0, 10) };
+      if (p.id === origenId) return { ...p, estado: "EN_DESCANSO", fechaInicioDescanso: hoy };
+      if (p.id === destinoId) return { ...p, estado: "ACTIVO", fechaInicioUso: hoy };
       return p;
     }));
-
-    notificar(`Hato rotado de ${modalRotar.nombre} al destino.`);
-    setModalRotar(null);
   };
 
-  // Manejador: Registrar ordeño individual
-  const handleGuardarOrdeno = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const animalSeleccionado = animales.find(a => a.id === Number(formOrdeno.animalId)) || animales[0];
-
-    try {
-      const nuevoReg = await registrarOrdenoGanaderia(tenantId, {
-        animalId: Number(formOrdeno.animalId),
-        fecha: new Date().toISOString().slice(0, 10),
-        turno: formOrdeno.turno,
-        cantidadLitros: Number(formOrdeno.cantidadLitros),
-        precioVentaLitro: Number(formOrdeno.precioVentaLitro),
-        porcentajeGrasa: Number(formOrdeno.porcentajeGrasa),
-        porcentajeProteina: Number(formOrdeno.porcentajeProteina),
-        destino: formOrdeno.destino,
-      });
-      setOrdenos(prev => [nuevoReg, ...prev]);
-
-      if (formOrdeno.destino === "TANQUE") {
-        setTanqueLeche(prev => prev ? {
-          ...prev,
-          stockActualLitros: (Number(prev.stockActualLitros) || 0) + Number(formOrdeno.cantidadLitros)
-        } : {
-          id: 1,
-          tenantId,
-          stockActualLitros: Number(formOrdeno.cantidadLitros),
-          capacidadLitros: 2000,
-          temperaturaCelsius: 4.0
-        });
-      }
-    } catch {
-      notificar(`No se pudo registrar el ordeño de ${animalSeleccionado.nombre || animalSeleccionado.arete} — revisa tu conexión e inténtalo de nuevo.`);
-      return;
-    }
-
-    const destinoTexto = formOrdeno.destino === "TANQUE" ? "almacenados en tanque de leche" : "registrados como venta directa";
-    notificar(`${formOrdeno.cantidadLitros} L ${destinoTexto} para ${animalSeleccionado.nombre || animalSeleccionado.arete}.`);
-    setModalOrdeno(false);
-  };
+  // Ordeño individual guardado: a la lista y, si fue al tanque, al stock del tanque.
+  const alRegistrarOrdeno = (nuevoReg: RegistroOrdenoGanaderia, litrosAlTanque: number) =>
+    alGuardarJornada([nuevoReg], litrosAlTanque);
 
   // Equivalente del despacho en la moneda de cobro, a la tasa configurada.
   const equivalenteDespachoLeche = () => {
@@ -1057,42 +863,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     }
   };
 
-  // Manejador: Registrar Gasto Operativo del Hato
-  const handleGuardarGasto = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const montoNum = Number(formGasto.monto);
-    if (!formGasto.descripcion.trim()) {
-      notificar("Ingrese una descripción detallada del gasto.");
-      return;
-    }
-    if (isNaN(montoNum) || montoNum <= 0) {
-      notificar("El monto del gasto debe ser mayor a cero.");
-      return;
-    }
-
-    const catInfo = CATEGORIAS_GASTO_GANADERIA.find(c => c.id === formGasto.categoria);
-    const catLabel = catInfo ? catInfo.label.split("/")[0].trim() : formGasto.categoria;
-
-    try {
-      const nuevo = await crearGastoGanaderia(tenantId, {
-        categoria: formGasto.categoria,
-        descripcion: formGasto.descripcion.trim(),
-        monto: montoNum,
-        fecha: formGasto.fecha || new Date().toISOString().slice(0, 10),
-      });
-      setGastos(prev => [nuevo, ...prev]);
-      setModalGasto(false);
-      setFormGasto({
-        categoria: "ALIMENTACION",
-        descripcion: "",
-        monto: "",
-        fecha: new Date().toISOString().slice(0, 10),
-      });
-      notificar(`Gasto registrado: $${montoNum.toFixed(2)} USD en ${catLabel}`);
-    } catch (err: any) {
-      notificar(`Error al registrar gasto: ${err?.message || "revisa tu conexión e inténtalo de nuevo"}.`);
-    }
-  };
 
   // Sincronizacion de operaciones de campo realizadas offline (manga/potreros)
   const handleSincronizarManual = async () => {
@@ -1651,7 +1421,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </div>
                 <div className="flex flex-wrap items-center gap-2.5">
                   <button
-                    onClick={() => setModalOrdeno(true)}
+                    onClick={() => setOrdenoAbierto(true)}
                     className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer">
                     + Registrar Ordeño
                   </button>
@@ -3137,7 +2907,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <span className="text-[10px] bg-emerald-500/30 px-1.5 py-0.5 rounded text-emerald-300">Teclado →</span>
                   </button>
                   <button
-                    onClick={() => setModalOrdeno(true)}
+                    onClick={() => setOrdenoAbierto(true)}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Pesaje Individual de Leche</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
@@ -3314,7 +3084,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   <span>Modo Vaquera Rápida (Bulk Entry)</span>
                 </button>
                 <button
-                  onClick={() => setModalOrdeno(true)}
+                  onClick={() => setOrdenoAbierto(true)}
                   className="apple-glass px-4 py-2 rounded-xl border border-white/20 text-slate-700 dark:text-white text-xs font-bold hover:bg-white/10 cursor-pointer">
                   + Ordeño Individual
                 </button>
@@ -3677,7 +3447,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
                 <div className="flex items-center gap-2.5">
                   <button
-                    onClick={() => setModalGasto(true)}
+                    onClick={() => setGastoAbierto(true)}
                     className="btn-cyber-neon text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg hover:scale-105 transition-all cursor-pointer flex items-center gap-2"
                   >
                     <IconCoins size={15} />
@@ -3814,7 +3584,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     </p>
                   </div>
                   <button
-                    onClick={() => setModalGasto(true)}
+                    onClick={() => setGastoAbierto(true)}
                     className="text-xs font-bold text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
                   >
                     + Registrar Gasto
@@ -5014,305 +4784,44 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       )}
 
       {/* MODAL: AGREGAR POTRERO (MEJORADO CON COLOR PICKER GANSOFT) */}
-      {modalNuevoPotrero && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/30 text-left space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-                Agregar Potrero
-              </h3>
-              <button
-                onClick={() => setModalNuevoPotrero(false)}
-                className="text-slate-400 hover:text-white cursor-pointer">
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleGuardarPotrero} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Código *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. POT-05"
-                    value={formPotrero.codigo}
-                    onChange={e => setFormPotrero({ ...formPotrero, codigo: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Descripción / Nombre *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Potrero La Esperanza"
-                    value={formPotrero.nombre}
-                    onChange={e => setFormPotrero({ ...formPotrero, nombre: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Pasto Predominante</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Brachiaria decumbens"
-                    value={formPotrero.tipoPasto}
-                    onChange={e => setFormPotrero({ ...formPotrero, tipoPasto: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Color Distintivo en el Mapa</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={formPotrero.color}
-                      onChange={e => setFormPotrero({ ...formPotrero, color: e.target.value })}
-                      className="w-10 h-9 rounded-xl bg-transparent border-0 cursor-pointer"
-                    />
-                    <div className="flex items-center gap-1.5">
-                      {["#10B981", "#3B82F6", "#F59E0B", "#8B5CF6", "#EF4444"].map(c => (
-                        <button
-                          type="button"
-                          key={c}
-                          onClick={() => setFormPotrero({ ...formPotrero, color: c })}
-                          className={`w-6 h-6 rounded-full border-2 transition-transform cursor-pointer ${
-                            formPotrero.color === c ? "scale-110 border-white" : "border-transparent"
-                          }`}
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Superficie (Hectáreas) *</label>
-                  <input
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    step="0.1"
-                    required
-                    value={formPotrero.areaHectareas}
-                    onChange={e => setFormPotrero({ ...formPotrero, areaHectareas: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Capacidad Animal Máxima</label>
-                  <input
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    value={formPotrero.capacidadAnimales}
-                    onChange={e => setFormPotrero({ ...formPotrero, capacidadAnimales: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Observaciones</label>
-                <textarea
-                  rows={2}
-                  placeholder="Relieve, presencia de agua, tipo de cerca..."
-                  value={formPotrero.observaciones}
-                  onChange={e => setFormPotrero({ ...formPotrero, observaciones: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white resize-none"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setModalNuevoPotrero(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer">
-                  Guardar Potrero
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {potreroEnModal && (
+        <ModalPotrero
+          inicial={potreroEnModal.form}
+          editandoId={potreroEnModal.editandoId}
+          potreros={potreros}
+          tenantId={tenantId}
+          notificar={notificar}
+          onGuardado={alGuardarPotrero}
+          onCerrar={() => setPotreroEnModal(null)}
+        />
       )}
 
       {/* MODAL: ROTAR POTRERO */}
       {modalRotar && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-emerald-500/30 text-left space-y-4">
-            <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-              Rotación de Potrero
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-white/60">
-              Mover el hato del potrero <strong className="text-emerald-400">{modalRotar.nombre}</strong> a un nuevo potrero. El origen pasará automáticamente a estado <strong>EN DESCANSO</strong> para recuperar el pasto.
-            </p>
-
-            <div className="space-y-2 text-xs">
-              <label className="text-slate-400 block">Seleccionar Potrero Destino:</label>
-              <select
-                value={potreroDestinoId}
-                onChange={e => setPotreroDestinoId(Number(e.target.value))}
-                className="w-full p-3 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-bold">
-                {potreros.filter(p => p.id !== modalRotar.id).map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} ({p.tipoPasto || "Pasto"}) • {p.estado}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setModalRotar(null)}
-                className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                Cancelar
-              </button>
-              <button
-                onClick={handleEjecutarRotacion}
-                className="btn-cyber-neon text-white font-bold px-5 py-2.5 rounded-xl cursor-pointer">
-                Confirmar Rotación
-              </button>
-            </div>
-          </div>
-        </div>
+        <ModalRotarPotrero
+          origen={modalRotar}
+          potreros={potreros}
+          tenantId={tenantId}
+          notificar={notificar}
+          onRotado={alRotarPotrero}
+          onCerrar={() => setModalRotar(null)}
+        />
       )}
 
       {/* MODAL: REGISTRAR ORDEÑO */}
-      {modalOrdeno && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-sky-500/30 text-left space-y-4">
-            <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-              Registrar Ordeño
-            </h3>
-
-            <form onSubmit={handleGuardarOrdeno} className="space-y-3 text-xs">
-              <div>
-                <label className="text-slate-400 block mb-1">Vaca / Hembra</label>
-                <select
-                  value={formOrdeno.animalId}
-                  onChange={e => setFormOrdeno({ ...formOrdeno, animalId: Number(e.target.value) })}
-                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
-                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
-                    <option key={a.id} value={a.id}>{a.arete} - {a.nombre || "Sin nombre"}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Turno</label>
-                  <select
-                    value={formOrdeno.turno}
-                    onChange={e => setFormOrdeno({ ...formOrdeno, turno: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
-                    <option value="MANANA">Mañana</option>
-                    <option value="TARDE">Tarde</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Litros Ordeñados *</label>
-                  <input
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    step="0.1"
-                    required
-                    value={formOrdeno.cantidadLitros}
-                    onChange={e => setFormOrdeno({ ...formOrdeno, cantidadLitros: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-sky-400 font-mono font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">% Grasa</label>
-                  <input
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    step="0.1"
-                    value={formOrdeno.porcentajeGrasa}
-                    onChange={e => setFormOrdeno({ ...formOrdeno, porcentajeGrasa: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Precio x Litro (USD)</label>
-                  <input
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    step="0.01"
-                    value={formOrdeno.precioVentaLitro}
-                    onChange={e => setFormOrdeno({ ...formOrdeno, precioVentaLitro: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-emerald-400 font-mono font-bold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Destino de la Leche *</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFormOrdeno({ ...formOrdeno, destino: "TANQUE" })}
-                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                      formOrdeno.destino === "TANQUE"
-                        ? "bg-sky-500/20 border-sky-400 text-sky-400 shadow-md shadow-sky-500/20"
-                        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
-                    }`}>
-                    <span className="inline-flex items-center gap-1.5"><IconMilk size={13} /> Al Tanque (Stock)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormOrdeno({ ...formOrdeno, destino: "VENTA_DIRECTA" })}
-                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                      formOrdeno.destino === "VENTA_DIRECTA"
-                        ? "bg-amber-500/20 border-amber-400 text-amber-400 shadow-md shadow-amber-500/20"
-                        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
-                    }`}>
-                    <span className="inline-flex items-center gap-1.5"><IconBolt size={13} /> Venta Directa</span>
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  {formOrdeno.destino === "TANQUE"
-                    ? "Suma los litros al tanque refrigerado de la finca para posterior despacho a cisterna."
-                    : "Ingreso inmediato por venta directa a pie de vaca o despacho sin almacenamiento."}
-                </p>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
-                <span className="text-slate-400 font-medium">Liquidación estimada:</span>
-                <span className="font-mono font-bold text-emerald-400">
-                  ${(formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro).toFixed(2)} USD
-                  {monedasConfig.VES && ` • Bs. ${((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaBCV).toFixed(2)}`}
-                  {monedasConfig.COP && ` • COP $${Math.round((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaCOP).toLocaleString()}`}
-                </span>
-              </div>
-
-              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setModalOrdeno(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer">
-                  Guardar Ordeño
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {ordenoAbierto && (
+        <ModalOrdeno
+          animales={animales}
+          animalesActivos={animalesActivos}
+          precioLecheUSD={precioLecheUSD}
+          tasaBCV={tasaBCV}
+          tasaCOP={tasaCOP}
+          monedasConfig={monedasConfig}
+          tenantId={tenantId}
+          notificar={notificar}
+          onRegistrado={alRegistrarOrdeno}
+          onCerrar={() => setOrdenoAbierto(false)}
+        />
       )}
 
       {/* MODAL: REGISTRAR PESAJE & GDP */}
@@ -5661,135 +5170,16 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       )}
 
       {/* ── MODAL: REGISTRAR GASTO OPERATIVO DEL HATO ── */}
-      {modalGasto && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in font-['Inter']">
-          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-emerald-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2.5">
-                <span className="text-emerald-400"><IconCoins size={24} /></span>
-                <div>
-                  <h3 className="font-['Outfit'] font-black text-lg text-white">
-                    Registrar Gasto Operativo
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Egreso de caja para insumos, alimentación, veterinario o jornales
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalGasto(false)}
-                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleGuardarGasto} className="space-y-4 text-xs">
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
-                  Categoría del Gasto *
-                </label>
-                <select
-                  value={formGasto.categoria}
-                  onChange={e => setFormGasto({ ...formGasto, categoria: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-emerald-500 focus:outline-none"
-                >
-                  {CATEGORIAS_GASTO_GANADERIA.map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
-                  Descripción Detallada *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej: 10 sacos de sal mineralizada y 2 tambores de melaza..."
-                  value={formGasto.descripcion}
-                  onChange={e => setFormGasto({ ...formGasto, descripcion: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
-                    Monto en Dólares (USD) *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-emerald-400 font-bold">$</span>
-                    <input
-                      type="number"
-                      onFocus={e => e.target.select()}
-                      step="0.01"
-                      min="0.01"
-                      required
-                      placeholder="0.00"
-                      value={formGasto.monto}
-                      onChange={e => setFormGasto({ ...formGasto, monto: e.target.value })}
-                      className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-800 border border-white/15 text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
-                    Fecha del Gasto *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={formGasto.fecha}
-                    onChange={e => setFormGasto({ ...formGasto, fecha: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-xs focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Conversión en vivo a monedas activas */}
-              {Number(formGasto.monto) > 0 && (monedasConfig.VES || monedasConfig.COP) && (
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1 text-[11px]">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Equivalencia al cambio actual:</span>
-                  {monedasConfig.VES && (
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Bolívares (Tasa {tasaBCV.toFixed(2)}):</span>
-                      <span className="font-mono font-bold text-emerald-300">
-                        Bs. {(Number(formGasto.monto) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  )}
-                  {monedasConfig.COP && (
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Pesos Colombianos (Tasa {tasaCOP}):</span>
-                      <span className="font-mono font-bold text-sky-300">
-                        COP ${Math.round(Number(formGasto.monto) * tasaCOP).toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setModalGasto(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl btn-cyber-neon text-white text-xs font-bold shadow-lg transition-all cursor-pointer flex items-center gap-1.5">
-                  <span>Guardar Gasto Operativo</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {gastoAbierto && (
+        <ModalGasto
+          tasaBCV={tasaBCV}
+          tasaCOP={tasaCOP}
+          monedasConfig={monedasConfig}
+          tenantId={tenantId}
+          notificar={notificar}
+          onRegistrado={g => setGastos(prev => [g, ...prev])}
+          onCerrar={() => setGastoAbierto(false)}
+        />
       )}
 
     </div>
