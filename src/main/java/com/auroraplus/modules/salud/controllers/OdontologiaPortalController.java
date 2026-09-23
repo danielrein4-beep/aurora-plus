@@ -263,18 +263,20 @@ public class OdontologiaPortalController {
         }
         String esperada = respuestaEsperada(a).substring(1);
         String dada = req.respuesta == null ? "" : req.respuesta.replaceAll("\\D", "");
+        // Un fallo se responde con return y no con throw: una excepcion haria rollback de
+        // @Transactional y se perderia el conteo, con lo que el bloqueo nunca llegaria.
         if (!MessageDigest.isEqual(esperada.getBytes(StandardCharsets.UTF_8), dada.getBytes(StandardCharsets.UTF_8))) {
             int intentos = ((Number) enlace.get("intentos_fallidos")).intValue() + 1;
             if (intentos >= MAX_INTENTOS) {
                 jdbcTemplate.update(
-                    "UPDATE salud_odontologia_portal_enlaces SET intentos_fallidos = 0, bloqueado_hasta = now() + make_interval(mins => ?) WHERE id = ?",
-                    MINUTOS_BLOQUEO, a.enlaceId());
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                    "Demasiados intentos. Por seguridad espere " + MINUTOS_BLOQUEO + " minutos e intente de nuevo.");
+                    "UPDATE salud_odontologia_portal_enlaces SET intentos_fallidos = 0, bloqueado_hasta = ? WHERE id = ?",
+                    Timestamp.valueOf(LocalDateTime.now().plusMinutes(MINUTOS_BLOQUEO)), a.enlaceId());
+                return sinCache(HttpStatus.TOO_MANY_REQUESTS, Map.of("message",
+                    "Demasiados intentos. Por seguridad espere " + MINUTOS_BLOQUEO + " minutos e intente de nuevo."));
             }
             jdbcTemplate.update("UPDATE salud_odontologia_portal_enlaces SET intentos_fallidos = ? WHERE id = ?", intentos, a.enlaceId());
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                "El dato no coincide. Le quedan " + (MAX_INTENTOS - intentos) + " intento(s).");
+            return sinCache(HttpStatus.FORBIDDEN, Map.of("message",
+                "El dato no coincide. Le quedan " + (MAX_INTENTOS - intentos) + " intento(s)."));
         }
         jdbcTemplate.update(
             "UPDATE salud_odontologia_portal_enlaces SET intentos_fallidos = 0, bloqueado_hasta = NULL, ultimo_acceso = now() WHERE id = ?",
