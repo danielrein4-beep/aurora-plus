@@ -3434,6 +3434,10 @@ export interface AnimalGanaderia {
   valorEstimado?: number;
   codigoQr?: string;
   lote?: string;
+  /** Ceba en sociedad: null = animal propio. */
+  sociedadCebaId?: number | null;
+  pesoEntradaSociedad?: number | null;
+  fechaEntradaSociedad?: string | null;
   estadoReproductivo?: "VACIA" | "PREÑADA" | "EN_ESPERA" | string;
   estadoProductivo?: "CRIANDO" | "ORDEÑO" | "SECA" | string;
 }
@@ -3830,6 +3834,93 @@ export function editarPesoGanaderia(id: number, datos: { pesoKg?: number; fecha?
 
 export function eliminarPesoGanaderia(id: number): Promise<void> {
   return request(`/api/ganaderia/pesos/${id}`, { method: "DELETE" });
+}
+
+// ── Ceba en sociedad (reparto de kilos ganados) ──
+
+export interface SociedadCebaGanaderia {
+  id: number;
+  nombreSocio: string;
+  documentoSocio?: string | null;
+  telefonoSocio?: string | null;
+  porcentajeFinca: number;
+  fechaInicio: string;
+  estado: "ACTIVA" | "CERRADA" | string;
+  fechaCierre?: string | null;
+  notas?: string | null;
+}
+
+export interface LineaLiquidacionSociedad {
+  animalId: number;
+  arete: string;
+  nombre: string | null;
+  tipoAnimal: string | null;
+  estado: string;
+  fechaEntrada: string | null;
+  diasEnFinca: number | null;
+  pesoEntrada: number | null;
+  pesoActual: number | null;
+  kilosGanados: number | null;
+  kilosFinca: number | null;
+  kilosSocio: number | null;
+  kilosTotalesSocio: number | null;
+  gdpKgDia: number | null;
+  precioVentaUSD: number | null;
+  precioKgUSD: number | null;
+  montoFincaUSD: number | null;
+  montoSocioUSD: number | null;
+}
+
+export interface ResumenSociedadCeba {
+  sociedad: SociedadCebaGanaderia;
+  porcentajeSocio: number;
+  animalesActivos: number;
+  animalesVendidos: number;
+  pesoEntradaTotal: number;
+  pesoActualTotal: number;
+  kilosGanadosTotal: number;
+  kilosFincaTotal: number;
+  kilosSocioTotal: number;
+  montoFincaVendidosUSD: number;
+  montoSocioVendidosUSD: number;
+  lineas: LineaLiquidacionSociedad[];
+}
+
+export interface DatosSociedadCeba {
+  nombreSocio?: string;
+  documentoSocio?: string;
+  telefonoSocio?: string;
+  porcentajeFinca?: number;
+  fechaInicio?: string;
+  notas?: string;
+}
+
+export function listarSociedadesCeba(): Promise<ResumenSociedadCeba[]> {
+  return request(`/api/ganaderia/sociedades`);
+}
+
+export function crearSociedadCeba(datos: DatosSociedadCeba): Promise<SociedadCebaGanaderia> {
+  return request(`/api/ganaderia/sociedades`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function editarSociedadCeba(id: number, datos: DatosSociedadCeba): Promise<SociedadCebaGanaderia> {
+  return request(`/api/ganaderia/sociedades/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function asignarAnimalesSociedadCeba(id: number, animalIds: number[], fechaEntrada?: string): Promise<{ asignados: number }> {
+  return request(`/api/ganaderia/sociedades/${id}/animales`, { method: "POST", body: JSON.stringify({ animalIds, fechaEntrada }) });
+}
+
+export function corregirPesoEntradaSociedadCeba(id: number, animalId: number, pesoEntrada: number): Promise<void> {
+  return request(`/api/ganaderia/sociedades/${id}/animales/${animalId}`, { method: "PUT", body: JSON.stringify({ pesoEntrada }) });
+}
+
+export function quitarAnimalSociedadCeba(id: number, animalId: number): Promise<void> {
+  return request(`/api/ganaderia/sociedades/${id}/animales/${animalId}`, { method: "DELETE" });
+}
+
+export function cerrarSociedadCeba(id: number): Promise<SociedadCebaGanaderia> {
+  return request(`/api/ganaderia/sociedades/${id}/cerrar`, { method: "POST" });
 }
 
 export function obtenerGdpGanaderia(animalId: number): Promise<GdpGanaderiaResponse> {

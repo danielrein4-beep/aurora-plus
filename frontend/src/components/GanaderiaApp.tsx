@@ -3,6 +3,7 @@ import ModalBasculaBluetooth from "./ModalBasculaBluetooth";
 import ModalImportarHato from "./ModalImportarHato";
 import TenantSoporteWidget from "./TenantSoporteWidget";
 import EngordeGanadero from "./EngordeGanadero";
+import SociedadesCeba from "./SociedadesCeba";
 import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO } from "./ReportesCampoGanaderia";
 import {
   encolarAccionGanaderia,
@@ -266,7 +267,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   });
 
   // Pestaña principal activa
-  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "engorde" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
+  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "engorde" | "sociedades" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
   const [aperturaSoporte, setAperturaSoporte] = useState(0);
 
@@ -1734,6 +1735,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 { id: "inventario" as const, Icon: IconCow, etiqueta: "Hato & Inventario", badge: 0 },
                 { id: "potreros" as const, Icon: IconPin, etiqueta: "Potreros", badge: 0 },
                 { id: "engorde" as const, Icon: IconScale, etiqueta: "Engorde (GDP)", badge: 0 },
+                { id: "sociedades" as const, Icon: IconUsers, etiqueta: "Ceba en sociedad", badge: 0 },
                 { id: "produccion" as const, Icon: IconMilk, etiqueta: "Producción & Pesajes", badge: 0 },
               ],
             },
@@ -2661,7 +2663,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                         );
                       })}
                       <tr className="bg-emerald-500/5 font-bold">
-                        <td className="p-4 text-slate-900 dark:text-white">TOTAL ACTIVOS</td>
+                        <td className="p-4 text-slate-900 dark:text-white">
+                          TOTAL ACTIVOS
+                          {animalesActivos.some(a => a.sociedadCebaId) && (
+                            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">
+                              {animalesActivos.filter(a => !a.sociedadCebaId).length} propios · {animalesActivos.filter(a => a.sociedadCebaId).length} en sociedad
+                            </div>
+                          )}
+                        </td>
                         <td className="p-4 text-center font-mono text-emerald-500 dark:text-emerald-400 text-base">{totalAnimales}</td>
                         <td className="p-4 text-center font-mono text-slate-600 dark:text-white/70">
                           {Math.round(animalesActivos.reduce((sum, a) => sum + (a.pesoActual || 0), 0) / Math.max(1, totalAnimales))} kg
@@ -4491,6 +4500,15 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           <EngordeGanadero
             tenantId={tenantId}
             puedeCorregir={puedeImportarHato}
+            notificar={notificar}
+            onCambio={cargarDatos}
+          />
+        )}
+
+        {tab === "sociedades" && (
+          <SociedadesCeba
+            animales={animales}
+            puedeGestionar={puedeImportarHato}
             notificar={notificar}
             onCambio={cargarDatos}
           />
