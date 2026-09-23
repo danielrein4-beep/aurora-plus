@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { IconCalendar, IconFileText, IconLock, IconPrescription, IconShield, IconTooth } from "../Icons";
+import AuroraLogo from "../AuroraLogo";
 
 // Portal publico del paciente odontologico. Se llega solo por el QR de la receta (o el
 // enlace que envia la clinica). Tener el enlace no basta: el paciente confirma su identidad
@@ -35,6 +36,7 @@ interface Plan {
 
 interface Portal {
   clinica: string;
+  doctor: string | null;
   paciente: string;
   hallazgos: Hallazgo[];
   planes: Plan[];
@@ -124,6 +126,25 @@ function comprimirImagen(file: File): Promise<string> {
   });
 }
 
+// El nombre del odontologo solo se muestra si existe y no repite el de la clinica
+// (en consultorios individuales el usuario suele llevar el mismo nombre).
+function doctorVisible(doctor: string | null | undefined, clinica: string): doctor is string {
+  return !!doctor && doctor.trim().toLowerCase() !== clinica.trim().toLowerCase();
+}
+
+// Firma discreta de Aurora: la clinica es la protagonista del portal.
+function SelloAurora({ conTecnologia = false }: { conTecnologia?: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/70 backdrop-blur-sm border border-slate-200/70 opacity-80 select-none">
+      <AuroraLogo size={16} animated={false} />
+      <span className="text-[11px] text-slate-500">
+        {conTecnologia && "Con tecnología de "}
+        <span className="font-semibold text-slate-600">Aurora Plus</span>
+      </span>
+    </div>
+  );
+}
+
 function Tarjeta({ icono, titulo, children }: { icono?: React.ReactNode; titulo: string; children: React.ReactNode }) {
   return (
     <section className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_1px_2px_rgba(13,59,61,0.04),0_8px_24px_-12px_rgba(13,59,61,0.12)] p-5 space-y-4">
@@ -192,7 +213,7 @@ export default function PortalOdontologiaPaciente() {
   const { token: tokenUrl } = useParams<{ token: string }>();
   const [token] = useState<string | null>(() => tokenUrl || leer(CLAVE_TOKEN));
   const [sesion, setSesion] = useState<string | null>(() => leer(CLAVE_SESION));
-  const [inicio, setInicio] = useState<{ clinica: string; metodo: string } | null>(null);
+  const [inicio, setInicio] = useState<{ clinica: string; doctor: string | null; metodo: string } | null>(null);
   const [datos, setDatos] = useState<Portal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [respuesta, setRespuesta] = useState("");
@@ -350,6 +371,9 @@ export default function PortalOdontologiaPaciente() {
             <div>
               <p className="text-[11px] uppercase tracking-[0.18em] text-aurora-primary font-semibold">{inicio.clinica}</p>
               <h1 className="text-2xl font-semibold text-aurora-dark mt-1">Su historia dental</h1>
+              {doctorVisible(inicio.doctor, inicio.clinica) && (
+                <p className="text-sm text-slate-500 mt-1">Consultorio de {inicio.doctor}</p>
+              )}
             </div>
           </div>
 
@@ -392,6 +416,9 @@ export default function PortalOdontologiaPaciente() {
             <IconShield size={13} /> Enlace personal y protegido
           </p>
         </div>
+        <div className="fixed bottom-4 right-4">
+          <SelloAurora />
+        </div>
       </main>
     );
   }
@@ -409,7 +436,9 @@ export default function PortalOdontologiaPaciente() {
             </button>
           </div>
           <h1 className="text-[28px] font-semibold mt-3 leading-tight">Hola, {datos.paciente}</h1>
-          <p className="text-teal-50/80 text-sm mt-1">Su historia dental, siempre a mano.</p>
+          <p className="text-teal-50/80 text-sm mt-1">
+            {doctorVisible(datos.doctor, datos.clinica) ? `Atendido por ${datos.doctor}` : "Su historia dental, siempre a mano."}
+          </p>
         </div>
       </header>
 
@@ -618,6 +647,9 @@ export default function PortalOdontologiaPaciente() {
         <p className="flex items-center justify-center gap-1.5 text-xs text-slate-400 pt-2">
           <IconShield size={13} /> Enlace personal y protegido. No lo comparta.
         </p>
+        <div className="flex justify-center pt-1">
+          <SelloAurora conTecnologia />
+        </div>
       </div>
 
       {imagen && (

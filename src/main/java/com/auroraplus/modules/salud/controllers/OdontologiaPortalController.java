@@ -219,9 +219,20 @@ public class OdontologiaPortalController {
     @GetMapping("/api/public/odontologia/portal/{token}/inicio")
     public ResponseEntity<Map<String, Object>> inicio(@PathVariable String token) {
         Acceso a = resolver(token);
-        return sinCache(HttpStatus.OK, Map.of(
-            "clinica", licenciaTenantRepository.findByTenantId(a.tenantId()).map(l -> l.getNombreEmpresa()).orElse("Su clinica odontologica"),
-            "metodo", respuestaEsperada(a).startsWith("A") ? "ANIO_NACIMIENTO" : "CEDULA"));
+        Map<String, Object> r = new HashMap<>();
+        r.put("clinica", licenciaTenantRepository.findByTenantId(a.tenantId()).map(l -> l.getNombreEmpresa()).orElse("Su clinica odontologica"));
+        r.put("doctor", doctorDelEnlace(a.enlaceId()));
+        r.put("metodo", respuestaEsperada(a).startsWith("A") ? "ANIO_NACIMIENTO" : "CEDULA");
+        return sinCache(HttpStatus.OK, r);
+    }
+
+    // Nombre del odontologo que genero el enlace, tal como esta en su usuario; null si no se encuentra.
+    private String doctorDelEnlace(Long enlaceId) {
+        List<String> nombres = jdbcTemplate.queryForList(
+            "SELECT u.nombre_completo FROM salud_odontologia_portal_enlaces e " +
+            "JOIN usuarios u ON u.username = e.creado_por AND u.tenant_id = e.tenant_id WHERE e.id = ?",
+            String.class, enlaceId);
+        return nombres.isEmpty() || nombres.get(0) == null || nombres.get(0).isBlank() ? null : nombres.get(0).trim();
     }
 
     // "C1234" = ultimos 4 digitos de la cedula; "A1990" = ano de nacimiento si la cedula no tiene 4 digitos.
@@ -281,6 +292,7 @@ public class OdontologiaPortalController {
         Map<String, Object> r = new LinkedHashMap<>();
 
         r.put("clinica", licenciaTenantRepository.findByTenantId(t).map(l -> l.getNombreEmpresa()).orElse("Su clinica odontologica"));
+        r.put("doctor", doctorDelEnlace(a.enlaceId()));
         r.put("paciente", jdbcTemplate.queryForObject(
             "SELECT split_part(trim(nombres), ' ', 1) FROM salud_pacientes WHERE tenant_id = ? AND id = ?", String.class, t, p));
 
