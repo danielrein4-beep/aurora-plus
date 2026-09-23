@@ -17,6 +17,8 @@ import VisorRadiografiasDental from "./VisorRadiografiasDental";
 import AgendaSillonesOdontologia from "./AgendaSillonesOdontologia";
 import FichaAnamnesisRiesgo from "./FichaAnamnesisRiesgo";
 import EvolucionClinicaSesiones from "./EvolucionClinicaSesiones";
+import RecetasOdontologicas from "./RecetasOdontologicas";
+import ConsentimientosOdontologicos from "./ConsentimientosOdontologicos";
 
 interface ModuloOdontologiaProps {
   pacientes: Paciente[] | null;
@@ -34,7 +36,9 @@ type PestanaOdonto =
   | "evolucion"
   | "planes" 
   | "agenda" 
-  | "radiografias";
+  | "radiografias"
+  | "recetas"
+  | "consentimientos";
 
 export default function ModuloOdontologia({
   pacientes,
@@ -311,6 +315,30 @@ export default function ModuloOdontologia({
           >
             <span>Radiografias</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setPestanaActiva("recetas")}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "recetas"
+                ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
+                : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <span>Recetas</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPestanaActiva("consentimientos")}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "consentimientos"
+                ? "bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20"
+                : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <span>Consentimientos</span>
+          </button>
         </div>
       </div>
 
@@ -368,6 +396,14 @@ export default function ModuloOdontologia({
               pacienteId={pacienteSeleccionado.id}
               pacienteNombre={pacienteSeleccionado.nombreCompleto}
             />
+          )}
+
+          {pestanaActiva === "recetas" && (
+            <RecetasOdontologicas paciente={pacienteSeleccionado} config={config} />
+          )}
+
+          {pestanaActiva === "consentimientos" && (
+            <ConsentimientosOdontologicos paciente={pacienteSeleccionado} config={config} />
           )}
         </>
       ) : (

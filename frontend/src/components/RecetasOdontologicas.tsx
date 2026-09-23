@@ -1,0 +1,271 @@
+import React, { useEffect, useState } from "react";
+import { leerSesion, type Paciente } from "../api";
+import { VademecumPrescriptor, type ItemRecipePrescrito } from "./VademecumPrescriptor";
+import { generarPdfRecipeMedico, type RecipeReportData, type RecipeItemData } from "../utils/pdfReports";
+
+interface RecetasOdontologicasProps {
+  paciente: Paciente;
+  config: any;
+}
+
+interface RecetaGuardada {
+  id: number;
+  odontologo: string;
+  diagnostico: string | null;
+  items_json: string;
+  indicaciones: string | null;
+  fecha_registro: string;
+}
+
+// Diagnosticos frecuentes en consulta dental para no escribirlos cada vez.
+const DIAGNOSTICOS_FRECUENTES = [
+  "Pulpitis irreversible sintomatica",
+  "Absceso periapical agudo",
+  "Pericoronaritis",
+  "Post-exodoncia",
+  "Alveolitis",
+  "Gingivitis asociada a placa",
+  "Periodontitis",
+];
+
+function authHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${leerSesion()?.token || ""}` };
+}
+
+function edadDesde(fechaNac?: string | null): number | undefined {
+  if (!fechaNac) return undefined;
+  const n = new Date(fechaNac);
+  if (Number.isNaN(n.getTime())) return undefined;
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - n.getFullYear();
+  const m = hoy.getMonth() - n.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < n.getDate())) edad--;
+  return edad;
+}
+
+export default function RecetasOdontologicas({ paciente, config }: RecetasOdontologicasProps) {
+  const [items, setItems] = useState<ItemRecipePrescrito[]>([]);
+  const [diagnostico, setDiagnostico] = useState("");
+  const [indicaciones, setIndicaciones] = useState("");
+  const [recetas, setRecetas] = useState<RecetaGuardada[]>([]);
+  const [alergiasAnamnesis, setAlergiasAnamnesis] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+
+  const cargarRecetas = async () => {
+    try {
+      const res = await fetch(`/api/salud/odontologia/recetas?pacienteId=${paciente.id}`, { headers: authHeaders() });
+      if (res.ok) setRecetas(await res.json());
+    } catch {
+      setRecetas([]);
+    }
+  };
+
+  useEffect(() => {
+    setItems([]);
+    setDiagnostico("");
+    setIndicaciones("");
+    setMensaje(null);
+    cargarRecetas();
+    // Las alergias de la ficha odontologica se suman a las del paciente para el cruce del vademecum.
+    fetch(`/api/salud/odontologia/anamnesis?pacienteId=${paciente.id}`, { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((a) => {
+        if (!a) return setAlergiasAnamnesis("");
+        const partes = [a.detalle_alergias || ""];
+        if (a.alergia_anestesia) partes.push("Alergia a anestesicos locales");
+        setAlergiasAnamnesis(partes.filter(Boolean).join(", "));
+      })
+      .catch(() => setAlergiasAnamnesis(""));
+  }, [paciente.id]);
+
+  const alergias = [paciente.alergias || "", alergiasAnamnesis].filter(Boolean).join(", ");
+
+  const construirPdf = (medicamentos: RecipeItemData[], diag: string, indic: string, fecha: string): RecipeReportData => ({
+    clinicaNombre: config?.clinicaNombre || "Clinica Odontologica",
+    doctorNombre: config?.doctorNombre || leerSesion()?.username || "Odontologo Tratante",
+    especialidad: config?.especialidad || "Odontologia",
+    matriculaMPPS: config?.matriculaMPPS,
+    colegioMedicos: config?.colegioMedicos,
+    telefonoContacto: config?.telefonoContacto,
+    direccionClinica: config?.direccionClinica,
+    logoBase64: config?.logoBase64,
+    paciente: {
+      nombre: paciente.nombreCompleto,
+      identificacion: paciente.identificacion,
+      edad: edadDesde(paciente.fechaNacimiento) ?? paciente.edad ?? "",
+      sexo: paciente.genero || "No especificado",
+      alergias: alergias || undefined,
+      fechaConsulta: fecha,
+      expediente: `HC-${String(paciente.id).padStart(4, "0")}`,
+      telefono: paciente.telefono || undefined,
+    },
+    diagnostico: diag || undefined,
+    medicamentos,
+    indicacionesGenerales: indic || undefined,
+  });
+
+  const guardarEImprimir = async () => {
+    if (items.length === 0) {
+      setMensaje({ tipo: "error", texto: "Agrega al menos un medicamento a la receta." });
+      return;
+    }
+    setGuardando(true);
+    setMensaje(null);
+    const medicamentos: RecipeItemData[] = items.map((it) => ({
+      medicamento: it.medicamento,
+      presentacion: it.presentacion,
+      via: it.via,
+      posologia: it.posologia,
+      duracionDias: it.duracionDias,
+      indicacionesEspeciales: it.indicacionesEspeciales,
+    }));
+    try {
+      const res = await fetch("/api/salud/odontologia/recetas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ pacienteId: paciente.id, diagnostico, items: medicamentos, indicaciones }),
+      });
+      if (!res.ok) {
+        const cuerpo = await res.json().catch(() => null);
+        throw new Error(cuerpo?.message || `error ${res.status}`);
+      }
+      generarPdfRecipeMedico(construirPdf(medicamentos, diagnostico, indicaciones, new Date().toLocaleDateString("es-VE")));
+      setItems([]);
+      setDiagnostico("");
+      setIndicaciones("");
+      setMensaje({ tipo: "ok", texto: "Receta guardada en el expediente y descargada en PDF." });
+      cargarRecetas();
+    } catch (e) {
+      setMensaje({ tipo: "error", texto: `La receta NO se guardo: ${e instanceof Error ? e.message : "fallo de conexion"}.` });
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const reimprimir = (r: RecetaGuardada) => {
+    let meds: RecipeItemData[] = [];
+    try {
+      meds = JSON.parse(r.items_json);
+    } catch {
+      meds = [];
+    }
+    generarPdfRecipeMedico(
+      construirPdf(meds, r.diagnostico || "", r.indicaciones || "", new Date(r.fecha_registro).toLocaleDateString("es-VE"))
+    );
+  };
+
+  return (
+    <div className="space-y-6 text-slate-900 dark:text-slate-100 text-left">
+      <div className="p-5 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 space-y-4">
+        <div>
+          <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Receta odontologica</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Prescripcion con vademecum y cruce de alergias para {paciente.nombreCompleto}
+          </p>
+        </div>
+
+        {alergias && (
+          <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-bold">
+            Alergias registradas: {alergias}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <label className="block">
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">Diagnostico</span>
+            <input
+              type="text"
+              list="diagnosticos-odonto"
+              value={diagnostico}
+              onChange={(e) => setDiagnostico(e.target.value)}
+              placeholder="Ej: Pulpitis irreversible pieza 36"
+              className="w-full p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15"
+            />
+            <datalist id="diagnosticos-odonto">
+              {DIAGNOSTICOS_FRECUENTES.map((d) => (
+                <option key={d} value={d} />
+              ))}
+            </datalist>
+          </label>
+          <label className="block">
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">Indicaciones generales</span>
+            <input
+              type="text"
+              value={indicaciones}
+              onChange={(e) => setIndicaciones(e.target.value)}
+              placeholder="Ej: Dieta blanda, no enjuagar en 24 horas, compresas frias"
+              className="w-full p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15"
+            />
+          </label>
+        </div>
+
+        <VademecumPrescriptor alergiasPaciente={alergias} itemsRecipe={items} onChangeItems={setItems} />
+
+        {mensaje && (
+          <div
+            className={`p-3 rounded-2xl text-xs font-bold ${
+              mensaje.tipo === "ok"
+                ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                : "bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300"
+            }`}
+          >
+            {mensaje.texto}
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={guardarEImprimir}
+            disabled={guardando || items.length === 0}
+            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm disabled:opacity-50"
+          >
+            {guardando ? "Guardando..." : "Guardar y descargar receta"}
+          </button>
+        </div>
+      </div>
+
+      <div className="p-5 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 space-y-3">
+        <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">Recetas anteriores</h4>
+        {recetas.length === 0 ? (
+          <p className="text-xs text-slate-500 dark:text-slate-400">Este paciente no tiene recetas odontologicas guardadas.</p>
+        ) : (
+          <ul className="space-y-2">
+            {recetas.map((r) => {
+              let meds: RecipeItemData[] = [];
+              try {
+                meds = JSON.parse(r.items_json);
+              } catch {
+                meds = [];
+              }
+              return (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs"
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-900 dark:text-white truncate">
+                      {meds.map((m) => m.medicamento).join(", ") || "Sin medicamentos"}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {new Date(r.fecha_registro).toLocaleDateString("es-VE")} - {r.odontologo}
+                      {r.diagnostico ? ` - ${r.diagnostico}` : ""}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => reimprimir(r)}
+                    className="shrink-0 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/15 font-semibold hover:bg-slate-200 dark:hover:bg-white/10"
+                  >
+                    Descargar PDF
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}

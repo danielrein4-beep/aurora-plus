@@ -137,6 +137,12 @@ public class OdontologiaAvanzadaController {
         public Integer sondajeMl;
         public Integer sondajeL;
         public Integer sondajeDl;
+        public Integer margenMv;
+        public Integer margenV;
+        public Integer margenDv;
+        public Integer margenMl;
+        public Integer margenL;
+        public Integer margenDl;
         public Boolean sangradoBop;
         public Boolean placa;
         public Integer movilidad;
@@ -155,31 +161,95 @@ public class OdontologiaAvanzadaController {
         }
         validarPacienteDelTenant(tenantId, req.pacienteId);
 
+        Object[] sondajes = {
+            sondaje(req.sondajeMv), sondaje(req.sondajeV), sondaje(req.sondajeDv),
+            sondaje(req.sondajeMl), sondaje(req.sondajeL), sondaje(req.sondajeDl)
+        };
+        Object[] margenes = {
+            margen(req.margenMv), margen(req.margenV), margen(req.margenDv),
+            margen(req.margenMl), margen(req.margenL), margen(req.margenDl)
+        };
+        boolean bop = Boolean.TRUE.equals(req.sangradoBop);
+        boolean placa = Boolean.TRUE.equals(req.placa);
+        int movilidad = req.movilidad != null ? Math.max(0, Math.min(3, req.movilidad)) : 0;
+        int furca = req.furca != null ? Math.max(0, Math.min(3, req.furca)) : 0;
+
+        List<Object> vigente = new ArrayList<>(List.of(tenantId, req.pacienteId, req.dienteFdi));
+        vigente.addAll(Arrays.asList(sondajes));
+        vigente.addAll(Arrays.asList(margenes));
+        vigente.addAll(Arrays.asList(bop, placa, movilidad, furca, req.notas));
         jdbcTemplate.update(
             "INSERT INTO salud_periodontograma (" +
             "tenant_id, paciente_id, diente_fdi, sondaje_mv, sondaje_v, sondaje_dv, " +
-            "sondaje_ml, sondaje_l, sondaje_dl, sangrado_bop, placa, movilidad, furca, notas, fecha_registro" +
-            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now()) " +
+            "sondaje_ml, sondaje_l, sondaje_dl, margen_mv, margen_v, margen_dv, margen_ml, margen_l, margen_dl, " +
+            "sangrado_bop, placa, movilidad, furca, notas, fecha_registro" +
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now()) " +
             "ON CONFLICT (paciente_id, diente_fdi) DO UPDATE SET " +
             "sondaje_mv = EXCLUDED.sondaje_mv, sondaje_v = EXCLUDED.sondaje_v, sondaje_dv = EXCLUDED.sondaje_dv, " +
             "sondaje_ml = EXCLUDED.sondaje_ml, sondaje_l = EXCLUDED.sondaje_l, sondaje_dl = EXCLUDED.sondaje_dl, " +
+            "margen_mv = EXCLUDED.margen_mv, margen_v = EXCLUDED.margen_v, margen_dv = EXCLUDED.margen_dv, " +
+            "margen_ml = EXCLUDED.margen_ml, margen_l = EXCLUDED.margen_l, margen_dl = EXCLUDED.margen_dl, " +
             "sangrado_bop = EXCLUDED.sangrado_bop, placa = EXCLUDED.placa, movilidad = EXCLUDED.movilidad, " +
             "furca = EXCLUDED.furca, notas = EXCLUDED.notas, fecha_registro = now()",
-            tenantId, req.pacienteId, req.dienteFdi,
-            req.sondajeMv != null ? req.sondajeMv : 1,
-            req.sondajeV != null ? req.sondajeV : 1,
-            req.sondajeDv != null ? req.sondajeDv : 1,
-            req.sondajeMl != null ? req.sondajeMl : 1,
-            req.sondajeL != null ? req.sondajeL : 1,
-            req.sondajeDl != null ? req.sondajeDl : 1,
-            Boolean.TRUE.equals(req.sangradoBop),
-            Boolean.TRUE.equals(req.placa),
-            req.movilidad != null ? req.movilidad : 0,
-            req.furca != null ? req.furca : 0,
-            req.notas
+            vigente.toArray()
+        );
+
+        List<Object> historial = new ArrayList<>(List.of(tenantId, req.pacienteId, req.dienteFdi));
+        historial.addAll(Arrays.asList(sondajes));
+        historial.addAll(Arrays.asList(margenes));
+        historial.addAll(Arrays.asList(bop, placa, movilidad, furca, AuthContext.getUsername()));
+        jdbcTemplate.update(
+            "INSERT INTO salud_periodontograma_historial (" +
+            "tenant_id, paciente_id, diente_fdi, sondaje_mv, sondaje_v, sondaje_dv, sondaje_ml, sondaje_l, sondaje_dl, " +
+            "margen_mv, margen_v, margen_dv, margen_ml, margen_l, margen_dl, sangrado_bop, placa, movilidad, furca, usuario" +
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            historial.toArray()
         );
 
         return ResponseEntity.ok(Map.of("mensaje", "Medicion periodontal actualizada correctamente."));
+    }
+
+    private static int sondaje(Integer mm) {
+        return mm != null ? Math.max(0, Math.min(15, mm)) : 1;
+    }
+
+    // Margen gingival: positivo = recesion, negativo = agrandamiento gingival.
+    private static int margen(Integer mm) {
+        return mm != null ? Math.max(-10, Math.min(15, mm)) : 0;
+    }
+
+    /**
+     * Estado periodontal tal como estaba al cierre de una fecha (la ultima medicion
+     * de cada pieza hasta ese dia), mas las fechas con mediciones para elegir.
+     */
+    @GetMapping("/periodontograma/historial")
+    public ResponseEntity<?> periodontogramaHistorico(@RequestParam Long pacienteId, @RequestParam(required = false) String fecha) {
+        validarPermisoClinico();
+        Long tenantId = TenantContext.getCurrentTenant();
+        validarPacienteDelTenant(tenantId, pacienteId);
+
+        List<String> fechas = jdbcTemplate.queryForList(
+            "SELECT DISTINCT CAST(fecha_registro AS date)::text AS f FROM salud_periodontograma_historial " +
+            "WHERE tenant_id = ? AND paciente_id = ? ORDER BY f DESC",
+            String.class, tenantId, pacienteId);
+
+        List<Map<String, Object>> filas = List.of();
+        if (fecha != null && !fecha.isBlank()) {
+            try {
+                LocalDate.parse(fecha);
+            } catch (Exception e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fecha invalida.");
+            }
+            filas = jdbcTemplate.queryForList(
+                "SELECT DISTINCT ON (diente_fdi) * FROM salud_periodontograma_historial " +
+                "WHERE tenant_id = ? AND paciente_id = ? AND fecha_registro < (CAST(? AS date) + 1) " +
+                "ORDER BY diente_fdi, fecha_registro DESC, id DESC",
+                tenantId, pacienteId, fecha);
+        }
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("fechas", fechas);
+        resp.put("filas", filas);
+        return ResponseEntity.ok(resp);
     }
 
     // ==========================================

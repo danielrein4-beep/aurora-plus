@@ -33,6 +33,56 @@ interface SesionOdonto {
   fecha_creacion: string;
 }
 
+// Plantillas de las sesiones mas frecuentes: llenan el formulario y el
+// odontologo solo ajusta pieza, medidas y lo propio del caso.
+const PLANTILLAS_EVOLUCION = [
+  {
+    nombre: "Endodoncia - sesion 1",
+    procedimiento: "Endodoncia sesion 1: apertura cameral, localizacion de conductos, conductometria y preparacion biomecanica",
+    aislamiento: "ABSOLUTO_DIQUE",
+    anestesia: "1 carpule Lidocaina 2% con epinefrina 1:100.000",
+    notas: "Longitud de trabajo: __ mm (referencia cuspide __). Lima apical maestra: #__. Irrigacion con hipoclorito de sodio 5.25%. Medicacion intraconducto: hidroxido de calcio. Obturacion provisional.",
+    medicacion: "Ibuprofeno 400 mg cada 8 horas por 3 dias si hay dolor",
+    proximaCita: "Sesion 2: obturacion de conductos en 7 dias",
+  },
+  {
+    nombre: "Endodoncia - obturacion",
+    procedimiento: "Endodoncia sesion 2: obturacion de conductos con gutapercha y cemento sellador",
+    aislamiento: "ABSOLUTO_DIQUE",
+    anestesia: "1 carpule Lidocaina 2% con epinefrina 1:100.000",
+    notas: "Retiro de medicacion intraconducto. Cono maestro #__ a __ mm. Tecnica de condensacion lateral. Radiografia de control: obturacion homogenea al limite apical.",
+    medicacion: "",
+    proximaCita: "Restauracion definitiva o corona sobre pieza tratada",
+  },
+  {
+    nombre: "Resina",
+    procedimiento: "Restauracion con resina compuesta fotocurada",
+    aislamiento: "ABSOLUTO_DIQUE",
+    anestesia: "1 carpule Lidocaina 2% con epinefrina 1:100.000",
+    notas: "Remocion de caries, grabado acido 37% 15 s, adhesivo universal, resina color __ por incrementos. Ajuste oclusal y pulido.",
+    medicacion: "",
+    proximaCita: "Control en 6 meses",
+  },
+  {
+    nombre: "Exodoncia simple",
+    procedimiento: "Exodoncia simple",
+    aislamiento: "NINGUNO",
+    anestesia: "2 carpules Articaina 4% con epinefrina 1:100.000",
+    notas: "Sindesmotomia, luxacion con elevador y avulsion con forceps. Revision del alveolo, hemostasia con gasa. Sutura: __.",
+    medicacion: "Ibuprofeno 400 mg cada 8 horas por 3 dias. Amoxicilina 500 mg cada 8 horas por 7 dias si esta indicada.",
+    proximaCita: "Control y retiro de puntos en 7 dias",
+  },
+  {
+    nombre: "Profilaxis",
+    procedimiento: "Profilaxis y tartrectomia con ultrasonido",
+    aislamiento: "RELATIVO_ALGODON",
+    anestesia: "",
+    notas: "Remocion de calculo supra y subgingival, pulido con pasta profilactica, aplicacion de fluor. Instrucciones de higiene oral.",
+    medicacion: "Enjuague de clorhexidina 0.12% cada 12 horas por 7 dias",
+    proximaCita: "Control periodontal en 6 meses",
+  },
+];
+
 export const EvolucionClinicaSesiones: React.FC<EvolucionClinicaSesionesProps> = ({
   pacienteId,
   pacienteNombre,
@@ -247,8 +297,32 @@ export const EvolucionClinicaSesiones: React.FC<EvolucionClinicaSesionesProps> =
       {/* Modal Nueva Sesion */}
       {modalNueva && (
         <div className="fixed inset-0 z-[2500] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-          <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-3xl p-6 max-w-lg w-full text-left space-y-4 shadow-2xl">
+          <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-3xl p-6 max-w-lg w-full max-h-[92vh] overflow-y-auto text-left space-y-4 shadow-2xl">
             <h4 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Registrar Evolucion en Sillon</h4>
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Plantillas rapidas
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {PLANTILLAS_EVOLUCION.map((p) => (
+                  <button
+                    key={p.nombre}
+                    type="button"
+                    onClick={() => {
+                      setProcedimiento(p.procedimiento);
+                      setAislamiento(p.aislamiento);
+                      setAnestesia(p.anestesia);
+                      setConductometria(p.notas);
+                      setMedicacion(p.medicacion);
+                      setProximaCita(p.proximaCita);
+                    }}
+                    className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-white/15 bg-slate-100 dark:bg-white/5 hover:bg-emerald-500/15 hover:border-emerald-500/40 text-[11px] font-semibold text-slate-700 dark:text-slate-200 transition"
+                  >
+                    {p.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
             <form onSubmit={handleGuardarSesion} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
