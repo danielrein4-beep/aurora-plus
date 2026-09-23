@@ -3621,6 +3621,9 @@ export interface FilaImportacionHato {
   estadoProductivo?: string;
   padrotePrenez?: string;
   fechaProbableParto?: string;
+  /** Nombre del socio de una ceba en sociedad activa (vacío = animal propio). */
+  socio?: string;
+  fechaEntradaSociedad?: string;
 }
 
 export interface ResultadoImportacionHato {
@@ -3628,6 +3631,7 @@ export interface ResultadoImportacionHato {
   totalFilas: number;
   animalesImportados: number;
   preneces: number;
+  animalesEnSociedad: number;
   errores: Array<{ fila: number; campo: string | null; mensaje: string }>;
   porTipo: Record<string, number>;
   porRaza: Record<string, number>;
@@ -3678,6 +3682,29 @@ export function descargarReporteOrdenoPdf(desde: string, hasta: string): Promise
 export function descargarConstanciaVacunacionPdf(desde: string, hasta: string, vacunaId?: number): Promise<Blob> {
   const q = vacunaId ? `&vacunaId=${vacunaId}` : "";
   return descargarPdfGanaderia(`/api/ganaderia/vacunas/constancia/pdf?desde=${desde}&hasta=${hasta}${q}`);
+}
+
+/** Inventario del hato: categorías, razas, preñez por padrote y ubicación por potrero. */
+export function descargarInventarioHatoPdf(): Promise<Blob> {
+  return descargarPdfGanaderia(`/api/ganaderia/reportes/hato/pdf`);
+}
+
+/** Engorde (GDP) del hato, opcionalmente de un potrero o lote. */
+export function descargarReporteEngordePdf(potreroId?: number | null, lote?: string | null): Promise<Blob> {
+  const params = new URLSearchParams();
+  if (potreroId) params.set("potreroId", String(potreroId));
+  if (lote) params.set("lote", lote);
+  const q = params.toString();
+  return descargarPdfGanaderia(`/api/ganaderia/reportes/engorde/pdf${q ? `?${q}` : ""}`);
+}
+
+export function descargarReportePotrerosPdf(): Promise<Blob> {
+  return descargarPdfGanaderia(`/api/ganaderia/reportes/potreros/pdf`);
+}
+
+/** Liquidación de ceba en sociedad para entregar al socio. */
+export function descargarLiquidacionSociedadPdf(sociedadId: number): Promise<Blob> {
+  return descargarPdfGanaderia(`/api/ganaderia/reportes/sociedades/${sociedadId}/pdf`);
 }
 
 export function actualizarAnimalGanaderia(id: number, datos: Partial<AnimalGanaderia>): Promise<AnimalGanaderia> {

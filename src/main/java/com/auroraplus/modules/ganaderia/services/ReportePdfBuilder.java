@@ -29,6 +29,7 @@ class ReportePdfBuilder implements AutoCloseable {
     private static final Color VERDE_ABISAL = new Color(13, 59, 61);
     private static final Color GRIS_FILA = new Color(243, 246, 246);
     private static final Color GRIS_TEXTO = new Color(90, 100, 105);
+    private static final Color VERDE_ACENTO = new Color(23, 126, 137);
 
     private final PDType1Font normal = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
     private final PDType1Font negrita = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
@@ -79,8 +80,8 @@ class ReportePdfBuilder implements AutoCloseable {
     }
 
     void seccion(String texto) throws IOException {
-        asegurarEspacio(ALTO_FILA * 3 + 18);
-        y -= 4;
+        asegurarEspacio(ALTO_FILA * 3 + 24);
+        y -= 10;
         texto(negrita, 11, VERDE_ABISAL, MARGEN, y, texto);
         y -= 14;
     }
@@ -89,6 +90,67 @@ class ReportePdfBuilder implements AutoCloseable {
         asegurarEspacio(14);
         texto(normal, 9, Color.BLACK, MARGEN, y, texto);
         y -= 14;
+    }
+
+    /** Texto chico en gris (aclaraciones al pie de una tabla). Corta en varias líneas si no cabe. */
+    void nota(String texto) throws IOException {
+        for (String linea : partirEnLineas(texto, normal, 7.5f, anchoUtil())) {
+            asegurarEspacio(11);
+            texto(normal, 7.5f, GRIS_TEXTO, MARGEN, y, linea);
+            y -= 10;
+        }
+        y -= 4;
+    }
+
+    /** Ficha de datos en dos columnas (etiqueta: valor) sobre un fondo suave. */
+    void datos(List<String[]> pares) throws IOException {
+        if (pares.isEmpty()) return;
+        int filas = (pares.size() + 1) / 2;
+        float alto = filas * 16 + 12;
+        asegurarEspacio(alto + 8);
+        cs.setNonStrokingColor(GRIS_FILA);
+        cs.addRect(MARGEN, y - alto, anchoUtil(), alto);
+        cs.fill();
+        float mitad = anchoUtil() / 2;
+        for (int i = 0; i < pares.size(); i++) {
+            float x = MARGEN + 10 + (i % 2) * mitad;
+            float yy = y - 16 - (i / 2) * 16;
+            String etiqueta = pares.get(i)[0] + ":";
+            texto(normal, 8, GRIS_TEXTO, x, yy, etiqueta);
+            float anchoEtiqueta = normal.getStringWidth(limpiar(etiqueta, normal)) / 1000 * 8 + 5;
+            texto(negrita, 8.5f, Color.BLACK, x + anchoEtiqueta, yy, recortar(pares.get(i)[1], negrita, 8.5f, mitad - anchoEtiqueta - 20));
+        }
+        y -= alto + 12;
+    }
+
+    /**
+     * Barras horizontales: etiqueta a la izquierda, barra proporcional y valor a la derecha.
+     * @param filas cada una {etiqueta, valorTexto}
+     * @param fracciones 0..1 por fila (largo de la barra respecto al máximo)
+     */
+    void barras(List<String[]> filas, List<Float> fracciones) throws IOException {
+        float anchoEtiqueta = anchoUtil() * 0.30f;
+        float anchoValor = anchoUtil() * 0.16f;
+        float anchoBarra = anchoUtil() - anchoEtiqueta - anchoValor - 12;
+        for (int i = 0; i < filas.size(); i++) {
+            asegurarEspacio(16);
+            float f = Math.max(0f, Math.min(1f, fracciones.get(i)));
+            texto(normal, 8.5f, Color.BLACK, MARGEN, y - 10, recortar(filas.get(i)[0], normal, 8.5f, anchoEtiqueta - 6));
+            float xb = MARGEN + anchoEtiqueta;
+            cs.setNonStrokingColor(GRIS_FILA);
+            cs.addRect(xb, y - 12, anchoBarra, 9);
+            cs.fill();
+            if (f > 0) {
+                cs.setNonStrokingColor(VERDE_ACENTO);
+                cs.addRect(xb, y - 12, Math.max(2f, anchoBarra * f), 9);
+                cs.fill();
+            }
+            String v = limpiar(filas.get(i)[1], negrita);
+            float wv = negrita.getStringWidth(v) / 1000 * 8.5f;
+            texto(negrita, 8.5f, VERDE_ABISAL, MARGEN + anchoUtil() - wv, y - 10, v);
+            y -= 15;
+        }
+        y -= 8;
     }
 
     /**
@@ -241,6 +303,23 @@ class ReportePdfBuilder implements AutoCloseable {
         s.newLineAtOffset(x, yy);
         s.showText(limpiar(t, fuente));
         s.endText();
+    }
+
+    /** Parte un texto en líneas que caben en el ancho dado (por palabras). */
+    private static List<String> partirEnLineas(String texto, PDType1Font fuente, float tam, float ancho) throws IOException {
+        List<String> lineas = new java.util.ArrayList<>();
+        StringBuilder actual = new StringBuilder();
+        for (String palabra : limpiar(texto, fuente).split(" ")) {
+            String prueba = actual.length() == 0 ? palabra : actual + " " + palabra;
+            if (fuente.getStringWidth(prueba) / 1000 * tam > ancho && actual.length() > 0) {
+                lineas.add(actual.toString());
+                actual = new StringBuilder(palabra);
+            } else {
+                actual = new StringBuilder(prueba);
+            }
+        }
+        if (actual.length() > 0) lineas.add(actual.toString());
+        return lineas;
     }
 
     /** Recorta con "..." para que el texto no invada la columna vecina. */

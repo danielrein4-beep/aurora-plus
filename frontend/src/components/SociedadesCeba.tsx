@@ -6,10 +6,11 @@ import {
   corregirPesoEntradaSociedadCeba,
   quitarAnimalSociedadCeba,
   cerrarSociedadCeba,
+  descargarLiquidacionSociedadPdf,
   type AnimalGanaderia,
   type ResumenSociedadCeba,
 } from "../api";
-import { fechaLocalISO } from "./ReportesCampoGanaderia";
+import { fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
 
 /**
  * Ceba en sociedad con reparto de kilos ganados: el socio aporta animales, la finca
@@ -109,6 +110,7 @@ export default function SociedadesCeba({ animales, puedeGestionar, notificar, on
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <BotonPdf etiqueta="Liquidación PDF" variante="primario" obtener={() => descargarLiquidacionSociedadPdf(s.id)} notificar={notificar} />
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${activa ? "bg-teal-50 text-teal-800 border border-teal-200" : "bg-slate-100 text-slate-600 border border-slate-200"}`}>
               {activa ? "Activa" : `Cerrada ${fechaCorta(s.fechaCierre)}`}
             </span>
