@@ -166,7 +166,11 @@ public class AnimalController {
             @RequestParam(defaultValue = "false") boolean confirmar) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
-        return ResponseEntity.ok(importacionService.importar(tenantId, request != null ? request.filas : null, confirmar));
+        GanaderiaImportacionService.ResultadoImportacion resultado =
+            importacionService.importar(tenantId, request != null ? request.filas : null, confirmar);
+        // Vista previa o archivo con errores: no se guardó nada, no hay nada que auditar.
+        if (!resultado.confirmado) auditoriaService.omitirRegistroAutomatico();
+        return ResponseEntity.ok(resultado);
     }
 
     /** Hembras preñadas activas con su padrote, para el desglose del hato. */
