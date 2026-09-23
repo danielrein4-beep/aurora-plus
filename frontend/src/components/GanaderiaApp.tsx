@@ -1656,31 +1656,30 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         />
       )}
       <aside
-        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#0D3B3D] border-r border-white/10 shadow-lg fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#fcfdfd] border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
           sidebarAbierto ? "translate-x-0" : "-translate-x-full"
         }`}
       >
+        {/* Identidad de la finca — mismo patrón institucional que Comercio (A+ de respaldo, sin íconos de rubro). */}
         <button
           onClick={onSalir}
-          className="flex items-center gap-2.5 text-left group cursor-pointer p-4 border-b border-white/10"
+          className="flex items-center gap-3 text-left group cursor-pointer px-5 py-4 border-b border-slate-200"
           title="Volver al Hub General"
         >
-          <div className="w-9 h-9 rounded-xl bg-[#177E89] p-0.5 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform flex-shrink-0">
-            <div className="w-full h-full bg-[#0D3B3D] rounded-[10px] flex items-center justify-center">
-              <IconCow size={18} className="text-[#5BC0BE]" />
-            </div>
+          <div className="w-10 h-10 rounded-md border border-slate-200 bg-white text-slate-700 flex items-center justify-center overflow-hidden group-hover:border-teal-300 transition-colors flex-shrink-0">
+            <span className="font-semibold tracking-[-0.06em] text-sm" aria-label="Aurora Plus">A+</span>
           </div>
           <div className="min-w-0">
-            <div className="font-['Outfit'] font-black text-sm !text-white leading-tight truncate">
+            <div className="font-['IBM_Plex_Sans'] font-semibold text-sm text-slate-900 leading-tight tracking-tight truncate">
               {user?.empresa || "Mi Finca"}
             </div>
-            <div className="text-[9px] !text-[#8FD8D2] tracking-wider uppercase truncate font-semibold">
-              Aurora Ganadería
+            <div className="text-[10px] text-slate-400 tracking-[0.02em] truncate font-medium mt-1">
+              Ganadería by <span className="font-semibold text-slate-600">A+</span>
             </div>
           </div>
         </button>
 
-        <nav className="flex-1 overflow-y-auto p-3 space-y-4">
+        <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
           {([
             {
               titulo: "Operación",
@@ -1701,24 +1700,24 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
               ],
             },
           ]).map((grupo) => (
-            <div key={grupo.titulo} className="space-y-1">
-              <div className="px-3.5 text-[10px] font-black uppercase tracking-wider !text-[#5BA8A2]">
+            <div key={grupo.titulo} className="space-y-1.5">
+              <div className="px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                 {grupo.titulo}
               </div>
               {grupo.items.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => { setTab(item.id); setSidebarAbierto(false); }}
-                  className={`sidebar-glare w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+                  className={`sidebar-glare w-full flex items-center gap-3 border-l-2 px-3 py-2.5 rounded-md font-medium text-[13px] transition-colors cursor-pointer ${
                     tab === item.id
-                      ? "sidebar-glare--active bg-white/10 !text-white"
-                      : "!text-[#B9DEDA] hover:bg-white/5 hover:!text-white"
+                      ? "sidebar-glare--active bg-teal-50/80 text-teal-900 border-teal-700"
+                      : "text-slate-800 border-transparent hover:bg-slate-100/70 hover:text-slate-900"
                   }`}
                 >
-                  <item.Icon size={16} />
+                  <span className={tab === item.id ? "text-teal-700" : "text-slate-500"}><item.Icon size={15} /></span>
                   <span className="flex-1 text-left">{item.etiqueta}</span>
                   {item.badge > 0 && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-amber-500 text-slate-950">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
                       {item.badge}
                     </span>
                   )}
@@ -1728,43 +1727,44 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           ))}
 
           {/* Acciones rápidas de campo */}
-          <div className="pt-3 border-t border-white/10 space-y-1">
-            <div className="px-3.5 text-[10px] font-black uppercase tracking-wider !text-[#5BA8A2]">
+          <div className="pt-3 mt-3 border-t border-slate-100 space-y-1">
+            <div className="px-3 pb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
               Acciones rápidas
             </div>
             <button
               type="button"
               onClick={() => { abrirVaqueraRapida(); setSidebarAbierto(false); }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer !text-white bg-white/5 hover:bg-white/10 transition-colors"
+              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
             >
-              <IconMilk size={16} className="text-[#5BC0BE]" />
+              <span className="text-slate-400"><IconMilk size={16} /></span>
               <span className="flex-1 text-left">Ordeño rápido</span>
             </button>
             <button
               type="button"
               onClick={() => { setModalNuevoAnimal(true); setSidebarAbierto(false); }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer !text-[#B9DEDA] hover:bg-white/5 hover:!text-white transition-colors"
+              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
             >
-              <IconTag size={16} />
+              <span className="text-slate-400"><IconTag size={16} /></span>
               <span className="flex-1 text-left">Alta de animal</span>
             </button>
             {puedeImportarHato && (
               <button
                 type="button"
                 onClick={() => { setModalImportarHato(true); setSidebarAbierto(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer !text-[#B9DEDA] hover:bg-white/5 hover:!text-white transition-colors"
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
               >
-                <IconUpload size={16} />
+                <span className="text-slate-400"><IconUpload size={16} /></span>
                 <span className="flex-1 text-left">Importar hato</span>
               </button>
             )}
           </div>
         </nav>
 
-        <div className="p-3 border-t border-white/10">
+        {/* Salir al Hub */}
+        <div className="p-4 border-t border-slate-100">
           <button
             onClick={onSalir}
-            className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 !text-[#B9DEDA] hover:!text-white transition-colors cursor-pointer"
+            className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left"
           >
             ← Salir al Hub
           </button>
