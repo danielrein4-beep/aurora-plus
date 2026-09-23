@@ -22,9 +22,9 @@ public interface AplicacionVacunaRepository extends JpaRepository<AplicacionVacu
 
     // Retiro sanitario todavía activo (el animal aún no es apto para venta/consumo de leche o carne) —
     // base de las alertas de cumplimiento sanitario (ver GanaderiaSanidadService).
-    @Query("SELECT a FROM AplicacionVacuna a JOIN FETCH a.animal JOIN FETCH a.vacuna WHERE a.tenantId = :tenantId AND a.fechaFinRetiroLeche >= :hoy")
+    @Query("SELECT a FROM AplicacionVacuna a JOIN FETCH a.animal JOIN FETCH a.vacuna WHERE a.tenantId = :tenantId AND a.fechaFinRetiroLeche >= :hoy AND a.fechaFinRetiroLeche > a.fechaAplicacion")
     List<AplicacionVacuna> findConRetiroLecheActivo(@Param("tenantId") Long tenantId, @Param("hoy") LocalDate hoy);
 
-    @Query("SELECT a FROM AplicacionVacuna a JOIN FETCH a.animal JOIN FETCH a.vacuna WHERE a.tenantId = :tenantId AND a.fechaFinRetiroCarne >= :hoy")
+    @Query("SELECT a FROM AplicacionVacuna a JOIN FETCH a.animal JOIN FETCH a.vacuna WHERE a.tenantId = :tenantId AND a.fechaFinRetiroCarne >= :hoy AND a.fechaFinRetiroCarne > a.fechaAplicacion")
     List<AplicacionVacuna> findConRetiroCarneActivo(@Param("tenantId") Long tenantId, @Param("hoy") LocalDate hoy);
 }

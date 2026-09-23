@@ -160,13 +160,13 @@ public class GanaderiaSanidadService {
         LocalDate hoy = LocalDate.now();
 
         for (AplicacionVacuna a : aplicacionVacunaRepository.findByAnimalIdOrderByFechaAplicacionDesc(animalId)) {
-            if (a.getFechaFinRetiroCarne() != null && a.getFechaFinRetiroCarne().isAfter(hoy.minusDays(1))) {
+            if (retiroActivo(a.getFechaFinRetiroCarne(), a.getFechaAplicacion(), hoy)) {
                 throw new RuntimeException("No se puede vender " + a.getAnimal().getArete()
                     + ": en período de retiro de carne por " + a.getVacuna().getNombre() + " hasta " + a.getFechaFinRetiroCarne());
             }
         }
         for (AplicacionMedicamento a : aplicacionMedicamentoRepository.findByAnimalIdOrderByFechaAplicacionDesc(animalId)) {
-            if (a.getFechaFinRetiroCarne() != null && a.getFechaFinRetiroCarne().isAfter(hoy.minusDays(1))) {
+            if (retiroActivo(a.getFechaFinRetiroCarne(), a.getFechaAplicacion(), hoy)) {
                 throw new RuntimeException("No se puede vender " + a.getAnimal().getArete()
                     + ": en período de retiro de carne por " + a.getMedicamento().getNombre() + " hasta " + a.getFechaFinRetiroCarne());
             }
@@ -182,19 +182,28 @@ public class GanaderiaSanidadService {
     public void validarAptoParaTanqueOVentaLeche(Long animalId) {
         LocalDate hoy = LocalDate.now();
         for (AplicacionVacuna a : aplicacionVacunaRepository.findByAnimalIdOrderByFechaAplicacionDesc(animalId)) {
-            if (a.getFechaFinRetiroLeche() != null && !a.getFechaFinRetiroLeche().isBefore(hoy)) {
+            if (retiroActivo(a.getFechaFinRetiroLeche(), a.getFechaAplicacion(), hoy)) {
                 throw new IllegalStateException("La leche de " + a.getAnimal().getArete()
                     + " está en retiro por " + a.getVacuna().getNombre() + " hasta " + a.getFechaFinRetiroLeche()
                     + ". Registre el ordeño con destino DESCARTE.");
             }
         }
         for (AplicacionMedicamento a : aplicacionMedicamentoRepository.findByAnimalIdOrderByFechaAplicacionDesc(animalId)) {
-            if (a.getFechaFinRetiroLeche() != null && !a.getFechaFinRetiroLeche().isBefore(hoy)) {
+            if (retiroActivo(a.getFechaFinRetiroLeche(), a.getFechaAplicacion(), hoy)) {
                 throw new IllegalStateException("La leche de " + a.getAnimal().getArete()
                     + " está en retiro por " + a.getMedicamento().getNombre() + " hasta " + a.getFechaFinRetiroLeche()
                     + ". Registre el ordeño con destino DESCARTE.");
             }
         }
+    }
+
+    /**
+     * Retiro vigente hasta su fecha de fin inclusive. Un producto con 0 días de
+     * retiro deja el fin igual a la aplicación: eso NO es retiro (antes bloqueaba
+     * todo ese día la leche al tanque y la venta del animal, y generaba alertas).
+     */
+    static boolean retiroActivo(LocalDate fin, LocalDate aplicacion, LocalDate hoy) {
+        return fin != null && !fin.isBefore(hoy) && (aplicacion == null || fin.isAfter(aplicacion));
     }
 
     private AlertaSanitaria alertaRetiro(String tipo, Animal animal, String producto, LocalDate fechaFin, String tipoRetiro) {
