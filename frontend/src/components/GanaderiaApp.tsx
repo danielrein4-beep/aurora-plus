@@ -1,6 +1,7 @@
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import ModalBasculaBluetooth from "./ModalBasculaBluetooth";
 import ModalImportarHato from "./ModalImportarHato";
+import TenantSoporteWidget from "./TenantSoporteWidget";
 import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO } from "./ReportesCampoGanaderia";
 import {
   encolarAccionGanaderia,
@@ -266,6 +267,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // Pestaña principal activa
   const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
+  const [aperturaSoporte, setAperturaSoporte] = useState(0);
 
   // Sub-vistas Sanidad & Trazabilidad
   const [subSanidad, setSubSanidad] = useState<"individual" | "lotes">("individual");
@@ -1807,6 +1809,23 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             )}
           </div>
         </nav>
+
+        {/* Soporte: tickets con el equipo de Aurora (super admin) */}
+        <div className="px-3 pt-3 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => { setAperturaSoporte(n => n + 1); setSidebarAbierto(false); }}
+            title="Solicitar ayuda al equipo de Aurora y ver tus tickets"
+            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+          >
+            <span className="text-slate-400">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </span>
+            <span className="flex-1 text-left">Soporte</span>
+          </button>
+        </div>
 
         {/* Salir al Hub */}
         <div className="p-4 border-t border-slate-100">
@@ -5061,6 +5080,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           </button>
         </div>
       )}
+
+      <TenantSoporteWidget solicitudApertura={aperturaSoporte} soloConTicketActivo />
 
       {modalImportarHato && (
         <ModalImportarHato
