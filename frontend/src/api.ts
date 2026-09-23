@@ -711,7 +711,23 @@ export interface OdontogramaDiente {
   numeroFdi: number;
   estado: EstadoDiente;
   notas: string | null;
+  caras?: string[] | null;
   fechaActualizacion: string;
+}
+
+export interface OdontogramaHistorialEntrada {
+  id: number;
+  numero_fdi: number;
+  estado: EstadoDiente;
+  caras_json: string | null;
+  notas: string | null;
+  usuario: string | null;
+  fecha_registro: string;
+}
+
+export async function listarHistorialOdontograma(pacienteId: number, numeroFdi?: number): Promise<OdontogramaHistorialEntrada[]> {
+  const filtro = numeroFdi ? `&numeroFdi=${numeroFdi}` : "";
+  return request<OdontogramaHistorialEntrada[]>(`/api/salud/odontograma/historial?pacienteId=${pacienteId}${filtro}`);
 }
 
 export async function listarOdontograma(pacienteId: number): Promise<OdontogramaDiente[]> {
@@ -721,7 +737,7 @@ export async function listarOdontograma(pacienteId: number): Promise<Odontograma
 export async function actualizarDienteOdontograma(
   pacienteId: number,
   numeroFdi: number,
-  datos: { estado: EstadoDiente; notas?: string }
+  datos: { estado: EstadoDiente; notas?: string; caras?: string[] }
 ): Promise<OdontogramaDiente> {
   return request<OdontogramaDiente>(`/api/salud/odontograma/diente`, {
     method: "PUT",

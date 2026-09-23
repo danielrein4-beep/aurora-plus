@@ -4,8 +4,14 @@ import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.financiero.entities.TasaCambio;
 import com.auroraplus.core.financiero.repositories.TasaCambioRepository;
+import com.auroraplus.modules.salud.entities.CobroConsulta;
 import com.auroraplus.modules.salud.entities.Paciente;
+import com.auroraplus.modules.salud.entities.SalaEspera;
+import com.auroraplus.modules.salud.repositories.CobroConsultaRepository;
 import com.auroraplus.modules.salud.repositories.PacienteRepository;
+import com.auroraplus.modules.salud.repositories.SalaEsperaRepository;
+import com.auroraplus.modules.salud.services.SalaEsperaService;
+import com.auroraplus.modules.salud.services.SaludFinanzasService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,12 +39,40 @@ public class OdontologiaAvanzadaController {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private SalaEsperaService salaEsperaService;
+
+    @Autowired
+    private SalaEsperaRepository salaEsperaRepository;
+
+    @Autowired
+    private SaludFinanzasService saludFinanzasService;
+
+    @Autowired
+    private CobroConsultaRepository cobroConsultaRepository;
+
     private void validarPermisoClinico() {
         String rol = AuthContext.getRol();
         if (rol != null && !"DUENO_ADMIN".equalsIgnoreCase(rol) && !"MEDICO".equalsIgnoreCase(rol) && !"SUPER_ADMIN".equalsIgnoreCase(rol)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                 "Acceso denegado: El expediente odontologico es informacion clinica confidencial.");
         }
+    }
+
+    // Evita leer o escribir expedientes de pacientes de otra clinica.
+    private void validarPacienteDelTenant(Long tenantId, Long pacienteId) {
+        if (pacienteId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente requerido.");
+        }
+        pacienteRepository.findByTenantIdAndId(tenantId, pacienteId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Paciente no encontrado."));
+    }
+
+    // Si el formulario no trae odontologo se firma con el usuario de la sesion.
+    private String nombreOdontologo(String enviado) {
+        if (enviado != null && !enviado.isBlank()) return enviado.trim();
+        String usuario = AuthContext.getUsername();
+        return usuario != null && !usuario.isBlank() ? usuario : "Odontologo Tratante";
     }
 
     private BigDecimal obtenerTasaBcv(Long tenantId) {
@@ -61,27 +95,35 @@ public class OdontologiaAvanzadaController {
     public ResponseEntity<?> listarPeriodontograma(@RequestParam Long pacienteId) {
         validarPermisoClinico();
         Long tenantId = TenantContext.getCurrentTenant();
+        validarPacienteDelTenant(tenantId, pacienteId);
 
         List<Map<String, Object>> filas = jdbcTemplate.queryForList(
             "SELECT * FROM salud_periodontograma WHERE tenant_id = ? AND paciente_id = ? ORDER BY diente_fdi ASC",
             tenantId, pacienteId
         );
 
-        // Calculo de indice de sangrado gingival (BOP %)
-        int totalPuntos = filas.size() * 6;
-        int puntosSangrado = 0;
+        // Indice de sangrado (BOP %): el sangrado se registra por pieza, asi que el
+        // denominador son las piezas evaluadas, no 6 puntos por pieza.
+        int piezasSangrado = 0;
+        int sitiosBolsa = 0;
         for (Map<String, Object> f : filas) {
-            Boolean bop = (Boolean) f.get("sangrado_bop");
-            if (Boolean.TRUE.equals(bop)) {
-                puntosSangrado += 1;
+            if (Boolean.TRUE.equals(f.get("sangrado_bop"))) {
+                piezasSangrado += 1;
+            }
+            for (String col : new String[]{"sondaje_mv", "sondaje_v", "sondaje_dv", "sondaje_ml", "sondaje_l", "sondaje_dl"}) {
+                Object v = f.get(col);
+                if (v instanceof Number n && n.intValue() >= 4) {
+                    sitiosBolsa += 1;
+                }
             }
         }
-        double indiceBop = totalPuntos > 0 ? ((double) puntosSangrado / totalPuntos) * 100.0 : 0.0;
+        double indiceBop = filas.isEmpty() ? 0.0 : ((double) piezasSangrado / filas.size()) * 100.0;
 
         Map<String, Object> resp = new HashMap<>();
         resp.put("filas", filas);
         resp.put("totalPiezasEvaluadas", filas.size());
         resp.put("indiceSangradoBop", Math.round(indiceBop * 10.0) / 10.0);
+        resp.put("sitiosBolsaMayor4mm", sitiosBolsa);
 
         return ResponseEntity.ok(resp);
     }
@@ -111,6 +153,7 @@ public class OdontologiaAvanzadaController {
         if (req.pacienteId == null || req.dienteFdi == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente y Diente FDI son requeridos.");
         }
+        validarPacienteDelTenant(tenantId, req.pacienteId);
 
         jdbcTemplate.update(
             "INSERT INTO salud_periodontograma (" +
@@ -147,6 +190,7 @@ public class OdontologiaAvanzadaController {
     public ResponseEntity<?> listarPlanes(@RequestParam Long pacienteId) {
         validarPermisoClinico();
         Long tenantId = TenantContext.getCurrentTenant();
+        validarPacienteDelTenant(tenantId, pacienteId);
         BigDecimal tasaBcv = obtenerTasaBcv(tenantId);
 
         List<Map<String, Object>> planes = jdbcTemplate.queryForList(
@@ -162,6 +206,8 @@ public class OdontologiaAvanzadaController {
             );
             p.put("items", items);
             p.put("tasaBcv", tasaBcv);
+            p.put("saldo_pendiente_usd",
+                ((BigDecimal) p.get("monto_total_usd")).subtract((BigDecimal) p.get("monto_pagado_usd")));
         }
 
         return ResponseEntity.ok(planes);
@@ -193,6 +239,7 @@ public class OdontologiaAvanzadaController {
         if (req.pacienteId == null || req.nombrePlan == null || req.nombrePlan.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente y nombre del plan son requeridos.");
         }
+        validarPacienteDelTenant(tenantId, req.pacienteId);
 
         BigDecimal totalUsd = BigDecimal.ZERO;
         if (req.items != null) {
@@ -249,6 +296,104 @@ public class OdontologiaAvanzadaController {
         return ResponseEntity.ok(Map.of("mensaje", "Plan aprobado por el paciente y listo para ejecucion por fases."));
     }
 
+    public static class AbonoPlanRequest {
+        public String claveIdempotencia;
+        public BigDecimal montoUsd;
+        public String monedaPago;
+        public BigDecimal montoRecibido;
+        public CobroConsulta.MetodoPago metodoPago;
+        public String referenciaPago;
+    }
+
+    @GetMapping("/planes/{planId}/abonos")
+    public ResponseEntity<?> listarAbonos(@PathVariable Long planId) {
+        validarPermisoClinico();
+        Long tenantId = TenantContext.getCurrentTenant();
+        return ResponseEntity.ok(jdbcTemplate.queryForList(
+            "SELECT a.id, a.monto_usd, a.fecha_registro, c.metodo_pago, c.moneda_pago, c.monto_recibido, " +
+            "c.referencia_pago, c.cajero_usuario " +
+            "FROM salud_odontologia_plan_abonos a JOIN salud_cobros_consulta c ON c.id = a.cobro_id " +
+            "WHERE a.tenant_id = ? AND a.plan_id = ? ORDER BY a.fecha_registro DESC",
+            tenantId, planId));
+    }
+
+    // Abono a un plan: pasa por el cobro de salud (movimiento real de caja) y
+    // solo despues suma al monto pagado del plan.
+    @PostMapping("/planes/{planId}/abonos")
+    @Transactional
+    public ResponseEntity<?> registrarAbono(@PathVariable Long planId, @RequestBody AbonoPlanRequest req) {
+        validarPermisoClinico();
+        Long tenantId = TenantContext.getCurrentTenant();
+
+        List<Map<String, Object>> planes = jdbcTemplate.queryForList(
+            "SELECT * FROM salud_odontologia_planes_tratamiento WHERE tenant_id = ? AND id = ? FOR UPDATE",
+            tenantId, planId);
+        if (planes.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Plan no encontrado.");
+        }
+        Map<String, Object> plan = planes.get(0);
+        if ("CANCELADO".equals(plan.get("estado"))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No se puede abonar a un plan cancelado.");
+        }
+        if (req.claveIdempotencia == null || req.claveIdempotencia.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Clave de idempotencia requerida.");
+        }
+
+        // Reintento del mismo abono (doble clic o reconexion): se devuelve lo ya registrado.
+        Optional<CobroConsulta> previo = cobroConsultaRepository.findByTenantIdAndClaveIdempotencia(tenantId, req.claveIdempotencia);
+        if (previo.isPresent()) {
+            return ResponseEntity.ok(Map.of("cobroId", previo.get().getId(), "mensaje", "Abono ya registrado."));
+        }
+
+        BigDecimal total = (BigDecimal) plan.get("monto_total_usd");
+        BigDecimal pagado = (BigDecimal) plan.get("monto_pagado_usd");
+        BigDecimal saldo = total.subtract(pagado);
+        if (req.montoUsd == null || req.montoUsd.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El monto del abono debe ser mayor a cero.");
+        }
+        if (req.montoUsd.compareTo(saldo) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "El abono (" + req.montoUsd + " USD) supera el saldo pendiente del plan (" + saldo + " USD).");
+        }
+
+        Long pacienteId = ((Number) plan.get("paciente_id")).longValue();
+        Paciente paciente = pacienteRepository.findByTenantIdAndId(tenantId, pacienteId).orElse(null);
+
+        SaludFinanzasService.CobroRequest cobroReq = new SaludFinanzasService.CobroRequest();
+        cobroReq.claveIdempotencia = req.claveIdempotencia;
+        cobroReq.pacienteId = pacienteId;
+        cobroReq.concepto = "Abono plan odontologico: " + plan.get("nombre_plan")
+            + (paciente != null ? " - " + paciente.getNombreCompleto() : "");
+        cobroReq.montoTotal = req.montoUsd;
+        cobroReq.monedaCobrada = "USD";
+        cobroReq.monedaPago = req.monedaPago;
+        cobroReq.montoRecibido = req.montoRecibido;
+        cobroReq.metodoPago = req.metodoPago;
+        cobroReq.referenciaPago = req.referenciaPago;
+        cobroReq.cajeroUsuario = nombreOdontologo(null);
+
+        CobroConsulta cobro;
+        try {
+            cobro = saludFinanzasService.procesarCobro(tenantId, cobroReq, paciente);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+
+        jdbcTemplate.update(
+            "INSERT INTO salud_odontologia_plan_abonos (tenant_id, plan_id, cobro_id, monto_usd) VALUES (?, ?, ?, ?)",
+            tenantId, planId, cobro.getId(), req.montoUsd);
+        jdbcTemplate.update(
+            "UPDATE salud_odontologia_planes_tratamiento SET monto_pagado_usd = monto_pagado_usd + ? WHERE tenant_id = ? AND id = ?",
+            req.montoUsd, tenantId, planId);
+
+        BigDecimal nuevoSaldo = saldo.subtract(req.montoUsd);
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+            "cobroId", cobro.getId(),
+            "saldoPendienteUsd", nuevoSaldo,
+            "mensaje", "Abono registrado en caja. Saldo pendiente: " + nuevoSaldo + " USD."
+        ));
+    }
+
     // 3. DESCARGA AUTOMATICA DE INSUMOS AL REALIZAR PROCEDIMIENTO
     @PostMapping("/planes/items/{itemId}/realizar")
     @Transactional
@@ -266,10 +411,27 @@ public class OdontologiaAvanzadaController {
         Map<String, Object> item = filas.get(0);
         String proc = (String) item.get("procedimiento");
 
-        // Marcar como realizado
+        if ("REALIZADO".equals(item.get("estado"))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este procedimiento ya estaba marcado como realizado.");
+        }
+
         jdbcTemplate.update(
-            "UPDATE salud_odontologia_plan_items SET estado = 'REALIZADO', fecha_realizado = now(), kit_descargado = true WHERE tenant_id = ? AND id = ?",
-            tenantId, itemId
+            "UPDATE salud_odontologia_plan_items SET estado = 'REALIZADO', fecha_realizado = now(), " +
+            "odontologo_responsable = COALESCE(odontologo_responsable, ?) WHERE tenant_id = ? AND id = ?",
+            nombreOdontologo(null), tenantId, itemId
+        );
+
+        // El plan pasa a EN_CURSO con el primer item hecho y a COMPLETADO cuando
+        // no quedan items pendientes.
+        Long planId = ((Number) item.get("plan_id")).longValue();
+        Integer pendientes = jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM salud_odontologia_plan_items WHERE tenant_id = ? AND plan_id = ? AND estado NOT IN ('REALIZADO', 'ANULADO')",
+            Integer.class, tenantId, planId
+        );
+        String estadoPlan = (pendientes != null && pendientes == 0) ? "COMPLETADO" : "EN_CURSO";
+        jdbcTemplate.update(
+            "UPDATE salud_odontologia_planes_tratamiento SET estado = ? WHERE tenant_id = ? AND id = ? AND estado <> 'CANCELADO'",
+            estadoPlan, tenantId, planId
         );
 
         // Buscar si existe un kit para este procedimiento
@@ -279,14 +441,22 @@ public class OdontologiaAvanzadaController {
             tenantId, procClave, "%" + proc + "%"
         );
 
+        // Salud aun no tiene inventario de insumos: se informa el kit de referencia
+        // sin afirmar un descuento de stock que no ocurre.
         String detalleInsumos = "Procedimiento completado.";
+        String insumosKit = "[]";
         if (!kits.isEmpty()) {
-            detalleInsumos = "Procedimiento completado. Se han descontado los insumos del kit: " + kits.get(0).get("nombre_kit");
+            detalleInsumos = "Procedimiento completado. Kit de referencia: " + kits.get(0).get("nombre_kit")
+                + " (el descuento automatico de inventario aun no esta conectado).";
+            Object json = kits.get(0).get("insumos_json");
+            insumosKit = json != null ? json.toString() : "[]";
         }
 
         return ResponseEntity.ok(Map.of(
             "mensaje", detalleInsumos,
-            "estado", "REALIZADO"
+            "estado", "REALIZADO",
+            "estadoPlan", estadoPlan,
+            "insumosKit", insumosKit
         ));
     }
 
@@ -338,21 +508,54 @@ public class OdontologiaAvanzadaController {
     @Transactional
     public ResponseEntity<?> crearCita(@RequestBody CrearCitaRequest req) {
         Long tenantId = TenantContext.getCurrentTenant();
+        validarPacienteDelTenant(tenantId, req.pacienteId);
+        if (req.fechaCita == null || req.horaInicio == null || req.horaFin == null
+                || req.motivo == null || req.motivo.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fecha, hora de inicio, hora de fin y motivo son requeridos.");
+        }
+        LocalTime inicio;
+        LocalTime fin;
+        try {
+            LocalDate.parse(req.fechaCita);
+            inicio = LocalTime.parse(req.horaInicio);
+            fin = LocalTime.parse(req.horaFin);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fecha u hora con formato invalido.");
+        }
+        if (!fin.isAfter(inicio)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La hora de fin debe ser posterior a la de inicio.");
+        }
+        if (req.sillonBox == null || req.sillonBox.isBlank()) {
+            req.sillonBox = "SILLON_1";
+        }
+        req.odontologo = nombreOdontologo(req.odontologo);
 
-        // Validacion de colision en el sillon
+        // Dos rangos se solapan si cada uno empieza antes de que termine el otro.
         Integer colisionesSillon = jdbcTemplate.queryForObject(
             "SELECT count(*) FROM salud_odontologia_citas_agenda " +
             "WHERE tenant_id = ? AND fecha_cita = ?::date AND sillon_box = ? " +
-            "AND estado NOT IN ('CANCELADA') " +
-            "AND ((hora_inicio <= ?::time AND hora_fin > ?::time) OR (hora_inicio < ?::time AND hora_fin >= ?::time))",
+            "AND estado NOT IN ('CANCELADA', 'NO_ASISTIO') " +
+            "AND hora_inicio < ?::time AND hora_fin > ?::time",
             Integer.class,
-            tenantId, req.fechaCita, req.sillonBox,
-            req.horaInicio, req.horaInicio, req.horaFin, req.horaFin
+            tenantId, req.fechaCita, req.sillonBox, req.horaFin, req.horaInicio
         );
 
         if (colisionesSillon != null && colisionesSillon > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Colision horaria detectada: El " + req.sillonBox + " ya se encuentra ocupado en ese horario.");
+        }
+
+        Integer colisionesDoctor = jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM salud_odontologia_citas_agenda " +
+            "WHERE tenant_id = ? AND fecha_cita = ?::date AND LOWER(odontologo) = LOWER(?) " +
+            "AND estado NOT IN ('CANCELADA', 'NO_ASISTIO') " +
+            "AND hora_inicio < ?::time AND hora_fin > ?::time",
+            Integer.class,
+            tenantId, req.fechaCita, req.odontologo, req.horaFin, req.horaInicio
+        );
+        if (colisionesDoctor != null && colisionesDoctor > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Colision horaria detectada: " + req.odontologo + " ya tiene otra cita en ese horario.");
         }
 
         Long citaId = jdbcTemplate.queryForObject(
@@ -362,7 +565,7 @@ public class OdontologiaAvanzadaController {
             Long.class,
             tenantId, req.pacienteId, req.odontologo,
             req.especialidad != null ? req.especialidad : "ODONTOLOGIA_GENERAL",
-            req.sillonBox != null ? req.sillonBox : "SILLON_1",
+            req.sillonBox,
             req.fechaCita, req.horaInicio, req.horaFin, req.motivo
         );
 
@@ -405,8 +608,8 @@ public class OdontologiaAvanzadaController {
             "Por favor confirme su asistencia respondiendo a este mensaje. Le esperamos puntual.";
 
         jdbcTemplate.update(
-            "UPDATE salud_odontologia_citas_agenda SET recordatorio_whatsapp_enviado = true WHERE id = ?",
-            citaId
+            "UPDATE salud_odontologia_citas_agenda SET recordatorio_whatsapp_enviado = true WHERE tenant_id = ? AND id = ?",
+            tenantId, citaId
         );
 
         return ResponseEntity.ok(Map.of(
@@ -414,6 +617,53 @@ public class OdontologiaAvanzadaController {
             "mensaje", mensaje,
             "waLink", "https://wa.me/" + (telefono != null ? telefono.replaceAll("[^0-9]", "") : "") + "?text=" + java.net.URLEncoder.encode(mensaje, java.nio.charset.StandardCharsets.UTF_8)
         ));
+    }
+
+    private static final Set<String> ESTADOS_CITA = Set.of(
+        "PROGRAMADA", "CONFIRMADA", "EN_SALA", "EN_ATENCION", "COMPLETADA", "CANCELADA", "NO_ASISTIO");
+
+    public static class CambiarEstadoCitaRequest {
+        public String estado;
+    }
+
+    @PatchMapping("/agenda/{citaId}/estado")
+    @Transactional
+    public ResponseEntity<?> cambiarEstadoCita(@PathVariable Long citaId, @RequestBody CambiarEstadoCitaRequest req) {
+        Long tenantId = TenantContext.getCurrentTenant();
+        String estado = req.estado != null ? req.estado.trim().toUpperCase() : "";
+        if (!ESTADOS_CITA.contains(estado)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de cita invalido: " + req.estado);
+        }
+        int filas = jdbcTemplate.update(
+            "UPDATE salud_odontologia_citas_agenda SET estado = ? WHERE tenant_id = ? AND id = ?",
+            estado, tenantId, citaId
+        );
+        if (filas == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Cita no encontrada.");
+        }
+
+        // Al llegar el paciente, entra a la sala de espera compartida de la clinica.
+        // citaId queda en null: esa columna apunta a salud_citas (agenda medica).
+        boolean enviadoASala = false;
+        if ("EN_SALA".equals(estado)) {
+            Map<String, Object> cita = jdbcTemplate.queryForMap(
+                "SELECT paciente_id, odontologo, sillon_box FROM salud_odontologia_citas_agenda WHERE tenant_id = ? AND id = ?",
+                tenantId, citaId);
+            Long pacienteId = ((Number) cita.get("paciente_id")).longValue();
+            boolean yaEnCola = salaEsperaRepository.findByTenantIdAndEstadoInOrderByHoraLlegadaAsc(
+                    tenantId, List.of(SalaEspera.EstadoEspera.EN_ESPERA, SalaEspera.EstadoEspera.EN_CONSULTA))
+                .stream()
+                .anyMatch(e -> e.getPaciente() != null && pacienteId.equals(e.getPaciente().getId()));
+            if (!yaEnCola) {
+                SalaEspera entrada = new SalaEspera();
+                entrada.setPaciente(pacienteRepository.findByTenantIdAndId(tenantId, pacienteId).orElseThrow());
+                entrada.setMedicoNombre((String) cita.get("odontologo"));
+                entrada.setConsultorio((String) cita.get("sillon_box"));
+                salaEsperaService.checkIn(tenantId, entrada);
+                enviadoASala = true;
+            }
+        }
+        return ResponseEntity.ok(Map.of("id", citaId, "estado", estado, "enviadoASalaEspera", enviadoASala));
     }
 
     // ==========================================
@@ -424,6 +674,7 @@ public class OdontologiaAvanzadaController {
     public ResponseEntity<?> listarRadiografias(@RequestParam Long pacienteId) {
         validarPermisoClinico();
         Long tenantId = TenantContext.getCurrentTenant();
+        validarPacienteDelTenant(tenantId, pacienteId);
 
         List<Map<String, Object>> fotos = jdbcTemplate.queryForList(
             "SELECT * FROM salud_odontologia_radiografias WHERE tenant_id = ? AND paciente_id = ? ORDER BY fecha_toma DESC, id DESC",
@@ -450,6 +701,7 @@ public class OdontologiaAvanzadaController {
         if (req.pacienteId == null || req.titulo == null || req.urlArchivo == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente, titulo y archivo son requeridos.");
         }
+        validarPacienteDelTenant(tenantId, req.pacienteId);
 
         Long id = jdbcTemplate.queryForObject(
             "INSERT INTO salud_odontologia_radiografias (tenant_id, paciente_id, tipo_estudio, titulo, url_archivo, hallazgos, diente_asociado) " +
@@ -488,6 +740,7 @@ public class OdontologiaAvanzadaController {
     public ResponseEntity<?> obtenerAnamnesis(@RequestParam Long pacienteId) {
         validarPermisoClinico();
         Long tenantId = TenantContext.getCurrentTenant();
+        validarPacienteDelTenant(tenantId, pacienteId);
 
         List<Map<String, Object>> filas = jdbcTemplate.queryForList(
             "SELECT * FROM salud_odontologia_anamnesis_riesgo WHERE tenant_id = ? AND paciente_id = ?",
@@ -539,6 +792,7 @@ public class OdontologiaAvanzadaController {
         if (req.pacienteId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente ID requerido.");
         }
+        validarPacienteDelTenant(tenantId, req.pacienteId);
 
         jdbcTemplate.update(
             "INSERT INTO salud_odontologia_anamnesis_riesgo (" +
@@ -579,6 +833,7 @@ public class OdontologiaAvanzadaController {
     public ResponseEntity<?> listarEvolucion(@RequestParam Long pacienteId) {
         validarPermisoClinico();
         Long tenantId = TenantContext.getCurrentTenant();
+        validarPacienteDelTenant(tenantId, pacienteId);
 
         List<Map<String, Object>> sesiones = jdbcTemplate.queryForList(
             "SELECT * FROM salud_odontologia_evolucion_sesiones WHERE tenant_id = ? AND paciente_id = ? ORDER BY fecha_sesion DESC, id DESC",
@@ -609,6 +864,7 @@ public class OdontologiaAvanzadaController {
         if (req.pacienteId == null || req.procedimientoRealizado == null || req.procedimientoRealizado.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente y procedimiento realizado son requeridos.");
         }
+        validarPacienteDelTenant(tenantId, req.pacienteId);
 
         Long id = jdbcTemplate.queryForObject(
             "INSERT INTO salud_odontologia_evolucion_sesiones (" +
@@ -624,7 +880,7 @@ public class OdontologiaAvanzadaController {
             req.conductometriaNotas,
             req.medicacionIndicada,
             req.proximaCitaConducta,
-            req.odontologo != null ? req.odontologo : "Odontologo Tratante"
+            nombreOdontologo(req.odontologo)
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(

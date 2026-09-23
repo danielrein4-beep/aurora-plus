@@ -4,8 +4,13 @@ import FiguraDienteAnatomico, { categorizarDienteFdi } from "./FiguraDienteAnato
 import {
   listarOdontograma,
   actualizarDienteOdontograma,
+  listarHistorialOdontograma,
+  listarProcedimientos,
+  leerSesion,
   type OdontogramaDiente,
+  type OdontogramaHistorialEntrada,
   type EstadoDiente,
+  type ProcedimientoMedico,
 } from "../api";
 
 // Arcadas Permanentes (Adultos, cuadrantes 1-4)
@@ -64,9 +69,52 @@ function sextanteDe(fdi: number): string {
 interface PresupuestoItem {
   id: string;
   fdi?: number;
+  caras?: string;
   descripcion: string;
   cantidad: number;
   precioUnitario: number;
+  fase: string;
+  // false cuando no hay un procedimiento equivalente en el catalogo de la clinica
+  // y se usa un precio sugerido que el odontologo debe confirmar.
+  desdeCatalogo: boolean;
+}
+
+// Tratamiento sugerido por hallazgo: palabras para buscarlo en el catalogo de
+// procedimientos de la clinica, precio sugerido si no existe y fase del plan.
+const TRATAMIENTO_POR_ESTADO: Partial<Record<EstadoDiente, { nombre: string; claves: string[]; precio: number; fase: string }>> = {
+  CARIES: { nombre: "Restauracion con resina", claves: ["resina", "restaura", "obtura"], precio: 30, fase: "FASE_1_HIGIENE" },
+  ENDODONCIA: { nombre: "Endodoncia / tratamiento de conducto", claves: ["endodon", "conducto"], precio: 80, fase: "FASE_2_QUIRURGICA" },
+  EXTRACCION_INDICADA: { nombre: "Exodoncia", claves: ["exodon", "extrac"], precio: 25, fase: "FASE_2_QUIRURGICA" },
+  CORONA: { nombre: "Corona", claves: ["corona"], precio: 140, fase: "FASE_3_REHABILITACION" },
+  IMPLANTE: { nombre: "Rehabilitacion sobre implante", claves: ["implant"], precio: 350, fase: "FASE_3_REHABILITACION" },
+};
+
+const PROFILAXIS = { nombre: "Profilaxis y tartrectomia", claves: ["profilax", "tartrect", "limpieza"], precio: 25, fase: "FASE_1_HIGIENE" };
+
+function buscarEnCatalogo(catalogo: ProcedimientoMedico[], claves: string[]): ProcedimientoMedico | undefined {
+  return catalogo.find((p) => {
+    // El presupuesto es en USD: un precio del catalogo en otra moneda no se mezcla.
+    if ((p as { activo?: boolean }).activo === false || (p.moneda && p.moneda !== "USD")) return false;
+    const nombre = p.nombre.toLowerCase();
+    return claves.some((c) => nombre.includes(c));
+  });
+}
+
+// Caras guardadas antes de V80 venian embebidas como "[Caras: O, M] nota".
+function separarCarasLegado(nota: string): { caras: string[]; nota: string } {
+  const match = nota.match(/^\[Caras:\s*([^\]]+)\]\s*(.*)$/);
+  if (!match) return { caras: [], nota };
+  return { caras: match[1].split(",").map((c) => c.trim()).filter(Boolean), nota: match[2] || "" };
+}
+
+function leerCarasJson(texto: string | null): string[] {
+  if (!texto) return [];
+  try {
+    const valor = JSON.parse(texto);
+    return Array.isArray(valor) ? valor : [];
+  } catch {
+    return [];
+  }
 }
 
 export interface OdontogramaProps {
@@ -74,6 +122,7 @@ export interface OdontogramaProps {
   nombrePaciente?: string;
   cedulaPaciente?: string;
   tasaBcv?: number;
+  onPlanCreado?: () => void;
 }
 
 export default function Odontograma({
@@ -81,6 +130,7 @@ export default function Odontograma({
   nombrePaciente,
   cedulaPaciente,
   tasaBcv = 36.5,
+  onPlanCreado,
 }: OdontogramaProps) {
   const [dientes, setDientes] = useState<OdontogramaDiente[] | null>(null);
   const [dienteSeleccionado, setDienteSeleccionado] = useState<number | null>(null);
@@ -99,6 +149,17 @@ export default function Odontograma({
   const [notaPresupuesto, setNotaPresupuesto] = useState("Plan de tratamiento sujeto a evolución clínica y radiográfica.");
   const [nuevoItemDesc, setNuevoItemDesc] = useState("");
   const [nuevoItemPrecio, setNuevoItemPrecio] = useState<number | "">("");
+  const [catalogo, setCatalogo] = useState<ProcedimientoMedico[]>([]);
+  const [nombrePlan, setNombrePlan] = useState("");
+  const [guardandoPlan, setGuardandoPlan] = useState(false);
+  const [errorPlan, setErrorPlan] = useState<string | null>(null);
+  const [historialDiente, setHistorialDiente] = useState<OdontogramaHistorialEntrada[] | null>(null);
+
+  useEffect(() => {
+    const tenantId = leerSesion()?.tenantId;
+    if (!tenantId) return;
+    listarProcedimientos(tenantId).then(setCatalogo).catch(() => setCatalogo([]));
+  }, []);
 
   const agregarItemManual = () => {
     if (!nuevoItemDesc.trim()) return;
@@ -110,6 +171,8 @@ export default function Odontograma({
         descripcion: nuevoItemDesc.trim(),
         cantidad: 1,
         precioUnitario: Math.max(0, precio),
+        fase: "FASE_1_HIGIENE",
+        desdeCatalogo: true,
       },
     ]);
     setNuevoItemDesc("");
@@ -156,18 +219,12 @@ export default function Odontograma({
     const existente = (dientes || []).find((d) => d.numeroFdi === fdi);
     setEstadoForm(existente?.estado || "SANO");
     
-    // Extraer caras si estaban guardadas en formato "[Caras: O, M] nota..."
-    const notaTexto = existente?.notas || "";
-    const matchCaras = notaTexto.match(/^\[Caras:\s*([^\]]+)\]\s*(.*)$/);
-    if (matchCaras) {
-      const caras = matchCaras[1].split(",").map((c) => c.trim()).filter(Boolean);
-      setCarasSeleccionadas(caras);
-      setNotasForm(matchCaras[2] || "");
-    } else {
-      setCarasSeleccionadas([]);
-      setNotasForm(notaTexto);
-    }
+    const legado = separarCarasLegado(existente?.notas || "");
+    setCarasSeleccionadas(existente?.caras && existente.caras.length > 0 ? existente.caras : legado.caras);
+    setNotasForm(legado.nota);
     setError(null);
+    setHistorialDiente(null);
+    listarHistorialOdontograma(pacienteId, fdi).then(setHistorialDiente).catch(() => setHistorialDiente([]));
   };
 
   const toggleCara = (caraId: string) => {
@@ -181,13 +238,10 @@ export default function Odontograma({
     setGuardando(true);
     setError(null);
     try {
-      let notaFinal = notasForm.trim();
-      if (carasSeleccionadas.length > 0) {
-        notaFinal = `[Caras: ${carasSeleccionadas.join(", ")}] ${notaFinal}`.trim();
-      }
       await actualizarDienteOdontograma(pacienteId, dienteSeleccionado, {
         estado: estadoForm,
-        notas: notaFinal || undefined,
+        notas: notasForm.trim() || undefined,
+        caras: carasSeleccionadas,
       });
       setDienteSeleccionado(null);
       cargar();
@@ -198,65 +252,78 @@ export default function Odontograma({
     }
   };
 
-  // Generar presupuesto automático basado en el estado de las piezas dentales
-  const generarPresupuesto = () => {
-    const items: PresupuestoItem[] = [];
-    let itemId = 1;
-
-    (dientes || []).forEach((d) => {
-      if (d.estado === "CARIES") {
-        items.push({
-          id: `item-${itemId++}`,
-          fdi: d.numeroFdi,
-          descripcion: `Restauración con Resina Fotocurada - Pieza #${d.numeroFdi} (${d.notas || "Caries activa"})`,
-          cantidad: 1,
-          precioUnitario: 30,
-        });
-      } else if (d.estado === "ENDODONCIA") {
-        items.push({
-          id: `item-${itemId++}`,
-          fdi: d.numeroFdi,
-          descripcion: `Tratamiento de Conducto / Endodoncia - Pieza #${d.numeroFdi}`,
-          cantidad: 1,
-          precioUnitario: 80,
-        });
-      } else if (d.estado === "CORONA") {
-        items.push({
-          id: `item-${itemId++}`,
-          fdi: d.numeroFdi,
-          descripcion: `Corona de Porcelana / Zirconio - Pieza #${d.numeroFdi}`,
-          cantidad: 1,
-          precioUnitario: 140,
-        });
-      } else if (d.estado === "EXTRACCION_INDICADA") {
-        items.push({
-          id: `item-${itemId++}`,
-          fdi: d.numeroFdi,
-          descripcion: `Exodoncia Dental Simple / Quirúrgica - Pieza #${d.numeroFdi}`,
-          cantidad: 1,
-          precioUnitario: 25,
-        });
-      } else if (d.estado === "IMPLANTE") {
-        items.push({
-          id: `item-${itemId++}`,
-          fdi: d.numeroFdi,
-          descripcion: `Rehabilitación Protésica sobre Implante - Pieza #${d.numeroFdi}`,
-          cantidad: 1,
-          precioUnitario: 350,
-        });
-      }
-    });
-
-    // Agregar opcionalmente profilaxis si hay items o como base
-    items.unshift({
-      id: `item-0`,
-      descripcion: "Profilaxis Dental & Tartrectomía con Ultrasonido",
+  // Presupuesto a partir de los hallazgos, con los precios del catalogo de la clinica.
+  const itemDesdeTratamiento = (
+    id: string,
+    t: { nombre: string; claves: string[]; precio: number; fase: string },
+    fdi?: number,
+    caras?: string[]
+  ): PresupuestoItem => {
+    const proc = buscarEnCatalogo(catalogo, t.claves);
+    const carasTexto = caras && caras.length > 0 ? caras.join("") : undefined;
+    return {
+      id,
+      fdi,
+      caras: carasTexto,
+      descripcion: `${proc ? proc.nombre : t.nombre}${fdi ? ` - Pieza #${fdi}` : ""}${carasTexto ? ` (${carasTexto})` : ""}`,
       cantidad: 1,
-      precioUnitario: 25,
-    });
+      precioUnitario: proc ? Number(proc.costo) : t.precio,
+      fase: t.fase,
+      desdeCatalogo: !!proc,
+    };
+  };
 
+  const generarPresupuesto = () => {
+    const items: PresupuestoItem[] = [itemDesdeTratamiento("item-0", PROFILAXIS)];
+    (dientes || []).forEach((d) => {
+      const t = TRATAMIENTO_POR_ESTADO[d.estado];
+      if (!t) return;
+      const caras = d.caras && d.caras.length > 0 ? d.caras : separarCarasLegado(d.notas || "").caras;
+      items.push(itemDesdeTratamiento(`item-${d.numeroFdi}`, t, d.numeroFdi, caras));
+    });
     setItemsPresupuesto(items);
+    setNombrePlan(`Plan integral ${new Date().toLocaleDateString("es-VE")}`);
+    setErrorPlan(null);
     setMostrarPresupuesto(true);
+  };
+
+  const guardarComoPlan = async () => {
+    if (itemsPresupuesto.length === 0 || !nombrePlan.trim()) return;
+    setGuardandoPlan(true);
+    setErrorPlan(null);
+    try {
+      const res = await fetch("/api/salud/odontologia/planes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${leerSesion()?.token || ""}`,
+        },
+        body: JSON.stringify({
+          pacienteId,
+          nombrePlan: nombrePlan.trim(),
+          notas: notaPresupuesto,
+          items: itemsPresupuesto.flatMap((it) =>
+            Array.from({ length: Math.max(1, it.cantidad) }, () => ({
+              fase: it.fase,
+              dienteFdi: it.fdi ?? null,
+              cara: it.caras ?? null,
+              procedimiento: it.descripcion,
+              costoUsd: it.precioUnitario,
+            }))
+          ),
+        }),
+      });
+      if (!res.ok) {
+        const cuerpo = await res.json().catch(() => null);
+        throw new Error(cuerpo?.message || `No se pudo guardar el plan (error ${res.status}).`);
+      }
+      setMostrarPresupuesto(false);
+      onPlanCreado?.();
+    } catch (e) {
+      setErrorPlan(e instanceof Error ? e.message : "No se pudo guardar el plan.");
+    } finally {
+      setGuardandoPlan(false);
+    }
   };
 
   const actualizarPrecioItem = (id: string, precio: number) => {
@@ -622,6 +689,35 @@ export default function Odontograma({
               />
             </div>
 
+            <div>
+              <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                Historial de la pieza
+              </span>
+              {historialDiente === null ? (
+                <p className="text-xs text-slate-400">Cargando historial...</p>
+              ) : historialDiente.length === 0 ? (
+                <p className="text-xs text-slate-400">Sin cambios registrados todavia.</p>
+              ) : (
+                <ul className="max-h-32 overflow-y-auto space-y-1 pr-1">
+                  {historialDiente.map((h) => {
+                    const caras = leerCarasJson(h.caras_json);
+                    return (
+                      <li key={h.id} className="flex items-start gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                        <span className="font-mono text-slate-400 shrink-0">
+                          {new Date(h.fecha_registro).toLocaleDateString("es-VE")}
+                        </span>
+                        <span>
+                          <span className="font-semibold">{ESTADO_INFO[h.estado]?.label || h.estado}</span>
+                          {caras.length > 0 && <span className="font-mono"> ({caras.join("")})</span>}
+                          {h.usuario && <span className="text-slate-400"> - {h.usuario}</span>}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
             {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
 
             <div className="flex items-center gap-2 pt-2">
@@ -724,6 +820,11 @@ export default function Odontograma({
                             Pieza #{it.fdi}
                           </span>
                         )}
+                        {!it.desdeCatalogo && (
+                          <span className="ml-2 text-[10px] font-semibold text-amber-600 dark:text-amber-400" title="No hay un procedimiento equivalente en el catalogo de la clinica">
+                            Precio sugerido, confirmar
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <div className="relative">
@@ -815,6 +916,24 @@ export default function Odontograma({
               />
             </div>
 
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                Nombre del plan
+              </label>
+              <input
+                type="text"
+                value={nombrePlan}
+                onChange={(e) => setNombrePlan(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            {errorPlan && (
+              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs font-semibold">
+                {errorPlan}
+              </div>
+            )}
+
             {/* Botones de acción */}
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/80 dark:border-white/10">
               <button
@@ -831,6 +950,15 @@ export default function Odontograma({
               >
                 <IconPrinter size={15} />
                 <span>Imprimir Plan Dental</span>
+              </button>
+              <button
+                type="button"
+                onClick={guardarComoPlan}
+                disabled={guardandoPlan || itemsPresupuesto.length === 0 || !nombrePlan.trim()}
+                className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs shadow-sm disabled:opacity-50"
+              >
+                <IconCheck size={15} />
+                <span>{guardandoPlan ? "Guardando..." : "Guardar como plan de tratamiento"}</span>
               </button>
             </div>
           </div>

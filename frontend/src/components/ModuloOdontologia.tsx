@@ -330,6 +330,7 @@ export default function ModuloOdontologia({
               nombrePaciente={pacienteSeleccionado.nombreCompleto}
               cedulaPaciente={pacienteSeleccionado.identificacion}
               tasaBcv={tasaBcvNum}
+              onPlanCreado={() => setPestanaActiva("planes")}
             />
           )}
 

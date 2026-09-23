@@ -3,7 +3,11 @@ package com.auroraplus.modules.salud.entities;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Estado vigente de un diente en el odontograma de un paciente (notación
@@ -51,6 +55,12 @@ public class OdontogramaDiente {
     @Column(columnDefinition = "TEXT")
     private String notas;
 
+    // Caras afectadas de la pieza (O, M, D, V, L/P). Los cambios quedan en
+    // salud_odontograma_historial; este registro sigue siendo el estado vigente.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "caras_json", columnDefinition = "jsonb")
+    private List<String> caras = new ArrayList<>();
+
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion = LocalDateTime.now();
 
@@ -70,6 +80,8 @@ public class OdontogramaDiente {
     public void setEstado(EstadoDiente estado) { this.estado = estado; }
     public String getNotas() { return notas; }
     public void setNotas(String notas) { this.notas = notas; }
+    public List<String> getCaras() { return caras; }
+    public void setCaras(List<String> caras) { this.caras = caras != null ? caras : new ArrayList<>(); }
     public LocalDateTime getFechaActualizacion() { return fechaActualizacion; }
     public void setFechaActualizacion(LocalDateTime fechaActualizacion) { this.fechaActualizacion = fechaActualizacion; }
 }

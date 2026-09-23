@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { leerSesion } from "../api";
 
 // El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
 // no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
@@ -49,7 +50,7 @@ export const EvolucionClinicaSesiones: React.FC<EvolucionClinicaSesionesProps> =
   const [conductometria, setConductometria] = useState("");
   const [medicacion, setMedicacion] = useState("");
   const [proximaCita, setProximaCita] = useState("");
-  const [odontologo, setOdontologo] = useState("Dra. Odontologo Titular");
+  const [odontologo, setOdontologo] = useState(() => leerSesion()?.username || "");
 
   useEffect(() => {
     cargarSesiones();
